@@ -124,32 +124,36 @@ class ConnectionDiscoveryManager(
                             }
                         } else if (msg.startsWith("HEARTBEAT:")) {
                             // 处理UDP心跳
-                            // 心跳格式：HEARTBEAT:<deviceUuid><设备电量%><设备类型>
-                            // UUID固定为36个字符（8-4-4-4-12格式），电量在UUID后直接拼接，设备类型在电量后直接拼接
+                            // 心跳格式：HEARTBEAT:<deviceUuid><<+/->设备电量%>,<设备类型>
+                            // UUID固定为36个字符（8-4-4-4-12格式）
                             val heartbeatPrefix = "HEARTBEAT:" 
                             if (msg.length > heartbeatPrefix.length + 36) {
                                 val remoteUuid = msg.substring(heartbeatPrefix.length, heartbeatPrefix.length + 36)
                                 val suffix = msg.substring(heartbeatPrefix.length + 36)
                                 
-                                // 解析电量和设备类型
-                                // 设备类型可能是pc或android，固定长度为2-7个字符
-                                var batteryStr = suffix
+                                // 解析充电状态、电量和设备类型
+                                // 格式：<+/-><电量>,<设备类型>
+                                var batteryLevel = 0
+                                var isCharging = false
                                 var deviceType = "unknown"
                                 
-                                // 尝试提取设备类型（从字符串末尾）
-                                if (suffix.endsWith("pc", ignoreCase = true)) {
-                                    batteryStr = suffix.substring(0, suffix.length - 2)
-                                    deviceType = "pc"
-                                } else if (suffix.endsWith("android", ignoreCase = true)) {
-                                    batteryStr = suffix.substring(0, suffix.length - 7)
-                                    deviceType = "android"
-                                }
-                                
-                                // 解析电量，确保在0-100之间
-                                val batteryLevel = try {
-                                    batteryStr.toInt().coerceIn(0, 100)
-                                } catch (e: NumberFormatException) {
-                                    0
+                                try {
+                                    // 提取充电符号
+                                    val chargeSign = suffix[0]
+                                    isCharging = chargeSign == '+'
+                                    
+                                    // 查找逗号位置
+                                    val commaIndex = suffix.indexOf(',')
+                                    if (commaIndex > 0) {
+                                        // 提取电量部分
+                                        val batteryPart = suffix.substring(1, commaIndex)
+                                        batteryLevel = batteryPart.toInt().coerceIn(0, 100)
+                                        
+                                        // 提取设备类型
+                                        deviceType = suffix.substring(commaIndex + 1)
+                                    }
+                                } catch (e: Exception) {
+                                    // 解析失败时使用默认值
                                 }
                                 
                                 // 仅已在认证表中的设备才接受心跳
@@ -167,7 +171,8 @@ class ConnectionDiscoveryManager(
                                             displayName,
                                             ip,
                                             old?.port ?: 23333,
-                                            batteryLevel
+                                            batteryLevel,
+                                            isCharging
                                         )
                                     }
                                     

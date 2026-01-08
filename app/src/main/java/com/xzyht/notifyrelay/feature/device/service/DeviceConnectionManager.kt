@@ -24,7 +24,8 @@ data class DeviceInfo(
     val displayName: String, // 前端显示名，优先蓝牙名，其次型号
     val ip: String,
     val port: Int,
-    var batteryLevel: Int = -1 // 设备电量，默认-1表示未知
+    var batteryLevel: Int = -1, // 设备电量，默认-1表示未知
+    var chargingStatus: Boolean = false // 充电状态，默认false
 )
 
 object DeviceConnectionManagerUtil {

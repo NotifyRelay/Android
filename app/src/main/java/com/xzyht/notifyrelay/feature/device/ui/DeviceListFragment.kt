@@ -3,6 +3,7 @@ package com.xzyht.notifyrelay.feature.device.ui
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -242,11 +243,51 @@ fun DeviceListScreen() {
         val batteryLevel = localBatteryLevel
         val progress = batteryLevel.toFloat() / 100f
         
-        // 根据电量百分比设置进度条颜色
-        val progressColor = when {
+        // 获取本机充电状态
+        val isCharging = remember {
+            BatteryUtils.isCharging(context)
+        }
+        
+        // 根据电量百分比设置基础颜色
+        val baseColor: Color = when {
             batteryLevel > 70 -> Color(0xFF4CAF50) // 绿色
             batteryLevel > 30 -> Color(0xFFFFC107) // 黄色
             else -> Color(0xFFF44336) // 红色
+        }
+        
+        // 充电状态下的闪烁动画
+        val is100Percent = batteryLevel == 100
+        val animateColor = if (isCharging && !is100Percent) {
+            // 充电中且非100%，实现闪烁效果
+            val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
+            val transitionValue = infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.InfiniteRepeatableSpec(
+                    animation = androidx.compose.animation.core.tween(durationMillis = 1000),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                )
+            )
+            
+            // 计算当前颜色：
+            // - 如果基础色已经是绿色，实现白绿闪烁
+            // - 否则，实现基础色到绿色的闪烁
+            val targetColor = if (baseColor == Color(0xFF4CAF50)) {
+                // 基础色是绿色，目标色改为白色
+                Color(0xFFFFFFFF)
+            } else {
+                // 基础色不是绿色，目标色为绿色
+                Color(0xFF4CAF50)
+            }
+            
+            baseColor.copy(
+                red = baseColor.red + (targetColor.red - baseColor.red) * transitionValue.value,
+                green = baseColor.green + (targetColor.green - baseColor.green) * transitionValue.value,
+                blue = baseColor.blue + (targetColor.blue - baseColor.blue) * transitionValue.value
+            )
+        } else {
+            // 未充电或100%，使用基础颜色
+            baseColor
         }
         
         if (isLandscape) {
@@ -263,7 +304,7 @@ fun DeviceListScreen() {
                         .fillMaxWidth()
                         .height(6.dp),
                     colors = ProgressIndicatorDefaults.progressIndicatorColors(
-                        foregroundColor = progressColor,
+                        foregroundColor = animateColor,
                         backgroundColor = colorScheme.surfaceVariant
                     )
                 )
@@ -305,7 +346,7 @@ fun DeviceListScreen() {
                 ) {
                     Text(
                         text = "本机",
-                        style = textStyles.body2.copy(color = if (selectedDevice == null) colorScheme.onPrimary else progressColor),
+                        style = textStyles.body2.copy(color = if (selectedDevice == null) colorScheme.onPrimary else animateColor),
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
@@ -320,23 +361,68 @@ fun DeviceListScreen() {
         val isDeleteConfirming = deleteConfirmStates[device.uuid] ?: false
         val context = LocalContext.current
         
-        // 使用 remember 缓存电量值，避免初始默认值导致跳动
+        // 使用 remember 缓存电量值和充电状态，避免初始默认值导致跳动
         val batteryLevel = remember {
             mutableStateOf(100)
         }
+        val isCharging = remember {
+            mutableStateOf(false)
+        }
+        
         // 只有当电量有效（不是默认值-1）且与当前值不同时才更新
         LaunchedEffect(device.batteryLevel) {
             if (device.batteryLevel != -1 && device.batteryLevel != batteryLevel.value) {
                 batteryLevel.value = device.batteryLevel.coerceIn(0, 100)
             }
         }
+        
+        // 更新充电状态
+        LaunchedEffect(device.chargingStatus) {
+            isCharging.value = device.chargingStatus
+        }
+        
         val progress = batteryLevel.value.toFloat() / 100f
         
-        // 根据电量百分比设置进度条颜色
-        val progressColor = when {
+        // 根据电量百分比设置基础颜色
+        val baseColor = when {
             batteryLevel.value > 70 -> Color(0xFF4CAF50) // 绿色
             batteryLevel.value > 30 -> Color(0xFFFFC107) // 黄色
             else -> Color(0xFFF44336) // 红色
+        }
+        
+        // 充电状态下的闪烁动画
+        val is100Percent = batteryLevel.value == 100
+        val animateColor = if (isCharging.value && !is100Percent) {
+            // 充电中且非100%，实现闪烁效果
+            val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
+            val transitionValue = infiniteTransition.animateFloat(
+                initialValue = 0f,
+                targetValue = 1f,
+                animationSpec = androidx.compose.animation.core.InfiniteRepeatableSpec(
+                    animation = androidx.compose.animation.core.tween(durationMillis = 1000),
+                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
+                )
+            )
+            
+            // 计算当前颜色：
+            // - 如果基础色已经是绿色，实现白绿闪烁
+            // - 否则，实现基础色到绿色的闪烁
+            val targetColor = if (baseColor == Color(0xFF4CAF50)) {
+                // 基础色是绿色，目标色改为白色
+                Color(0xFFFFFFFF)
+            } else {
+                // 基础色不是绿色，目标色为绿色
+                Color(0xFF4CAF50)
+            }
+            
+            baseColor.copy(
+                red = baseColor.red + (targetColor.red - baseColor.red) * transitionValue.value,
+                green = baseColor.green + (targetColor.green - baseColor.green) * transitionValue.value,
+                blue = baseColor.blue + (targetColor.blue - baseColor.blue) * transitionValue.value
+            )
+        } else {
+            // 未充电或100%，使用基础颜色
+            baseColor
         }
         
         // 添加2秒窗口期，超过时间自动清除确认状态
@@ -357,62 +443,62 @@ fun DeviceListScreen() {
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             if (isLandscape) {
-                // 横屏模式：垂直排列，进度条在按钮下方
-                Column(
-                    modifier = Modifier.weight(1f),
-                    horizontalAlignment = Alignment.Start,
-                    verticalArrangement = Arrangement.spacedBy(0.dp)
-                ) {
-                    // 水平进度条，宽度与按钮一致
-                    LinearProgressIndicator(
-                        progress = progress,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .height(6.dp),
-                        colors = ProgressIndicatorDefaults.progressIndicatorColors(
-                            foregroundColor = progressColor,
-                            backgroundColor = colorScheme.surfaceVariant
-                        )
-                    )
-                    Button(
-                        onClick = { onSelectDevice(device) },
-                        modifier = Modifier
-                            .defaultMinSize(minHeight = buttonMinHeight)
-                            .fillMaxWidth(),
-                        insideMargin = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                        colors = if (selectedDevice?.uuid == device.uuid) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors()
+                    // 横屏模式：垂直排列，进度条在按钮下方
+                    Column(
+                        modifier = Modifier.weight(1f),
+                        horizontalAlignment = Alignment.Start,
+                        verticalArrangement = Arrangement.spacedBy(0.dp)
                     ) {
-                        Text(
-                            device.displayName + if (!isOnline) " (离线)" else "",
-                            style = textStyles.body2.copy(color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else colorScheme.primary),
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        // 水平进度条，宽度与按钮一致
+                        LinearProgressIndicator(
+                            progress = progress,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .height(6.dp),
+                            colors = ProgressIndicatorDefaults.progressIndicatorColors(
+                                foregroundColor = animateColor,
+                                backgroundColor = colorScheme.surfaceVariant
+                            )
                         )
+                        Button(
+                            onClick = { onSelectDevice(device) },
+                            modifier = Modifier
+                                .defaultMinSize(minHeight = buttonMinHeight)
+                                .fillMaxWidth(),
+                            insideMargin = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                            colors = if (selectedDevice?.uuid == device.uuid) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors()
+                        ) {
+                            Text(
+                                device.displayName + if (!isOnline) " (离线)" else "",
+                                style = textStyles.body2.copy(color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else colorScheme.primary),
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
+                    }
+                } else {
+                    // 竖屏模式：进度条显示在按钮下方，独立布局
+                    Column(
+                        modifier = Modifier,
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                        verticalArrangement = Arrangement.spacedBy(2.dp)
+                    ) {
+                        Button(
+                            onClick = { onSelectDevice(device) },
+                            modifier = Modifier
+                                .defaultMinSize(minHeight = buttonMinHeight)
+                                .width(120.dp), // 固定宽度，避免文本裁剪
+                            insideMargin = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
+                            colors = if (selectedDevice?.uuid == device.uuid) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors()
+                        ) {
+                            Text(
+                                device.displayName + if (!isOnline) " (离线)" else "",
+                                style = textStyles.body2.copy(color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else animateColor),
+                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            )
+                        }
+                        // 竖屏下不显示进度条，仅通过按钮颜色体现电量
                     }
                 }
-            } else {
-                // 竖屏模式：进度条显示在按钮下方，独立布局
-                Column(
-                    modifier = Modifier,
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(2.dp)
-                ) {
-                    Button(
-                        onClick = { onSelectDevice(device) },
-                        modifier = Modifier
-                            .defaultMinSize(minHeight = buttonMinHeight)
-                            .width(120.dp), // 固定宽度，避免文本裁剪
-                        insideMargin = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-                        colors = if (selectedDevice?.uuid == device.uuid) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors()
-                    ) {
-                        Text(
-                            device.displayName + if (!isOnline) " (离线)" else "",
-                            style = textStyles.body2.copy(color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else progressColor),
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                        )
-                    }
-                    // 竖屏下不显示进度条，仅通过按钮颜色体现电量
-                }
-            }
             if (selectedDevice?.uuid == device.uuid) {
                 Spacer(Modifier.width(4.dp))
                 Button(

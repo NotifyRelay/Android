@@ -93,9 +93,11 @@ object HeartbeatSender {
         var socket: DatagramSocket? = null
         return try {
             socket = DatagramSocket()
-            // 心跳格式：HEARTBEAT:<deviceUuid><设备电量%>
+            // 心跳格式：HEARTBEAT:<deviceUuid><<+/->设备电量%>,<设备类型>
             val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
-            val payload = "HEARTBEAT:${manager.uuid}$batteryLevel"
+            val isCharging = BatteryUtils.isCharging(manager.contextInternal)
+            val chargeSign = if (isCharging) "+" else "-"
+            val payload = "HEARTBEAT:${manager.uuid}$chargeSign$batteryLevel,android"
             val buf = payload.toByteArray()
             val address = InetAddress.getByName(target.ip)
             val packet = DatagramPacket(buf, buf.size, address, HEARTBEAT_PORT)
