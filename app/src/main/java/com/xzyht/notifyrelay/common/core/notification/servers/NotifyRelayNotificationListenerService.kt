@@ -25,6 +25,7 @@ import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.R
 import com.xzyht.notifyrelay.common.core.sync.MessageSender
 import com.xzyht.notifyrelay.common.core.util.Logger
+import com.xzyht.notifyrelay.common.core.util.DataUrlUtils
 import com.xzyht.notifyrelay.common.data.StorageManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
@@ -219,16 +220,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         val sentTime: Long = System.currentTimeMillis() // 添加发送时间戳
     )
     
-    /**
-     * 将Drawable转换为Bitmap
-     */
-    private fun Drawable.toBitmap(): Bitmap {
-        val bitmap = Bitmap.createBitmap(intrinsicWidth, intrinsicHeight, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bitmap)
-        setBounds(0, 0, canvas.width, canvas.height)
-        draw(canvas)
-        return bitmap
-    }
+    // 使用通用工具将 Drawable 转换为 Bitmap（参照项目中其他模块的实现）
     
     /**
      * 处理媒体播放通知
@@ -251,7 +243,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 // 将Drawable转换为Bitmap
                 val drawable = largeIcon.loadDrawable(applicationContext)
                 if (drawable != null) {
-                    val bitmap = drawable.toBitmap()
+                    val bitmap = DataUrlUtils.drawableToBitmap(drawable)
                     val stream = ByteArrayOutputStream()
                     bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
                     val bytes = stream.toByteArray()
