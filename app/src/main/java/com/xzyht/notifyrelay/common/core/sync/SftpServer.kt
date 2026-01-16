@@ -67,19 +67,12 @@ object SftpServer {
     }
     
     private fun createFileSystemFactory(): FileSystemFactory {
-        return when {
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q -> {
-                // Android 10+ 使用VirtualFileSystemFactory
-                VirtualFileSystemFactory(Paths.get("/storage/emulated/0/"))
-            }
-            Build.VERSION.SDK_INT >= Build.VERSION_CODES.O -> {
-                // Android 8+ 使用NativeFileSystemFactory
-                NativeFileSystemFactory()
-            }
-            else -> {
-                // 旧版本使用VirtualFileSystemFactory
-                VirtualFileSystemFactory(Paths.get("/storage/emulated/0/"))
-            }
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            // Android 10+ 使用 VirtualFileSystemFactory
+            VirtualFileSystemFactory(Paths.get("/storage/emulated/0/"))
+        } else {
+            // Android O(26)+ 使用 NativeFileSystemFactory
+            NativeFileSystemFactory()
         }
     }
 
@@ -128,7 +121,10 @@ object SftpServer {
     enum class StartResult {
         SUCCESS,         // 启动成功
         ALREADY_RUNNING, // 已在运行
-        PERMISSION_DENIED // 权限不足
+        PERMISSION_DENIED, // 权限不足
+        PORT_IN_USE,     // 端口被占用
+        CONFIG_ERROR,    // 配置错误
+        FAILED           // 其他失败
     }
     
     data class SftpStartResult(
@@ -136,16 +132,17 @@ object SftpServer {
         val serverInfo: SftpServerInfo? = null
     )
     
+    @Synchronized
     fun start(sharedSecret: String, deviceName: String, context: Context): SftpStartResult {
         Logger.i(TAG, "SFTP 服务器启动请求，设备名称: $deviceName")
         if (isRunning.get()) {
             Logger.i(TAG, "SFTP 服务器已在运行，返回当前服务器信息")
             return SftpStartResult(StartResult.ALREADY_RUNNING, serverInfo)
         }
-        
+
         // 设置上下文
         this.applicationContext = context.applicationContext
-        
+
         // 检查文件管理权限
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             if (!android.os.Environment.isExternalStorageManager()) {
@@ -164,19 +161,26 @@ object SftpServer {
         Logger.d(TAG, "派生的用户名: $username")
 
         Logger.d(TAG, "开始在端口范围 $PORT_RANGE 中尝试启动 SFTP 服务器")
+
+        var lastException: Exception? = null
+        var seenBind = false
+        var seenPermDenied = false
+        var seenConfig = false
+
         PORT_RANGE.forEach { port ->
             try {
                 Logger.d(TAG, "尝试在端口 $port 启动 SFTP 服务器")
-                
+
                 // 创建文件系统工厂
                 val fileSystemFactory = createFileSystemFactory()
-                
+
                 sshd = ServerBuilder.builder().apply {
                     fileSystemFactory(fileSystemFactory)
                 }.build().apply {
                     this.port = port
                     keyPairProvider = PfxKeyPairProvider()
-                    publickeyAuthenticator = PublickeyAuthenticator { _, _, _ -> true }
+                    // 禁用公钥认证，强制使用派生的用户名/密码认证
+                    publickeyAuthenticator = PublickeyAuthenticator { _, _, _ -> false }
                     passwordAuthenticator = DerivedPasswordAuthenticator(username, passwordHash)
                     subsystemFactories = listOf(SftpSubsystemFactory())
                     start()
@@ -196,17 +200,42 @@ object SftpServer {
                 Logger.i(TAG, "SFTP server started: $ipAddress on port $port (derived from sharedSecret)")
                 return SftpStartResult(StartResult.SUCCESS, serverInfo)
             } catch (e: Exception) {
+                lastException = e
+                when (e) {
+                    is java.net.BindException -> seenBind = true
+                    is SecurityException -> seenPermDenied = true
+                    is IllegalArgumentException -> seenConfig = true
+                }
+
                 Logger.e(TAG, "Failed to start SFTP server on port $port", e)
+
+                // 如果构建了 sshd 实例但 start() 抛出异常，确保清理已分配的资源
+                try {
+                    sshd?.stop(true)
+                } catch (stopEx: Exception) {
+                    Logger.w(TAG, "Failed to stop partially-initialized sshd", stopEx)
+                }
+                sshd = null
+                isRunning.set(false)
             }
         }
-        Logger.e(TAG, "所有端口尝试失败，无法启动 SFTP 服务器")
-        return SftpStartResult(StartResult.PERMISSION_DENIED)
+
+        Logger.e(TAG, "所有端口尝试失败，无法启动 SFTP 服务器: lastException=${lastException?.javaClass?.name}")
+
+        return when {
+            seenPermDenied -> SftpStartResult(StartResult.PERMISSION_DENIED)
+            seenConfig -> SftpStartResult(StartResult.CONFIG_ERROR)
+            seenBind -> SftpStartResult(StartResult.PORT_IN_USE)
+            else -> SftpStartResult(StartResult.FAILED)
+        }
     }
 
+    @Synchronized
     fun stop() {
         try {
-            if (isRunning.get()) {
+            if (isRunning.get() || sshd != null) {
                 sshd?.stop(true)
+                sshd = null
                 isRunning.set(false)
                 serverInfo = null
                 com.xzyht.notifyrelay.common.core.util.Logger.i(TAG, "SFTP server stopped")

@@ -4,7 +4,10 @@ import android.content.Context
 import android.os.Build
 import android.os.Environment
 import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.ALREADY_RUNNING
+import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.CONFIG_ERROR
+import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.FAILED
 import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.PERMISSION_DENIED
+import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.PORT_IN_USE
 import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.SUCCESS
 import com.xzyht.notifyrelay.common.core.util.IntentUtils
 import com.xzyht.notifyrelay.common.core.util.Logger
@@ -267,6 +270,9 @@ object ProtocolRouter {
                                         }
 
                                         PERMISSION_DENIED -> TODO()
+                                        PORT_IN_USE -> TODO()
+                                        CONFIG_ERROR -> TODO()
+                                        FAILED -> TODO()
                                     }
                                 }
                                 "stop" -> {
