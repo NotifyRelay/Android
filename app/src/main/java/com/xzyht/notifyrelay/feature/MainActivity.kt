@@ -48,6 +48,7 @@ import com.xzyht.notifyrelay.common.core.repository.AppRepository
 import com.xzyht.notifyrelay.common.core.util.IntentUtils
 import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.common.core.util.DeviceInfoManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.common.core.util.ServiceManager
 import com.xzyht.notifyrelay.common.core.util.ToastUtils
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
@@ -158,6 +159,8 @@ class MainActivity : FragmentActivity() {
             return
         }
 
+        // 确保 DeviceConnectionManager 在首次启动时完成 UUID 初始化
+        DeviceConnectionManager.getInstance(this)
         // 生成设备信息文件，用于 ADB 连接检测
         DeviceInfoManager.generateDeviceInfoFile(this)
         

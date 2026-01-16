@@ -201,7 +201,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                         uuid = uuid,
                         publicKey = auth.publicKey,
                         sharedSecret = auth.sharedSecret,
-                        isAccepted = auth.isAccepted,
+                        isAccepted = true,
                         displayName = name,
                         lastIp = info?.ip ?: auth.lastIp ?: "",
                         lastPort = info?.port ?: auth.lastPort ?: 23333
@@ -358,12 +358,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 val s = String(decoded, Charsets.UTF_8)
                 val sanitized = sanitizeDisplayName(s)
                 // 确保解码后的名称不为空，使用默认值"错误空"兜底以便排除故障点
-                return if (sanitized.isNotEmpty()) sanitized else "错误空"
+                return sanitized.ifEmpty { "错误空" }
             }
         } catch (_: Exception) {}
         // 如果解码失败，尝试直接使用原字符串，确保不为空
         val sanitized = sanitizeDisplayName(encoded)
-        return if (sanitized.isNotEmpty()) sanitized else "错误空"
+        return sanitized.ifEmpty { "错误空" }
     }
 
     internal fun decodeDisplayNameFromTransportInternal(encoded: String): String = decodeDisplayNameFromTransport(encoded)
@@ -830,17 +830,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             Logger.w("死神-NotifyRelay", "removeAuthenticatedDevice failed: ${e.message}")
             return false
         }
-    }
-
-    // 设置加密类型（可通过UI调用）
-    fun setEncryptionType(type: EncryptionManager.EncryptionType) {
-        EncryptionManager.setEncryptionType(type)
-        //Logger.d("死神-NotifyRelay", "加密类型已设置为: $type")
-    }
-
-    // 获取当前加密类型
-    fun getCurrentEncryptionType(): EncryptionManager.EncryptionType {
-        return EncryptionManager.getCurrentEncryptionType()
     }
 
     // 发送超级岛ACK（包含接收的hash），用于发送方确认
