@@ -38,7 +38,9 @@ object MediaStoreHelper {
         val values = ContentValues().apply {
             put(MediaStore.Images.Media.DISPLAY_NAME, file.name)
             put(MediaStore.Images.Media.MIME_TYPE, "image/${file.extension}")
-            put(MediaStore.Images.Media.DATA, file.absolutePath)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                put(MediaStore.Images.Media.DATA, file.absolutePath)
+            }
             put(MediaStore.Images.Media.SIZE, file.length())
         }
         
@@ -53,7 +55,9 @@ object MediaStoreHelper {
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, file.name)
             put(MediaStore.Video.Media.MIME_TYPE, "video/${file.extension}")
-            put(MediaStore.Video.Media.DATA, file.absolutePath)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                put(MediaStore.Video.Media.DATA, file.absolutePath)
+            }
             put(MediaStore.Video.Media.SIZE, file.length())
         }
         
@@ -68,7 +72,9 @@ object MediaStoreHelper {
         val values = ContentValues().apply {
             put(MediaStore.Audio.Media.DISPLAY_NAME, file.name)
             put(MediaStore.Audio.Media.MIME_TYPE, "audio/${file.extension}")
-            put(MediaStore.Audio.Media.DATA, file.absolutePath)
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+                put(MediaStore.Audio.Media.DATA, file.absolutePath)
+            }
             put(MediaStore.Audio.Media.SIZE, file.length())
         }
         
@@ -80,17 +86,9 @@ object MediaStoreHelper {
     }
     
     private fun sendMediaScanBroadcast(context: Context, file: File) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
-            val mediaScanIntent = android.content.Intent(android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
-            val contentUri = Uri.fromFile(file)
-            mediaScanIntent.data = contentUri
-            context.sendBroadcast(mediaScanIntent)
-        } else {
-            context.sendBroadcast(
-                android.content.Intent(android.content.Intent.ACTION_MEDIA_MOUNTED,
-                Uri.parse("file://" + file.parent))
-            )
-        }
+        val mediaScanIntent = android.content.Intent(android.content.Intent.ACTION_MEDIA_SCANNER_SCAN_FILE)
+        mediaScanIntent.data = Uri.fromFile(file)
+        context.sendBroadcast(mediaScanIntent)
     }
     
     private fun File.isImage(): Boolean {
