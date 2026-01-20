@@ -1,5 +1,7 @@
 package com.xzyht.notifyrelay.common.core.util
 
+import androidx.compose.ui.graphics.Color
+
 /**
  * 电池图标转换器，根据电池电量和充电状态返回对应的Segoe MDL2图标
  */
@@ -46,6 +48,20 @@ object BatteryIconConverter {
                 clampedLevel >= 10 -> "\uE851" // 10-20%
                 else -> "\uE850" // 0-10%
             }
+        }
+    }
+
+    /**
+     * 根据电池电量返回对应的颜色（红、浅黄、绿）
+     * @param batteryLevel 电池电量，范围 0-100
+     * @return 对应的颜色
+     */
+    fun getBatteryColor(batteryLevel: Int): Color {
+        val clampedLevel = batteryLevel.coerceIn(0, 100)
+        return when {
+            clampedLevel >= 40 -> Color(0xFF00FFE1) // 40%+ 绿色
+            clampedLevel >= 20 -> Color(0xFFFF8C00) // 20%-40% 黄色
+            else -> Color(0xFFFF0000) // 20%- 红色
         }
     }
 }

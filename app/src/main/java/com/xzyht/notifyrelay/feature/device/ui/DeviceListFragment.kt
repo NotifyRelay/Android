@@ -15,7 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -264,7 +264,7 @@ fun DeviceListScreen() {
         } else {
             Modifier
                 .defaultMinSize(minHeight = buttonMinHeight)
-                .widthIn(min = 88.dp, max = 200.dp)
+                .wrapContentWidth()
                 .padding(end = 6.dp)
         }
         
@@ -281,22 +281,13 @@ fun DeviceListScreen() {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.Center,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier
                 ) {
-                    // 设备名称
+                    // 设备名称（不显示电池图标）
                     Text(
                         text = "本机",
                         style = textStyles.body2.copy(color = if (selectedDevice == null) colorScheme.onPrimary else colorScheme.primary),
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f)
-                    )
-                    // 电池图标
-                    Text(
-                        text = batteryIcon,
-                        fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(resId = com.xzyht.notifyrelay.R.font.segsmdl2)),
-                        fontSize = 16.sp,
-                        color = if (selectedDevice == null) colorScheme.onPrimary else colorScheme.primary,
-                        modifier = Modifier.padding(start = 8.dp)
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                     )
                 }
             }
@@ -368,7 +359,7 @@ fun DeviceListScreen() {
             } else {
                 Modifier
                     .defaultMinSize(minHeight = buttonMinHeight)
-                    .widthIn(min = 100.dp, max = 140.dp)
+                    .wrapContentWidth()
             }
             
             Column(
@@ -385,22 +376,24 @@ fun DeviceListScreen() {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
                     ) {
+                        // 只有在线设备显示电池图标
+                        if (isOnline) {
+                            // 电池图标
+                            Text(
+                                text = batteryIcon,
+                                fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(resId = com.xzyht.notifyrelay.R.font.segsmdl2)),
+                                fontSize = 16.sp,
+                                color = BatteryIconConverter.getBatteryColor(batteryLevel.value),
+                                modifier = Modifier.padding(end = 8.dp)
+                            )
+                        }
                         // 设备名称
                         Text(
                             text = device.displayName + if (!isOnline) " (离线)" else "",
                             style = textStyles.body2.copy(color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else colorScheme.primary),
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f)
-                        )
-                        // 电池图标
-                        Text(
-                            text = batteryIcon,
-                            fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(resId = com.xzyht.notifyrelay.R.font.segsmdl2)),
-                            fontSize = 16.sp,
-                            color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else colorScheme.primary,
-                            modifier = Modifier.padding(start = 8.dp)
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                         )
                     }
                 }
