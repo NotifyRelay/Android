@@ -3,7 +3,6 @@ package com.xzyht.notifyrelay.feature.device.ui
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import androidx.compose.animation.core.animateFloat
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,7 +12,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -36,7 +34,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
+import com.xzyht.notifyrelay.common.core.util.BatteryIconConverter
 import com.xzyht.notifyrelay.common.core.util.BatteryUtils
 import com.xzyht.notifyrelay.common.core.util.ToastUtils
 import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
@@ -47,8 +47,6 @@ import com.xzyht.notifyrelay.feature.device.ui.dialog.HandshakeRequestDialog
 import com.xzyht.notifyrelay.feature.device.ui.dialog.RejectedDevicesDialog
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
-import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -241,113 +239,64 @@ fun DeviceListScreen() {
     fun LocalDeviceButton() {
         // 使用真实本机电量
         val batteryLevel = localBatteryLevel
-        val progress = batteryLevel.toFloat() / 100f
         
         // 获取本机充电状态
         val isCharging = remember {
             BatteryUtils.isCharging(context)
         }
         
-        // 根据电量百分比设置基础颜色
-        val baseColor: Color = when {
-            batteryLevel > 70 -> Color(0xFF4CAF50) // 绿色
-            batteryLevel > 30 -> Color(0xFFFFC107) // 黄色
-            else -> Color(0xFFF44336) // 红色
-        }
+        // 获取电池图标
+        val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel, isCharging)
         
-        // 充电状态下的闪烁动画
-        val is100Percent = batteryLevel == 100
-        val animateColor = if (isCharging && !is100Percent) {
-            // 充电中且非100%，实现闪烁效果
-            val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
-            val transitionValue = infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.InfiniteRepeatableSpec(
-                    animation = androidx.compose.animation.core.tween(durationMillis = 1000),
-                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-                )
-            )
-            
-            // 计算当前颜色：
-            // - 如果基础色已经是绿色，实现白绿闪烁
-            // - 否则，实现基础色到绿色的闪烁
-            val targetColor = if (baseColor == Color(0xFF4CAF50)) {
-                // 基础色是绿色，目标色改为白色
-                Color(0xFFFFFFFF)
-            } else {
-                // 基础色不是绿色，目标色为绿色
-                Color(0xFF4CAF50)
-            }
-            
-            baseColor.copy(
-                red = baseColor.red + (targetColor.red - baseColor.red) * transitionValue.value,
-                green = baseColor.green + (targetColor.green - baseColor.green) * transitionValue.value,
-                blue = baseColor.blue + (targetColor.blue - baseColor.blue) * transitionValue.value
-            )
+        // 按钮颜色设置
+        val buttonColors = if (selectedDevice == null) {
+            ButtonDefaults.buttonColorsPrimary()
         } else {
-            // 未充电或100%，使用基础颜色
-            baseColor
+            ButtonDefaults.buttonColors()
         }
         
-        if (isLandscape) {
-            // 横屏模式：垂直排列，进度条在按钮下方
-            androidx.compose.foundation.layout.Column(
-                modifier = Modifier.padding(bottom = 4.dp),
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.spacedBy(0.dp)
+        // 统一横竖屏布局
+        val buttonModifier = if (isLandscape) {
+            Modifier
+                .defaultMinSize(minHeight = buttonMinHeight)
+                .fillMaxWidth()
+                .padding(bottom = 4.dp)
+        } else {
+            Modifier
+                .defaultMinSize(minHeight = buttonMinHeight)
+                .widthIn(min = 88.dp, max = 200.dp)
+                .padding(end = 6.dp)
+        }
+        
+        Column(
+            horizontalAlignment = if (isLandscape) Alignment.Start else Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(2.dp)
+        ) {
+            Button(
+                onClick = { onSelectDevice(null) },
+                modifier = buttonModifier,
+                insideMargin = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                colors = buttonColors
             ) {
-                // 水平进度条，宽度与按钮一致
-                LinearProgressIndicator(
-                    progress = progress,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(6.dp),
-                    colors = ProgressIndicatorDefaults.progressIndicatorColors(
-                        foregroundColor = animateColor,
-                        backgroundColor = colorScheme.surfaceVariant
-                    )
-                )
-                Button(
-                    onClick = { onSelectDevice(null) },
-                    modifier = Modifier
-                        .defaultMinSize(minHeight = buttonMinHeight)
-                        .fillMaxWidth(),
-                    insideMargin = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                    colors = if (selectedDevice == null) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors()
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.Center,
+                    modifier = Modifier.fillMaxWidth()
                 ) {
+                    // 设备名称
                     Text(
                         text = "本机",
                         style = textStyles.body2.copy(color = if (selectedDevice == null) colorScheme.onPrimary else colorScheme.primary),
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f)
                     )
-                }
-            }
-        } else {
-            // 竖屏模式：进度条显示在按钮下方，独立布局
-            androidx.compose.foundation.layout.Column(
-                modifier = Modifier.padding(end = 6.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp)
-            ) {
-                // 竖屏下不显示进度条，仅通过按钮文本颜色体现电量（不修改按钮背景）
-                val localBtnColors = if (selectedDevice == null) {
-                    ButtonDefaults.buttonColorsPrimary()
-                } else {
-                    ButtonDefaults.buttonColors()
-                }
-                Button(
-                    onClick = { onSelectDevice(null) },
-                    modifier = Modifier
-                        .defaultMinSize(minHeight = buttonMinHeight)
-                        .widthIn(min = 88.dp, max = 200.dp), // 自适应宽度，避免文本裁剪，允许在 88-200dp 之间扩展
-                    insideMargin = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-                    colors = localBtnColors
-                ) {
+                    // 电池图标
                     Text(
-                        text = "本机",
-                        style = textStyles.body2.copy(color = if (selectedDevice == null) colorScheme.onPrimary else animateColor),
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        text = batteryIcon,
+                        fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(resId = com.xzyht.notifyrelay.R.font.segsmdl2)),
+                        fontSize = 16.sp,
+                        color = if (selectedDevice == null) colorScheme.onPrimary else colorScheme.primary,
+                        modifier = Modifier.padding(start = 8.dp)
                     )
                 }
             }
@@ -381,48 +330,14 @@ fun DeviceListScreen() {
             isCharging.value = device.chargingStatus
         }
         
-        val progress = batteryLevel.value.toFloat() / 100f
+        // 获取电池图标
+        val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel.value, isCharging.value)
         
-        // 根据电量百分比设置基础颜色
-        val baseColor = when {
-            batteryLevel.value > 70 -> Color(0xFF4CAF50) // 绿色
-            batteryLevel.value > 30 -> Color(0xFFFFC107) // 黄色
-            else -> Color(0xFFF44336) // 红色
-        }
-        
-        // 充电状态下的闪烁动画
-        val is100Percent = batteryLevel.value == 100
-        val animateColor = if (isCharging.value && !is100Percent) {
-            // 充电中且非100%，实现闪烁效果
-            val infiniteTransition = androidx.compose.animation.core.rememberInfiniteTransition()
-            val transitionValue = infiniteTransition.animateFloat(
-                initialValue = 0f,
-                targetValue = 1f,
-                animationSpec = androidx.compose.animation.core.InfiniteRepeatableSpec(
-                    animation = androidx.compose.animation.core.tween(durationMillis = 1000),
-                    repeatMode = androidx.compose.animation.core.RepeatMode.Reverse
-                )
-            )
-            
-            // 计算当前颜色：
-            // - 如果基础色已经是绿色，实现白绿闪烁
-            // - 否则，实现基础色到绿色的闪烁
-            val targetColor = if (baseColor == Color(0xFF4CAF50)) {
-                // 基础色是绿色，目标色改为白色
-                Color(0xFFFFFFFF)
-            } else {
-                // 基础色不是绿色，目标色为绿色
-                Color(0xFF4CAF50)
-            }
-            
-            baseColor.copy(
-                red = baseColor.red + (targetColor.red - baseColor.red) * transitionValue.value,
-                green = baseColor.green + (targetColor.green - baseColor.green) * transitionValue.value,
-                blue = baseColor.blue + (targetColor.blue - baseColor.blue) * transitionValue.value
-            )
+        // 按钮颜色设置
+        val buttonColors = if (selectedDevice?.uuid == device.uuid) {
+            ButtonDefaults.buttonColorsPrimary()
         } else {
-            // 未充电或100%，使用基础颜色
-            baseColor
+            ButtonDefaults.buttonColors()
         }
         
         // 添加2秒窗口期，超过时间自动清除确认状态
@@ -438,67 +353,57 @@ fun DeviceListScreen() {
         }
         
         Row(
-            verticalAlignment = Alignment.Top, // 改为顶部对齐，避免进度条被裁剪
+            verticalAlignment = Alignment.Top,
             modifier = if (isLandscape) Modifier.padding(bottom = 4.dp) else Modifier.padding(end = 6.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            if (isLandscape) {
-                    // 横屏模式：垂直排列，进度条在按钮下方
-                    Column(
-                        modifier = Modifier.weight(1f),
-                        horizontalAlignment = Alignment.Start,
-                        verticalArrangement = Arrangement.spacedBy(0.dp)
+            // 统一横竖屏按钮布局
+            val buttonModifier = if (isLandscape) {
+                Modifier
+                    .defaultMinSize(minHeight = buttonMinHeight)
+                    .fillMaxWidth()
+            } else {
+                Modifier
+                    .defaultMinSize(minHeight = buttonMinHeight)
+                    .widthIn(min = 100.dp, max = 140.dp)
+            }
+            
+            Column(
+                modifier = if (isLandscape) Modifier.weight(1f) else Modifier,
+                horizontalAlignment = if (isLandscape) Alignment.Start else Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.spacedBy(2.dp)
+            ) {
+                Button(
+                    onClick = { onSelectDevice(device) },
+                    modifier = buttonModifier,
+                    insideMargin = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
+                    colors = buttonColors
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center,
+                        modifier = Modifier.fillMaxWidth()
                     ) {
-                        // 水平进度条，宽度与按钮一致
-                        LinearProgressIndicator(
-                            progress = progress,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .height(6.dp),
-                            colors = ProgressIndicatorDefaults.progressIndicatorColors(
-                                foregroundColor = animateColor,
-                                backgroundColor = colorScheme.surfaceVariant
-                            )
+                        // 设备名称
+                        Text(
+                            text = device.displayName + if (!isOnline) " (离线)" else "",
+                            style = textStyles.body2.copy(color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else colorScheme.primary),
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f)
                         )
-                        Button(
-                            onClick = { onSelectDevice(device) },
-                            modifier = Modifier
-                                .defaultMinSize(minHeight = buttonMinHeight)
-                                .fillMaxWidth(),
-                            insideMargin = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-                            colors = if (selectedDevice?.uuid == device.uuid) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors()
-                        ) {
-                            Text(
-                                device.displayName + if (!isOnline) " (离线)" else "",
-                                style = textStyles.body2.copy(color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else colorScheme.primary),
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                } else {
-                    // 竖屏模式：进度条显示在按钮下方，独立布局
-                    Column(
-                        modifier = Modifier,
-                        horizontalAlignment = Alignment.CenterHorizontally,
-                        verticalArrangement = Arrangement.spacedBy(2.dp)
-                    ) {
-                        Button(
-                            onClick = { onSelectDevice(device) },
-                            modifier = Modifier
-                                .defaultMinSize(minHeight = buttonMinHeight)
-                                .width(120.dp), // 固定宽度，避免文本裁剪
-                            insideMargin = PaddingValues(horizontal = 4.dp, vertical = 6.dp),
-                            colors = if (selectedDevice?.uuid == device.uuid) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors()
-                        ) {
-                            Text(
-                                device.displayName + if (!isOnline) " (离线)" else "",
-                                style = textStyles.body2.copy(color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else animateColor),
-                                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                            )
-                        }
-                        // 竖屏下不显示进度条，仅通过按钮颜色体现电量
+                        // 电池图标
+                        Text(
+                            text = batteryIcon,
+                            fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(resId = com.xzyht.notifyrelay.R.font.segsmdl2)),
+                            fontSize = 16.sp,
+                            color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else colorScheme.primary,
+                            modifier = Modifier.padding(start = 8.dp)
+                        )
                     }
                 }
+            }
+            
+            // 删除按钮
             if (selectedDevice?.uuid == device.uuid) {
                 Spacer(Modifier.width(4.dp))
                 Button(
