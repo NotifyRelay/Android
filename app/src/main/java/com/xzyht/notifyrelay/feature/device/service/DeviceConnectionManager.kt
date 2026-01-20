@@ -25,7 +25,8 @@ data class DeviceInfo(
     val ip: String,
     val port: Int,
     var batteryLevel: Int = -1, // 设备电量，默认-1表示未知
-    var chargingStatus: Boolean = false // 充电状态，默认false
+    // 充电状态：使用 '*' 表示未知（与 batteryLevel 使用 -1 表示未知一致），'1' 表示充电，'0' 表示未充电
+    var chargingStatus: Char = '*' // 充电状态，默认'*'表示未知
 )
 
 object DeviceConnectionManagerUtil {

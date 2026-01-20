@@ -11,8 +11,10 @@ object BatteryIconConverter {
      * @param isCharging 是否正在充电
      * @return 对应的Segoe MDL2图标Unicode字符
      */
-    fun getBatteryIcon(batteryLevel: Int, isCharging: Boolean): String {
+    fun getBatteryIcon(batteryLevel: Int, chargingState: Char): String {
         val clampedLevel = batteryLevel.coerceIn(0, 100)
+        // chargingState: '1' = charging, '0' = not charging, '*' = unknown -> treat as not charging for icon choice
+        val isCharging = chargingState == '1'
         
         return if (isCharging) {
             // 充电状态下的电池图标

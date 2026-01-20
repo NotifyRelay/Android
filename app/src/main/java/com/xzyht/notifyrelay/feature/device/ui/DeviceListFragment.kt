@@ -239,14 +239,14 @@ fun DeviceListScreen() {
     fun LocalDeviceButton() {
         // 使用真实本机电量
         val batteryLevel = localBatteryLevel
-        
-        // 获取本机充电状态
+
+        // 获取本机充电状态，使用三态字符：'1'充电，'0'未充电，'*'未知
         val isCharging = remember {
-            BatteryUtils.isCharging(context)
+            androidx.compose.runtime.mutableStateOf(if (BatteryUtils.isCharging(context)) '1' else '0')
         }
-        
-        // 获取电池图标
-        val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel, isCharging)
+
+        // 获取电池图标（BatteryIconConverter 接受 chargingState: Char）
+        val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel, isCharging.value)
         
         // 按钮颜色设置
         val buttonColors = if (selectedDevice == null) {
@@ -315,9 +315,10 @@ fun DeviceListScreen() {
             mutableStateOf(100)
         }
         val isCharging = remember {
-            mutableStateOf(false)
+            // 使用 device 提供的初始充电状态（三态Char），避免初始组合时切换导致闪烁
+            mutableStateOf(device.chargingStatus)
         }
-        
+
         // 只有当电量有效（不是默认值-1）且与当前值不同时才更新
         LaunchedEffect(device.batteryLevel) {
             if (device.batteryLevel != -1 && device.batteryLevel != batteryLevel.value) {
@@ -325,9 +326,11 @@ fun DeviceListScreen() {
             }
         }
         
-        // 更新充电状态
+        // 更新充电状态：仅当状态实际变化时才更新，避免闪烁；device.chargingStatus 为三态Char
         LaunchedEffect(device.chargingStatus) {
-            isCharging.value = device.chargingStatus
+            if (device.chargingStatus != '*' && device.chargingStatus != isCharging.value) {
+                isCharging.value = device.chargingStatus
+            }
         }
         
         // 获取电池图标

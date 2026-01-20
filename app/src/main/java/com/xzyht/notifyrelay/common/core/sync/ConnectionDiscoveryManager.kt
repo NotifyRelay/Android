@@ -134,7 +134,7 @@ class ConnectionDiscoveryManager(
                                 // 解析充电状态、电量和设备类型
                                 // 格式：<+/-><电量>,<设备类型>
                                 var batteryLevel = 0
-                                var isCharging = false
+                                var isCharging: Boolean = false
                                 var deviceType = "unknown"
                                 
                                 try {
@@ -172,7 +172,7 @@ class ConnectionDiscoveryManager(
                                             ip,
                                             old?.port ?: 23333,
                                             batteryLevel,
-                                            isCharging
+                                            if (isCharging) '1' else '0'
                                         )
                                     }
                                     
