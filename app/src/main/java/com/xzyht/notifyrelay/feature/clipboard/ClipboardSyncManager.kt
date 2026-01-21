@@ -177,14 +177,15 @@ object ClipboardSyncManager {
     fun handleClipboardMessage(jsonData: String, context: Context) {
         try {
             val json = org.json.JSONObject(jsonData)
-            val type = json.getString("clipboardType")
+            var type = json.getString("clipboardType")
             val content = json.getString("content")
             val time = json.optLong("time", 0)
             
-            // 避免处理旧消息
-            if (time <= lastSyncTime) {
-                Logger.d(TAG, "旧剪贴板消息，跳过处理")
-                return
+            // 将完整的MIME类型转换为内部使用的简化类型
+            if (type.startsWith("text/")) {
+                type = CLIPBOARD_TYPE_TEXT
+            } else if (type.startsWith("image/")) {
+                type = CLIPBOARD_TYPE_IMAGE
             }
             
             // 保存最后接收的内容、类型和时间，用于防止循环发送
@@ -379,6 +380,44 @@ object ClipboardSyncManager {
                 if (clipboardData != null) {
                     Logger.d(TAG, "手动同步：剪贴板读取成功")
                     
+                    val (type, content) = clipboardData
+                    
+                    // 避免发送内部更新的内容，防止循环发送
+                    if (isInternalUpdate) {
+                        Logger.d(TAG, "手动同步：内部更新剪贴板，跳过发送")
+                        isSyncing = false
+                        isManualSyncMode = previousMode
+                        return@launch
+                    }
+                    
+                    // 避免重复发送相同内容
+                    if (content == lastClipboardContent && type == lastClipboardType) {
+                        Logger.d(TAG, "手动同步：剪贴板内容未改变，跳过发送")
+                        isSyncing = false
+                        isManualSyncMode = previousMode
+                        return@launch
+                    }
+                    
+                    // 避免发送刚刚从远程接收的内容，防止循环发送
+                    if (content == lastReceivedContent && type == lastReceivedType) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastReceivedTime < ANTI_LOOP_DELAY) {
+                            Logger.d(TAG, "手动同步：剪贴板内容来自远程，跳过发送")
+                            isSyncing = false
+                            isManualSyncMode = previousMode
+                            return@launch
+                        }
+                    }
+                    
+                    // 避免频繁发送
+                    val now = System.currentTimeMillis()
+                    if (now - lastSyncTime < TimeUnit.SECONDS.toMillis(1)) {
+                        Logger.d(TAG, "手动同步：剪贴板内容同步过频繁，跳过发送")
+                        isSyncing = false
+                        isManualSyncMode = previousMode
+                        return@launch
+                    }
+                    
                     // 2. 切换到后台线程发送数据
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
@@ -389,8 +428,6 @@ object ClipboardSyncManager {
                                 return@launch
                             }
                             
-                            val (type, content) = clipboardData
-                            val now = System.currentTimeMillis()
                             val json = buildClipboardJsonString(type, content, now)
                             
                             for (device in devices) {
