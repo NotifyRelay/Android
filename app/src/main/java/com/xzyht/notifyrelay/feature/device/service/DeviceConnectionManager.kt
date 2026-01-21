@@ -644,6 +644,55 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             return false
         }
     }
+    
+    /**
+     * 公开API：发送剪贴板内容到指定设备。
+     * @param device 目标设备
+     * @param clipboardType 剪贴板类型（text/image）
+     * @param content 剪贴板内容
+     * @return 是否成功发送请求
+     */
+    fun sendClipboardToDevice(device: DeviceInfo, clipboardType: String, content: String): Boolean {
+        try {
+            val json = org.json.JSONObject().apply {
+                put("type", "clipboard")
+                put("clipboardType", clipboardType)
+                put("content", content)
+                put("time", System.currentTimeMillis())
+            }
+            com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
+            return true
+        } catch (_: Exception) {
+            return false
+        }
+    }
+    
+    /**
+     * 公开API：发送剪贴板内容到所有已认证的在线设备。
+     * @param clipboardType 剪贴板类型（text/image）
+     * @param content 剪贴板内容
+     * @return 是否成功发送请求
+     */
+    fun sendClipboardToAllDevices(clipboardType: String, content: String): Boolean {
+        try {
+            val devices = getAuthenticatedOnlineDevices()
+            if (devices.isEmpty()) return false
+            
+            val json = org.json.JSONObject().apply {
+                put("type", "clipboard")
+                put("clipboardType", clipboardType)
+                put("content", content)
+                put("time", System.currentTimeMillis())
+            }
+            
+            for (device in devices) {
+                com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
+            }
+            return true
+        } catch (_: Exception) {
+            return false
+        }
+    }
 
     init {
         // 启动图标同步过期请求清理协程

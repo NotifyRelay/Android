@@ -275,6 +275,7 @@ object ProtocolRouter {
                                         FAILED -> TODO()
                                     }
                                 }
+
                                 "stop" -> {
                                     Logger.i(TAG, "停止 SFTP 服务器")
                                     SftpServer.stop()
@@ -297,6 +298,20 @@ object ProtocolRouter {
                             Logger.e(TAG, "处理 SFTP 命令失败", e)
                         }
                     }
+                    true
+                }
+                "DATA_CLIPBOARD" -> {
+                    Logger.d(TAG, "接收到 DATA_CLIPBOARD 消息: $decrypted")
+                    // 处理剪贴板消息
+                    com.xzyht.notifyrelay.common.core.clipboard.ClipboardProcessor.process(
+                        context,
+                        com.xzyht.notifyrelay.common.core.clipboard.ClipboardProcessor.ClipboardInput(
+                            header = "DATA_CLIPBOARD",
+                            rawData = decrypted,
+                            sharedSecret = auth.sharedSecret,
+                            remoteUuid = remoteUuid
+                        )
+                    )
                     true
                 }
                 else -> {

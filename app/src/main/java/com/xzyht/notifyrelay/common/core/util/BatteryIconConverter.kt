@@ -10,7 +10,7 @@ object BatteryIconConverter {
     /**
      * 根据电池电量和充电状态获取对应的Segoe MDL2图标
      * @param batteryLevel 电池电量，范围 0-100
-     * @param isCharging 是否正在充电
+     * @param com.xzyht.notifyrelay.common.core.util.BatteryUtils.isCharging 是否正在充电
      * @return 对应的Segoe MDL2图标Unicode字符
      */
     fun getBatteryIcon(batteryLevel: Int, chargingState: Char): String {
