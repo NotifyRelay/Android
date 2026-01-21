@@ -11,6 +11,7 @@ import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.util.concurrent.TimeUnit
 
@@ -29,6 +30,11 @@ object ClipboardSyncManager {
     private var lastClipboardType: String = ""
     private var lastSyncTime: Long = 0
     private var isSyncing = false
+    private var lastReceivedContent: String = ""
+    private var lastReceivedType: String = ""
+    private var lastReceivedTime: Long = 0
+    private var isInternalUpdate = false // 标记是否为内部更新，用于防止循环发送
+    private val ANTI_LOOP_DELAY = 1000L // 防止循环发送的延迟时间（毫秒）
     
     /**
      * 初始化剪贴板同步管理器
@@ -43,6 +49,12 @@ object ClipboardSyncManager {
      */
     fun sendClipboardToDevices(deviceManager: DeviceConnectionManager, context: Context) {
         if (isSyncing) return
+        
+        // 如果是内部更新，直接返回，防止循环发送
+        if (isInternalUpdate) {
+            Logger.d(TAG, "内部更新剪贴板，跳过发送")
+            return
+        }
         
         isSyncing = true
         CoroutineScope(Dispatchers.IO).launch {
@@ -64,6 +76,16 @@ object ClipboardSyncManager {
                         //Logger.d(TAG, "剪贴板内容未改变，跳过发送")
                         isSyncing = false
                         return@launch
+                    }
+                    
+                    // 避免发送刚刚从远程接收的内容，防止循环发送
+                    if (content == lastReceivedContent && type == lastReceivedType) {
+                        val now = System.currentTimeMillis()
+                        if (now - lastReceivedTime < ANTI_LOOP_DELAY) {
+                            Logger.d(TAG, "剪贴板内容来自远程，跳过发送")
+                            isSyncing = false
+                            return@launch
+                        }
                     }
                     
                     // 避免频繁发送
@@ -111,7 +133,10 @@ object ClipboardSyncManager {
                 return
             }
             
-            Logger.d(TAG, "已接收剪贴板： $type")
+            // 保存最后接收的内容、类型和时间，用于防止循环发送
+            lastReceivedContent = content
+            lastReceivedType = type
+            lastReceivedTime = System.currentTimeMillis()
             
             // 更新本地剪贴板
             updateLocalClipboardContent(type, content, context)
@@ -142,6 +167,15 @@ object ClipboardSyncManager {
                             clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)) {
                             val text = item.text?.toString()
                             if (!text.isNullOrEmpty()) {
+                                // 检查是否为图片的data URL格式
+                                if (text.startsWith("data:image/") && text.contains(",")) {
+                                    // 从data URL中提取纯base64部分
+                                    val commaIndex = text.indexOf(',')
+                                    if (commaIndex > 0) {
+                                        val base64Image = text.substring(commaIndex + 1)
+                                        return Pair(CLIPBOARD_TYPE_IMAGE, base64Image)
+                                    }
+                                }
                                 return Pair(CLIPBOARD_TYPE_TEXT, text)
                             }
                         }
@@ -195,6 +229,7 @@ object ClipboardSyncManager {
      */
     private fun updateLocalClipboardContent(type: String, content: String, context: Context) {
         try {
+            isInternalUpdate = true
             clipboardManager?.let { cm ->
                 when (type) {
                     CLIPBOARD_TYPE_TEXT -> {
@@ -224,6 +259,12 @@ object ClipboardSyncManager {
             Logger.e(TAG, "更新剪贴板失败：访问被拒绝。应用可能未处于前台状态。", e)
         } catch (e: Exception) {
             Logger.e(TAG, "更新剪贴板失败", e)
+        } finally {
+            // 延迟重置内部更新标志，确保剪贴板变化监听器有足够时间触发
+            CoroutineScope(Dispatchers.IO).launch {
+                delay(500)
+                isInternalUpdate = false
+            }
         }
     }
     
