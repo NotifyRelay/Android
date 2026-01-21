@@ -69,17 +69,12 @@ object ClipboardSyncManager {
             return Pair(true, "手动同步模式")
         }
         
-        // 检查无障碍服务是否启用
-        if (isAccessibilityServiceEnabled(context)) {
-            return Pair(true, "无障碍服务已启用，允许后台同步")
-        }
-        
-        // 无障碍服务未启用，检查是否在前台
+        // 检查应用是否处于前台（Android 10+ 要求应用必须在前台才能访问剪贴板）
         if (PermissionHelper.isAppInForeground(context)) {
             return Pair(true, "应用处于前台")
         }
         
-        return Pair(false, "无障碍服务未启用且应用不在前台")
+        return Pair(false, "应用不在前台，需要通过透明Activity获取剪贴板")
     }
     
     /**

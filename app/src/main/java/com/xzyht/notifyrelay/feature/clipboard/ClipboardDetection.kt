@@ -61,7 +61,6 @@ class ClipboardDetection(
                     && event.text?.toString()?.contains(copyWord, true) == true)
                     || event.contentDescription == "Cut" || event.contentDescription == copyWord)
         ) {
-            Log.d(TAG,"Copy captured - 2")
             return true
         }
 
@@ -75,7 +74,6 @@ class ClipboardDetection(
                             && secondEvent.className == firstEvent.className) && secondEvent.text.toString() == firstEvent.text.toString()
                 typeViewSelectionChangeEvent.clear()
                 if (success) {
-                    Log.d(TAG,"Copy captured - 3")
                     return true
                 }
             }
@@ -91,7 +89,6 @@ class ClipboardDetection(
                 && previousEvent.text?.size == 1
                 && (previousEvent.text?.toString()?.contains(copyWord, true) == true
                         || previousEvent.contentDescription?.contains(copyWord, true) == true)) {
-                Log.d(TAG,"Copy captured - 1.1")
                 return true
             }
         }
@@ -99,7 +96,6 @@ class ClipboardDetection(
         // 检测Toast通知中的复制提示
         if (event.eventType == AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED && event.className?.toString()?.contains("Toast") == true
             && event.text != null && event.text?.toString()?.contains(AEvent.copyKeyWords) == true) {
-            Log.d(TAG,"Copy captured - 1.2")
             return true
         }
 
