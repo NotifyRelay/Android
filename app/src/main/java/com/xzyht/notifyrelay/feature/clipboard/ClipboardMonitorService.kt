@@ -74,9 +74,13 @@ class ClipboardMonitorService : Service() {
                     
                     // 每2秒检查一次剪贴板变化
                     delay(2000)
+                } catch (e: SecurityException) {
+                    Logger.w(TAG, "剪贴板访问权限被拒绝，应用可能不在前台", e)
+                    // 权限拒绝时，延长检查间隔，减少系统负担
+                    delay(5000)
                 } catch (e: Exception) {
                     Logger.e(TAG, "剪贴板监控服务发生错误", e)
-                    // 发生异常时，短暂延迟后继续监控
+                    // 其他异常时，短暂延迟后继续监控
                     delay(10000)
                 }
             }
@@ -86,8 +90,14 @@ class ClipboardMonitorService : Service() {
         clipboardManager?.addPrimaryClipChangedListener {
             Logger.d(TAG, "剪贴板内容已改变，正在发送到其他设备")
             serviceScope.launch {
-                deviceManager?.let {
-                    ClipboardSyncManager.sendClipboardToDevices(it, this@ClipboardMonitorService)
+                try {
+                    deviceManager?.let {
+                        ClipboardSyncManager.sendClipboardToDevices(it, this@ClipboardMonitorService)
+                    }
+                } catch (e: SecurityException) {
+                    Logger.w(TAG, "剪贴板变化监听：权限拒绝", e)
+                } catch (e: Exception) {
+                    Logger.e(TAG, "剪贴板变化监听：发生错误", e)
                 }
             }
         }

@@ -156,15 +156,21 @@ object ClipboardSyncManager {
     private fun getCurrentClipboardData(context: Context): Pair<String, String>? {
         try {
             clipboardManager?.let { cm ->
-                if (cm.hasPrimaryClip()) {
-                    val clip = cm.primaryClip
-                    val clipDescription = clip?.description
-                    val item = clip?.getItemAt(0)
-                    
-                    if (clipDescription != null && item != null) {
-                        // 处理文本类型剪贴板内容
-                        if (clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) ||
-                            clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)) {
+                // 尝试获取剪贴板内容，捕获可能的权限异常
+                val clip = cm.primaryClip
+                if (clip == null) {
+                    Logger.d(TAG, "剪贴板为空")
+                    return null
+                }
+                
+                val clipDescription = clip.description
+                val item = clip.getItemAt(0)
+                
+                if (clipDescription != null && item != null) {
+                    // 处理文本类型剪贴板内容
+                    if (clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) ||
+                        clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)) {
+                        try {
                             val text = item.text?.toString()
                             if (!text.isNullOrEmpty()) {
                                 // 检查是否为图片的data URL格式
@@ -178,19 +184,24 @@ object ClipboardSyncManager {
                                 }
                                 return Pair(CLIPBOARD_TYPE_TEXT, text)
                             }
+                        } catch (e: SecurityException) {
+                            Logger.w(TAG, "获取剪贴板文本失败：权限拒绝", e)
+                            return null
                         }
-                        
-                        // 处理图片类型剪贴板内容
-                        // 检查是否支持图片类型
-                        var hasImageType = false
-                        for (i in 0 until clipDescription.mimeTypeCount) {
-                            if (clipDescription.getMimeType(i).startsWith("image/")) {
-                                hasImageType = true
-                                break
-                            }
+                    }
+                    
+                    // 处理图片类型剪贴板内容
+                    // 检查是否支持图片类型
+                    var hasImageType = false
+                    for (i in 0 until clipDescription.mimeTypeCount) {
+                        if (clipDescription.getMimeType(i).startsWith("image/")) {
+                            hasImageType = true
+                            break
                         }
-                        
-                        if (hasImageType) {
+                    }
+                    
+                    if (hasImageType) {
+                        try {
                             // 尝试获取Bitmap
                             val imageBitmap: Bitmap? = item.uri?.let { uri ->
                                 try {
@@ -212,12 +223,15 @@ object ClipboardSyncManager {
                                     return Pair(CLIPBOARD_TYPE_IMAGE, base64Image)
                                 }
                             }
+                        } catch (e: SecurityException) {
+                            Logger.w(TAG, "获取剪贴板图片失败：权限拒绝", e)
+                            return null
                         }
                     }
                 }
             }
         } catch (e: SecurityException) {
-            Logger.e(TAG, "获取剪贴板数据失败：权限拒绝。应用可能不在前台。", e)
+            Logger.w(TAG, "获取剪贴板数据失败：权限拒绝。应用可能不在前台。", e)
         } catch (e: Exception) {
             Logger.e(TAG, "获取剪贴板数据失败", e)
         }
