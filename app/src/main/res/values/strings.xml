@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">NotifyRelay</string>
+    <string name="clipboard_accessibility_description">允许Notify Relay在后台自动同步剪贴板内容，实现设备间无缝剪贴板共享
+待开放:使用dkrivoruchko/ScreenStream进行屏幕镜像</string>
 </resources>

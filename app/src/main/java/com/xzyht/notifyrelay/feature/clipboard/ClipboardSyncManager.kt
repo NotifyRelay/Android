@@ -71,7 +71,7 @@ object ClipboardSyncManager {
         
         // 检查无障碍服务是否启用
         if (isAccessibilityServiceEnabled(context)) {
-            return Pair(true, "无障碍服务已启用")
+            return Pair(true, "无障碍服务已启用，允许后台同步")
         }
         
         // 无障碍服务未启用，检查是否在前台
@@ -88,6 +88,8 @@ object ClipboardSyncManager {
     fun init(context: Context) {
         clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         Logger.d(TAG, "剪贴板同步管理器已初始化")
+        // 初始化应用前后台检测器
+        PermissionHelper.AppForegroundDetector.initialize(context)
     }
     
     /**
@@ -206,12 +208,17 @@ object ClipboardSyncManager {
      * 获取当前剪贴板数据
      */
     private fun getCurrentClipboardData(context: Context): Pair<String, String>? {
+        // 先检查是否可以访问剪贴板
+        val (canSync, _) = canSyncClipboard(context)
+        if (!canSync) {
+            return null
+        }
+        
         try {
             clipboardManager?.let { cm ->
                 // 尝试获取剪贴板内容，捕获可能的权限异常
                 val clip = cm.primaryClip
                 if (clip == null) {
-                    Logger.d(TAG, "剪贴板为空")
                     return null
                 }
                 
@@ -237,7 +244,7 @@ object ClipboardSyncManager {
                                 return Pair(CLIPBOARD_TYPE_TEXT, text)
                             }
                         } catch (e: SecurityException) {
-                            Logger.w(TAG, "获取剪贴板文本失败：权限拒绝", e)
+                            // 忽略权限异常，直接返回null
                             return null
                         }
                     }
@@ -262,7 +269,7 @@ object ClipboardSyncManager {
                                         BitmapFactory.decodeStream(it)
                                     }
                                 } catch (e: Exception) {
-                                    Logger.e(TAG, "从URI解码图片Bitmap失败", e)
+                                    // 忽略异常，返回null
                                     null
                                 }
                             }
@@ -276,16 +283,16 @@ object ClipboardSyncManager {
                                 }
                             }
                         } catch (e: SecurityException) {
-                            Logger.w(TAG, "获取剪贴板图片失败：权限拒绝", e)
+                            // 忽略权限异常，直接返回null
                             return null
                         }
                     }
                 }
             }
         } catch (e: SecurityException) {
-            Logger.w(TAG, "获取剪贴板数据失败：权限拒绝。应用可能不在前台。", e)
+            // 忽略权限异常，直接返回null
         } catch (e: Exception) {
-            Logger.e(TAG, "获取剪贴板数据失败", e)
+            // 忽略其他异常，直接返回null
         }
         return null
     }

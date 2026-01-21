@@ -28,23 +28,24 @@ class ClipboardSyncActivity : AppCompatActivity() {
         
         // 添加一个空的View，确保Activity能正常获得焦点
         setContentView(android.R.layout.activity_list_item)
-        
         // 注册焦点变化监听器
         window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener {
                 oldFocus, newFocus -> 
-            Logger.d(TAG, "Global focus changed: old=$oldFocus, new=$newFocus")
             if (newFocus != null) {
                 performClipboardSyncOnUIThread()
             }
         }
+        // 设置窗口标志：不可触摸
+        window.setFlags(
+            android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
+            android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+        )
     }
     
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        Logger.d(TAG, "onWindowFocusChanged: hasFocus=$hasFocus")
         
         if (hasFocus) {
-            Logger.d(TAG, "✅ 窗口获得焦点，开始读取剪贴板")
             performClipboardSyncOnUIThread()
         }
     }
@@ -53,32 +54,24 @@ class ClipboardSyncActivity : AppCompatActivity() {
         // 在UI线程中直接执行，确保能访问剪贴板
         runOnUiThread {
             try {
-                Logger.d(TAG, "开始执行剪贴板同步（UI线程）")
-                
                 // 1. 直接在UI线程获取剪贴板数据
                 val clipboardData = getCurrentClipboardData()
                 
                 if (clipboardData != null) {
-                    Logger.d(TAG, "✅ 剪贴板读取成功")
-                    
                     // 2. 获取设备管理器实例
                     val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(this)
                     
                     // 3. 发送剪贴板数据
                     sendClipboardData(deviceManager, clipboardData)
                 } else {
-                    Logger.e(TAG, "❌ 剪贴板为空或无法获取")
                     Toast.makeText(this, "剪贴板为空", Toast.LENGTH_SHORT).show()
                 }
             } catch (e: SecurityException) {
-                Logger.e(TAG, "❌ 剪贴板访问被拒绝：${e.message}")
                 Toast.makeText(this, "剪贴板访问被拒绝", Toast.LENGTH_SHORT).show()
             } catch (e: Exception) {
-                Logger.e(TAG, "❌ 剪贴板同步失败：${e.message}", e)
                 Toast.makeText(this, "同步失败", Toast.LENGTH_SHORT).show()
             } finally {
                 // 无论成功与否，都立即结束Activity
-                Logger.d(TAG, "剪贴板同步执行完成，关闭Activity")
                 finish()
             }
         }
@@ -93,7 +86,6 @@ class ClipboardSyncActivity : AppCompatActivity() {
             
             // 检查剪贴板是否有内容
             if (!clipboardManager.hasPrimaryClip()) {
-                Logger.d(TAG, "剪贴板为空")
                 return null
             }
             
@@ -108,16 +100,14 @@ class ClipboardSyncActivity : AppCompatActivity() {
                     
                     val text = item.text?.toString()
                     if (!text.isNullOrEmpty()) {
-                        Logger.d(TAG, "获取到文本剪贴板：$text")
                         return Pair(CLIPBOARD_TYPE_TEXT, text)
                     }
                 }
             }
         } catch (e: SecurityException) {
-            Logger.e(TAG, "获取剪贴板失败：权限拒绝", e)
             throw e // 重新抛出，让调用者处理
         } catch (e: Exception) {
-            Logger.e(TAG, "获取剪贴板失败：${e.message}", e)
+            // 忽略异常，返回null
         }
         return null
     }

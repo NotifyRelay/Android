@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
+    android:accessibilityEventTypes="typeViewClicked|typeViewFocused|typeViewLongClicked|typeViewSelected|typeViewTextChanged|typeViewTextSelectionChanged|typeWindowContentChanged|typeWindowStateChanged"
+    android:accessibilityFeedbackType="feedbackGeneric"
+    android:canRequestTouchExplorationMode="true"
+    android:accessibilityFlags="flagDefault|flagRetrieveInteractiveWindows|flagRequestTouchExplorationMode"
+    android:canRetrieveWindowContent="true"
+    android:notificationTimeout="120"
+    android:description="@string/clipboard_accessibility_description" />
