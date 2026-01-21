@@ -69,9 +69,14 @@ object ClipboardSyncManager {
             return Pair(true, "手动同步模式")
         }
         
-        // 检查应用是否处于前台（Android 10+ 要求应用必须在前台才能访问剪贴板）
+        // 检查应用是否处于前台
         if (PermissionHelper.isAppInForeground(context)) {
             return Pair(true, "应用处于前台")
+        }
+        
+        // Android 10 (API 29) 之前可以在后台直接访问剪贴板
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+            return Pair(true, "Android 10 之前可以后台访问剪贴板")
         }
         
         return Pair(false, "应用不在前台，需要通过透明Activity获取剪贴板")
