@@ -6,6 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import com.xzyht.notifyrelay.common.PermissionHelper
 import com.xzyht.notifyrelay.common.core.sync.ProtocolSender
 import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
@@ -24,6 +25,7 @@ object ClipboardSyncManager {
     private const val CLIPBOARD_TYPE_TEXT = "text"
     private const val CLIPBOARD_TYPE_IMAGE = "image"
     private const val DATA_HEADER = "DATA_CLIPBOARD"
+    private const val ACCESSIBILITY_SERVICE_NAME = "com.xzyht.notifyrelay/com.xzyht.notifyrelay.feature.clipboard.ClipboardAccessiblityService"
     
     private var clipboardManager: ClipboardManager? = null
     private var lastClipboardContent: String = ""
@@ -33,8 +35,52 @@ object ClipboardSyncManager {
     private var lastReceivedContent: String = ""
     private var lastReceivedType: String = ""
     private var lastReceivedTime: Long = 0
-    private var isInternalUpdate = false // 标记是否为内部更新，用于防止循环发送
-    private val ANTI_LOOP_DELAY = 1000L // 防止循环发送的延迟时间（毫秒）
+    private var isInternalUpdate = false
+    private var isManualSyncMode = false // 手动同步模式，通过通知点击触发
+    private val ANTI_LOOP_DELAY = 1000L
+    
+    /**
+     * 检查无障碍服务是否已启用
+     */
+    fun isAccessibilityServiceEnabled(context: Context): Boolean {
+        return PermissionHelper.isAccessibilityServiceEnabled(context, ACCESSIBILITY_SERVICE_NAME)
+    }
+    
+    /**
+     * 设置手动同步模式
+     * @param enabled 是否启用手动同步模式
+     */
+    fun setManualSyncMode(context: Context, enabled: Boolean) {
+        isManualSyncMode = enabled
+        if (enabled) {
+            Logger.d(TAG, "已启用手动同步模式，将通过通知点击触发剪贴板同步")
+        } else {
+            Logger.d(TAG, "已禁用手动同步模式")
+        }
+    }
+    
+    /**
+     * 检查是否可以进行剪贴板同步
+     * @return Pair<Boolean, String> 第一个值为是否可以同步，第二个值为原因描述
+     */
+    private fun canSyncClipboard(context: Context): Pair<Boolean, String> {
+        // 如果是手动同步模式，允许同步
+        if (isManualSyncMode) {
+            return Pair(true, "手动同步模式")
+        }
+        
+        // 检查无障碍服务是否启用
+        if (isAccessibilityServiceEnabled(context)) {
+            return Pair(true, "无障碍服务已启用")
+        }
+        
+        // 无障碍服务未启用，检查是否在前台
+        if (PermissionHelper.isAppInForeground(context)) {
+            return Pair(true, "应用处于前台")
+        }
+        
+        return Pair(false, "无障碍服务未启用且应用不在前台")
+    }
     
     /**
      * 初始化剪贴板同步管理器
@@ -53,6 +99,12 @@ object ClipboardSyncManager {
         // 如果是内部更新，直接返回，防止循环发送
         if (isInternalUpdate) {
             Logger.d(TAG, "内部更新剪贴板，跳过发送")
+            return
+        }
+        
+        // 检查是否可以进行剪贴板同步
+        val (canSync, reason) = canSyncClipboard(context)
+        if (!canSync) {
             return
         }
         
@@ -291,5 +343,78 @@ object ClipboardSyncManager {
             put("content", content)
             put("time", time)
         }.toString()
+    }
+    
+    /**
+     * 手动触发剪贴板同步（通过通知点击调用）
+     * 此方法忽略前台检测，直接获取并发送当前剪贴板内容
+     */
+    fun manualSyncClipboard(deviceManager: DeviceConnectionManager, context: Context) {
+        if (isSyncing) {
+            Logger.d(TAG, "剪贴板同步正在进行中，跳过手动同步")
+            return
+        }
+        
+        Logger.d(TAG, "手动触发剪贴板同步")
+        
+        // 临时启用手动同步模式
+        val previousMode = isManualSyncMode
+        isManualSyncMode = true
+        
+        isSyncing = true
+        
+        // 先在UI线程获取剪贴板数据，然后再在后台线程发送
+        CoroutineScope(Dispatchers.Main).launch {
+            try {
+                // 1. 在UI线程获取剪贴板数据
+                val clipboardData = getCurrentClipboardData(context)
+                
+                if (clipboardData != null) {
+                    Logger.d(TAG, "手动同步：剪贴板读取成功")
+                    
+                    // 2. 切换到后台线程发送数据
+                    CoroutineScope(Dispatchers.IO).launch {
+                        try {
+                            var devices = emptyList<com.xzyht.notifyrelay.feature.device.service.DeviceInfo>()
+                            devices = deviceManager.getAuthenticatedOnlineDevices()
+                            if (devices.isEmpty()) {
+                                Logger.d(TAG, "没有可用于发送剪贴板内容的在线设备")
+                                return@launch
+                            }
+                            
+                            val (type, content) = clipboardData
+                            val now = System.currentTimeMillis()
+                            val json = buildClipboardJsonString(type, content, now)
+                            
+                            for (device in devices) {
+                                ProtocolSender.sendEncrypted(deviceManager, device, DATA_HEADER, json)
+                            }
+                            
+                            lastClipboardContent = content
+                            lastClipboardType = type
+                            lastSyncTime = now
+                            Logger.d(TAG, "手动同步：剪贴板已发送至 ${devices.size} 台设备")
+                        } catch (e: Exception) {
+                            Logger.e(TAG, "手动同步：发送剪贴板失败", e)
+                        } finally {
+                            isSyncing = false
+                            isManualSyncMode = previousMode
+                        }
+                    }
+                } else {
+                    Logger.d(TAG, "手动同步：剪贴板为空或无法获取")
+                    isSyncing = false
+                    isManualSyncMode = previousMode
+                }
+            } catch (e: SecurityException) {
+                Logger.e(TAG, "手动同步：剪贴板访问被拒绝", e)
+                isSyncing = false
+                isManualSyncMode = previousMode
+            } catch (e: Exception) {
+                Logger.e(TAG, "手动同步：获取剪贴板失败", e)
+                isSyncing = false
+                isManualSyncMode = previousMode
+            }
+        }
     }
 }

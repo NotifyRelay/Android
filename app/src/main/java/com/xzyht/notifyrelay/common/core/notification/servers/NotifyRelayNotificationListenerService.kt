@@ -1,32 +1,29 @@
 package com.xzyht.notifyrelay.common.core.notification.servers
 
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
-import android.app.Notification
+import android.graphics.Bitmap
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Build
 import android.os.IBinder
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.Canvas
-import android.graphics.drawable.Drawable
-import android.os.Parcelable
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Base64
-import android.view.View
 import androidx.core.app.NotificationCompat
-import androidx.core.graphics.drawable.IconCompat
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.R
 import com.xzyht.notifyrelay.common.core.sync.MessageSender
-import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.common.core.util.DataUrlUtils
+import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.common.data.StorageManager
+import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
+import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
@@ -560,25 +557,51 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(channel)
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        val notification = buildNotification()
+        startForeground(NOTIFY_ID, notification)
+    }
+
+    private fun buildNotification(): Notification {
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("通知监听/转发中")
             .setContentText(getNotificationText())
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .build()
-        // Android 12+ 及以上不再指定特殊前台服务类型，避免权限崩溃
-        startForeground(NOTIFY_ID, notification)
+
+        // 检查剪贴板同步状态，为通知主体添加点击事件
+        try {
+            val accessibilityEnabled = ClipboardSyncManager.isAccessibilityServiceEnabled(this)
+            
+            // 为通知主体添加点击事件，实现剪贴板同步功能
+            val syncIntent = Intent(this, ClipboardSyncReceiver::class.java).apply {
+                action = ClipboardSyncReceiver.ACTION_MANUAL_SYNC
+            }
+            val syncPendingIntent = PendingIntent.getBroadcast(
+                this, 0, syncIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            builder.setContentIntent(syncPendingIntent)
+        } catch (e: Exception) {
+            Logger.w("NotifyRelay", "添加剪贴板点击事件失败", e)
+        }
+
+        return builder.build()
     }
 
     private fun getNotificationText(): String {
         // 使用 DeviceConnectionManager 提供的线程安全方法获取在线且已认证的设备数量
         val onlineDevices = try { connectionManager.getAuthenticatedOnlineCount() } catch (_: Exception) { 0 }
+        val accessibilityEnabled = try { ClipboardSyncManager.isAccessibilityServiceEnabled(this) } catch (_: Exception) { false }
         //Logger.d("黑影 NotifyRelay", "getNotificationText: authenticatedOnlineCount=$onlineDevices")
 
         // 优先显示设备连接数，如果有设备连接
         if (onlineDevices > 0) {
-            return "当前${onlineDevices}台设备已连接"
+            return if (!accessibilityEnabled) {
+                "当前${onlineDevices}台设备已连接，点击以同步剪贴板"
+            } else {
+                "当前${onlineDevices}台设备已连接"
+            }
         }
 
         // 没有设备连接时，显示网络状态
@@ -590,30 +613,24 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         val isWifiDirect = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_WIFI_P2P) == true
 
         // 如果不是WiFi、以太网或WLAN直连，则认为是移动数据等非局域网
-        if (!isWifi && !isEthernet && !isWifiDirect) {
-            return "非局域网连接"
+        val baseText = if (!isWifi && !isEthernet && !isWifiDirect) {
+            "非局域网连接"
+        } else {
+            "无设备在线"
         }
 
-        return "无设备在线"
+        // 无障碍服务未启用时，添加点击提示
+        return if (!accessibilityEnabled) {
+            "$baseText，点击通知同步剪贴板"
+        } else {
+            baseText
+        }
     }
 
     private fun updateNotification() {
-        //Logger.d("黑影 NotifyRelay", "updateNotification called")
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        // 根据是否有转发条件决定标题
-        val canForward = getNotificationText().let { text ->
-            !text.contains("无设备在线") && !text.contains("非局域网连接")
-        }
-        val title = if (canForward) "通知监听/转发中" else "通知监听中"
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(getNotificationText())
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .build()
+        val notification = buildNotification()
         manager.notify(NOTIFY_ID, notification)
-        //Logger.d("黑影 NotifyRelay", "notify posted: id=$NOTIFY_ID, text=${getNotificationText()}")
     }
 
     // 保留通知历史，不做移除处理

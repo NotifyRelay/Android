@@ -126,6 +126,9 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 初始化前后台检测器
+        PermissionHelper.AppForegroundDetector.initialize(this)
+
         // 先设置沉浸式虚拟键和状态栏，然后立即显示UI
         WindowCompat.setDecorFitsSystemWindows(this.window, false)
         this.window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)

@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 /**
  * 剪贴板监控服务
  * 负责在后台持续监听剪贴板变化并同步到其他设备
+ * 通知管理由 NotifyRelayNotificationListenerService 的前台服务统一处理
  */
 class ClipboardMonitorService : Service() {
     private val TAG = "ClipboardMonitorService"

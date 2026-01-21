@@ -1,5 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.ui.filter
 
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -26,21 +28,22 @@ import com.xzyht.notifyrelay.common.core.sync.ProtocolSender
 import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.common.core.util.MediaControlUtil
 import com.xzyht.notifyrelay.common.core.util.ToastUtils
+import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.ui.GlobalSelectedDeviceHolder
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.MediaIslandCompose
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * 音频转发功能页面，与远程通知过滤同级
+ * 设备互联功能页面，提供设备间的各种互联功能
+ * 包括音频转发、媒体控制、剪贴板同步等功能
  */
 @Composable
-fun UIAudioForwarding() {
+fun DeviceInterconnect() {
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
@@ -57,6 +60,11 @@ fun UIAudioForwarding() {
 
     // 移除媒体会话相关状态
     var islandEnabled by remember { mutableStateOf(RemoteMediaSessionManager.isEnabled(context)) }
+    
+    // 无障碍服务状态
+    var accessibilityEnabled by remember {
+        mutableStateOf(ClipboardSyncManager.isAccessibilityServiceEnabled(context))
+    }
 
     Column(
         modifier = Modifier
@@ -67,14 +75,14 @@ fun UIAudioForwarding() {
     ) {
         // 标题
         Text(
-            text = "音频转发",
+            text = "设备互联",
             style = textStyles.title1,
             color = colorScheme.onSurface
         )
         
         // 说明文本
         Text(
-            text = "向当前选中的设备发送音频转发请求",
+            text = "管理设备间的互联功能，包括音频转发、媒体控制和剪贴板同步",
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary
         )
@@ -90,20 +98,53 @@ fun UIAudioForwarding() {
             color = colorScheme.onSurface
         )
         
+        // 无障碍服务状态卡片
+        Column(
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(
+                text = "无障碍服务",
+                style = textStyles.title2,
+                color = colorScheme.onSurface
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = if (accessibilityEnabled) {
+                    "已启用 - 剪贴板同步功能正常运行中"
+                } else {
+                    "未启用 - 剪贴板同步需要无障碍服务支持"
+                },
+                style = textStyles.body2,
+                color = if (accessibilityEnabled) colorScheme.primary else colorScheme.error
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Button(
+                onClick = {
+                    try {
+                        val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
+                        intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                        context.startActivity(intent)
+                    } catch (e: Exception) {
+                        Logger.e("DeviceInterconnect", "打开无障碍设置失败", e)
+                        ToastUtils.showShortToast(context, "打开设置失败，请手动前往设置")
+                    }
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(if (accessibilityEnabled) "重新设置" else "启用无障碍服务")
+            }
+        }
+        
         // 音频转发按钮
         Button(
             onClick = {
                 if (selectedDevice == null) {
-                    // 如果选中的是本机，显示提示
                     ToastUtils.showShortToast(context, "当前选中的是本机，无法转发音频到本机")
                     return@Button
                 }
                 
                 try {
-                    // 获取设备连接管理器实例
                     val deviceManager = DeviceConnectionManager.getInstance(context)
-                    
-                    // 直接向当前选中的设备发送音频转发请求
                     val success = deviceManager.requestAudioForwarding(selectedDevice)
                     
                     if (success) {
@@ -120,7 +161,9 @@ fun UIAudioForwarding() {
         ) {
             Text("开始音频转发")
         }
-                Row(
+        
+        // 远端媒体超级岛显示开关
+        Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
@@ -148,10 +191,11 @@ fun UIAudioForwarding() {
                 }
             )
         }
+        
         // 媒体控制标题
         Text(
             text = "媒体控制",
-            style = textStyles.title1,
+            style = textStyles.title2,
             color = colorScheme.onSurface
         )
         
@@ -172,7 +216,6 @@ fun UIAudioForwarding() {
                 onClick = {
                     try {
                         if (selectedDevice == null) {
-                            // 控制本机媒体，优先使用通知中的 PendingIntent 触发
                             val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
                             if (sbn != null) {
                                 MediaControlUtil.triggerPreviousFromNotification(sbn)
@@ -181,7 +224,6 @@ fun UIAudioForwarding() {
                                 ToastUtils.showShortToast(context, "未找到媒体通知，请启用通知监听服务或使用 PendingIntent")
                             }
                         } else {
-                            // 向其他设备发送指令
                             val deviceManager = DeviceConnectionManager.getInstance(context)
                             val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"previous\"}"
                             ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
@@ -202,7 +244,6 @@ fun UIAudioForwarding() {
                 onClick = {
                     try {
                         if (selectedDevice == null) {
-                            // 控制本机媒体，优先使用通知中的 PendingIntent 触发
                             val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
                             if (sbn != null) {
                                 MediaControlUtil.triggerPlayPauseFromNotification(sbn)
@@ -211,7 +252,6 @@ fun UIAudioForwarding() {
                                 ToastUtils.showShortToast(context, "未找到媒体通知，请启用通知监听服务或使用 PendingIntent")
                             }
                         } else {
-                            // 向其他设备发送指令
                             val deviceManager = DeviceConnectionManager.getInstance(context)
                             val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"playPause\"}"
                             ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
@@ -232,7 +272,6 @@ fun UIAudioForwarding() {
                 onClick = {
                     try {
                         if (selectedDevice == null) {
-                            // 控制本机媒体，优先使用通知中的 PendingIntent 触发
                             val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
                             if (sbn != null) {
                                 MediaControlUtil.triggerNextFromNotification(sbn)
@@ -241,7 +280,6 @@ fun UIAudioForwarding() {
                                 ToastUtils.showShortToast(context, "未找到媒体通知，请启用通知监听服务或使用 PendingIntent")
                             }
                         } else {
-                            // 向其他设备发送指令
                             val deviceManager = DeviceConnectionManager.getInstance(context)
                             val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"next\"}"
                             ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
@@ -269,13 +307,12 @@ fun UIAudioForwarding() {
             text = "1. 请确保目标设备已连接且在线\n" +
                     "2. 音频转发功能需要目标设备支持\n" +
                     "3. 目标设备暂时只能是pc,且需要adb调试开启,因为转发利用的是scrcpy\n" +
-                    "4. 媒体控制功能支持播放/暂停、上一首、下一首操作",
+                    "4. 媒体控制功能支持播放/暂停、上一首、下一首操作\n" +
+                    "5. 剪贴板同步：启用无障碍服务后自动同步；否则可手动点击通知栏按钮同步",
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary
         )
 
         Spacer(modifier = Modifier.height(16.dp))
-
-
     }
 }

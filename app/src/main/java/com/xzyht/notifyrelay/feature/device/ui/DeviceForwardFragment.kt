@@ -127,7 +127,7 @@ fun DeviceForwardScreen(
         }
     }
     // TabRow相关状态
-    val tabTitles = listOf("远程过滤", "本地过滤", "音频转发", "超级岛", "聊天测试")
+    val tabTitles = listOf("远程过滤", "本地过滤", "设备互联", "超级岛", "聊天测试")
     
     // Pager相关状态 - 使用Pager状态作为唯一数据源
     val pagerState = rememberPagerState(initialPage = 0) {
@@ -224,8 +224,8 @@ fun DeviceForwardScreen(
                         UILocalFilter()
                     }
                     2 -> {
-                        // 音频转发 Tab
-                        com.xzyht.notifyrelay.feature.notification.ui.filter.UIAudioForwarding()
+                        // 设备互联 Tab
+                        com.xzyht.notifyrelay.feature.notification.ui.filter.DeviceInterconnect()
                     }
                     3 -> {
                         // 超级岛设置 Tab

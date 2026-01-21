@@ -10,6 +10,7 @@ import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.xzyht.notifyrelay.common.core.util.IntentUtils
+import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.common.core.util.ToastUtils
 
 /**
@@ -295,5 +296,98 @@ object PermissionHelper {
         return kotlin.runCatching {
             context.packageManager.getPermissionInfo("com.android.permission.GET_INSTALLED_APPS", 0).packageName == "com.lbe.security.miui"
         }.getOrElse { false }
+    }
+
+    /**
+     * 检查指定的无障碍服务是否已启用。
+     *
+     * @param context 用于访问 Settings.Secure 的上下文。
+     * @param accessibilityServiceName 无障碍服务的完整名称，格式为 "包名/服务类全限定名"。
+     * @return 如果该无障碍服务已在系统设置中启用则返回 true，否则返回 false。
+     */
+    fun isAccessibilityServiceEnabled(context: Context, accessibilityServiceName: String?): Boolean {
+        if (accessibilityServiceName.isNullOrEmpty()) return false
+        val enabledServices = Settings.Secure.getString(
+            context.contentResolver,
+            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        )
+        return enabledServices?.contains(accessibilityServiceName) == true
+    }
+
+    /**
+     * 检查应用是否处于前台。
+     *
+     * 通过 ActivityLifecycleCallbacks 计数法判断应用当前是否在前台运行。
+     * 这是目前最可靠且实时的方案，无需任何权限。
+     *
+     * @param context 用于注册 ActivityLifecycleCallbacks 的上下文。
+     * @return 如果应用处于前台则返回 true，否则返回 false。
+     */
+    fun isAppInForeground(context: Context): Boolean {
+        return AppForegroundDetector.isForeground()
+    }
+    
+    /**
+     * 应用前后台检测器
+     * 使用 ActivityLifecycleCallbacks 计数法，实时准确，无需权限
+     */
+    object AppForegroundDetector {
+        private var activityStartCount = 0
+        private var isForeground = false
+        private var isInitialized = false
+        private val listeners = mutableListOf<(Boolean) -> Unit>()
+        
+        @Synchronized
+        fun initialize(context: Context) {
+            if (isInitialized) return
+            isInitialized = true
+            
+            try {
+                val application = context.applicationContext as? android.app.Application
+                application?.registerActivityLifecycleCallbacks(object : android.app.Application.ActivityLifecycleCallbacks {
+                    override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
+                    override fun onActivityStarted(activity: android.app.Activity) {
+                        if (activityStartCount == 0) {
+                            // 从后台进入前台
+                            isForeground = true
+                            notifyListeners(true)
+                        }
+                        activityStartCount++
+                    }
+                    
+                    override fun onActivityResumed(activity: android.app.Activity) {}
+                    override fun onActivityPaused(activity: android.app.Activity) {}
+                    override fun onActivityStopped(activity: android.app.Activity) {
+                        activityStartCount--
+                        if (activityStartCount == 0) {
+                            // 进入后台
+                            isForeground = false
+                            notifyListeners(false)
+                        }
+                    }
+                    
+                    override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
+                    override fun onActivityDestroyed(activity: android.app.Activity) {}
+                })
+            } catch (e: Exception) {
+                Logger.e("AppForegroundDetector", "初始化失败", e)
+            }
+        }
+        
+        fun isForeground(): Boolean {
+            return isForeground
+        }
+        
+        fun addListener(listener: (Boolean) -> Unit) {
+            listeners.add(listener)
+        }
+        
+        fun removeListener(listener: (Boolean) -> Unit) {
+            listeners.remove(listener)
+        }
+        
+        private fun notifyListeners(foreground: Boolean) {
+            listeners.forEach { it(foreground) }
+        }
     }
 }

@@ -70,12 +70,32 @@
             android:name=".feature.device.receiver.RemoteNotificationClickReceiver"
             android:exported="false" />
         
+        <!-- 剪贴板同步广播接收器 -->
+        <receiver
+            android:name=".feature.clipboard.ClipboardSyncReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.xzyht.notifyrelay.CLIPBOARD_MANUAL_SYNC" />
+                <action android:name="com.xzyht.notifyrelay.CLIPBOARD_OPEN_SETTINGS" />
+            </intent-filter>
+        </receiver>
+        
         <!-- 剪贴板监控服务 -->
         <service
             android:name=".feature.clipboard.ClipboardMonitorService"
             android:exported="true"
             android:foregroundServiceType="dataSync"
             android:stopWithTask="false" />
+            
+        <!-- 剪贴板同步透明Activity -->
+        <activity
+            android:name=".feature.clipboard.ClipboardSyncActivity"
+            android:exported="true"
+            android:theme="@style/TransparentTheme"
+            android:launchMode="singleInstance"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="" />
     </application>
 
 </manifest>

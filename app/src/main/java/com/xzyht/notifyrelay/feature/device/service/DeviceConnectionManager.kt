@@ -73,21 +73,12 @@ data class AuthInfo(
 class DeviceConnectionManager(private val context: android.content.Context) {
     // 单例实例
     companion object {
-        @Volatile
-        private var instance: DeviceConnectionManager? = null
-        
         /**
          * 获取单例实例
+         * 内部使用DeviceConnectionManagerSingleton确保全局唯一实例
          */
         fun getInstance(context: android.content.Context): DeviceConnectionManager {
-            if (instance == null) {
-                synchronized(this) {
-                    if (instance == null) {
-                        instance = DeviceConnectionManager(context.applicationContext)
-                    }
-                }
-            }
-            return instance!!
+            return DeviceConnectionManagerSingleton.getDeviceManager(context)
         }
     }
     // 获取本地设备显示名称，优先级按要求：1. 蓝牙 -> 2. Settings.Secure(bluetooth_name) -> 3. Settings.Global(device_name) -> 4. Build.MODEL/DEVICE -> 5. 兜底
