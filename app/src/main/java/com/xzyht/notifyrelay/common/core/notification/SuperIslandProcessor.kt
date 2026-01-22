@@ -1,7 +1,9 @@
 package com.xzyht.notifyrelay.common.core.notification
 
 import android.content.Context
+import android.os.Build
 import android.util.LruCache
+import com.xzyht.notifyrelay.common.core.data.StorageManager
 import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
@@ -9,10 +11,15 @@ import com.xzyht.notifyrelay.feature.notification.superisland.SuperIslandRemoteS
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
+import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
 
 object SuperIslandProcessor {
     private const val TAG = "SuperIslandProcessor"
     private const val DEDUP_CACHE_MAX_SIZE = 1024
+    
+    // Live Updates 设置键
+    private const val LIVE_UPDATES_ENABLED_KEY = "super_island_live_updates_enabled"
+    
     private val superIslandDeduplicationCache = object : LruCache<String, Boolean>(DEDUP_CACHE_MAX_SIZE) {
         override fun entryRemoved(evicted: Boolean, key: String?, oldValue: Boolean?, newValue: Boolean?) {
             if (evicted && key != null) {
@@ -76,6 +83,10 @@ object SuperIslandProcessor {
                             // 如果显式值看起来像完整的 sourceId（包含分隔符），直接移除
                             if (explicitFeatureKey.contains("|")) {
                                 FloatingReplicaManager.dismissBySource(explicitFeatureKey)
+                                // 同时关闭对应的 Live Updates 通知
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(explicitFeatureKey)
+                                }
                                 SuperIslandRemoteStore.removeExact(explicitFeatureKey)
                                 superIslandDeduplicationCache.remove(dedupKey)
                                 Logger.i("超级岛", "收到终止通知(显式完整 sourceId)，移除去重缓存: $dedupKey -> source=$explicitFeatureKey")
@@ -86,9 +97,15 @@ object SuperIslandProcessor {
                             val matched = SuperIslandRemoteStore.removeByFeatureKey(explicitFeatureKey)
                             if (matched.isNotEmpty()) {
                                 matched.forEach { rid ->
-                                    try { FloatingReplicaManager.dismissBySource(rid) } catch (_: Exception) {}
+                                    try { 
+                                        FloatingReplicaManager.dismissBySource(rid) 
+                                        // 同时关闭对应的 Live Updates 通知
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                            LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
+                                        }
+                                    } catch (_: Exception) {}
                                     superIslandDeduplicationCache.remove("${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
-                                    Logger.i("超级岛", "收到终止通知(显式 featureKey 匹配)，移除并关闭浮窗: $rid -> featureKey=$explicitFeatureKey")
+                                    Logger.i("超级岛", "收到终止通知(显式 featureKey 匹配)，移除并关闭通知: $rid -> featureKey=$explicitFeatureKey")
                                 }
                                 return true
                             }
@@ -100,16 +117,28 @@ object SuperIslandProcessor {
                     val removedKeys = SuperIslandRemoteStore.removeByDeviceAndPkgPrefix(remoteUuid, mappedPkg)
                     if (removedKeys.isNotEmpty()) {
                         removedKeys.forEach { rid ->
-                            try { FloatingReplicaManager.dismissBySource(rid) } catch (_: Exception) {}
+                            try { 
+                                FloatingReplicaManager.dismissBySource(rid) 
+                                // 同时关闭对应的 Live Updates 通知
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
+                                }
+                            } catch (_: Exception) {}
                             // 同步移除去重缓存（若存在）
                             superIslandDeduplicationCache.remove("${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
-                            Logger.i("超级岛", "收到终止通知，按前缀移除并关闭浮窗: $rid")
+                            Logger.i("超级岛", "收到终止通知，按前缀移除并关闭通知: $rid")
                         }
                         return true
                     }
 
                     // 最后兜底：按照当前计算的 sourceKey 进行移除（可能无对应），以防漏掉
-                    try { FloatingReplicaManager.dismissBySource(sourceKey) } catch (_: Exception) {}
+                    try { 
+                        FloatingReplicaManager.dismissBySource(sourceKey) 
+                        // 同时关闭对应的 Live Updates 通知
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceKey)
+                        }
+                    } catch (_: Exception) {}
                     superIslandDeduplicationCache.remove(dedupKey)
                     Logger.i("超级岛", "收到终止通知(兜底)，尝试移除: $sourceKey")
                     return true
@@ -145,17 +174,39 @@ object SuperIslandProcessor {
                 val finalText = merged.text ?: mText
                 val mParam2 = merged.paramV2Raw
                 val mPics = merged.pics
-
+                
+                // 初始化 Live Updates 通知管理器（仅第一次调用时初始化）
                 try {
-                    // 仅在有实际可展示内容时才创建浮窗，避免只含基础元信息的空白浮窗
-                    val hasContent = !finalTitle.isNullOrBlank() || !finalText.isNullOrBlank() || !mParam2.isNullOrBlank() || (mPics.isNotEmpty())
-                    if (hasContent) {
-                        FloatingReplicaManager.showFloating(context, sourceKey, finalTitle, finalText, mParam2, mPics, appName, isLocked)
-                    } else {
-                        Logger.i("超级岛", "收到内容为空的超级岛包，跳过创建浮窗: sourceKey=$sourceKey")
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        LiveUpdatesNotificationManager.initialize(context)
                     }
                 } catch (e: Exception) {
-                    Logger.w("超级岛", "差异复刻悬浮窗失败: ${e.message}")
+                    Logger.e(TAG, "初始化 Live Updates 通知管理器失败: ${e.message}")
+                }
+
+                try {
+                    // 仅在有实际可展示内容时才创建浮窗或 Live Updates 通知
+                    val hasContent = !finalTitle.isNullOrBlank() || !finalText.isNullOrBlank() || !mParam2.isNullOrBlank() || (mPics.isNotEmpty())
+                    if (hasContent) {
+                        // 检查用户设置，决定使用浮窗还是 Live Updates
+                        val isLiveUpdatesEnabled = StorageManager.getBoolean(context, LIVE_UPDATES_ENABLED_KEY, false)
+                        
+                        if (isLiveUpdatesEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            // 使用 Live Updates API
+                            LiveUpdatesNotificationManager.showLiveUpdate(
+                                sourceKey, finalTitle, finalText, mParam2, appName, isLocked
+                            )
+                            Logger.i("超级岛", "使用 Live Updates 显示通知: sourceKey=$sourceKey")
+                        } else {
+                            // 使用传统浮窗
+                            FloatingReplicaManager.showFloating(context, sourceKey, finalTitle, finalText, mParam2, mPics, appName, isLocked)
+                            Logger.i("超级岛", "使用浮窗显示通知: sourceKey=$sourceKey")
+                        }
+                    } else {
+                        Logger.i("超级岛", "收到内容为空的超级岛包，跳过创建通知: sourceKey=$sourceKey")
+                    }
+                } catch (e: Exception) {
+                    Logger.w("超级岛", "显示超级岛通知失败: ${e.message}")
                 }
 
                 val historyEntry = SuperIslandHistoryEntry(

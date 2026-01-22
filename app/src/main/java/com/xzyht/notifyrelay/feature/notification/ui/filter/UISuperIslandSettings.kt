@@ -164,6 +164,17 @@ fun UISuperIslandSettings() {
 
             Spacer(modifier = Modifier.height(0.dp))
 
+                        SuperSwitch(
+                title = "使用 Live Updates API",
+                summary = "将小米超级岛通知转换为 Live Updates 通知，需 Android 15+ 支持，否则自动回退到浮窗显示",
+                checked = StorageManager.getBoolean(context, "super_island_live_updates_enabled", false),
+                onCheckedChange = {
+                    StorageManager.putBoolean(context, "super_island_live_updates_enabled", it)
+                }
+            )
+
+            Spacer(modifier = Modifier.height(0.dp))
+
                         if (groups.isEmpty()) {
                             Text("暂无超级岛历史记录", style = textStyles.body2, color = colorScheme.onSurfaceVariantSummary)
                         } else {
