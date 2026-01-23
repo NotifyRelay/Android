@@ -224,6 +224,7 @@ object LiveUpdatesNotificationManager {
         allIconKeys["picForwardBox"] = multiProgressInfo?.picForwardBox ?: ""
         
         Logger.i(TAG, "所有图标键映射: $allIconKeys")
+        Logger.i(TAG, "当前进度: $currentProgress, 进度信息: $progressInfo, 多进度信息: $multiProgressInfo")
         
         // 找到有效的前进图标作为进度指示点
         val forwardIconKey = listOf(
@@ -338,7 +339,8 @@ object LiveUpdatesNotificationManager {
             
             // 处理进度样式通知
             if (paramV2.progressInfo != null || paramV2.multiProgressInfo != null) {
-                val progressInfo = paramV2.progressInfo ?: return
+                val progressInfo = paramV2.progressInfo
+                val multiProgressInfo = paramV2.multiProgressInfo
                 
                 // 与官方示例保持一致：先获取基础样式，再增量添加图标和进度
                 val progressStyle = buildBaseProgressStyle(paramV2)
@@ -349,7 +351,8 @@ object LiveUpdatesNotificationManager {
                 }
                 
                 // 设置进度值
-                progressStyle.setProgress(progressInfo.progress)
+                val currentProgress = progressInfo?.progress ?: multiProgressInfo?.progress ?: 0
+                progressStyle.setProgress(currentProgress)
                 
                 // 设置样式
                 updatedBuilder.setStyle(progressStyle)
@@ -758,18 +761,18 @@ object LiveUpdatesNotificationManager {
      */
     @RequiresApi(Build.VERSION_CODES.BAKLAVA)
     private fun buildBaseProgressStyle(paramV2: ParamV2): NotificationCompat.ProgressStyle {
-        val progressInfo = paramV2.progressInfo ?: return NotificationCompat.ProgressStyle()
+        val progressInfo = paramV2.progressInfo
         val multiProgressInfo = paramV2.multiProgressInfo
         
         // 获取颜色配置
-        val progressColor = progressInfo.colorProgress ?: multiProgressInfo?.color
-        val progressEndColor = progressInfo.colorProgressEnd ?: multiProgressInfo?.color
+        val progressColor = progressInfo?.colorProgress ?: multiProgressInfo?.color
+        val progressEndColor = progressInfo?.colorProgressEnd ?: multiProgressInfo?.color
         
         // 解析颜色值
         val pointColor = progressColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.BLUE
         val segmentColor = progressEndColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.CYAN
         
-        // 与官方示例保持一致，先创建基础ProgressStyle，再进行配置
+        // 与官方示例保持一致，先创建基础ProgressStyle，设置默认的4个进度点和4个进度段
         return NotificationCompat.ProgressStyle()
             .setProgressPoints(
                 listOf(
