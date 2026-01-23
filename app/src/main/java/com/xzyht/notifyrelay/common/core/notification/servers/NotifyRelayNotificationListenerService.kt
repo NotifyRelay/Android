@@ -28,6 +28,7 @@ import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.backend.BackendLocalFilter
+import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandManager
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
 import kotlinx.coroutines.CoroutineScope
@@ -54,6 +55,13 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             Logger.w("NotifyRelay", "前台服务通知被移除，自动补发！")
             // 立即补发本服务前台通知
             startForegroundService()
+        } else if (sbn.packageName == applicationContext.packageName) {
+            // 检查是否为超级岛复刻通知
+            if (sbn.notification.channelId == "super_island_replica") {
+                // 超级岛复刻通知被移除，关闭对应的浮窗条目
+                Logger.i("NotifyRelay", "超级岛复刻通知被移除，关闭对应的浮窗条目: id=${sbn.id}")
+                FloatingReplicaManager.closeByNotificationId(sbn.id)
+            }
         } else {
             // 普通通知被移除时，从已处理缓存中移除，允许下次重新处理
             val notificationKey = sbn.key ?: (sbn.id.toString() + sbn.packageName)
