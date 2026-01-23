@@ -55,12 +55,12 @@ val computedVersionCode = versionInfo.versionCode
 
 android {
     namespace = "com.xzyht.notifyrelay"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.xzyht.notifyrelay"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         // 使用自动计算的版本号
         versionCode = computedVersionCode
         versionName = computedVersionName

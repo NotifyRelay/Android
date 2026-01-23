@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.common.core.notification
 import android.content.Context
 import android.os.Build
 import android.util.LruCache
-import com.xzyht.notifyrelay.common.core.data.StorageManager
+import com.xzyht.notifyrelay.common.data.StorageManager
 import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
@@ -84,7 +84,7 @@ object SuperIslandProcessor {
                             if (explicitFeatureKey.contains("|")) {
                                 FloatingReplicaManager.dismissBySource(explicitFeatureKey)
                                 // 同时关闭对应的 Live Updates 通知
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                if (Build.VERSION.SDK_INT >= 36) {
                                     LiveUpdatesNotificationManager.dismissLiveUpdateNotification(explicitFeatureKey)
                                 }
                                 SuperIslandRemoteStore.removeExact(explicitFeatureKey)
@@ -100,7 +100,7 @@ object SuperIslandProcessor {
                                     try { 
                                         FloatingReplicaManager.dismissBySource(rid) 
                                         // 同时关闭对应的 Live Updates 通知
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                        if (Build.VERSION.SDK_INT >= 36) {
                                             LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
                                         }
                                     } catch (_: Exception) {}
@@ -121,8 +121,8 @@ object SuperIslandProcessor {
                                 FloatingReplicaManager.dismissBySource(rid) 
                                 // 同时关闭对应的 Live Updates 通知
                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
-                                }
+                                LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
+                            }
                             } catch (_: Exception) {}
                             // 同步移除去重缓存（若存在）
                             superIslandDeduplicationCache.remove("${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
@@ -135,9 +135,9 @@ object SuperIslandProcessor {
                     try { 
                         FloatingReplicaManager.dismissBySource(sourceKey) 
                         // 同时关闭对应的 Live Updates 通知
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceKey)
-                        }
+                        if (Build.VERSION.SDK_INT >= 36) {
+                                LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceKey)
+                            }
                     } catch (_: Exception) {}
                     superIslandDeduplicationCache.remove(dedupKey)
                     Logger.i("超级岛", "收到终止通知(兜底)，尝试移除: $sourceKey")
@@ -177,7 +177,7 @@ object SuperIslandProcessor {
                 
                 // 初始化 Live Updates 通知管理器（仅第一次调用时初始化）
                 try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    if (Build.VERSION.SDK_INT >= 36) {
                         LiveUpdatesNotificationManager.initialize(context)
                     }
                 } catch (e: Exception) {
@@ -191,7 +191,7 @@ object SuperIslandProcessor {
                         // 检查用户设置，决定使用浮窗还是 Live Updates
                         val isLiveUpdatesEnabled = StorageManager.getBoolean(context, LIVE_UPDATES_ENABLED_KEY, false)
                         
-                        if (isLiveUpdatesEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        if (isLiveUpdatesEnabled && Build.VERSION.SDK_INT >= 36) {
                             // 使用 Live Updates API
                             LiveUpdatesNotificationManager.showLiveUpdate(
                                 sourceKey, finalTitle, finalText, mParam2, appName, isLocked

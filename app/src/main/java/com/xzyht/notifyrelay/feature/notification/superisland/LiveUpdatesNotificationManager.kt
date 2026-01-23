@@ -11,14 +11,14 @@ import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.parseParamV2
 
-@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@RequiresApi(36)
 object LiveUpdatesNotificationManager {
     private const val TAG = "LiveUpdatesNotificationManager"
     const val CHANNEL_ID = "live_updates_channel"
     private const val CHANNEL_NAME = "超级岛Live Updates"
     private const val NOTIFICATION_BASE_ID = 10000
-    private var notificationManager: NotificationManager? = null
-    private var appContext: Context? = null
+    private lateinit var notificationManager: NotificationManager
+    private lateinit var appContext: Context
 
     fun initialize(context: Context) {
         appContext = context.applicationContext
@@ -33,7 +33,7 @@ object LiveUpdatesNotificationManager {
             CHANNEL_NAME,
             NotificationManager.IMPORTANCE_DEFAULT
         )
-        notificationManager?.createNotificationChannel(channel)
+        notificationManager.createNotificationChannel(channel)
     }
 
     fun showLiveUpdate(
@@ -44,7 +44,7 @@ object LiveUpdatesNotificationManager {
         appName: String?,
         isLocked: Boolean
     ) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
+        if (Build.VERSION.SDK_INT < 36) {
             Logger.w(TAG, "Live Updates not supported on this Android version")
             return
         }
@@ -82,23 +82,20 @@ object LiveUpdatesNotificationManager {
             }
 
             val notification = notificationBuilder.build()
-            notificationManager?.notify(notificationId, notification)
+            notificationManager.notify(notificationId, notification)
             Logger.i(TAG, "Sent Live Update notification: $sourceId")
         } catch (e: Exception) {
             Logger.e(TAG, "Error showing Live Update notification: ${e.message}")
         }
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun buildBaseNotification(sourceId: String): NotificationCompat.Builder {
-        val context = appContext ?: throw IllegalStateException("App context not initialized")
-        return NotificationCompat.Builder(context, CHANNEL_ID)
+        return NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setOngoing(true)
             .setRequestPromotedOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun buildBasicStyleNotification(
         builder: NotificationCompat.Builder,
         paramV2: ParamV2?
@@ -109,7 +106,6 @@ object LiveUpdatesNotificationManager {
         )
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun buildProgressStyleNotification(
         builder: NotificationCompat.Builder,
         paramV2: ParamV2
@@ -126,7 +122,6 @@ object LiveUpdatesNotificationManager {
         return builder.setStyle(progressStyle)
     }
 
-    @RequiresApi(Build.VERSION_CODES.TIRAMISU)
     private fun buildHighlightStyleNotification(
         builder: NotificationCompat.Builder,
         paramV2: ParamV2
@@ -142,7 +137,7 @@ object LiveUpdatesNotificationManager {
     fun cancelLiveUpdate(sourceId: String) {
         try {
             val notificationId = sourceId.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
-            notificationManager?.cancel(notificationId)
+            notificationManager.cancel(notificationId)
             Logger.i(TAG, "Cancelled Live Update notification: $sourceId")
         } catch (e: Exception) {
             Logger.e(TAG, "Error cancelling Live Update notification: ${e.message}")
@@ -155,17 +150,15 @@ object LiveUpdatesNotificationManager {
     }
 
     fun cancelAllLiveUpdates() {
-        notificationManager?.cancelAll()
+        notificationManager.cancelAll()
         Logger.i(TAG, "Cancelled all Live Update notifications")
     }
 
-@RequiresApi(Build.VERSION_CODES.TIRAMISU)
     fun canUseLiveUpdates(): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU && 
-               notificationManager?.canPostPromotedNotifications() == true
+        return Build.VERSION.SDK_INT >= 36 && 
+               notificationManager.canPostPromotedNotifications()
     }
 
-@RequiresApi(Build.VERSION_CODES.TIRAMISU)
     fun hasPromotableCharacteristics(notification: NotificationCompat.Builder): Boolean {
         return notification.build().hasPromotableCharacteristics()
     }
