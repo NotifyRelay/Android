@@ -85,6 +85,7 @@ fun UISuperIslandSettings() {
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_KEY, true)) }
     var includeImageDataOnCopy by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_COPY_IMAGE_DATA_KEY, false)) }
+    var useLiveUpdates by remember { mutableStateOf(StorageManager.getBoolean(context, "super_island_live_updates_enabled", false)) }
 
     val historyState = remember(context) { SuperIslandHistory.historyState(context) }
     val history by historyState.collectAsState()
@@ -167,8 +168,9 @@ fun UISuperIslandSettings() {
                         SuperSwitch(
                 title = "使用 Live Updates API",
                 summary = "将小米超级岛通知转换为 Live Updates 通知，需 Android 15+ 支持，否则自动回退到浮窗显示",
-                checked = StorageManager.getBoolean(context, "super_island_live_updates_enabled", false),
+                checked = useLiveUpdates,
                 onCheckedChange = {
+                    useLiveUpdates = it
                     StorageManager.putBoolean(context, "super_island_live_updates_enabled", it)
                 }
             )
