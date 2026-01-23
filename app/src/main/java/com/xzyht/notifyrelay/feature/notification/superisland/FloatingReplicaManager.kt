@@ -7,6 +7,7 @@ import android.graphics.Bitmap
 import android.graphics.PixelFormat
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
@@ -28,6 +29,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
+import com.google.gson.Gson
+import org.json.JSONObject
 
 /**
  * 接收端的超级岛复刻实现骨架。
@@ -247,35 +250,100 @@ object FloatingReplicaManager {
             // 生成唯一的通知ID
             val notificationId = key.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
             
-            // 构建基础通知
+            // 构建基础通知，调整属性使其更接近实际超级岛通知
             val builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
                 .setContentTitle(title ?: appName ?: "超级岛通知")
                 .setContentText(text ?: "")
-                .setSmallIcon(android.R.drawable.stat_notify_more)
-                .setAutoCancel(true)
-                .setOngoing(false)
+                .setSmallIcon(android.R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
+                // 调整为与实际超级岛通知一致的属性
+                .setAutoCancel(false) // 实际通知通常不可清除
+                .setOngoing(true) // 实际通知通常是持续的
+                .setPriority(NotificationCompat.PRIORITY_MAX) // 提高优先级到最高，与原始通知一致
+                .setShowWhen(false) // 不显示时间，与原始通知一致
+                .setWhen(System.currentTimeMillis()) // 设置时间，但不显示
+                .setOnlyAlertOnce(true) // 只提示一次
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 公开可见
             
-            // 添加超级岛相关的结构化数据，符合小米超级岛通知模板库要求
+            // 添加超级岛相关的结构化数据，严格按照小米官方文档规范和实际通知结构
             val extras = builder.extras
             
             // 获取paramV2原始数据
             val entry = floatingWindowManager.getEntry(key)
             val paramV2Raw = entry?.paramV2Raw
             
-            // 直接添加原始数据到通知中
+            // 构建符合小米官方规范的完整miui.focus.param结构
             paramV2Raw?.let {
-                extras.putString("miui.focus.param", it)
+                try {
+                    // 解析原始paramV2数据
+                    val paramV2Json = JSONObject(it)
+                    
+                    // 构建完整的焦点通知参数结构，包含外层scene、ticker等字段
+                    val fullFocusParam = JSONObject().apply {
+                        put("protocol", 1)
+                        put("scene", paramV2Json.optString("business", "default"))
+                        put("ticker", title ?: "")
+                        put("content", text ?: "")
+                        put("timerType", 0)
+                        put("timerWhen", 0)
+                        put("timerSystemCurrent", 0)
+                        put("enableFloat", false)
+                        put("updatable", true)
+                        put("param_v2", paramV2Json) // 将原始paramV2作为嵌套字段
+                    }
+                    
+                    extras.putString("miui.focus.param", fullFocusParam.toString())
+                } catch (e: Exception) {
+                    // 如果构建完整结构失败，回退到直接使用原始数据
+                    extras.putString("miui.focus.param", it)
+                }
             }
             
-            // 添加picMap数据
+            // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
             picMap?.let {map ->
-                // 将picMap转换为Bundle
-                val picBundle = android.os.Bundle()
-                map.forEach { (key, value) ->
-                    picBundle.putString(key, value)
+                map.forEach { (picKey, picUrl) ->
+                    // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
+                    if (picKey.startsWith("miui.focus.pic_")) {
+                        // 解析图片引用符，获取实际的图片数据
+                        val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
+                        extras.putString(picKey, actualPicUrl)
+                    }
                 }
-                extras.putBundle("miui.focus.pics", picBundle)
+                
+                // 添加miui.focus.pics字段，包含所有图片资源的Bundle
+                val picsBundle = Bundle()
+                map.forEach { (picKey, picUrl) ->
+                    if (picKey.startsWith("miui.focus.pic_")) {
+                        // 这里简化处理，实际应该创建Icon对象
+                        picsBundle.putString(picKey, picUrl)
+                    }
+                }
+                extras.putBundle("miui.focus.pics", picsBundle)
             }
+            
+            // 添加焦点通知必要的额外字段
+            extras.putBoolean("miui.showAction", true)
+            
+            // 添加模拟的action字段，实际应该包含真实的Notification.Action对象
+            val actionsBundle = Bundle()
+            actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
+            actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
+            extras.putBundle("miui.focus.actions", actionsBundle)
+            
+            // 添加原始通知中存在的其他字段，这些可能影响UI显示
+            // 对于计时器类通知，添加计时器相关字段
+            if (title?.contains("计时") == true || title?.contains("秒表") == true) {
+                extras.putBoolean("android.chronometerCountDown", false)
+                extras.putBoolean("android.showChronometer", true)
+            }
+            
+            // 添加应用信息，与原始通知保持一致
+            extras.putBoolean("android.reduced.images", true)
+            
+            // 添加超级岛源包信息，与原始通知保持一致
+            extras.putString("superIslandSourcePackage", context.packageName)
+            
+            // 添加包名信息，与原始通知保持一致
+            extras.putString("app_package", context.packageName)
             
             // 发送通知
             notificationManager.notify(notificationId, builder.build())
@@ -317,12 +385,14 @@ object FloatingReplicaManager {
                 floatingWindowManager.removeEntry(entryKey)
                 // 从映射中移除
                 entryKeyToNotificationId.remove(entryKey)
-                // 从sourceId映射中移除
+                // 从sourceId映射中移除，并将sourceId添加到黑名单
                 sourceIdToEntryKeyMap.forEach { (sourceId, keys) ->
                     if (keys.contains(entryKey)) {
                         keys.remove(entryKey)
                         if (keys.isEmpty()) {
                             sourceIdToEntryKeyMap.remove(sourceId)
+                            // 当用户手动移除通知关闭浮窗时，将sourceId添加到黑名单，避免短时间内再次弹出
+                            blockInstance(sourceId)
                         }
                     }
                 }
@@ -352,7 +422,7 @@ object FloatingReplicaManager {
     // 新增：按来源键立刻移除指定浮窗（用于接收终止事件SI_END时立即消除）
     fun dismissBySource(sourceId: String) {
         try {
-            val context = overlayView?.get()?.context ?: return
+            val context = overlayView?.get()?.context
             
             // 从映射中获取所有对应的entryKey
             val entryKeys = sourceIdToEntryKeyMap[sourceId]
@@ -361,7 +431,12 @@ object FloatingReplicaManager {
                 entryKeys.forEach { entryKey ->
                     floatingWindowManager.removeEntry(entryKey)
                     // 取消对应的复刻通知
-                    cancelReplicaNotification(context, entryKey)
+                    if (context != null) {
+                        cancelReplicaNotification(context, entryKey)
+                    } else {
+                        // 如果没有上下文，直接从映射中移除
+                        entryKeyToNotificationId.remove(entryKey)
+                    }
                 }
                 // 清理映射关系
                 sourceIdToEntryKeyMap.remove(sourceId)
@@ -369,11 +444,18 @@ object FloatingReplicaManager {
                 // 如果没有找到映射，尝试直接使用sourceId移除
                 floatingWindowManager.removeEntry(sourceId)
                 // 取消对应的复刻通知
-                cancelReplicaNotification(context, sourceId)
+                if (context != null) {
+                    cancelReplicaNotification(context, sourceId)
+                } else {
+                    // 如果没有上下文，直接从映射中移除
+                    entryKeyToNotificationId.remove(sourceId)
+                }
             }
             // 如果对应的会话结束（SI_END），同步移除黑名单，允许后续同一通知重新展示
             blockedInstanceIds.remove(sourceId)
-        } catch (_: Exception) {}
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: 按来源关闭浮窗失败: ${e.message}")
+        }
     }
 
     /**

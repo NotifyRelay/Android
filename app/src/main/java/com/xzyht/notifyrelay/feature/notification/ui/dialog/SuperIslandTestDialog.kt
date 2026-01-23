@@ -129,6 +129,7 @@ private fun appimgDataUrl(): String {
 /**
  * 测试基础文本组件
  */
+//TODO 数据并不符合超级岛规范
 private fun testBaseInfo(context: Context) {
     val paramV2Raw = """
         {

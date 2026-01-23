@@ -373,11 +373,19 @@ class FloatingWindowManager {
      * 清空所有条目
      */
     fun clearAllEntries() {
+        // 保存之前的条目数量
+        val previousSize = entriesMap.size
+        
         // 取消所有任务
         entriesMap.keys.forEach {
             cancelAllTasks(it)
         }
         entriesMap.clear()
         entriesList.clear()
+        
+        // 如果之前有条目，现在变为空，调用回调
+        if (previousSize > 0) {
+            onEntriesEmpty?.invoke()
+        }
     }
 }
