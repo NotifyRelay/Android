@@ -84,7 +84,7 @@ object SuperIslandProcessor {
                             if (explicitFeatureKey.contains("|")) {
                                 FloatingReplicaManager.dismissBySource(explicitFeatureKey)
                                 // 同时关闭对应的 Live Updates 通知
-                                if (Build.VERSION.SDK_INT >= 36) {
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                                     LiveUpdatesNotificationManager.dismissLiveUpdateNotification(explicitFeatureKey)
                                 }
                                 SuperIslandRemoteStore.removeExact(explicitFeatureKey)
@@ -100,7 +100,7 @@ object SuperIslandProcessor {
                                     try { 
                                         FloatingReplicaManager.dismissBySource(rid) 
                                         // 同时关闭对应的 Live Updates 通知
-                                        if (Build.VERSION.SDK_INT >= 36) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                                             LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
                                         }
                                     } catch (_: Exception) {}
@@ -135,7 +135,7 @@ object SuperIslandProcessor {
                     try { 
                         FloatingReplicaManager.dismissBySource(sourceKey) 
                         // 同时关闭对应的 Live Updates 通知
-                        if (Build.VERSION.SDK_INT >= 36) {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                                 LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceKey)
                             }
                     } catch (_: Exception) {}
@@ -177,7 +177,7 @@ object SuperIslandProcessor {
                 
                 // 初始化 Live Updates 通知管理器（仅第一次调用时初始化）
                 try {
-                    if (Build.VERSION.SDK_INT >= 36) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                         LiveUpdatesNotificationManager.initialize(context)
                     }
                 } catch (e: Exception) {
@@ -191,7 +191,7 @@ object SuperIslandProcessor {
                         // 检查用户设置，决定使用浮窗还是 Live Updates
                         val isLiveUpdatesEnabled = StorageManager.getBoolean(context, LIVE_UPDATES_ENABLED_KEY, false)
                         
-                        if (isLiveUpdatesEnabled && Build.VERSION.SDK_INT >= 36) {
+                        if (isLiveUpdatesEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                             // 使用 Live Updates API
                             LiveUpdatesNotificationManager.showLiveUpdate(
                                 sourceKey, finalTitle, finalText, mParam2, appName, isLocked
