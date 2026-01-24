@@ -61,22 +61,37 @@ object FloatingReplicaManager {
                 entryKeyToNotificationId.remove(key)
             }
             // 从sourceId映射中移除，并将sourceId添加到黑名单
+            // 创建需要移除的sourceId列表，避免ConcurrentModificationException
+            val sourceIdsToRemove = mutableListOf<String>()
+            val sourceIdsToBlock = mutableListOf<String>()
+            
+            // 第一次遍历：找出需要处理的sourceId
             sourceIdToEntryKeyMap.forEach { (sourceId, keys) ->
                 if (keys.contains(key)) {
                     keys.remove(key)
                     if (keys.isEmpty()) {
-                        sourceIdToEntryKeyMap.remove(sourceId)
-                        // 当用户手动移除通知关闭浮窗时，将sourceId添加到黑名单，避免短时间内再次弹出
-                        blockInstance(sourceId)
-                        // 同时关闭对应的Live Updates复合通知
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                            try {
-                                LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
-                                Logger.i(TAG, "关闭Live Updates复合通知: sourceId=$sourceId")
-                            } catch (e: Exception) {
-                                Logger.w(TAG, "关闭Live Updates复合通知失败: ${e.message}")
-                            }
-                        }
+                        sourceIdsToRemove.add(sourceId)
+                        sourceIdsToBlock.add(sourceId)
+                    }
+                }
+            }
+            
+            // 第二次遍历：移除空的sourceId条目
+            sourceIdsToRemove.forEach {
+                sourceIdToEntryKeyMap.remove(it)
+            }
+            
+            // 第三次遍历：处理需要添加到黑名单和关闭Live Updates通知的sourceId
+            sourceIdsToBlock.forEach { sourceId ->
+                // 当用户手动移除通知关闭浮窗时，将sourceId添加到黑名单，避免短时间内再次弹出
+                blockInstance(sourceId)
+                // 同时关闭对应的Live Updates复合通知
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                    try {
+                        LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
+                        Logger.i(TAG, "关闭Live Updates复合通知: sourceId=$sourceId")
+                    } catch (e: Exception) {
+                        Logger.w(TAG, "关闭Live Updates复合通知失败: ${e.message}")
                     }
                 }
             }
