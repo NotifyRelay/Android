@@ -237,8 +237,13 @@ class FloatingWindowManager {
                 scheduleCollapse(key, EXPANDED_DURATION_MS)
             }
 
-            // 重新添加自动移除任务
-            scheduleRemoval(key, AUTO_DISMISS_DURATION_MS)
+            // 重新添加自动移除任务，根据business类型选择正确的自动移除时间
+            val autoDismissDuration = if (currentEntry.business == "media") {
+                AUTO_DISMISS_DURATION_MS_MEDIA
+            } else {
+                AUTO_DISMISS_DURATION_MS
+            }
+            scheduleRemoval(key, autoDismissDuration)
 
             updateEntriesList()
         }
@@ -271,8 +276,13 @@ class FloatingWindowManager {
                 scheduleCollapse(key, EXPANDED_DURATION_MS)
             }
 
-            // 重新添加自动移除任务
-            scheduleRemoval(key, AUTO_DISMISS_DURATION_MS)
+            // 重新添加自动移除任务，根据business类型选择正确的自动移除时间
+            val autoDismissDuration = if (currentEntry.business == "media") {
+                AUTO_DISMISS_DURATION_MS_MEDIA
+            } else {
+                AUTO_DISMISS_DURATION_MS
+            }
+            scheduleRemoval(key, autoDismissDuration)
 
             updateEntriesList()
         }
