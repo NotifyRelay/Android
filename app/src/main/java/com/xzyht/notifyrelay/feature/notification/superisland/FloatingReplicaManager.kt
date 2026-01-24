@@ -283,19 +283,23 @@ object FloatingReplicaManager {
                 // 添加焦点歌词相关的结构化数据
                 val extras = builder.extras
                 
-                // 构建基于HyperCeiler焦点歌词数据的miui.focus.param
+                // 构建最精简版miui.focus.param，严格按照HyperIslandApi标准，避免系统崩溃
                 val fullFocusParam = JSONObject().apply {
                     put("protocol", 1)
                     put("scene", "music") // 使用music场景
                     put("ticker", title ?: "")
                     put("content", text ?: "")
-                    put("timerType", 0)
-                    put("timerWhen", 0)
-                    put("timerSystemCurrent", 0)
                     put("enableFloat", false)
                     put("updatable", true)
+                    put("reopen", "close")
                     
-                    // 构建param_v2，基于HyperCeiler焦点歌词数据结构
+                    // 最精简的animTextInfo，只使用HyperIslandApi定义的标准字段
+                    put("animTextInfo", JSONObject().apply {
+                        put("title", title ?: "")
+                        put("content", text ?: "")
+                    })
+                    
+                    // 修复：param_v2内部应该保留baseInfo，而不是animTextInfo
                     val paramV2Json = JSONObject().apply {
                         put("business", "music")
                         put("protocol", 1)
@@ -303,8 +307,10 @@ object FloatingReplicaManager {
                         put("content", text ?: "")
                         put("enableFloat", false)
                         put("updatable", true)
+                        put("scene", "music")
+                        put("reopen", "close")
                         
-                        // 添加基础信息
+                        // 恢复baseInfo字段，移除错误的内部animTextInfo
                         put("baseInfo", JSONObject().apply {
                             put("title", title ?: "")
                             put("content", text ?: "")
