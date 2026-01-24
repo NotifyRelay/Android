@@ -1,6 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.superisland
 
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
@@ -13,8 +14,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
-import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.common.core.util.IntentUtils
+import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.parseParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingComposeContainer
@@ -27,10 +28,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
-import com.google.gson.Gson
-import org.json.JSONObject
 
 /**
  * 接收端的超级岛复刻实现骨架。
@@ -237,116 +237,231 @@ object FloatingReplicaManager {
         try {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
-            // 创建通知渠道（Android O及以上）
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val channel = android.app.NotificationChannel(
-                    NOTIFICATION_CHANNEL_ID,
-                    "超级岛复刻通知",
-                    NotificationManager.IMPORTANCE_DEFAULT
-                )
-                notificationManager.createNotificationChannel(channel)
-            }
-            
             // 生成唯一的通知ID
             val notificationId = key.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
             
-            // 构建基础通知，调整属性使其更接近实际超级岛通知
-            val builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-                .setContentTitle(title ?: appName ?: "超级岛通知")
-                .setContentText(text ?: "")
-                .setSmallIcon(android.R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
-                // 调整为与实际超级岛通知一致的属性
-                .setAutoCancel(false) // 实际通知通常不可清除
-                .setOngoing(true) // 实际通知通常是持续的
-                .setPriority(NotificationCompat.PRIORITY_MAX) // 提高优先级到最高，与原始通知一致
-                .setShowWhen(false) // 不显示时间，与原始通知一致
-                .setWhen(System.currentTimeMillis()) // 设置时间，但不显示
-                .setOnlyAlertOnce(true) // 只提示一次
-                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 公开可见
+            // 检查是否为媒体类型的超级岛浮窗
+            val isMediaType = paramV2?.business == "media"
             
-            // 添加超级岛相关的结构化数据，严格按照小米官方文档规范和实际通知结构
-            val extras = builder.extras
-            
-            // 获取paramV2原始数据
-            val entry = floatingWindowManager.getEntry(key)
-            val paramV2Raw = entry?.paramV2Raw
-            
-            // 构建符合小米官方规范的完整miui.focus.param结构
-            paramV2Raw?.let {
-                try {
-                    // 解析原始paramV2数据
-                    val paramV2Json = JSONObject(it)
+            // 对于媒体类型，使用HyperCeiler焦点歌词的特殊处理
+            if (isMediaType) {
+                // 创建焦点歌词通知通道（Android O及以上）
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val channel = android.app.NotificationChannel(
+                        "channel_id_focusNotifLyrics",
+                        "焦点通知歌词",
+                        NotificationManager.IMPORTANCE_DEFAULT
+                    )
+                    notificationManager.createNotificationChannel(channel)
+                }
+                
+                // 构建基于HyperCeiler焦点歌词数据的特殊通知
+                // 创建删除意图，用于处理用户移除通知时关闭浮窗
+                val deleteIntent = PendingIntent.getBroadcast(
+                    context,
+                    notificationId,
+                    Intent(context, NotificationBroadcastReceiver::class.java)
+                        .putExtra("notificationId", notificationId)
+                        .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+                
+                val builder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
+                    .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
+                    .setContentText(text ?: "")
+                    .setSmallIcon(android.R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
+                    // 调整为可交互的属性，以便用户可以关闭通知
+                    .setAutoCancel(true) // 允许用户点击清除通知
+                    .setOngoing(false) // 允许通知被清除
+                    .setPriority(NotificationCompat.PRIORITY_MAX)
+                    .setShowWhen(false)
+                    .setWhen(System.currentTimeMillis())
+                    .setOnlyAlertOnce(true)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setDeleteIntent(deleteIntent) // 设置删除意图，处理用户移除通知的情况
+                
+                // 添加焦点歌词相关的结构化数据
+                val extras = builder.extras
+                
+                // 构建基于HyperCeiler焦点歌词数据的miui.focus.param
+                val fullFocusParam = JSONObject().apply {
+                    put("protocol", 1)
+                    put("scene", "music") // 使用music场景
+                    put("ticker", title ?: "")
+                    put("content", text ?: "")
+                    put("timerType", 0)
+                    put("timerWhen", 0)
+                    put("timerSystemCurrent", 0)
+                    put("enableFloat", false)
+                    put("updatable", true)
                     
-                    // 构建完整的焦点通知参数结构，包含外层scene、ticker等字段
-                    val fullFocusParam = JSONObject().apply {
+                    // 构建param_v2，基于HyperCeiler焦点歌词数据结构
+                    val paramV2Json = JSONObject().apply {
+                        put("business", "music")
                         put("protocol", 1)
-                        put("scene", paramV2Json.optString("business", "default"))
                         put("ticker", title ?: "")
                         put("content", text ?: "")
-                        put("timerType", 0)
-                        put("timerWhen", 0)
-                        put("timerSystemCurrent", 0)
                         put("enableFloat", false)
                         put("updatable", true)
-                        put("param_v2", paramV2Json) // 将原始paramV2作为嵌套字段
+                        
+                        // 添加基础信息
+                        put("baseInfo", JSONObject().apply {
+                            put("title", title ?: "")
+                            put("content", text ?: "")
+                        })
                     }
                     
-                    extras.putString("miui.focus.param", fullFocusParam.toString())
-                } catch (e: Exception) {
-                    // 如果构建完整结构失败，回退到直接使用原始数据
-                    extras.putString("miui.focus.param", it)
+                    put("param_v2", paramV2Json)
                 }
-            }
-            
-            // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
-            picMap?.let {map ->
-                map.forEach { (picKey, picUrl) ->
-                    // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
-                    if (picKey.startsWith("miui.focus.pic_")) {
-                        // 解析图片引用符，获取实际的图片数据
-                        val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
-                        extras.putString(picKey, actualPicUrl)
+                
+                extras.putString("miui.focus.param", fullFocusParam.toString())
+                
+                // 添加其他必要的焦点通知字段
+                extras.putBoolean("miui.showAction", true)
+                
+                // 添加模拟的action字段
+                val actionsBundle = Bundle()
+                actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
+                actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
+                extras.putBundle("miui.focus.actions", actionsBundle)
+                
+                // 添加图片资源
+                picMap?.let { map ->
+                    // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
+                    map.forEach { (picKey, picUrl) ->
+                        if (picKey.startsWith("miui.focus.pic_")) {
+                            val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
+                            extras.putString(picKey, actualPicUrl)
+                        }
+                    }
+                    
+                    // 添加miui.focus.pics字段，包含所有图片资源的Bundle
+                    val picsBundle = Bundle()
+                    map.forEach { (picKey, picUrl) ->
+                        if (picKey.startsWith("miui.focus.pic_")) {
+                            picsBundle.putString(picKey, picUrl)
+                        }
+                    }
+                    extras.putBundle("miui.focus.pics", picsBundle)
+                }
+                
+                // 添加应用信息
+                extras.putBoolean("android.reduced.images", true)
+                extras.putString("superIslandSourcePackage", context.packageName)
+                extras.putString("app_package", context.packageName)
+                
+                // 发送通知
+                notificationManager.notify(notificationId, builder.build())
+            } else {
+                // 非媒体类型，使用原来的通知渠道和构建方式
+                // 创建通知渠道（Android O及以上）
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    val channel = android.app.NotificationChannel(
+                        NOTIFICATION_CHANNEL_ID,
+                        "超级岛复刻通知",
+                        NotificationManager.IMPORTANCE_DEFAULT
+                    )
+                    notificationManager.createNotificationChannel(channel)
+                }
+                
+                // 构建基础通知，调整属性使其更接近实际超级岛通知
+                val builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+                    .setContentTitle(title ?: appName ?: "超级岛通知")
+                    .setContentText(text ?: "")
+                    .setSmallIcon(android.R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
+                    // 调整为与实际超级岛通知一致的属性
+                    .setAutoCancel(false) // 实际通知通常不可清除
+                    .setOngoing(true) // 实际通知通常是持续的
+                    .setPriority(NotificationCompat.PRIORITY_MAX) // 提高优先级到最高，与原始通知一致
+                    .setShowWhen(false) // 不显示时间，与原始通知一致
+                    .setWhen(System.currentTimeMillis()) // 设置时间，但不显示
+                    .setOnlyAlertOnce(true) // 只提示一次
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 公开可见
+                
+                // 添加超级岛相关的结构化数据，严格按照小米官方文档规范和实际通知结构
+                val extras = builder.extras
+                
+                // 获取paramV2原始数据
+                val entry = floatingWindowManager.getEntry(key)
+                val paramV2Raw = entry?.paramV2Raw
+                
+                // 构建符合小米官方规范的完整miui.focus.param结构
+                paramV2Raw?.let {
+                    try {
+                        // 解析原始paramV2数据
+                        val paramV2Json = JSONObject(it)
+                        
+                        // 构建完整的焦点通知参数结构，包含外层scene、ticker等字段
+                        val fullFocusParam = JSONObject().apply {
+                            put("protocol", 1)
+                            put("scene", paramV2Json.optString("business", "default"))
+                            put("ticker", title ?: "")
+                            put("content", text ?: "")
+                            put("timerType", 0)
+                            put("timerWhen", 0)
+                            put("timerSystemCurrent", 0)
+                            put("enableFloat", false)
+                            put("updatable", true)
+                            put("param_v2", paramV2Json) // 将原始paramV2作为嵌套字段
+                        }
+                        
+                        extras.putString("miui.focus.param", fullFocusParam.toString())
+                    } catch (e: Exception) {
+                        // 如果构建完整结构失败，回退到直接使用原始数据
+                        extras.putString("miui.focus.param", it)
                     }
                 }
                 
-                // 添加miui.focus.pics字段，包含所有图片资源的Bundle
-                val picsBundle = Bundle()
-                map.forEach { (picKey, picUrl) ->
-                    if (picKey.startsWith("miui.focus.pic_")) {
-                        // 这里简化处理，实际应该创建Icon对象
-                        picsBundle.putString(picKey, picUrl)
+                // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
+                picMap?.let {map ->
+                    map.forEach { (picKey, picUrl) ->
+                        // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
+                        if (picKey.startsWith("miui.focus.pic_")) {
+                            // 解析图片引用符，获取实际的图片数据
+                            val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
+                            extras.putString(picKey, actualPicUrl)
+                        }
                     }
+                    
+                    // 添加miui.focus.pics字段，包含所有图片资源的Bundle
+                    val picsBundle = Bundle()
+                    map.forEach { (picKey, picUrl) ->
+                        if (picKey.startsWith("miui.focus.pic_")) {
+                            // 这里简化处理，实际应该创建Icon对象
+                            picsBundle.putString(picKey, picUrl)
+                        }
+                    }
+                    extras.putBundle("miui.focus.pics", picsBundle)
                 }
-                extras.putBundle("miui.focus.pics", picsBundle)
+                
+                // 添加焦点通知必要的额外字段
+                extras.putBoolean("miui.showAction", true)
+                
+                // 添加模拟的action字段，实际应该包含真实的Notification.Action对象
+                val actionsBundle = Bundle()
+                actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
+                actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
+                extras.putBundle("miui.focus.actions", actionsBundle)
+                
+                // 添加原始通知中存在的其他字段，这些可能影响UI显示
+                // 对于计时器类通知，添加计时器相关字段
+                if (title?.contains("计时") == true || title?.contains("秒表") == true) {
+                    extras.putBoolean("android.chronometerCountDown", false)
+                    extras.putBoolean("android.showChronometer", true)
+                }
+                
+                // 添加应用信息，与原始通知保持一致
+                extras.putBoolean("android.reduced.images", true)
+                
+                // 添加超级岛源包信息，与原始通知保持一致
+                extras.putString("superIslandSourcePackage", context.packageName)
+                
+                // 添加包名信息，与原始通知保持一致
+                extras.putString("app_package", context.packageName)
+                
+                // 发送通知
+                notificationManager.notify(notificationId, builder.build())
             }
-            
-            // 添加焦点通知必要的额外字段
-            extras.putBoolean("miui.showAction", true)
-            
-            // 添加模拟的action字段，实际应该包含真实的Notification.Action对象
-            val actionsBundle = Bundle()
-            actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
-            actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
-            extras.putBundle("miui.focus.actions", actionsBundle)
-            
-            // 添加原始通知中存在的其他字段，这些可能影响UI显示
-            // 对于计时器类通知，添加计时器相关字段
-            if (title?.contains("计时") == true || title?.contains("秒表") == true) {
-                extras.putBoolean("android.chronometerCountDown", false)
-                extras.putBoolean("android.showChronometer", true)
-            }
-            
-            // 添加应用信息，与原始通知保持一致
-            extras.putBoolean("android.reduced.images", true)
-            
-            // 添加超级岛源包信息，与原始通知保持一致
-            extras.putString("superIslandSourcePackage", context.packageName)
-            
-            // 添加包名信息，与原始通知保持一致
-            extras.putString("app_package", context.packageName)
-            
-            // 发送通知
-            notificationManager.notify(notificationId, builder.build())
             
             // 保存entryKey到notificationId的映射
             entryKeyToNotificationId[key] = notificationId

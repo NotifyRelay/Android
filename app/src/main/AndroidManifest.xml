@@ -82,6 +82,15 @@
             </intent-filter>
         </receiver>
         
+        <!-- 超级岛通知广播接收器，用于处理通知删除事件 -->
+        <receiver
+            android:name=".feature.notification.superisland.NotificationBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION" />
+            </intent-filter>
+        </receiver>
+        
         <!-- 剪贴板监控服务 -->
         <service
             android:name=".feature.clipboard.ClipboardMonitorService"
