@@ -710,16 +710,25 @@ object LiveUpdatesNotificationManager {
                     val paramV2Json = org.json.JSONObject(rawData)
                     
                     // 构建完整的焦点通知参数结构，包含外层scene、ticker等字段
+                    // 从paramV2Json中直接获取baseInfo，确保与FloatingReplicaManager一致
+                    val baseInfoJson = paramV2Json.optJSONObject("baseInfo")
+                    val tickerValue = baseInfoJson?.optString("title", "") ?: ""
+                    val contentValue = baseInfoJson?.optString("content", "") ?: ""
+                    
                     val fullFocusParam = org.json.JSONObject().apply {
                         put("protocol", 1)
                         put("scene", paramV2Json.optString("business", "default"))
-                        put("ticker", paramV2?.baseInfo?.title ?: "")
-                        put("content", paramV2?.baseInfo?.content ?: "")
+                        put("ticker", tickerValue)
+                        put("content", contentValue)
                         put("timerType", 0)
                         put("timerWhen", 0)
                         put("timerSystemCurrent", 0)
                         put("enableFloat", false)
                         put("updatable", true)
+                        put("reopen", paramV2Json.optString("reopen", "close"))
+                        put("timeout", paramV2Json.optInt("timeout", 720))
+                        put("filterWhenNoPermission", paramV2Json.optBoolean("filterWhenNoPermission", false))
+                        put("islandFirstFloat", paramV2Json.optBoolean("islandFirstFloat", false))
                         put("param_v2", paramV2Json) // 将原始paramV2作为嵌套字段
                     }
                     
@@ -779,6 +788,10 @@ object LiveUpdatesNotificationManager {
             
             // 添加包名信息，与原始通知保持一致
             extras.putString("app_package", appContext.packageName)
+            
+            // 添加MIUI焦点通知所需的额外字段
+            extras.putBoolean("miui.isFocusNotification", true)
+            extras.putBoolean("miui.showBadge", false)
             
             Logger.i(TAG, "添加超级岛结构化数据成功")
         } catch (e: Exception) {

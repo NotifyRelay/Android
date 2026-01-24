@@ -206,12 +206,11 @@ object FloatingReplicaManager {
                     // 创建或更新浮窗UI
                     addOrUpdateEntry(context, entryKey, summaryOnly)
                     
-                    // 发送复刻通知
-                    sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap)
-                    
-                    // 对于进度类型，且Live Updates启用时，发送复合通知作为浮窗的生命周期管理
+                    // 对于进度类型，且Live Updates启用时，只发送复合通知作为浮窗的生命周期管理
+                    // 否则发送传统复刻通知
                     val isLiveUpdatesEnabled = StorageManager.getBoolean(context, "super_island_live_updates_enabled", false)
                     val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
+                    
                     if (isProgressType && isLiveUpdatesEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                         try {
                             // 初始化Live Updates通知管理器
@@ -223,7 +222,12 @@ object FloatingReplicaManager {
                             Logger.i(TAG, "浮窗创建时发送Live Updates复合通知作为生命周期管理: sourceId=$sourceId")
                         } catch (e: Exception) {
                             Logger.w(TAG, "发送Live Updates复合通知失败: ${e.message}")
+                            // 发送失败时，回退到传统复刻通知
+                            sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap)
                         }
+                    } else {
+                        // 非进度类型或Live Updates未启用时，发送传统复刻通知
+                        sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap)
                     }
                 } catch (e: Exception) {
                     Logger.w(TAG, "超级岛: 显示浮窗失败(协程): ${e.message}")
