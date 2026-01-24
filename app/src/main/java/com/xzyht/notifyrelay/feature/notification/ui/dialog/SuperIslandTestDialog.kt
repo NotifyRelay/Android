@@ -46,45 +46,18 @@ private fun showTestNotification(
     picMap: Map<String, String>?,
     appName: String? = "测试应用"
 ) {
-    val isLiveUpdatesEnabled = StorageManager.getBoolean(context, "super_island_live_updates_enabled", false)
-    
-    if (isLiveUpdatesEnabled && Build.VERSION.SDK_INT >= 36) {
-            // 使用Live Updates API
-            try {
-                LiveUpdatesNotificationManager.initialize(context)
-                LiveUpdatesNotificationManager.showLiveUpdate(
-                    sourceId = sourceId,
-                    title = title,
-                    text = text,
-                    paramV2Raw = paramV2Raw,
-                    appName = appName,
-                    isLocked = false,
-                    picMap = picMap
-                )
-            } catch (e: Exception) {
-                // 如果Live Updates失败，回退到浮窗显示
-                FloatingReplicaManager.showFloating(
-                    context = context,
-                    sourceId = sourceId,
-                    title = title,
-                    text = text,
-                    paramV2Raw = paramV2Raw,
-                    picMap = picMap,
-                    isLocked = false
-                )
-            }
-        } else {
-            // 使用传统浮窗
-            FloatingReplicaManager.showFloating(
-                context = context,
-                sourceId = sourceId,
-                title = title,
-                text = text,
-                paramV2Raw = paramV2Raw,
-                picMap = picMap,
-                isLocked = false
-            )
-        }
+    // 总是使用FloatingReplicaManager创建浮窗
+    // 由FloatingReplicaManager内部决定是否需要发送Live Updates复合通知
+    FloatingReplicaManager.showFloating(
+        context = context,
+        sourceId = sourceId,
+        title = title,
+        text = text,
+        paramV2Raw = paramV2Raw,
+        picMap = picMap,
+        isLocked = false,
+        appName = appName
+    )
 }
 
 /**

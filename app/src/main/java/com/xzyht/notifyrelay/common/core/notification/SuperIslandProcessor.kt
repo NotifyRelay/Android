@@ -185,23 +185,13 @@ object SuperIslandProcessor {
                 }
 
                 try {
-                    // 仅在有实际可展示内容时才创建浮窗或 Live Updates 通知
+                    // 仅在有实际可展示内容时才创建浮窗
                     val hasContent = !finalTitle.isNullOrBlank() || !finalText.isNullOrBlank() || !mParam2.isNullOrBlank() || (mPics.isNotEmpty())
                     if (hasContent) {
-                        // 检查用户设置，决定使用浮窗还是 Live Updates
-                        val isLiveUpdatesEnabled = StorageManager.getBoolean(context, LIVE_UPDATES_ENABLED_KEY, false)
-                        
-                        if (isLiveUpdatesEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                            // 使用 Live Updates API
-                            LiveUpdatesNotificationManager.showLiveUpdate(
-                                sourceKey, finalTitle, finalText, mParam2, appName, isLocked
-                            )
-                            Logger.i("超级岛", "使用 Live Updates 显示通知: sourceKey=$sourceKey")
-                        } else {
-                            // 使用传统浮窗
-                            FloatingReplicaManager.showFloating(context, sourceKey, finalTitle, finalText, mParam2, mPics, appName, isLocked)
-                            Logger.i("超级岛", "使用浮窗显示通知: sourceKey=$sourceKey")
-                        }
+                        // 对于所有类型，都显示传统浮窗
+                        // 复合通知将在浮窗创建时由FloatingReplicaManager处理
+                        FloatingReplicaManager.showFloating(context, sourceKey, finalTitle, finalText, mParam2, mPics, appName, isLocked)
+                        Logger.i("超级岛", "使用浮窗显示通知: sourceKey=$sourceKey")
                     } else {
                         Logger.i("超级岛", "收到内容为空的超级岛包，跳过创建通知: sourceKey=$sourceKey")
                     }

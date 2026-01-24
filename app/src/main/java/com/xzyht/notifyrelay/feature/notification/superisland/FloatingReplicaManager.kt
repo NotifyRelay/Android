@@ -24,6 +24,8 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingW
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.common.data.StorageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -66,6 +68,15 @@ object FloatingReplicaManager {
                         sourceIdToEntryKeyMap.remove(sourceId)
                         // 当用户手动移除通知关闭浮窗时，将sourceId添加到黑名单，避免短时间内再次弹出
                         blockInstance(sourceId)
+                        // 同时关闭对应的Live Updates复合通知
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                            try {
+                                LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
+                                Logger.i(TAG, "关闭Live Updates复合通知: sourceId=$sourceId")
+                            } catch (e: Exception) {
+                                Logger.w(TAG, "关闭Live Updates复合通知失败: ${e.message}")
+                            }
+                        }
                     }
                 }
             }
@@ -182,6 +193,23 @@ object FloatingReplicaManager {
                     
                     // 发送复刻通知
                     sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap)
+                    
+                    // 对于进度类型，且Live Updates启用时，发送复合通知作为浮窗的生命周期管理
+                    val isLiveUpdatesEnabled = StorageManager.getBoolean(context, "super_island_live_updates_enabled", false)
+                    val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
+                    if (isProgressType && isLiveUpdatesEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                        try {
+                            // 初始化Live Updates通知管理器
+                            LiveUpdatesNotificationManager.initialize(context)
+                            // 发送复合通知
+                            LiveUpdatesNotificationManager.showLiveUpdate(
+                                sourceId, title, text, paramV2Raw, appName, isLocked, internedPicMap
+                            )
+                            Logger.i(TAG, "浮窗创建时发送Live Updates复合通知作为生命周期管理: sourceId=$sourceId")
+                        } catch (e: Exception) {
+                            Logger.w(TAG, "发送Live Updates复合通知失败: ${e.message}")
+                        }
+                    }
                 } catch (e: Exception) {
                     Logger.w(TAG, "超级岛: 显示浮窗失败(协程): ${e.message}")
                 }

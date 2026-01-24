@@ -82,6 +82,12 @@ object LiveUpdatesNotificationManager {
                 Logger.i(TAG, "picMap为空或null")
             }
 
+            // 仅处理进度类型通知
+            if (paramV2?.progressInfo == null && paramV2?.multiProgressInfo == null) {
+                Logger.i(TAG, "非进度类型通知，跳过处理: $sourceId")
+                return
+            }
+
             // 构建基础通知
             val notificationBuilder = buildBaseNotification(sourceId)
                 .setContentTitle(title ?: appName ?: "超级岛通知")
@@ -92,13 +98,13 @@ object LiveUpdatesNotificationManager {
             val shortText = when {
                 title?.isNotEmpty() == true && title.length <= 7 -> title
                 appName?.isNotEmpty() == true && appName.length <= 7 -> appName
-                paramV2?.baseInfo?.title?.isNotEmpty() == true && paramV2.baseInfo.title.length <= 7 -> paramV2.baseInfo.title
+                paramV2.baseInfo?.title?.isNotEmpty() == true && paramV2.baseInfo.title.length <= 7 -> paramV2.baseInfo.title
                 else -> "更新"
             }
             notificationBuilder.setShortCriticalText(shortText)
 
             // 添加操作按钮（如果有）
-            paramV2?.actions?.let {
+            paramV2.actions?.let {
                 for (action in it) {
                     try {
                         notificationBuilder.addAction(
@@ -114,25 +120,11 @@ object LiveUpdatesNotificationManager {
                 }
             }
 
-            // 构建最终通知
-            val finalBuilder = when {
-                paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null -> {
-                    // 进度条样式或多进度样式
-                    buildProgressStyleNotificationWithoutIcons(notificationBuilder, paramV2)
-                }
-                paramV2?.highlightInfo != null -> {
-                    // 强调样式
-                    buildHighlightStyleNotificationWithoutIcons(notificationBuilder, paramV2)
-                }
-                paramV2?.hintInfo != null || paramV2?.textButton != null -> {
-                    // 提示组件或文本按钮组件
-                    buildBasicStyleNotificationWithoutIcons(notificationBuilder, paramV2)
-                }
-                else -> {
-                    // 其他基础样式
-                    buildBasicStyleNotificationWithoutIcons(notificationBuilder, paramV2)
-                }
-            }
+            // 构建最终通知 - 仅处理进度类型
+            val finalBuilder = buildProgressStyleNotification(notificationBuilder, paramV2, picMap)
+
+            // 添加超级岛相关的结构化数据
+            addSuperIslandStructuredData(finalBuilder, paramV2, paramV2Raw, picMap)
 
             val notification = finalBuilder.build()
             
@@ -150,7 +142,7 @@ object LiveUpdatesNotificationManager {
 
             // 发送通知
             notificationManager.notify(notificationId, notification)
-            Logger.i(TAG, "发送Live Update通知成功: $sourceId")
+            Logger.i(TAG, "发送Live Update进度通知成功: $sourceId")
             
             // 异步加载图标并更新通知，确保图标正确显示
             loadIconsAndUpdateNotification(sourceId, notificationId, paramV2, picMap)
@@ -175,20 +167,10 @@ object LiveUpdatesNotificationManager {
         // 异步加载图标
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                // 根据不同的通知类型，加载对应的图标
-                when {
-                    paramV2.progressInfo != null || paramV2.multiProgressInfo != null -> {
-                        loadProgressStyleIcons(sourceId, notificationId, paramV2, picMap)
-                    }
-                    paramV2.highlightInfo != null -> {
-                        loadHighlightStyleIcons(sourceId, notificationId, paramV2, picMap)
-                    }
-                    else -> {
-                        loadBasicStyleIcons(sourceId, notificationId, paramV2, picMap)
-                    }
-                }
+                // 仅处理进度类型图标加载
+                loadProgressStyleIcons(sourceId, notificationId, paramV2, picMap)
             } catch (e: Exception) {
-                Logger.e(TAG, "异步加载图标并更新通知失败: ${e.message}")
+                Logger.e(TAG, "异步加载进度图标并更新通知失败: ${e.message}")
                 e.printStackTrace()
             }
         }
@@ -337,303 +319,30 @@ object LiveUpdatesNotificationManager {
                 updatedBuilder.setLargeIcon(it)
             }
             
-            // 处理进度样式通知
-            if (paramV2.progressInfo != null || paramV2.multiProgressInfo != null) {
-                val progressInfo = paramV2.progressInfo
-                val multiProgressInfo = paramV2.multiProgressInfo
-                
-                // 与官方示例保持一致：先获取基础样式，再增量添加图标和进度
-                val progressStyle = buildBaseProgressStyle(paramV2)
-                
-                // 设置进度图标（如果有）
-                progressIcon?.let {
-                    progressStyle.setProgressTrackerIcon(IconCompat.createWithBitmap(it))
-                }
-                
-                // 设置进度值
-                val currentProgress = progressInfo?.progress ?: multiProgressInfo?.progress ?: 0
-                progressStyle.setProgress(currentProgress)
-                
-                // 设置样式
-                updatedBuilder.setStyle(progressStyle)
-            } else if (paramV2.highlightInfo != null) {
-                // 强调样式
-                buildHighlightStyleNotificationWithoutIcons(updatedBuilder, paramV2)
-            } else {
-                // 其他基础样式
-                buildBasicStyleNotificationWithoutIcons(updatedBuilder, paramV2)
+            // 处理进度样式通知（仅处理进度类型）
+            val progressInfo = paramV2.progressInfo
+            val multiProgressInfo = paramV2.multiProgressInfo
+            
+            // 与官方示例保持一致：先获取基础样式，再增量添加图标和进度
+            val progressStyle = buildBaseProgressStyle(paramV2)
+            
+            // 设置进度图标（如果有）
+            progressIcon?.let {
+                progressStyle.setProgressTrackerIcon(IconCompat.createWithBitmap(it))
             }
             
+            // 设置进度值
+            val currentProgress = progressInfo?.progress ?: multiProgressInfo?.progress ?: 0
+            progressStyle.setProgress(currentProgress)
+            
+            // 设置样式
+            updatedBuilder.setStyle(progressStyle)
+            
             notificationManager.notify(notificationId, updatedBuilder.build())
-            Logger.i(TAG, "更新通知所有图标成功: $sourceId")
+            Logger.i(TAG, "更新进度通知图标成功: $sourceId")
         } catch (e: Exception) {
             Logger.w(TAG, "更新通知所有图标失败: ${e.message}")
             e.printStackTrace()
-        }
-    }
-    
-    /**
-     * 更新通知，添加应用图标
-     */
-    private fun updateNotificationWithAppIcon(
-        sourceId: String,
-        notificationId: Int,
-        paramV2: ParamV2,
-        appIcon: Bitmap
-    ) {
-        // 调用新的统一更新方法，不传入进度图标
-        updateNotificationWithAllIcons(sourceId, notificationId, paramV2, appIcon, null)
-    }
-    
-    /**
-     * 加载强调样式的图标并更新通知
-     */
-    private suspend fun loadHighlightStyleIcons(
-        sourceId: String,
-        notificationId: Int,
-        paramV2: ParamV2,
-        picMap: Map<String, String>
-    ) {
-        val highlightInfo = paramV2.highlightInfo ?: return
-        
-        // 加载强调组件图标
-        highlightInfo.picFunction?.let { picKey ->
-            val iconUrl = picMap[picKey]
-            if (iconUrl != null) {
-                val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
-                    context = appContext,
-                    urlOrData = iconUrl,
-                    timeoutMs = 5000
-                )
-                
-                if (bitmap != null) {
-                    // 缓存图标
-                    iconCache.put(iconUrl, bitmap)
-                    
-                    // 在主线程更新通知
-                    withContext(Dispatchers.Main) {
-                        updateHighlightNotificationWithIcon(sourceId, notificationId, paramV2, picMap, bitmap)
-                    }
-                }
-            }
-        }
-        
-        // 加载应用图标
-        paramV2.picInfo?.pic?.let { picKey ->
-            val appIconUrl = picMap[picKey]
-            if (appIconUrl != null) {
-                val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
-                    context = appContext,
-                    urlOrData = appIconUrl,
-                    timeoutMs = 5000
-                )
-                
-                if (bitmap != null) {
-                    // 缓存图标
-                    iconCache.put(appIconUrl, bitmap)
-                    
-                    // 在主线程更新通知
-                    withContext(Dispatchers.Main) {
-                        updateNotificationWithAppIcon(sourceId, notificationId, paramV2, bitmap)
-                    }
-                }
-            }
-        }
-    }
-    
-    /**
-     * 更新强调通知，添加图标
-     */
-    private fun updateHighlightNotificationWithIcon(
-        sourceId: String,
-        notificationId: Int,
-        paramV2: ParamV2,
-        picMap: Map<String, String>,
-        highlightIcon: Bitmap
-    ) {
-        try {
-            // 重新构建强调样式通知，包含图标
-            val updatedBuilder = buildBaseNotification(sourceId)
-            buildHighlightStyleNotificationWithIcon(updatedBuilder, paramV2, picMap, highlightIcon)
-            
-            notificationManager.notify(notificationId, updatedBuilder.build())
-            Logger.i(TAG, "更新强调通知图标成功: $sourceId")
-        } catch (e: Exception) {
-            Logger.w(TAG, "更新强调通知图标失败: ${e.message}")
-        }
-    }
-    
-    /**
-     * 加载基础样式的图标并更新通知
-     */
-    private suspend fun loadBasicStyleIcons(
-        sourceId: String,
-        notificationId: Int,
-        paramV2: ParamV2,
-        picMap: Map<String, String>
-    ) {
-        // 加载应用图标
-        paramV2.picInfo?.pic?.let { picKey ->
-            val appIconUrl = picMap[picKey]
-            if (appIconUrl != null) {
-                val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
-                    context = appContext,
-                    urlOrData = appIconUrl,
-                    timeoutMs = 5000
-                )
-                
-                if (bitmap != null) {
-                    // 缓存图标
-                    iconCache.put(appIconUrl, bitmap)
-                    
-                    // 在主线程更新通知
-                    withContext(Dispatchers.Main) {
-                        updateNotificationWithAppIcon(sourceId, notificationId, paramV2, bitmap)
-                    }
-                }
-            }
-        }
-        
-        // 根据不同的基础样式，加载对应的图标
-        when {
-            // 处理基础文本组件图标
-            paramV2.baseInfo != null -> {
-                paramV2.paramIsland?.smallIslandArea?.iconKey?.let { iconKey ->
-                    val iconUrl = picMap[iconKey]
-                    if (iconUrl != null) {
-                        val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
-                            context = appContext,
-                            urlOrData = iconUrl,
-                            timeoutMs = 5000
-                        )
-                        
-                        if (bitmap != null) {
-                            // 缓存图标
-                            iconCache.put(iconUrl, bitmap)
-                            
-                            // 在主线程更新通知
-                            withContext(Dispatchers.Main) {
-                                updateNotificationWithAppIcon(sourceId, notificationId, paramV2, bitmap)
-                            }
-                        }
-                    }
-                }
-            }
-            // 处理IM图文组件头像
-            paramV2.chatInfo != null -> {
-                paramV2.chatInfo.picProfile?.let { picKey ->
-                    val iconUrl = picMap[picKey]
-                    if (iconUrl != null) {
-                        val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
-                            context = appContext,
-                            urlOrData = iconUrl,
-                            timeoutMs = 5000
-                        )
-                        
-                        if (bitmap != null) {
-                            // 缓存图标
-                            iconCache.put(iconUrl, bitmap)
-                            
-                            // 在主线程更新通知
-                            withContext(Dispatchers.Main) {
-                                updateNotificationWithAppIcon(sourceId, notificationId, paramV2, bitmap)
-                            }
-                        }
-                    }
-                }
-            }
-            // 处理动画文本组件图标
-            paramV2.animTextInfo != null -> {
-                paramV2.paramIsland?.smallIslandArea?.iconKey?.let { iconKey ->
-                    val iconUrl = picMap[iconKey]
-                    if (iconUrl != null) {
-                        val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
-                            context = appContext,
-                            urlOrData = iconUrl,
-                            timeoutMs = 5000
-                        )
-                        
-                        if (bitmap != null) {
-                            // 缓存图标
-                            iconCache.put(iconUrl, bitmap)
-                            
-                            // 在主线程更新通知
-                            withContext(Dispatchers.Main) {
-                                updateNotificationWithAppIcon(sourceId, notificationId, paramV2, bitmap)
-                            }
-                        }
-                    }
-                }
-            }
-            // 处理图片识别组件图标
-            paramV2.picInfo != null -> {
-                paramV2.picInfo.pic?.let { picKey ->
-                    val iconUrl = picMap[picKey]
-                    if (iconUrl != null) {
-                        val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
-                            context = appContext,
-                            urlOrData = iconUrl,
-                            timeoutMs = 5000
-                        )
-                        
-                        if (bitmap != null) {
-                            // 缓存图标
-                            iconCache.put(iconUrl, bitmap)
-                            
-                            // 在主线程更新通知
-                            withContext(Dispatchers.Main) {
-                                updateNotificationWithAppIcon(sourceId, notificationId, paramV2, bitmap)
-                            }
-                        }
-                    }
-                }
-            }
-            // 处理提示组件图标
-            paramV2.hintInfo != null -> {
-                paramV2.hintInfo.picContent?.let { picKey ->
-                    val iconUrl = picMap[picKey]
-                    if (iconUrl != null) {
-                        val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
-                            context = appContext,
-                            urlOrData = iconUrl,
-                            timeoutMs = 5000
-                        )
-                        
-                        if (bitmap != null) {
-                            // 缓存图标
-                            iconCache.put(iconUrl, bitmap)
-                            
-                            // 在主线程更新通知
-                            withContext(Dispatchers.Main) {
-                                updateNotificationWithAppIcon(sourceId, notificationId, paramV2, bitmap)
-                            }
-                        }
-                    }
-                }
-            }
-            // 处理文本按钮组件图标
-            paramV2.textButton != null -> {
-                paramV2.paramIsland?.smallIslandArea?.iconKey?.let { iconKey ->
-                    val iconUrl = picMap[iconKey]
-                    if (iconUrl != null) {
-                        val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
-                            context = appContext,
-                            urlOrData = iconUrl,
-                            timeoutMs = 5000
-                        )
-                        
-                        if (bitmap != null) {
-                            // 缓存图标
-                            iconCache.put(iconUrl, bitmap)
-                            
-                            // 在主线程更新通知
-                            withContext(Dispatchers.Main) {
-                                updateNotificationWithAppIcon(sourceId, notificationId, paramV2, bitmap)
-                            }
-                        }
-                    }
-                }
-            }
         }
     }
     
@@ -886,213 +595,6 @@ object LiveUpdatesNotificationManager {
             return builder
         }
     }
-    
-    /**
-     * 构建不包含图标的强调样式通知
-     */
-    private fun buildHighlightStyleNotificationWithoutIcons(
-        builder: NotificationCompat.Builder,
-        paramV2: ParamV2
-    ): NotificationCompat.Builder {
-        val highlightInfo = paramV2.highlightInfo ?: return builder
-        
-        // 处理强调图文组件
-        try {
-            // 更新通知标题和内容
-            builder
-                .setContentTitle(HtmlCompat.fromHtml(highlightInfo.title ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY))
-                .setContentText(HtmlCompat.fromHtml(highlightInfo.content ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY))
-            
-            // 直接创建ProgressStyle实例，使用正确的原生API
-            val progressStyle = NotificationCompat.ProgressStyle()
-                .setProgress(50) // 强调样式默认显示50%进度
-
-            // 从highlightInfo获取颜色（如果有）
-            val highlightColor = paramV2.highlightInfo?.colorTitle ?: paramV2.highlightInfo?.colorContent
-            val color = highlightColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.BLUE
-            
-            // 创建进度点列表
-            val point25 = NotificationCompat.ProgressStyle.Point(25).setColor(color)
-            val point50 = NotificationCompat.ProgressStyle.Point(50).setColor(color)
-            
-            // 生成进度段列表
-            val segment25 = NotificationCompat.ProgressStyle.Segment(25).setColor(color)
-            
-            val progressSegments = listOf(segment25, segment25, segment25, segment25)
-            
-            // 设置进度点和进度段
-            progressStyle.setProgressPoints(listOf(point25, point50))
-            progressStyle.setProgressSegments(progressSegments)
-
-            // 直接调用builder.setStyle方法
-            return builder.setStyle(progressStyle)
-        } catch (e: Exception) {
-            // 回退到BigTextStyle
-            Logger.w(TAG, "使用ProgressStyle失败，回退到BigTextStyle: ${e.message}")
-            
-            // 更新通知标题和内容
-            val title = highlightInfo.title ?: ""
-            val content = highlightInfo.content ?: ""
-            val bigText = title.ifEmpty { content }
-            
-            builder
-                .setContentTitle(HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                .setContentText(HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY))
-            
-            return builder.setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText(HtmlCompat.fromHtml(bigText, HtmlCompat.FROM_HTML_MODE_LEGACY))
-            )
-        }
-    }
-    
-    /**
-     * 构建包含图标的强调样式通知
-     */
-    private fun buildHighlightStyleNotificationWithIcon(
-        builder: NotificationCompat.Builder,
-        paramV2: ParamV2,
-        picMap: Map<String, String>,
-        highlightIcon: Bitmap
-    ): NotificationCompat.Builder {
-        val highlightInfo = paramV2.highlightInfo ?: return builder
-        
-        try {
-            // 调用不包含图标的方法构建基础强调样式
-            buildHighlightStyleNotificationWithoutIcons(builder, paramV2)
-            
-            // 重新创建ProgressStyle实例，使用正确的原生API
-            val progressStyle = NotificationCompat.ProgressStyle()
-                .setProgress(50) // 强调样式默认显示50%进度
-
-            // 从highlightInfo获取颜色（如果有）
-            val highlightColor = paramV2.highlightInfo?.colorTitle ?: paramV2.highlightInfo?.colorContent
-            val color = highlightColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.BLUE
-            
-            // 创建进度点列表
-            val point25 = NotificationCompat.ProgressStyle.Point(25).setColor(color)
-            val point50 = NotificationCompat.ProgressStyle.Point(50).setColor(color)
-            
-            // 生成进度段列表
-            val segment25 = NotificationCompat.ProgressStyle.Segment(25).setColor(color)
-            
-            val progressSegments = listOf(segment25, segment25, segment25, segment25)
-            
-            // 设置进度点和进度段
-            progressStyle.setProgressPoints(listOf(point25, point50))
-            progressStyle.setProgressSegments(progressSegments)
-            
-            // 设置进度跟踪器图标
-            progressStyle.setProgressTrackerIcon(IconCompat.createWithBitmap(highlightIcon))
-            
-            // 直接调用builder.setStyle方法
-            return builder.setStyle(progressStyle)
-        } catch (e: Exception) {
-            Logger.w(TAG, "构建包含图标的强调样式通知失败: ${e.message}")
-            return builder
-        }
-    }
-    
-    /**
-     * 构建不包含图标的基础样式通知
-     */
-    private fun buildBasicStyleNotificationWithoutIcons(
-        builder: NotificationCompat.Builder,
-        paramV2: ParamV2?
-    ): NotificationCompat.Builder {
-        if (paramV2 == null) return builder
-        
-        // 处理基础文本组件
-        paramV2.baseInfo?.let {baseInfo ->
-            val title = baseInfo.title ?: ""
-            val content = baseInfo.content ?: ""
-            val bigText = title.ifEmpty { content }
-            
-            return builder
-                // 标题和内容使用HTML渲染
-                .setContentTitle(HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                .setContentText(HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                // BigTextStyle也需要使用HTML渲染
-                .setStyle(
-                    NotificationCompat.BigTextStyle()
-                        .bigText(HtmlCompat.fromHtml(bigText, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                )
-        }
-        
-        // 处理IM图文组件
-        paramV2.chatInfo?.let {chatInfo ->
-            val title = chatInfo.title ?: ""
-            val content = chatInfo.content ?: ""
-            val combinedText = "${title}: ${content}"
-            
-            return builder
-                .setContentTitle(HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                .setContentText(HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                .setStyle(
-                    NotificationCompat.BigTextStyle()
-                        .bigText(HtmlCompat.fromHtml(combinedText, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                )
-        }
-        
-        // 处理动画文本组件
-        paramV2.animTextInfo?.let {animTextInfo ->
-            val title = animTextInfo.title ?: ""
-            val content = animTextInfo.content ?: ""
-            val bigText = title.ifEmpty { content }
-            
-            return builder
-                .setContentTitle(HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                .setContentText(HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                .setStyle(
-                    NotificationCompat.BigTextStyle()
-                        .bigText(HtmlCompat.fromHtml(bigText, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                )
-        }
-        
-        // 处理图片识别组件
-        paramV2.picInfo?.let {picInfo ->
-            val title = picInfo.title ?: ""
-            
-            return builder
-                .setContentTitle(HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                .setContentText("")
-                .setStyle(
-                    NotificationCompat.BigTextStyle()
-                        .bigText(HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                )
-        }
-        
-        // 处理提示组件
-        paramV2.hintInfo?.let {hintInfo ->
-            val title = hintInfo.title ?: ""
-            val content = hintInfo.content ?: ""
-            val bigText = title.ifEmpty { content }
-            
-            return builder
-                .setContentTitle(HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                .setContentText(HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                .setStyle(
-                    NotificationCompat.BigTextStyle()
-                        .bigText(HtmlCompat.fromHtml(bigText, HtmlCompat.FROM_HTML_MODE_LEGACY))
-                )
-        }
-        
-        // 处理文本按钮组件
-        paramV2.textButton?.let {textButton ->
-            // 从actions中获取按钮文本
-            val buttonText = textButton.actions?.firstOrNull()?.actionTitle ?: "文本按钮"
-            return builder.setStyle(
-                NotificationCompat.BigTextStyle()
-                    .bigText(buttonText)
-            )
-        }
-        
-        // 默认使用BigTextStyle
-        return builder.setStyle(
-            NotificationCompat.BigTextStyle()
-                .bigText(builder.build().extras.getString(NotificationCompat.EXTRA_TEXT))
-        )
-    }
 
     private fun buildBaseNotification(sourceId: String): NotificationCompat.Builder {
         val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
@@ -1107,24 +609,6 @@ object LiveUpdatesNotificationManager {
             .setRequestPromotedOngoing(true)
 
         return builder
-    }
-
-    private fun buildBasicStyleNotification(
-        builder: NotificationCompat.Builder,
-        paramV2: ParamV2?,
-        picMap: Map<String, String>? = null
-    ): NotificationCompat.Builder {
-        // 这里保留原方法，供其他地方调用
-        return buildBasicStyleNotificationWithoutIcons(builder, paramV2)
-    }
-
-    private fun buildHighlightStyleNotification(
-        builder: NotificationCompat.Builder,
-        paramV2: ParamV2,
-        picMap: Map<String, String>? = null
-    ): NotificationCompat.Builder {
-        // 这里保留原方法，供其他地方调用
-        return buildHighlightStyleNotificationWithoutIcons(builder, paramV2)
     }
 
     fun cancelLiveUpdate(sourceId: String) {
@@ -1199,6 +683,107 @@ object LiveUpdatesNotificationManager {
         } catch (e: Exception) {
             Logger.w(TAG, "检查通知可提升特性失败: ${e.message}")
             return false
+        }
+    }
+    
+    /**
+     * 添加超级岛相关的结构化数据到Live Updates通知
+     * @param builder 通知构建器
+     * @param paramV2 ParamV2对象
+     * @param paramV2Raw ParamV2原始JSON字符串
+     * @param picMap 图片映射
+     */
+    private fun addSuperIslandStructuredData(
+        builder: NotificationCompat.Builder,
+        paramV2: ParamV2?,
+        paramV2Raw: String?,
+        picMap: Map<String, String>?
+    ) {
+        try {
+            // 获取通知的extras，用于添加结构化数据
+            val extras = builder.extras
+            
+            // 构建符合小米官方规范的完整miui.focus.param结构
+            paramV2Raw?.let { rawData ->
+                try {
+                    // 解析原始paramV2数据
+                    val paramV2Json = org.json.JSONObject(rawData)
+                    
+                    // 构建完整的焦点通知参数结构，包含外层scene、ticker等字段
+                    val fullFocusParam = org.json.JSONObject().apply {
+                        put("protocol", 1)
+                        put("scene", paramV2Json.optString("business", "default"))
+                        put("ticker", paramV2?.baseInfo?.title ?: "")
+                        put("content", paramV2?.baseInfo?.content ?: "")
+                        put("timerType", 0)
+                        put("timerWhen", 0)
+                        put("timerSystemCurrent", 0)
+                        put("enableFloat", false)
+                        put("updatable", true)
+                        put("param_v2", paramV2Json) // 将原始paramV2作为嵌套字段
+                    }
+                    
+                    extras.putString("miui.focus.param", fullFocusParam.toString())
+                    Logger.i(TAG, "添加miui.focus.param成功")
+                } catch (e: Exception) {
+                    // 如果构建完整结构失败，回退到直接使用原始数据
+                    extras.putString("miui.focus.param", rawData)
+                    Logger.w(TAG, "构建完整焦点通知参数结构失败，回退到原始数据: ${e.message}")
+                }
+            }
+            
+            // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
+            picMap?.let { map ->
+                map.forEach { (picKey, picUrl) ->
+                    // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
+                    if (picKey.startsWith("miui.focus.pic_")) {
+                        // 解析图片引用符，获取实际的图片数据
+                        val actualPicUrl = com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore.resolve(appContext, picUrl) ?: picUrl
+                        extras.putString(picKey, actualPicUrl)
+                    }
+                }
+                
+                // 添加miui.focus.pics字段，包含所有图片资源的Bundle
+                val picsBundle = android.os.Bundle()
+                map.forEach { (picKey, picUrl) ->
+                    if (picKey.startsWith("miui.focus.pic_")) {
+                        picsBundle.putString(picKey, picUrl)
+                    }
+                }
+                extras.putBundle("miui.focus.pics", picsBundle)
+                Logger.i(TAG, "添加图片资源成功，共${map.size}个图片")
+            }
+            
+            // 添加焦点通知必要的额外字段
+            extras.putBoolean("miui.showAction", true)
+            
+            // 添加模拟的action字段
+            val actionsBundle = android.os.Bundle()
+            actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
+            actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
+            extras.putBundle("miui.focus.actions", actionsBundle)
+            
+            // 添加原始通知中存在的其他字段，这些可能影响UI显示
+            // 对于计时器类通知，添加计时器相关字段
+            val title = paramV2?.baseInfo?.title ?: ""
+            if (title.contains("计时") || title.contains("秒表")) {
+                extras.putBoolean("android.chronometerCountDown", false)
+                extras.putBoolean("android.showChronometer", true)
+            }
+            
+            // 添加应用信息，与原始通知保持一致
+            extras.putBoolean("android.reduced.images", true)
+            
+            // 添加超级岛源包信息，与原始通知保持一致
+            extras.putString("superIslandSourcePackage", appContext.packageName)
+            
+            // 添加包名信息，与原始通知保持一致
+            extras.putString("app_package", appContext.packageName)
+            
+            Logger.i(TAG, "添加超级岛结构化数据成功")
+        } catch (e: Exception) {
+            Logger.w(TAG, "添加超级岛结构化数据失败: ${e.message}")
+            e.printStackTrace()
         }
     }
 }
