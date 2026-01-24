@@ -52,7 +52,7 @@ object MessageSender {
     // 去重集合：防止同一设备、同一数据在未完成前被重复入队
     private val pendingKeys = ConcurrentHashMap.newKeySet<String>()
     // 已发送记录（带 TTL），防止短时间内重复发送已成功发送的通知
-    private const val SENT_KEY_TTL_MS = 10_000L // 10秒内视为已发送，避免重复
+    private const val SENT_KEY_TTL_MS = 3_000L // 3秒内视为已发送，避免重复
     private val sentKeys = ConcurrentHashMap<String, Long>()
 
     // 超级岛：为实现“首次全量，后续差异”，需要跟踪每个设备下每个feature的上次完整状态
@@ -482,11 +482,11 @@ object MessageSender {
                 // 计算差异
                 val diff = diffMediaPlay(lastState, currentState)
                 
-                // 判断是否需要发送全量包：首次发送、封面变化、或超过15秒
+                // 判断是否需要发送全量包：首次发送、封面变化、或超过6秒
                 val now = System.currentTimeMillis()
                 val needFullPayload = lastState == null || 
                                       diff.coverUrl != null ||
-                                      (now - lastState.sentTime > 15 * 1000)
+                                      (now - lastState.sentTime > 6 * 1000)
                 
                 // 构建发送数据
                 val payloadObj = if (needFullPayload) {

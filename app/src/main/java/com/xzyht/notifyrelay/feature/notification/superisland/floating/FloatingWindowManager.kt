@@ -15,7 +15,8 @@ class FloatingWindowManager {
 
     // 常量定义
     private val EXPANDED_DURATION_MS = 3000L // 展开态持续时间
-    private val AUTO_DISMISS_DURATION_MS = 12000L // 自动移除时间
+    private val AUTO_DISMISS_DURATION_MS = 12000L // 自动移除时间（非媒体类型）
+    private val AUTO_DISMISS_DURATION_MS_MEDIA = 20000L // 媒体类型自动移除时间，比媒体会话超时时间（16秒）长一些
 
     // 用于处理延迟任务的Handler
     private val handler = Handler(Looper.getMainLooper())
@@ -28,6 +29,9 @@ class FloatingWindowManager {
 
     // 条目数量变化回调，当条目数量变为0时调用
     var onEntriesEmpty: (() -> Unit)? = null
+    
+    // 条目移除回调，当单个条目被移除时调用
+    var onEntryRemoved: ((String) -> Unit)? = null
 
     // 记录条目的内部数据类
     private data class EntryWithTimestamp(
@@ -129,7 +133,12 @@ class FloatingWindowManager {
         }
 
         // 所有条目都添加自动移除任务
-        scheduleRemoval(key, AUTO_DISMISS_DURATION_MS)
+        val autoDismissDuration = if (business == "media") {
+            AUTO_DISMISS_DURATION_MS_MEDIA
+        } else {
+            AUTO_DISMISS_DURATION_MS
+        }
+        scheduleRemoval(key, autoDismissDuration)
 
         updateEntriesList()
     }
@@ -193,6 +202,8 @@ class FloatingWindowManager {
         cancelAllTasks(key)
         entriesMap.remove(key)
         updateEntriesList()
+        // 调用条目移除回调
+        onEntryRemoved?.invoke(key)
     }
 
     /**

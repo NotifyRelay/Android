@@ -44,7 +44,32 @@ object FloatingReplicaManager {
     // Compose浮窗管理器
     private val floatingWindowManager = FloatingWindowManager().apply {
         // 设置条目为空时的回调
-        onEntriesEmpty = { removeOverlayContainer() }
+        onEntriesEmpty = { 
+            removeOverlayContainer() 
+            // 当所有条目为空时，清除所有通知
+            clearAllReplicaNotifications()
+        }
+        // 设置条目移除回调，当单个条目被移除时取消对应的通知
+        onEntryRemoved = { key -> 
+            val context = overlayView?.get()?.context
+            if (context != null) {
+                cancelReplicaNotification(context, key)
+            } else {
+                // 如果没有上下文，直接从映射中移除
+                entryKeyToNotificationId.remove(key)
+            }
+            // 从sourceId映射中移除，并将sourceId添加到黑名单
+            sourceIdToEntryKeyMap.forEach { (sourceId, keys) ->
+                if (keys.contains(key)) {
+                    keys.remove(key)
+                    if (keys.isEmpty()) {
+                        sourceIdToEntryKeyMap.remove(sourceId)
+                        // 当用户手动移除通知关闭浮窗时，将sourceId添加到黑名单，避免短时间内再次弹出
+                        blockInstance(sourceId)
+                    }
+                }
+            }
+        }
     }
     // Compose生命周期管理器
     private val lifecycleManager = LifecycleManager()
@@ -270,9 +295,9 @@ object FloatingReplicaManager {
                     .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
                     .setContentText(text ?: "")
                     .setSmallIcon(android.R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
-                    // 调整为可交互的属性，以便用户可以关闭通知
-                    .setAutoCancel(true) // 允许用户点击清除通知
-                    .setOngoing(false) // 允许通知被清除
+                    // 调整为不可被一键清除的属性，只能手动划去
+                    .setAutoCancel(false) // 不允许用户点击清除通知
+                    .setOngoing(true) // 不允许通知被一键清除
                     .setPriority(NotificationCompat.PRIORITY_MAX)
                     .setShowWhen(false)
                     .setWhen(System.currentTimeMillis())
@@ -283,34 +308,37 @@ object FloatingReplicaManager {
                 // 添加焦点歌词相关的结构化数据
                 val extras = builder.extras
                 
-                // 构建最精简版miui.focus.param，严格按照HyperIslandApi标准，避免系统崩溃
+                // 构建符合HyperIslandApi标准的媒体类型miui.focus.param，优化数据结构
                 val fullFocusParam = JSONObject().apply {
                     put("protocol", 1)
-                    put("scene", "music") // 使用music场景
+                    put("scene", "music") // 媒体类型固定使用music场景
                     put("ticker", title ?: "")
                     put("content", text ?: "")
                     put("enableFloat", false)
                     put("updatable", true)
                     put("reopen", "close")
                     
-                    // 最精简的animTextInfo，只使用HyperIslandApi定义的标准字段
+                    // 媒体类型需要的animTextInfo字段
                     put("animTextInfo", JSONObject().apply {
                         put("title", title ?: "")
                         put("content", text ?: "")
                     })
                     
-                    // 修复：param_v2内部应该保留baseInfo，而不是animTextInfo
+                    // 优化媒体类型param_v2结构，符合小米官方标准
                     val paramV2Json = JSONObject().apply {
                         put("business", "music")
                         put("protocol", 1)
+                        put("scene", "music")
                         put("ticker", title ?: "")
                         put("content", text ?: "")
                         put("enableFloat", false)
                         put("updatable", true)
-                        put("scene", "music")
                         put("reopen", "close")
+                        put("timerType", 0)
+                        put("timerWhen", 0)
+                        put("timerSystemCurrent", 0)
                         
-                        // 恢复baseInfo字段，移除错误的内部animTextInfo
+                        // 媒体类型必须包含的baseInfo字段
                         put("baseInfo", JSONObject().apply {
                             put("title", title ?: "")
                             put("content", text ?: "")
@@ -495,6 +523,28 @@ object FloatingReplicaManager {
     }
     
     /**
+     * 清除所有复刻通知
+     */
+    private fun clearAllReplicaNotifications() {
+        try {
+            val context = overlayView?.get()?.context ?: return
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            
+            // 取消所有映射中的通知
+            entryKeyToNotificationId.forEach { (key, notificationId) ->
+                notificationManager.cancel(notificationId)
+                Logger.i(TAG, "超级岛: 取消复刻通知成功，key=$key, notificationId=$notificationId")
+            }
+            
+            // 清空映射
+            entryKeyToNotificationId.clear()
+            Logger.i(TAG, "超级岛: 清除所有复刻通知成功")
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: 清除所有复刻通知失败: ${e.message}")
+        }
+    }
+    
+    /**
      * 根据通知ID关闭对应的浮窗条目
      */
     fun closeByNotificationId(notificationId: Int) {
@@ -502,21 +552,8 @@ object FloatingReplicaManager {
             // 查找对应的entryKey
             val entryKey = entryKeyToNotificationId.entries.find { it.value == notificationId }?.key
             if (entryKey != null) {
-                // 移除浮窗条目
+                // 移除浮窗条目，这会触发onEntryRemoved回调，进而取消对应的通知并清理映射
                 floatingWindowManager.removeEntry(entryKey)
-                // 从映射中移除
-                entryKeyToNotificationId.remove(entryKey)
-                // 从sourceId映射中移除，并将sourceId添加到黑名单
-                sourceIdToEntryKeyMap.forEach { (sourceId, keys) ->
-                    if (keys.contains(entryKey)) {
-                        keys.remove(entryKey)
-                        if (keys.isEmpty()) {
-                            sourceIdToEntryKeyMap.remove(sourceId)
-                            // 当用户手动移除通知关闭浮窗时，将sourceId添加到黑名单，避免短时间内再次弹出
-                            blockInstance(sourceId)
-                        }
-                    }
-                }
                 Logger.i(TAG, "超级岛: 根据通知ID关闭浮窗条目成功，notificationId=$notificationId, entryKey=$entryKey")
             }
         } catch (e: Exception) {
@@ -529,10 +566,17 @@ object FloatingReplicaManager {
      */
     fun closeAllEntries() {
         try {
+            val context = overlayView?.get()?.context
             // 清空所有条目
             floatingWindowManager.clearAllEntries()
+            // 取消所有复刻通知
+            if (context != null) {
+                clearAllReplicaNotifications()
+            } else {
+                // 如果没有上下文，直接清空映射
+                entryKeyToNotificationId.clear()
+            }
             // 清空映射
-            entryKeyToNotificationId.clear()
             sourceIdToEntryKeyMap.clear()
             Logger.i(TAG, "超级岛: 关闭所有浮窗条目成功")
         } catch (e: Exception) {
@@ -543,34 +587,18 @@ object FloatingReplicaManager {
     // 新增：按来源键立刻移除指定浮窗（用于接收终止事件SI_END时立即消除）
     fun dismissBySource(sourceId: String) {
         try {
-            val context = overlayView?.get()?.context
-            
             // 从映射中获取所有对应的entryKey
             val entryKeys = sourceIdToEntryKeyMap[sourceId]
             if (entryKeys != null) {
-                // 移除所有相关条目
+                // 移除所有相关条目，这会触发onEntryRemoved回调，进而取消对应的通知并清理映射
                 entryKeys.forEach { entryKey ->
                     floatingWindowManager.removeEntry(entryKey)
-                    // 取消对应的复刻通知
-                    if (context != null) {
-                        cancelReplicaNotification(context, entryKey)
-                    } else {
-                        // 如果没有上下文，直接从映射中移除
-                        entryKeyToNotificationId.remove(entryKey)
-                    }
                 }
-                // 清理映射关系
+                // 清理映射关系（如果还有剩余）
                 sourceIdToEntryKeyMap.remove(sourceId)
             } else {
-                // 如果没有找到映射，尝试直接使用sourceId移除
+                // 如果没有找到映射，尝试直接使用sourceId移除，这会触发onEntryRemoved回调
                 floatingWindowManager.removeEntry(sourceId)
-                // 取消对应的复刻通知
-                if (context != null) {
-                    cancelReplicaNotification(context, sourceId)
-                } else {
-                    // 如果没有上下文，直接从映射中移除
-                    entryKeyToNotificationId.remove(sourceId)
-                }
             }
             // 如果对应的会话结束（SI_END），同步移除黑名单，允许后续同一通知重新展示
             blockedInstanceIds.remove(sourceId)
