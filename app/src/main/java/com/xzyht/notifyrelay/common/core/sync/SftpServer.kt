@@ -1,22 +1,21 @@
 package com.xzyht.notifyrelay.common.core.sync
 
 import android.content.Context
-import android.os.Build
 import android.util.Base64
 import com.xzyht.notifyrelay.common.core.util.Logger
-import org.apache.sshd.common.file.FileSystemFactory
-import org.apache.sshd.common.file.nativefs.NativeFileSystemFactory
-import org.apache.sshd.common.file.virtualfs.VirtualFileSystemFactory
-import org.apache.sshd.common.keyprovider.KeyPairProvider
-import org.apache.sshd.common.session.SessionContext
-import org.apache.sshd.common.util.io.PathUtils
-import org.apache.sshd.common.util.security.SecurityUtils
-import org.apache.sshd.server.ServerBuilder
-import org.apache.sshd.server.auth.password.PasswordAuthenticator
-import org.apache.sshd.server.auth.pubkey.PublickeyAuthenticator
-import org.apache.sshd.sftp.server.SftpSubsystemFactory
-import java.nio.file.Paths
-import java.security.KeyPair
+import org.apache.ftpserver.FtpServer
+import org.apache.ftpserver.FtpServerFactory
+import org.apache.ftpserver.ftplet.Authority
+import org.apache.ftpserver.ftplet.FtpException
+import org.apache.ftpserver.ftplet.UserManager
+import org.apache.ftpserver.ftplet.User
+import org.apache.ftpserver.listener.ListenerFactory
+import org.apache.ftpserver.usermanager.PropertiesUserManagerFactory
+import org.apache.ftpserver.usermanager.impl.BaseUser
+import org.apache.ftpserver.usermanager.impl.WritePermission
+import java.io.File
+import java.io.IOException
+import java.io.FileOutputStream
 import java.security.MessageDigest
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -29,12 +28,12 @@ data class SftpServerInfo(
 
 object SftpServer {
     private const val TAG = "SftpServer"
-    private const val DERIVED_USERNAME_PREFIX = "sftp_"
+    private const val DERIVED_USERNAME_PREFIX = "ftp_"
     private const val DERIVED_PASSWORD_LENGTH = 32
 
     private val PORT_RANGE = 5151..5169
 
-    private var sshd: org.apache.sshd.server.SshServer? = null
+    private var ftpServer: FtpServer? = null
     private var isRunning = AtomicBoolean(false)
     private var serverInfo: SftpServerInfo? = null
     private lateinit var applicationContext: Context
@@ -43,51 +42,40 @@ object SftpServer {
         this.applicationContext = context.applicationContext
     }
 
-    init {
-        System.setProperty(SecurityUtils.SECURITY_PROVIDER_REGISTRARS, "")
-        System.setProperty(
-            "org.apache.sshd.common.io.IoServiceFactoryFactory",
-            "org.apache.sshd.common.io.nio2.Nio2ServiceFactoryFactory"
-        )
-        PathUtils.setUserHomeFolderResolver {
-            Paths.get("/")
-        }
-    }
-
-    private fun createSelfSignedKeyPair(): KeyPair {
-        val keyPairGenerator = java.security.KeyPairGenerator.getInstance("RSA")
-        keyPairGenerator.initialize(2048)
-        return keyPairGenerator.generateKeyPair()
-    }
-
-    private class PfxKeyPairProvider : KeyPairProvider {
-        private val keyPair: KeyPair = createSelfSignedKeyPair()
-
-        override fun loadKeys(session: SessionContext?): Iterable<KeyPair> = listOf(keyPair)
-    }
-    
-    private fun createFileSystemFactory(): FileSystemFactory {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Android 10+ 使用 VirtualFileSystemFactory
-            VirtualFileSystemFactory(Paths.get("/storage/emulated/0/"))
-        } else {
-            // Android O(26)+ 使用 NativeFileSystemFactory
-            NativeFileSystemFactory()
-        }
-    }
-
-    private class DerivedPasswordAuthenticator(
-        private val validUsername: String,
-        private val validPasswordHash: String
-    ) : PasswordAuthenticator {
-        override fun authenticate(
-            username: String?,
-            password: String?,
-            session: org.apache.sshd.server.session.ServerSession?
-        ): Boolean {
-            if (username != validUsername) return false
-            val inputHash = derivePasswordHash(password ?: "")
-            return inputHash == validPasswordHash
+    private fun createTemporaryUserManager(username: String, password: String, context: Context): UserManager {
+        try {
+            // 创建临时用户管理器
+            val userManagerFactory = PropertiesUserManagerFactory()
+            
+            // 设置临时属性文件
+            val tempFile = File.createTempFile("ftpusers", ".properties", context.cacheDir)
+            tempFile.deleteOnExit()
+            
+            // 确保文件存在
+            FileOutputStream(tempFile).use { it.write("# FTPServer Users\n".toByteArray()) }
+            
+            userManagerFactory.file = tempFile
+            
+            val userManager = userManagerFactory.createUserManager()
+            
+            // 创建用户
+            val user = BaseUser()
+            user.name = username
+            user.password = password
+            user.homeDirectory = "/storage/emulated/0/"
+            
+            // 设置权限
+            val authorities = mutableListOf<Authority>()
+            authorities.add(WritePermission())
+            user.authorities = authorities
+            
+            // 添加用户
+            userManager.save(user)
+            
+            return userManager
+        } catch (e: Exception) {
+            Logger.e(TAG, "Failed to create user manager", e)
+            throw e
         }
     }
 
@@ -107,17 +95,11 @@ object SftpServer {
         return Pair(username, password)
     }
 
-    fun derivePasswordHash(password: String): String {
-        val md5 = MessageDigest.getInstance("MD5")
-        val hash = md5.digest(password.toByteArray(Charsets.UTF_8))
-        return Base64.encodeToString(hash, Base64.NO_WRAP)
-    }
-
     fun initialize() {
         // 初始化方法不再需要，在start方法中动态创建
     }
 
-    // 定义SFTP启动结果状态
+    // 定义FTP启动结果状态（保持与原SFTP相同的枚举名称）
     enum class StartResult {
         SUCCESS,         // 启动成功
         ALREADY_RUNNING, // 已在运行
@@ -134,9 +116,9 @@ object SftpServer {
     
     @Synchronized
     fun start(sharedSecret: String, deviceName: String, context: Context): SftpStartResult {
-        Logger.i(TAG, "SFTP 服务器启动请求，设备名称: $deviceName")
+        Logger.i(TAG, "FTP 服务器启动请求，设备名称: $deviceName")
         if (isRunning.get()) {
-            Logger.i(TAG, "SFTP 服务器已在运行，返回当前服务器信息")
+            Logger.i(TAG, "FTP 服务器已在运行，返回当前服务器信息")
             return SftpStartResult(StartResult.ALREADY_RUNNING, serverInfo)
         }
 
@@ -146,21 +128,20 @@ object SftpServer {
         // 检查文件管理权限
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
             if (!android.os.Environment.isExternalStorageManager()) {
-                Logger.w(TAG, "SFTP 服务需要文件管理权限，当前未授权")
+                Logger.w(TAG, "FTP 服务需要文件管理权限，当前未授权")
                 // 在UI线程中显示Toast提示用户
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    com.xzyht.notifyrelay.common.core.util.ToastUtils.showShortToast(context, "SFTP 服务需要文件管理权限，当前仅能查看文件层级")
+                    com.xzyht.notifyrelay.common.core.util.ToastUtils.showShortToast(context, "FTP 服务需要文件管理权限，当前仅能查看文件层级")
                 }
-                // 即使没有文件权限，也继续启动SFTP服务，PC端可以获取文件层级
+                // 即使没有文件权限，也继续启动FTP服务，PC端可以获取文件层级
             }
         }
 
-        Logger.d(TAG, "从共享密钥派生 SFTP 凭据")
+        Logger.d(TAG, "从共享密钥派生 FTP 凭据")
         val (username, password) = deriveCredentialsFromSharedSecret(sharedSecret)
-        val passwordHash = derivePasswordHash(password)
         Logger.d(TAG, "派生的用户名: $username")
 
-        Logger.d(TAG, "开始在端口范围 $PORT_RANGE 中尝试启动 SFTP 服务器")
+        Logger.d(TAG, "开始在端口范围 $PORT_RANGE 中尝试启动 FTP 服务器")
 
         var lastException: Exception? = null
         var seenBind = false
@@ -169,26 +150,27 @@ object SftpServer {
 
         PORT_RANGE.forEach { port ->
             try {
-                Logger.d(TAG, "尝试在端口 $port 启动 SFTP 服务器")
+                Logger.d(TAG, "尝试在端口 $port 启动 FTP 服务器")
 
-                // 创建文件系统工厂
-                val fileSystemFactory = createFileSystemFactory()
-
-                sshd = ServerBuilder.builder().apply {
-                    fileSystemFactory(fileSystemFactory)
-                }.build().apply {
-                    this.port = port
-                    keyPairProvider = PfxKeyPairProvider()
-                    // 禁用公钥认证，强制使用派生的用户名/密码认证
-                    publickeyAuthenticator = PublickeyAuthenticator { _, _, _ -> false }
-                    passwordAuthenticator = DerivedPasswordAuthenticator(username, passwordHash)
-                    subsystemFactories = listOf(SftpSubsystemFactory())
-                    start()
-                }
+                // 创建FTP服务器工厂
+                val serverFactory = FtpServerFactory()
+                
+                // 创建监听器
+                val listenerFactory = ListenerFactory()
+                listenerFactory.port = port
+                serverFactory.addListener("default", listenerFactory.createListener())
+                
+                // 创建用户管理器
+                val userManager = createTemporaryUserManager(username, password, context)
+                serverFactory.userManager = userManager
+                
+                // 启动服务器
+                ftpServer = serverFactory.createServer()
+                ftpServer?.start()
 
                 isRunning.set(true)
                 val ipAddress = getDeviceIpAddress()
-                Logger.i(TAG, "SFTP 服务器在端口 $port 启动成功，IP 地址: $ipAddress")
+                Logger.i(TAG, "FTP 服务器在端口 $port 启动成功，IP 地址: $ipAddress")
 
                 serverInfo = SftpServerInfo(
                     username = username,
@@ -197,7 +179,7 @@ object SftpServer {
                     port = port
                 )
 
-                Logger.i(TAG, "SFTP server started: $ipAddress on port $port (derived from sharedSecret)")
+                Logger.i(TAG, "FTP server started: $ipAddress on port $port (derived from sharedSecret)")
                 return SftpStartResult(StartResult.SUCCESS, serverInfo)
             } catch (e: Exception) {
                 lastException = e
@@ -205,22 +187,24 @@ object SftpServer {
                     is java.net.BindException -> seenBind = true
                     is SecurityException -> seenPermDenied = true
                     is IllegalArgumentException -> seenConfig = true
+                    is FtpException -> seenConfig = true
+                    is IOException -> seenConfig = true
                 }
 
-                Logger.e(TAG, "Failed to start SFTP server on port $port", e)
+                Logger.e(TAG, "Failed to start FTP server on port $port", e)
 
-                // 如果构建了 sshd 实例但 start() 抛出异常，确保清理已分配的资源
+                // 如果构建了 ftpServer 实例但 start() 抛出异常，确保清理已分配的资源
                 try {
-                    sshd?.stop(true)
+                    ftpServer?.stop()
                 } catch (stopEx: Exception) {
-                    Logger.w(TAG, "Failed to stop partially-initialized sshd", stopEx)
+                    Logger.w(TAG, "Failed to stop partially-initialized ftpServer", stopEx)
                 }
-                sshd = null
+                ftpServer = null
                 isRunning.set(false)
             }
         }
 
-        Logger.e(TAG, "所有端口尝试失败，无法启动 SFTP 服务器: lastException=${lastException?.javaClass?.name}")
+        Logger.e(TAG, "所有端口尝试失败，无法启动 FTP 服务器: lastException=${lastException?.javaClass?.name}")
 
         return when {
             seenPermDenied -> SftpStartResult(StartResult.PERMISSION_DENIED)
@@ -233,15 +217,15 @@ object SftpServer {
     @Synchronized
     fun stop() {
         try {
-            if (isRunning.get() || sshd != null) {
-                sshd?.stop(true)
-                sshd = null
+            if (isRunning.get() || ftpServer != null) {
+                ftpServer?.stop()
+                ftpServer = null
                 isRunning.set(false)
                 serverInfo = null
-                com.xzyht.notifyrelay.common.core.util.Logger.i(TAG, "SFTP server stopped")
+                com.xzyht.notifyrelay.common.core.util.Logger.i(TAG, "FTP server stopped")
             }
         } catch (e: Exception) {
-            com.xzyht.notifyrelay.common.core.util.Logger.e(TAG, "Failed to stop SFTP server", e)
+            com.xzyht.notifyrelay.common.core.util.Logger.e(TAG, "Failed to stop FTP server", e)
         }
     }
 
