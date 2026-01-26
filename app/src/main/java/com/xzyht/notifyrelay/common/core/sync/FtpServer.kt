@@ -1,41 +1,39 @@
 package com.xzyht.notifyrelay.common.core.sync
 
 import android.content.Context
-import android.util.Base64
 import com.xzyht.notifyrelay.common.core.util.Logger
 import org.apache.ftpserver.FtpServer
 import org.apache.ftpserver.FtpServerFactory
 import org.apache.ftpserver.ftplet.Authority
 import org.apache.ftpserver.ftplet.FtpException
 import org.apache.ftpserver.ftplet.UserManager
-import org.apache.ftpserver.ftplet.User
 import org.apache.ftpserver.listener.ListenerFactory
 import org.apache.ftpserver.usermanager.PropertiesUserManagerFactory
 import org.apache.ftpserver.usermanager.impl.BaseUser
 import org.apache.ftpserver.usermanager.impl.WritePermission
 import java.io.File
-import java.io.IOException
 import java.io.FileOutputStream
-import java.security.MessageDigest
+import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
 
-data class SftpServerInfo(
+data class ftpServerInfo(
     val username: String,
     val password: String,
     val ipAddress: String,
     val port: Int
 )
 
-object SftpServer {
-    private const val TAG = "SftpServer"
-    private const val DERIVED_USERNAME_PREFIX = "ftp_"
-    private const val DERIVED_PASSWORD_LENGTH = 32
+object ftpServer {
+    private const val TAG = "ftpServer"
+    // 简化：移除密码生成相关常量，使用匿名登录
+    // private const val DERIVED_USERNAME_PREFIX = "ftp_"
+    // private const val DERIVED_PASSWORD_LENGTH = 32
 
     private val PORT_RANGE = 5151..5169
 
     private var ftpServer: FtpServer? = null
     private var isRunning = AtomicBoolean(false)
-    private var serverInfo: SftpServerInfo? = null
+    private var serverInfo: ftpServerInfo? = null
     private lateinit var applicationContext: Context
     
     fun setContext(context: Context) {
@@ -72,6 +70,14 @@ object SftpServer {
             // 添加用户
             userManager.save(user)
             
+            // 添加匿名用户支持
+            val anonymousUser = BaseUser()
+            anonymousUser.name = "anonymous"
+            anonymousUser.password = ""
+            anonymousUser.homeDirectory = "/storage/emulated/0/"
+            anonymousUser.authorities = authorities
+            userManager.save(anonymousUser)
+            
             return userManager
         } catch (e: Exception) {
             Logger.e(TAG, "Failed to create user manager", e)
@@ -79,27 +85,11 @@ object SftpServer {
         }
     }
 
-    fun deriveCredentialsFromSharedSecret(sharedSecret: String): Pair<String, String> {
-        val secretBytes = Base64.decode(sharedSecret, Base64.NO_WRAP)
-        val sha256 = MessageDigest.getInstance("SHA-256")
-        val derived = sha256.digest(secretBytes)
-
-        val username = DERIVED_USERNAME_PREFIX + Base64.encodeToString(derived.copyOf(8), Base64.NO_WRAP or Base64.URL_SAFE)
-            .replace("[^a-zA-Z0-9]".toRegex(), "")
-            .take(16)
-            .lowercase()
-
-        val password = Base64.encodeToString(derived.copyOf(DERIVED_PASSWORD_LENGTH), Base64.NO_WRAP or Base64.URL_SAFE)
-            .replace("[^a-zA-Z0-9]".toRegex(), "")
-
-        return Pair(username, password)
-    }
-
     fun initialize() {
         // 初始化方法不再需要，在start方法中动态创建
     }
 
-    // 定义FTP启动结果状态（保持与原SFTP相同的枚举名称）
+    // 定义FTP启动结果状态（保持与原ftp相同的枚举名称）
     enum class StartResult {
         SUCCESS,         // 启动成功
         ALREADY_RUNNING, // 已在运行
@@ -109,17 +99,17 @@ object SftpServer {
         FAILED           // 其他失败
     }
     
-    data class SftpStartResult(
+    data class ftpStartResult(
         val status: StartResult,
-        val serverInfo: SftpServerInfo? = null
+        val serverInfo: ftpServerInfo? = null
     )
     
     @Synchronized
-    fun start(sharedSecret: String, deviceName: String, context: Context): SftpStartResult {
+    fun start(sharedSecret: String, deviceName: String, context: Context): ftpStartResult {
         Logger.i(TAG, "FTP 服务器启动请求，设备名称: $deviceName")
         if (isRunning.get()) {
             Logger.i(TAG, "FTP 服务器已在运行，返回当前服务器信息")
-            return SftpStartResult(StartResult.ALREADY_RUNNING, serverInfo)
+            return ftpStartResult(StartResult.ALREADY_RUNNING, serverInfo)
         }
 
         // 设置上下文
@@ -137,9 +127,12 @@ object SftpServer {
             }
         }
 
-        Logger.d(TAG, "从共享密钥派生 FTP 凭据")
-        val (username, password) = deriveCredentialsFromSharedSecret(sharedSecret)
-        Logger.d(TAG, "派生的用户名: $username")
+        // 简化：不再从共享密钥派生凭据，使用固定用户名密码，主要使用匿名登录
+        // Logger.d(TAG, "从共享密钥派生 FTP 凭据")
+        // val (username, password) = deriveCredentialsFromSharedSecret(sharedSecret)
+        val username = "anonymous"
+        val password = ""
+        Logger.d(TAG, "使用固定用户名: $username")
 
         Logger.d(TAG, "开始在端口范围 $PORT_RANGE 中尝试启动 FTP 服务器")
 
@@ -172,7 +165,7 @@ object SftpServer {
                 val ipAddress = getDeviceIpAddress()
                 Logger.i(TAG, "FTP 服务器在端口 $port 启动成功，IP 地址: $ipAddress")
 
-                serverInfo = SftpServerInfo(
+                serverInfo = ftpServerInfo(
                     username = username,
                     password = password,
                     ipAddress = ipAddress ?: "127.0.0.1",
@@ -180,7 +173,7 @@ object SftpServer {
                 )
 
                 Logger.i(TAG, "FTP server started: $ipAddress on port $port (derived from sharedSecret)")
-                return SftpStartResult(StartResult.SUCCESS, serverInfo)
+                return ftpStartResult(StartResult.SUCCESS, serverInfo)
             } catch (e: Exception) {
                 lastException = e
                 when (e) {
@@ -207,10 +200,10 @@ object SftpServer {
         Logger.e(TAG, "所有端口尝试失败，无法启动 FTP 服务器: lastException=${lastException?.javaClass?.name}")
 
         return when {
-            seenPermDenied -> SftpStartResult(StartResult.PERMISSION_DENIED)
-            seenConfig -> SftpStartResult(StartResult.CONFIG_ERROR)
-            seenBind -> SftpStartResult(StartResult.PORT_IN_USE)
-            else -> SftpStartResult(StartResult.FAILED)
+            seenPermDenied -> ftpStartResult(StartResult.PERMISSION_DENIED)
+            seenConfig -> ftpStartResult(StartResult.CONFIG_ERROR)
+            seenBind -> ftpStartResult(StartResult.PORT_IN_USE)
+            else -> ftpStartResult(StartResult.FAILED)
         }
     }
 

@@ -212,10 +212,6 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.4.0")
     // DiskLruCache: stable disk-based LRU cache for icons
     implementation("com.jakewharton:disklrucache:2.0.2")
-
-    // Apache SSHD for SFTP server (暂时保留，后续移除)
-    implementation(libs.apache.sshd)
-    implementation(libs.apache.sshd.sftp)
     // 添加Apache FtpServer依赖用于FTP服务器实现
     implementation("org.apache.ftpserver:ftpserver-core:1.2.0")
 }
