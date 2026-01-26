@@ -56,6 +56,7 @@ import com.xzyht.notifyrelay.feature.device.ui.DeviceForwardFragment
 import com.xzyht.notifyrelay.feature.device.ui.DeviceListFragment
 import com.xzyht.notifyrelay.feature.notification.ui.NotificationHistoryFragment
 import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -116,6 +117,8 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         checkPermissionsAndStartServices()
+        // 尝试启动剪贴板日志监控
+        ClipboardSyncManager.startLogMonitoring(this)
     }
 
     private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->

@@ -90,8 +90,18 @@ object ClipboardSyncManager {
         Logger.d(TAG, "剪贴板同步管理器已初始化")
         // 初始化应用前后台检测器
         PermissionHelper.AppForegroundDetector.initialize(context)
+        
+        // 尝试启动日志监控
+        startLogMonitoring(context)
     }
     
+    /**
+     * 尝试启动日志监控（如果有权限）
+     */
+    fun startLogMonitoring(context: Context) {
+        ClipboardLogDetector.startMonitoring(context)
+    }
+
     /**
      * 发送剪贴板内容到所有已认证的在线设备
      */
@@ -192,6 +202,9 @@ object ClipboardSyncManager {
             lastReceivedContent = content
             lastReceivedType = type
             lastReceivedTime = System.currentTimeMillis()
+            
+            // 收到远端消息时，暂停日志检测一段时间，避免写入剪贴板时触发拒绝访问日志导致循环
+            ClipboardLogDetector.pauseDetectionTemporary(2000)
             
             // 更新本地剪贴板
             updateLocalClipboardContent(type, content, context)
