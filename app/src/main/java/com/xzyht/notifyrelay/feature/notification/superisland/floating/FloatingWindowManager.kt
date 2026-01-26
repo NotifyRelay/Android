@@ -30,8 +30,19 @@ class FloatingWindowManager {
     // 条目数量变化回调，当条目数量变为0时调用
     var onEntriesEmpty: (() -> Unit)? = null
     
-    // 条目移除回调，当单个条目被移除时调用
-    var onEntryRemoved: ((String) -> Unit)? = null
+    // 条目移除回调，当单个条目被移除时调用，包含移除原因
+    var onEntryRemoved: ((String, RemovalReason) -> Unit)? = null
+
+    /**
+     * 移除原因枚举
+     */
+    enum class RemovalReason {
+        TIMEOUT, // 超时自动移除
+        MANUAL,  // 用户手动移除（划掉通知等）
+        REMOTE,  // 远端指令移除
+        HIDDEN,  // 用户点击通知隐藏（可恢复）
+        OTHER    // 其他原因
+    }
 
     // 记录条目的内部数据类
     private data class EntryWithTimestamp(
@@ -168,7 +179,7 @@ class FloatingWindowManager {
         val entryWithTimestamp = entriesMap[key] ?: return
 
         val runnable = Runnable {
-            removeEntry(key)
+            removeEntry(key, RemovalReason.TIMEOUT)
         }
 
         entryWithTimestamp.removalRunnable = runnable
@@ -197,13 +208,17 @@ class FloatingWindowManager {
     /**
      * 移除浮窗条目
      */
-    fun removeEntry(key: String) {
+    fun removeEntry(key: String, reason: RemovalReason = RemovalReason.OTHER) {
         // 取消所有相关任务
         cancelAllTasks(key)
         entriesMap.remove(key)
-        updateEntriesList()
+        
         // 调用条目移除回调
-        onEntryRemoved?.invoke(key)
+        // 注意：必须在updateEntriesList之前调用，因为updateEntriesList可能会导致Overlay被移除（当条目为空时），
+        // 从而导致onEntryRemoved回调中无法获取Context来执行清理操作（如移除通知）
+        onEntryRemoved?.invoke(key, reason)
+
+        updateEntriesList()
     }
 
     /**

@@ -52,14 +52,23 @@ object FloatingReplicaManager {
             clearAllReplicaNotifications()
         }
         // 设置条目移除回调，当单个条目被移除时取消对应的通知
-        onEntryRemoved = { key -> 
-            val context = overlayView?.get()?.context
-            if (context != null) {
-                cancelReplicaNotification(context, key)
+        onEntryRemoved = { key, reason -> 
+            // 只有当原因不是 HIDDEN 时，才移除系统通知
+            if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
+                val context = overlayView?.get()?.context
+                if (context != null) {
+                    cancelReplicaNotification(context, key)
+                } else {
+                    // 如果没有上下文，直接从映射中移除
+                    entryKeyToNotificationId.remove(key)
+                }
             } else {
-                // 如果没有上下文，直接从映射中移除
-                entryKeyToNotificationId.remove(key)
+                // 如果是 HIDDEN，我们仍然需要从 FloatingWindowManager 中移除条目（已由 removeEntry 完成）
+                // 但我们需要保留 Notification 以便用户再次点击
+                // 所以我们不调用 cancelReplicaNotification
+                Logger.i(TAG, "超级岛: 条目被隐藏 (HIDDEN)，保留系统通知以便恢复, key=$key")
             }
+
             // 从sourceId映射中移除，并将sourceId添加到黑名单
             // 创建需要移除的sourceId列表，避免ConcurrentModificationException
             val sourceIdsToRemove = mutableListOf<String>()
@@ -83,10 +92,26 @@ object FloatingReplicaManager {
             
             // 第三次遍历：处理需要添加到黑名单和关闭Live Updates通知的sourceId
             sourceIdsToBlock.forEach { sourceId ->
-                // 当用户手动移除通知关闭浮窗时，将sourceId添加到黑名单，避免短时间内再次弹出
-                blockInstance(sourceId)
+                // 仅当用户手动移除通知时，将sourceId添加到黑名单，避免短时间内再次弹出
+                // 自动超时关闭或远端移除不应触发黑名单
+                // 如果是用户点击隐藏 (HIDDEN)，也触发黑名单，防止远端更新立即重新显示
+                if (reason == FloatingWindowManager.RemovalReason.MANUAL || reason == FloatingWindowManager.RemovalReason.HIDDEN) {
+                    blockInstance(sourceId)
+                }
+                
+                // 只有当原因是 HIDDEN 时，才保留通知（不调用 cancelReplicaNotification）
+                // 其他情况（TIMEOUT, MANUAL, REMOTE, OTHER）都应该移除通知
+                if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
+                    // 对于 HIDDEN 以外的情况，我们已经在循环外部调用了 cancelReplicaNotification
+                    // 但这里需要注意：onEntryRemoved 的参数 key 是具体的条目 key
+                    // 而这里是在处理 sourceId 对应的所有条目都移除的情况
+                    // 所以如果 sourceId 被判定为“移除”，那么属于该 sourceId 的所有通知都应该被移除
+                    // 除非是 HIDDEN 模式，这种情况下我们希望通知保留以便用户重新点击
+                }
+
                 // 同时关闭对应的Live Updates复合通知
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                // 只有在彻底移除时才关闭，HIDDEN 模式下保留
+                if (reason != FloatingWindowManager.RemovalReason.HIDDEN && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                     try {
                         LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
                         Logger.i(TAG, "关闭Live Updates复合通知: sourceId=$sourceId")
@@ -141,9 +166,27 @@ object FloatingReplicaManager {
         appName: String? = null,
         isLocked: Boolean = false
     ) {
+        showFloatingInternal(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked, false)
+    }
+
+    /**
+     * 内部显示浮窗方法，增加isRestoring参数
+     */
+    private fun showFloatingInternal(
+        context: Context,
+        sourceId: String,
+        title: String?,
+        text: String?,
+        paramV2Raw: String? = null,
+        picMap: Map<String, String>? = null,
+        appName: String? = null,
+        isLocked: Boolean = false,
+        isRestoring: Boolean = false // 是否是从隐藏状态恢复
+    ) {
         try {
             // 会话级屏蔽检查：同一个 instanceId 在本轮被用户关闭后不再展示
-            if (sourceId.isNotBlank() && isInstanceBlocked(sourceId)) {
+            // 如果是从隐藏状态恢复，则忽略屏蔽检查
+            if (!isRestoring && sourceId.isNotBlank() && isInstanceBlocked(sourceId)) {
                 Logger.i(TAG, "超级岛: instanceId=$sourceId 已在本轮会话中被屏蔽，忽略展示")
                 return
             }
@@ -223,11 +266,13 @@ object FloatingReplicaManager {
                         } catch (e: Exception) {
                             Logger.w(TAG, "发送Live Updates复合通知失败: ${e.message}")
                             // 发送失败时，回退到传统复刻通知
-                            sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap)
+                            // 如果是从隐藏恢复，不需要重新发送通知，除非通知已经不在了
+                            // 但为了确保通知处于最新状态（且包含正确的数据以供下次点击），我们还是更新一下通知
+                            sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId)
                         }
                     } else {
                         // 非进度类型或Live Updates未启用时，发送传统复刻通知
-                        sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap)
+                        sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId)
                     }
                 } catch (e: Exception) {
                     Logger.w(TAG, "超级岛: 显示浮窗失败(协程): ${e.message}")
@@ -235,6 +280,43 @@ object FloatingReplicaManager {
             }
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 显示浮窗失败，退化为通知: ${e.message}")
+        }
+    }
+
+    /**
+     * 切换浮窗显示状态：如果显示则隐藏，如果隐藏则显示
+     */
+    fun toggleFloating(
+        context: Context,
+        sourceId: String,
+        title: String?,
+        text: String?,
+        paramV2Raw: String? = null,
+        picMap: Map<String, String>? = null,
+        appName: String? = null
+    ) {
+        try {
+            // 检查当前是否已显示
+            val entryKeys = sourceIdToEntryKeyMap[sourceId]
+            val isShowing = entryKeys?.any { floatingWindowManager.getEntry(it) != null } == true
+
+            if (isShowing) {
+                // 当前已显示，执行隐藏操作
+                // 使用 HIDDEN 原因，这样不会移除系统通知
+                Logger.i(TAG, "超级岛: 点击通知切换 - 隐藏浮窗, sourceId=$sourceId")
+                dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.HIDDEN)
+            } else {
+                // 当前未显示，执行恢复显示操作
+                Logger.i(TAG, "超级岛: 点击通知切换 - 恢复浮窗, sourceId=$sourceId")
+                // 恢复显示时，移除黑名单，确保可以显示
+                blockedInstanceIds.remove(sourceId)
+                showFloatingInternal(
+                    context, sourceId, title, text, paramV2Raw, picMap, appName, 
+                    isLocked = false, isRestoring = true
+                )
+            }
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: 切换浮窗状态失败: ${e.message}")
         }
     }
 
@@ -304,7 +386,8 @@ object FloatingReplicaManager {
         text: String?,
         appName: String?,
         paramV2: ParamV2?,
-        picMap: Map<String, String>?
+        picMap: Map<String, String>?,
+        sourceId: String // 新增sourceId参数
     ) {
         try {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -312,32 +395,51 @@ object FloatingReplicaManager {
             // 生成唯一的通知ID
             val notificationId = key.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
             
+            // 创建点击意图，用于处理用户点击通知时切换浮窗显示/隐藏
+            val contentIntent = Intent(context, NotificationBroadcastReceiver::class.java).apply {
+                action = "com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"
+                putExtra("sourceId", sourceId)
+                putExtra("title", title)
+                putExtra("text", text)
+                putExtra("appName", appName)
+                putExtra("paramV2Raw", paramV2?.toString()) // 注意：这里可能需要原始的json字符串，但paramV2是对象。如果需要原始串，应该在参数中传入
+                // 优化：传入paramV2Raw
+                val entry = floatingWindowManager.getEntry(key)
+                if (entry?.paramV2Raw != null) {
+                    putExtra("paramV2Raw", entry.paramV2Raw)
+                }
+                
+                // 传入图片映射
+                if (!picMap.isNullOrEmpty()) {
+                    val bundle = Bundle()
+                    picMap.forEach { (k, v) -> bundle.putString(k, v) }
+                    putExtra("picMap", bundle)
+                }
+            }
+            
+            val pendingContentIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId,
+                contentIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             // 检查是否为媒体类型的超级岛浮窗
             val isMediaType = paramV2?.business == "media"
+
+            // 创建删除意图，用于处理用户移除通知时关闭浮窗
+            val deleteIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId,
+                Intent(context, NotificationBroadcastReceiver::class.java)
+                    .putExtra("notificationId", notificationId)
+                    .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
             
             // 对于媒体类型，使用HyperCeiler焦点歌词的特殊处理
             if (isMediaType) {
-                // 创建焦点歌词通知通道（Android O及以上）
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    val channel = android.app.NotificationChannel(
-                        "channel_id_focusNotifLyrics",
-                        "焦点通知歌词",
-                        NotificationManager.IMPORTANCE_DEFAULT
-                    )
-                    notificationManager.createNotificationChannel(channel)
-                }
-                
-                // 构建基于HyperCeiler焦点歌词数据的特殊通知
-                // 创建删除意图，用于处理用户移除通知时关闭浮窗
-                val deleteIntent = PendingIntent.getBroadcast(
-                    context,
-                    notificationId,
-                    Intent(context, NotificationBroadcastReceiver::class.java)
-                        .putExtra("notificationId", notificationId)
-                        .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
-                
+                // ... (原有代码保持不变)
                 val builder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
                     .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
                     .setContentText(text ?: "")
@@ -351,7 +453,9 @@ object FloatingReplicaManager {
                     .setOnlyAlertOnce(true)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .setDeleteIntent(deleteIntent) // 设置删除意图，处理用户移除通知的情况
+                    .setContentIntent(pendingContentIntent) // 设置点击意图
                 
+                // ... (后续构建extras的代码保持不变)
                 // 添加焦点歌词相关的结构化数据
                 val extras = builder.extras
                 
@@ -458,7 +562,10 @@ object FloatingReplicaManager {
                     .setWhen(System.currentTimeMillis()) // 设置时间，但不显示
                     .setOnlyAlertOnce(true) // 只提示一次
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 公开可见
+                    .setDeleteIntent(deleteIntent) // 设置删除意图
+                    .setContentIntent(pendingContentIntent) // 设置点击意图
                 
+                // ... (后续构建extras的代码保持不变)
                 // 添加超级岛相关的结构化数据，严格按照小米官方文档规范和实际通知结构
                 val extras = builder.extras
                 
@@ -537,7 +644,7 @@ object FloatingReplicaManager {
                 // 添加超级岛源包信息，与原始通知保持一致
                 extras.putString("superIslandSourcePackage", context.packageName)
                 
-                // 添加包名信息，与原始通知保持一致
+                // 包名信息
                 extras.putString("app_package", context.packageName)
                 
                 // 发送通知
@@ -600,7 +707,8 @@ object FloatingReplicaManager {
             val entryKey = entryKeyToNotificationId.entries.find { it.value == notificationId }?.key
             if (entryKey != null) {
                 // 移除浮窗条目，这会触发onEntryRemoved回调，进而取消对应的通知并清理映射
-                floatingWindowManager.removeEntry(entryKey)
+                // 标记为手动移除
+                floatingWindowManager.removeEntry(entryKey, FloatingWindowManager.RemovalReason.MANUAL)
                 Logger.i(TAG, "超级岛: 根据通知ID关闭浮窗条目成功，notificationId=$notificationId, entryKey=$entryKey")
             }
         } catch (e: Exception) {
@@ -633,22 +741,29 @@ object FloatingReplicaManager {
 
     // 新增：按来源键立刻移除指定浮窗（用于接收终止事件SI_END时立即消除）
     fun dismissBySource(sourceId: String) {
+        dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.REMOTE)
+    }
+
+    private fun dismissBySourceInternal(sourceId: String, reason: FloatingWindowManager.RemovalReason) {
         try {
             // 从映射中获取所有对应的entryKey
             val entryKeys = sourceIdToEntryKeyMap[sourceId]
             if (entryKeys != null) {
                 // 移除所有相关条目，这会触发onEntryRemoved回调，进而取消对应的通知并清理映射
                 entryKeys.forEach { entryKey ->
-                    floatingWindowManager.removeEntry(entryKey)
+                    floatingWindowManager.removeEntry(entryKey, reason)
                 }
                 // 清理映射关系（如果还有剩余）
                 sourceIdToEntryKeyMap.remove(sourceId)
             } else {
                 // 如果没有找到映射，尝试直接使用sourceId移除，这会触发onEntryRemoved回调
-                floatingWindowManager.removeEntry(sourceId)
+                floatingWindowManager.removeEntry(sourceId, reason)
             }
             // 如果对应的会话结束（SI_END），同步移除黑名单，允许后续同一通知重新展示
-            blockedInstanceIds.remove(sourceId)
+            // 只有在 REMOTE 或 TIMEOUT 移除时才移除黑名单（因为 MANUAL 会加黑名单）
+            if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
+                blockedInstanceIds.remove(sourceId)
+            }
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 按来源关闭浮窗失败: ${e.message}")
         }

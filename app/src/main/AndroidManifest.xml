@@ -88,6 +88,7 @@
             android:exported="false">
             <intent-filter>
                 <action android:name="com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION" />
+                <action android:name="com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING" />
             </intent-filter>
         </receiver>
         
