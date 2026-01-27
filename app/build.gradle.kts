@@ -213,7 +213,7 @@ dependencies {
     // DiskLruCache: stable disk-based LRU cache for icons
     implementation("com.jakewharton:disklrucache:2.0.2")
     // 添加Apache FtpServer依赖用于FTP服务器实现
-    implementation("org.apache.ftpserver:ftpserver-core:1.2.0")
+    implementation(libs.apache.ftpserver)
 }
 
 // 移除强制使用旧版本stdlib的配置，让项目使用与Kotlin 2.1.21兼容的stdlib版本

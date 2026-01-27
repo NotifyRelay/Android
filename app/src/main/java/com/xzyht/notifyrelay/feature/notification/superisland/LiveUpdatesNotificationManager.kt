@@ -31,8 +31,8 @@ object LiveUpdatesNotificationManager {
     // 图标缓存，避免重复加载
     private val iconCache = object : androidx.collection.LruCache<String, android.graphics.Bitmap>(ICON_CACHE_SIZE) {
         override fun sizeOf(key: String, value: android.graphics.Bitmap): Int {
-            // 返回图标大小，单位为KB
-            return value.byteCount / 1024
+            // 返回1，表示每个图标计数为1，这样maxSize就表示图标数量
+            return 1
         }
     }
 

@@ -12,7 +12,8 @@ uiText = "1.10.0"
 material3 = "1.4.0"
 foundationLayout = "1.10.0"
 runtime = "1.10.0"
-sshd = "2.13.1"
+ftpserver = "1.2.1"
+
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -26,6 +27,7 @@ androidx-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.re
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 androidx-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 androidx-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
+apache-ftpserver = { group = "org.apache.ftpserver", name = "ftpserver-core", version.ref = "ftpserver" }
 
 
 [plugins]
