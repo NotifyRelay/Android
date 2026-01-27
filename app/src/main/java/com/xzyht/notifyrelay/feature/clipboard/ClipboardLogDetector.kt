@@ -38,24 +38,26 @@ object ClipboardLogDetector {
      * 启动日志监听
      */
     fun startMonitoring(context: Context) {
-        if (isMonitoring.get()) return
+        // 使用 compareAndSet 实现原子化的检查-设置操作
+        if (!isMonitoring.compareAndSet(false, true)) return
         
         try {
             // 检查应用是否处于前台
             val isForeground = com.xzyht.notifyrelay.common.PermissionHelper.isAppInForeground(context)
             if (!isForeground) {
                 Logger.d(TAG, "应用未处于前台，无法启动日志监听")
+                isMonitoring.set(false)
                 return
             }
             
             // 检查是否有READ_LOGS权限
             if (context.checkSelfPermission(android.Manifest.permission.READ_LOGS) != PackageManager.PERMISSION_GRANTED) {
                 Logger.d(TAG, "没有 READ_LOGS 权限，无法启动日志监听")
+                isMonitoring.set(false)
                 return
             }
             
             Logger.d(TAG, "启动剪贴板日志监听...")
-            isMonitoring.set(true)
             
             monitoringJob = CoroutineScope(Dispatchers.IO).launch {
                 var process: Process? = null
