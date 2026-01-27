@@ -13,6 +13,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * 剪贴板日志检测器
@@ -21,7 +22,7 @@ import java.util.concurrent.atomic.AtomicLong
  */
 object ClipboardLogDetector {
     private const val TAG = "ClipboardLogDetector"
-    private var monitoringJob: Job? = null
+    private val monitoringJob = AtomicReference<Job?>(null)
     private val isMonitoring = AtomicBoolean(false)
     private val pausedUntilTime = AtomicLong(0)
     
@@ -59,7 +60,7 @@ object ClipboardLogDetector {
             
             Logger.d(TAG, "启动剪贴板日志监听...")
             
-            monitoringJob = CoroutineScope(Dispatchers.IO).launch {
+            monitoringJob.set(CoroutineScope(Dispatchers.IO).launch {
                 var process: Process? = null
                 try {
                     // 仅监听 ClipboardService 标签的日志
@@ -109,7 +110,7 @@ object ClipboardLogDetector {
                     }
                     isMonitoring.set(false)
                 }
-            }
+            })
         } catch (e: SecurityException) {
             Logger.e(TAG, "启动日志监听时发生安全异常", e)
             isMonitoring.set(false)
@@ -123,8 +124,8 @@ object ClipboardLogDetector {
      * 停止监听
      */
     fun stopMonitoring() {
-        monitoringJob?.cancel()
-        monitoringJob = null
+        monitoringJob.get()?.cancel()
+        monitoringJob.set(null)
         isMonitoring.set(false)
         Logger.d(TAG, "日志监听已停止")
     }

@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,6 +26,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ActionInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamIsland
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.CommonImageCompose
+import top.yukonga.miuix.kmp.basic.TextButton
 
 /**
  * ParamIsland的Compose组件实现
@@ -130,6 +130,7 @@ fun ParamIslandCompose(
                             val context = LocalContext.current
                             Spacer(modifier = Modifier.width(8.dp))
                             TextButton(
+                                text = copyAction.actionTitle ?: "复制",
                                 onClick = {
                                     if (code.contains("*")) {
                                         Toast.makeText(context, "请解锁对端设备", Toast.LENGTH_SHORT).show()
@@ -148,13 +149,7 @@ fun ParamIslandCompose(
                                         }
                                     }
                                 }
-                            ) {
-                                Text(
-                                    text = copyAction.actionTitle ?: "复制",
-                                    color = Color(0xFF1DCD3A),
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
+                            )
                         } else {
                             Logger.w("超级岛ParamIslandCompose", "验证码按钮未渲染: copyAction=${true}, code=${!code.isNullOrBlank()}")
                         }
