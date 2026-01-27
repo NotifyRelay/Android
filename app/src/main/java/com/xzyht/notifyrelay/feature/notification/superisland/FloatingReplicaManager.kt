@@ -548,15 +548,13 @@ object FloatingReplicaManager {
                 notificationManager.notify(notificationId, builder.build())
             } else {
                 // 非媒体类型，使用原来的通知渠道和构建方式
-                // 创建通知渠道（Android O及以上）
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    val channel = android.app.NotificationChannel(
-                        NOTIFICATION_CHANNEL_ID,
-                        "超级岛复刻通知",
-                        NotificationManager.IMPORTANCE_DEFAULT
-                    )
-                    notificationManager.createNotificationChannel(channel)
-                }
+                // 创建通知渠道
+                val channel = android.app.NotificationChannel(
+                    NOTIFICATION_CHANNEL_ID,
+                    "超级岛复刻通知",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                )
+                notificationManager.createNotificationChannel(channel)
                 
                 // 构建基础通知，调整属性使其更接近实际超级岛通知
                 val builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
