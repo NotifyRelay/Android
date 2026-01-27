@@ -277,26 +277,6 @@ object LiveUpdatesNotificationManager {
     }
     
     /**
-     * 更新进度通知，添加进度跟踪器图标
-     */
-    private fun updateProgressNotificationWithIcon(
-        sourceId: String,
-        notificationId: Int,
-        paramV2: ParamV2,
-        picMap: Map<String, String>,
-        progressIcon: Bitmap
-    ) {
-        try {
-            // 调用新的统一更新方法，不传入应用图标（会在后续加载应用图标时统一更新）
-            updateNotificationWithAllIcons(sourceId, notificationId, paramV2, null, progressIcon)
-            Logger.i(TAG, "更新进度通知图标成功: $sourceId")
-        } catch (e: Exception) {
-            Logger.w(TAG, "更新进度通知图标失败: ${e.message}")
-            e.printStackTrace()
-        }
-    }
-    
-    /**
      * 更新通知，添加应用图标和进度图标
      */
     private fun updateNotificationWithAllIcons(
