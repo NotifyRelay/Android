@@ -1,10 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model
 
-import android.content.Context
-import androidx.compose.ui.platform.ComposeView
-import androidx.lifecycle.LifecycleOwner
 import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.builder.buildComposeViewFromParam
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.core.parseBigIslandArea
 import org.json.JSONObject
 
@@ -25,15 +21,6 @@ data class ParamV2(
     val paramIsland: ParamIsland? = null, // 摘要态组件
     val business: String? = null // 可选的业务标识（例如 miui_flashlight）
 )
-
-
-
-// 构建Compose UI视图的函数
-suspend fun buildComposeViewFromTemplate(context: Context, paramV2: ParamV2, picMap: Map<String, String>?, business: String? = null, lifecycleOwner: LifecycleOwner? = null): ComposeTemplateViewResult {
-    return ComposeTemplateViewResult(
-        view = buildComposeViewFromParam(context, paramV2, picMap, business, lifecycleOwner)
-    )
-}
 
 // 解析param_v2总容器，根据不同字段选择对应的子组件解析
 fun parseParamV2(jsonString: String): ParamV2? {
@@ -180,7 +167,9 @@ private fun parseHighlightFromIconText(root: JSONObject): HighlightInfo? {
         ?: root.optJSONObject("paramIsland")
         ?: root.optJSONObject("islandParam"))
     val big = parseBigIslandArea(
-        paramIsland?.optJSONObject("bigIslandArea") ?: paramIsland?.optJSONObject("bigIsland")
+        paramIsland?.optJSONObject("bigIslandArea") ?: paramIsland?.optJSONObject(
+            "bigIsland"
+        )
     )
     val leftPic = big?.leftImage
     val rightPic = big?.rightImage
@@ -199,9 +188,3 @@ private fun parseHighlightFromIconText(root: JSONObject): HighlightInfo? {
         iconOnly = true
     )
 }
-
-
-// 支持ComposeView的视图结果类
-data class ComposeTemplateViewResult(
-    val view: ComposeView
-)
