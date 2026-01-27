@@ -143,7 +143,7 @@ fun ParamIslandCompose(
                                             ClipboardSyncManager.syncTextDirectly(deviceManager, code)
                                             Toast.makeText(context, "验证码已复制", Toast.LENGTH_SHORT).show()
                                         } catch (e: Exception) {
-                                            e.printStackTrace()
+                                            Logger.e("ParamIslandCompose", "复制验证码失败", e)
                                             Toast.makeText(context, "复制失败", Toast.LENGTH_SHORT).show()
                                         }
                                     }
