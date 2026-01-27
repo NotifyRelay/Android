@@ -158,7 +158,7 @@ class DatabaseRepository(private val database: AppDatabase) {
      * 根据包名和设备UUID删除最旧的通知记录，保留最新的指定数量
      */
     suspend fun deleteOldestNotificationsByPackageAndDevice(packageName: String, deviceUuid: String, keepCount: Int) {
-        val totalCount = notificationRecordDao.getByPackageAndDevice(packageName, deviceUuid).size
+        val totalCount = notificationRecordDao.countByPackageAndDevice(packageName, deviceUuid)
         if (totalCount > keepCount) {
             val deleteCount = totalCount - keepCount
             notificationRecordDao.deleteOldestByPackageAndDevice(packageName, deviceUuid, deleteCount)
