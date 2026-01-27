@@ -118,9 +118,9 @@ object SuperIslandProcessor {
                             try { 
                                 FloatingReplicaManager.dismissBySource(rid) 
                                 // 同时关闭对应的 Live Updates 通知
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
-                            }
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
+                                }
                             } catch (_: Exception) {}
                             // 同步移除去重缓存（若存在）
                             superIslandDeduplicationCache.remove("${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
