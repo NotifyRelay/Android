@@ -634,14 +634,8 @@ object LiveUpdatesNotificationManager {
         }
 
         // 检查notificationManager是否已初始化
-        try {
-            // 尝试访问notificationManager，会抛出UninitializedPropertyAccessException如果未初始化
-            val managerRef = notificationManager
-        } catch (e: UninitializedPropertyAccessException) {
+        if (!::notificationManager.isInitialized) {
             Logger.e(TAG, "canUseLiveUpdates: notificationManager未初始化")
-            return false
-        } catch (e: Exception) {
-            Logger.e(TAG, "canUseLiveUpdates: 检查notificationManager时发生意外错误: ${e.message}")
             return false
         }
 
