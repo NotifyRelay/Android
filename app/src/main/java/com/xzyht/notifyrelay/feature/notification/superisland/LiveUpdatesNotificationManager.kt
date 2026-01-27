@@ -188,9 +188,16 @@ object LiveUpdatesNotificationManager {
         paramV2: ParamV2,
         picMap: Map<String, String>
     ) {
-        val progressInfo = paramV2.progressInfo ?: return
+        val progressInfo = paramV2.progressInfo
         val multiProgressInfo = paramV2.multiProgressInfo
-        val currentProgress = progressInfo.progress
+        
+        // 检查是否有任何进度信息
+        if (progressInfo == null && multiProgressInfo == null) {
+            return
+        }
+        
+        // 获取当前进度值
+        val currentProgress = progressInfo?.progress ?: multiProgressInfo?.progress ?: 0
         
         // 调试日志：打印picMap内容，确认图标资源是否存在
         Logger.d(TAG, "加载进度图标 - picMap: $picMap")
@@ -201,11 +208,11 @@ object LiveUpdatesNotificationManager {
         val allIconKeys = mutableMapOf<String, String>()
         
         // 收集所有可能需要的图标键
-        allIconKeys["picForward"] = progressInfo.picForward ?: multiProgressInfo?.picForward ?: ""
-        allIconKeys["picMiddle"] = progressInfo.picMiddle ?: multiProgressInfo?.picMiddle ?: ""
-        allIconKeys["picMiddleUnselected"] = progressInfo.picMiddleUnselected ?: multiProgressInfo?.picMiddleUnselected ?: ""
-        allIconKeys["picEnd"] = progressInfo.picEnd ?: multiProgressInfo?.picEnd ?: ""
-        allIconKeys["picEndUnselected"] = progressInfo.picEndUnselected ?: multiProgressInfo?.picEndUnselected ?: ""
+        allIconKeys["picForward"] = progressInfo?.picForward ?: multiProgressInfo?.picForward ?: ""
+        allIconKeys["picMiddle"] = progressInfo?.picMiddle ?: multiProgressInfo?.picMiddle ?: ""
+        allIconKeys["picMiddleUnselected"] = progressInfo?.picMiddleUnselected ?: multiProgressInfo?.picMiddleUnselected ?: ""
+        allIconKeys["picEnd"] = progressInfo?.picEnd ?: multiProgressInfo?.picEnd ?: ""
+        allIconKeys["picEndUnselected"] = progressInfo?.picEndUnselected ?: multiProgressInfo?.picEndUnselected ?: ""
         allIconKeys["picForwardBox"] = multiProgressInfo?.picForwardBox ?: ""
         
         Logger.d(TAG, "所有图标键映射: $allIconKeys")
@@ -337,8 +344,13 @@ object LiveUpdatesNotificationManager {
         paramV2: ParamV2,
         picMap: Map<String, String>? = null
     ): NotificationCompat.Builder {
-        val progressInfo = paramV2.progressInfo ?: return builder
+        val progressInfo = paramV2.progressInfo
         val multiProgressInfo = paramV2.multiProgressInfo
+        
+        // 检查是否有任何进度信息
+        if (progressInfo == null && multiProgressInfo == null) {
+            return builder
+        }
         
         try {
             // 更新通知标题和内容
@@ -363,41 +375,64 @@ object LiveUpdatesNotificationManager {
             }
             
             // 获取颜色配置
-            val progressColor = progressInfo.colorProgress ?: multiProgressInfo?.color
-            val progressEndColor = progressInfo.colorProgressEnd ?: multiProgressInfo?.color
+            val progressColor = progressInfo?.colorProgress ?: multiProgressInfo?.color
+            val progressEndColor = progressInfo?.colorProgressEnd ?: multiProgressInfo?.color
             
             // 解析颜色值
             val pointColor = progressColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.BLUE
             val segmentColor = progressEndColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.CYAN
             
-            // 与官方示例保持一致，使用固定的4个进度点（25%, 50%, 75%, 100%）和4个进度段（25% each）
-            val progressPoints = listOf(
-                NotificationCompat.ProgressStyle.Point(25).setColor(pointColor),
-                NotificationCompat.ProgressStyle.Point(50).setColor(pointColor),
-                NotificationCompat.ProgressStyle.Point(75).setColor(pointColor),
-                NotificationCompat.ProgressStyle.Point(100).setColor(pointColor)
-            )
-            
-            val progressSegments = listOf(
-                NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
-                NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
-                NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
-                NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor)
-            )
-            
-            // 直接创建ProgressStyle实例，按照官方示例顺序：先设置基础样式，再设置图标，最后设置进度
+            // 直接创建ProgressStyle实例
             val progressStyle = NotificationCompat.ProgressStyle()
-                .setProgressPoints(progressPoints)
-                .setProgressSegments(progressSegments)
+            
+            // 声明变量，用于记录节点和分段数量
+            var progressPointsCount = 0
+            var progressSegmentsCount = 0
+            
+            // 只有当 multiProgressInfo 存在时才生成节点和分段
+            if (multiProgressInfo != null) {
+                // 根据 multiProgressInfo.points 生成进度点和分段
+                val nodeCount = multiProgressInfo.points ?: 4
+                val validNodeCount = maxOf(2, nodeCount) // 最少需要2个节点来创建分段
+                val segmentCount = validNodeCount - 1
+                val segmentSize = 100 / segmentCount
+                
+                // 生成进度点
+                val progressPoints = mutableListOf<NotificationCompat.ProgressStyle.Point>()
+                val nodePositions = mutableListOf<Int>()
+                for (i in 0 until validNodeCount) {
+                    val position = (i * 100) / (validNodeCount - 1)
+                    nodePositions.add(position)
+                    val point = NotificationCompat.ProgressStyle.Point(position).setColor(pointColor)
+                    progressPoints.add(point)
+                    Logger.d(TAG, "生成节点 $i，位置: $position%")
+                }
+                
+                // 生成进度分段
+                val progressSegments = mutableListOf<NotificationCompat.ProgressStyle.Segment>()
+                for (i in 0 until segmentCount) {
+                    progressSegments.add(NotificationCompat.ProgressStyle.Segment(segmentSize).setColor(segmentColor))
+                }
+                
+                // 设置进度点和分段
+                progressStyle.setProgressPoints(progressPoints)
+                progressStyle.setProgressSegments(progressSegments)
+                
+                // 记录节点和分段数量
+                progressPointsCount = progressPoints.size
+                progressSegmentsCount = progressSegments.size
+                
+                Logger.d(TAG, "为 multiProgressInfo 生成了 $progressPointsCount 个节点，分别在位置: $nodePositions")
+            }
             
             // 尝试直接设置进度跟踪器图标，避免闪烁
             if (picMap != null && picMap.isNotEmpty()) {
                 // 找到有效的前进图标作为进度指示点
                 val possibleIconKeys = listOf(
-                    progressInfo.picForward,
+                    progressInfo?.picForward,
                     multiProgressInfo?.picForward,
                     multiProgressInfo?.picForwardBox,
-                    progressInfo.picMiddle,
+                    progressInfo?.picMiddle,
                     multiProgressInfo?.picMiddle
                 )
                 
@@ -421,10 +456,13 @@ object LiveUpdatesNotificationManager {
                 }
             }
             
-            // 最后设置进度，按照官方示例顺序
-            progressStyle.setProgress(progressInfo.progress)
+            // 获取进度值
+            val currentProgress = progressInfo?.progress ?: multiProgressInfo?.progress ?: 0
             
-            Logger.d(TAG, "设置了 ${progressPoints.size} 个进度点和 ${progressSegments.size} 个进度段，与官方示例保持一致")
+            // 最后设置进度，按照官方示例顺序
+            progressStyle.setProgress(currentProgress)
+            
+            Logger.d(TAG, "设置了 ${progressPointsCount} 个进度点和 ${progressSegmentsCount} 个进度段，与官方示例保持一致")
             
             // 直接调用builder.setStyle方法，符合官方示例的API使用
             return builder.setStyle(progressStyle)
@@ -440,9 +478,12 @@ object LiveUpdatesNotificationManager {
                     .setContentText(HtmlCompat.fromHtml(it.content ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY))
             }
             
+            // 获取进度值
+            val currentProgress = progressInfo?.progress ?: multiProgressInfo?.progress ?: 0
+            
             return builder.setProgress(
                 100,
-                progressInfo.progress,
+                currentProgress,
                 false
             )
         }
@@ -464,24 +505,42 @@ object LiveUpdatesNotificationManager {
         val pointColor = progressColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.BLUE
         val segmentColor = progressEndColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.CYAN
         
-        // 与官方示例保持一致，先创建基础ProgressStyle，设置默认的4个进度点和4个进度段
-        return NotificationCompat.ProgressStyle()
-            .setProgressPoints(
-                listOf(
-                    NotificationCompat.ProgressStyle.Point(25).setColor(pointColor),
-                    NotificationCompat.ProgressStyle.Point(50).setColor(pointColor),
-                    NotificationCompat.ProgressStyle.Point(75).setColor(pointColor),
-                    NotificationCompat.ProgressStyle.Point(100).setColor(pointColor)
-                )
-            )
-            .setProgressSegments(
-                listOf(
-                    NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
-                    NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
-                    NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor),
-                    NotificationCompat.ProgressStyle.Segment(25).setColor(segmentColor)
-                )
-            )
+        // 直接创建ProgressStyle实例
+        val progressStyle = NotificationCompat.ProgressStyle()
+        
+        // 只有当 multiProgressInfo 存在时才生成节点和分段
+        if (multiProgressInfo != null) {
+            // 根据 multiProgressInfo.points 生成进度点和分段
+            val nodeCount = multiProgressInfo.points ?: 4
+            val validNodeCount = maxOf(2, nodeCount) // 最少需要2个节点来创建分段
+            val segmentCount = validNodeCount - 1
+            val segmentSize = 100 / segmentCount
+            
+            // 生成进度点
+            val progressPoints = mutableListOf<NotificationCompat.ProgressStyle.Point>()
+            for (i in 0 until validNodeCount) {
+                var position = (i * 100) / (validNodeCount - 1)
+                // 调整位置，避免使用0和100，因为原生通知可能不支持
+                if (position == 0) {
+                    position = 5 // 使用5%代替0%
+                } else if (position == 100) {
+                    position = 95 // 使用95%代替100%
+                }
+                progressPoints.add(NotificationCompat.ProgressStyle.Point(position).setColor(pointColor))
+            }
+            
+            // 生成进度分段
+            val progressSegments = mutableListOf<NotificationCompat.ProgressStyle.Segment>()
+            for (i in 0 until segmentCount) {
+                progressSegments.add(NotificationCompat.ProgressStyle.Segment(segmentSize).setColor(segmentColor))
+            }
+            
+            // 设置进度点和分段
+            progressStyle.setProgressPoints(progressPoints)
+            progressStyle.setProgressSegments(progressSegments)
+        }
+        
+        return progressStyle
     }
     
     /**
