@@ -26,16 +26,8 @@ class ClipboardSyncActivity : AppCompatActivity() {
         // 设置透明主题（在AndroidManifest.xml中配置）
         Logger.d(TAG, "透明Activity创建，准备获取剪贴板数据")
         
-        // 添加一个空的View，确保Activity能正常获得焦点
-        setContentView(android.R.layout.activity_list_item)
-        // 注册焦点变化监听器
-        window.decorView.viewTreeObserver.addOnGlobalFocusChangeListener {
-                oldFocus, newFocus -> 
-            if (newFocus != null) {
-                performClipboardSyncOnUIThread()
-            }
-        }
-        // 设置窗口标志：不可触摸
+        // 移除 setContentView 和 viewTreeObserver 监听，减少UI渲染
+        // 直接设置不可触摸标志
         window.setFlags(
             android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
             android.view.WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
@@ -63,16 +55,17 @@ class ClipboardSyncActivity : AppCompatActivity() {
                     
                     // 3. 发送剪贴板数据
                     sendClipboardData(deviceManager, clipboardData)
-                } else {
-                    Toast.makeText(this, "剪贴板为空", Toast.LENGTH_SHORT).show()
                 }
+                // 移除Toast，减少干扰
             } catch (e: SecurityException) {
-                Toast.makeText(this, "剪贴板访问被拒绝", Toast.LENGTH_SHORT).show()
+                Logger.e(TAG, "剪贴板访问被拒绝", e)
             } catch (e: Exception) {
-                Toast.makeText(this, "同步失败", Toast.LENGTH_SHORT).show()
+                Logger.e(TAG, "同步失败", e)
             } finally {
                 // 无论成功与否，都立即结束Activity
                 finish()
+                // 禁用退出动画，实现无感关闭
+                overridePendingTransition(0, 0)
             }
         }
     }
