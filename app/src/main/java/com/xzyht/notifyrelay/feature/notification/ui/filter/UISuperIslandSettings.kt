@@ -47,6 +47,8 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import com.xzyht.notifyrelay.common.core.util.DataUrlUtils
 import com.xzyht.notifyrelay.common.core.util.Logger
+import com.xzyht.notifyrelay.common.core.util.ToastUtils
+import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.common.data.StorageManager
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
@@ -58,6 +60,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -67,6 +70,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.ToolbarPosition
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import androidx.compose.ui.graphics.Color
 import java.util.Date
 import kotlin.math.max
 import kotlin.math.roundToInt
@@ -175,13 +179,18 @@ fun UISuperIslandSettings() {
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.End
                             ) {
-                                Button(
+                                DoubleClickConfirmButton(
+                                    text = "清空超级岛历史",
+                                    confirmText = "确认?",
                                     onClick = {
+                                        // 第一次点击，显示提示信息
+                                    },
+                                    onConfirm = {
                                         SuperIslandHistory.clearAll(context)
-                                    }
-                                ) {
-                                    Text("清空超级岛历史")
-                                }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(),
+                                    confirmColors = ButtonDefaults.buttonColors(color = Color.Red)
+                                )
                             }
                         }
                     }

@@ -39,6 +39,7 @@ import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.common.core.util.BatteryIconConverter
 import com.xzyht.notifyrelay.common.core.util.BatteryUtils
 import com.xzyht.notifyrelay.common.core.util.ToastUtils
+import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
@@ -138,8 +139,6 @@ fun DeviceListScreen() {
     val devices: List<DeviceInfo> = deviceMap.values.map { it.first }
     val deviceStates: Map<String, Boolean> = deviceMap.mapValues { it.value.second }
     var selectedDevice by remember { mutableStateOf(GlobalSelectedDeviceHolder.selectedDevice) }
-    // 删除按钮二次确认状态管理
-    var deleteConfirmStates by rememberSaveable { mutableStateOf(mapOf<String, Boolean>()) }
     
     // 获取本机电量，使用 remember 缓存并监听电量变化
     val localBatteryLevel = remember {
@@ -298,7 +297,6 @@ fun DeviceListScreen() {
     @Composable
     fun AuthenticatedDeviceButton(device: DeviceInfo) {
         val isOnline = deviceStates[device.uuid] == true
-        val isDeleteConfirming = deleteConfirmStates[device.uuid] ?: false
         val context = LocalContext.current
         
         // 使用 remember 缓存电量值和充电状态，避免初始默认值导致跳动
@@ -332,18 +330,6 @@ fun DeviceListScreen() {
             ButtonDefaults.buttonColorsPrimary()
         } else {
             ButtonDefaults.buttonColors()
-        }
-        
-        // 添加2秒窗口期，超过时间自动清除确认状态
-        LaunchedEffect(isDeleteConfirming, device.uuid) {
-            if (isDeleteConfirming) {
-                // 2秒后自动清除确认状态
-                kotlinx.coroutines.delay(2000)
-                // 检查状态是否仍为true，避免竞态条件
-                if (deleteConfirmStates[device.uuid] == true) {
-                    deleteConfirmStates = deleteConfirmStates - device.uuid
-                }
-            }
         }
         
         Row(
@@ -402,45 +388,33 @@ fun DeviceListScreen() {
             // 删除按钮
             if (selectedDevice?.uuid == device.uuid) {
                 Spacer(Modifier.width(4.dp))
-                Button(
+                DoubleClickConfirmButton(
+                    text = "删除",
+                    confirmText = "确认?",
                     onClick = {
-                        if (isDeleteConfirming) {
-                            // 第二次点击，执行删除操作
-                            try {
-                                // 使用 DeviceConnectionManager 提供的安全 API 移除已认证设备
-                                val removed = deviceManager.removeAuthenticatedDevice(device.uuid)
-                                if (removed) {
-                                    // 更新本地 UI 用的已认证 uuid 集合
-                                    authedDeviceUuids = authedDeviceUuids - device.uuid
-                                    // 清除确认状态
-                                    deleteConfirmStates = deleteConfirmStates - device.uuid
-                                }
-                            } catch (_: Exception) {}
-                            selectedDevice = null
-                            GlobalSelectedDeviceHolder.selectedDevice = null
-                        } else {
-                            // 第一次点击，显示提示并进入确认状态
-                            ToastUtils.showShortToast(context, "再次点击确认删除该设备")
-                            deleteConfirmStates = deleteConfirmStates + (device.uuid to true)
-                        }
+                        // 第一次点击，显示提示信息
                     },
-                    insideMargin = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
+                    onConfirm = {
+                        // 第二次点击，执行删除操作
+                        try {
+                            // 使用 DeviceConnectionManager 提供的安全 API 移除已认证设备
+                            val removed = deviceManager.removeAuthenticatedDevice(device.uuid)
+                            if (removed) {
+                                // 更新本地 UI 用的已认证 uuid 集合
+                                authedDeviceUuids = authedDeviceUuids - device.uuid
+                            }
+                        } catch (_: Exception) {}
+                        selectedDevice = null
+                        GlobalSelectedDeviceHolder.selectedDevice = null
+                    },
                     modifier = Modifier
                         .defaultMinSize(minHeight = buttonMinHeight)
                         .heightIn(min = buttonMinHeight),
-                    // 确认状态下使用更亮的红色，非确认状态使用普通红色
-                    colors = if (isDeleteConfirming) {
-                        ButtonDefaults.buttonColors(color = Color(0xFFFF0000)) // 更亮的红色
-                    } else {
-                        ButtonDefaults.buttonColors(color = Color.Red)
-                    }
-                ) {
-                    Text(
-                        text = if (isDeleteConfirming) "确认?" else "删除",
-                        style = textStyles.body2.copy(color = Color.White),
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                    )
-                }
+                    colors = ButtonDefaults.buttonColors(color = Color.Red),
+                    confirmColors = ButtonDefaults.buttonColors(color = Color(0xFFFF0000)), // 更亮的红色
+                    textColor = Color.White,
+                    confirmTextColor = Color.White
+                )
             }
         }
     }
