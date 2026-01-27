@@ -3,12 +3,12 @@ package com.xzyht.notifyrelay.common.core.sync
 import android.content.Context
 import android.os.Build
 import android.os.Environment
-import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.ALREADY_RUNNING
-import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.CONFIG_ERROR
-import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.FAILED
-import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.PERMISSION_DENIED
-import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.PORT_IN_USE
-import com.xzyht.notifyrelay.common.core.sync.SftpServer.StartResult.SUCCESS
+import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.ALREADY_RUNNING
+import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.CONFIG_ERROR
+import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.FAILED
+import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.PERMISSION_DENIED
+import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.PORT_IN_USE
+import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.SUCCESS
 import com.xzyht.notifyrelay.common.core.util.IntentUtils
 import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.feature.GuideActivity
@@ -215,53 +215,53 @@ object ProtocolRouter {
                     }
                     true
                 }
-                "DATA_SFTP" -> {
-                    Logger.d(TAG, "接收到 DATA_SFTP 消息，clientIp: $clientIp, remoteUuid: $remoteUuid")
+                "DATA_FTP" -> {
+                    Logger.d(TAG, "接收到 DATA_FTP 消息，clientIp: $clientIp, remoteUuid: $remoteUuid")
                     if (!isRemoteDevicePc(auth)) {
-                        Logger.w(TAG, "SFTP 请求被忽略：非 PC 设备")
+                        Logger.w(TAG, "FTP 请求被忽略：非 PC 设备")
                         return true
                     }
-                    Logger.d(TAG, "设备类型验证通过，开始处理 SFTP 命令")
+                    Logger.d(TAG, "设备类型验证通过，开始处理 ftp 命令")
                     // 使用设备管理器的协程作用域处理 suspend 函数调用
                     deviceManager.coroutineScopeInternal.launch {
                         try {
                             val json = JSONObject(decrypted)
                             val action = json.optString("action", "")
-                            Logger.i(TAG, "SFTP 命令 action: $action")
+                            Logger.i(TAG, "ftp 命令 action: $action")
 
                             when (action) {
                                 "start" -> {
-                                    Logger.i(TAG, "开始启动 SFTP 服务器")
+                                    Logger.i(TAG, "开始启动 FTP 服务器")
                                     val sharedSecret = auth.sharedSecret
                                     val deviceName = deviceManager.getLocalDisplayName()
-                                    Logger.d(TAG, "使用共享密钥派生 SFTP 凭据")
-                                    val sftpStartResult = SftpServer.start(sharedSecret, deviceName, context)
-                                    when (sftpStartResult.status) {
+                                    Logger.d(TAG, "使用共享密钥派生 FTP 凭据")
+                                    val ftpStartResult = ftpServer.start(sharedSecret, deviceName, context)
+                                    when (ftpStartResult.status) {
                                         SUCCESS, ALREADY_RUNNING -> {
-                                            val sftpInfo = sftpStartResult.serverInfo
-                                            if (sftpInfo != null) {
-                                                Logger.i(TAG, "SFTP 服务器启动成功，IP: ${sftpInfo.ipAddress}, 端口: ${sftpInfo.port}")
+                                            val ftpInfo = ftpStartResult.serverInfo
+                                            if (ftpInfo != null) {
+                                                Logger.i(TAG, "ftp 服务器启动成功，IP: ${ftpInfo.ipAddress}, 端口: ${ftpInfo.port}")
                                                 val responseJson = JSONObject().apply {
                                                     put("action", "started")
-                                                    put("ipAddress", sftpInfo.ipAddress)
-                                                    put("port", sftpInfo.port)
+                                                    put("ipAddress", ftpInfo.ipAddress)
+                                                    put("port", ftpInfo.port)
                                                     // 不再发送用户名和密码，PC端可以从sharedSecret独立计算
                                                 }
-                                                Logger.d(TAG, "发送 SFTP 服务器信息到 PC")
+                                                Logger.d(TAG, "发送 FTP 服务器信息到 PC")
                                                 ProtocolSender.sendEncrypted(
                                                     deviceManager,
                                                     deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
-                                                    "DATA_SFTP",
+                                                    "DATA_FTP",
                                                     responseJson.toString()
                                                 )
-                                                Logger.i(TAG, "SFTP server started and info sent to PC (derived from sharedSecret)")
+                                                Logger.i(TAG, "FTP server started and info sent to PC (derived from sharedSecret)")
                                                 
                                                 // 检查是否需要跳转到引导页授权
                                                 if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
                                                     if (!Environment.isExternalStorageManager()) {
                                                         // 跳转到引导页，让用户手动授权
                                                         val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
-                                                        intent.putExtra("fromSftp", true)
+                                                        intent.putExtra("fromftp", true)
                                                         intent.putExtra("fromInternal", true)
                                                         IntentUtils.startActivity(context, intent, true)
                                                     }
@@ -277,25 +277,25 @@ object ProtocolRouter {
                                 }
 
                                 "stop" -> {
-                                    Logger.i(TAG, "停止 SFTP 服务器")
-                                    SftpServer.stop()
+                                    Logger.i(TAG, "停止 ftp 服务器")
+                                    ftpServer.stop()
                                     val responseJson = JSONObject().apply {
                                         put("action", "stopped")
                                     }
                                     ProtocolSender.sendEncrypted(
                                         deviceManager,
                                         deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
-                                        "DATA_SFTP",
+                                        "DATA_FTP",
                                         responseJson.toString()
                                     )
-                                    Logger.i(TAG, "SFTP server stopped via command")
+                                    Logger.i(TAG, "FTP server stopped via command")
                                 }
                                 else -> {
-                                    Logger.w(TAG, "未知的 SFTP action: $action")
+                                    Logger.w(TAG, "未知的 ftp action: $action")
                                 }
                             }
                         } catch (e: Exception) {
-                            Logger.e(TAG, "处理 SFTP 命令失败", e)
+                            Logger.e(TAG, "处理 ftp 命令失败", e)
                         }
                     }
                     true

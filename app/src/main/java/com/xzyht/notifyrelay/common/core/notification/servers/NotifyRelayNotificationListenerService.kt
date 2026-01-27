@@ -10,6 +10,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Build
+import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
@@ -28,6 +29,7 @@ import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.backend.BackendLocalFilter
+import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandManager
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
 import kotlinx.coroutines.CoroutineScope
@@ -36,6 +38,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import java.io.ByteArrayOutputStream
+import java.io.File
 
 class NotifyRelayNotificationListenerService : NotificationListenerService() {
     companion object {
@@ -54,6 +57,14 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             Logger.w("NotifyRelay", "前台服务通知被移除，自动补发！")
             // 立即补发本服务前台通知
             startForegroundService()
+        } else if (sbn.packageName == applicationContext.packageName) {
+            // 检查是否为超级岛相关通知（包括普通超级岛和焦点歌词）
+            val channelId = sbn.notification.channelId
+            if (channelId == "super_island_replica" || channelId == "channel_id_focusNotifLyrics") {
+                // 超级岛相关通知被移除，关闭对应的浮窗条目
+                Logger.i("NotifyRelay", "超级岛相关通知被移除，关闭对应的浮窗条目: id=${sbn.id}, channelId=$channelId")
+                FloatingReplicaManager.closeByNotificationId(sbn.id)
+            }
         } else {
             // 普通通知被移除时，从已处理缓存中移除，允许下次重新处理
             val notificationKey = sbn.key ?: (sbn.id.toString() + sbn.packageName)
@@ -344,39 +355,43 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 val superData = SuperIslandManager.extractSuperIslandData(sbn, applicationContext)
                 if (superData != null) {
                     Logger.i("超级岛", "超级岛: 检测到超级岛数据，准备转发，pkg=${superData.sourcePackage}, title=${superData.title}")
-                    try {
-                        val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(applicationContext)
-                        // 不再使用包名前缀标记；通过通道头 DATA_SUPERISLAND 区分超级岛
-                        val superPkg = superData.sourcePackage ?: "unknown"
-                        // 严格以通知 sbn.key 作为会话键：一条系统通知只对应一座“岛”
-                        val sbnInstanceId = sbn.key ?: (sbn.id.toString() + "|" + sbn.packageName)
-                        // 优先复用历史特征ID，避免因字段轻微变化导致“不同岛”的错判
-                        val oldId = try { superIslandFeatureByKey[sbnInstanceId]?.second } catch (_: Exception) { null }
-                        val computedId = SuperIslandProtocol.computeFeatureId(
-                            superPkg,
-                            superData.paramV2Raw,
-                            superData.title,
-                            superData.text,
-                            sbnInstanceId
-                        )
-                        val featureId = oldId ?: computedId
-                        // 初次出现时登记；后续保持不变
-                        try { if (oldId == null) superIslandFeatureByKey[sbnInstanceId] = superPkg to featureId } catch (_: Exception) {}
-                        MessageSender.sendSuperIslandData(
-                            applicationContext,
-                            superPkg,
-                            superData.appName ?: "超级岛",
-                            superData.title,
-                            superData.text,
-                            sbn.postTime,
-                            superData.paramV2Raw,
-                            // 尝试把 simple pic map 提取为 string map（仅支持 string/url 类值）
-                            (superData.picMap ?: emptyMap()),
-                            deviceManager,
-                            featureIdOverride = featureId
-                        )
-                    } catch (e: Exception) {
-                        Logger.w("超级岛", "超级岛: 转发超级岛数据失败: ${e.message}")
+                    
+                    // 过滤本应用的超级岛通知，不进行转发
+                    if (sbn.packageName != applicationContext.packageName) {
+                        try {
+                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(applicationContext)
+                            // 不再使用包名前缀标记；通过通道头 DATA_SUPERISLAND 区分超级岛
+                            val superPkg = superData.sourcePackage ?: "unknown"
+                            // 严格以通知 sbn.key 作为会话键：一条系统通知只对应一座“岛”
+                            val sbnInstanceId = sbn.key ?: (sbn.id.toString() + "|" + sbn.packageName)
+                            // 优先复用历史特征ID，避免因字段轻微变化导致“不同岛”的错判
+                            val oldId = try { superIslandFeatureByKey[sbnInstanceId]?.second } catch (_: Exception) { null }
+                            val computedId = SuperIslandProtocol.computeFeatureId(
+                                superPkg,
+                                superData.paramV2Raw,
+                                superData.title,
+                                superData.text,
+                                sbnInstanceId
+                            )
+                            val featureId = oldId ?: computedId
+                            // 初次出现时登记；后续保持不变
+                            try { if (oldId == null) superIslandFeatureByKey[sbnInstanceId] = superPkg to featureId } catch (_: Exception) {}
+                            MessageSender.sendSuperIslandData(
+                                applicationContext,
+                                superPkg,
+                                superData.appName ?: "超级岛",
+                                superData.title,
+                                superData.text,
+                                sbn.postTime,
+                                superData.paramV2Raw,
+                                // 尝试把 simple pic map 提取为 string map（仅支持 string/url 类值）
+                                (superData.picMap ?: emptyMap()),
+                                deviceManager,
+                                featureIdOverride = featureId
+                            )
+                        } catch (e: Exception) {
+                            Logger.w("超级岛", "超级岛: 转发超级岛数据失败: ${e.message}")
+                        }
                     }
                     // 已按超级岛分支处理，本条不再继续普通转发
                     true

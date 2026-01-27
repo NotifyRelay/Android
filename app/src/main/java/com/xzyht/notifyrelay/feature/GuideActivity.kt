@@ -68,7 +68,7 @@ class GuideActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         val isFirstLaunch = StorageManager.getBoolean(this, "isFirstLaunch", true, StorageManager.PrefsType.GENERAL)
         val fromInternal = intent.getBooleanExtra("fromInternal", false)
-        val fromSftp = intent.getBooleanExtra("fromSftp", false)
+        val fromftp = intent.getBooleanExtra("fromftp", false)
         // 仅冷启动且权限满足时自动跳主界面，应用内跳转（fromInternal=true）始终渲染引导页
         if (!fromInternal && PermissionHelper.checkAllPermissions(this) && !isFirstLaunch) {
             startActivity(Intent(this, MainActivity::class.java))
@@ -91,9 +91,9 @@ class GuideActivity : ComponentActivity() {
                     // 首次启动后标记为已启动
                     StorageManager.putBoolean(this@GuideActivity, "isFirstLaunch", false, StorageManager.PrefsType.GENERAL)
                     
-                    if (fromSftp) {
-                        // 如果是从SFTP请求跳转过来的，尝试重新启动SFTP服务
-                        Logger.d("GuideActivity", "从SFTP请求跳转，尝试重新启动SFTP服务")
+                    if (fromftp) {
+                        // 如果是从ftp请求跳转过来的，尝试重新启动ftp服务
+                        Logger.d("GuideActivity", "从ftp请求跳转，尝试重新启动ftp服务")
                     }
                     
                     startActivity(Intent(this@GuideActivity, MainActivity::class.java))
@@ -109,11 +109,11 @@ class GuideActivity : ComponentActivity() {
         // 当从系统设置页面返回时，刷新权限状态
         GuideScreen.refreshTrigger++
         
-        // 检查是否从SFTP请求跳转过来，并且已经获取了文件管理权限
-        val fromSftp = intent.getBooleanExtra("fromSftp", false)
-        if (fromSftp && PermissionHelper.checkManageExternalStoragePermission(this)) {
+        // 检查是否从ftp请求跳转过来，并且已经获取了文件管理权限
+        val fromftp = intent.getBooleanExtra("fromftp", false)
+        if (fromftp && PermissionHelper.checkManageExternalStoragePermission(this)) {
             // 从系统设置返回，并且已经获取了文件管理权限
-            Logger.d("GuideActivity", "从SFTP请求跳转，已经获取文件管理权限，尝试重新启动SFTP服务")
+            Logger.d("GuideActivity", "从ftp请求跳转，已经获取文件管理权限，尝试重新启动ftp服务")
             // 这里需要获取当前连接的PC设备的sharedSecret和deviceName
             // 目前无法直接获取，需要后续优化，先关闭当前页面
             startActivity(Intent(this, MainActivity::class.java))
@@ -344,7 +344,7 @@ object GuideScreen {
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
                     SuperSwitch(
                         title = "文件管理权限",
-                        summary = if (hasManageExternalStorage) "已授权" else "用于支持SFTP功能，管理设备文件",
+                        summary = if (hasManageExternalStorage) "已授权" else "用于支持ftp功能，管理设备文件",
                         checked = hasManageExternalStorage,
                         onCheckedChange = {
                             showToast("跳转文件管理权限设置")

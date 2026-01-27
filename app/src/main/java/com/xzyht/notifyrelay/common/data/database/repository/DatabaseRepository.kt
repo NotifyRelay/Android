@@ -147,6 +147,45 @@ class DatabaseRepository(private val database: AppDatabase) {
         notificationRecordDao.deleteByPackageAndDevice(packageName, deviceUuid)
     }
     
+    /**
+     * 根据包名和设备UUID获取通知记录，按时间降序排序
+     */
+    suspend fun getNotificationsByPackageAndDevice(packageName: String, deviceUuid: String): List<NotificationRecordEntity> {
+        return notificationRecordDao.getByPackageAndDevice(packageName, deviceUuid)
+    }
+    
+    /**
+     * 根据包名和设备UUID删除最旧的通知记录，保留最新的指定数量
+     */
+    suspend fun deleteOldestNotificationsByPackageAndDevice(packageName: String, deviceUuid: String, keepCount: Int) {
+        val totalCount = notificationRecordDao.countByPackageAndDevice(packageName, deviceUuid)
+        if (totalCount > keepCount) {
+            val deleteCount = totalCount - keepCount
+            notificationRecordDao.deleteOldestByPackageAndDevice(packageName, deviceUuid, deleteCount)
+        }
+    }
+    
+    /**
+     * 保存通知记录并限制每个包名的通知数量
+     */
+    suspend fun saveNotificationWithLimit(record: NotificationRecordEntity, maxCountPerPackage: Int = 80) {
+        notificationRecordDao.insert(record)
+        deleteOldestNotificationsByPackageAndDevice(record.packageName, record.deviceUuid, maxCountPerPackage)
+    }
+    
+    /**
+     * 批量保存通知记录并限制每个包名的通知数量
+     */
+    suspend fun saveNotificationsWithLimit(records: List<NotificationRecordEntity>, maxCountPerPackage: Int = 80) {
+        notificationRecordDao.insertAll(records)
+        // 对每个唯一的包名和设备组合进行限制
+        val packageDevicePairs = records.groupBy { Pair(it.packageName, it.deviceUuid) }
+        for ((pair, packageRecords) in packageDevicePairs) {
+            val (packageName, deviceUuid) = pair
+            deleteOldestNotificationsByPackageAndDevice(packageName, deviceUuid, maxCountPerPackage)
+        }
+    }
+    
     // 超级岛历史记录相关方法
     
     /**

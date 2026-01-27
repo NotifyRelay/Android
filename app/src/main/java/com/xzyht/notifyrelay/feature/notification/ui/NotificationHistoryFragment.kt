@@ -51,6 +51,7 @@ import com.xzyht.notifyrelay.common.core.sync.MessageSender
 import com.xzyht.notifyrelay.common.core.util.IntentUtils
 import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.common.core.util.ToastUtils
+import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.feature.GuideActivity
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.ui.GlobalSelectedDeviceHolder
@@ -72,6 +73,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.icons.useful.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
+import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId
@@ -742,29 +744,30 @@ fun NotificationHistoryScreen() {
                     // 使用Row水平排列按钮
                     Row(
                         modifier = Modifier.padding(8.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
                         // 清除按钮 - 始终显示
-                        Button(
+                        DoubleClickConfirmButton(
+                            text = "清除",
+                            confirmText = "确认?",
                             onClick = {
+                                // 第一次点击，显示提示信息
+                            },
+                            onConfirm = {
                                 clearHistory()
                             },
+                            modifier = Modifier,
                             colors = ButtonDefaults.buttonColorsPrimary(),
-                            cornerRadius = 16.dp,
-                            minWidth = 0.dp,
-                            minHeight = 0.dp,
-                            insideMargin = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
-                        ) {
-                            Text(
-                                text = "清除",
-                                style = textStyles.body2.copy(color = colorScheme.onPrimary)
-                            )
-                        }
+                            confirmColors = ButtonDefaults.buttonColors(color = Color.Red),
+                            textColor = colorScheme.onPrimary,
+                            confirmTextColor = Color.White
+                        )
                         
                         // 垂直分割线
                         VerticalDivider(
                             thickness = 1.dp,
-                            modifier = Modifier.height(30.dp)
+                            modifier = Modifier.height(40.dp)
                         )
                         
                         // 引导按钮 - 仅在DEBUG模式下显示

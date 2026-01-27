@@ -55,6 +55,8 @@ import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.ui.DeviceForwardFragment
 import com.xzyht.notifyrelay.feature.device.ui.DeviceListFragment
 import com.xzyht.notifyrelay.feature.notification.ui.NotificationHistoryFragment
+import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -114,7 +116,13 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 先检查权限并启动服务
         checkPermissionsAndStartServices()
+        // 只检查READ_LOGS权限来决定是否启动日志监控
+        if (checkSelfPermission(android.Manifest.permission.READ_LOGS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            // 尝试启动剪贴板日志监控
+            ClipboardSyncManager.startLogMonitoring(this)
+        }
     }
 
     private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
@@ -166,6 +174,8 @@ class MainActivity : FragmentActivity() {
         DeviceConnectionManager.getInstance(this)
         // 生成设备信息文件，用于 ADB 连接检测
         DeviceInfoManager.generateDeviceInfoFile(this)
+        // 初始化 Live Updates 通知管理器
+        LiveUpdatesNotificationManager.initialize(this)
         
         // 在后台线程初始化 NotificationRepository 和启动服务
         GlobalScope.launch {

@@ -1,7 +1,7 @@
 [versions]
 agp = "8.13.0"
 kotlin = "2.1.21"
-coreKtx = "1.16.0"
+coreKtx = "1.17.0-alpha01"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
@@ -12,7 +12,8 @@ uiText = "1.10.0"
 material3 = "1.4.0"
 foundationLayout = "1.10.0"
 runtime = "1.10.0"
-sshd = "2.13.1"
+ftpserver = "1.2.1"
+
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -26,8 +27,8 @@ androidx-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.re
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 androidx-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }
 androidx-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
-apache-sshd = { group = "org.apache.sshd", name = "sshd-core", version.ref = "sshd" }
-apache-sshd-sftp = { group = "org.apache.sshd", name = "sshd-sftp", version.ref = "sshd" }
+apache-ftpserver = { group = "org.apache.ftpserver", name = "ftpserver-core", version.ref = "ftpserver" }
+
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

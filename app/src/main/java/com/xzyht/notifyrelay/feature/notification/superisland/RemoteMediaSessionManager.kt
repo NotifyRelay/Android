@@ -217,9 +217,6 @@ object RemoteMediaSessionManager {
                 pics = currentPics
             )
             
-            // 计算差异
-            val diff = SuperIslandProtocol.diff(lastState, currentState)
-            
             // 构建payload
             val payload = JSONObject().apply {
                 put("packageName", packageName)
@@ -227,13 +224,23 @@ object RemoteMediaSessionManager {
                 put("time", timestamp)
             }
             
-            // 如果是差异包，添加changes字段
+            // 计算差异
+            val diff = SuperIslandProtocol.diff(lastState, currentState)
+            
+            var merged: SuperIslandProtocol.State?
+            
             if (diff.isEmpty()) {
-                // 没有变化，返回
+                // 没有变化，但仍需更新浮窗，避免被自动移除
+                // 直接调用showFloating更新浮窗时间戳
+                com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.showFloating(
+                    context, sourceKey, finalTitle, finalText, buildMediaParamV2(finalTitle, finalText).toString(), currentPics, appName, false
+                )
+                Logger.i("RemoteMediaSessionManager", "媒体会话无变化，但更新浮窗时间戳: $title - $text (来自 ${device.displayName})")
                 return
             } else if (lastState != null) {
                 // 差异包
                 payload.put("changes", diff.toJson())
+                merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
             } else {
                 // 全量包
                 payload.put("title", title)
@@ -242,10 +249,9 @@ object RemoteMediaSessionManager {
                 if (currentPics.isNotEmpty()) {
                     payload.put("pics", JSONObject(currentPics))
                 }
+                merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
             }
             
-            val merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
-
             if (merged != null) {
                 // 有内容需要展示，更新浮窗
                 val pics = merged.pics
@@ -406,9 +412,6 @@ object RemoteMediaSessionManager {
                     pics = currentPics
                 )
                 
-                // 计算差异
-                val diff = SuperIslandProtocol.diff(lastState, currentState)
-                
                 // 构建payload
                 val payload = JSONObject().apply {
                     put("packageName", session.packageName)
@@ -416,10 +419,15 @@ object RemoteMediaSessionManager {
                     put("time", System.currentTimeMillis())
                 }
                 
-                // 如果有变化，发送差异包
+                // 计算差异
+                val diff = SuperIslandProtocol.diff(lastState, currentState)
+                
+                var merged: SuperIslandProtocol.State?
+                
                 if (!diff.isEmpty()) {
+                    // 有变化，发送差异包
                     payload.put("changes", diff.toJson())
-                    val merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
+                    merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
                     
                     if (merged != null) {
                         // 调用超级岛浮窗显示
@@ -428,6 +436,13 @@ object RemoteMediaSessionManager {
                         )
                         Logger.d("RemoteMediaSessionManager", "已定时复传媒体会话: ${session.title} - ${session.text} (来自 ${device.displayName})")
                     }
+                } else {
+                    // 没有变化，但仍需更新浮窗，避免被自动移除
+                    // 直接调用showFloating更新浮窗时间戳
+                    com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.showFloating(
+                        context, sourceKey, session.title, session.text, buildMediaParamV2(session.title, session.text).toString(), currentPics, session.appName, false
+                    )
+                    Logger.d("RemoteMediaSessionManager", "媒体会话无变化，但定时复传更新浮窗时间戳: ${session.title} - ${session.text} (来自 ${device.displayName})")
                 }
                 
                 // 重新安排下一次复传

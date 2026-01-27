@@ -55,12 +55,12 @@ val computedVersionCode = versionInfo.versionCode
 
 android {
     namespace = "com.xzyht.notifyrelay"
-    compileSdk = 35
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.xzyht.notifyrelay"
         minSdk = 26
-        targetSdk = 35
+        targetSdk = 36
         // 使用自动计算的版本号
         versionCode = computedVersionCode
         versionName = computedVersionName
@@ -212,13 +212,9 @@ dependencies {
     implementation("io.coil-kt:coil-compose:2.4.0")
     // DiskLruCache: stable disk-based LRU cache for icons
     implementation("com.jakewharton:disklrucache:2.0.2")
-
-    // Apache SSHD for SFTP server
-    implementation(libs.apache.sshd)
-    implementation(libs.apache.sshd.sftp)
+    // 添加Apache FtpServer依赖用于FTP服务器实现
+    implementation(libs.apache.ftpserver)
 }
-
-// 移除强制使用旧版本stdlib的配置，让项目使用与Kotlin 2.1.21兼容的stdlib版本
 
 tasks.register("printVersionName") {
     doLast {

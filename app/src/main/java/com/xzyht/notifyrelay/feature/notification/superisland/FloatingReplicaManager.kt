@@ -1,21 +1,19 @@
 package com.xzyht.notifyrelay.feature.notification.superisland
 
-import android.animation.ValueAnimator
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.PixelFormat
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
+import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import android.widget.FrameLayout
-import android.widget.ImageView
-import com.xzyht.notifyrelay.R
-import com.xzyht.notifyrelay.common.core.util.HapticFeedbackUtils
+import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.common.core.util.IntentUtils
 import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
@@ -26,10 +24,13 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingW
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.common.data.StorageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 
@@ -45,7 +46,91 @@ object FloatingReplicaManager {
     // Compose浮窗管理器
     private val floatingWindowManager = FloatingWindowManager().apply {
         // 设置条目为空时的回调
-        onEntriesEmpty = { removeOverlayContainer() }
+        onEntriesEmpty = { 
+            removeOverlayContainer() 
+            // 当所有条目为空时，清除所有通知
+            clearAllReplicaNotifications()
+        }
+        // 设置条目移除回调，当单个条目被移除时取消对应的通知
+        onEntryRemoved = { key, reason -> 
+            // 只有当原因不是 HIDDEN 时，才移除系统通知
+            if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
+                val context = overlayView?.get()?.context
+                if (context != null) {
+                    cancelReplicaNotification(context, key)
+                } else {
+                    // 如果没有上下文，直接从映射中移除
+                    entryKeyToNotificationId.remove(key)
+                }
+            } else {
+                // 如果是 HIDDEN，我们仍然需要从 FloatingWindowManager 中移除条目（已由 removeEntry 完成）
+                // 但我们需要保留 Notification 以便用户再次点击
+                // 所以我们不调用 cancelReplicaNotification
+                Logger.i(TAG, "超级岛: 条目被隐藏 (HIDDEN)，保留系统通知以便恢复, key=$key")
+            }
+
+            // 从sourceId映射中移除，并将sourceId添加到黑名单
+            // 创建需要移除的sourceId列表，避免ConcurrentModificationException
+            val sourceIdsToRemove = mutableListOf<String>()
+            val sourceIdsToBlock = mutableListOf<String>()
+            val sourceIdsToUpdate = mutableMapOf<String, MutableList<String>>()
+            
+            // 第一次遍历：找出需要处理的sourceId
+            sourceIdToEntryKeyMap.forEach { (sourceId, keys) ->
+                if (keys.contains(key)) {
+                    // 创建列表副本，避免在遍历期间修改原集合
+                    val updatedKeys = keys.toMutableList()
+                    updatedKeys.remove(key)
+                    if (updatedKeys.isEmpty()) {
+                        sourceIdsToRemove.add(sourceId)
+                        sourceIdsToBlock.add(sourceId)
+                    } else {
+                        sourceIdsToUpdate[sourceId] = updatedKeys
+                    }
+                }
+            }
+            
+            // 更新需要修改的列表
+            sourceIdsToUpdate.forEach {
+                sourceIdToEntryKeyMap[it.key] = it.value
+            }
+            
+            // 第二次遍历：移除空的sourceId条目
+            sourceIdsToRemove.forEach {
+                sourceIdToEntryKeyMap.remove(it)
+            }
+            
+            // 第三次遍历：处理需要添加到黑名单和关闭Live Updates通知的sourceId
+            sourceIdsToBlock.forEach { sourceId ->
+                // 仅当用户手动移除通知时，将sourceId添加到黑名单，避免短时间内再次弹出
+                // 自动超时关闭或远端移除不应触发黑名单
+                // 如果是用户点击隐藏 (HIDDEN)，也触发黑名单，防止远端更新立即重新显示
+                if (reason == FloatingWindowManager.RemovalReason.MANUAL || reason == FloatingWindowManager.RemovalReason.HIDDEN) {
+                    blockInstance(sourceId)
+                }
+                
+                // 只有当原因是 HIDDEN 时，才保留通知（不调用 cancelReplicaNotification）
+                // 其他情况（TIMEOUT, MANUAL, REMOTE, OTHER）都应该移除通知
+                if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
+                    // 对于 HIDDEN 以外的情况，我们已经在循环外部调用了 cancelReplicaNotification
+                    // 但这里需要注意：onEntryRemoved 的参数 key 是具体的条目 key
+                    // 而这里是在处理 sourceId 对应的所有条目都移除的情况
+                    // 所以如果 sourceId 被判定为“移除”，那么属于该 sourceId 的所有通知都应该被移除
+                    // 除非是 HIDDEN 模式，这种情况下我们希望通知保留以便用户重新点击
+                }
+
+                // 同时关闭对应的Live Updates复合通知
+                // 只有在彻底移除时才关闭，HIDDEN 模式下保留
+                if (reason != FloatingWindowManager.RemovalReason.HIDDEN && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                    try {
+                        LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
+                        Logger.i(TAG, "关闭Live Updates复合通知: sourceId=$sourceId")
+                    } catch (e: Exception) {
+                        Logger.w(TAG, "关闭Live Updates复合通知失败: ${e.message}")
+                    }
+                }
+            }
+        }
     }
     // Compose生命周期管理器
     private val lifecycleManager = LifecycleManager()
@@ -66,21 +151,14 @@ object FloatingReplicaManager {
 
     // 保存sourceId到entryKey列表的映射，以便后续能正确移除条目
     // 一个sourceId可能对应多个条目，所以使用列表保存
-    private val sourceIdToEntryKeyMap = mutableMapOf<String, MutableList<String>>()
-
-    // 单独的全屏关闭层（拖动时显示底部中心关闭指示器）
-    private var closeOverlayView: WeakReference<View>? = null
-    private var closeOverlayLayoutParams: WindowManager.LayoutParams? = null
-    private var closeTargetView: WeakReference<View>? = null
-
-    // 当前是否正在拖动容器
-    private var isContainerDragging = false
-
-    // 关闭区位置信息
-    private var closeAreaTop: Int = 0
-    private var closeAreaBottom: Int = 0
-    private var closeAreaLeft: Int = 0
-    private var closeAreaRight: Int = 0
+    private val sourceIdToEntryKeyMap = ConcurrentHashMap<String, MutableList<String>>()
+    
+    // 保存entryKey到notificationId的映射，用于管理复刻通知
+    private val entryKeyToNotificationId = ConcurrentHashMap<String, Int>()
+    // 通知渠道ID
+    private const val NOTIFICATION_CHANNEL_ID = "super_island_replica"
+    // 通知ID基础值
+    private const val NOTIFICATION_BASE_ID = 20000
 
     /**
      * 显示超级岛复刻悬浮窗。
@@ -98,9 +176,27 @@ object FloatingReplicaManager {
         appName: String? = null,
         isLocked: Boolean = false
     ) {
+        showFloatingInternal(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked, false)
+    }
+
+    /**
+     * 内部显示浮窗方法，增加isRestoring参数
+     */
+    private fun showFloatingInternal(
+        context: Context,
+        sourceId: String,
+        title: String?,
+        text: String?,
+        paramV2Raw: String? = null,
+        picMap: Map<String, String>? = null,
+        appName: String? = null,
+        isLocked: Boolean = false,
+        isRestoring: Boolean = false // 是否是从隐藏状态恢复
+    ) {
         try {
             // 会话级屏蔽检查：同一个 instanceId 在本轮被用户关闭后不再展示
-            if (sourceId.isNotBlank() && isInstanceBlocked(sourceId)) {
+            // 如果是从隐藏状态恢复，则忽略屏蔽检查
+            if (!isRestoring && sourceId.isNotBlank() && isInstanceBlocked(sourceId)) {
                 Logger.i(TAG, "超级岛: instanceId=$sourceId 已在本轮会话中被屏蔽，忽略展示")
                 return
             }
@@ -162,12 +258,74 @@ object FloatingReplicaManager {
 
                     // 创建或更新浮窗UI
                     addOrUpdateEntry(context, entryKey, summaryOnly)
+                    
+                    // 对于进度类型，且Live Updates启用时，只发送复合通知作为浮窗的生命周期管理
+                    // 否则发送传统复刻通知
+                    val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
+                    
+                    if (isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                        try {
+                            // 初始化Live Updates通知管理器
+                            LiveUpdatesNotificationManager.initialize(context)
+                            // 发送复合通知
+                            LiveUpdatesNotificationManager.showLiveUpdate(
+                                sourceId, title, text, paramV2Raw, appName, isLocked, internedPicMap
+                            )
+                            Logger.i(TAG, "浮窗创建时发送Live Updates复合通知作为生命周期管理: sourceId=$sourceId")
+                        } catch (e: Exception) {
+                            Logger.w(TAG, "发送Live Updates复合通知失败: ${e.message}")
+                            // 发送失败时，回退到传统复刻通知
+                            // 如果是从隐藏恢复，不需要重新发送通知，除非通知已经不在了
+                            // 但为了确保通知处于最新状态（且包含正确的数据以供下次点击），我们还是更新一下通知
+                            sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId)
+                        }
+                    } else {
+                        // 非进度类型或Live Updates未启用时，发送传统复刻通知
+                        sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId)
+                    }
                 } catch (e: Exception) {
                     Logger.w(TAG, "超级岛: 显示浮窗失败(协程): ${e.message}")
                 }
             }
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 显示浮窗失败，退化为通知: ${e.message}")
+        }
+    }
+
+    /**
+     * 切换浮窗显示状态：如果显示则隐藏，如果隐藏则显示
+     */
+    fun toggleFloating(
+        context: Context,
+        sourceId: String,
+        title: String?,
+        text: String?,
+        paramV2Raw: String? = null,
+        picMap: Map<String, String>? = null,
+        appName: String? = null
+    ) {
+        try {
+            // 检查当前是否已显示
+            val entryKeys = sourceIdToEntryKeyMap[sourceId]
+            val isShowing = entryKeys?.any { floatingWindowManager.getEntry(it) != null } == true
+
+            if (isShowing) {
+                // 当前已显示，执行隐藏操作
+                // 使用 HIDDEN 原因，这样不会移除系统通知
+                Logger.i(TAG, "超级岛: 点击通知切换 - 隐藏浮窗, sourceId=$sourceId")
+                dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.HIDDEN)
+            } else {
+                // 当前未显示，执行恢复显示操作
+                Logger.i(TAG, "超级岛: 点击通知切换 - 恢复浮窗, sourceId=$sourceId")
+                // 恢复显示时，移除黑名单，确保可以显示
+                blockedInstanceIds.remove(sourceId)
+                showFloatingInternal(
+                    context, sourceId, title, text, paramV2Raw, picMap, appName, 
+                    isLocked = false, isRestoring = true
+                )
+            }
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: 切换浮窗状态失败: ${e.message}")
         }
     }
 
@@ -212,370 +370,410 @@ object FloatingReplicaManager {
         // 切换展开/折叠状态，toggleEntryExpanded内部会处理摘要态的情况
         floatingWindowManager.toggleEntryExpanded(key)
     }
-
-    // 关闭指示器高亮/还原动画
-    private fun animateCloseTargetHighlight(highlight: Boolean) {
-        val target = closeTargetView?.get() ?: return
-        val endScale = if (highlight) 1.2f else 1.0f
-        val endAlpha = if (highlight) 1.0f else 0.7f
-
-        try {
-            // 使用ViewPropertyAnimatorCompat处理动画
-            ValueAnimator.ofFloat(0f, 1f).apply {
-                duration = 160L
-                addUpdateListener { animator ->
-                    val progress = animator.animatedValue as Float
-                    val currentScale = 1.0f + (endScale - 1.0f) * progress
-                    val currentAlpha = 0.7f + (endAlpha - 0.7f) * progress
-                    target.scaleX = currentScale
-                    target.scaleY = currentScale
-                    target.alpha = currentAlpha
-                }
-                start()
-            }
-        } catch (_: Exception) {
-        }
-    }
-
-    // 触觉反馈：进入/离开关闭区域时短振动
-    private fun performHapticFeedback(context: Context) {
-        HapticFeedbackUtils.performLightHaptic(context)
-    }
-
-    /**
-     * 显示关闭层
-     */
-    private fun showCloseOverlay() {
-        // 获取上下文并显示关闭层
-        overlayView?.get()?.context?.let { showCloseOverlay(it) }
-    }
-
-    /**
-     * 隐藏关闭层
-     */
-    private fun hideCloseOverlay() {
-        // 获取上下文并隐藏关闭层
-        overlayView?.get()?.context?.let { hideCloseOverlay(it) }
-    }
-
+    
     /**
      * 处理容器拖动开始事件
      */
     private fun onContainerDragStarted() {
-        // 显示关闭层
-        showCloseOverlay()
-        // 记录容器正在拖动
-        isContainerDragging = true
-        // 立即更新一次重叠状态，确保初始状态正确
-        updateEntriesOverlappingStatus()
+        // 移除原来的关闭层相关逻辑
     }
 
     /**
      * 处理容器拖动结束事件
      */
     private fun onContainerDragEnded() {
-        // 检查是否有条目与关闭区重叠
-        checkEntriesInCloseArea()
-        // 清除所有条目的重叠状态
-        floatingWindowManager.clearAllEntriesOverlapping()
-        // 隐藏关闭层
-        hideCloseOverlay()
-        // 记录容器拖动结束
-        isContainerDragging = false
+        // 移除原来的关闭层相关逻辑
     }
-
+    
     /**
-     * 更新条目的重叠状态，用于实时检测
+     * 发送复刻通知，与原通知保持一致
      */
-    private fun updateEntriesOverlappingStatus() {
+    private fun sendReplicaNotification(
+        context: Context,
+        key: String,
+        title: String?,
+        text: String?,
+        appName: String?,
+        paramV2: ParamV2?,
+        picMap: Map<String, String>?,
+        sourceId: String // 新增sourceId参数
+    ) {
         try {
-            // 获取所有条目
-            val entries = floatingWindowManager.entriesList
-            if (entries.isEmpty()) return
-
-            // 获取容器当前位置
-            val containerX = overlayLayoutParams?.x ?: 0
-            val containerY = overlayLayoutParams?.y ?: 0
-
-            // 获取显示密度
-            val density = overlayView?.get()?.context?.resources?.displayMetrics?.density ?: 1f
-
-            // 计算容器宽度
-            val containerWidth = (FIXED_WIDTH_DP * density).toInt()
-
-            // 检查关闭区是否已经初始化（非默认值）
-            if (closeAreaLeft == 0 && closeAreaTop == 0 && closeAreaRight == 0 && closeAreaBottom == 0) {
-                // 如果关闭区位置没有初始化，直接返回
-                return
-            }
-
-            // 记录之前的重叠状态，用于判断是否需要振动
-            val previousOverlappingKeys = mutableSetOf<String>()
-            entries.forEach { entry ->
-                if (entry.isOverlapping) {
-                    previousOverlappingKeys.add(entry.key)
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            
+            // 生成唯一的通知ID
+            val notificationId = key.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
+            
+            // 创建点击意图，用于处理用户点击通知时切换浮窗显示/隐藏
+            val contentIntent = Intent(context, NotificationBroadcastReceiver::class.java).apply {
+                action = "com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"
+                putExtra("sourceId", sourceId)
+                putExtra("title", title)
+                putExtra("text", text)
+                putExtra("appName", appName)
+                putExtra("paramV2Raw", paramV2?.toString()) // 注意：这里可能需要原始的json字符串，但paramV2是对象。如果需要原始串，应该在参数中传入
+                // 优化：传入paramV2Raw
+                val entry = floatingWindowManager.getEntry(key)
+                if (entry?.paramV2Raw != null) {
+                    putExtra("paramV2Raw", entry.paramV2Raw)
+                }
+                
+                // 传入图片映射
+                if (!picMap.isNullOrEmpty()) {
+                    val bundle = Bundle()
+                    picMap.forEach { (k, v) -> bundle.putString(k, v) }
+                    putExtra("picMap", bundle)
                 }
             }
+            
+            val pendingContentIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId,
+                contentIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
 
-            // 遍历所有条目，检查每个条目是否与关闭区重叠
-            var currentY = containerY
-            for ((_, entry) in entries.withIndex()) {
-                // 使用条目实际高度，如果高度为0（未测量）则使用默认值
-                val currentHeight = if (entry.height > 0) entry.height else (100f * density).toInt()
+            // 检查是否为媒体类型的超级岛浮窗
+            val isMediaType = paramV2?.business == "media"
+
+            // 创建删除意图，用于处理用户移除通知时关闭浮窗
+            val deleteIntent = PendingIntent.getBroadcast(
+                context,
+                notificationId,
+                Intent(context, NotificationBroadcastReceiver::class.java)
+                    .putExtra("notificationId", notificationId)
+                    .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            
+            // 对于媒体类型，使用HyperCeiler焦点歌词的特殊处理
+            if (isMediaType) {
+                // ... (原有代码保持不变)
+                val builder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
+                    .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
+                    .setContentText(text ?: "")
+                    .setSmallIcon(android.R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
+                    // 调整为不可被一键清除的属性，只能手动划去
+                    .setAutoCancel(false) // 不允许用户点击清除通知
+                    .setOngoing(true) // 不允许通知被一键清除
+                    .setPriority(NotificationCompat.PRIORITY_MAX)
+                    .setShowWhen(false)
+                    .setWhen(System.currentTimeMillis())
+                    .setOnlyAlertOnce(true)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setDeleteIntent(deleteIntent) // 设置删除意图，处理用户移除通知的情况
+                    .setContentIntent(pendingContentIntent) // 设置点击意图
                 
-                // 计算当前条目的位置（垂直排列，最新的在底部）
-                val entryTop = currentY
-                val entryBottom = entryTop + currentHeight
-                val entryCenterX = containerX + containerWidth / 2
+                // ... (后续构建extras的代码保持不变)
+                // 添加焦点歌词相关的结构化数据
+                val extras = builder.extras
                 
-                // 更新当前Y坐标，为下一个条目做准备
-                currentY += currentHeight
-
-                // 检查条目是否与关闭区重叠
-                val isVerticallyOverlapping = entryBottom > closeAreaTop && entryTop < closeAreaBottom
-                val isHorizontallyOverlapping = entryCenterX > closeAreaLeft && entryCenterX < closeAreaRight
-                val isOverlapping = isVerticallyOverlapping && isHorizontallyOverlapping
-
-                // 如果条目重叠状态发生变化
-                if (entry.isOverlapping != isOverlapping) {
-                    // 更新条目重叠状态
-                    floatingWindowManager.setEntryOverlapping(entry.key, isOverlapping)
-
-                    // 如果条目开始重叠，执行振动反馈
-                    if (isOverlapping) {
-                        // 获取上下文，用于振动反馈
-                        val context = overlayView?.get()?.context
-                        if (context != null) {
-                            // 执行振动反馈
-                            try {
-                                HapticFeedbackUtils.performLightHaptic(context)
-                                Logger.i(TAG, "超级岛: 执行振动反馈 - Key: ${entry.key}")
-                            } catch (e: Exception) {
-                                Logger.w(TAG, "超级岛: 振动反馈执行失败: ${e.message}")
-                            }
+                // 构建符合HyperIslandApi标准的媒体类型miui.focus.param，优化数据结构
+                val fullFocusParam = JSONObject().apply {
+                    put("protocol", 1)
+                    put("scene", "music") // 媒体类型固定使用music场景
+                    put("ticker", title ?: "")
+                    put("content", text ?: "")
+                    put("enableFloat", false)
+                    put("updatable", true)
+                    put("reopen", "close")
+                    
+                    // 媒体类型需要的animTextInfo字段
+                    put("animTextInfo", JSONObject().apply {
+                        put("title", title ?: "")
+                        put("content", text ?: "")
+                    })
+                    
+                    // 优化媒体类型param_v2结构，符合小米官方标准
+                    val paramV2Json = JSONObject().apply {
+                        put("business", "music")
+                        put("protocol", 1)
+                        put("scene", "music")
+                        put("ticker", title ?: "")
+                        put("content", text ?: "")
+                        put("enableFloat", false)
+                        put("updatable", true)
+                        put("reopen", "close")
+                        put("timerType", 0)
+                        put("timerWhen", 0)
+                        put("timerSystemCurrent", 0)
+                        
+                        // 媒体类型必须包含的baseInfo字段
+                        put("baseInfo", JSONObject().apply {
+                            put("title", title ?: "")
+                            put("content", text ?: "")
+                        })
+                    }
+                    
+                    put("param_v2", paramV2Json)
+                }
+                
+                extras.putString("miui.focus.param", fullFocusParam.toString())
+                
+                // 添加其他必要的焦点通知字段
+                extras.putBoolean("miui.showAction", true)
+                
+                // 添加模拟的action字段
+                val actionsBundle = Bundle()
+                actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
+                actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
+                extras.putBundle("miui.focus.actions", actionsBundle)
+                
+                // 添加图片资源
+                picMap?.let { map ->
+                    // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
+                    map.forEach { (picKey, picUrl) ->
+                        if (picKey.startsWith("miui.focus.pic_")) {
+                            val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
+                            extras.putString(picKey, actualPicUrl)
                         }
                     }
-                }
-            }
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 更新条目重叠状态失败: ${e.message}")
-               e.printStackTrace()
-        }
-    }
-
-    /**
-     * 检查条目是否与关闭区重叠
-     */
-    private fun checkEntriesInCloseArea() {
-        try {
-            // 获取所有条目
-            val entries = floatingWindowManager.entriesList
-            if (entries.isEmpty()) return
-
-            // 获取容器当前位置
-            val containerX = overlayLayoutParams?.x ?: 0
-            val containerY = overlayLayoutParams?.y ?: 0
-
-            // 获取显示密度
-            val density = overlayView?.get()?.context?.resources?.displayMetrics?.density ?: 1f
-
-            // 计算容器宽度
-            val containerWidth = (FIXED_WIDTH_DP * density).toInt()
-
-            // 添加调试日志，便于检查关闭区和容器位置
-            Logger.i(TAG, "超级岛: 关闭区位置 - Left: $closeAreaLeft, Top: $closeAreaTop, Right: $closeAreaRight, Bottom: $closeAreaBottom")
-            Logger.i(TAG, "超级岛: 容器位置 - X: $containerX, Y: $containerY, Width: $containerWidth")
-
-            // 检查关闭区是否已经初始化（非默认值）
-            if (closeAreaLeft == 0 && closeAreaTop == 0 && closeAreaRight == 0 && closeAreaBottom == 0) {
-                // 如果关闭区位置没有初始化，直接返回
-                return
-            }
-
-            // 遍历所有条目，检查每个条目是否与关闭区重叠
-            var currentY = containerY
-            for ((index, entry) in entries.withIndex()) {
-                // 使用条目实际高度，如果高度为0（未测量）则使用默认值
-                val currentHeight = if (entry.height > 0) entry.height else (100f * density).toInt()
-                
-                // 计算当前条目的位置（垂直排列，最新的在底部）
-                val entryTop = currentY
-                val entryBottom = entryTop + currentHeight
-                val entryCenterX = containerX + containerWidth / 2
-                
-                // 更新当前Y坐标，为下一个条目做准备
-                currentY += currentHeight
-
-                // 检查条目是否与关闭区重叠
-                val isVerticallyOverlapping = entryBottom > closeAreaTop && entryTop < closeAreaBottom
-                val isHorizontallyOverlapping = entryCenterX > closeAreaLeft && entryCenterX < closeAreaRight
-
-                // 添加调试日志
-                Logger.i(TAG, "超级岛: 条目重叠检测 - Key: ${entry.key}, Index: $index, 垂直重叠: $isVerticallyOverlapping, 水平重叠: $isHorizontallyOverlapping")
-
-                // 如果条目与关闭区重叠
-                if (isVerticallyOverlapping && isHorizontallyOverlapping) {
-                    // 获取上下文，用于振动反馈
-                    val context = overlayView?.get()?.context
-                    if (context != null) {
-                        // 执行振动反馈
-                        try {
-                            HapticFeedbackUtils.performLightHaptic(context)
-                            Logger.i(TAG, "超级岛: 执行振动反馈")
-                        } catch (e: Exception) {
-                            Logger.w(TAG, "超级岛: 振动反馈执行失败: ${e.message}")
+                    
+                    // 添加miui.focus.pics字段，包含所有图片资源的Bundle
+                    val picsBundle = Bundle()
+                    map.forEach { (picKey, picUrl) ->
+                        if (picKey.startsWith("miui.focus.pic_")) {
+                            picsBundle.putString(picKey, picUrl)
                         }
                     }
-
-                    // 关闭重叠的条目
-                    Logger.i(TAG, "超级岛: 关闭重叠条目 - Key: ${entry.key}")
-
-                    // 添加会话级屏蔽，避免用户刚关闭就再次弹出
-                    blockInstance(entry.key)
-
-                    floatingWindowManager.removeEntry(entry.key)
-
-                    // 只关闭一个重叠条目，然后退出循环
-                    break
+                    extras.putBundle("miui.focus.pics", picsBundle)
                 }
-            }
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 检查条目与关闭区重叠失败: ${e.message}")
-        }
-    }
-
-    // 显示全屏关闭层，底部中心有关闭指示器
-    private fun showCloseOverlay(context: Context) {
-        if (closeOverlayView?.get() != null) return
-
-        // 获取windowManager
-        val wm = context.getSystemService(Context.WINDOW_SERVICE) as? WindowManager ?: return
-
-        val density = context.resources.displayMetrics.density
-        val container = FrameLayout(context)
-        val lp = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.MATCH_PARENT,
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-            PixelFormat.TRANSLUCENT
-        ).apply {
-            gravity = Gravity.LEFT or Gravity.TOP
-        }
-
-        val closeSize = (72 * density).toInt()
-        val closeLp = FrameLayout.LayoutParams(closeSize, closeSize, Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL).apply {
-            bottomMargin = (24 * density).toInt()
-        }
-        val closeView = ImageView(context).apply {
-                layoutParams = closeLp
-                background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(0x99000000.toInt())
-                }
-                // 使用实际的叉号图标
-                try {
-                    setImageResource(R.drawable.ic_pip_close)
-                } catch (_: Exception) { }
-                scaleType = ImageView.ScaleType.CENTER_INSIDE
-                alpha = 0.7f
-                visibility = View.VISIBLE
-                contentDescription = "close_overlay_target"
-                setOnClickListener {
-                    // 点击关闭按钮时，移除所有浮窗条目
-                    // 为每个条目添加会话级屏蔽
-                    floatingWindowManager.entriesList.forEach { entry ->
-                        blockInstance(entry.key)
+                
+                // 添加应用信息
+                extras.putBoolean("android.reduced.images", true)
+                extras.putString("superIslandSourcePackage", context.packageName)
+                extras.putString("app_package", context.packageName)
+                
+                // 发送通知
+                notificationManager.notify(notificationId, builder.build())
+            } else {
+                // 非媒体类型，使用原来的通知渠道和构建方式
+                // 创建通知渠道
+                val channel = android.app.NotificationChannel(
+                    NOTIFICATION_CHANNEL_ID,
+                    "超级岛复刻通知",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                )
+                notificationManager.createNotificationChannel(channel)
+                
+                // 构建基础通知，调整属性使其更接近实际超级岛通知
+                val builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+                    .setContentTitle(title ?: appName ?: "超级岛通知")
+                    .setContentText(text ?: "")
+                    .setSmallIcon(android.R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
+                    // 调整为与实际超级岛通知一致的属性
+                    .setAutoCancel(false) // 实际通知通常不可清除
+                    .setOngoing(true) // 实际通知通常是持续的
+                    .setPriority(NotificationCompat.PRIORITY_MAX) // 提高优先级到最高，与原始通知一致
+                    .setShowWhen(false) // 不显示时间，与原始通知一致
+                    .setWhen(System.currentTimeMillis()) // 设置时间，但不显示
+                    .setOnlyAlertOnce(true) // 只提示一次
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 公开可见
+                    .setDeleteIntent(deleteIntent) // 设置删除意图
+                    .setContentIntent(pendingContentIntent) // 设置点击意图
+                
+                // ... (后续构建extras的代码保持不变)
+                // 添加超级岛相关的结构化数据，严格按照小米官方文档规范和实际通知结构
+                val extras = builder.extras
+                
+                // 获取paramV2原始数据
+                val entry = floatingWindowManager.getEntry(key)
+                val paramV2Raw = entry?.paramV2Raw
+                
+                // 构建符合小米官方规范的完整miui.focus.param结构
+                paramV2Raw?.let {
+                    try {
+                        // 解析原始paramV2数据
+                        val paramV2Json = JSONObject(it)
+                        
+                        // 构建完整的焦点通知参数结构，包含外层scene、ticker等字段
+                        val fullFocusParam = JSONObject().apply {
+                            put("protocol", 1)
+                            put("scene", paramV2Json.optString("business", "default"))
+                            put("ticker", title ?: "")
+                            put("content", text ?: "")
+                            put("timerType", 0)
+                            put("timerWhen", 0)
+                            put("timerSystemCurrent", 0)
+                            put("enableFloat", false)
+                            put("updatable", true)
+                            put("param_v2", paramV2Json) // 将原始paramV2作为嵌套字段
+                        }
+                        
+                        extras.putString("miui.focus.param", fullFocusParam.toString())
+                    } catch (e: Exception) {
+                        // 如果构建完整结构失败，回退到直接使用原始数据
+                        extras.putString("miui.focus.param", it)
                     }
-                    floatingWindowManager.clearAllEntries()
-                    // 隐藏全屏关闭层
-                    hideCloseOverlay(context)
                 }
-            }
-        container.addView(closeView)
-
-        try {
-            wm.addView(container, lp)
-            closeOverlayView = WeakReference(container)
-            closeOverlayLayoutParams = lp
-            closeTargetView = WeakReference(closeView)
-
-            // 计算关闭区位置信息 - 确保在屏幕底部中心
-            val displayMetrics = context.resources.displayMetrics
-            val screenWidth = displayMetrics.widthPixels
-            val screenHeight = displayMetrics.heightPixels
-
-            // 关闭区大小和边距（与关闭按钮一致）
-            val closeAreaSize = closeSize
-            val closeAreaMargin = (24 * density).toInt()
-
-            // 计算关闭区的边界 - 底部中心位置
-            closeAreaLeft = (screenWidth - closeAreaSize) / 2
-            closeAreaRight = closeAreaLeft + closeAreaSize
-            closeAreaTop = screenHeight - closeAreaSize - closeAreaMargin
-            closeAreaBottom = closeAreaTop + closeAreaSize
-
-            // 添加调试日志，便于检查关闭区位置
-            Logger.i(TAG, "超级岛: 关闭区位置 - Left: $closeAreaLeft, Top: $closeAreaTop, Right: $closeAreaRight, Bottom: $closeAreaBottom")
-
-            // 使用ValueAnimator实现淡入动画
-            ValueAnimator.ofFloat(0.7f, 1.0f).apply {
-                duration = 150L
-                addUpdateListener { animator ->
-                    closeView.alpha = animator.animatedValue as Float
+                
+                // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
+                picMap?.let {map ->
+                    map.forEach { (picKey, picUrl) ->
+                        // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
+                        if (picKey.startsWith("miui.focus.pic_")) {
+                            // 解析图片引用符，获取实际的图片数据
+                            val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
+                            extras.putString(picKey, actualPicUrl)
+                        }
+                    }
+                    
+                    // 添加miui.focus.pics字段，包含所有图片资源的Bundle
+                    val picsBundle = Bundle()
+                    map.forEach { (picKey, picUrl) ->
+                        if (picKey.startsWith("miui.focus.pic_")) {
+                            // 这里简化处理，实际应该创建Icon对象
+                            picsBundle.putString(picKey, picUrl)
+                        }
+                    }
+                    extras.putBundle("miui.focus.pics", picsBundle)
                 }
-                start()
+                
+                // 添加焦点通知必要的额外字段
+                extras.putBoolean("miui.showAction", true)
+                
+                // 添加模拟的action字段，实际应该包含真实的Notification.Action对象
+                val actionsBundle = Bundle()
+                actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
+                actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
+                extras.putBundle("miui.focus.actions", actionsBundle)
+                
+                // 添加原始通知中存在的其他字段，这些可能影响UI显示
+                // 对于计时器类通知，添加计时器相关字段
+                if (title?.contains("计时") == true || title?.contains("秒表") == true) {
+                    extras.putBoolean("android.chronometerCountDown", false)
+                    extras.putBoolean("android.showChronometer", true)
+                }
+                
+                // 添加应用信息，与原始通知保持一致
+                extras.putBoolean("android.reduced.images", true)
+                
+                // 添加超级岛源包信息，与原始通知保持一致
+                extras.putString("superIslandSourcePackage", context.packageName)
+                
+                // 包名信息
+                extras.putString("app_package", context.packageName)
+                
+                // 发送通知
+                notificationManager.notify(notificationId, builder.build())
             }
+            
+            // 保存entryKey到notificationId的映射
+            entryKeyToNotificationId[key] = notificationId
+            
+            Logger.i(TAG, "超级岛: 发送复刻通知成功，key=$key, notificationId=$notificationId")
         } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 显示关闭层失败: ${e.message}")
-            // 清理资源
-            try {
-                container.removeAllViews()
-                // 移除所有监听器，避免内存泄漏
-                closeView.setOnClickListener(null)
-                // 清理背景资源
-                closeView.background = null
-            } catch (_: Exception) {}
+            Logger.w(TAG, "超级岛: 发送复刻通知失败: ${e.message}")
         }
     }
-
-    private fun hideCloseOverlay(context: Context? = null) {
-        val view = closeOverlayView?.get() ?: return
-        val actualContext = context ?: view.context
-        val wm = actualContext.getSystemService(Context.WINDOW_SERVICE) as? WindowManager ?: return
-
+    
+    /**
+     * 取消复刻通知
+     */
+    private fun cancelReplicaNotification(context: Context, key: String) {
         try {
-            wm.removeView(view)
-            //Logger.d(TAG, "超级岛: 关闭层已隐藏")
+            val notificationId = entryKeyToNotificationId.remove(key)
+            if (notificationId != null) {
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                notificationManager.cancel(notificationId)
+                Logger.i(TAG, "超级岛: 取消复刻通知成功，key=$key, notificationId=$notificationId")
+            }
         } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 隐藏关闭层失败: ${e.message}")
-        } finally {
-            // 无论移除是否成功，都置空全局引用，避免内存泄漏
-            closeTargetView = null
-            closeOverlayLayoutParams = null
-            closeOverlayView = null
+            Logger.w(TAG, "超级岛: 取消复刻通知失败: ${e.message}")
+        }
+    }
+    
+    /**
+     * 清除所有复刻通知
+     */
+    private fun clearAllReplicaNotifications() {
+        try {
+            val context = overlayView?.get()?.context ?: return
+            val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            
+            // 取消所有映射中的通知
+            entryKeyToNotificationId.forEach { (key, notificationId) ->
+                notificationManager.cancel(notificationId)
+                Logger.i(TAG, "超级岛: 取消复刻通知成功，key=$key, notificationId=$notificationId")
+            }
+            
+            // 清空映射
+            entryKeyToNotificationId.clear()
+            Logger.i(TAG, "超级岛: 清除所有复刻通知成功")
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: 清除所有复刻通知失败: ${e.message}")
+        }
+    }
+    
+    /**
+     * 根据通知ID关闭对应的浮窗条目
+     */
+    fun closeByNotificationId(notificationId: Int) {
+        try {
+            // 查找对应的entryKey
+            val entryKey = entryKeyToNotificationId.entries.find { it.value == notificationId }?.key
+            if (entryKey != null) {
+                // 移除浮窗条目，这会触发onEntryRemoved回调，进而取消对应的通知并清理映射
+                // 标记为手动移除
+                floatingWindowManager.removeEntry(entryKey, FloatingWindowManager.RemovalReason.MANUAL)
+                Logger.i(TAG, "超级岛: 根据通知ID关闭浮窗条目成功，notificationId=$notificationId, entryKey=$entryKey")
+            }
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: 根据通知ID关闭浮窗条目失败: ${e.message}")
+        }
+    }
+    
+    /**
+     * 关闭所有浮窗条目
+     */
+    fun closeAllEntries() {
+        try {
+            val context = overlayView?.get()?.context
+            // 清空所有条目
+            floatingWindowManager.clearAllEntries()
+            // 取消所有复刻通知
+            if (context != null) {
+                clearAllReplicaNotifications()
+            } else {
+                // 如果没有上下文，直接清空映射
+                entryKeyToNotificationId.clear()
+            }
+            // 清空映射
+            sourceIdToEntryKeyMap.clear()
+            Logger.i(TAG, "超级岛: 关闭所有浮窗条目成功")
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: 关闭所有浮窗条目失败: ${e.message}")
         }
     }
 
     // 新增：按来源键立刻移除指定浮窗（用于接收终止事件SI_END时立即消除）
     fun dismissBySource(sourceId: String) {
+        dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.REMOTE)
+    }
+
+    private fun dismissBySourceInternal(sourceId: String, reason: FloatingWindowManager.RemovalReason) {
         try {
             // 从映射中获取所有对应的entryKey
             val entryKeys = sourceIdToEntryKeyMap[sourceId]
             if (entryKeys != null) {
-                // 移除所有相关条目
+                // 移除所有相关条目，这会触发onEntryRemoved回调，进而取消对应的通知并清理映射
                 entryKeys.forEach { entryKey ->
-                    floatingWindowManager.removeEntry(entryKey)
+                    floatingWindowManager.removeEntry(entryKey, reason)
                 }
-                // 清理映射关系
+                // 清理映射关系（如果还有剩余）
                 sourceIdToEntryKeyMap.remove(sourceId)
             } else {
-                // 如果没有找到映射，尝试直接使用sourceId移除
-                floatingWindowManager.removeEntry(sourceId)
+                // 如果没有找到映射，尝试直接使用sourceId移除，这会触发onEntryRemoved回调
+                floatingWindowManager.removeEntry(sourceId, reason)
             }
             // 如果对应的会话结束（SI_END），同步移除黑名单，允许后续同一通知重新展示
-            blockedInstanceIds.remove(sourceId)
-        } catch (_: Exception) {}
+            // 只有在 REMOTE 或 TIMEOUT 移除时才移除黑名单（因为 MANUAL 会加黑名单）
+            if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
+                blockedInstanceIds.remove(sourceId)
+            }
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: 按来源关闭浮窗失败: ${e.message}")
+        }
     }
 
     /**
@@ -583,9 +781,6 @@ object FloatingReplicaManager {
      */
     private fun removeOverlayContainer() {
         try {
-            // 关闭关闭层，确保在移除浮窗容器前清理
-            hideCloseOverlay()
-
             val view = overlayView?.get()
             val wm = windowManager?.get()
             val lp = overlayLayoutParams
@@ -614,8 +809,6 @@ object FloatingReplicaManager {
             overlayView = null
             overlayLayoutParams = null
             windowManager = null
-            // 确保关闭层被清理
-            hideCloseOverlay()
         }
     }
 
@@ -675,8 +868,8 @@ object FloatingReplicaManager {
                 this.onEntryClick = { entryKey -> onEntryClicked(entryKey) }
                 // 设置容器拖动开始回调
                 this.onContainerDragStart = { onContainerDragStarted() }
-                // 设置容器拖动中回调，用于实时检测重叠
-                this.onContainerDragging = { updateEntriesOverlappingStatus() }
+                // 设置容器拖动中回调，移除了关闭区重叠检测逻辑
+                this.onContainerDragging = { }
                 // 设置容器拖动结束回调
                 this.onContainerDragEnd = { onContainerDragEnded() }
             }
