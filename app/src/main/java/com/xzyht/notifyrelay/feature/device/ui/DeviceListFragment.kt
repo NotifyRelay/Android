@@ -402,8 +402,14 @@ fun DeviceListScreen() {
                             if (removed) {
                                 // 更新本地 UI 用的已认证 uuid 集合
                                 authedDeviceUuids = authedDeviceUuids - device.uuid
+                            } else {
+                                // 删除失败，显示错误信息
+                                ToastUtils.showShortToast(context, "删除设备失败: 设备不存在或已被删除")
                             }
-                        } catch (_: Exception) {}
+                        } catch (e: Exception) {
+                            // 显示异常信息
+                            ToastUtils.showShortToast(context, "删除设备失败: ${e.message ?: "未知错误"}")
+                        }
                         selectedDevice = null
                         GlobalSelectedDeviceHolder.selectedDevice = null
                     },
