@@ -11,6 +11,8 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
  * 剪贴板日志检测器
@@ -20,15 +22,15 @@ import java.io.InputStreamReader
 object ClipboardLogDetector {
     private const val TAG = "ClipboardLogDetector"
     private var monitoringJob: Job? = null
-    private var isMonitoring = false
-    private var pausedUntilTime: Long = 0
+    private val isMonitoring = AtomicBoolean(false)
+    private val pausedUntilTime = AtomicLong(0)
     
     /**
      * 暂停检测一段时间（用于防止处理远端消息时产生的自身日志触发循环）
      * @param durationMs 暂停毫秒数
      */
     fun pauseDetectionTemporary(durationMs: Long = 2000) {
-        pausedUntilTime = System.currentTimeMillis() + durationMs
+        pausedUntilTime.set(System.currentTimeMillis() + durationMs)
         Logger.d(TAG, "暂停日志检测 $durationMs ms")
     }
     
@@ -36,7 +38,7 @@ object ClipboardLogDetector {
      * 启动日志监听
      */
     fun startMonitoring(context: Context) {
-        if (isMonitoring) return
+        if (isMonitoring.get()) return
         
         if (context.checkSelfPermission(android.Manifest.permission.READ_LOGS) != PackageManager.PERMISSION_GRANTED) {
             Logger.d(TAG, "没有 READ_LOGS 权限，无法启动日志监听")
@@ -44,7 +46,7 @@ object ClipboardLogDetector {
         }
         
         Logger.d(TAG, "启动剪贴板日志监听...")
-        isMonitoring = true
+        isMonitoring.set(true)
         
         monitoringJob = CoroutineScope(Dispatchers.IO).launch {
             var process: Process? = null
@@ -59,7 +61,7 @@ object ClipboardLogDetector {
                 while (isActive && reader.readLine().also { line = it } != null) {
                     line?.let { logLine ->
                         // 如果处于暂停期，则忽略
-                        if (System.currentTimeMillis() < pausedUntilTime) {
+                        if (System.currentTimeMillis() < pausedUntilTime.get()) {
                             return@let
                         }
                         
@@ -82,7 +84,7 @@ object ClipboardLogDetector {
                 Logger.e(TAG, "日志监听出错", e)
             } finally {
                 process?.destroy()
-                isMonitoring = false
+                isMonitoring.set(false)
             }
         }
     }
@@ -93,7 +95,7 @@ object ClipboardLogDetector {
     fun stopMonitoring() {
         monitoringJob?.cancel()
         monitoringJob = null
-        isMonitoring = false
+        isMonitoring.set(false)
         Logger.d(TAG, "日志监听已停止")
     }
     
