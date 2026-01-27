@@ -17,7 +17,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-@RequiresApi(Build.VERSION_CODES.BAKLAVA)
 object LiveUpdatesNotificationManager {
     private const val TAG = "超级岛-LiveUpdates"
     const val CHANNEL_ID = "live_updates_channel"
@@ -37,6 +36,10 @@ object LiveUpdatesNotificationManager {
     }
 
     fun initialize(context: Context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
+            Logger.w(TAG, "当前Android版本不支持Live Updates")
+            return
+        }
         appContext = context.applicationContext
         notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         createNotificationChannel()
@@ -612,6 +615,10 @@ object LiveUpdatesNotificationManager {
     }
 
     fun cancelLiveUpdate(sourceId: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
+            Logger.w(TAG, "当前Android版本不支持Live Updates")
+            return
+        }
         try {
             val notificationId = sourceId.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
             notificationManager.cancel(notificationId)
@@ -623,10 +630,18 @@ object LiveUpdatesNotificationManager {
     
     // 兼容旧方法名
     fun dismissLiveUpdateNotification(sourceId: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
+            Logger.w(TAG, "当前Android版本不支持Live Updates")
+            return
+        }
         cancelLiveUpdate(sourceId)
     }
 
     fun cancelAllLiveUpdates() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
+            Logger.w(TAG, "当前Android版本不支持Live Updates")
+            return
+        }
         notificationManager.cancelAll()
         Logger.i(TAG, "取消所有Live Update通知成功")
     }
@@ -675,6 +690,10 @@ object LiveUpdatesNotificationManager {
     }
 
     fun hasPromotableCharacteristics(notification: NotificationCompat.Builder): Boolean {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
+            Logger.w(TAG, "当前Android版本不支持Live Updates")
+            return false
+        }
         val builtNotification = notification.build()
         // 使用反射检查通知是否具有可提升特性
         try {
