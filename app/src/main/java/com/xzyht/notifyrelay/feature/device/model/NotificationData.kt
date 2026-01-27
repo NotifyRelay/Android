@@ -337,7 +337,9 @@ object NotificationRepository {
             
             // 清理历史通知，确保每个包名的通知数量不超过80条
             if (!hasCleanedUpOldNotifications) {
-                cleanupOldNotifications(context)
+                runBlocking {
+                    cleanupOldNotifications(context)
+                }
                 hasCleanedUpOldNotifications = true
             }
         } catch (e: Exception) {
@@ -510,7 +512,7 @@ object NotificationRepository {
     /**
      * 清理历史通知，确保每个包名的通知数量不超过80条
      */
-    private fun cleanupOldNotifications(context: Context) {
+    private suspend fun cleanupOldNotifications(context: Context) {
         try {
             Logger.i("NotifyRelay", "开始清理历史通知")
             val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
@@ -523,32 +525,16 @@ object NotificationRepository {
                 Logger.i("NotifyRelay", "清理设备 $device 的通知")
                 
                 // 获取该设备的所有通知
-                val allNotifications = runBlocking {
-                    repository.getNotificationsByDevice(device)
-                }
+                val allNotifications = repository.getNotificationsByDevice(device)
                 
                 // 按包名分组通知
-                val notificationsByPackage = allNotifications.groupBy { it.packageName }
+                val packageNames = allNotifications.map { it.packageName }.distinct()
                 
-                // 对每个包名的通知列表，保留最新的80条
-                for ((packageName, packageNotifications) in notificationsByPackage) {
-                    Logger.i("NotifyRelay", "清理包名 $packageName 的通知，当前数量：${packageNotifications.size}")
-                    
-                    // 按时间降序排序（最新的在前）
-                    val sortedNotifications = packageNotifications.sortedByDescending { it.time }
-                    
-                    // 如果数量超过80，删除超出的旧通知
-                    if (sortedNotifications.size > 80) {
-                        val notificationsToDelete = sortedNotifications.subList(80, sortedNotifications.size)
-                        Logger.i("NotifyRelay", "删除包名 $packageName 的旧通知数量：${notificationsToDelete.size}")
-                        
-                        // 删除超出的旧通知
-                        for (notification in notificationsToDelete) {
-                            runBlocking {
-                                repository.deleteNotificationByKey(notification.key)
-                            }
-                        }
-                    }
+                // 对每个包名使用批量删除方法
+                for (packageName in packageNames) {
+                    Logger.i("NotifyRelay", "清理包名 $packageName 的通知")
+                    // 使用数据库仓库的批量删除方法，保留最新的80条
+                    repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
                 }
             }
             
