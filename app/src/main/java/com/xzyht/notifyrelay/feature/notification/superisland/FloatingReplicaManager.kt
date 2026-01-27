@@ -251,10 +251,9 @@ object FloatingReplicaManager {
                     
                     // 对于进度类型，且Live Updates启用时，只发送复合通知作为浮窗的生命周期管理
                     // 否则发送传统复刻通知
-                    val isLiveUpdatesEnabled = StorageManager.getBoolean(context, "super_island_live_updates_enabled", false)
                     val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
                     
-                    if (isProgressType && isLiveUpdatesEnabled && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                    if (isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                         try {
                             // 初始化Live Updates通知管理器
                             LiveUpdatesNotificationManager.initialize(context)

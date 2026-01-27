@@ -17,9 +17,7 @@ object SuperIslandProcessor {
     private const val TAG = "SuperIslandProcessor"
     private const val DEDUP_CACHE_MAX_SIZE = 1024
     
-    // Live Updates 设置键
-    private const val LIVE_UPDATES_ENABLED_KEY = "super_island_live_updates_enabled"
-    
+
     private val superIslandDeduplicationCache = object : LruCache<String, Boolean>(DEDUP_CACHE_MAX_SIZE) {
         override fun entryRemoved(evicted: Boolean, key: String?, oldValue: Boolean?, newValue: Boolean?) {
             if (evicted && key != null) {
