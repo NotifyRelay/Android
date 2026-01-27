@@ -116,9 +116,13 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 先检查权限并启动服务
         checkPermissionsAndStartServices()
-        // 尝试启动剪贴板日志监控
-        ClipboardSyncManager.startLogMonitoring(this)
+        // 只检查READ_LOGS权限来决定是否启动日志监控
+        if (checkSelfPermission(android.Manifest.permission.READ_LOGS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            // 尝试启动剪贴板日志监控
+            ClipboardSyncManager.startLogMonitoring(this)
+        }
     }
 
     private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->

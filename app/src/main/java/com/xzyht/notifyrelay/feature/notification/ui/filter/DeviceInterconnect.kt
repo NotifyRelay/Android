@@ -33,9 +33,12 @@ import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.ui.GlobalSelectedDeviceHolder
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -65,6 +68,27 @@ fun DeviceInterconnect() {
     var accessibilityEnabled by remember {
         mutableStateOf(ClipboardSyncManager.isAccessibilityServiceEnabled(context))
     }
+    
+    // 日志监控状态
+    var logMonitoringEnabled by remember {
+        mutableStateOf(com.xzyht.notifyrelay.feature.clipboard.ClipboardLogDetector.isMonitoring())
+    }
+    
+    // 手动刷新权限状态的函数
+    fun refreshPermissionStatus() {
+        accessibilityEnabled = ClipboardSyncManager.isAccessibilityServiceEnabled(context)
+        logMonitoringEnabled = com.xzyht.notifyrelay.feature.clipboard.ClipboardLogDetector.isMonitoring()
+    }
+    
+    // 初始检查一次权限状态
+    androidx.compose.runtime.LaunchedEffect(Unit) {
+        refreshPermissionStatus()
+    }
+
+    // 检查是否有READ_LOGS权限
+    val hasReadLogsPermission = context.checkSelfPermission(android.Manifest.permission.READ_LOGS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    // 检查是否有可用的剪贴板同步方案
+    val hasSyncSolution = accessibilityEnabled || (logMonitoringEnabled && hasReadLogsPermission)
 
     Column(
         modifier = Modifier
@@ -98,42 +122,70 @@ fun DeviceInterconnect() {
             color = colorScheme.onSurface
         )
         
-        // 无障碍服务状态卡片
+        // 剪贴板同步功能组
         Column(
             modifier = Modifier.fillMaxWidth()
         ) {
             Text(
-                text = "无障碍服务",
+                text = "剪贴板同步",
                 style = textStyles.title2,
                 color = colorScheme.onSurface
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(12.dp))
+            
+            // 总体状态
             Text(
-                text = if (accessibilityEnabled) {
-                    "已启用 - 剪贴板同步功能正常运行中"
-                } else {
-                    "未启用 - 剪贴板同步需要无障碍服务支持"
+                text = when {
+                    accessibilityEnabled -> "已启用无障碍服务 - 剪贴板同步功能正常运行中"
+                    logMonitoringEnabled && hasReadLogsPermission -> "已启用日志监控 - 剪贴板同步功能正常运行中"
+                    else -> "未启用 - 剪贴板同步需要无障碍服务或日志监控支持"
                 },
                 style = textStyles.body2,
-                color = if (accessibilityEnabled) colorScheme.primary else colorScheme.error
+                color = if (hasSyncSolution) colorScheme.primary else colorScheme.error
             )
-            Spacer(modifier = Modifier.height(8.dp))
-            Button(
+            Spacer(modifier = Modifier.height(16.dp))
+            
+            // 无障碍服务选项 - 使用 SuperArrow
+            SuperArrow(
+                title = "无障碍服务",
+                summary = if (accessibilityEnabled) "已启用" else "未启用",
                 onClick = {
                     try {
                         val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
                         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                         context.startActivity(intent)
+                        // 延迟刷新状态，让用户有时间从设置返回
+                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+                            kotlinx.coroutines.delay(1000)
+                            refreshPermissionStatus()
+                        }
                     } catch (e: Exception) {
                         Logger.e("DeviceInterconnect", "打开无障碍设置失败", e)
                         ToastUtils.showShortToast(context, "打开设置失败，请手动前往设置")
                     }
+                }
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            // 日志监控选项 - 使用 SuperArrow
+            SuperArrow(
+                title = "日志监控",
+                summary = when {
+                    logMonitoringEnabled && hasReadLogsPermission -> "已启用 - 作为无障碍服务的替代方案"
+                    !hasReadLogsPermission -> "未授权 - 需要 READ_LOGS 权限"
+                    else -> "未启用 - 作为无障碍服务的替代方案"
                 },
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                Text(if (accessibilityEnabled) "重新设置" else "启用无障碍服务")
-            }
+                onClick = {
+                    // 尝试启动日志监控
+                    ClipboardSyncManager.startLogMonitoring(context)
+                    // 刷新状态
+                    refreshPermissionStatus()
+                }
+            )
         }
+        
+        // 添加分割线，分隔剪贴板块与其他部分
+        HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
         
         // 音频转发按钮
         Button(
@@ -308,7 +360,10 @@ fun DeviceInterconnect() {
                     "2. 音频转发功能需要目标设备支持\n" +
                     "3. 目标设备暂时只能是pc,且需要adb调试开启,因为转发利用的是scrcpy\n" +
                     "4. 媒体控制功能支持播放/暂停、上一首、下一首操作\n" +
-                    "5. 剪贴板同步：启用无障碍服务后自动同步；否则可手动点击通知栏按钮同步",
+                    "5. 剪贴板同步：\n" +
+                    "   - 启用无障碍服务后自动同步\n" +
+                    "   - 或启用日志监控（作为无障碍服务的替代方案）\n" +
+                    "   - 否则可手动点击通知栏按钮同步",
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary
         )

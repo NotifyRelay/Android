@@ -99,7 +99,22 @@ object ClipboardSyncManager {
      * 尝试启动日志监控（如果有权限）
      */
     fun startLogMonitoring(context: Context) {
-        ClipboardLogDetector.startMonitoring(context)
+        try {
+            // 只检查是否有READ_LOGS权限
+            val hasReadLogsPermission = context.checkSelfPermission(android.Manifest.permission.READ_LOGS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            
+            if (!hasReadLogsPermission) {
+                Logger.d(TAG, "没有READ_LOGS权限，无法启动日志监控")
+                return
+            }
+            
+            // 启动日志监控
+            ClipboardLogDetector.startMonitoring(context)
+        } catch (e: SecurityException) {
+            Logger.e(TAG, "启动日志监控时发生安全异常", e)
+        } catch (e: Exception) {
+            Logger.e(TAG, "启动日志监控失败", e)
+        }
     }
 
     /**

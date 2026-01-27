@@ -125,7 +125,7 @@ fun ParamIslandCompose(
                             it.actionTitle?.contains("复制") == true
                         } ?: ActionInfo(actionTitle = "复制")
                         val code = bigArea.verificationCode ?: bigArea.primaryText
-                        if (copyAction != null && !code.isNullOrBlank()) {
+                        if (!code.isNullOrBlank()) {
                             Logger.d("ParamIslandCompose", "渲染验证码复制按钮: code=$code")
                             val context = LocalContext.current
                             Spacer(modifier = Modifier.width(8.dp))
@@ -156,7 +156,7 @@ fun ParamIslandCompose(
                                 )
                             }
                         } else {
-                            Logger.w("超级岛ParamIslandCompose", "验证码按钮未渲染: copyAction=${copyAction != null}, code=${!code.isNullOrBlank()}")
+                            Logger.w("超级岛ParamIslandCompose", "验证码按钮未渲染: copyAction=${true}, code=${!code.isNullOrBlank()}")
                         }
                     }
 

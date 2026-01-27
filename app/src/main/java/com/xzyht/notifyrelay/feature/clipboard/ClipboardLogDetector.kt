@@ -40,52 +40,80 @@ object ClipboardLogDetector {
     fun startMonitoring(context: Context) {
         if (isMonitoring.get()) return
         
-        if (context.checkSelfPermission(android.Manifest.permission.READ_LOGS) != PackageManager.PERMISSION_GRANTED) {
-            Logger.d(TAG, "没有 READ_LOGS 权限，无法启动日志监听")
-            return
-        }
-        
-        Logger.d(TAG, "启动剪贴板日志监听...")
-        isMonitoring.set(true)
-        
-        monitoringJob = CoroutineScope(Dispatchers.IO).launch {
-            var process: Process? = null
-            try {
-                // 仅监听 ClipboardService 标签的日志
-                // 加上 -T 1 可能需要较新版本的 logcat，这里直接读取流，依赖 SyncManager 去重
-                val cmd = "logcat -v tag -s ClipboardService"
-                process = Runtime.getRuntime().exec(cmd)
-                val reader = BufferedReader(InputStreamReader(process.inputStream))
-                
-                var line: String? = null
-                while (isActive && reader.readLine().also { line = it } != null) {
-                    line?.let { logLine ->
-                        // 如果处于暂停期，则忽略
-                        if (System.currentTimeMillis() < pausedUntilTime.get()) {
-                            return@let
-                        }
-                        
-                        // 检测剪贴板变化日志
-                        // 1. 常规 setPrimaryClip
-                        // 2. 本应用访问被拒绝（意味着剪贴板发生了变化且本应用尝试读取了）
-                        // "Denying clipboard access to com.xzyht.notifyrelay"
-                        val isSetPrimaryClip = logLine.contains("setPrimaryClip")
-                        val isAccessDenied = logLine.contains("Denying clipboard access to") && 
-                                           logLine.contains("com.xzyht.notifyrelay")
-                        
-                        if (isSetPrimaryClip || isAccessDenied) {
-                            // 简单的防抖动或去重可以在这里做，但 SyncManager 已经有了
-                            Logger.d(TAG, "检测到剪贴板变化日志: $logLine")
-                            onClipboardChanged(context)
+        try {
+            // 检查应用是否处于前台
+            val isForeground = com.xzyht.notifyrelay.common.PermissionHelper.isAppInForeground(context)
+            if (!isForeground) {
+                Logger.d(TAG, "应用未处于前台，无法启动日志监听")
+                return
+            }
+            
+            // 检查是否有READ_LOGS权限
+            if (context.checkSelfPermission(android.Manifest.permission.READ_LOGS) != PackageManager.PERMISSION_GRANTED) {
+                Logger.d(TAG, "没有 READ_LOGS 权限，无法启动日志监听")
+                return
+            }
+            
+            Logger.d(TAG, "启动剪贴板日志监听...")
+            isMonitoring.set(true)
+            
+            monitoringJob = CoroutineScope(Dispatchers.IO).launch {
+                var process: Process? = null
+                try {
+                    // 仅监听 ClipboardService 标签的日志
+                    // 加上 -T 1 可能需要较新版本的 logcat，这里直接读取流，依赖 SyncManager 去重
+                    val cmd = "logcat -v tag -s ClipboardService"
+                    process = Runtime.getRuntime().exec(cmd)
+                    val reader = BufferedReader(InputStreamReader(process.inputStream))
+                    
+                    var line: String? = null
+                    while (isActive && reader.readLine().also { line = it } != null) {
+                        try {
+                            line?.let { logLine ->
+                                // 如果处于暂停期，则忽略
+                                if (System.currentTimeMillis() < pausedUntilTime.get()) {
+                                    return@let
+                                }
+                                
+                                // 检测剪贴板变化日志
+                                // 1. 常规 setPrimaryClip
+                                // 2. 本应用访问被拒绝（意味着剪贴板发生了变化且本应用尝试读取了）
+                                // "Denying clipboard access to com.xzyht.notifyrelay"
+                                val isSetPrimaryClip = logLine.contains("setPrimaryClip")
+                                val isAccessDenied = logLine.contains("Denying clipboard access to") && 
+                                                   logLine.contains("com.xzyht.notifyrelay")
+                                
+                                if (isSetPrimaryClip || isAccessDenied) {
+                                    // 简单的防抖动或去重可以在这里做，但 SyncManager 已经有了
+                                    Logger.d(TAG, "检测到剪贴板变化日志: $logLine")
+                                    onClipboardChanged(context)
+                                }
+                            }
+                        } catch (e: SecurityException) {
+                            Logger.e(TAG, "处理日志行时发生安全异常", e)
+                        } catch (e: Exception) {
+                            Logger.e(TAG, "处理日志行时发生异常", e)
                         }
                     }
+                } catch (e: SecurityException) {
+                    Logger.e(TAG, "启动日志监听时发生安全异常", e)
+                } catch (e: Exception) {
+                    Logger.e(TAG, "日志监听出错", e)
+                } finally {
+                    try {
+                        process?.destroy()
+                    } catch (e: Exception) {
+                        Logger.e(TAG, "销毁进程时发生异常", e)
+                    }
+                    isMonitoring.set(false)
                 }
-            } catch (e: Exception) {
-                Logger.e(TAG, "日志监听出错", e)
-            } finally {
-                process?.destroy()
-                isMonitoring.set(false)
             }
+        } catch (e: SecurityException) {
+            Logger.e(TAG, "启动日志监听时发生安全异常", e)
+            isMonitoring.set(false)
+        } catch (e: Exception) {
+            Logger.e(TAG, "启动日志监听失败", e)
+            isMonitoring.set(false)
         }
     }
     
@@ -97,6 +125,13 @@ object ClipboardLogDetector {
         monitoringJob = null
         isMonitoring.set(false)
         Logger.d(TAG, "日志监听已停止")
+    }
+    
+    /**
+     * 获取日志监听状态
+     */
+    fun isMonitoring(): Boolean {
+        return isMonitoring.get()
     }
     
     private fun onClipboardChanged(context: Context) {
