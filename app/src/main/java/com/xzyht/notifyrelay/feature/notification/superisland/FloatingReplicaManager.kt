@@ -141,10 +141,10 @@ object FloatingReplicaManager {
 
     // 保存sourceId到entryKey列表的映射，以便后续能正确移除条目
     // 一个sourceId可能对应多个条目，所以使用列表保存
-    private val sourceIdToEntryKeyMap = mutableMapOf<String, MutableList<String>>()
+    private val sourceIdToEntryKeyMap = ConcurrentHashMap<String, MutableList<String>>()
     
     // 保存entryKey到notificationId的映射，用于管理复刻通知
-    private val entryKeyToNotificationId = mutableMapOf<String, Int>()
+    private val entryKeyToNotificationId = ConcurrentHashMap<String, Int>()
     // 通知渠道ID
     private const val NOTIFICATION_CHANNEL_ID = "super_island_replica"
     // 通知ID基础值
