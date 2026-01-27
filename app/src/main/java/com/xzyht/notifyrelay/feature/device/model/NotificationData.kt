@@ -168,6 +168,12 @@ object NotificationRepository {
             // writeAll是同步的，不需要runBlocking
             store.writeAll(oldList, fileKey)
             Logger.i("秩序之光 狂鼠 NotifyRelay", "写入远端历史 device=$device, size=${oldList.size}")
+            
+            // 限制每个包名的通知数量为80
+            val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+            runBlocking {
+                repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
+            }
         } catch (e: Exception) {
             Logger.e("秩序之光 狂鼠 NotifyRelay", "[addRemoteNotification] 写入远程设备json失败: $device, error=${e.message}")
         }
@@ -249,6 +255,12 @@ object NotificationRepository {
             } catch (e: Exception) {
                 Logger.e("NotifyRelay", "调用 onLocalNotificationEnqueued 失败", e)
             }
+            
+            // 限制每个包名的通知数量为80
+            val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+            runBlocking {
+                repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
+            }
         }
 
         notifyHistoryChanged(device, context)
@@ -300,6 +312,7 @@ object NotificationRepository {
     private var maxNotificationsPerDevice: Int = 100
     private var debounceJob: Job? = null
     private const val DEBOUNCE_DELAY = 500L
+    private var hasCleanedUpOldNotifications = false
 
     @Synchronized
     fun init(context: Context) {
@@ -321,6 +334,12 @@ object NotificationRepository {
             }
             notifications.clear()
             notifications.addAll(localList)
+            
+            // 清理历史通知，确保每个包名的通知数量不超过80条
+            if (!hasCleanedUpOldNotifications) {
+                cleanupOldNotifications(context)
+                hasCleanedUpOldNotifications = true
+            }
         } catch (e: Exception) {
             notifications.clear()
         }
@@ -486,5 +505,56 @@ object NotificationRepository {
     private fun clearProcessedCacheAll() {
         // 传递空集合表示清除全部缓存
         cacheCleaner?.invoke(emptySet())
+    }
+    
+    /**
+     * 清理历史通知，确保每个包名的通知数量不超过80条
+     */
+    private fun cleanupOldNotifications(context: Context) {
+        try {
+            Logger.i("NotifyRelay", "开始清理历史通知")
+            val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+            
+            // 获取所有设备的列表
+            val devices = deviceList
+            
+            // 对每个设备，清理其通知
+            for (device in devices) {
+                Logger.i("NotifyRelay", "清理设备 $device 的通知")
+                
+                // 获取该设备的所有通知
+                val allNotifications = runBlocking {
+                    repository.getNotificationsByDevice(device)
+                }
+                
+                // 按包名分组通知
+                val notificationsByPackage = allNotifications.groupBy { it.packageName }
+                
+                // 对每个包名的通知列表，保留最新的80条
+                for ((packageName, packageNotifications) in notificationsByPackage) {
+                    Logger.i("NotifyRelay", "清理包名 $packageName 的通知，当前数量：${packageNotifications.size}")
+                    
+                    // 按时间降序排序（最新的在前）
+                    val sortedNotifications = packageNotifications.sortedByDescending { it.time }
+                    
+                    // 如果数量超过80，删除超出的旧通知
+                    if (sortedNotifications.size > 80) {
+                        val notificationsToDelete = sortedNotifications.subList(80, sortedNotifications.size)
+                        Logger.i("NotifyRelay", "删除包名 $packageName 的旧通知数量：${notificationsToDelete.size}")
+                        
+                        // 删除超出的旧通知
+                        for (notification in notificationsToDelete) {
+                            runBlocking {
+                                repository.deleteNotificationByKey(notification.key)
+                            }
+                        }
+                    }
+                }
+            }
+            
+            Logger.i("NotifyRelay", "历史通知清理完成")
+        } catch (e: Exception) {
+            Logger.e("NotifyRelay", "清理历史通知失败: ${e.message}")
+        }
     }
 }

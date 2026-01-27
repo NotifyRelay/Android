@@ -78,4 +78,16 @@ interface NotificationRecordDao {
      */
     @Query("DELETE FROM notification_records WHERE packageName = :packageName AND deviceUuid = :deviceUuid")
     suspend fun deleteByPackageAndDevice(packageName: String, deviceUuid: String)
+    
+    /**
+     * 根据包名和设备UUID获取通知记录，按时间降序排序
+     */
+    @Query("SELECT * FROM notification_records WHERE packageName = :packageName AND deviceUuid = :deviceUuid ORDER BY time DESC")
+    suspend fun getByPackageAndDevice(packageName: String, deviceUuid: String): List<NotificationRecordEntity>
+    
+    /**
+     * 根据包名和设备UUID删除最旧的通知记录，保留最新的指定数量
+     */
+    @Query("DELETE FROM notification_records WHERE key IN (SELECT key FROM notification_records WHERE packageName = :packageName AND deviceUuid = :deviceUuid ORDER BY time ASC LIMIT :limit)")
+    suspend fun deleteOldestByPackageAndDevice(packageName: String, deviceUuid: String, limit: Int)
 }
