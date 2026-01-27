@@ -126,28 +126,33 @@ fun parseParamV2(jsonString: String): ParamV2? {
         }
         
         // 如果multiProgressInfo为空，但progressInfo包含节点资源，则转换为multiProgressInfo
-        val finalMultiProgressInfo = multiProgressInfo ?: run {
-            val title = baseInfo?.title?.takeIf { it.isNotBlank() }
-            progressInfo?.toMultiProgressInfo(title)
-        }
+    val finalMultiProgressInfo = multiProgressInfo ?: run {
+        val title = baseInfo?.title?.takeIf { it.isNotBlank() }
+        progressInfo?.toMultiProgressInfo(title)
+    }
 
-        val paramV2 = ParamV2(
-            business = business,
-            baseInfo = baseInfo,
-            chatInfo = chatInfo,
-            highlightInfo = highlight,
-            animTextInfo = anim,
-            picInfo = picInfo,
-            progressInfo = progressInfo,
-            multiProgressInfo = finalMultiProgressInfo,
-            actions = actions,
-            hintInfo = hintInfo,
-            textButton = textButton,
-            paramIsland = paramIsland
-        )
-        
-        //Logger.d("超级岛", "解析param_v2成功: business=$business, baseInfo=${paramV2.baseInfo != null}")
-        paramV2
+    val paramV2 = ParamV2(
+        business = business,
+        baseInfo = baseInfo,
+        chatInfo = chatInfo,
+        highlightInfo = highlight,
+        animTextInfo = anim,
+        picInfo = picInfo,
+        progressInfo = progressInfo,
+        multiProgressInfo = finalMultiProgressInfo,
+        actions = actions,
+        hintInfo = hintInfo,
+        textButton = textButton,
+        paramIsland = paramIsland
+    )
+    
+    Logger.d("超级岛", "ParamV2解析结果: paramIsland=${paramIsland != null}, highlight=${highlight != null}, baseInfo=${baseInfo != null}, actions=${actions?.size}")
+    if (paramIsland != null) {
+        Logger.d("超级岛", "paramIsland详情: verCode=${paramIsland.bigIslandArea?.verificationCode}, isVerCode=${paramIsland.bigIslandArea?.isVerificationCode}")
+    }
+
+    //Logger.d("超级岛", "解析param_v2成功: business=$business, baseInfo=${paramV2.baseInfo != null}")
+    paramV2
     } catch (e: Exception) {
         run {
             Logger.w("超级岛", "解析param_v2失败: ${e.message}")

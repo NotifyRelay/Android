@@ -98,7 +98,12 @@ fun buildComposeViewFromParam(
         setContent {
             val contentBlock: @Composable () -> Unit = {
                 SuperIslandComposeRoot(content = {
+                    Logger.d("超级岛", "buildComposeViewFromParam开始构建: paramIsland=${paramV2.paramIsland != null}, highlight=${paramV2.highlightInfo != null}")
                     when {
+                        paramV2.paramIsland != null -> {
+                            Logger.i("超级岛", "分支选择-Compose: paramIsland")
+                            ParamIslandCompose(paramV2.paramIsland, actions = paramV2.actions, picMap = picMap)
+                        }
                         paramV2.baseInfo != null -> {
                             Logger.i("超级岛", "分支选择-Compose: baseInfo")
                             BaseInfoCompose(paramV2.baseInfo, picMap = picMap)
@@ -126,10 +131,6 @@ fun buildComposeViewFromParam(
                         paramV2.textButton != null -> {
                             Logger.i("超级岛", "分支选择-Compose: textButton")
                             TextButtonCompose(paramV2.textButton, picMap = picMap)
-                        }
-                        paramV2.paramIsland != null -> {
-                            Logger.i("超级岛", "分支选择-Compose: paramIsland")
-                            ParamIslandCompose(paramV2.paramIsland)
                         }
                         paramV2.actions?.isNotEmpty() == true -> {
                             Logger.i("超级岛", "分支选择-Compose: actions")
@@ -192,8 +193,13 @@ fun buildComposeViewFromRawParam(
                     when (val parseResult = parseParamV2WithResult(paramV2Raw)) {
                         is ParseResult.Success -> {
                             val paramV2 = parseResult.data
+                            Logger.d("超级岛", "Compose构建: paramIsland=${paramV2.paramIsland != null}, highlight=${paramV2.highlightInfo != null}")
                             // 根据paramV2的不同类型显示不同的Compose组件
                             when {
+                                paramV2.paramIsland != null -> {
+                                    Logger.i("超级岛", "分支选择-Compose: paramIsland")
+                                    ParamIslandCompose(paramV2.paramIsland, actions = paramV2.actions, picMap = picMap)
+                                }
                                 paramV2.baseInfo != null -> {
                                     Logger.i("超级岛", "分支选择-Compose: baseInfo")
                                     BaseInfoCompose(paramV2.baseInfo, picMap = picMap)
@@ -221,10 +227,6 @@ fun buildComposeViewFromRawParam(
                                 paramV2.textButton != null -> {
                                     Logger.i("超级岛", "分支选择-Compose: textButton")
                                     TextButtonCompose(paramV2.textButton, picMap = picMap)
-                                }
-                                paramV2.paramIsland != null -> {
-                                    Logger.i("超级岛", "分支选择-Compose: paramIsland")
-                                    ParamIslandCompose(paramV2.paramIsland)
                                 }
                                 paramV2.actions?.isNotEmpty() == true -> {
                                     Logger.i("超级岛", "分支选择-Compose: actions")

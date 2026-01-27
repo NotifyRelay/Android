@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.core
 
+import com.xzyht.notifyrelay.common.core.util.Logger
 import org.json.JSONObject
 
 /**
@@ -10,7 +11,9 @@ data class BigIslandArea(
     val primaryText: String? = null,
     val secondaryText: String? = null,
     val leftImage: String? = null,
-    val rightImage: String? = null
+    val rightImage: String? = null,
+    val verificationCode: String? = null,
+    val isVerificationCode: Boolean = false
 )
 
 fun parseBigIslandArea(json: JSONObject?): BigIslandArea? {
@@ -25,6 +28,24 @@ fun parseBigIslandArea(json: JSONObject?): BigIslandArea? {
         ?.optJSONObject("picInfo")
         ?.optString("pic", "")
         ?.takeIf { it.isNotBlank() }
+
+    // 解析验证码逻辑
+    var isVerCode = false
+    var verCode: String? = null
+    val leftTextInfo = json.optJSONObject("imageTextInfoLeft")?.optJSONObject("textInfo")
+    if (leftTextInfo != null) {
+        val title = leftTextInfo.optString("title")
+        val highlight = leftTextInfo.optBoolean("showHighlightColor", false)
+        Logger.d("BigIslandArea", "解析验证码检查: title=$title, highlight=$highlight")
+        if (highlight && (title == "验证码" || title.contains("验证码"))) {
+            isVerCode = true
+            // 尝试从 textInfo 中提取验证码
+            verCode = json.optJSONObject("textInfo")?.optString("title")
+            Logger.d("BigIslandArea", "识别到验证码: $verCode")
+        }
+    } else {
+        Logger.d("BigIslandArea", "imageTextInfoLeft 或 textInfo 为空")
+    }
 
     val primary = firstString(json, arrayOf(
         "title",
@@ -50,11 +71,18 @@ fun parseBigIslandArea(json: JSONObject?): BigIslandArea? {
     val finalPrimary = primary ?: nestedFirstString(json, arrayOf("textInfo", "iconTextInfo", "imageTextInfoLeft", "imageTextInfoRight"))
     val finalSecondary = secondary ?: nestedFirstString(json, arrayOf("textInfo", "iconTextInfo", "imageTextInfoLeft", "imageTextInfoRight"))
 
+    // 如果是验证码但没有提取到独立字段，尝试使用 primaryText
+    if (isVerCode && verCode.isNullOrBlank()) {
+        verCode = finalPrimary
+    }
+
     return BigIslandArea(
         primaryText = finalPrimary,
         secondaryText = finalSecondary,
         leftImage = leftPic,
-        rightImage = rightPic
+        rightImage = rightPic,
+        verificationCode = verCode,
+        isVerificationCode = isVerCode
     )
 }
 

@@ -103,6 +103,17 @@ object ClipboardSyncManager {
     }
 
     /**
+     * 抑制剪贴板监听（包括日志监听和无障碍服务监听）
+     * 用于在程序主动写入剪贴板时防止回环触发
+     * @param durationMs 抑制时长（毫秒）
+     */
+    fun suppressClipboardMonitoring(durationMs: Long = 2000) {
+        Logger.d(TAG, "抑制所有剪贴板监听 $durationMs ms")
+        ClipboardLogDetector.pauseDetectionTemporary(durationMs)
+        ClipboardAccessiblityService.pauseDetectionTemporary(durationMs)
+    }
+
+    /**
      * 发送剪贴板内容到所有已认证的在线设备
      */
     fun sendClipboardToDevices(deviceManager: DeviceConnectionManager, context: Context) {
@@ -203,8 +214,8 @@ object ClipboardSyncManager {
             lastReceivedType = type
             lastReceivedTime = System.currentTimeMillis()
             
-            // 收到远端消息时，暂停日志检测一段时间，避免写入剪贴板时触发拒绝访问日志导致循环
-            ClipboardLogDetector.pauseDetectionTemporary(2000)
+            // 收到远端消息时，暂停所有检测一段时间，避免写入剪贴板时触发拒绝访问日志或无障碍事件导致循环
+            suppressClipboardMonitoring(2000)
             
             // 更新本地剪贴板
             updateLocalClipboardContent(type, content, context)
@@ -471,6 +482,44 @@ object ClipboardSyncManager {
                 Logger.e(TAG, "手动同步：获取剪贴板失败", e)
                 isSyncing = false
                 isManualSyncMode = previousMode
+            }
+        }
+    }
+    
+    /**
+     * 直接同步文本内容到其他设备
+     * 不触发系统剪贴板读取，不检查前台状态，用于特定场景（如验证码复制）
+     */
+    fun syncTextDirectly(deviceManager: DeviceConnectionManager, text: String) {
+        if (text.isBlank()) return
+        
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                // 1. 准备数据
+                val now = System.currentTimeMillis()
+                val type = CLIPBOARD_TYPE_TEXT
+                val json = buildClipboardJsonString(type, text, now)
+                
+                // 2. 获取设备
+                val devices = deviceManager.getAuthenticatedOnlineDevices()
+                if (devices.isEmpty()) {
+                    Logger.d(TAG, "直接同步：没有在线设备")
+                    return@launch
+                }
+                
+                // 3. 发送
+                for (device in devices) {
+                    ProtocolSender.sendEncrypted(deviceManager, device, DATA_HEADER, json)
+                }
+                
+                // 4. 更新状态以防止回环
+                lastClipboardContent = text
+                lastClipboardType = type
+                lastSyncTime = now
+                
+                Logger.d(TAG, "直接同步：文本已发送至 ${devices.size} 台设备")
+            } catch (e: Exception) {
+                Logger.e(TAG, "直接同步失败", e)
             }
         }
     }

@@ -57,6 +57,11 @@ class ClipboardAccessiblityService : AccessibilityService() {
         try {
             val currentTimeMs = System.currentTimeMillis()
             
+            // 如果处于暂停状态，直接忽略事件
+            if (currentTimeMs < pausedUntilTime) {
+                return
+            }
+            
             // Android 10+ 检测复制操作
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && 
                 clipboardDetector.getSupportedEventTypes(event)) {
@@ -98,6 +103,19 @@ class ClipboardAccessiblityService : AccessibilityService() {
     }
     
     companion object {
+        // 暂停截止时间
+        @Volatile
+        private var pausedUntilTime: Long = 0
+        
+        /**
+         * 暂时暂停检测（用于防止循环同步）
+         * @param durationMs 暂停时长（毫秒）
+         */
+        fun pauseDetectionTemporary(durationMs: Long) {
+            pausedUntilTime = System.currentTimeMillis() + durationMs
+            Logger.d("ClipboardAccessibility", "无障碍服务检测已暂停 $durationMs ms")
+        }
+
         // 监听的事件类型
         private const val MONITORED_EVENTS = AccessibilityEvent.TYPE_VIEW_CLICKED or
                 AccessibilityEvent.TYPE_VIEW_FOCUSED or
