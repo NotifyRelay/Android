@@ -89,6 +89,7 @@ fun DoubleClickConfirmButton(
             } else {
                 // 第一次点击，显示提示并进入确认状态
                 ToastUtils.showShortToast(context, "再次点击确认$text")
+                onClick()
                 state.isConfirming = true
             }
         },
