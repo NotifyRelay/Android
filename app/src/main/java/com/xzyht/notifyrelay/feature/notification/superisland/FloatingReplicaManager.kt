@@ -73,16 +73,26 @@ object FloatingReplicaManager {
             // 创建需要移除的sourceId列表，避免ConcurrentModificationException
             val sourceIdsToRemove = mutableListOf<String>()
             val sourceIdsToBlock = mutableListOf<String>()
+            val sourceIdsToUpdate = mutableMapOf<String, MutableList<String>>()
             
             // 第一次遍历：找出需要处理的sourceId
             sourceIdToEntryKeyMap.forEach { (sourceId, keys) ->
                 if (keys.contains(key)) {
-                    keys.remove(key)
-                    if (keys.isEmpty()) {
+                    // 创建列表副本，避免在遍历期间修改原集合
+                    val updatedKeys = keys.toMutableList()
+                    updatedKeys.remove(key)
+                    if (updatedKeys.isEmpty()) {
                         sourceIdsToRemove.add(sourceId)
                         sourceIdsToBlock.add(sourceId)
+                    } else {
+                        sourceIdsToUpdate[sourceId] = updatedKeys
                     }
                 }
+            }
+            
+            // 更新需要修改的列表
+            sourceIdsToUpdate.forEach {
+                sourceIdToEntryKeyMap[it.key] = it.value
             }
             
             // 第二次遍历：移除空的sourceId条目
