@@ -36,12 +36,13 @@ fun parseBigIslandArea(json: JSONObject?): BigIslandArea? {
     if (leftTextInfo != null) {
         val title = leftTextInfo.optString("title")
         val highlight = leftTextInfo.optBoolean("showHighlightColor", false)
-        Logger.d("BigIslandArea", "解析验证码检查: title=$title, highlight=$highlight")
+        Logger.d("BigIslandArea", "解析验证码检查: highlight=$highlight")
         if (highlight && (title == "验证码" || title.contains("验证码"))) {
             isVerCode = true
             // 尝试从 textInfo 中提取验证码
             verCode = json.optJSONObject("textInfo")?.optString("title")
-            Logger.d("BigIslandArea", "识别到验证码: $verCode")
+            val codeLength = verCode?.length ?: 0
+            Logger.d("BigIslandArea", "识别到验证码: ${codeLength}位")
         }
     } else {
         Logger.d("BigIslandArea", "imageTextInfoLeft 或 textInfo 为空")
