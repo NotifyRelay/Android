@@ -216,8 +216,6 @@ dependencies {
     implementation(libs.apache.ftpserver)
 }
 
-// 移除强制使用旧版本stdlib的配置，让项目使用与Kotlin 2.1.21兼容的stdlib版本
-
 tasks.register("printVersionName") {
     doLast {
         println(computedVersionName)
