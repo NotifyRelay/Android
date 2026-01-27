@@ -77,9 +77,9 @@ object LiveUpdatesNotificationManager {
             
             // 调试picMap内容
             if (picMap != null && picMap.isNotEmpty()) {
-                Logger.i(TAG, "收到picMap，包含 ${picMap.size} 个图标资源: ${picMap.keys}")
+                Logger.d(TAG, "收到picMap，包含 ${picMap.size} 个图标资源: ${picMap.keys}")
             } else {
-                Logger.i(TAG, "picMap为空或null")
+                Logger.d(TAG, "picMap为空或null")
             }
 
             // 仅处理进度类型通知
@@ -190,9 +190,9 @@ object LiveUpdatesNotificationManager {
         val currentProgress = progressInfo.progress
         
         // 调试日志：打印picMap内容，确认图标资源是否存在
-        Logger.i(TAG, "加载进度图标 - picMap: $picMap")
-        Logger.i(TAG, "加载进度图标 - progressInfo: $progressInfo")
-        Logger.i(TAG, "加载进度图标 - multiProgressInfo: $multiProgressInfo")
+        Logger.d(TAG, "加载进度图标 - picMap: $picMap")
+        Logger.d(TAG, "加载进度图标 - progressInfo: $progressInfo")
+        Logger.d(TAG, "加载进度图标 - multiProgressInfo: $multiProgressInfo")
         
         // 根据当前进度和节点状态，为每个节点选择合适的图标
         val allIconKeys = mutableMapOf<String, String>()
@@ -205,8 +205,8 @@ object LiveUpdatesNotificationManager {
         allIconKeys["picEndUnselected"] = progressInfo.picEndUnselected ?: multiProgressInfo?.picEndUnselected ?: ""
         allIconKeys["picForwardBox"] = multiProgressInfo?.picForwardBox ?: ""
         
-        Logger.i(TAG, "所有图标键映射: $allIconKeys")
-        Logger.i(TAG, "当前进度: $currentProgress, 进度信息: $progressInfo, 多进度信息: $multiProgressInfo")
+        Logger.d(TAG, "所有图标键映射: $allIconKeys")
+        Logger.d(TAG, "当前进度: $currentProgress, 进度信息: $progressInfo, 多进度信息: $multiProgressInfo")
         
         // 找到有效的前进图标作为进度指示点
         val forwardIconKey = listOf(
@@ -218,7 +218,7 @@ object LiveUpdatesNotificationManager {
         }
         
         // 调试日志：打印选中的图标键
-        Logger.i(TAG, "选中的前进图标键: $forwardIconKey")
+        Logger.d(TAG, "选中的前进图标键: $forwardIconKey")
         
         // 并行加载进度图标和应用图标
         var progressIconBitmap: Bitmap? = null
@@ -228,7 +228,7 @@ object LiveUpdatesNotificationManager {
         forwardIconKey?.let { key ->
             val iconUrl = picMap[key]
             if (iconUrl != null) {
-                Logger.i(TAG, "加载前进图标URL: $iconUrl")
+                Logger.d(TAG, "加载前进图标URL: $iconUrl")
                 
                 val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
                     context = appContext,
@@ -237,7 +237,7 @@ object LiveUpdatesNotificationManager {
                 )
                 
                 if (bitmap != null) {
-                    Logger.i(TAG, "前进图标加载成功，大小: ${bitmap.width}x${bitmap.height}")
+                    Logger.d(TAG, "前进图标加载成功，大小: ${bitmap.width}x${bitmap.height}")
                     // 缓存图标
                     iconCache.put(iconUrl, bitmap)
                     progressIconBitmap = bitmap
@@ -364,15 +364,15 @@ object LiveUpdatesNotificationManager {
                 val content = it.content ?: ""
                 
                 // 调试日志：打印原始HTML和处理后的文本
-                Logger.i(TAG, "原始标题HTML: $title")
-                Logger.i(TAG, "原始内容HTML: $content")
+                Logger.d(TAG, "原始标题HTML: $title")
+                Logger.d(TAG, "原始内容HTML: $content")
                 
                 // 处理HTML，使用LEGACY模式确保颜色标签被支持
                 val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
                 val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
                 
-                Logger.i(TAG, "处理后标题: $processedTitle")
-                Logger.i(TAG, "处理后内容: $processedContent")
+                Logger.d(TAG, "处理后标题: $processedTitle")
+                Logger.d(TAG, "处理后内容: $processedContent")
                 
                 builder
                     .setContentTitle(processedTitle)
@@ -428,11 +428,11 @@ object LiveUpdatesNotificationManager {
                         // 尝试从缓存加载图标
                         val cachedBitmap = iconCache.get(iconUrl)
                         if (cachedBitmap != null) {
-                            Logger.i(TAG, "从缓存加载图标成功，避免闪烁")
+                            Logger.d(TAG, "从缓存加载图标成功，避免闪烁")
                             progressStyle.setProgressTrackerIcon(IconCompat.createWithBitmap(cachedBitmap))
                         } else {
                             // 缓存中没有，异步加载时会处理
-                            Logger.i(TAG, "图标不在缓存中，异步加载时会处理")
+                            Logger.d(TAG, "图标不在缓存中，异步加载时会处理")
                         }
                     }
                 }
@@ -441,7 +441,7 @@ object LiveUpdatesNotificationManager {
             // 最后设置进度，按照官方示例顺序
             progressStyle.setProgress(progressInfo.progress)
             
-            Logger.i(TAG, "设置了 ${progressPoints.size} 个进度点和 ${progressSegments.size} 个进度段，与官方示例保持一致")
+            Logger.d(TAG, "设置了 ${progressPoints.size} 个进度点和 ${progressSegments.size} 个进度段，与官方示例保持一致")
             
             // 直接调用builder.setStyle方法，符合官方示例的API使用
             return builder.setStyle(progressStyle)
@@ -517,15 +517,15 @@ object LiveUpdatesNotificationManager {
                 val content = it.content ?: ""
                 
                 // 调试日志：打印原始HTML和处理后的文本
-                Logger.i(TAG, "原始标题HTML: $title")
-                Logger.i(TAG, "原始内容HTML: $content")
+                Logger.d(TAG, "原始标题HTML: $title")
+                Logger.d(TAG, "原始内容HTML: $content")
                 
                 // 处理HTML，使用LEGACY模式确保颜色标签被支持
                 val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
                 val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
                 
-                Logger.i(TAG, "处理后标题: $processedTitle")
-                Logger.i(TAG, "处理后内容: $processedContent")
+                Logger.d(TAG, "处理后标题: $processedTitle")
+                Logger.d(TAG, "处理后内容: $processedContent")
                 
                 builder
                     .setContentTitle(processedTitle)
