@@ -122,7 +122,7 @@ object MessageSender {
             if (state.coverUrl != null) {
                 put("coverUrl", state.coverUrl)
             }
-            put("time", System.currentTimeMillis()) // 使用当前时间戳
+            put("time", time) // 使用传入的时间戳
             put("isLocked", isLocked)
             put("type", "MEDIA_PLAY")
             put("mediaType", "FULL") // 全量包
