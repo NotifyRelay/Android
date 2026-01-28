@@ -300,6 +300,42 @@ object MessageSender {
                 ProtocolSender.sendEncrypted(task.deviceManager, task.device, header, task.data, 10000L)
                 success = true
                 try { sentKeys[task.dedupKey] = System.currentTimeMillis() } catch (_: Exception) {}
+                
+                // 检查是否为媒体播放消息，如果是，更新或清理媒体状态
+                if (header == "DATA_MEDIAPLAY") {
+                    try {
+                        val obj = org.json.JSONObject(task.data)
+                        val mediaType = obj.optString("mediaType", "")
+                        if (mediaType.equals("END", true)) {
+                            // 是结束包，清理媒体状态
+                            val deviceMap = synchronized(mediaLastStatePerDevice) {
+                                mediaLastStatePerDevice.getOrPut(task.device.uuid) { mutableMapOf() }
+                            }
+                            val mediaSourceId = "global_media_session"
+                            synchronized(mediaLastStatePerDevice) { deviceMap.remove(mediaSourceId) }
+                        } else {
+                            // 不是结束包，更新媒体状态
+                            val packageName = obj.optString("packageName", "")
+                            val title = obj.optString("title", "")
+                            val text = obj.optString("text", "")
+                            val coverUrl = obj.optString("coverUrl", null)
+                            
+                            val deviceMap = synchronized(mediaLastStatePerDevice) {
+                                mediaLastStatePerDevice.getOrPut(task.device.uuid) { mutableMapOf() }
+                            }
+                            val mediaSourceId = "global_media_session"
+                            val updatedState = MediaPlayState(
+                                title = title,
+                                text = text,
+                                packageName = packageName,
+                                coverUrl = coverUrl,
+                                sentTime = System.currentTimeMillis()
+                            )
+                            synchronized(mediaLastStatePerDevice) { deviceMap[mediaSourceId] = updatedState }
+                        }
+                    } catch (_: Exception) {}
+                }
+                
                 //Logger.d(TAG, "通知发送成功到设备: ${task.device.displayName}, data: ${task.data}")
 
                 if (success) return
@@ -511,10 +547,6 @@ object MessageSender {
                 
                 val json = payloadObj.toString()
                 
-                // 立即更新本地lastState（用于后续差异计算），包含当前时间戳
-                val updatedState = currentState.copy(sentTime = System.currentTimeMillis())
-                synchronized(mediaLastStatePerDevice) { deviceMap[mediaSourceId] = updatedState }
-                
                 val dedupKey = buildDedupKey(deviceInfo.uuid, json)
                 // 检查是否正在等待发送或最近已发送过
                 val lastSent = sentKeys[dedupKey]
@@ -527,6 +559,10 @@ object MessageSender {
                     return@forEach
                 }
                 val task = SendTask(deviceInfo, json, deviceManager, dedupKey = dedupKey)
+                // 保存设备UUID和媒体源ID，用于发送成功后更新状态
+                val deviceUuid = deviceInfo.uuid
+                val sourceId = mediaSourceId
+                val stateToUpdate = currentState
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         sendChannel.send(task)
@@ -611,15 +647,7 @@ object MessageSender {
                 }
             }
             
-            // 清理媒体状态缓存
-            authenticatedDevices.forEach { deviceInfo ->
-                val deviceMap = synchronized(mediaLastStatePerDevice) {
-                    mediaLastStatePerDevice.getOrPut(deviceInfo.uuid) { mutableMapOf() }
-                }
-                // 全局只会存在一个媒体会话，使用固定的媒体源ID
-                val mediaSourceId = "global_media_session"
-                synchronized(mediaLastStatePerDevice) { deviceMap.remove(mediaSourceId) }
-            }
+            // 媒体状态缓存会在发送成功后自动清理，无需提前清理
             
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放结束通知失败", e)
