@@ -770,37 +770,40 @@ class DeviceConnectionManager(private val context: android.content.Context) {
      */
     fun getAuthenticatedOnlineDevices(): List<DeviceInfo> {
         try {
+            val devsSnapshot = devices.value
             val authSnapshot = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
             val deviceInfoSnapshot = synchronized(deviceInfoCache) { deviceInfoCache.toMap() }
-            val devsSnapshot = devices.value
             
             // 调试日志
             Logger.d("死神-NotifyRelay", "[getAuthenticatedOnlineDevices] 认证设备: ${authSnapshot.size} 个设备")
             Logger.d("死神-NotifyRelay", "[getAuthenticatedOnlineDevices] 设备信息缓存: ${deviceInfoSnapshot.size} 个设备")
             Logger.d("死神-NotifyRelay", "[getAuthenticatedOnlineDevices] 设备列表: ${devsSnapshot.size} 个设备")
             
-            // 首先获取所有已认证设备
-            val allAuthenticatedDevices = authSnapshot.filter { (_, auth) -> auth.isAccepted }
-            
-            // 从所有已认证设备中构建设备列表
-            val result = allAuthenticatedDevices.mapNotNull { (uuid, auth) ->
+            // 获取同时在线且已认证的设备列表
+            val result = devsSnapshot.filter { (uuid, pair) ->
+                val isOnline = pair.second
+                isOnline && (authSnapshot[uuid]?.isAccepted == true)
+            }.mapNotNull { (uuid, pair) ->
                 // 从设备信息缓存中获取设备信息
                 var deviceInfo = deviceInfoSnapshot[uuid]
                 
-                // 如果缓存中没有，从设备列表中获取
+                // 如果缓存中没有，使用设备列表中的设备信息
                 if (deviceInfo == null) {
-                    deviceInfo = devsSnapshot[uuid]?.first
+                    deviceInfo = pair.first
                 }
                 
                 // 如果还是没有，从认证信息中构建
                 if (deviceInfo == null) {
-                    val name = auth.displayName ?: "已认证设备"
-                    val ip = auth.lastIp ?: ""
-                    val port = auth.lastPort ?: listenPort
-                    deviceInfo = DeviceInfo(uuid, name, ip, port)
+                    val auth = authSnapshot[uuid]
+                    if (auth != null) {
+                        val name = auth.displayName ?: "已认证设备"
+                        val ip = auth.lastIp ?: ""
+                        val port = auth.lastPort ?: listenPort
+                        deviceInfo = DeviceInfo(uuid, name, ip, port)
+                    }
                 }
                 
-                Logger.d("死神-NotifyRelay", "[getAuthenticatedOnlineDevices] 已认证设备: $uuid, name=${deviceInfo.displayName}, ip=${deviceInfo.ip}")
+                Logger.d("死神-NotifyRelay", "[getAuthenticatedOnlineDevices] 在线且已认证设备: $uuid, name=${deviceInfo?.displayName}, ip=${deviceInfo?.ip}")
                 deviceInfo
             }
             
