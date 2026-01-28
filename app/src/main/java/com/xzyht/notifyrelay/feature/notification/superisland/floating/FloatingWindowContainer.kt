@@ -154,7 +154,7 @@ fun FloatingWindowContainer(
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 MediaIslandCompose")
                                                 // 构建MediaSessionData
                                                 val mediaSession = com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.MediaSessionData(
-                                                    packageName = entry.key,
+                                                    packageName = entry.appName ?: "",
                                                     appName = entry.appName,
                                                     title = entry.title ?: "",
                                                     text = entry.text ?: "",
