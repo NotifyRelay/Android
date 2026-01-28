@@ -10,12 +10,16 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.MediaSessionData
 import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 
 object RemoteMediaSessionManager {
     private const val KEY_ENABLED = "remote_media_island_enabled"
     private const val DEFAULT_ENABLED = true
 
+    // 会话和设备信息，需要线程安全访问
+    @Volatile
     private var currentSession: MediaSessionData? = null
+    @Volatile
     private var currentDevice: DeviceInfo? = null
 
     private var isEnabled: Boolean = true
@@ -27,13 +31,13 @@ object RemoteMediaSessionManager {
     private const val SOURCE_KEY_PREFIX = "media_island"
 
     // 媒体会话特征ID缓存，用于sourceId计算
-    private val mediaFeatureIdCache = mutableMapOf<String, String>()
+    private val mediaFeatureIdCache = ConcurrentHashMap<String, String>()
     
     // 媒体会话最后更新时间缓存
-    private val mediaLastUpdateTime = mutableMapOf<String, Long>()
+    private val mediaLastUpdateTime = ConcurrentHashMap<String, Long>()
     
     // 媒体会话数据缓存，用于定时复传
-    private val mediaSessionCache = mutableMapOf<String, MediaSessionCacheData>()
+    private val mediaSessionCache = ConcurrentHashMap<String, MediaSessionCacheData>()
     
     // 超时时间（毫秒），与发送端超时发送时间匹配并略长（16秒）
     private const val MEDIA_SESSION_TIMEOUT_MS = 16 * 1000L
