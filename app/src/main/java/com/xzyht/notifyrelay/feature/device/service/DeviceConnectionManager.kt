@@ -864,9 +864,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             try { 
                 coroutineScope.launch { 
                     updateDeviceList() 
-                    // 更新Flow值
-                    _authenticatedDevicesFlow.value = authenticatedDevices.toMap()
-                    _rejectedDevicesFlow.value = rejectedDevices.toSet()
+                    // 更新Flow值（在同步块内读取，确保一致性）
+                    val authMap = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
+                    val rejectedSet = synchronized(rejectedDevices) { rejectedDevices.toSet() }
+                    _authenticatedDevicesFlow.value = authMap
+                    _rejectedDevicesFlow.value = rejectedSet
                 } 
             } catch (_: Exception) {}
             return existed
