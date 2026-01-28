@@ -9,6 +9,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonColors
@@ -94,15 +95,13 @@ fun DoubleClickConfirmButton(
             }
         },
         modifier = modifier,
+        insideMargin = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
         colors = if (state.isConfirming) confirmColors else colors
     ) {
         Text(
             text = if (state.isConfirming) confirmText else text,
-            color = if (state.isConfirming) {
-                confirmTextColor ?: colorScheme.onPrimary
-            } else {
-                textColor ?: colorScheme.onPrimary
-            }
+            color = Color.White,
+            style = top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles.body2
         )
     }
 }
