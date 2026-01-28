@@ -1,13 +1,13 @@
-﻿package com.xzyht.notifyrelay.feature.device.model
+package com.xzyht.notifyrelay.feature.device.model
 
 import android.app.Notification
 import android.content.Context
 import android.service.notification.StatusBarNotification
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecord
+import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecordEntity
 import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.feature.notification.model.NotificationRecord
-import com.xzyht.notifyrelay.feature.notification.model.NotificationRecordEntity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 
@@ -70,12 +70,18 @@ class NotificationRecordStore(private val context: Context) {
     }
 
     suspend fun deleteByKey(key: String, device: String) {
+        // 直接调用数据库删除方法，key是唯一的，不需要设备参数
         repository.deleteNotificationByKey(key)
     }
 
     suspend fun clearByDevice(device: String) {
         val deviceUuid = if (device == "local") "本机" else device
         repository.deleteNotificationsByDevice(deviceUuid)
+    }
+    
+    suspend fun deleteByPackageAndDevice(packageName: String, device: String) {
+        val deviceUuid = if (device == "local") "本机" else device
+        repository.deleteNotificationsByPackageAndDevice(packageName, deviceUuid)
     }
 }
 
@@ -162,6 +168,12 @@ object NotificationRepository {
             // writeAll是同步的，不需要runBlocking
             store.writeAll(oldList, fileKey)
             Logger.i("秩序之光 狂鼠 NotifyRelay", "写入远端历史 device=$device, size=${oldList.size}")
+            
+            // 限制每个包名的通知数量为80
+            val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+            runBlocking {
+                repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
+            }
         } catch (e: Exception) {
             Logger.e("秩序之光 狂鼠 NotifyRelay", "[addRemoteNotification] 写入远程设备json失败: $device, error=${e.message}")
         }
@@ -177,7 +189,6 @@ object NotificationRepository {
     fun addNotification(sbn: StatusBarNotification, context: Context): Boolean {
         val notification = sbn.notification
         val time = sbn.postTime
-        val key = (sbn.key ?: (sbn.id.toString() + sbn.packageName)) + "_" + time.toString()
         fun getStringCompat(bundle: android.os.Bundle, key: String): String? {
             val value = bundle.getCharSequence(key)
             return value?.toString()
@@ -187,6 +198,8 @@ object NotificationRepository {
         val text = getStringCompat(notification.extras, Notification.EXTRA_TEXT)
         val packageName = sbn.packageName
         val device = "本机"
+        // 本地通知的 key 也需要包含设备信息，确保不同设备的相同通知不会冲突
+        val key = ((sbn.key ?: (sbn.id.toString() + sbn.packageName)) + "_" + time.toString()) + "_" + device
         var appName: String? = null
         try {
             val pm = context.packageManager
@@ -242,6 +255,12 @@ object NotificationRepository {
             } catch (e: Exception) {
                 Logger.e("NotifyRelay", "调用 onLocalNotificationEnqueued 失败", e)
             }
+            
+            // 限制每个包名的通知数量为80
+            val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+            runBlocking {
+                repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
+            }
         }
 
         notifyHistoryChanged(device, context)
@@ -253,10 +272,12 @@ object NotificationRepository {
      * 兼容 Bundle 字段类型，支持 CharSequence/SpannableString 自动转 String
      */
     fun getStringCompat(bundle: android.os.Bundle, key: String): String? {
-        val str = bundle.getString(key)
-        if (str != null) return str
-        val charSeq = bundle.getCharSequence(key)
-        return charSeq?.toString()
+        try {
+            val charSeq = bundle.getCharSequence(key)
+            return charSeq?.toString()
+        } catch (e: Exception) {
+            return null
+        }
     }
     // 当前选中设备
     var currentDevice: String = "本机"
@@ -291,6 +312,7 @@ object NotificationRepository {
     private var maxNotificationsPerDevice: Int = 100
     private var debounceJob: Job? = null
     private const val DEBOUNCE_DELAY = 500L
+    private var hasCleanedUpOldNotifications = false
 
     @Synchronized
     fun init(context: Context) {
@@ -312,6 +334,14 @@ object NotificationRepository {
             }
             notifications.clear()
             notifications.addAll(localList)
+            
+            // 清理历史通知，确保每个包名的通知数量不超过80条
+            if (!hasCleanedUpOldNotifications) {
+                runBlocking {
+                    cleanupOldNotifications(context)
+                }
+                hasCleanedUpOldNotifications = true
+            }
         } catch (e: Exception) {
             notifications.clear()
         }
@@ -323,22 +353,27 @@ object NotificationRepository {
     @Synchronized
     fun removeNotification(key: String, context: Context) {
         //Logger.d("NotifyRelay", "开始删除通知 key=$key")
-        notifications.size
 
         // 查找要删除的通知，检查其设备类型
-        val notificationToRemove = notifications.find { it.key == key }
+        val notificationToRemove = notifications.find { it.key == key && it.device == currentDevice }
         val isLocalDevice = notificationToRemove?.device == "本机"
 
-        notifications.removeAll { it.key == key }
-        notifications.size
-        //Logger.d("NotifyRelay", "删除通知 key=$key, 删除前数量=$beforeSize, 删除后数量=$afterSize")
-        syncToCache(context)
+        // 只删除当前设备的通知
+        notifications.removeAll { it.key == key && it.device == currentDevice }
+        
+        // 调用Room数据库的删除方法
+        val store = NotifyRelayStoreProvider.getInstance(context)
+        runBlocking {
+            store.deleteByKey(key, currentDevice)
+        }
 
         // 仅在本机设备时清理processedNotifications缓存
         if (isLocalDevice) {
             clearProcessedCache(setOf(key))
         }
 
+        // 通知历史变更，UI会自动刷新
+        // 注意：notifyHistoryChanged会重新从数据库加载数据，所以不需要单独调用syncToCache
         notifyHistoryChanged(currentDevice, context)
     }
 
@@ -348,21 +383,28 @@ object NotificationRepository {
     @Synchronized
     fun removeNotificationsByPackage(packageName: String, context: Context) {
         // 收集要清除的通知key，用于清理缓存
-        val notificationsToRemove = notifications.filter { it.packageName == packageName }
-        notificationsToRemove.map { it.key }.toSet()
+        val notificationsToRemove = notifications.filter { it.packageName == packageName && it.device == currentDevice }
+        val keysToRemove = notificationsToRemove.map { it.key }.toSet()
 
         // 检查是否有本机设备的通知
         val hasLocalNotifications = notificationsToRemove.any { it.device == "本机" }
         val localKeysToClear = notificationsToRemove.filter { it.device == "本机" }.map { it.key }.toSet()
 
-        notifications.removeAll { it.packageName == packageName }
-        syncToCache(context)
-
+        // 移除内存中的通知
+        notifications.removeAll { it.packageName == packageName && it.device == currentDevice }
+        
+        // 使用新添加的高效方法，直接从数据库中删除指定包名和设备的所有通知
+        val store = NotifyRelayStoreProvider.getInstance(context)
+        runBlocking {
+            store.deleteByPackageAndDevice(packageName, currentDevice)
+        }
+        
         // 仅清理本机设备的缓存
         if (hasLocalNotifications) {
             clearProcessedCache(localKeysToClear)
         }
 
+        // 通知历史变更，UI会自动刷新
         notifyHistoryChanged(currentDevice, context)
     }
 
@@ -371,16 +413,21 @@ object NotificationRepository {
      */
     @Synchronized
     fun clearDeviceHistory(device: String, context: Context) {
+        // 只清除当前设备的历史
+        val deviceToClear = currentDevice
+        
         // 收集要清除的通知key，用于清理缓存
-        val keysToClear = notifications.filter { it.device == device }.map { it.key }.toSet()
-        notifications.removeAll { it.device == device }
-        syncToCache(context)
-
-        // Room数据库操作是异步的，不需要等待写入完成
-        // 清除操作已经通过Repository提交到数据库
+        val keysToClear = notifications.filter { it.device == deviceToClear }.map { it.key }.toSet()
+        notifications.removeAll { it.device == deviceToClear }
+        
+        // 调用Room数据库的清除方法
+        val store = NotifyRelayStoreProvider.getInstance(context)
+        runBlocking {
+            store.clearByDevice(deviceToClear)
+        }
 
         // 仅在本机设备时清理processedNotifications缓存（非本机设备没有缓存）
-        if (device == "本机") {
+        if (deviceToClear == "本机") {
             // 对于本机设备，直接清除全部缓存（处理遗留问题）
             clearProcessedCacheAll()
         } else {
@@ -389,7 +436,8 @@ object NotificationRepository {
         }
 
         // 写入后主动推送变更
-        notifyHistoryChanged(device, context)
+        // 注意：notifyHistoryChanged会重新从数据库加载数据，所以不需要单独调用syncToCache
+        notifyHistoryChanged(deviceToClear, context)
     }
 
     /**
@@ -402,24 +450,23 @@ object NotificationRepository {
         Logger.i("NotifyRelay", "[syncToCache] contextType=$ctxType, hash=$ctxHash")
         try {
             val store = NotifyRelayStoreProvider.getInstance(context)
-            val grouped = notifications.groupBy { it.device }
-            for ((device, list) in grouped) {
-                val entities = list.map {
-                    NotificationRecordEntity(
-                        key = it.key,
-                        packageName = it.packageName,
-                        appName = it.appName,
-                        title = it.title,
-                        text = it.text,
-                        time = it.time,
-                        device = it.device
-                    )
-                }
-                val fileKey = if (device == "本机") "local" else device
-                // 移除不必要的runBlocking，writeAll已经是同步的
-                store.writeAll(entities, fileKey)
-                Logger.i("回声 NotifyRelay", "写入本地历史 device=$device, fileKey=$fileKey, size=${entities.size}")
+            // 只同步当前设备的通知，避免影响其他设备
+            val currentDeviceNotifications = notifications.filter { it.device == currentDevice }
+            val entities = currentDeviceNotifications.map {
+                NotificationRecordEntity(
+                    key = it.key,
+                    packageName = it.packageName,
+                    appName = it.appName,
+                    title = it.title,
+                    text = it.text,
+                    time = it.time,
+                    device = it.device
+                )
             }
+            val fileKey = if (currentDevice == "本机") "local" else currentDevice
+            // 移除不必要的runBlocking，writeAll已经是同步的
+            store.writeAll(entities, fileKey)
+            Logger.i("回声 NotifyRelay", "写入本地历史 device=$currentDevice, fileKey=$fileKey, size=${entities.size}")
             scanDeviceList(context)
         } catch (e: Exception) {
             val device = notifications.firstOrNull()?.device ?: "(unknown)"
@@ -460,5 +507,40 @@ object NotificationRepository {
     private fun clearProcessedCacheAll() {
         // 传递空集合表示清除全部缓存
         cacheCleaner?.invoke(emptySet())
+    }
+    
+    /**
+     * 清理历史通知，确保每个包名的通知数量不超过80条
+     */
+    private suspend fun cleanupOldNotifications(context: Context) {
+        try {
+            Logger.i("NotifyRelay", "开始清理历史通知")
+            val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+            
+            // 获取所有设备的列表
+            val devices = deviceList
+            
+            // 对每个设备，清理其通知
+            for (device in devices) {
+                Logger.i("NotifyRelay", "清理设备 $device 的通知")
+                
+                // 获取该设备的所有通知
+                val allNotifications = repository.getNotificationsByDevice(device)
+                
+                // 按包名分组通知
+                val packageNames = allNotifications.map { it.packageName }.distinct()
+                
+                // 对每个包名使用批量删除方法
+                for (packageName in packageNames) {
+                    Logger.i("NotifyRelay", "清理包名 $packageName 的通知")
+                    // 使用数据库仓库的批量删除方法，保留最新的80条
+                    repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
+                }
+            }
+            
+            Logger.i("NotifyRelay", "历史通知清理完成")
+        } catch (e: Exception) {
+            Logger.e("NotifyRelay", "清理历史通知失败: ${e.message}")
+        }
     }
 }

@@ -59,6 +59,19 @@ object Versioning {
         }
     }
 
+    // 在多个候选引用中查找第一个存在的引用名（返回候选字符串），找不到返回 null
+    private fun findFirstRefName(git: Git?, candidates: List<String>): String? {
+        if (git == null) return null
+        val repository = try { git.repository } catch (e: Exception) { return null }
+        for (c in candidates) {
+            try {
+                val id = repository.resolve(c)
+                if (id != null) return c
+            } catch (_: Exception) { }
+        }
+        return null
+    }
+
     // 计算 version 信息
     // majorSubtract: 手动设置的减量（用于在大版本号更新后减去一定量，防止次版本号持续增长）
     fun compute(rootProjectDir: File, majorOverride: Int = 0, majorSubtract: Int = 0): VersionInfo {
@@ -72,9 +85,22 @@ object Versioning {
             ""
         }
 
-        // 统计 main 分支提交数（如果存在）
-        val mainCount = countExclusiveCommits(git, "refs/heads/main", null)
-        // 应用手动减量，确保不小于 0
+        // 统计 main 分支提交数（始终以 main 的提交数为次版本基准），优先尝试本地和远程常见引用名
+        val mainRefCandidates = listOf(
+            "refs/heads/main",
+            "refs/remotes/origin/main",
+            "origin/main",
+            "refs/heads/master",
+            "refs/remotes/origin/master",
+            "origin/master"
+        )
+        val mainRef = findFirstRefName(git, mainRefCandidates)
+        val mainCount = if (mainRef != null) {
+            countExclusiveCommits(git, mainRef, null)
+        } else {
+            // 在极端情况下找不到 main 引用（如 CI 只检出单个分支），回退到 HEAD 的提交数以避免 0
+            countExclusiveCommits(git, "HEAD", null)
+        }
         val mainCountAdjusted = kotlin.math.max(0, mainCount - majorSubtract)
 
         // 获取当前时间
@@ -82,12 +108,10 @@ object Versioning {
         val dateTime = now.format(DateTimeFormatter.ofPattern("MMddHHmm"))
 
         // 生成 versionName 和 versionCode
-        // 简化版本号格式：所有分支统一使用 major.mainCount.MMddHHmm，main分支添加发布后缀
+        // 简化版本号格式：所有分支统一使用 major.<count>.MMddHHmm，main 分支添加 "-release" 后缀
         val versionName = if (branch == "main") {
-            // main分支：major.mainCount.MMddHHmm-release
             "$majorOverride.$mainCountAdjusted.$dateTime-release"
         } else {
-            // 非main分支：major.mainCount.MMddHHmm
             "$majorOverride.$mainCountAdjusted.$dateTime"
         }
         
@@ -97,8 +121,6 @@ object Versioning {
         // 1_000_000 系数确保 major 为高位，1_000 系数确保 mainCount 为中位，MMddHHmm 为低位
         // 最大值估算：200*1,000,000 + 100,000*1,000 + 12312359 = 312,312,359 < 2,147,483,647
         val versionCode = (majorOverride * 1_000_000L + mainCountAdjusted * 1_000L + dateTime.toLong()).coerceAtMost(Int.MAX_VALUE.toLong())
-        
-        Pair(versionName, versionCode)
 
         // Close repository resources
         try { git?.repository?.close() } catch (_: Exception) {}

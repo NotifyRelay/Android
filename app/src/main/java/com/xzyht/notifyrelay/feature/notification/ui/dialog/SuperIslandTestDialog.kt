@@ -1,6 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.ui.dialog
 
 import android.content.Context
+import android.os.Build
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,7 +15,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.xzyht.notifyrelay.common.data.StorageManager
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperDialog
@@ -23,6 +26,39 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 // 全局变量，用于保存递增循环的进度值
 private var progressCounter = 0
+
+/**
+ * 根据Live Updates开关选择合适的通道显示测试弹窗
+ * @param context 上下文
+ * @param sourceId 源ID
+ * @param title 标题
+ * @param text 文本内容
+ * @param paramV2Raw paramV2原始数据
+ * @param picMap 图片映射
+ * @param appName 应用名称
+ */
+private fun showTestNotification(
+    context: Context,
+    sourceId: String,
+    title: String?,
+    text: String?,
+    paramV2Raw: String?,
+    picMap: Map<String, String>?,
+    appName: String? = "测试应用"
+) {
+    // 总是使用FloatingReplicaManager创建浮窗
+    // 由FloatingReplicaManager内部决定是否需要发送Live Updates复合通知
+    FloatingReplicaManager.showFloating(
+        context = context,
+        sourceId = sourceId,
+        title = title,
+        text = text,
+        paramV2Raw = paramV2Raw,
+        picMap = picMap,
+        isLocked = false,
+        appName = appName
+    )
+}
 
 /**
  * 获取进度值
@@ -66,6 +102,7 @@ private fun appimgDataUrl(): String {
 /**
  * 测试基础文本组件
  */
+//TODO 数据并不符合超级岛规范
 private fun testBaseInfo(context: Context) {
     val paramV2Raw = """
         {
@@ -109,7 +146,7 @@ private fun testBaseInfo(context: Context) {
         }
     """
 
-    FloatingReplicaManager.showFloating(
+    showTestNotification(
         context = context,
         sourceId = "test_base_info",
         title = "基础文本测试",
@@ -117,8 +154,7 @@ private fun testBaseInfo(context: Context) {
         paramV2Raw = paramV2Raw,
         picMap = mapOf(
             "base_icon" to createBlackBlockDataUrl()
-        ),
-        isLocked = false
+        )
     )
 }
 
@@ -167,7 +203,7 @@ private fun testChatInfo(context: Context) {
         }
     """
 
-    FloatingReplicaManager.showFloating(
+    showTestNotification(
         context = context,
         sourceId = "test_chat_info",
         title = "聊天测试",
@@ -175,8 +211,7 @@ private fun testChatInfo(context: Context) {
         paramV2Raw = paramV2Raw,
         picMap = mapOf(
             "profile_pic" to createBlackBlockDataUrl()
-        ),
-        isLocked = false
+        )
     )
 }
 
@@ -224,7 +259,7 @@ private fun testAnimTextInfo(context: Context) {
         }
     """
 
-    FloatingReplicaManager.showFloating(
+    showTestNotification(
         context = context,
         sourceId = "test_anim_text_info",
         title = "动画文本测试",
@@ -232,8 +267,7 @@ private fun testAnimTextInfo(context: Context) {
         paramV2Raw = paramV2Raw,
         picMap = mapOf(
             "anim_icon" to createBlackBlockDataUrl()
-        ),
-        isLocked = false
+        )
     )
 }
 
@@ -282,7 +316,7 @@ private fun testHighlightInfo(context: Context) {
         }
     """
 
-    FloatingReplicaManager.showFloating(
+    showTestNotification(
         context = context,
         sourceId = "test_highlight_info",
         title = "强调文本测试",
@@ -290,8 +324,7 @@ private fun testHighlightInfo(context: Context) {
         paramV2Raw = paramV2Raw,
         picMap = mapOf(
             "highlight_pic" to createBlackBlockDataUrl()
-        ),
-        isLocked = false
+        )
     )
 }
 
@@ -332,7 +365,7 @@ private fun testPicInfo(context: Context) {
         }
     """
 
-    FloatingReplicaManager.showFloating(
+    showTestNotification(
         context = context,
         sourceId = "test_pic_info",
         title = "图形测试",
@@ -340,8 +373,7 @@ private fun testPicInfo(context: Context) {
         paramV2Raw = paramV2Raw,
         picMap = mapOf(
             "test_pic" to createBlackBlockDataUrl()
-        ),
-        isLocked = false
+        )
     )
 }
 
@@ -383,7 +415,7 @@ private fun testHintInfo(context: Context) {
         }
     """
 
-    FloatingReplicaManager.showFloating(
+    showTestNotification(
         context = context,
         sourceId = "test_hint_info",
         title = "提示测试",
@@ -391,8 +423,7 @@ private fun testHintInfo(context: Context) {
         paramV2Raw = paramV2Raw,
         picMap = mapOf(
             "hint_pic" to createBlackBlockDataUrl()
-        ),
-        isLocked = false
+        )
     )
 }
 
@@ -434,7 +465,7 @@ private fun testTextButton(context: Context) {
         }
     """
 
-    FloatingReplicaManager.showFloating(
+    showTestNotification(
         context = context,
         sourceId = "test_text_button",
         title = "文本按钮测试",
@@ -442,8 +473,7 @@ private fun testTextButton(context: Context) {
         paramV2Raw = paramV2Raw,
         picMap = mapOf(
             "button_icon" to createBlackBlockDataUrl()
-        ),
-        isLocked = false
+        )
     )
 }
 
@@ -498,7 +528,7 @@ private fun testProgressInfo(context: Context, isVariableProgress: Boolean) {
         }
     """
 
-    FloatingReplicaManager.showFloating(
+    showTestNotification(
         context = context,
         sourceId = "test_progress_info",
         title = "线性进度测试",
@@ -506,8 +536,7 @@ private fun testProgressInfo(context: Context, isVariableProgress: Boolean) {
         paramV2Raw = paramV2Raw,
         picMap = mapOf(
             "progress_icon" to createBlackBlockDataUrl()
-        ),
-        isLocked = false
+        )
     )
 }
 
@@ -574,7 +603,7 @@ private fun testMultiProgressInfo(context: Context, isVariableProgress: Boolean)
         }
     """
 
-    FloatingReplicaManager.showFloating(
+    showTestNotification(
         context = context,
         sourceId = "test_multi_progress_info",
         title = "多节点进度测试",
@@ -587,8 +616,7 @@ private fun testMultiProgressInfo(context: Context, isVariableProgress: Boolean)
             "middle_unselected_pic" to createBlackBlockDataUrl(),
             "end_pic" to createBlackBlockDataUrl(),
             "end_unselected_pic" to createBlackBlockDataUrl()
-        ),
-        isLocked = false
+        )
     )
 }
 
@@ -673,7 +701,7 @@ private fun testMultiProgressWithIcons(context: Context, isVariableProgress: Boo
         }
     """
 
-    FloatingReplicaManager.showFloating(
+    showTestNotification(
         context = context,
         sourceId = "test_multi_progress_with_icons",
         title = "带图标多节点进度测试",
@@ -688,8 +716,7 @@ private fun testMultiProgressWithIcons(context: Context, isVariableProgress: Boo
             "miui.focus.pic_forward_wait" to "https://gw.alicdn.com/imgextra/i3/O1CN012aWbML1PqaSChXHK7_!!6000000001892-2-tps-180-141.png",
             "miui.focus.pic_forward_box" to "https://gw.alicdn.com/imgextra/i1/O1CN01LLnS7n1xM50ZBmNL7_!!6000000006428-2-tps-180-141.png",
             "miui.focus.pic_app_icon" to appimgDataUrl(),
-        ),
-        isLocked = false
+        )
     )
 }
 
@@ -777,7 +804,7 @@ private fun testCircularProgressInfo(context: Context, isVariableProgress: Boole
         }
     """
 
-    FloatingReplicaManager.showFloating(
+    showTestNotification(
         context = context,
         sourceId = "test_circular_progress_info",
         title = "圆形进度测试",
@@ -789,8 +816,7 @@ private fun testCircularProgressInfo(context: Context, isVariableProgress: Boole
             "miui.focus.pic_cancel" to createBlackBlockDataUrl(),
             "miui.focus.pic_cancelDark" to createBlackBlockDataUrl(),
             "miui.focus.pic_app_icon" to createBlackBlockDataUrl()
-        ),
-        isLocked = false
+        )
     )
 }
 

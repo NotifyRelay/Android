@@ -3,6 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Live Updates API 所需权限 -->
+    <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
@@ -28,6 +30,14 @@
 
     <!-- Android 14+ 数据同步前台服务权限声明（解决 FGS type dataSync 崩溃） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- 文件管理权限 -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ProtectedPermissions" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <!-- 剪贴板访问权限 -->
+    <uses-permission android:name="android.permission.READ_CLIPBOARD_IN_BACKGROUND" android:maxSdkVersion="34" />
+    <!-- 日志读取权限，用于检测剪贴板变化 -->
+    <uses-permission android:name="android.permission.READ_LOGS" tools:ignore="ProtectedPermissions" />
 
     <application
         android:enableOnBackInvokedCallback="true"
@@ -49,7 +59,7 @@
         <activity android:name=".feature.MainActivity" android:exported="true" />
         <!-- 通知监听服务声明，用于系统识别通知访问权限 -->
         <service
-            android:name=".feature.notification.service.NotifyRelayNotificationListenerService"
+            android:name=".common.core.notification.servers.NotifyRelayNotificationListenerService"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true"
@@ -63,6 +73,57 @@
         <receiver
             android:name=".feature.device.receiver.RemoteNotificationClickReceiver"
             android:exported="false" />
+        
+        <!-- 剪贴板同步广播接收器 -->
+        <receiver
+            android:name=".feature.clipboard.ClipboardSyncReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.xzyht.notifyrelay.CLIPBOARD_MANUAL_SYNC" />
+                <action android:name="com.xzyht.notifyrelay.CLIPBOARD_OPEN_SETTINGS" />
+            </intent-filter>
+        </receiver>
+        
+        <!-- 超级岛通知广播接收器，用于处理通知删除事件 -->
+        <receiver
+            android:name=".feature.notification.superisland.NotificationBroadcastReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION" />
+                <action android:name="com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING" />
+            </intent-filter>
+        </receiver>
+        
+        <!-- 剪贴板监控服务 -->
+        <service
+            android:name=".feature.clipboard.ClipboardMonitorService"
+            android:exported="true"
+            android:foregroundServiceType="dataSync"
+            android:stopWithTask="false" />
+            
+        <!-- 剪贴板同步透明Activity -->
+        <activity
+            android:name=".feature.clipboard.ClipboardSyncActivity"
+            android:exported="true"
+            android:theme="@style/TransparentTheme"
+            android:launchMode="singleInstance"
+            android:noHistory="true"
+            android:excludeFromRecents="true"
+            android:taskAffinity="" />
+            
+        <!-- 剪贴板无障碍服务 -->
+        <service
+            android:name=".feature.clipboard.ClipboardAccessiblityService"
+            android:label="NotifyRelay 设备互联"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.accessibilityservice"
+                android:resource="@xml/clipboard_accessibility_service" />
+        </service>
     </application>
 
 </manifest>

@@ -47,12 +47,16 @@ import com.xzyht.notifyrelay.common.SetupSystemBars
 import com.xzyht.notifyrelay.common.core.repository.AppRepository
 import com.xzyht.notifyrelay.common.core.util.IntentUtils
 import com.xzyht.notifyrelay.common.core.util.Logger
+import com.xzyht.notifyrelay.common.core.util.DeviceInfoManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.common.core.util.ServiceManager
 import com.xzyht.notifyrelay.common.core.util.ToastUtils
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.ui.DeviceForwardFragment
 import com.xzyht.notifyrelay.feature.device.ui.DeviceListFragment
 import com.xzyht.notifyrelay.feature.notification.ui.NotificationHistoryFragment
+import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
@@ -112,7 +116,13 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        // 先检查权限并启动服务
         checkPermissionsAndStartServices()
+        // 只检查READ_LOGS权限来决定是否启动日志监控
+        if (checkSelfPermission(android.Manifest.permission.READ_LOGS) == android.content.pm.PackageManager.PERMISSION_GRANTED) {
+            // 尝试启动剪贴板日志监控
+            ClipboardSyncManager.startLogMonitoring(this)
+        }
     }
 
     private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
@@ -123,6 +133,9 @@ class MainActivity : FragmentActivity() {
     @OptIn(DelicateCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 初始化前后台检测器
+        PermissionHelper.AppForegroundDetector.initialize(this)
 
         // 先设置沉浸式虚拟键和状态栏，然后立即显示UI
         WindowCompat.setDecorFitsSystemWindows(this.window, false)
@@ -157,6 +170,13 @@ class MainActivity : FragmentActivity() {
             return
         }
 
+        // 确保 DeviceConnectionManager 在首次启动时完成 UUID 初始化
+        DeviceConnectionManager.getInstance(this)
+        // 生成设备信息文件，用于 ADB 连接检测
+        DeviceInfoManager.generateDeviceInfoFile(this)
+        // 初始化 Live Updates 通知管理器
+        LiveUpdatesNotificationManager.initialize(this)
+        
         // 在后台线程初始化 NotificationRepository 和启动服务
         GlobalScope.launch {
             // 启动时加载本地历史通知

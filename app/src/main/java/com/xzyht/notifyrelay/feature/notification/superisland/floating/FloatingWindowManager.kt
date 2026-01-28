@@ -15,7 +15,8 @@ class FloatingWindowManager {
 
     // 常量定义
     private val EXPANDED_DURATION_MS = 3000L // 展开态持续时间
-    private val AUTO_DISMISS_DURATION_MS = 12000L // 自动移除时间
+    private val AUTO_DISMISS_DURATION_MS = 12000L // 自动移除时间（非媒体类型）
+    private val AUTO_DISMISS_DURATION_MS_MEDIA = 20000L // 媒体类型自动移除时间，比媒体会话超时时间（16秒）长一些
 
     // 用于处理延迟任务的Handler
     private val handler = Handler(Looper.getMainLooper())
@@ -28,6 +29,20 @@ class FloatingWindowManager {
 
     // 条目数量变化回调，当条目数量变为0时调用
     var onEntriesEmpty: (() -> Unit)? = null
+    
+    // 条目移除回调，当单个条目被移除时调用，包含移除原因
+    var onEntryRemoved: ((String, RemovalReason) -> Unit)? = null
+
+    /**
+     * 移除原因枚举
+     */
+    enum class RemovalReason {
+        TIMEOUT, // 超时自动移除
+        MANUAL,  // 用户手动移除（划掉通知等）
+        REMOTE,  // 远端指令移除
+        HIDDEN,  // 用户点击通知隐藏（可恢复）
+        OTHER    // 其他原因
+    }
 
     // 记录条目的内部数据类
     private data class EntryWithTimestamp(
@@ -129,7 +144,12 @@ class FloatingWindowManager {
         }
 
         // 所有条目都添加自动移除任务
-        scheduleRemoval(key, AUTO_DISMISS_DURATION_MS)
+        val autoDismissDuration = if (business == "media") {
+            AUTO_DISMISS_DURATION_MS_MEDIA
+        } else {
+            AUTO_DISMISS_DURATION_MS
+        }
+        scheduleRemoval(key, autoDismissDuration)
 
         updateEntriesList()
     }
@@ -159,7 +179,7 @@ class FloatingWindowManager {
         val entryWithTimestamp = entriesMap[key] ?: return
 
         val runnable = Runnable {
-            removeEntry(key)
+            removeEntry(key, RemovalReason.TIMEOUT)
         }
 
         entryWithTimestamp.removalRunnable = runnable
@@ -188,10 +208,16 @@ class FloatingWindowManager {
     /**
      * 移除浮窗条目
      */
-    fun removeEntry(key: String) {
+    fun removeEntry(key: String, reason: RemovalReason = RemovalReason.OTHER) {
         // 取消所有相关任务
         cancelAllTasks(key)
         entriesMap.remove(key)
+        
+        // 调用条目移除回调
+        // 注意：必须在updateEntriesList之前调用，因为updateEntriesList可能会导致Overlay被移除（当条目为空时），
+        // 从而导致onEntryRemoved回调中无法获取Context来执行清理操作（如移除通知）
+        onEntryRemoved?.invoke(key, reason)
+
         updateEntriesList()
     }
 
@@ -226,8 +252,13 @@ class FloatingWindowManager {
                 scheduleCollapse(key, EXPANDED_DURATION_MS)
             }
 
-            // 重新添加自动移除任务
-            scheduleRemoval(key, AUTO_DISMISS_DURATION_MS)
+            // 重新添加自动移除任务，根据business类型选择正确的自动移除时间
+            val autoDismissDuration = if (currentEntry.business == "media") {
+                AUTO_DISMISS_DURATION_MS_MEDIA
+            } else {
+                AUTO_DISMISS_DURATION_MS
+            }
+            scheduleRemoval(key, autoDismissDuration)
 
             updateEntriesList()
         }
@@ -260,8 +291,13 @@ class FloatingWindowManager {
                 scheduleCollapse(key, EXPANDED_DURATION_MS)
             }
 
-            // 重新添加自动移除任务
-            scheduleRemoval(key, AUTO_DISMISS_DURATION_MS)
+            // 重新添加自动移除任务，根据business类型选择正确的自动移除时间
+            val autoDismissDuration = if (currentEntry.business == "media") {
+                AUTO_DISMISS_DURATION_MS_MEDIA
+            } else {
+                AUTO_DISMISS_DURATION_MS
+            }
+            scheduleRemoval(key, autoDismissDuration)
 
             updateEntriesList()
         }
@@ -373,11 +409,19 @@ class FloatingWindowManager {
      * 清空所有条目
      */
     fun clearAllEntries() {
+        // 保存之前的条目数量
+        val previousSize = entriesMap.size
+        
         // 取消所有任务
         entriesMap.keys.forEach {
             cancelAllTasks(it)
         }
         entriesMap.clear()
         entriesList.clear()
+        
+        // 如果之前有条目，现在变为空，调用回调
+        if (previousSize > 0) {
+            onEntriesEmpty?.invoke()
+        }
     }
 }

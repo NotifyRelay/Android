@@ -42,6 +42,8 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.Co
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandComposeRoot
 import org.json.JSONObject
 
+import com.xzyht.notifyrelay.common.core.util.Logger
+
 /**
  * 浮窗条目数据类，对应原有EntryRecord
  */
@@ -70,7 +72,8 @@ fun FloatingWindowContainer(
     onEntryClick: (String) -> Unit,
     lifecycleOwner: LifecycleOwner?,
     modifier: Modifier = Modifier.Companion,
-    onUpdateEntryHeight: ((String, Int) -> Unit)? = null
+    onUpdateEntryHeight: ((String, Int) -> Unit)? = null,
+    isContainerDragging: Boolean = false
 ) {
     LocalContext.current
 
@@ -95,7 +98,12 @@ fun FloatingWindowContainer(
                         .clickable(
                             interactionSource = interactionSource,
                             indication = null, // 移除默认点击效果
-                            onClick = { onEntryClick(entry.key) }
+                            onClick = { 
+                                // 只有当容器未拖动时才执行点击操作
+                                if (!isContainerDragging) {
+                                    onEntryClick(entry.key)
+                                }
+                            }
                         )
                         .onGloballyPositioned {
                             // 测量条目实际高度并更新
@@ -136,10 +144,64 @@ fun FloatingWindowContainer(
                             content = {
                                 val hasParamV2 = entry.paramV2 != null
 
+                                val context = LocalContext.current
                                 if (hasParamV2) {
                                     entry.paramV2?.let { paramV2 ->
+                                        Logger.d("超级岛", "FloatingWindowContainer渲染: paramIsland=${paramV2.paramIsland != null}, highlight=${paramV2.highlightInfo != null}, baseInfo=${paramV2.baseInfo != null}")
                                         when {
+                                            // 媒体类型处理
+                                            paramV2.business == "media" -> {
+                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 MediaIslandCompose")
+                                                // 构建MediaSessionData
+                                                val mediaSession = com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.MediaSessionData(
+                                                    packageName = entry.appName ?: "",
+                                                    appName = entry.appName,
+                                                    title = entry.title ?: "",
+                                                    text = entry.text ?: "",
+                                                    coverUrl = entry.picMap?.get("miui.focus.pic_cover") ?: entry.picMap?.values?.firstOrNull(),
+                                                    deviceName = entry.appName ?: ""
+                                                )
+                                                // 使用媒体类型大岛组件
+                                                com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.MediaIslandCompose(
+                                                    mediaSession = mediaSession,
+                                                    isExpanded = entry.isExpanded,
+                                                    onCollapse = {
+                                                        // 点击条目切换展开状态
+                                                        onEntryClick(entry.key)
+                                                    },
+                                                    onPlayPause = {
+                                                        // 媒体控制按钮点击事件，由RemoteMediaSessionManager处理
+                                                        com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager.onPlayPause(
+                                                            context,
+                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager.getInstance(context)
+                                                        )
+                                                    },
+                                                    onPrevious = {
+                                                        com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager.onPrevious(
+                                                            context,
+                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager.getInstance(context)
+                                                        )
+                                                    },
+                                                    onNext = {
+                                                        com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager.onNext(
+                                                            context,
+                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager.getInstance(context)
+                                                        )
+                                                    },
+                                                    onClose = {
+                                                        // 发送关闭指令，由外部处理
+                                                        onEntryClick(entry.key)
+                                                    }
+                                                )
+                                            }
+                                            
+                                            paramV2.paramIsland != null -> {
+                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 ParamIslandCompose")
+                                                ParamIslandCompose(paramV2.paramIsland, actions = paramV2.actions, picMap = entry.picMap)
+                                            }
+
                                             paramV2.baseInfo != null -> {
+                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 BaseInfoCompose")
                                                 BaseInfoCompose(
                                                     paramV2.baseInfo,
                                                     picMap = entry.picMap
@@ -147,10 +209,12 @@ fun FloatingWindowContainer(
                                             }
 
                                             paramV2.chatInfo != null -> {
+                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 ChatInfoCompose")
                                                 ChatInfoCompose(paramV2, picMap = entry.picMap)
                                             }
 
                                             paramV2.animTextInfo != null -> {
+                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 AnimTextInfoCompose")
                                                 AnimTextInfoCompose(
                                                     paramV2.animTextInfo,
                                                     picMap = entry.picMap
@@ -158,6 +222,7 @@ fun FloatingWindowContainer(
                                             }
 
                                             paramV2.highlightInfo != null -> {
+                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 HighlightInfoCompose")
                                                 HighlightInfoCompose(
                                                     paramV2.highlightInfo,
                                                     picMap = entry.picMap
@@ -165,6 +230,7 @@ fun FloatingWindowContainer(
                                             }
 
                                             paramV2.picInfo != null -> {
+                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 PicInfoCompose")
                                                 PicInfoCompose(
                                                     paramV2.picInfo,
                                                     picMap = entry.picMap
@@ -172,6 +238,7 @@ fun FloatingWindowContainer(
                                             }
 
                                             paramV2.hintInfo != null -> {
+                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 HintInfoCompose")
                                                 HintInfoCompose(
                                                     paramV2.hintInfo,
                                                     picMap = entry.picMap
@@ -179,21 +246,20 @@ fun FloatingWindowContainer(
                                             }
 
                                             paramV2.textButton != null -> {
+                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 TextButtonCompose")
                                                 TextButtonCompose(
                                                     paramV2.textButton,
                                                     picMap = entry.picMap
                                                 )
                                             }
 
-                                            paramV2.paramIsland != null -> {
-                                                ParamIslandCompose(paramV2.paramIsland)
-                                            }
-
                                             paramV2.actions?.isNotEmpty() == true -> {
+                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 ActionCompose")
                                                 ActionCompose(paramV2.actions, entry.picMap)
                                             }
 
                                             else -> {
+                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 DefaultSuperIslandCompose")
                                                 // 默认模板：未支持的模板类型
                                                 Box(modifier = Modifier.padding(16.dp)) {
                                                     Text(
