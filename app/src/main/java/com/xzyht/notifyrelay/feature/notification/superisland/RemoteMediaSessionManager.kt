@@ -253,9 +253,9 @@ object RemoteMediaSessionManager {
                 merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
             } else {
                 // 全量包
-                payload.put("title", title)
-                payload.put("text", text)
-                payload.put("param_v2_raw", buildMediaParamV2(title, text).toString())
+                payload.put("title", finalTitle)
+                payload.put("text", finalText)
+                payload.put("param_v2_raw", buildMediaParamV2(finalTitle, finalText).toString())
                 if (currentPics.isNotEmpty()) {
                     payload.put("pics", JSONObject(currentPics))
                 }
