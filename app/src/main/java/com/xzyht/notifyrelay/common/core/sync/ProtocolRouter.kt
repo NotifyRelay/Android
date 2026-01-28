@@ -12,6 +12,7 @@ import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.SUCCESS
 import com.xzyht.notifyrelay.common.core.util.IntentUtils
 import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.feature.GuideActivity
+import com.xzyht.notifyrelay.common.core.notification.StatusProcessor
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
@@ -164,37 +165,70 @@ object ProtocolRouter {
                             "playPause" -> {
                                 try {
                                     val sbn = com.xzyht.notifyrelay.common.core.notification.servers.NotifyRelayNotificationListenerService.latestMediaSbn
+                                    val result: String
+                                    val errorMessage: String?
                                     if (sbn != null) {
                                         com.xzyht.notifyrelay.common.core.util.MediaControlUtil.triggerPlayPauseFromNotification(sbn)
+                                        result = "success"
+                                        errorMessage = null
+                                        Logger.i(TAG, "执行 playPause 成功")
                                     } else {
-                                        Logger.w(TAG, "playPause: 未找到媒体通知，无法触发本机媒体操作")
+                                        result = "error"
+                                        errorMessage = "未找到媒体通知，无法触发本机媒体操作"
+                                        Logger.w(TAG, "playPause: $errorMessage")
                                     }
+                                    // 发送响应
+                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "playPause", result, errorMessage)
                                 } catch (e: Exception) {
                                     Logger.e(TAG, "执行 playPause 失败", e)
+                                    // 发送错误响应
+                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "playPause", "error", e.message)
                                 }
                             }
                             "next" -> {
                                 try {
                                     val sbn = com.xzyht.notifyrelay.common.core.notification.servers.NotifyRelayNotificationListenerService.latestMediaSbn
+                                    val result: String
+                                    val errorMessage: String?
                                     if (sbn != null) {
                                         com.xzyht.notifyrelay.common.core.util.MediaControlUtil.triggerNextFromNotification(sbn)
+                                        result = "success"
+                                        errorMessage = null
+                                        Logger.i(TAG, "执行 next 成功")
                                     } else {
-                                        Logger.w(TAG, "next: 未找到媒体通知，无法触发本机媒体操作")
+                                        result = "error"
+                                        errorMessage = "未找到媒体通知，无法触发本机媒体操作"
+                                        Logger.w(TAG, "next: $errorMessage")
                                     }
+                                    // 发送响应
+                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "next", result, errorMessage)
                                 } catch (e: Exception) {
                                     Logger.e(TAG, "执行 next 失败", e)
+                                    // 发送错误响应
+                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "next", "error", e.message)
                                 }
                             }
                             "previous" -> {
                                 try {
                                     val sbn = com.xzyht.notifyrelay.common.core.notification.servers.NotifyRelayNotificationListenerService.latestMediaSbn
+                                    val result: String
+                                    val errorMessage: String?
                                     if (sbn != null) {
                                         com.xzyht.notifyrelay.common.core.util.MediaControlUtil.triggerPreviousFromNotification(sbn)
+                                        result = "success"
+                                        errorMessage = null
+                                        Logger.i(TAG, "执行 previous 成功")
                                     } else {
-                                        Logger.w(TAG, "previous: 未找到媒体通知，无法触发本机媒体操作")
+                                        result = "error"
+                                        errorMessage = "未找到媒体通知，无法触发本机媒体操作"
+                                        Logger.w(TAG, "previous: $errorMessage")
                                     }
+                                    // 发送响应
+                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "previous", result, errorMessage)
                                 } catch (e: Exception) {
                                     Logger.e(TAG, "执行 previous 失败", e)
+                                    // 发送错误响应
+                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "previous", "error", e.message)
                                 }
                             }
                             // 音频转发控制（仅对 PC 设备响应）
@@ -269,10 +303,74 @@ object ProtocolRouter {
                                             }
                                         }
 
-                                        PERMISSION_DENIED -> TODO()
-                                        PORT_IN_USE -> TODO()
-                                        CONFIG_ERROR -> TODO()
-                                        FAILED -> TODO()
+                                        PERMISSION_DENIED -> {
+                                            Logger.i(TAG, "ftp 服务器启动失败：权限被拒绝")
+                                            val errorMessage = "FTP服务器启动失败：权限被拒绝"
+                                            val responseJson = JSONObject().apply {
+                                                put("originalHeader", "DATA_FTP")
+                                                put("action", "start")
+                                                put("result", "error")
+                                                put("errorCode", "PERMISSION_DENIED")
+                                                put("errorMessage", errorMessage)
+                                            }
+                                            ProtocolSender.sendEncrypted(
+                                                deviceManager,
+                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                                                "DATA_STATUS",
+                                                responseJson.toString()
+                                            )
+                                        }
+                                        PORT_IN_USE -> {
+                                            Logger.i(TAG, "ftp 服务器启动失败：端口被占用")
+                                            val errorMessage = "FTP服务器启动失败：端口被占用"
+                                            val responseJson = JSONObject().apply {
+                                                put("originalHeader", "DATA_FTP")
+                                                put("action", "start")
+                                                put("result", "error")
+                                                put("errorCode", "PORT_IN_USE")
+                                                put("errorMessage", errorMessage)
+                                            }
+                                            ProtocolSender.sendEncrypted(
+                                                deviceManager,
+                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                                                "DATA_STATUS",
+                                                responseJson.toString()
+                                            )
+                                        }
+                                        CONFIG_ERROR -> {
+                                            Logger.i(TAG, "ftp 服务器启动失败：配置错误")
+                                            val errorMessage = "FTP服务器启动失败：配置错误"
+                                            val responseJson = JSONObject().apply {
+                                                put("originalHeader", "DATA_FTP")
+                                                put("action", "start")
+                                                put("result", "error")
+                                                put("errorCode", "CONFIG_ERROR")
+                                                put("errorMessage", errorMessage)
+                                            }
+                                            ProtocolSender.sendEncrypted(
+                                                deviceManager,
+                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                                                "DATA_STATUS",
+                                                responseJson.toString()
+                                            )
+                                        }
+                                        FAILED -> {
+                                            Logger.i(TAG, "ftp 服务器启动失败：未知错误")
+                                            val errorMessage = "FTP服务器启动失败：未知错误"
+                                            val responseJson = JSONObject().apply {
+                                                put("originalHeader", "DATA_FTP")
+                                                put("action", "start")
+                                                put("result", "error")
+                                                put("errorCode", "FAILED")
+                                                put("errorMessage", errorMessage)
+                                            }
+                                            ProtocolSender.sendEncrypted(
+                                                deviceManager,
+                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                                                "DATA_STATUS",
+                                                responseJson.toString()
+                                            )
+                                        }
                                     }
                                 }
 
@@ -314,6 +412,23 @@ object ProtocolRouter {
                     )
                     true
                 }
+                "DATA_STATUS" -> {
+                    Logger.d(TAG, "接收到 DATA_STATUS 消息: $decrypted")
+                    val routedHeader = "DATA_STATUS"
+                    StatusProcessor.process(
+                        context,
+                        deviceManager,
+                        deviceManager.coroutineScopeInternal,
+                        StatusProcessor.StatusInput(
+                            header = routedHeader,
+                            rawData = decrypted,
+                            sharedSecret = auth.sharedSecret,
+                            remoteUuid = remoteUuid
+                        ),
+                        deviceManager.notificationDataReceivedCallbacksInternal
+                    )
+                    true
+                }
                 else -> {
                     // 其他未识别的 DATA_* 报文：当前版本不支持，直接忽略（方便后向兼容）
                     Logger.d(TAG, "未知DATA通道: $header")
@@ -327,4 +442,35 @@ object ProtocolRouter {
     }
 
     // 解密逻辑已由 DeviceConnectionManager 直接提供，无需反射
+
+    /**
+     * 发送媒体控制响应
+     */
+    private fun sendMediaControlResponse(
+        deviceManager: DeviceConnectionManager,
+        remoteUuid: String,
+        clientIp: String,
+        action: String,
+        result: String,
+        errorMessage: String?
+    ) {
+        try {
+            val responseJson = JSONObject().apply {
+                put("originalHeader", "DATA_MEDIA_CONTROL")
+                put("action", action)
+                put("result", result)
+                if (errorMessage != null) {
+                    put("errorMessage", errorMessage)
+                }
+            }
+            ProtocolSender.sendEncrypted(
+                deviceManager,
+                deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                "DATA_STATUS",
+                responseJson.toString()
+            )
+        } catch (e: Exception) {
+            Logger.e(TAG, "发送媒体控制响应失败", e)
+        }
+    }
 }

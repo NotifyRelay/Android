@@ -47,7 +47,7 @@ object SuperIslandProcessor {
 
             val siType = try { json.optString("type", "") } catch (_: Exception) { "" }
 
-            // SI_ACK 属于超岛协议的确认包，仅用于可靠性确认，不应进入通知/聊天管线
+            // SI_ACK 属于超级岛协议的确认包，仅用于可靠性确认，不应进入通知/聊天管线
             if (siType == "SI_ACK") {
                 Logger.i("超级岛", "收到超级岛ACK: remoteUuid=$remoteUuid, pkg=$pkg, mappedPkg=$mappedPkg, hash=${try { json.optString("hash", "") } catch (_: Exception) { "" }}")
                 return true

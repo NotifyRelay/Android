@@ -883,9 +883,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             val port = device?.port ?: (auth?.lastPort ?: 23333)
             if (ip.isNullOrEmpty() || ip == "0.0.0.0") return
 
+            // 使用DATA_STATUS发送超级岛ack
             val ackObj = org.json.JSONObject().apply {
+                put("originalHeader", "DATA_SUPERISLAND")
+                put("result", "success")
+                put("action", "SI_ACK")
                 put("packageName", mappedPkg ?: "superisland:ack")
-                put("type", "SI_ACK")
                 put("hash", hash)
                 if (!featureKeyValue.isNullOrEmpty()) {
                     put("featureKeyName", SuperIslandProtocol.FEATURE_KEY_NAME)
@@ -896,7 +899,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
             // 通过统一加密发送器发回对端
             val deviceInfo = DeviceInfo(remoteUuid, DeviceConnectionManagerUtil.getDisplayNameByUuid(remoteUuid), ip, port)
-            com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_SUPERISLAND", ackObj.toString(), 3000L)
+            com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_STATUS", ackObj.toString(), 3000L)
         } catch (_: Exception) {
         }
     }
