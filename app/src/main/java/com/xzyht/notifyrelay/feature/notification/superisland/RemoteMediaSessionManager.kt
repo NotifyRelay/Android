@@ -19,6 +19,9 @@ object RemoteMediaSessionManager {
     private var currentDevice: DeviceInfo? = null
 
     private var isEnabled: Boolean = true
+    
+    // 应用上下文，用于定期检查任务
+    private var applicationContext: Context? = null
 
     // 固定sourceKey前缀，以设备为单位
     private const val SOURCE_KEY_PREFIX = "media_island"
@@ -51,9 +54,13 @@ object RemoteMediaSessionManager {
     private fun initCleanupRunnable() {
         cleanupRunnable = Runnable {
             try {
-                // 获取上下文，使用应用上下文
-                val context = android.content.ContextWrapper(android.app.Application::class.java.getDeclaredMethod("getInstance").invoke(null) as android.content.Context)
-                cleanupTimeoutSessions(context)
+                // 使用保存的应用上下文
+                val context = applicationContext
+                if (context != null) {
+                    cleanupTimeoutSessions(context)
+                } else {
+                    Logger.w("RemoteMediaSessionManager", "应用上下文未初始化，跳过定期检查")
+                }
             } catch (e: Exception) {
                 Logger.e("RemoteMediaSessionManager", "定期检查超时会话失败", e)
             } finally {
@@ -72,6 +79,9 @@ object RemoteMediaSessionManager {
     )
 
     fun init(context: Context) {
+        // 保存应用上下文
+        applicationContext = context.applicationContext
+        
         isEnabled = try {
             getBoolean(context, KEY_ENABLED, DEFAULT_ENABLED)
         } catch (_: Exception) {
