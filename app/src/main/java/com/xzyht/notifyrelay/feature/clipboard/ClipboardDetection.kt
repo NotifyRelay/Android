@@ -80,7 +80,7 @@ class ClipboardDetection(
         }
 
         // 检测窗口内容变化相关的复制行为
-        if ((event.contentChangeTypes ?: (0 and AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE)) == 1
+        if ((event.contentChangeTypes ?: 0) and AccessibilityEvent.CONTENT_CHANGE_TYPE_SUBTREE != 0
             && event.eventType == AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED && lastEvent != null
         ) {
             val previousEvent = lastEvent!!
