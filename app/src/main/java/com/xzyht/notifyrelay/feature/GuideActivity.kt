@@ -47,10 +47,10 @@ import com.xzyht.notifyrelay.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.common.PermissionHelper
 import com.xzyht.notifyrelay.common.SetupSystemBars
 import com.xzyht.notifyrelay.common.core.repository.AppListHelper
-import com.xzyht.notifyrelay.common.core.util.IntentUtils
-import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.common.core.util.ToastUtils
-import com.xzyht.notifyrelay.common.data.StorageManager
+import notifyrelay.core.util.IntentUtils
+import notifyrelay.core.util.Logger
+import notifyrelay.core.util.ToastUtils
+import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentColors
 import top.yukonga.miuix.kmp.basic.Button
@@ -61,7 +61,6 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 class GuideActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {

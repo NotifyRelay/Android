@@ -2,10 +2,10 @@ package com.xzyht.notifyrelay.common.core.notification
 
 import android.content.Context
 import com.xzyht.notifyrelay.common.core.sync.MessageSender
-import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.common.core.util.ToastUtils
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import kotlinx.coroutines.CoroutineScope
+import notifyrelay.core.util.Logger
+import notifyrelay.core.util.ToastUtils
 import org.json.JSONObject
 
 /**

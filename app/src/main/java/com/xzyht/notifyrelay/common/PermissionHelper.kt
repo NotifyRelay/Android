@@ -9,9 +9,9 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.xzyht.notifyrelay.common.core.util.IntentUtils
-import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.common.core.util.ToastUtils
+import notifyrelay.core.util.IntentUtils
+import notifyrelay.core.util.Logger
+import notifyrelay.core.util.ToastUtils
 
 /**
  * 权限辅助工具类

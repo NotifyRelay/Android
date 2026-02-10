@@ -1,6 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model
 
-import com.xzyht.notifyrelay.common.core.util.Logger
+import notifyrelay.core.util.Logger
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.core.parseBigIslandArea
 import org.json.JSONObject
 

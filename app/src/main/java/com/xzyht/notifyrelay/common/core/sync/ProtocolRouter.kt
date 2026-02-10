@@ -9,14 +9,15 @@ import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.FAILED
 import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.PERMISSION_DENIED
 import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.PORT_IN_USE
 import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.SUCCESS
-import com.xzyht.notifyrelay.common.core.util.IntentUtils
-import com.xzyht.notifyrelay.common.core.util.Logger
+import notifyrelay.core.util.IntentUtils
+import notifyrelay.core.util.Logger
 import com.xzyht.notifyrelay.feature.GuideActivity
 import com.xzyht.notifyrelay.common.core.notification.StatusProcessor
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import kotlinx.coroutines.launch
+import notifyrelay.core.util.MediaControlUtil
 import org.json.JSONObject
 
 /**
@@ -168,7 +169,7 @@ object ProtocolRouter {
                                     val result: String
                                     val errorMessage: String?
                                     if (sbn != null) {
-                                        com.xzyht.notifyrelay.common.core.util.MediaControlUtil.triggerPlayPauseFromNotification(sbn)
+                                        MediaControlUtil.triggerPlayPauseFromNotification(sbn)
                                         result = "success"
                                         errorMessage = null
                                         Logger.i(TAG, "执行 playPause 成功")
@@ -191,7 +192,7 @@ object ProtocolRouter {
                                     val result: String
                                     val errorMessage: String?
                                     if (sbn != null) {
-                                        com.xzyht.notifyrelay.common.core.util.MediaControlUtil.triggerNextFromNotification(sbn)
+                                        MediaControlUtil.triggerNextFromNotification(sbn)
                                         result = "success"
                                         errorMessage = null
                                         Logger.i(TAG, "执行 next 成功")
@@ -214,7 +215,7 @@ object ProtocolRouter {
                                     val result: String
                                     val errorMessage: String?
                                     if (sbn != null) {
-                                        com.xzyht.notifyrelay.common.core.util.MediaControlUtil.triggerPreviousFromNotification(sbn)
+                                        MediaControlUtil.triggerPreviousFromNotification(sbn)
                                         result = "success"
                                         errorMessage = null
                                         Logger.i(TAG, "执行 previous 成功")

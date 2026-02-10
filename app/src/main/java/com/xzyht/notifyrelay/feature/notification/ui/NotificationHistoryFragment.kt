@@ -48,10 +48,10 @@ import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.common.core.repository.AppRepository
 import com.xzyht.notifyrelay.common.core.sync.MessageSender
-import com.xzyht.notifyrelay.common.core.util.IntentUtils
-import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.common.core.util.ToastUtils
-import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
+import notifyrelay.core.util.IntentUtils
+import notifyrelay.core.util.Logger
+import notifyrelay.core.util.ToastUtils
+import notifyrelay.core.util.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.feature.GuideActivity
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.ui.GlobalSelectedDeviceHolder
@@ -73,7 +73,6 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.icons.useful.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
-import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
 import java.time.Instant
 import java.time.LocalDateTime
 import java.time.ZoneId

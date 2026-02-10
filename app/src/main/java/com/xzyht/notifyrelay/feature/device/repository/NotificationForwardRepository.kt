@@ -3,11 +3,7 @@ package com.xzyht.notifyrelay.feature.device.repository
 import android.content.Context
 import androidx.compose.runtime.MutableState
 import com.xzyht.notifyrelay.common.core.repository.AppRepository
-import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
+import notifyrelay.core.util.Logger
 import kotlinx.coroutines.delay
 
 // 延迟去重缓存（10秒内）

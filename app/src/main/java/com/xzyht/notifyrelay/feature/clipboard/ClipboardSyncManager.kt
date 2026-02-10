@@ -8,12 +8,13 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.xzyht.notifyrelay.common.PermissionHelper
 import com.xzyht.notifyrelay.common.core.sync.ProtocolSender
-import com.xzyht.notifyrelay.common.core.util.Logger
+import notifyrelay.core.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import notifyrelay.core.util.DataUrlUtils
 import java.util.concurrent.TimeUnit
 
 /**
@@ -314,7 +315,7 @@ object ClipboardSyncManager {
                                 }
                             }
                             if (imageBitmap != null) {
-                                val dataUrl = com.xzyht.notifyrelay.common.core.util.DataUrlUtils.bitmapToDataUri(imageBitmap)
+                                val dataUrl = DataUrlUtils.bitmapToDataUri(imageBitmap)
                                 // 从data URI中提取纯base64部分
                                 val commaIndex = dataUrl.indexOf(',')
                                 if (commaIndex > 0) {
@@ -354,7 +355,7 @@ object ClipboardSyncManager {
                     CLIPBOARD_TYPE_IMAGE -> {
                         // 构建完整的data URI
                         val dataUrl = "data:image/png;base64,$content"
-                        val bitmap = com.xzyht.notifyrelay.common.core.util.DataUrlUtils.decodeDataUrlToBitmap(dataUrl)
+                        val bitmap = DataUrlUtils.decodeDataUrlToBitmap(dataUrl)
                         if (bitmap != null) {
                             // 将Bitmap转换为文本，因为直接存储Bitmap在剪贴板中需要特殊处理
                             // 这里我们将图片转换为Base64字符串存储，其他应用可以解析

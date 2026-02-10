@@ -21,3 +21,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "NotifyRelay"
 include(":app")
+include(":data")
+include(":core")
+include(":base")

@@ -10,7 +10,6 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.Build
-import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
@@ -20,9 +19,6 @@ import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.R
 import com.xzyht.notifyrelay.common.core.sync.MessageSender
-import com.xzyht.notifyrelay.common.core.util.DataUrlUtils
-import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.common.data.StorageManager
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
@@ -37,8 +33,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import notifyrelay.core.util.DataUrlUtils
+import notifyrelay.core.util.Logger
+import notifyrelay.data.StorageManager
 import java.io.ByteArrayOutputStream
-import java.io.File
 
 class NotifyRelayNotificationListenerService : NotificationListenerService() {
     companion object {

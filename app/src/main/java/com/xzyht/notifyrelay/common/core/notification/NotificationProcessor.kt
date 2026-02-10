@@ -1,13 +1,13 @@
 package com.xzyht.notifyrelay.common.core.notification
 
 import android.content.Context
-import com.xzyht.notifyrelay.common.core.util.Logger
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import notifyrelay.core.util.Logger
 
 /**
  * 远程通知处理管线（单条通知级别，不负责网络收发）。

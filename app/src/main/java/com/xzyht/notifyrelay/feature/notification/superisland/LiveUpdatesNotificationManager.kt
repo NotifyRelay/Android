@@ -9,7 +9,7 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.text.HtmlCompat
-import com.xzyht.notifyrelay.common.core.util.Logger
+import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.parseParamV2
 import kotlinx.coroutines.CoroutineScope

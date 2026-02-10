@@ -4,9 +4,9 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import com.xzyht.notifyrelay.common.core.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.common.core.sync.ServerLineRouter
-import com.xzyht.notifyrelay.common.core.util.EncryptionManager
-import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.common.data.StorageManager
+import notifyrelay.core.util.EncryptionManager
+import notifyrelay.core.util.Logger
+import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -14,6 +14,9 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import notifyrelay.core.util.AppConfig
+import notifyrelay.data.database.entity.DeviceEntity
+import notifyrelay.data.database.repository.DatabaseRepository
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.ServerSocket
@@ -144,7 +147,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private fun loadAuthedDevices() {
         // 从Room数据库加载设备信息
         val devices = kotlinx.coroutines.runBlocking {
-            com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context).getDevices()
+            DatabaseRepository.getInstance(context).getDevices()
         }
         
         for (device in devices) {
@@ -184,12 +187,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private fun saveAuthedDevices() {
         try {
             // 保存到Room数据库
-            val deviceEntities = mutableListOf<com.xzyht.notifyrelay.common.data.database.entity.DeviceEntity>()
+            val deviceEntities = mutableListOf<DeviceEntity>()
             for ((uuid, auth) in authenticatedDevices) {
                 if (auth.isAccepted) {
                     val name = auth.displayName ?: deviceInfoCache[uuid]?.displayName ?: DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid)
                     val info = deviceInfoCache[uuid]
-                    val deviceEntity = com.xzyht.notifyrelay.common.data.database.entity.DeviceEntity(
+                    val deviceEntity = DeviceEntity(
                         uuid = uuid,
                         publicKey = auth.publicKey,
                         sharedSecret = auth.sharedSecret,
@@ -204,7 +207,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             
             // 异步保存到数据库
             coroutineScope.launch {
-                val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+                val repository = DatabaseRepository.getInstance(context)
                 
                 // 获取当前数据库中的所有设备
                 val currentDevices = repository.getDevices()
@@ -377,10 +380,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // 使用AppConfig管理UDP发现配置
     var udpDiscoveryEnabled: Boolean
         get() {
-            return com.xzyht.notifyrelay.common.core.util.AppConfig.getUdpDiscoveryEnabled(context)
+            return AppConfig.getUdpDiscoveryEnabled(context)
         }
         set(value) {
-            com.xzyht.notifyrelay.common.core.util.AppConfig.setUdpDiscoveryEnabled(context, value)
+            AppConfig.setUdpDiscoveryEnabled(context, value)
         }
 
     init {
@@ -404,8 +407,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // 私钥可临时
         localPrivateKey = UUID.randomUUID().toString().replace("-", "")
         // 兼容旧用户：首次运行时如无保存则默认true
-        if (!com.xzyht.notifyrelay.common.core.util.AppConfig.getUdpDiscoveryEnabled(context)) {
-            com.xzyht.notifyrelay.common.core.util.AppConfig.setUdpDiscoveryEnabled(context, true)
+        if (!AppConfig.getUdpDiscoveryEnabled(context)) {
+            AppConfig.setUdpDiscoveryEnabled(context, true)
         }
         loadAuthedDevices()
         // 新增：初始补全本机 deviceInfoCache，便于反向 connectToDevice
@@ -840,7 +843,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 if (authenticatedDevices.containsKey(uuid)) {
                     // 直接从数据库中删除设备
                     coroutineScope.launch {
-                        val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+                        val repository = DatabaseRepository.getInstance(context)
                         repository.deleteDeviceByUuid(uuid)
                     }
                     

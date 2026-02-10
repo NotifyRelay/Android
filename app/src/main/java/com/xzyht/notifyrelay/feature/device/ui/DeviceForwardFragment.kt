@@ -22,7 +22,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.common.core.repository.AppRepository
-import com.xzyht.notifyrelay.common.data.StorageManager
+import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.ui.filter.UILocalFilter

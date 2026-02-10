@@ -7,17 +7,18 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecordEntity
-import com.xzyht.notifyrelay.common.core.util.Logger
+import notifyrelay.core.util.Logger
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import notifyrelay.data.database.repository.DatabaseRepository
 
 class NotificationRecordStore(private val context: Context) {
     // 数据库仓库实例
-    private val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+    private val repository = DatabaseRepository.getInstance(context)
     
     // 转换方法：将旧的NotificationRecordEntity转换为新的Room实体
-    private fun convertToRoomEntity(old: NotificationRecordEntity, deviceUuid: String): com.xzyht.notifyrelay.common.data.database.entity.NotificationRecordEntity {
-        return com.xzyht.notifyrelay.common.data.database.entity.NotificationRecordEntity(
+    private fun convertToRoomEntity(old: NotificationRecordEntity, deviceUuid: String): notifyrelay.data.database.entity.NotificationRecordEntity {
+        return notifyrelay.data.database.entity.NotificationRecordEntity(
             key = old.key,
             deviceUuid = deviceUuid,
             packageName = old.packageName,
@@ -29,7 +30,7 @@ class NotificationRecordStore(private val context: Context) {
     }
     
     // 转换方法：将新的Room实体转换为旧的NotificationRecordEntity
-    private fun convertFromRoomEntity(new: com.xzyht.notifyrelay.common.data.database.entity.NotificationRecordEntity): NotificationRecordEntity {
+    private fun convertFromRoomEntity(new: notifyrelay.data.database.entity.NotificationRecordEntity): NotificationRecordEntity {
         return NotificationRecordEntity(
             key = new.key,
             packageName = new.packageName,
@@ -170,7 +171,7 @@ object NotificationRepository {
             Logger.i("秩序之光 狂鼠 NotifyRelay", "写入远端历史 device=$device, size=${oldList.size}")
             
             // 限制每个包名的通知数量为80
-            val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
             }
@@ -257,7 +258,7 @@ object NotificationRepository {
             }
             
             // 限制每个包名的通知数量为80
-            val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
             }
@@ -288,7 +289,7 @@ object NotificationRepository {
     fun scanDeviceList(context: Context) {
         // 从Room数据库中获取所有已认证设备
         val allDevicesFromDb = runBlocking {
-            com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context).getDevices()
+            DatabaseRepository.getInstance(context).getDevices()
         }
         
         // 添加本机设备
@@ -515,7 +516,7 @@ object NotificationRepository {
     private suspend fun cleanupOldNotifications(context: Context) {
         try {
             Logger.i("NotifyRelay", "开始清理历史通知")
-            val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             
             // 获取所有设备的列表
             val devices = deviceList

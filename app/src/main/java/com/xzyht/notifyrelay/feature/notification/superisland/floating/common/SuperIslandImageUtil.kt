@@ -5,7 +5,6 @@ import android.graphics.Bitmap
 import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
@@ -13,8 +12,8 @@ import androidx.compose.ui.graphics.painter.Painter
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import coil.request.SuccessResult
-import com.xzyht.notifyrelay.common.core.util.DataUrlUtils
-import com.xzyht.notifyrelay.common.core.util.Logger
+import notifyrelay.core.util.DataUrlUtils
+import notifyrelay.core.util.Logger
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import coil.ImageLoader as CoilImageLoader
 

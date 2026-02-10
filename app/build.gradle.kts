@@ -215,6 +215,13 @@ dependencies {
     implementation("com.jakewharton:disklrucache:2.0.2")
     // 添加Apache FtpServer依赖用于FTP服务器实现
     implementation(libs.apache.ftpserver)
+    
+    // 依赖数据模块
+    implementation(project(":data"))
+    // 依赖core模块
+    implementation(project(":core"))
+    // 依赖base模块
+    implementation(project(":base"))
 }
 
 tasks.register("printVersionName") {

@@ -37,10 +37,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
-import com.xzyht.notifyrelay.common.core.util.BatteryIconConverter
-import com.xzyht.notifyrelay.common.core.util.BatteryUtils
-import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
-import com.xzyht.notifyrelay.common.core.util.ToastUtils
+import notifyrelay.core.util.BatteryIconConverter
+import notifyrelay.core.util.BatteryUtils
+import notifyrelay.core.util.DoubleClickConfirmButton
+import notifyrelay.core.util.ToastUtils
 import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo

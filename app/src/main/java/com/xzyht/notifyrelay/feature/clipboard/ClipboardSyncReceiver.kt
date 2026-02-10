@@ -4,9 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
-import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.common.core.util.ToastUtils
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import notifyrelay.core.util.Logger
+import notifyrelay.core.util.ToastUtils
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 
 /**

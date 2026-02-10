@@ -5,11 +5,10 @@ import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import com.xzyht.notifyrelay.common.core.cache.IconCacheManager
 import com.xzyht.notifyrelay.common.core.repository.AppRepository.loadApps
-import com.xzyht.notifyrelay.common.core.repository.AppListHelper
-import com.xzyht.notifyrelay.common.core.util.Logger
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import notifyrelay.core.util.Logger
 
 /**
  * 应用数据仓库。

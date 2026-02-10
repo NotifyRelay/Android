@@ -1,7 +1,8 @@
 package com.xzyht.notifyrelay.common.core.sync
 
 import android.content.Context
-import com.xzyht.notifyrelay.common.core.util.Logger
+import notifyrelay.core.util.Logger
+import notifyrelay.core.util.ToastUtils
 import org.apache.ftpserver.FtpServer
 import org.apache.ftpserver.FtpServerFactory
 import org.apache.ftpserver.ftplet.Authority
@@ -121,7 +122,7 @@ object ftpServer {
                 Logger.w(TAG, "FTP 服务需要文件管理权限，当前未授权")
                 // 在UI线程中显示Toast提示用户
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
-                    com.xzyht.notifyrelay.common.core.util.ToastUtils.showShortToast(context, "FTP 服务需要文件管理权限，当前仅能查看文件层级")
+                    ToastUtils.showShortToast(context, "FTP 服务需要文件管理权限，当前仅能查看文件层级")
                 }
                 // 即使没有文件权限，也继续启动FTP服务，PC端可以获取文件层级
             }
@@ -215,10 +216,10 @@ object ftpServer {
                 ftpServer = null
                 isRunning.set(false)
                 serverInfo = null
-                com.xzyht.notifyrelay.common.core.util.Logger.i(TAG, "FTP server stopped")
+                Logger.i(TAG, "FTP server stopped")
             }
         } catch (e: Exception) {
-            com.xzyht.notifyrelay.common.core.util.Logger.e(TAG, "Failed to stop FTP server", e)
+            Logger.e(TAG, "Failed to stop FTP server", e)
         }
     }
 
@@ -239,7 +240,7 @@ object ftpServer {
             }
             null
         } catch (e: Exception) {
-            com.xzyht.notifyrelay.common.core.util.Logger.e(TAG, "Failed to get device IP address", e)
+            Logger.e(TAG, "Failed to get device IP address", e)
             null
         }
     }

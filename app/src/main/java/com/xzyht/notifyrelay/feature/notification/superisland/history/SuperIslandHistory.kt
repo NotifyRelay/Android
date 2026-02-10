@@ -3,8 +3,8 @@ package com.xzyht.notifyrelay.feature.notification.superisland.history
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.xzyht.notifyrelay.common.data.database.entity.SuperIslandHistoryEntity
-import com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository
+import notifyrelay.data.database.entity.SuperIslandHistoryEntity
+import notifyrelay.data.database.repository.DatabaseRepository
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

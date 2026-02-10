@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.common.core.sync
 
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.common.core.util.BatteryUtils
+import notifyrelay.core.util.BatteryUtils
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter

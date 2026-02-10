@@ -1,10 +1,12 @@
 package com.xzyht.notifyrelay.common.core.sync
 
 import android.content.Context
-import com.xzyht.notifyrelay.common.core.util.Logger
+import notifyrelay.core.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.launch
+import notifyrelay.core.util.BatteryUtils
+import notifyrelay.core.util.EncryptionManager
 import java.io.BufferedReader
 import java.io.OutputStreamWriter
 import java.net.Socket
@@ -131,7 +133,7 @@ object ServerLineRouter {
                     deviceManager.handshakeRequestHandler!!.onHandshakeRequest(remoteDevice, remotePubKey) { accepted ->
                         if (accepted) {
                             // 用户点击“接受”：生成共享密钥并写入认证表
-                            val sharedSecret = com.xzyht.notifyrelay.common.core.util.EncryptionManager.generateSharedSecret(deviceManager.localPublicKey, remotePubKey)
+                            val sharedSecret = EncryptionManager.generateSharedSecret(deviceManager.localPublicKey, remotePubKey)
                             synchronized(deviceManager.authenticatedDevices) {
                                 deviceManager.authenticatedDevices.remove(remoteUuid)
                                 deviceManager.authenticatedDevices[remoteUuid] = com.xzyht.notifyrelay.feature.device.service.AuthInfo(
@@ -270,8 +272,8 @@ object ServerLineRouter {
 
     private fun getLocalBatteryInfo(deviceManager: DeviceConnectionManager): String {
         return try {
-            val batteryLevel = com.xzyht.notifyrelay.common.core.util.BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
-            val isCharging = com.xzyht.notifyrelay.common.core.util.BatteryUtils.isCharging(deviceManager.contextInternal)
+            val batteryLevel = BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+            val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
             if (isCharging) "$batteryLevel+" else "$batteryLevel"
         } catch (_: Exception) {
             ""
