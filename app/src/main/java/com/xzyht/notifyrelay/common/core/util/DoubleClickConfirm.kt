@@ -100,7 +100,11 @@ fun DoubleClickConfirmButton(
     ) {
         Text(
             text = if (state.isConfirming) confirmText else text,
-            color = Color.White,
+            color = if (state.isConfirming) {
+                confirmTextColor ?: Color.White
+            } else {
+                textColor ?: Color.White
+            },
             style = top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles.body2
         )
     }
