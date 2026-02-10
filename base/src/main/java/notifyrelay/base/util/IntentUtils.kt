@@ -1,4 +1,4 @@
-package notifyrelay.core.util
+package notifyrelay.base.util
 
 import android.content.Context
 import android.content.Intent
@@ -118,5 +118,3 @@ object IntentUtils {
         return intent
     }
 }
-
-

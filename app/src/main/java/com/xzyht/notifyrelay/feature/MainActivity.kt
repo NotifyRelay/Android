@@ -45,7 +45,7 @@ import com.xzyht.notifyrelay.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.common.PermissionHelper
 import com.xzyht.notifyrelay.common.SetupSystemBars
 import com.xzyht.notifyrelay.common.core.repository.AppRepository
-import notifyrelay.core.util.IntentUtils
+import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.data.config.DeviceInfoManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager

@@ -11,6 +11,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.base.util.IntentUtils
 
 /**
  * 权限辅助工具类
@@ -280,10 +281,7 @@ object PermissionHelper {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
             intent.data = android.net.Uri.parse("package:${context.packageName}")
-            if (context !is Activity) {
-                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
+            IntentUtils.startActivity(context, intent, context !is Activity)
         }
     }
 

@@ -9,7 +9,7 @@ import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.FAILED
 import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.PERMISSION_DENIED
 import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.PORT_IN_USE
 import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.SUCCESS
-import notifyrelay.core.util.IntentUtils
+import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.GuideActivity
 import com.xzyht.notifyrelay.common.core.notification.StatusProcessor
