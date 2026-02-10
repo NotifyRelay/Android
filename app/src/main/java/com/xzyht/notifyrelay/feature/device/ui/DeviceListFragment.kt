@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
@@ -38,8 +39,8 @@ import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.common.core.util.BatteryIconConverter
 import com.xzyht.notifyrelay.common.core.util.BatteryUtils
-import com.xzyht.notifyrelay.common.core.util.ToastUtils
 import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
+import com.xzyht.notifyrelay.common.core.util.ToastUtils
 import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
@@ -414,8 +415,9 @@ fun DeviceListScreen() {
                         GlobalSelectedDeviceHolder.selectedDevice = null
                     },
                     modifier = Modifier
-                        .defaultMinSize(minHeight = buttonMinHeight)
-                        .heightIn(min = buttonMinHeight),
+                        .defaultMinSize(minHeight = buttonMinHeight, minWidth = 60.dp)
+                        .heightIn(min = buttonMinHeight)
+                        .widthIn(min = 60.dp),
                     colors = ButtonDefaults.buttonColors(color = Color.Red),
                     confirmColors = ButtonDefaults.buttonColors(color = Color(0xFFFF0000)), // 更亮的红色
                     textColor = Color.White,
