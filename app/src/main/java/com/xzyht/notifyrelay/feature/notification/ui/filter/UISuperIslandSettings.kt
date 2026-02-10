@@ -47,7 +47,7 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import notifyrelay.core.util.DataUrlUtils
 import notifyrelay.core.util.Logger
-import notifyrelay.core.util.DoubleClickConfirmButton
+import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
 import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil

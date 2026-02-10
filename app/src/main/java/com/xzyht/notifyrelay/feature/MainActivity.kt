@@ -45,11 +45,11 @@ import com.xzyht.notifyrelay.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.common.PermissionHelper
 import com.xzyht.notifyrelay.common.SetupSystemBars
 import com.xzyht.notifyrelay.common.core.repository.AppRepository
-import com.xzyht.notifyrelay.common.core.util.IntentUtils
+import notifyrelay.core.util.IntentUtils
 import notifyrelay.base.util.Logger
-import notifyrelay.base.util.DeviceInfoManager
+import notifyrelay.data.config.DeviceInfoManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import notifyrelay.base.util.ServiceManager
+import notifyrelay.core.util.ServiceManager
 import notifyrelay.base.util.ToastUtils
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.ui.DeviceForwardFragment

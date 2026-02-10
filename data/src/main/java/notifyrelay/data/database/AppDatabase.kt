@@ -169,9 +169,7 @@ abstract class AppDatabase : RoomDatabase() {
                 // 清理旧存储文件
                 MigrationHelper.cleanupLegacyStorage(context)
             } catch (e: Exception) {
-                if (BuildConfig.DEBUG) {
-                   Logger.e("AppDatabase", "迁移失败: ${e.message}", e)
-                }
+                Logger.e("AppDatabase", "迁移失败: ${e.message}", e)
             }
         }
     }

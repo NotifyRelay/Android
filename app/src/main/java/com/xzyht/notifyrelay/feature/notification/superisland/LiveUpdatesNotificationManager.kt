@@ -314,7 +314,12 @@ object LiveUpdatesNotificationManager {
             val multiProgressInfo = paramV2.multiProgressInfo
             
             // 与官方示例保持一致：先获取基础样式，再增量添加图标和进度
-            val progressStyle = buildBaseProgressStyle(paramV2)
+            val progressStyle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                buildBaseProgressStyle(paramV2)
+            } else {
+                // 在低 API 级别上使用简单的 ProgressStyle
+                NotificationCompat.ProgressStyle()
+            }
             
             // 设置进度图标（如果有）
             progressIcon?.let {
@@ -575,8 +580,12 @@ object LiveUpdatesNotificationManager {
             }
             
             // 与官方示例保持一致：先获取基础样式，再进行增量修改
-            val progressStyle = buildBaseProgressStyle(paramV2)
-                .setProgress(progressInfo.progress)
+            val progressStyle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                buildBaseProgressStyle(paramV2).setProgress(progressInfo.progress)
+            } else {
+                // 在低 API 级别上使用简单的 ProgressStyle
+                NotificationCompat.ProgressStyle().setProgress(progressInfo.progress)
+            }
             
             // 直接调用builder.setStyle方法，符合官方示例的API使用
             return builder.setStyle(progressStyle)
@@ -626,7 +635,12 @@ object LiveUpdatesNotificationManager {
             }
             
             // 与官方示例保持一致：先获取基础样式，再增量添加图标和进度
-            val progressStyle = buildBaseProgressStyle(paramV2)
+            val progressStyle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                buildBaseProgressStyle(paramV2)
+            } else {
+                // 在低 API 级别上使用简单的 ProgressStyle
+                NotificationCompat.ProgressStyle()
+            }
                 .setProgressTrackerIcon(IconCompat.createWithBitmap(progressIcon))
                 .setProgress(progressInfo.progress)
             

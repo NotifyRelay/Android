@@ -14,7 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import notifyrelay.core.util.AppConfig
+import notifyrelay.data.config.AppConfig
 import notifyrelay.data.database.entity.DeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 import java.io.BufferedReader
@@ -794,18 +794,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 if (deviceInfo == null) {
                     deviceInfo = pair.first
                 }
-                
-                // 如果还是没有，从认证信息中构建
-                if (deviceInfo == null) {
-                    val auth = authSnapshot[uuid]
-                    if (auth != null) {
-                        val name = auth.displayName ?: "已认证设备"
-                        val ip = auth.lastIp ?: ""
-                        val port = auth.lastPort ?: listenPort
-                        deviceInfo = DeviceInfo(uuid, name, ip, port)
-                    }
-                }
-                
+
                 Logger.d("死神-NotifyRelay", "[getAuthenticatedOnlineDevices] 在线且已认证设备: $uuid, name=${deviceInfo?.displayName}, ip=${deviceInfo?.ip}")
                 deviceInfo
             }

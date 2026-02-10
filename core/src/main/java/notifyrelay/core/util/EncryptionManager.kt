@@ -1,9 +1,6 @@
 package notifyrelay.core.util
 
 import android.util.Base64
-import notifyrelay.base.util.EncryptionManager.AESEncryption.generateSharedSecret
-import notifyrelay.base.util.EncryptionManager.AESEncryption.keyToString
-import notifyrelay.base.util.EncryptionManager.setEncryptionType
 import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator

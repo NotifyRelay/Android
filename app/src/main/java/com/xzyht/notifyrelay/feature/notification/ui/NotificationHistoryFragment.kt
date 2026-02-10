@@ -51,7 +51,7 @@ import com.xzyht.notifyrelay.common.core.sync.MessageSender
 import notifyrelay.core.util.IntentUtils
 import notifyrelay.core.util.Logger
 import notifyrelay.core.util.ToastUtils
-import notifyrelay.core.util.DoubleClickConfirmButton
+import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.feature.GuideActivity
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.ui.GlobalSelectedDeviceHolder

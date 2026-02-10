@@ -9,14 +9,12 @@ import notifyrelay.data.StorageManager
 import notifyrelay.data.database.entity.AppConfigEntity
 import notifyrelay.data.database.entity.DeviceEntity
 import notifyrelay.data.database.entity.NotificationRecordEntity
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory.SuperIslandHistoryEntry
 import notifyrelay.data.database.dao.AppConfigDao
 import notifyrelay.data.database.dao.DeviceDao
 import notifyrelay.data.database.dao.NotificationRecordDao
 import notifyrelay.data.database.dao.SuperIslandHistoryDao
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import org.json.JSONArray
-import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecordEntity as OldNotificationRecordEntity
 
 /**
  * 迁移帮助类
@@ -127,8 +125,8 @@ object MigrationHelper {
                 
                 // 读取文件内容
                 val jsonContent = file.readText()
-                val typeToken = object : TypeToken<List<OldNotificationRecordEntity>>() {}
-                val oldRecords = gson.fromJson<List<OldNotificationRecordEntity>>(jsonContent, typeToken.type)
+                val typeToken = object : TypeToken<List<Map<String, Any>>>() {}
+                val oldRecords = gson.fromJson<List<Map<String, Any>>>(jsonContent, typeToken.type)
                 
                 // 转换为Room实体
                 for (oldRecord in oldRecords) {
@@ -154,13 +152,13 @@ object MigrationHelper {
                     // 转换为新实体
                     notificationEntities.add(
                         NotificationRecordEntity(
-                            key = oldRecord.key,
+                            key = oldRecord["key"] as? String ?: "",
                             deviceUuid = deviceUuid,
-                            packageName = oldRecord.packageName,
-                            appName = oldRecord.appName,
-                            title = oldRecord.title,
-                            text = oldRecord.text,
-                            time = oldRecord.time
+                            packageName = oldRecord["packageName"] as? String ?: "",
+                            appName = oldRecord["appName"] as? String,
+                            title = oldRecord["title"] as? String,
+                            text = oldRecord["text"] as? String,
+                            time = (oldRecord["time"] as? Number)?.toLong() ?: 0
                         )
                     )
                 }
@@ -204,7 +202,7 @@ object MigrationHelper {
         
         try {
             // 从旧存储读取超级岛历史记录
-            val oldHistoryTypeToken = object : TypeToken<List<SuperIslandHistoryEntry>>() {}
+            val oldHistoryTypeToken = object : TypeToken<List<Map<String, Any>>>() {}
             val oldHistory = PersistenceManager.readNotificationRecords(
                 context,
                 "super_island_history",
@@ -212,19 +210,23 @@ object MigrationHelper {
             )
             
             // 转换为Room实体
-            val entities = oldHistory.map { oldEntry ->
-                SuperIslandHistoryEntity(
-                    id = oldEntry.id,
-                    sourceDeviceUuid = oldEntry.sourceDeviceUuid,
-                    originalPackage = oldEntry.originalPackage,
-                    mappedPackage = oldEntry.mappedPackage,
-                    appName = oldEntry.appName,
-                    title = oldEntry.title,
-                    text = oldEntry.text,
-                    paramV2Raw = oldEntry.paramV2Raw,
-                    picMap = gson.toJson(oldEntry.picMap),
-                    rawPayload = oldEntry.rawPayload
-                )
+            val entities = oldHistory.mapNotNull { oldEntry ->
+                try {
+                    SuperIslandHistoryEntity(
+                        id = (oldEntry["id"] as? Number)?.toLong() ?: System.currentTimeMillis(),
+                        sourceDeviceUuid = oldEntry["sourceDeviceUuid"] as? String ?: "",
+                        originalPackage = oldEntry["originalPackage"] as? String ?: "",
+                        mappedPackage = oldEntry["mappedPackage"] as? String ?: "",
+                        appName = oldEntry["appName"] as? String,
+                        title = oldEntry["title"] as? String,
+                        text = oldEntry["text"] as? String,
+                        paramV2Raw = oldEntry["paramV2Raw"] as? String,
+                        picMap = oldEntry["picMap"]?.let { gson.toJson(it) } ?: "{}",
+                        rawPayload = oldEntry["rawPayload"] as? String
+                    )
+                } catch (e: Exception) {
+                    null
+                }
             }
             
             // 插入到数据库

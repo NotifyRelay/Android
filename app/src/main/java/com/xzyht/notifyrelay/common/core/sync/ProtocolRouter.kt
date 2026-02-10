@@ -17,7 +17,7 @@ import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import kotlinx.coroutines.launch
-import notifyrelay.core.util.MediaControlUtil
+import com.xzyht.notifyrelay.common.core.util.MediaControlUtil
 import org.json.JSONObject
 
 /**
