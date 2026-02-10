@@ -44,7 +44,7 @@ object ClipboardLogDetector {
         
         try {
             // 检查应用是否处于前台
-            val isForeground = com.xzyht.notifyrelay.common.PermissionHelper.isAppInForeground(context)
+            val isForeground = notifyrelay.base.util.PermissionHelper.isAppInForeground(context)
             if (!isForeground) {
                 Logger.d(TAG, "应用未处于前台，无法启动日志监听")
                 isMonitoring.set(false)

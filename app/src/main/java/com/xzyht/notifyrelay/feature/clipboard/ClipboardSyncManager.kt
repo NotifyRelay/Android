@@ -6,7 +6,7 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import com.xzyht.notifyrelay.common.PermissionHelper
+import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.common.core.sync.ProtocolSender
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager

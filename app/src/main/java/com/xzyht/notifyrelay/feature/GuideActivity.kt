@@ -44,7 +44,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import com.xzyht.notifyrelay.common.NotifyRelayTheme
-import com.xzyht.notifyrelay.common.PermissionHelper
+import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.common.SetupSystemBars
 import com.xzyht.notifyrelay.common.core.repository.AppListHelper
 import notifyrelay.base.util.IntentUtils

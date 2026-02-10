@@ -42,7 +42,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import com.xzyht.notifyrelay.common.NotifyRelayTheme
-import com.xzyht.notifyrelay.common.PermissionHelper
+import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.common.SetupSystemBars
 import com.xzyht.notifyrelay.common.core.repository.AppRepository
 import notifyrelay.base.util.IntentUtils
