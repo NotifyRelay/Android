@@ -10,8 +10,8 @@ import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import notifyrelay.core.util.IntentUtils
-import notifyrelay.core.util.Logger
-import notifyrelay.core.util.ToastUtils
+import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
 
 /**
  * 权限辅助工具类

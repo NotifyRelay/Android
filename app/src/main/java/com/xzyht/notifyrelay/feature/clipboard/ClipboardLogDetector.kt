@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.clipboard
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

@@ -10,7 +10,7 @@ import android.provider.Settings
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import notifyrelay.core.util.DataUrlUtils
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import org.json.JSONObject
 

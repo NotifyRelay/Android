@@ -7,7 +7,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecordEntity
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
 import notifyrelay.data.database.repository.DatabaseRepository

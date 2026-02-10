@@ -49,8 +49,8 @@ import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.common.core.repository.AppRepository
 import com.xzyht.notifyrelay.common.core.sync.MessageSender
 import notifyrelay.core.util.IntentUtils
-import notifyrelay.core.util.Logger
-import notifyrelay.core.util.ToastUtils
+import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
 import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.feature.GuideActivity
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository

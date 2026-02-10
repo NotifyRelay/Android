@@ -8,7 +8,7 @@ import com.xzyht.notifyrelay.common.core.repository.AppRepository.loadApps
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 
 /**
  * 应用数据仓库。

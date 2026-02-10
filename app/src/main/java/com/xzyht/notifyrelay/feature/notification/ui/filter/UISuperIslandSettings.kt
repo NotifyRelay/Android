@@ -46,7 +46,7 @@ import com.xzyht.notifyrelay.common.core.repository.AppRepository
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import notifyrelay.core.util.DataUrlUtils
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
 import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager

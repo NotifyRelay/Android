@@ -5,7 +5,7 @@ import androidx.core.content.ContextCompat
 import com.xzyht.notifyrelay.common.core.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.common.core.sync.ServerLineRouter
 import notifyrelay.core.util.EncryptionManager
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
 import kotlinx.coroutines.CoroutineScope

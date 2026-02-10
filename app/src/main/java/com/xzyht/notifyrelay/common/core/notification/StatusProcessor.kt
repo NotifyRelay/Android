@@ -4,8 +4,8 @@ import android.content.Context
 import com.xzyht.notifyrelay.common.core.sync.MessageSender
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import kotlinx.coroutines.CoroutineScope
-import notifyrelay.core.util.Logger
-import notifyrelay.core.util.ToastUtils
+import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
 import org.json.JSONObject
 
 /**

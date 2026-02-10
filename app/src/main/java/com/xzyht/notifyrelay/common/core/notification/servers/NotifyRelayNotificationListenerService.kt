@@ -34,7 +34,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.core.util.DataUrlUtils
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import java.io.ByteArrayOutputStream
 

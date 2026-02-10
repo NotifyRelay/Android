@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.device.repository
 import android.content.Context
 import androidx.compose.runtime.MutableState
 import com.xzyht.notifyrelay.common.core.repository.AppRepository
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 import kotlinx.coroutines.delay
 
 // 延迟去重缓存（10秒内）

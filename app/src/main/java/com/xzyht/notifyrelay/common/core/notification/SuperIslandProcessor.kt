@@ -10,7 +10,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.SuperIslandRemoteS
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 
 object SuperIslandProcessor {
     private const val TAG = "SuperIslandProcessor"

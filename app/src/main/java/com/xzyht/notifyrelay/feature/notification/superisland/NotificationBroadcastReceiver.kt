@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 
 class NotificationBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {

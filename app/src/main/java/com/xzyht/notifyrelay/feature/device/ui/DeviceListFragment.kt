@@ -40,7 +40,7 @@ import androidx.fragment.app.Fragment
 import notifyrelay.core.util.BatteryIconConverter
 import notifyrelay.core.util.BatteryUtils
 import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
-import notifyrelay.core.util.ToastUtils
+import notifyrelay.base.util.ToastUtils
 import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo

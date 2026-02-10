@@ -5,7 +5,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
 import android.os.Build
 import android.view.accessibility.AccessibilityEvent
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 
 /**
  * 剪贴板无障碍服务

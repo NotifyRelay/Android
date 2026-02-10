@@ -13,7 +13,7 @@ import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import notifyrelay.core.util.DataUrlUtils
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import coil.ImageLoader as CoilImageLoader
 

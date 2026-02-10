@@ -48,8 +48,8 @@ import com.xzyht.notifyrelay.common.PermissionHelper
 import com.xzyht.notifyrelay.common.SetupSystemBars
 import com.xzyht.notifyrelay.common.core.repository.AppListHelper
 import notifyrelay.core.util.IntentUtils
-import notifyrelay.core.util.Logger
-import notifyrelay.core.util.ToastUtils
+import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.BasicComponentColors

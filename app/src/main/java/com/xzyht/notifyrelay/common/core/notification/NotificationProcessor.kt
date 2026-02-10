@@ -7,7 +7,7 @@ import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 
 /**
  * 远程通知处理管线（单条通知级别，不负责网络收发）。

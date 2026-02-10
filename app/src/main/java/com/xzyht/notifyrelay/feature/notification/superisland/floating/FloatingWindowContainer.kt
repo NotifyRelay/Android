@@ -42,7 +42,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.Co
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandComposeRoot
 import org.json.JSONObject
 
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 
 /**
  * 浮窗条目数据类，对应原有EntryRecord

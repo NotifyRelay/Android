@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.common.core.repository
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 
 object AppListHelper {
     /**

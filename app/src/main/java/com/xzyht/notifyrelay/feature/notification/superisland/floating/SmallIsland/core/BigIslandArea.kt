@@ -1,6 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.core
 
-import notifyrelay.core.util.Logger
+import notifyrelay.base.util.Logger
 import org.json.JSONObject
 
 /**
