@@ -47,6 +47,14 @@ object AppRepository {
     private val _iconUpdates = MutableStateFlow<String?>(null)
     val iconUpdates: StateFlow<String?> = _iconUpdates.asStateFlow()
     
+    /**
+     * 通知UI层图标已更新
+     * @param packageName 应用包名
+     */
+    fun notifyIconUpdated(packageName: String) {
+        _iconUpdates.value = packageName
+    }
+    
     // 初始化数据库仓库
     private fun initDatabaseRepository(context: Context) {
         if (!::databaseRepository.isInitialized) {

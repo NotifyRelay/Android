@@ -95,7 +95,6 @@ object ToastDebounce {
 fun DeleteButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
     IconButton(
         onClick = {
-            //Logger.d("NotifyRelay", "轮胎: 删除按钮被点击")
             onClick()
         },
         modifier = modifier.fillMaxHeight().width(80.dp),
@@ -230,19 +229,21 @@ fun getAppNameAndIcon(context: android.content.Context, packageName: String?): P
             }
             
             // 使用统一的图标获取方法，自动处理本地和外部应用
-            // 先从内存缓存获取，不阻塞
-            icon = AppRepository.getAppIcon(packageName)
+            // 同步获取图标，确保返回时有图标
+            icon = AppRepository.getAppIconSync(context, packageName)
             
-            // 如果内存缓存中没有，尝试从持久化缓存加载（非阻塞）
+            // 如果同步获取失败，尝试异步加载并更新缓存
             if (icon == null) {
                 // 异步加载图标，不等待结果
-                    kotlinx.coroutines.GlobalScope.launch {
-                        val loadedIcon = AppRepository.getAppIconAsync(context, packageName)
-                        if (loadedIcon != null) {
-                            // 使用现有的公共方法缓存外部应用图标
-                            AppRepository.cacheExternalAppIcon(context, packageName, loadedIcon, "remote")
-                        }
+                kotlinx.coroutines.GlobalScope.launch {
+                    val loadedIcon = AppRepository.getAppIconAsync(context, packageName)
+                    if (loadedIcon != null) {
+                        // 使用现有的公共方法缓存外部应用图标
+                        AppRepository.cacheExternalAppIcon(context, packageName, loadedIcon, "remote")
+                        // 通知UI更新
+                        AppRepository.notifyIconUpdated(packageName)
                     }
+                }
             }
         } catch (_: Exception) {
             // 如果所有尝试都失败，使用包名和默认图标
