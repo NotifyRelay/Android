@@ -58,6 +58,7 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlinx.coroutines.delay
@@ -356,20 +357,9 @@ object GuideScreen {
                         enabled = true
                     )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
-                    SuperSwitch(
+                    SuperArrow(
                         title = "后台无限制权限 (可选)",
                         summary = if (hasBackgroundUnlimited) "已设置" else "用于确保应用在后台正常运行，防止被系统杀死",
-                        summaryColor = BasicComponentColors(
-                            color = Color(0xFF888888),
-                            disabledColor = Color(0xFFCCCCCC)
-                        ),
-                        checked = hasBackgroundUnlimited,
-                        onCheckedChange = {
-                            showToast("跳转到电池优化设置，请将应用设为无限制")
-                            val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                            intent.data = Uri.parse("package:${context.packageName}")
-                            IntentUtils.startActivity(context, intent, true)
-                        },
                         onClick = {
                             showToast("跳转到电池优化设置，请将应用设为无限制")
                             val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
@@ -379,25 +369,9 @@ object GuideScreen {
                         enabled = true
                     )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
-        BasicComponent(
-            title = "悬浮窗权限 (可选)",
-            summary = if (hasFloatNotification) "已授权：允许在其他应用上层显示悬浮窗" else "用于支持超级岛/悬浮岛复刻，提升通知交互体验",
-            summaryColor = BasicComponentColors(
-                color = Color(0xFF888888),
-                disabledColor = Color(0xFFCCCCCC)
-            ),
-            rightActions = {
-                if (hasFloatNotification) {
-                    Button(
-                        onClick = { showToast("悬浮窗已开启") },
-                        modifier = Modifier
-                            .defaultMinSize(minHeight = 32.dp)
-                            .padding(horizontal = 8.dp)
-                    ) {
-                        Text("已开启", fontSize = 14.sp)
-                    }
-                } else {
-                    Button(
+                    SuperArrow(
+                        title = "悬浮窗权限 (可选)",
+                        summary = if (hasFloatNotification) "已授权：允许在其他应用上层显示悬浮窗" else "用于支持超级岛/悬浮岛复刻，提升通知交互体验",
                         onClick = {
                             showToast("跳转悬浮窗权限设置")
                             try {
@@ -412,17 +386,18 @@ object GuideScreen {
                                 showToast("无法跳转悬浮窗设置，请手动在系统设置中允许悬浮窗权限")
                             }
                         },
-                        modifier = Modifier
-                            .defaultMinSize(minHeight = 32.dp)
-                            .padding(horizontal = 8.dp)
-                    ) {
-                        Text("开启悬浮窗", fontSize = 14.sp)
-                    }
-                }
-            },
-            enabled = true,
-            modifier = Modifier.padding(vertical = 0.dp)
-        )
+                        enabled = true
+                    )
+                    HorizontalDivider(color = dividerColor, thickness = 1.dp)
+                    SuperArrow(
+                        title = "自启动权限",
+                        summary = if (hasSelfStart) "已启用" else "必须启用，否则监听服务无法启动",
+                        onClick = {
+                            showToast("请在应用详情页启用自启动权限")
+                            IntentUtils.startActivity(context, Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null), true)
+                        },
+                        enabled = true
+                    )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
         BasicComponent(
             title = "敏感通知访问权限 (Android 15+，可选)",
@@ -469,21 +444,6 @@ object GuideScreen {
                 }
             }
         }
-                    HorizontalDivider(color = dividerColor, thickness = 1.dp)
-                    SuperSwitch(
-                        title = "自启动权限",
-                        summary = if (hasSelfStart) "已启用" else "必须启用，否则监听服务无法启动",
-                        checked = hasSelfStart,
-                        onCheckedChange = {
-                            showToast("请在应用详情页启用自启动权限")
-                            IntentUtils.startActivity(context, Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null), true)
-                        },
-                        onClick = {
-                            showToast("请在应用详情页启用自启动权限")
-                            IntentUtils.startActivity(context, Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null), true)
-                        },
-                        enabled = true
-                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     Button(onClick = {
                         if (permissionsGranted) {

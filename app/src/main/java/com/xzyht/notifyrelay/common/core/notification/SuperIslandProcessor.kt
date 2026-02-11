@@ -201,7 +201,7 @@ object SuperIslandProcessor {
                     sourceDeviceUuid = remoteUuid,
                     originalPackage = pkg,
                     mappedPackage = mappedPkg,
-                    appName = appName?.takeIf { it.isNotEmpty() },
+                    appName = appName.takeIf { it.isNotEmpty() },
                     title = finalTitle?.takeIf { it.isNotBlank() },
                     text = finalText?.takeIf { it.isNotBlank() },
                     paramV2Raw = mParam2?.takeIf { it.isNotBlank() },
