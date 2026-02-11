@@ -1,8 +1,15 @@
-package com.xzyht.notifyrelay.feature.device.ui
+package com.xzyht.notifyrelay.feature.fragment
 
+import android.app.Activity
+import android.content.Context
+import android.content.res.Configuration
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,6 +24,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -33,22 +41,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.Font
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
-import notifyrelay.core.util.BatteryIconConverter
-import notifyrelay.core.util.BatteryUtils
+import com.xzyht.notifyrelay.R
 import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
-import notifyrelay.base.util.ToastUtils
 import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.ui.dialog.ConnectDeviceDialog
-import com.xzyht.notifyrelay.feature.device.ui.dialog.HandshakeRequestDialog
-import com.xzyht.notifyrelay.feature.device.ui.dialog.RejectedDevicesDialog
+import com.xzyht.notifyrelay.feature.fragment.filter.dialog.ConnectDeviceDialog
+import com.xzyht.notifyrelay.feature.fragment.filter.dialog.HandshakeRequestDialog
+import com.xzyht.notifyrelay.feature.fragment.filter.dialog.RejectedDevicesDialog
+import notifyrelay.base.util.ToastUtils
+import notifyrelay.core.util.BatteryIconConverter
+import notifyrelay.core.util.BatteryUtils
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
+import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -68,7 +83,7 @@ object GlobalSelectedDeviceHolder {
         // 这样可在任意Compose页面通过 GlobalSelectedDeviceHolder.current().value 响应式获取
         rememberUpdatedState(_selectedDevice)
         // 由于mutableStateOf已全局可观察，直接返回即可
-        return androidx.compose.runtime.remember { object : State<DeviceInfo?> {
+        return remember { object : State<DeviceInfo?> {
             override val value: DeviceInfo? get() = _selectedDevice
         } }
     }
@@ -82,10 +97,10 @@ object GlobalSelectedDeviceHolder {
  */
 class DeviceListFragment : Fragment() {
     override fun onCreateView(
-        inflater: android.view.LayoutInflater,
-        container: android.view.ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): android.view.View {
+    ): View {
         //Logger.d("NotifyRelay", "[UI] DeviceListFragment onCreateView called")
         return ComposeView(requireContext()).apply {
             setContent {
@@ -103,7 +118,7 @@ fun DeviceListScreen() {
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
-    val deviceManager = remember { com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton.getDeviceManager(context) }
+    val deviceManager = remember { DeviceConnectionManagerSingleton.getDeviceManager(context) }
     // 手动发现/心跳等提示完全交由后端处理，前端不再注册回调
     // 拒绝设备弹窗状态（需提前声明，供下方 LaunchedEffect、rejectedDevices 使用）
     var showRejectedDialog by remember { mutableStateOf(false) }
@@ -193,8 +208,8 @@ fun DeviceListScreen() {
         }
     }
 
-    val configuration = androidx.compose.ui.platform.LocalConfiguration.current
-    val isLandscape = configuration.orientation == android.content.res.Configuration.ORIENTATION_LANDSCAPE
+    val configuration = LocalConfiguration.current
+    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     fun isAuthed(uuid: String) = authedDeviceUuids.contains(uuid)
 
@@ -227,7 +242,7 @@ fun DeviceListScreen() {
                 style = textStyles.body2,
                 modifier = Modifier.weight(1f)
             )
-            top.yukonga.miuix.kmp.basic.Switch(
+            Switch(
                 checked = udpDiscoveryEnabled,
                 onCheckedChange = { toggleUdpDiscovery(it) }
             )
@@ -242,7 +257,7 @@ fun DeviceListScreen() {
 
         // 获取本机充电状态，使用三态字符：'1'充电，'0'未充电，'*'未知
         val isCharging = remember {
-            androidx.compose.runtime.mutableStateOf(if (BatteryUtils.isCharging(context)) '1' else '0')
+            mutableStateOf(if (BatteryUtils.isCharging(context)) '1' else '0')
         }
 
         // 获取电池图标（BatteryIconConverter 接受 chargingState: Char）
@@ -287,7 +302,7 @@ fun DeviceListScreen() {
                     Text(
                         text = "本机",
                         style = textStyles.body2.copy(color = if (selectedDevice == null) colorScheme.onPrimary else colorScheme.primary),
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
             }
@@ -370,7 +385,7 @@ fun DeviceListScreen() {
                             // 电池图标
                             Text(
                                 text = batteryIcon,
-                                fontFamily = androidx.compose.ui.text.font.FontFamily(androidx.compose.ui.text.font.Font(resId = com.xzyht.notifyrelay.R.font.segsmdl2)),
+                                fontFamily = FontFamily(Font(resId = R.font.segsmdl2)),
                                 fontSize = 16.sp,
                                 color = BatteryIconConverter.getBatteryColor(batteryLevel.value),
                                 modifier = Modifier.padding(end = 8.dp)
@@ -380,7 +395,7 @@ fun DeviceListScreen() {
                         Text(
                             text = device.displayName + if (!isOnline) " (离线)" else "",
                             style = textStyles.body2.copy(color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else colorScheme.primary),
-                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis
                         )
                     }
                 }
@@ -443,7 +458,7 @@ fun DeviceListScreen() {
             Text(
                 device.displayName + if (!isOnline) " (离线)" else "",
                 style = textStyles.body2.copy(color = colorScheme.primary),
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -463,7 +478,7 @@ fun DeviceListScreen() {
             Text(
                 "查看已拒绝设备",
                 style = textStyles.body2.copy(color = colorScheme.secondary),
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis
             )
         }
     }
@@ -507,7 +522,7 @@ fun DeviceListScreen() {
             // UDP广播开关
             UdpDiscoverySwitch()
             // 设备列表横排，顺序：本机、已认证、未认证、已拒绝
-            androidx.compose.foundation.lazy.LazyRow(
+            LazyRow(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.Top, // 改为顶部对齐，避免进度条被裁剪
             ) {
@@ -532,7 +547,7 @@ fun DeviceListScreen() {
 
     // 连接设备弹窗
     if (showConnectDialog && pendingConnectDevice != null) {
-        val activity = LocalContext.current as? android.app.Activity
+        val activity = LocalContext.current as? Activity
         val showDialog = remember { mutableStateOf(true) }
         ConnectDeviceDialog(
             showDialog = showDialog,
@@ -556,9 +571,9 @@ fun DeviceListScreen() {
                         safeMap.remove(uuid)
                         try {
                             val notificationDataClass = Class.forName("com.xzyht.notifyrelay.feature.device.model.NotificationData")
-                            val getInstance = notificationDataClass.getDeclaredMethod("getInstance", android.content.Context::class.java)
+                            val getInstance = notificationDataClass.getDeclaredMethod("getInstance", Context::class.java)
                             val notificationData = getInstance.invoke(null, appContext)
-                            val clearDeviceHistory = notificationDataClass.getDeclaredMethod("clearDeviceHistory", String::class.java, android.content.Context::class.java)
+                            val clearDeviceHistory = notificationDataClass.getDeclaredMethod("clearDeviceHistory", String::class.java, Context::class.java)
                             clearDeviceHistory.invoke(notificationData, uuid, appContext)
                         } catch (_: Exception) {}
                         // 使用Room数据库后，不需要手动删除JSON文件
@@ -570,7 +585,7 @@ fun DeviceListScreen() {
                 deviceManager.connectToDevice(device) { success, msg ->
                     if (!success && msg != null && activity != null) {
                         activity.runOnUiThread {
-                            android.widget.Toast.makeText(activity, "连接失败: $msg", android.widget.Toast.LENGTH_SHORT).show()
+                            Toast.makeText(activity, "连接失败: $msg", Toast.LENGTH_SHORT).show()
                         }
                     } else if (success) {
                         // 认证成功，立即刷新UI侧已认证设备列表
@@ -628,9 +643,9 @@ fun DeviceListScreen() {
                         safeMap.remove(uuid)
                         try {
                             val notificationDataClass = Class.forName("com.xzyht.notifyrelay.feature.device.model.NotificationData")
-                            val getInstance = notificationDataClass.getDeclaredMethod("getInstance", android.content.Context::class.java)
+                            val getInstance = notificationDataClass.getDeclaredMethod("getInstance", Context::class.java)
                             val notificationData = getInstance.invoke(null, appContext)
-                            val clearDeviceHistory = notificationDataClass.getDeclaredMethod("clearDeviceHistory", String::class.java, android.content.Context::class.java)
+                            val clearDeviceHistory = notificationDataClass.getDeclaredMethod("clearDeviceHistory", String::class.java, Context::class.java)
                             clearDeviceHistory.invoke(notificationData, uuid, appContext)
                         } catch (_: Exception) {}
                         // 持久化认证状态

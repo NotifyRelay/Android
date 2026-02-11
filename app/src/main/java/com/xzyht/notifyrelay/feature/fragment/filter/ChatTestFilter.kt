@@ -1,5 +1,9 @@
-package com.xzyht.notifyrelay.feature.notification.ui.filter
+package com.xzyht.notifyrelay.feature.fragment.filter
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -7,7 +11,10 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -25,6 +32,7 @@ import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -64,7 +72,7 @@ fun UIChatTest(
         // 通知数据回调仅在上层 DeviceForwardScreen 注册并同步 ChatMemory，这里只读取显示与发送
 
         Column(modifier = modifier.fillMaxSize().padding(top = 8.dp)) {
-            val listState = remember { androidx.compose.foundation.lazy.LazyListState() }
+            val listState = remember { LazyListState() }
             val chatList = chatHistoryState.value
             var firstLoad by remember { mutableStateOf(true) }
             LaunchedEffect(chatList.size) {
@@ -78,7 +86,7 @@ fun UIChatTest(
                 }
             }
 
-            androidx.compose.foundation.lazy.LazyColumn(
+            LazyColumn(
                 state = listState,
                 modifier = Modifier
                     .weight(1f)
@@ -92,19 +100,19 @@ fun UIChatTest(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = if (isSend) Arrangement.End else Arrangement.Start
                     ) {
-                        top.yukonga.miuix.kmp.basic.Surface(
+                        Surface(
                             color = if (isSend) colorScheme.primaryContainer else colorScheme.secondaryContainer,
-                            shape = androidx.compose.foundation.shape.RoundedCornerShape(12.dp),
+                            shape = RoundedCornerShape(12.dp),
                             modifier = Modifier
                                 .padding(vertical = 2.dp, horizontal = 4.dp)
                                 .combinedClickable(
                                     onClick = {},
                                     onLongClick = {
                                         try {
-                                            val clipboard = context.getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                                            val clip = android.content.ClipData.newPlainText("message", msg)
+                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                                            val clip = ClipData.newPlainText("message", msg)
                                             clipboard.setPrimaryClip(clip)
-                                            android.widget.Toast.makeText(context, "已复制原始消息到剪贴板", android.widget.Toast.LENGTH_SHORT).show()
+                                            Toast.makeText(context, "已复制原始消息到剪贴板", Toast.LENGTH_SHORT).show()
                                         } catch (e: Exception) {
                                             Logger.e("NotifyRelay", "复制失败", e)
                                         }

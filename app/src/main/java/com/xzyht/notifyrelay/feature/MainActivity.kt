@@ -47,10 +47,11 @@ import com.xzyht.notifyrelay.common.core.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.device.ui.DeviceForwardFragment
-import com.xzyht.notifyrelay.feature.device.ui.DeviceListFragment
+import com.xzyht.notifyrelay.feature.fragment.DeviceForwardFragment
+import com.xzyht.notifyrelay.feature.fragment.DeviceListFragment
 import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
-import com.xzyht.notifyrelay.feature.notification.ui.NotificationHistoryFragment
+import com.xzyht.notifyrelay.feature.fragment.NotificationHistoryFragment
+import com.xzyht.notifyrelay.feature.fragment.SettingsFragment
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope

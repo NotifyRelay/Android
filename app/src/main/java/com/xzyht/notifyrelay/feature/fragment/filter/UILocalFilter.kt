@@ -1,6 +1,10 @@
-package com.xzyht.notifyrelay.feature.notification.ui.filter
+package com.xzyht.notifyrelay.feature.fragment.filter
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -23,8 +27,9 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.xzyht.notifyrelay.common.core.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.notification.backend.BackendLocalFilter
-import com.xzyht.notifyrelay.feature.notification.ui.dialog.AppPickerDialog
+import com.xzyht.notifyrelay.feature.fragment.filter.dialog.AppPickerDialog
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -36,6 +41,8 @@ import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.icon.extended.More
+import top.yukonga.miuix.kmp.theme.darkColorScheme
+import top.yukonga.miuix.kmp.theme.lightColorScheme
 
 /**
  * UI本机通知过滤设置
@@ -46,8 +53,8 @@ fun UILocalFilter(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
-    val isDarkTheme = androidx.compose.foundation.isSystemInDarkTheme()
-    val colors = if (isDarkTheme) top.yukonga.miuix.kmp.theme.darkColorScheme() else top.yukonga.miuix.kmp.theme.lightColorScheme()
+    val isDarkTheme = isSystemInDarkTheme()
+    val colors = if (isDarkTheme) darkColorScheme() else lightColorScheme()
 
     MiuixTheme(colors = colors) {
         // 状态管理
@@ -67,14 +74,14 @@ fun UILocalFilter(
         val defaultAppIconBitmap = remember {
             val drawable = try { pm.defaultActivityIcon
             } catch (_: Exception) { null }
-            if (drawable is android.graphics.drawable.BitmapDrawable) {
+            if (drawable is BitmapDrawable) {
                 drawable.bitmap.asImageBitmap()
             } else {
                 // convert other drawables to a small placeholder bitmap
                 val width = drawable?.intrinsicWidth?.takeIf { it > 0 } ?: 48
                 val height = drawable?.intrinsicHeight?.takeIf { it > 0 } ?: 48
-                val bmp = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
-                val canvas = android.graphics.Canvas(bmp)
+                val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bmp)
                 drawable?.setBounds(0, 0, width, height)
                 drawable?.draw(canvas)
                 bmp.asImageBitmap()
@@ -295,7 +302,7 @@ fun UILocalFilter(
                     LaunchedEffect(entry.packageName) {
                         if (entry.packageName.isNotBlank() && entryIcons[entry] == null) {
                             try {
-                                val bmp = com.xzyht.notifyrelay.common.core.appslist.AppRepository.getAppIconAsync(context, entry.packageName)
+                                val bmp = AppRepository.getAppIconAsync(context, entry.packageName)
                                 entryIcons = entryIcons + (entry to (bmp?.asImageBitmap() ?: defaultAppIconBitmap))
                             } catch (_: Exception) {
                                 entryIcons = entryIcons + (entry to defaultAppIconBitmap)
@@ -378,7 +385,7 @@ fun UILocalFilter(
                     LaunchedEffect(entry.packageName) {
                         if (entry.packageName.isNotBlank() && entryIcons[entry] == null) {
                             try {
-                                val bmp = com.xzyht.notifyrelay.common.core.appslist.AppRepository.getAppIconAsync(context, entry.packageName)
+                                val bmp = AppRepository.getAppIconAsync(context, entry.packageName)
                                 entryIcons = entryIcons + (entry to (bmp?.asImageBitmap() ?: defaultAppIconBitmap))
                             } catch (_: Exception) {
                                 entryIcons = entryIcons + (entry to defaultAppIconBitmap)
@@ -460,7 +467,7 @@ fun UILocalFilter(
             newPackageIcon = defaultAppIconBitmap
             coroutineScope.launch {
                 try {
-                    val bmp = com.xzyht.notifyrelay.common.core.appslist.AppRepository.getAppIconAsync(context, packageName)
+                    val bmp = AppRepository.getAppIconAsync(context, packageName)
                     newPackageIcon = bmp?.asImageBitmap() ?: defaultAppIconBitmap
                 } catch (_: Exception) {
                     newPackageIcon = defaultAppIconBitmap

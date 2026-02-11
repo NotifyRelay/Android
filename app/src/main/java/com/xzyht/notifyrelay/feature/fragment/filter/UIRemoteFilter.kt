@@ -1,10 +1,12 @@
-package com.xzyht.notifyrelay.feature.notification.ui.filter
+package com.xzyht.notifyrelay.feature.fragment.filter
 
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
@@ -29,12 +32,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.PopupProperties
 import com.xzyht.notifyrelay.common.core.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
-import com.xzyht.notifyrelay.feature.notification.ui.dialog.AddKeywordDialog
-import com.xzyht.notifyrelay.feature.notification.ui.dialog.AppPickerDialog
+import com.xzyht.notifyrelay.feature.fragment.filter.dialog.AddKeywordDialog
+import com.xzyht.notifyrelay.feature.fragment.filter.dialog.AppPickerDialog
+import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperCheckbox
 import top.yukonga.miuix.kmp.extra.SuperSwitch
@@ -143,7 +150,7 @@ fun UIRemoteFilter() {
                     modifier = Modifier
                         .padding(start = 8.dp)
                         .background(colorScheme.surface),
-                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                    shape = RoundedCornerShape(8.dp)
                 ) {
                     Text(text = selectedText, color = colorScheme.onSurface)
                 }
@@ -151,7 +158,7 @@ fun UIRemoteFilter() {
                     expanded = expanded,
                     onDismissRequest = { expanded = false },
                     modifier = Modifier.background(colorScheme.surfaceContainer),
-                    properties = androidx.compose.ui.window.PopupProperties(
+                    properties = PopupProperties(
                         focusable = true
                     )
                 ) {
@@ -183,7 +190,7 @@ fun UIRemoteFilter() {
                 color = colorScheme.onSurface
             )
                 Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                top.yukonga.miuix.kmp.basic.TextField(
+                TextField(
                     value = filterListText,
                     onValueChange = {
                         filterListText = it
@@ -196,12 +203,12 @@ fun UIRemoteFilter() {
                     modifier = Modifier.weight(1f),
                     label = "com.a,关键字\ncom.b"
                 )
-                top.yukonga.miuix.kmp.basic.Button(
-                    onClick = { showFilterAppPicker = true },
-                    modifier = Modifier.padding(start = 6.dp)
-                ) {
-                    Text("添加包名")
-                }
+                    Button(
+                        onClick = { showFilterAppPicker = true },
+                        modifier = Modifier.padding(start = 6.dp)
+                    ) {
+                        Text("添加包名")
+                    }
             }
             if (showFilterAppPicker) {
                 AppPickerDialog(
@@ -249,7 +256,7 @@ fun UIRemoteFilter() {
         ) {
             Text("启用包名等价映射", style = textStyles.body2, color = colorScheme.onSurface)
             Spacer(modifier = Modifier.width(16.dp))
-                top.yukonga.miuix.kmp.basic.Switch(
+                Switch(
                 checked = enablePackageGroupMapping,
                 onCheckedChange = {
                     RemoteFilterConfig.enablePackageGroupMapping = it
@@ -296,14 +303,14 @@ fun UIRemoteFilter() {
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             if (idx >= RemoteFilterConfig.defaultPackageGroups.size) {
-                                top.yukonga.miuix.kmp.basic.Button(
+                                Button(
                                     onClick = { showAppPickerForGroup = true to idx },
                                     modifier = Modifier.defaultMinSize(minWidth = 28.dp, minHeight = 28.dp),
                                     enabled = enablePackageGroupMapping
                                 ) {
                                     Text("+")
                                 }
-                                top.yukonga.miuix.kmp.basic.Button(
+                                Button(
                                     onClick = {
                                         val newGroups = allGroups.toMutableList().apply { removeAt(idx) }
                                         val newEnabled = allGroupEnabled.toMutableList().apply { removeAt(idx) }
@@ -325,7 +332,7 @@ fun UIRemoteFilter() {
                     }
                     
                     // 包名自动换行显示
-                    androidx.compose.foundation.layout.FlowRow(
+                    FlowRow(
                         modifier = Modifier.fillMaxWidth().padding(start = 60.dp, top = 0.dp, bottom = 2.dp),
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp)
@@ -344,7 +351,7 @@ fun UIRemoteFilter() {
                         group.forEach { pkg ->
                             val isInstalled = installedPkgSet.contains(pkg)
                             // 使用mutableStateOf保存图标状态，这样更新时会触发UI重新渲染
-                            var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+                            var iconBitmap by remember { mutableStateOf<Bitmap?>(null) }
                             
                             // 异步加载缺失的图标，并在加载完成后更新状态
                             LaunchedEffect(pkg) {

@@ -1,6 +1,8 @@
-package com.xzyht.notifyrelay.feature.notification.ui.filter
+package com.xzyht.notifyrelay.feature.fragment.filter
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,6 +15,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -25,15 +28,19 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.common.core.notification.servers.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.common.core.sync.ProtocolSender
-import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.common.core.util.MediaControlUtil
-import notifyrelay.base.util.ToastUtils
+import com.xzyht.notifyrelay.feature.clipboard.ClipboardLogDetector
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.device.ui.GlobalSelectedDeviceHolder
+import com.xzyht.notifyrelay.feature.fragment.GlobalSelectedDeviceHolder
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Switch
@@ -71,22 +78,22 @@ fun DeviceInterconnect() {
     
     // 日志监控状态
     var logMonitoringEnabled by remember {
-        mutableStateOf(com.xzyht.notifyrelay.feature.clipboard.ClipboardLogDetector.isMonitoring())
+        mutableStateOf(ClipboardLogDetector.isMonitoring())
     }
     
     // 手动刷新权限状态的函数
     fun refreshPermissionStatus() {
         accessibilityEnabled = ClipboardSyncManager.isAccessibilityServiceEnabled(context)
-        logMonitoringEnabled = com.xzyht.notifyrelay.feature.clipboard.ClipboardLogDetector.isMonitoring()
+        logMonitoringEnabled = ClipboardLogDetector.isMonitoring()
     }
     
     // 初始检查一次权限状态
-    androidx.compose.runtime.LaunchedEffect(Unit) {
+    LaunchedEffect(Unit) {
         refreshPermissionStatus()
     }
 
     // 检查是否有READ_LOGS权限
-    val hasReadLogsPermission = context.checkSelfPermission(android.Manifest.permission.READ_LOGS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+    val hasReadLogsPermission = context.checkSelfPermission(Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED
     // 检查是否有可用的剪贴板同步方案
     val hasSyncSolution = accessibilityEnabled || (logMonitoringEnabled && hasReadLogsPermission)
 
@@ -155,8 +162,8 @@ fun DeviceInterconnect() {
                         intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                         context.startActivity(intent)
                         // 延迟刷新状态，让用户有时间从设置返回
-                        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
-                            kotlinx.coroutines.delay(1000)
+                        CoroutineScope(Dispatchers.Main).launch {
+                            delay(1000)
                             refreshPermissionStatus()
                         }
                     } catch (e: Exception) {

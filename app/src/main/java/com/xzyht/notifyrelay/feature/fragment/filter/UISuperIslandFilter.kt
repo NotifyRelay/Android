@@ -1,9 +1,12 @@
-package com.xzyht.notifyrelay.feature.notification.ui.filter
+package com.xzyht.notifyrelay.feature.fragment.filter
 
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.text.format.DateFormat
+import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -24,6 +27,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -36,28 +40,31 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.common.core.appslist.AppRepository
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
-import notifyrelay.core.util.DataUrlUtils
-import notifyrelay.base.util.Logger
+import com.xzyht.notifyrelay.common.core.appslist.AppRepository
 import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
-import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import com.xzyht.notifyrelay.feature.notification.ui.dialog.SuperIslandTestDialog
+import com.xzyht.notifyrelay.feature.fragment.filter.dialog.SuperIslandTestDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.Logger
+import notifyrelay.core.util.DataUrlUtils
+import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -69,11 +76,10 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.ToolbarPosition
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import androidx.compose.ui.graphics.Color
 import java.util.Date
+import java.util.Locale
 import kotlin.math.max
 import kotlin.math.roundToInt
-import java.util.Locale
 
 private const val SUPER_ISLAND_IMAGE_MAX_DIMENSION = 320
 private const val SUPER_ISLAND_DOWNLOAD_MAX_BYTES = 4 * 1024 * 1024
@@ -513,7 +519,7 @@ private fun SuperIslandHistoryEntryCard(
             )
         } else {
             // 未加载 rawPayload，提供按需加载按钮
-            androidx.compose.material3.TextButton(onClick = {
+            TextButton(onClick = {
                 coroutineScope.launch {
                     val full = try { SuperIslandHistory.loadEntryDetail(context, entry.id) } catch (_: Exception) { null }
                     if (full != null) {
@@ -613,7 +619,7 @@ private fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
             value = null
             return@produceState
         }
-        val cached = kotlinx.coroutines.runBlocking {
+        val cached = runBlocking {
             AppRepository.getExternalAppIcon(context, target)
         }
         if (cached != null) {
@@ -632,7 +638,7 @@ private fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
 private fun SuperIslandAppIcon(
     iconBitmap: ImageBitmap?,
     packageName: String?,
-    size: androidx.compose.ui.unit.Dp,
+    size: Dp,
     modifier: Modifier = Modifier
 ) {
     val colorScheme = MiuixTheme.colorScheme
@@ -803,17 +809,17 @@ private fun buildEntryCopyText(
 
 private fun copyEntryToClipboard(context: Context, content: String) {
     if (content.isBlank()) {
-        android.widget.Toast.makeText(context, "当前条目无可复制内容", android.widget.Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "当前条目无可复制内容", Toast.LENGTH_SHORT).show()
         return
     }
     try {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-        val clip = android.content.ClipData.newPlainText("super_island_entry", content)
+        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        val clip = ClipData.newPlainText("super_island_entry", content)
         clipboard.setPrimaryClip(clip)
-        android.widget.Toast.makeText(context, "已复制原始消息到剪贴板", android.widget.Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "已复制原始消息到剪贴板", Toast.LENGTH_SHORT).show()
     } catch (e: Exception) {
         Logger.e("NotifyRelay", "复制超级岛原始消息失败", e)
-        android.widget.Toast.makeText(context, "复制失败", android.widget.Toast.LENGTH_SHORT).show()
+        Toast.makeText(context, "复制失败", Toast.LENGTH_SHORT).show()
     }
 }
 

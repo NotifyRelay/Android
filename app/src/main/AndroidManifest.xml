@@ -103,7 +103,7 @@
             
         <!-- 剪贴板同步透明Activity -->
         <activity
-            android:name=".feature.clipboard.ClipboardSyncActivity"
+            android:name=".feature.ClipboardSyncActivity"
             android:exported="true"
             android:theme="@style/TransparentTheme"
             android:launchMode="singleInstance"

@@ -1,8 +1,16 @@
-package com.xzyht.notifyrelay.feature.device.ui
+package com.xzyht.notifyrelay.feature.fragment
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Bundle
+import android.view.LayoutInflater
+import android.view.View
+import android.view.ViewGroup
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -19,14 +27,19 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.common.core.appslist.AppRepository
 import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.feature.fragment.filter.DeviceInterconnect
+import com.xzyht.notifyrelay.feature.fragment.filter.UIChatTest
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
-import com.xzyht.notifyrelay.feature.notification.ui.filter.UILocalFilter
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
@@ -40,19 +53,19 @@ class DeviceForwardFragment : Fragment() {
     private val KEY_AUTHED_UUIDS = "authed_device_uuids"
 
     // 应用安装/卸载监听器
-    private val appChangeReceiver = object : android.content.BroadcastReceiver() {
-        override fun onReceive(context: android.content.Context, intent: android.content.Intent) {
+    private val appChangeReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
-                android.content.Intent.ACTION_PACKAGE_ADDED -> {
+                Intent.ACTION_PACKAGE_ADDED -> {
                     // 应用安装时清除缓存，下次使用时会重新加载最新的应用列表和图标
-                    kotlinx.coroutines.runBlocking {
+                    runBlocking {
                         AppRepository.clearCache(context)
                     }
                     //Logger.d("DeviceForwardFragment", "应用安装，清除缓存")
                 }
-                android.content.Intent.ACTION_PACKAGE_REMOVED -> {
+                Intent.ACTION_PACKAGE_REMOVED -> {
                     // 应用卸载时清除缓存，下次使用时会重新加载最新的应用列表和图标
-                    kotlinx.coroutines.runBlocking {
+                    runBlocking {
                         AppRepository.clearCache(context)
                     }
                     //Logger.d("DeviceForwardFragment", "应用卸载，清除缓存")
@@ -78,9 +91,9 @@ class DeviceForwardFragment : Fragment() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         // 注册应用安装/卸载监听器
-        val filter = android.content.IntentFilter().apply {
-            addAction(android.content.Intent.ACTION_PACKAGE_ADDED)
-            addAction(android.content.Intent.ACTION_PACKAGE_REMOVED)
+        val filter = IntentFilter().apply {
+            addAction(Intent.ACTION_PACKAGE_ADDED)
+            addAction(Intent.ACTION_PACKAGE_REMOVED)
             addDataScheme("package")
         }
         requireContext().registerReceiver(appChangeReceiver, filter)
@@ -93,16 +106,16 @@ class DeviceForwardFragment : Fragment() {
     }
 
     override fun onCreateView(
-        inflater: android.view.LayoutInflater,
-        container: android.view.ViewGroup?,
+        inflater: LayoutInflater,
+        container: ViewGroup?,
         savedInstanceState: Bundle?
-    ): android.view.View {
+    ): View {
         //Logger.d("NotifyRelay(狂鼠)", "onCreateView called")
         return ComposeView(requireContext()).apply {
             setContent {
                 MiuixTheme {
                     DeviceForwardScreen(
-                        deviceManager = com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton.getDeviceManager(requireContext())
+                        deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(requireContext())
                     )
                 }
             }
@@ -112,7 +125,7 @@ class DeviceForwardFragment : Fragment() {
 fun DeviceForwardScreen(
     deviceManager: DeviceConnectionManager
 ) {
-    val context = androidx.compose.ui.platform.LocalContext.current
+    val context = LocalContext.current
     // 触发一次读取以避免未使用参数提示（保持原有持久化行为）
         // loadAuthedUuids/saveAuthedUuids 留作接口使用，具体操作在需要时调用
     // 手动发现提示相关状态
@@ -168,7 +181,7 @@ fun DeviceForwardScreen(
         }
         // 自动消失
         LaunchedEffect(manualDiscoveryPrompt.value) {
-            kotlinx.coroutines.delay(5000)
+            delay(5000)
             snackbarVisible.value = false
         }
     }
@@ -181,7 +194,7 @@ fun DeviceForwardScreen(
     // 复刻lancomm事件监听风格，Compose事件流监听消息
     // 远程通知过滤与复刻到系统通知中心
 
-    androidx.compose.foundation.layout.Column(
+    Column(
         modifier = Modifier
             .fillMaxSize()
             .background(colorScheme.background)
@@ -221,11 +234,11 @@ fun DeviceForwardScreen(
                 when (page) {
                     0 -> {
                         // 设备互联 Tab
-                        com.xzyht.notifyrelay.feature.notification.ui.filter.DeviceInterconnect()
+                        DeviceInterconnect()
                     }
                     1 -> {
                         // 聊天测试 Tab：独立到 UIChatTest 组件
-                        com.xzyht.notifyrelay.feature.notification.ui.filter.UIChatTest(deviceManager = deviceManager)
+                        UIChatTest(deviceManager = deviceManager)
                     }
                 }
             }
