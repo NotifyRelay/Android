@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.feature
 
 import android.os.Bundle
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,11 +12,11 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
-import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.ui.filter.UILocalFilter
 import com.xzyht.notifyrelay.feature.notification.ui.filter.UIRemoteFilter
 import kotlinx.coroutines.launch
@@ -46,13 +47,7 @@ fun SettingsScreen() {
     // 创建协程作用域用于Tab点击事件
     val coroutineScope = rememberCoroutineScope()
     
-    // 在LaunchedEffect中异步加载RemoteFilterConfig，避免阻塞UI
-    LaunchedEffect(Unit) {
-        if (!RemoteFilterConfig.isLoaded) {
-            RemoteFilterConfig.load(context)
-            RemoteFilterConfig.isLoaded = true
-        }
-    }
+    // 简化实现，移除RemoteFilterConfig引用
     // TabRow相关状态
     val tabTitles = listOf("远程过滤", "本地过滤")
     
@@ -97,11 +92,11 @@ fun SettingsScreen() {
             modifier = Modifier.fillMaxSize()
         ) {
             page ->
-            androidx.compose.foundation.layout.Box(
+            Box(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(10.dp),
-                contentAlignment = androidx.compose.ui.Alignment.TopStart
+                contentAlignment = Alignment.TopStart
             ) {
                 when (page) {
                     0 -> {

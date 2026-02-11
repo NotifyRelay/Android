@@ -1,7 +1,9 @@
 package com.xzyht.notifyrelay.feature.notification.ui.filter
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -12,6 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -32,7 +37,6 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperCheckbox
-import top.yukonga.miuix.kmp.extra.SuperDropdown
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -119,19 +123,55 @@ fun UIRemoteFilter() {
         val modeLabels = modes.map { it.second }
         val selectedModeIndex = modes.indexOfFirst { it.first == filterMode }
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
-        SuperDropdown(
-            title = "过滤模式",
-            items = modeLabels,
-            selectedIndex = selectedModeIndex,
-            onSelectedIndexChange = { index ->
-                val (value, _) = modes[index]
-                RemoteFilterConfig.filterMode = value
-                RemoteFilterConfig.enablePeerMode = (value == "peer")
-                RemoteFilterConfig.save(context)
-                filterMode = value
-            },
-            modifier = Modifier.padding(vertical = 4.dp)
-        )
+        // 使用Compose内置的DropdownMenu替代WindowDropdown
+        var expanded by remember { mutableStateOf(false) }
+        val selectedText = modeLabels[selectedModeIndex]
+        
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "过滤模式",
+                style = textStyles.body1,
+                color = colorScheme.onSurface,
+                modifier = Modifier.weight(1f)
+            )
+            Box {
+                OutlinedButton(
+                    onClick = { expanded = true },
+                    modifier = Modifier
+                        .padding(start = 8.dp)
+                        .background(colorScheme.surface),
+                    shape = androidx.compose.foundation.shape.RoundedCornerShape(8.dp)
+                ) {
+                    Text(text = selectedText, color = colorScheme.onSurface)
+                }
+                DropdownMenu(
+                    expanded = expanded,
+                    onDismissRequest = { expanded = false },
+                    modifier = Modifier.background(colorScheme.surfaceContainer),
+                    properties = androidx.compose.ui.window.PopupProperties(
+                        focusable = true
+                    )
+                ) {
+                    modeLabels.forEachIndexed { index, label ->
+                        DropdownMenuItem(
+                            text = { Text(text = label, color = colorScheme.onSurface) },
+                            onClick = {
+                                val (value, _) = modes[index]
+                                RemoteFilterConfig.filterMode = value
+                                RemoteFilterConfig.enablePeerMode = (value == "peer")
+                                RemoteFilterConfig.save(context)
+                                filterMode = value
+                                expanded = false
+                            },
+                            modifier = Modifier.background(colorScheme.surface)
+                        )
+                    }
+                }
+            }
+        }
 
         if (filterMode == "black" || filterMode == "white") {
             var showFilterAppPicker by remember { mutableStateOf(false) }
@@ -376,6 +416,5 @@ fun UIRemoteFilter() {
             )}
         }
     }
-}
-}
+}}
     
