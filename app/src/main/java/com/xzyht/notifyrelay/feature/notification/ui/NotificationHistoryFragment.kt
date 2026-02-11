@@ -236,13 +236,13 @@ fun getAppNameAndIcon(context: android.content.Context, packageName: String?): P
             // 如果内存缓存中没有，尝试从持久化缓存加载（非阻塞）
             if (icon == null) {
                 // 异步加载图标，不等待结果
-                kotlinx.coroutines.GlobalScope.launch {
-                    val loadedIcon = AppRepository.getAppIconAsync(context, packageName)
-                    if (loadedIcon != null) {
-                        // 使用现有的公共方法缓存外部应用图标
-                        AppRepository.cacheExternalAppIcon(packageName, loadedIcon)
+                    kotlinx.coroutines.GlobalScope.launch {
+                        val loadedIcon = AppRepository.getAppIconAsync(context, packageName)
+                        if (loadedIcon != null) {
+                            // 使用现有的公共方法缓存外部应用图标
+                            AppRepository.cacheExternalAppIcon(context, packageName, loadedIcon, "remote")
+                        }
                     }
-                }
             }
         } catch (_: Exception) {
             // 如果所有尝试都失败，使用包名和默认图标

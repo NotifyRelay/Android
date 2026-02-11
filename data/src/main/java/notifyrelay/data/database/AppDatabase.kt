@@ -8,10 +8,14 @@ import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import notifyrelay.base.util.Logger
 import notifyrelay.data.database.dao.AppConfigDao
+import notifyrelay.data.database.dao.AppDao
+import notifyrelay.data.database.dao.AppDeviceDao
 import notifyrelay.data.database.dao.DeviceDao
 import notifyrelay.data.database.dao.NotificationRecordDao
 import notifyrelay.data.database.dao.SuperIslandHistoryDao
 import notifyrelay.data.database.entity.AppConfigEntity
+import notifyrelay.data.database.entity.AppDeviceEntity
+import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.entity.DeviceEntity
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
@@ -27,16 +31,20 @@ import notifyrelay.data.database.migration.MigrationHelper
 @Database(
     entities = [
         AppConfigEntity::class,
+        AppEntity::class,
+        AppDeviceEntity::class,
         DeviceEntity::class,
         NotificationRecordEntity::class,
         SuperIslandHistoryEntity::class
     ],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     // DAO接口
     abstract fun appConfigDao(): AppConfigDao
+    abstract fun appDao(): AppDao
+    abstract fun appDeviceDao(): AppDeviceDao
     abstract fun deviceDao(): DeviceDao
     abstract fun notificationRecordDao(): NotificationRecordDao
     abstract fun superIslandHistoryDao(): SuperIslandHistoryDao
@@ -71,7 +79,7 @@ abstract class AppDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .build().also { INSTANCE = it }
             }
         }
@@ -132,6 +140,40 @@ abstract class AppDatabase : RoomDatabase() {
         }
         
         /**
+         * 数据库迁移：从版本3到版本4
+         * 添加apps表和app_devices表
+         */
+        private val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // 1. 创建apps表
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS apps (
+                        packageName TEXT PRIMARY KEY NOT NULL,
+                        appName TEXT NOT NULL,
+                        isSystemApp INTEGER NOT NULL,
+                        iconBytes BLOB,
+                        isIconMissing INTEGER NOT NULL,
+                        lastUpdated INTEGER NOT NULL
+                    )
+                """)
+                
+                // 2. 创建app_devices表
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS app_devices (
+                        packageName TEXT NOT NULL,
+                        sourceDevice TEXT NOT NULL,
+                        lastUpdated INTEGER NOT NULL,
+                        PRIMARY KEY (packageName, sourceDevice),
+                        FOREIGN KEY (packageName) REFERENCES apps(packageName) ON DELETE CASCADE
+                    )
+                """)
+                
+                // 3. 创建索引
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_app_devices_source_device ON app_devices(sourceDevice)")
+            }
+        }
+        
+        /**
          * 从旧存储迁移数据到Room数据库
          */
         private suspend fun migrateFromLegacyStorage(context: Context, database: AppDatabase) {
@@ -158,6 +200,13 @@ abstract class AppDatabase : RoomDatabase() {
                     context,
                     database.notificationRecordDao(),
                     database.deviceDao()
+                )
+                
+                // 迁移应用信息和图标
+                MigrationHelper.migrateApps(
+                    context,
+                    database.appDao(),
+                    database.appDeviceDao()
                 )
                 
                 // 迁移超级岛历史记录

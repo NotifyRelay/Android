@@ -3,6 +3,8 @@ package notifyrelay.data.database.repository
 import android.content.Context
 import notifyrelay.data.database.AppDatabase
 import notifyrelay.data.database.entity.AppConfigEntity
+import notifyrelay.data.database.entity.AppDeviceEntity
+import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.entity.DeviceEntity
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
@@ -15,6 +17,10 @@ import kotlin.collections.iterator
 class DatabaseRepository(private val database: AppDatabase) {
     // 应用配置相关
     private val appConfigDao = database.appConfigDao()
+    // 应用相关
+    private val appDao = database.appDao()
+    // 应用设备关联相关
+    private val appDeviceDao = database.appDeviceDao()
     // 设备相关
     private val deviceDao = database.deviceDao()
     // 通知记录相关
@@ -294,9 +300,141 @@ class DatabaseRepository(private val database: AppDatabase) {
     suspend fun deleteSuperIslandHistory(history: SuperIslandHistoryEntity) {
         superIslandHistoryDao.delete(history)
     }
-    
 
-    
+    // 应用相关方法
+
+    /**
+     * 获取所有应用
+     */
+    fun getAllApps() = appDao.getAll()
+
+    /**
+     * 根据包名获取应用
+     */
+    suspend fun getAppByPackageName(packageName: String): AppEntity? {
+        return appDao.getByPackageName(packageName)
+    }
+
+    /**
+     * 保存应用
+     */
+    suspend fun saveApp(app: AppEntity) {
+        appDao.insert(app)
+    }
+
+    /**
+     * 批量保存应用
+     */
+    suspend fun saveApps(apps: List<AppEntity>) {
+        appDao.insertAll(apps)
+    }
+
+    /**
+     * 删除应用
+     */
+    suspend fun deleteApp(app: AppEntity) {
+        appDao.delete(app)
+    }
+
+    /**
+     * 根据包名删除应用
+     */
+    suspend fun deleteAppByPackageName(packageName: String) {
+        appDao.deleteByPackageName(packageName)
+    }
+
+    /**
+     * 获取缺失图标的应用
+     */
+    fun getIconMissingApps() = appDao.getIconMissingApps()
+
+    /**
+     * 更新应用图标
+     */
+    suspend fun updateAppIcon(packageName: String, iconBytes: ByteArray) {
+        appDao.updateIcon(packageName, iconBytes, System.currentTimeMillis())
+    }
+
+    /**
+     * 标记应用图标为缺失
+     */
+    suspend fun markAppIconAsMissing(packageName: String) {
+        appDao.markIconAsMissing(packageName, System.currentTimeMillis())
+    }
+
+    /**
+     * 获取过期的应用数据
+     */
+    suspend fun getExpiredApps(expiryTime: Long): List<AppEntity> {
+        return appDao.getExpiredApps(expiryTime)
+    }
+
+    // 应用设备关联相关方法
+
+    /**
+     * 获取所有应用设备关联
+     */
+    fun getAllAppDevices() = appDeviceDao.getAll()
+
+    /**
+     * 根据包名获取应用设备关联
+     */
+    fun getAppDevicesByPackageName(packageName: String) = appDeviceDao.getByPackageName(packageName)
+
+    /**
+     * 根据设备UUID获取应用设备关联
+     */
+    fun getAppDevicesByDeviceUuid(deviceUuid: String) = appDeviceDao.getByDeviceUuid(deviceUuid)
+
+    /**
+     * 检查应用与设备是否存在关联
+     */
+    suspend fun checkAppDeviceAssociation(packageName: String, deviceUuid: String): AppDeviceEntity? {
+        return appDeviceDao.getByPackageNameAndDeviceUuid(packageName, deviceUuid)
+    }
+
+    /**
+     * 保存应用设备关联
+     */
+    suspend fun saveAppDeviceAssociation(appDevice: AppDeviceEntity) {
+        appDeviceDao.insert(appDevice)
+    }
+
+    /**
+     * 批量保存应用设备关联
+     */
+    suspend fun saveAppDeviceAssociations(appDevices: List<AppDeviceEntity>) {
+        appDeviceDao.insertAll(appDevices)
+    }
+
+    /**
+     * 删除应用设备关联
+     */
+    suspend fun deleteAppDeviceAssociation(appDevice: AppDeviceEntity) {
+        appDeviceDao.delete(appDevice)
+    }
+
+    /**
+     * 根据包名删除应用设备关联
+     */
+    suspend fun deleteAppDeviceAssociationsByPackageName(packageName: String) {
+        appDeviceDao.deleteByPackageName(packageName)
+    }
+
+    /**
+     * 根据设备UUID删除应用设备关联
+     */
+    suspend fun deleteAppDeviceAssociationsByDeviceUuid(deviceUuid: String) {
+        appDeviceDao.deleteByDeviceUuid(deviceUuid)
+    }
+
+    /**
+     * 根据包名和设备UUID删除应用设备关联
+     */
+    suspend fun deleteAppDeviceAssociation(packageName: String, deviceUuid: String) {
+        appDeviceDao.deleteByPackageNameAndDeviceUuid(packageName, deviceUuid)
+    }
+
     companion object {
         @Volatile
         private var INSTANCE: DatabaseRepository? = null

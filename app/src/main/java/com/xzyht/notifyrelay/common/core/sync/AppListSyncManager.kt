@@ -6,6 +6,7 @@ import com.xzyht.notifyrelay.common.core.appslist.AppRepository
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -129,10 +130,12 @@ object AppListSyncManager {
             }
             
             // 缓存到 AppRepository
-            AppRepository.cacheRemoteAppList(appsMap)
-            
-            // 将应用包名与来源设备关联
-            AppRepository.associateAppsWithDevice(packageNames, deviceUuid)
+            runBlocking {
+                AppRepository.cacheRemoteAppList(context, appsMap, deviceUuid)
+                
+                // 将应用包名与来源设备关联
+                AppRepository.associateAppsWithDevice(context, packageNames, deviceUuid)
+            }
         } catch (e: Exception) {
             Logger.e(TAG, "处理应用列表响应失败", e)
         }
@@ -153,7 +156,9 @@ object AppListSyncManager {
         sourceDevice: DeviceInfo
     ) {
         // 检查缺失的图标
-        val missingIcons = AppRepository.getMissingIconsForPackages(packageNames)
+        val missingIcons = runBlocking {
+            AppRepository.getMissingIconsForPackages(context, packageNames)
+        }
         if (missingIcons.isEmpty()) {
             //Logger.d(TAG, "所有图标已缓存，无需请求")
             return

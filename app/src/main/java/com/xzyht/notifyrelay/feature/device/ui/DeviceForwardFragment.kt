@@ -45,12 +45,16 @@ class DeviceForwardFragment : Fragment() {
             when (intent.action) {
                 android.content.Intent.ACTION_PACKAGE_ADDED -> {
                     // 应用安装时清除缓存，下次使用时会重新加载最新的应用列表和图标
-                    AppRepository.clearCache()
+                    kotlinx.coroutines.runBlocking {
+                        AppRepository.clearCache(context)
+                    }
                     //Logger.d("DeviceForwardFragment", "应用安装，清除缓存")
                 }
                 android.content.Intent.ACTION_PACKAGE_REMOVED -> {
                     // 应用卸载时清除缓存，下次使用时会重新加载最新的应用列表和图标
-                    AppRepository.clearCache()
+                    kotlinx.coroutines.runBlocking {
+                        AppRepository.clearCache(context)
+                    }
                     //Logger.d("DeviceForwardFragment", "应用卸载，清除缓存")
                 }
             }

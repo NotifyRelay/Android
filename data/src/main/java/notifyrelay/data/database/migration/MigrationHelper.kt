@@ -6,15 +6,20 @@ import com.google.gson.reflect.TypeToken
 import notifyrelay.base.util.Logger
 import notifyrelay.data.PersistenceManager
 import notifyrelay.data.StorageManager
-import notifyrelay.data.database.entity.AppConfigEntity
-import notifyrelay.data.database.entity.DeviceEntity
-import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.dao.AppConfigDao
+import notifyrelay.data.database.dao.AppDao
+import notifyrelay.data.database.dao.AppDeviceDao
 import notifyrelay.data.database.dao.DeviceDao
 import notifyrelay.data.database.dao.NotificationRecordDao
 import notifyrelay.data.database.dao.SuperIslandHistoryDao
+import notifyrelay.data.database.entity.AppConfigEntity
+import notifyrelay.data.database.entity.AppDeviceEntity
+import notifyrelay.data.database.entity.AppEntity
+import notifyrelay.data.database.entity.DeviceEntity
+import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import org.json.JSONArray
+import java.io.ByteArrayOutputStream
 
 /**
  * 迁移帮助类
@@ -236,6 +241,93 @@ object MigrationHelper {
             }
         } catch (e: Exception) {
             Logger.e("MigrationHelper", "迁移超级岛历史记录失败: ${e.message}", e)
+        }
+    }
+    
+    /**
+     * 迁移应用信息和图标
+     */
+    suspend fun migrateApps(
+        context: Context,
+        appDao: AppDao,
+        appDeviceDao: AppDeviceDao
+    ) {
+        //Logger.d("MigrationHelper", "开始迁移应用信息和图标")
+        
+        try {
+            // 迁移本地应用
+            val pm = context.packageManager
+            val installedApps = pm.getInstalledApplications(0)
+            
+            val appEntities = mutableListOf<AppEntity>()
+            val appDeviceEntities = mutableListOf<AppDeviceEntity>()
+            
+            installedApps.forEach { appInfo ->
+                try {
+                    val packageName = appInfo.packageName
+                    val appName = try {
+                        pm.getApplicationLabel(appInfo).toString()
+                    } catch (e: Exception) {
+                        packageName
+                    }
+                    val isSystemApp = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
+                    
+                    // 获取应用图标
+                    var iconBytes: ByteArray? = null
+                    try {
+                        val drawable = pm.getApplicationIcon(appInfo)
+                        val bitmap = when (drawable) {
+                            is android.graphics.drawable.BitmapDrawable -> drawable.bitmap
+                            else -> {
+                                val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
+                                val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
+                                val createdBitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+                                val canvas = android.graphics.Canvas(createdBitmap)
+                                drawable.setBounds(0, 0, width, height)
+                                drawable.draw(canvas)
+                                createdBitmap
+                            }
+                        }
+                        val baos = ByteArrayOutputStream()
+                        bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, baos)
+                        iconBytes = baos.toByteArray()
+                    } catch (e: Exception) {
+                        Logger.w("MigrationHelper", "获取应用图标失败: ${appInfo.packageName}", e)
+                    }
+                    
+                    val appEntity = AppEntity(
+                        packageName = packageName,
+                        appName = appName,
+                        isSystemApp = isSystemApp,
+                        iconBytes = iconBytes,
+                        isIconMissing = iconBytes == null,
+                        lastUpdated = System.currentTimeMillis()
+                    )
+                    appEntities.add(appEntity)
+                    
+                    val appDeviceEntity = AppDeviceEntity(
+                        packageName = packageName,
+                        sourceDevice = "local",
+                        lastUpdated = System.currentTimeMillis()
+                    )
+                    appDeviceEntities.add(appDeviceEntity)
+                } catch (e: Exception) {
+                    Logger.w("MigrationHelper", "迁移应用信息失败: ${appInfo.packageName}", e)
+                }
+            }
+            
+            // 批量插入到数据库
+            if (appEntities.isNotEmpty()) {
+                appDao.insertAll(appEntities)
+                Logger.d("MigrationHelper", "迁移应用信息完成，共${appEntities.size}条")
+            }
+            
+            if (appDeviceEntities.isNotEmpty()) {
+                appDeviceDao.insertAll(appDeviceEntities)
+                Logger.d("MigrationHelper", "迁移应用设备关联完成，共${appDeviceEntities.size}条")
+            }
+        } catch (e: Exception) {
+            Logger.e("MigrationHelper", "迁移应用信息和图标失败: ${e.message}", e)
         }
     }
     

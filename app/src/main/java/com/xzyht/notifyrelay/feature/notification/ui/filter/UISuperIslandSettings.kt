@@ -613,7 +613,9 @@ private fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
             value = null
             return@produceState
         }
-        val cached = AppRepository.getAppIcon(target) ?: AppRepository.getExternalAppIcon(target)
+        val cached = AppRepository.getAppIcon(target) ?: kotlinx.coroutines.runBlocking {
+            AppRepository.getExternalAppIcon(context, target)
+        }
         if (cached != null) {
             value = cached.asImageBitmap()
             return@produceState

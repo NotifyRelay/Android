@@ -10,6 +10,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -43,7 +44,9 @@ object IconSyncManager {
         sourceDevice: DeviceInfo
     ) {
         // 检查 AppRepository 缓存
-        val exist = AppRepository.getExternalAppIcon(packageName)
+        val exist = runBlocking {
+            AppRepository.getExternalAppIcon(context, packageName)
+        }
         if (exist != null) {
             //Logger.d(TAG, "图标已存在，跳过：$packageName")
             return
@@ -64,11 +67,13 @@ object IconSyncManager {
             return
         }
         
-        // 获取应用的来源设备UUID
-        val appDeviceUuid = AppRepository.getAppDeviceUuid(packageName)
+        // 获取应用的来源设备UUID列表
+        val appDeviceUuids = runBlocking {
+            AppRepository.getAppDeviceUuids(context, packageName)
+        }
         
         // 检查是否应该从当前设备请求图标
-        val shouldRequestFromThisDevice = appDeviceUuid == null || appDeviceUuid == sourceDevice.uuid
+        val shouldRequestFromThisDevice = appDeviceUuids.isEmpty() || appDeviceUuids.contains(sourceDevice.uuid)
         
         if (shouldRequestFromThisDevice) {
             pendingRequests[packageName] = now
@@ -76,7 +81,7 @@ object IconSyncManager {
                 try {
                     requestIconsFromDevice(context, listOf(packageName), deviceManager, sourceDevice)
                     // 请求成功，关联应用包名与当前设备
-                    AppRepository.associateAppWithDevice(packageName, sourceDevice.uuid)
+                    AppRepository.associateAppWithDevice(context, packageName, sourceDevice.uuid)
                 } catch (e: Exception) {
                     Logger.e(TAG, "请求图标失败：$packageName", e)
                 } finally {
@@ -105,15 +110,19 @@ object IconSyncManager {
         
         val need = packageNames.filter { pkg ->
             // 1. 检查 AppRepository 缓存
-            val exist = AppRepository.getExternalAppIcon(pkg) != null
+            val exist = runBlocking {
+                AppRepository.getExternalAppIcon(context, pkg)
+            } != null
             // 2. 检查本机已安装应用
             val isInstalled = installedPackages.contains(pkg)
             // 3. 检查正在请求的图标
             val last = pendingRequests[pkg]
             val inFlight = last != null && (now - last) < ICON_REQUEST_TIMEOUT
             // 4. 检查应用与设备的关联关系
-            val appDeviceUuid = AppRepository.getAppDeviceUuid(pkg)
-            val isAssociatedWithThisDevice = appDeviceUuid == null || appDeviceUuid == sourceDevice.uuid
+            val appDeviceUuids = runBlocking {
+                AppRepository.getAppDeviceUuids(context, pkg)
+            }
+            val isAssociatedWithThisDevice = appDeviceUuids.isEmpty() || appDeviceUuids.contains(sourceDevice.uuid)
             
             !exist && !isInstalled && !inFlight && isAssociatedWithThisDevice
         }
@@ -129,7 +138,7 @@ object IconSyncManager {
             try {
                 requestIconsFromDevice(context, need, deviceManager, sourceDevice)
                 // 请求成功，批量关联应用包名与当前设备
-                AppRepository.associateAppsWithDevice(need, sourceDeviceUuid)
+                AppRepository.associateAppsWithDevice(context, need, sourceDeviceUuid)
             } catch (e: Exception) {
                 Logger.e(TAG, "批量请求失败：$need", e)
             } finally {
@@ -249,7 +258,7 @@ object IconSyncManager {
                     val item = iconsArray.optJSONObject(i) ?: continue
                     val pkg = item.optString("packageName")
                     val base64 = item.optString("iconData")
-                    cacheDecodedIcon(pkg, base64)
+                    cacheDecodedIcon(context, pkg, base64)
                 }
                 //Logger.d(TAG, "批量图标接收完成：${iconsArray.length()}")
             }
@@ -261,13 +270,15 @@ object IconSyncManager {
             if (pkg.isNotEmpty()) {
                 if (base64.isNotEmpty()) {
                     // 处理单个图标响应
-                    cacheDecodedIcon(pkg, base64)
+                cacheDecodedIcon(context, pkg, base64)
                     //Logger.d(TAG, "单图标接收：$pkg")
                 } else if (isMissing) {
                     // 处理单个缺失图标响应
                     //Logger.d(TAG, "单图标缺失：$pkg")
                     // 标记图标为缺失，避免重复请求
-                    AppRepository.markIconAsMissing(pkg)
+                    runBlocking {
+                        AppRepository.markIconAsMissing(context, pkg)
+                    }
                 }
             }
             
@@ -278,8 +289,10 @@ object IconSyncManager {
                     val missingPkg = missingArray.optString(i)
                     if (missingPkg.isNotEmpty()) {
                         //Logger.d(TAG, "批量图标缺失：$missingPkg")
-                        // 标记图标为缺失，避免重复请求
-                        AppRepository.markIconAsMissing(missingPkg)
+                    // 标记图标为缺失，避免重复请求
+                    runBlocking {
+                        AppRepository.markIconAsMissing(context, missingPkg)
+                    }
                     }
                 }
             }
@@ -288,11 +301,13 @@ object IconSyncManager {
         }
     }
 
-    private fun cacheDecodedIcon(packageName: String, base64: String) {
+    private fun cacheDecodedIcon(context: Context, packageName: String, base64: String) {
         try {
             val bytes = Base64.decode(base64, Base64.DEFAULT)
             val bmp = android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return
-            AppRepository.cacheExternalAppIcon(packageName, bmp)
+            runBlocking {
+                AppRepository.cacheExternalAppIcon(context, packageName, bmp, "remote")
+            }
         } catch (e: Exception) {
             Logger.w(TAG, "图标解码失败：$packageName", e)
         }
