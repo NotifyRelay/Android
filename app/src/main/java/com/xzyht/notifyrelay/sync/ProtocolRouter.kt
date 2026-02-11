@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.sync
 import android.content.Context
 import android.os.Build
 import android.os.Environment
-import com.xzyht.notifyrelay.common.core.clipboard.ClipboardProcessor
+import com.xzyht.notifyrelay.common.clipboard.ClipboardProcessor
 import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.ALREADY_RUNNING
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.CONFIG_ERROR

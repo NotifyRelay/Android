@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.core.clipboard
+package com.xzyht.notifyrelay.common.clipboard
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
