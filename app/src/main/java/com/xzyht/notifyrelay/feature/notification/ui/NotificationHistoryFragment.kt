@@ -46,7 +46,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecord
-import com.xzyht.notifyrelay.common.core.repository.AppRepository
+import com.xzyht.notifyrelay.common.core.appslist.AppRepository
 import com.xzyht.notifyrelay.common.core.sync.MessageSender
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger

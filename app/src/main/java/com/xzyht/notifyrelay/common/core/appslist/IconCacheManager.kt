@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.core.cache
+package com.xzyht.notifyrelay.common.core.appslist
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -61,13 +61,22 @@ object IconCacheManager {
                         //Logger.d(TAG, "图标已缓存 (DiskLruCache): $packageName")
                         return@withContext true
                     } catch (e: Exception) {
-                        try { editor.abort() } catch (_: Exception) {}
+                        try {
+                            editor.abort()
+                        } catch (_: Exception) {
+                        }
                         throw e
                     }
                 } else {
                     // fallback: write directly to file
                     val file = File(cacheDir, "$key.png")
-                    FileOutputStream(file).use { out -> bitmap.compress(Bitmap.CompressFormat.PNG, 100, out) }
+                    FileOutputStream(file).use { out ->
+                        bitmap.compress(
+                            Bitmap.CompressFormat.PNG,
+                            100,
+                            out
+                        )
+                    }
                     updateMetadata(packageName, System.currentTimeMillis())
                     //Logger.d(TAG, "图标已缓存 (fallback): $packageName")
                     return@withContext true
@@ -128,7 +137,10 @@ object IconCacheManager {
         return withContext(Dispatchers.IO) {
             try {
                 val key = keyFor(packageName)
-                try { diskCache?.remove(key) } catch (_: Exception) {}
+                try {
+                    diskCache?.remove(key)
+                } catch (_: Exception) {
+                }
                 val f = File(cacheDir, "$key.png")
                 val deleted = if (f.exists()) f.delete() else true
                 removeMetadata(packageName)
@@ -144,7 +156,10 @@ object IconCacheManager {
     suspend fun clearAllCache(): Boolean {
         return withContext(Dispatchers.IO) {
             try {
-                try { diskCache?.delete() } catch (_: Exception) {}
+                try {
+                    diskCache?.delete()
+                } catch (_: Exception) {
+                }
                 // recreate directory
                 cacheDir.listFiles()?.forEach { it.delete() }
                 //Logger.d(TAG, "已清空所有图标缓存")
@@ -174,7 +189,9 @@ object IconCacheManager {
                 expired.forEach { removeIcon(it) }
                 // If over size, rely on DiskLruCache eviction; additionally delete oldest files
                 if (getCacheSize() > MAX_CACHE_SIZE_MB * 1024 * 1024) {
-                    val files = cacheDir.listFiles()?.filter { it.isFile }?.sortedBy { it.lastModified() } ?: emptyList()
+                    val files =
+                        cacheDir.listFiles()?.filter { it.isFile }?.sortedBy { it.lastModified() }
+                            ?: emptyList()
                     var total = getCacheSize()
                     val limit = MAX_CACHE_SIZE_MB * 1024 * 1024
                     for (f in files) {

@@ -295,7 +295,7 @@ fun UILocalFilter(
                     LaunchedEffect(entry.packageName) {
                         if (entry.packageName.isNotBlank() && entryIcons[entry] == null) {
                             try {
-                                val bmp = com.xzyht.notifyrelay.common.core.repository.AppRepository.getAppIconAsync(context, entry.packageName)
+                                val bmp = com.xzyht.notifyrelay.common.core.appslist.AppRepository.getAppIconAsync(context, entry.packageName)
                                 entryIcons = entryIcons + (entry to (bmp?.asImageBitmap() ?: defaultAppIconBitmap))
                             } catch (_: Exception) {
                                 entryIcons = entryIcons + (entry to defaultAppIconBitmap)
@@ -378,7 +378,7 @@ fun UILocalFilter(
                     LaunchedEffect(entry.packageName) {
                         if (entry.packageName.isNotBlank() && entryIcons[entry] == null) {
                             try {
-                                val bmp = com.xzyht.notifyrelay.common.core.repository.AppRepository.getAppIconAsync(context, entry.packageName)
+                                val bmp = com.xzyht.notifyrelay.common.core.appslist.AppRepository.getAppIconAsync(context, entry.packageName)
                                 entryIcons = entryIcons + (entry to (bmp?.asImageBitmap() ?: defaultAppIconBitmap))
                             } catch (_: Exception) {
                                 entryIcons = entryIcons + (entry to defaultAppIconBitmap)
@@ -460,7 +460,7 @@ fun UILocalFilter(
             newPackageIcon = defaultAppIconBitmap
             coroutineScope.launch {
                 try {
-                    val bmp = com.xzyht.notifyrelay.common.core.repository.AppRepository.getAppIconAsync(context, packageName)
+                    val bmp = com.xzyht.notifyrelay.common.core.appslist.AppRepository.getAppIconAsync(context, packageName)
                     newPackageIcon = bmp?.asImageBitmap() ?: defaultAppIconBitmap
                 } catch (_: Exception) {
                     newPackageIcon = defaultAppIconBitmap

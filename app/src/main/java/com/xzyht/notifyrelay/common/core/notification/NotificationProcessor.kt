@@ -67,7 +67,7 @@ object NotificationProcessor {
                 val text = json.optString("text")
                 val time = json.optLong("time", System.currentTimeMillis())
 
-                val installedPkgs = com.xzyht.notifyrelay.common.core.repository.AppRepository.getInstalledPackageNamesSync(context)
+                val installedPkgs = com.xzyht.notifyrelay.common.core.appslist.AppRepository.getInstalledPackageNamesSync(context)
                 val mappedPkg = com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
 
                 try {

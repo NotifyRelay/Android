@@ -1,10 +1,9 @@
-package com.xzyht.notifyrelay.common.core.repository
+package com.xzyht.notifyrelay.common.core.appslist
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
-import com.xzyht.notifyrelay.common.core.cache.IconCacheManager
-import com.xzyht.notifyrelay.common.core.repository.AppRepository.loadApps
+import com.xzyht.notifyrelay.common.core.appslist.AppRepository.loadApps
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

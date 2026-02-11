@@ -46,7 +46,7 @@ import androidx.core.view.WindowCompat
 import com.xzyht.notifyrelay.common.NotifyRelayTheme
 import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.common.SetupSystemBars
-import com.xzyht.notifyrelay.common.core.repository.AppListHelper
+import com.xzyht.notifyrelay.common.core.appslist.AppListHelper
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils

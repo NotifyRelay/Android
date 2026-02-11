@@ -1,8 +1,8 @@
 package com.xzyht.notifyrelay.common.core.sync
 
 import android.content.Context
-import com.xzyht.notifyrelay.common.core.repository.AppListHelper
-import com.xzyht.notifyrelay.common.core.repository.AppRepository
+import com.xzyht.notifyrelay.common.core.appslist.AppListHelper
+import com.xzyht.notifyrelay.common.core.appslist.AppRepository
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo

@@ -42,7 +42,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.common.core.repository.AppRepository
+import com.xzyht.notifyrelay.common.core.appslist.AppRepository
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import notifyrelay.core.util.DataUrlUtils

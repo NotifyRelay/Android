@@ -44,7 +44,7 @@ import androidx.fragment.app.FragmentActivity
 import com.xzyht.notifyrelay.common.NotifyRelayTheme
 import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.common.SetupSystemBars
-import com.xzyht.notifyrelay.common.core.repository.AppRepository
+import com.xzyht.notifyrelay.common.core.appslist.AppRepository
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.data.config.DeviceInfoManager
