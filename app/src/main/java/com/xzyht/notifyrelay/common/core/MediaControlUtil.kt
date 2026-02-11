@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.core.util
+package com.xzyht.notifyrelay.common.core
 
 import android.app.Notification
 import android.app.PendingIntent
@@ -15,7 +15,7 @@ object MediaControlUtil {
      */
     fun playPause(context: Context) {
         try {
-            val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
+            val sbn = NotifyRelayNotificationListenerService.Companion.latestMediaSbn
             if (sbn != null) {
                 triggerPlayPauseFromNotification(sbn)
                 return
@@ -33,7 +33,7 @@ object MediaControlUtil {
 
     fun next(context: Context) {
         try {
-            val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
+            val sbn = NotifyRelayNotificationListenerService.Companion.latestMediaSbn
             if (sbn != null) {
                 triggerNextFromNotification(sbn)
                 return
@@ -51,7 +51,7 @@ object MediaControlUtil {
 
     fun previous(context: Context) {
         try {
-            val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
+            val sbn = NotifyRelayNotificationListenerService.Companion.latestMediaSbn
             if (sbn != null) {
                 triggerPreviousFromNotification(sbn)
                 return
