@@ -1,5 +1,6 @@
-package com.xzyht.notifyrelay.common.core.util
+package com.xzyht.notifyrelay.feature.fragment
 
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -11,11 +12,12 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
+import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonColors
-import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 双击确认状态接口
@@ -40,7 +42,7 @@ fun rememberDoubleClickConfirm(): DoubleClickConfirmState {
             override var isConfirming by mutableStateOf(false)
         }
     }
-    
+
     // 监听确认状态变化，2秒后自动清除确认状态
     LaunchedEffect(state.isConfirming) {
         if (state.isConfirming) {
@@ -50,14 +52,14 @@ fun rememberDoubleClickConfirm(): DoubleClickConfirmState {
             }
         }
     }
-    
+
     return state
 }
 
 /**
  * 双击确认按钮组件
  * 第一次点击进入确认状态，第二次点击执行确认操作
- * 
+ *
  * @param text 按钮默认文本
  * @param confirmText 确认状态下的按钮文本，默认为"确认?"
  * @param onClick 第一次点击时的回调
@@ -72,16 +74,16 @@ fun DoubleClickConfirmButton(
     confirmText: String = "确认?",
     onClick: () -> Unit,
     onConfirm: () -> Unit,
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier.Companion,
     colors: ButtonColors = ButtonDefaults.buttonColors(),
-    confirmColors: ButtonColors = ButtonDefaults.buttonColors(color = Color.Red),
-    textColor: androidx.compose.ui.graphics.Color? = null,
-    confirmTextColor: androidx.compose.ui.graphics.Color? = null
+    confirmColors: ButtonColors = ButtonDefaults.buttonColors(color = Color.Companion.Red),
+    textColor: Color? = null,
+    confirmTextColor: Color? = null
 ) {
     val state = rememberDoubleClickConfirm()
     val context = LocalContext.current
-    val colorScheme = top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
-    
+    val colorScheme = MiuixTheme.colorScheme
+
     Button(
         onClick = {
             if (state.isConfirming) {
@@ -96,17 +98,17 @@ fun DoubleClickConfirmButton(
             }
         },
         modifier = modifier,
-        insideMargin = androidx.compose.foundation.layout.PaddingValues(horizontal = 12.dp, vertical = 6.dp),
+        insideMargin = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
         colors = if (state.isConfirming) confirmColors else colors
     ) {
         Text(
             text = if (state.isConfirming) confirmText else text,
             color = if (state.isConfirming) {
-                confirmTextColor ?: Color.White
+                confirmTextColor ?: Color.Companion.White
             } else {
-                textColor ?: Color.White
+                textColor ?: Color.Companion.White
             },
-            style = top.yukonga.miuix.kmp.theme.MiuixTheme.textStyles.body2
+            style = MiuixTheme.textStyles.body2
         )
     }
 }
