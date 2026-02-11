@@ -27,7 +27,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.common.core.appslist.AppRepository
+import com.xzyht.notifyrelay.common.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.notification.backend.BackendLocalFilter
 import com.xzyht.notifyrelay.feature.fragment.filter.dialog.AppPickerDialog
 import kotlinx.coroutines.launch

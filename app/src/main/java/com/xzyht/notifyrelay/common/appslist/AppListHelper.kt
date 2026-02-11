@@ -1,8 +1,9 @@
-package com.xzyht.notifyrelay.common.core.appslist
+package com.xzyht.notifyrelay.common.appslist
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import notifyrelay.base.util.Logger
+import org.json.JSONArray
 
 object AppListHelper {
     /**
@@ -119,7 +120,7 @@ object AppListHelper {
      * @param appsArray 包含应用信息的 JSONArray
      * @return 解析后的应用列表，格式为 Map<包名, 应用名>
      */
-    fun parseRemoteAppList(appsArray: org.json.JSONArray): Map<String, String> {
+    fun parseRemoteAppList(appsArray: JSONArray): Map<String, String> {
         val result = mutableMapOf<String, String>()
         for (i in 0 until appsArray.length()) {
             val appItem = appsArray.optJSONObject(i) ?: continue

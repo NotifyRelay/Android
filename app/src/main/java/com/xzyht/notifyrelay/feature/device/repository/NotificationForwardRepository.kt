@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.feature.device.repository
 
 import android.content.Context
 import androidx.compose.runtime.MutableState
-import com.xzyht.notifyrelay.common.core.appslist.AppRepository
+import com.xzyht.notifyrelay.common.appslist.AppRepository
 import notifyrelay.base.util.Logger
 import kotlinx.coroutines.delay
 

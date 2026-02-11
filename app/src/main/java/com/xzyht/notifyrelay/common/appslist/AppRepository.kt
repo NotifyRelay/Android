@@ -1,14 +1,20 @@
-package com.xzyht.notifyrelay.common.core.appslist
+package com.xzyht.notifyrelay.common.appslist
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import com.xzyht.notifyrelay.common.core.appslist.AppListHelper
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
+import com.xzyht.notifyrelay.common.appslist.AppRepository.loadApps
+import com.xzyht.notifyrelay.common.core.sync.IconSyncManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
@@ -111,13 +117,13 @@ object AppRepository {
                     try {
                         val drawable = pm.getApplicationIcon(appInfo)
                         val bitmap = when (drawable) {
-                            is android.graphics.drawable.BitmapDrawable -> drawable.bitmap
+                            is BitmapDrawable -> drawable.bitmap
                             else -> {
                                 // 将其他类型的drawable转换为bitmap
                                 val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
                                 val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
                                 val createdBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                                val canvas = android.graphics.Canvas(createdBitmap)
+                                val canvas = Canvas(createdBitmap)
                                 drawable.setBounds(0, 0, width, height)
                                 drawable.draw(canvas)
                                 createdBitmap
@@ -359,7 +365,7 @@ object AppRepository {
     fun getInstalledPackageNamesSync(context: Context): Set<String> {
         if (!isDataLoaded()) {
             // 同步加载，使用runBlocking
-            kotlinx.coroutines.runBlocking {
+            runBlocking {
                 loadApps(context)
             }
         }
@@ -386,13 +392,13 @@ object AppRepository {
                     // 从PackageManager获取图标
                     val drawable = pm.getApplicationIcon(appInfo)
                     val bitmap = when (drawable) {
-                        is android.graphics.drawable.BitmapDrawable -> drawable.bitmap
+                        is BitmapDrawable -> drawable.bitmap
                         else -> {
                             // 将其他类型的drawable转换为bitmap
                             val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
                             val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
                             val createdBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                            val canvas = android.graphics.Canvas(createdBitmap)
+                            val canvas = Canvas(createdBitmap)
                             drawable.setBounds(0, 0, width, height)
                             drawable.draw(canvas)
                             createdBitmap
@@ -464,13 +470,13 @@ object AppRepository {
 
         if (!isDataLoaded()) {
             // 同步加载，使用runBlocking
-            kotlinx.coroutines.runBlocking {
+            runBlocking {
                 loadApps(context)
             }
         }
 
         // 从数据库获取应用信息
-        val app = kotlinx.coroutines.runBlocking {
+        val app = runBlocking {
             databaseRepository.getAppByPackageName(packageName)
         }
         val iconBytes = app?.iconBytes
@@ -573,8 +579,8 @@ object AppRepository {
     suspend fun getAppIconWithAutoRequest(
         context: Context,
         packageName: String,
-        deviceManager: com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager? = null,
-        sourceDevice: com.xzyht.notifyrelay.feature.device.service.DeviceInfo? = null
+        deviceManager: DeviceConnectionManager? = null,
+        sourceDevice: DeviceInfo? = null
     ): Bitmap? {
         try {
             // 1. 优先获取本地应用图标
@@ -591,7 +597,7 @@ object AppRepository {
             
             // 3. 自动请求缺失的图标
             if (deviceManager != null && sourceDevice != null) {
-                com.xzyht.notifyrelay.common.core.sync.IconSyncManager.checkAndSyncIcon(
+                IconSyncManager.checkAndSyncIcon(
                     context,
                     packageName,
                     deviceManager,
@@ -618,8 +624,8 @@ object AppRepository {
     suspend fun getAppIconWithAutoRequestAsync(
         context: Context,
         packageName: String,
-        deviceManager: com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager? = null,
-        sourceDevice: com.xzyht.notifyrelay.feature.device.service.DeviceInfo? = null
+        deviceManager: DeviceConnectionManager? = null,
+        sourceDevice: DeviceInfo? = null
     ): Bitmap? {
         try {
             // 1. 优先获取本地应用图标
@@ -636,7 +642,7 @@ object AppRepository {
             
             // 3. 自动请求缺失的图标
             if (deviceManager != null && sourceDevice != null) {
-                com.xzyht.notifyrelay.common.core.sync.IconSyncManager.checkAndSyncIcon(
+                IconSyncManager.checkAndSyncIcon(
                     context,
                     packageName,
                     deviceManager,

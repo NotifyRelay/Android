@@ -33,7 +33,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.PopupProperties
-import com.xzyht.notifyrelay.common.core.appslist.AppRepository
+import com.xzyht.notifyrelay.common.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.fragment.filter.dialog.AddKeywordDialog
 import com.xzyht.notifyrelay.feature.fragment.filter.dialog.AppPickerDialog

@@ -43,7 +43,7 @@ import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import com.xzyht.notifyrelay.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.common.SetupSystemBars
-import com.xzyht.notifyrelay.common.core.appslist.AppRepository
+import com.xzyht.notifyrelay.common.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager

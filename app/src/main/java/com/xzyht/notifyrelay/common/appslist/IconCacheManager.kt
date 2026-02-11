@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.core.appslist
+package com.xzyht.notifyrelay.common.appslist
 
 import android.content.Context
 import android.graphics.Bitmap

@@ -1,6 +1,7 @@
 package com.xzyht.notifyrelay.common.core.notification
 
 import android.content.Context
+import com.xzyht.notifyrelay.common.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
@@ -67,7 +68,7 @@ object NotificationProcessor {
                 val text = json.optString("text")
                 val time = json.optLong("time", System.currentTimeMillis())
 
-                val installedPkgs = com.xzyht.notifyrelay.common.core.appslist.AppRepository.getInstalledPackageNamesSync(context)
+                val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
                 val mappedPkg = com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
 
                 try {
