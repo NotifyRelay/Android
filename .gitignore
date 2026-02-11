@@ -2,8 +2,7 @@
 *.iml
 .idea/
 .vscode/
-/.vscode/
-
+.trae/
 # 构建相关文件
 .gradle/
 /build
@@ -26,6 +25,5 @@ local.properties
 # 其他文件
 /.kotlin
 /captures
-/.trae/
 .qoder/
 base/build/
