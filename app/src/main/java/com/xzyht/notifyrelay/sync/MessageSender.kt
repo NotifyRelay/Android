@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.core.sync
+package com.xzyht.notifyrelay.sync
 
 import android.R
 import android.app.KeyguardManager
@@ -294,7 +294,7 @@ object MessageSender {
 
                 // 根据负载类型选择报文头（媒体播放使用 DATA_MEDIAPLAY，其它使用 DATA_NOTIFICATION）
                 val header = try {
-                    val obj = org.json.JSONObject(task.data)
+                    val obj = JSONObject(task.data)
                     if (obj.optString("type", "").equals("MEDIA_PLAY", true)) "DATA_MEDIAPLAY" else "DATA_NOTIFICATION"
                 } catch (_: Exception) { "DATA_NOTIFICATION" }
                 ProtocolSender.sendEncrypted(task.deviceManager, task.device, header, task.data, 10000L)
@@ -304,7 +304,7 @@ object MessageSender {
                 // 检查是否为媒体播放消息，如果是，更新或清理媒体状态
                 if (header == "DATA_MEDIAPLAY") {
                     try {
-                        val obj = org.json.JSONObject(task.data)
+                        val obj = JSONObject(task.data)
                         val mediaType = obj.optString("mediaType", "")
                         if (mediaType.equals("END", true)) {
                             // 是结束包，清理媒体状态

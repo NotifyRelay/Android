@@ -1,6 +1,7 @@
-package com.xzyht.notifyrelay.common.core.sync
+package com.xzyht.notifyrelay.sync
 
 import android.content.Context
+import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
@@ -9,7 +10,10 @@ import notifyrelay.core.util.BatteryUtils
 import notifyrelay.core.util.EncryptionManager
 import java.io.BufferedReader
 import java.io.OutputStreamWriter
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import java.net.Socket
+import kotlin.collections.iterator
 
 /**
  * 服务端首行协议路由器
@@ -136,7 +140,7 @@ object ServerLineRouter {
                             val sharedSecret = EncryptionManager.generateSharedSecret(deviceManager.localPublicKey, remotePubKey)
                             synchronized(deviceManager.authenticatedDevices) {
                                 deviceManager.authenticatedDevices.remove(remoteUuid)
-                                deviceManager.authenticatedDevices[remoteUuid] = com.xzyht.notifyrelay.feature.device.service.AuthInfo(
+                                deviceManager.authenticatedDevices[remoteUuid] = AuthInfo(
                                 remotePubKey, sharedSecret, true, remoteDevice.displayName,
                                 deviceType = remoteDeviceType, battery = remoteBattery
                             )
@@ -282,7 +286,7 @@ object ServerLineRouter {
 
     private fun getLocalIpAddress(deviceManager: DeviceConnectionManager): String {
         return try {
-            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+            val interfaces = NetworkInterface.getNetworkInterfaces()
             while (interfaces.hasMoreElements()) {
                 val networkInterface = interfaces.nextElement()
                 if (networkInterface.isLoopback || !networkInterface.isUp) continue
@@ -290,7 +294,7 @@ object ServerLineRouter {
                 val addresses = networkInterface.inetAddresses
                 while (addresses.hasMoreElements()) {
                     val address = addresses.nextElement()
-                    if (address is java.net.Inet4Address && !address.isLoopbackAddress) {
+                    if (address is Inet4Address && !address.isLoopbackAddress) {
                         return address.hostAddress ?: "0.0.0.0"
                     }
                 }

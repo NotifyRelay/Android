@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.core.sync
+package com.xzyht.notifyrelay.sync
 
 import android.content.Context
 import com.xzyht.notifyrelay.common.appslist.AppListHelper
@@ -7,6 +7,8 @@ import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.runBlocking
+import notifyrelay.data.database.entity.AppDeviceEntity
+import notifyrelay.data.database.repository.DatabaseRepository
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -134,9 +136,9 @@ object AppListSyncManager {
                 AppRepository.cacheRemoteAppList(context, appsMap, deviceUuid)
                 
                 // 关联应用包名与设备（替代原 associateAppsWithDevice 方法）
-                val databaseRepository = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+                val databaseRepository = DatabaseRepository.getInstance(context)
                 val appDeviceEntities = packageNames.map {
-                    notifyrelay.data.database.entity.AppDeviceEntity(
+                    AppDeviceEntity(
                         packageName = it,
                         sourceDevice = deviceUuid,
                         lastUpdated = System.currentTimeMillis()
@@ -164,7 +166,7 @@ object AppListSyncManager {
         sourceDevice: DeviceInfo
     ) {
         // 检查缺失的图标（替代原 getMissingIconsForPackages 方法）
-        val databaseRepository = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+        val databaseRepository = DatabaseRepository.getInstance(context)
         val missingIcons = runBlocking {
             packageNames.filter { pkg ->
                 val app = databaseRepository.getAppByPackageName(pkg)

@@ -1,6 +1,10 @@
-package com.xzyht.notifyrelay.common.core.sync
+package com.xzyht.notifyrelay.sync
 
 import android.content.Context
+import android.os.Build
+import android.os.Environment
+import android.os.Handler
+import android.os.Looper
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import org.apache.ftpserver.FtpServer
@@ -15,6 +19,9 @@ import org.apache.ftpserver.usermanager.impl.WritePermission
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
+import java.net.BindException
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import java.util.concurrent.atomic.AtomicBoolean
 
 data class ftpServerInfo(
@@ -117,11 +124,11 @@ object ftpServer {
         this.applicationContext = context.applicationContext
 
         // 检查文件管理权限
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.R) {
-            if (!android.os.Environment.isExternalStorageManager()) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            if (!Environment.isExternalStorageManager()) {
                 Logger.w(TAG, "FTP 服务需要文件管理权限，当前未授权")
                 // 在UI线程中显示Toast提示用户
-                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                Handler(Looper.getMainLooper()).post {
                     ToastUtils.showShortToast(context, "FTP 服务需要文件管理权限，当前仅能查看文件层级")
                 }
                 // 即使没有文件权限，也继续启动FTP服务，PC端可以获取文件层级
@@ -178,7 +185,7 @@ object ftpServer {
             } catch (e: Exception) {
                 lastException = e
                 when (e) {
-                    is java.net.BindException -> seenBind = true
+                    is BindException -> seenBind = true
                     is SecurityException -> seenPermDenied = true
                     is IllegalArgumentException -> seenConfig = true
                     is FtpException -> seenConfig = true
@@ -225,7 +232,7 @@ object ftpServer {
 
     private fun getDeviceIpAddress(): String? {
         return try {
-            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
+            val interfaces = NetworkInterface.getNetworkInterfaces()
             while (interfaces.hasMoreElements()) {
                 val networkInterface = interfaces.nextElement()
                 if (networkInterface.isLoopback || !networkInterface.isUp) continue
@@ -233,7 +240,7 @@ object ftpServer {
                 val addresses = networkInterface.inetAddresses
                 while (addresses.hasMoreElements()) {
                     val address = addresses.nextElement()
-                    if (address is java.net.Inet4Address && !address.isLoopbackAddress) {
+                    if (address is Inet4Address && !address.isLoopbackAddress) {
                         return address.hostAddress
                     }
                 }

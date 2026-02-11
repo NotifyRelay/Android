@@ -1,18 +1,21 @@
-package com.xzyht.notifyrelay.common.core.sync
+package com.xzyht.notifyrelay.sync
 
 import android.content.Context
 import android.os.Build
 import android.os.Environment
-import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.ALREADY_RUNNING
-import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.CONFIG_ERROR
-import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.FAILED
-import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.PERMISSION_DENIED
-import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.PORT_IN_USE
-import com.xzyht.notifyrelay.common.core.sync.ftpServer.StartResult.SUCCESS
+import com.xzyht.notifyrelay.common.core.clipboard.ClipboardProcessor
+import com.xzyht.notifyrelay.common.core.notification.NotificationProcessor
+import com.xzyht.notifyrelay.sync.ftpServer.StartResult.ALREADY_RUNNING
+import com.xzyht.notifyrelay.sync.ftpServer.StartResult.CONFIG_ERROR
+import com.xzyht.notifyrelay.sync.ftpServer.StartResult.FAILED
+import com.xzyht.notifyrelay.sync.ftpServer.StartResult.PERMISSION_DENIED
+import com.xzyht.notifyrelay.sync.ftpServer.StartResult.PORT_IN_USE
+import com.xzyht.notifyrelay.sync.ftpServer.StartResult.SUCCESS
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.GuideActivity
 import com.xzyht.notifyrelay.common.core.notification.StatusProcessor
+import com.xzyht.notifyrelay.common.core.notification.SuperIslandProcessor
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
@@ -83,11 +86,11 @@ object ProtocolRouter {
                 "DATA", "DATA_NOTIFICATION" -> {
                     Logger.d(TAG, "接收到 DATA_NOTIFICATION 消息: $decrypted")
                     val routedHeader = "DATA_NOTIFICATION"
-                    com.xzyht.notifyrelay.common.core.notification.NotificationProcessor.process(
+                    NotificationProcessor.process(
                         context,
                         deviceManager,
                         deviceManager.coroutineScopeInternal,
-                        com.xzyht.notifyrelay.common.core.notification.NotificationProcessor.NotificationInput(
+                        NotificationProcessor.NotificationInput(
                             header = routedHeader,
                             rawData = decrypted,
                             sharedSecret = auth.sharedSecret,
@@ -101,7 +104,7 @@ object ProtocolRouter {
                     // 分流到 SuperIslandProcessor 专门处理超级岛通知
                     Logger.d(TAG, "接收到 DATA_NOTIFICATION 消息: $decrypted")
                     try {
-                        val handled = com.xzyht.notifyrelay.common.core.notification.SuperIslandProcessor.process(
+                        val handled = SuperIslandProcessor.process(
                             context,
                             deviceManager,
                             decrypted,
@@ -158,7 +161,7 @@ object ProtocolRouter {
                     Logger.d(TAG, "接收到 DATA_MEDIA_CONTROL 消息: $decrypted")
                     // 处理媒体控制命令，包括音频转发和媒体播放控制
                     try {
-                        val json = org.json.JSONObject(decrypted)
+                        val json = JSONObject(decrypted)
                         val action = json.getString("action")
                         
                         // 执行相应的媒体控制操作，优先通过通知的 PendingIntent 触发
@@ -403,9 +406,9 @@ object ProtocolRouter {
                 "DATA_CLIPBOARD" -> {
                     Logger.d(TAG, "接收到 DATA_CLIPBOARD 消息: $decrypted")
                     // 处理剪贴板消息
-                    com.xzyht.notifyrelay.common.core.clipboard.ClipboardProcessor.process(
+                    ClipboardProcessor.process(
                         context,
-                        com.xzyht.notifyrelay.common.core.clipboard.ClipboardProcessor.ClipboardInput(
+                        ClipboardProcessor.ClipboardInput(
                             header = "DATA_CLIPBOARD",
                             rawData = decrypted,
                             sharedSecret = auth.sharedSecret,

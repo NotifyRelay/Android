@@ -1,5 +1,9 @@
-package com.xzyht.notifyrelay.common.core.sync
+package com.xzyht.notifyrelay.sync
 
+import android.os.Handler
+import android.os.Looper
+import android.widget.Toast
+import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import notifyrelay.core.util.EncryptionManager
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
@@ -8,6 +12,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.collections.iterator
 
 /**
  * 连接保活与重连策略封装：
@@ -113,11 +118,11 @@ class ConnectionKeepAlive(
 
         val msg = "设备[${DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid)}]离线，已尝试重连，请检查网络或重新发现设备"
         val ctx = deviceManager.contextInternal
-        if (android.os.Looper.myLooper() == android.os.Looper.getMainLooper()) {
-            android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_SHORT).show()
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
         } else {
-            android.os.Handler(android.os.Looper.getMainLooper()).post {
-                android.widget.Toast.makeText(ctx, msg, android.widget.Toast.LENGTH_SHORT).show()
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -175,7 +180,7 @@ class ConnectionKeepAlive(
                         val sharedSecret = EncryptionManager.generateSharedSecret(deviceManager.localPublicKey, remotePubKey)
                         synchronized(authenticatedDevices) {
                             authenticatedDevices.remove(device.uuid)
-                            authenticatedDevices[device.uuid] = com.xzyht.notifyrelay.feature.device.service.AuthInfo(
+                            authenticatedDevices[device.uuid] = AuthInfo(
                                 remotePubKey,
                                 sharedSecret,
                                 true,

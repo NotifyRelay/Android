@@ -7,7 +7,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import notifyrelay.base.util.PermissionHelper
-import com.xzyht.notifyrelay.common.core.sync.ProtocolSender
+import com.xzyht.notifyrelay.sync.ProtocolSender
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import kotlinx.coroutines.CoroutineScope

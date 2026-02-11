@@ -2,12 +2,16 @@ package com.xzyht.notifyrelay.feature.device.service
 
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
-import com.xzyht.notifyrelay.common.core.sync.ConnectionDiscoveryManager
-import com.xzyht.notifyrelay.common.core.sync.ServerLineRouter
+import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
+import com.xzyht.notifyrelay.sync.ServerLineRouter
 import notifyrelay.core.util.EncryptionManager
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
+import com.xzyht.notifyrelay.sync.AppListSyncManager
+import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
+import com.xzyht.notifyrelay.sync.IconSyncManager
+import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -302,7 +306,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private val localPrivateKey: String
     internal val listenPort: Int = 23333
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
-    private val keepAlive = com.xzyht.notifyrelay.common.core.sync.ConnectionKeepAlive(this, coroutineScope)
+    private val keepAlive = ConnectionKeepAlive(this, coroutineScope)
     private val discoveryManager = ConnectionDiscoveryManager(this, coroutineScope)
 
     // === 以下为提供给 ServerLineRouter 等内部组件使用的访问器（保持字段本身 private） ===
@@ -621,7 +625,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                     //Logger.d("死神-NotifyRelay", "未认证设备，禁止发送")
                     return@launch
                 }
-                com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this@DeviceConnectionManager, device, "DATA_NOTIFICATION", data, 10000L)
+                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, device, "DATA_NOTIFICATION", data, 10000L)
             } catch (e: Exception) {
                 Logger.e("死神-NotifyRelay", "发送通知数据失败", e)
             }
@@ -633,7 +637,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
      */
     fun requestRemoteAppList(device: DeviceInfo, scope: String = "user") {
         try {
-            com.xzyht.notifyrelay.common.core.sync.AppListSyncManager.requestAppListFromDevice(context, this, device, scope)
+            AppListSyncManager.requestAppListFromDevice(context, this, device, scope)
         } catch (_: Exception) {}
     }
 
@@ -644,7 +648,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     fun requestAudioForwarding(device: DeviceInfo): Boolean {
         try {
             val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioRequest\"}"
-            com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, device, "DATA_MEDIA_CONTROL", request, 10000L)
+            ProtocolSender.sendEncrypted(this, device, "DATA_MEDIA_CONTROL", request, 10000L)
             return true
         } catch (_: Exception) {
             return false
@@ -666,7 +670,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 put("content", content)
                 put("time", System.currentTimeMillis())
             }
-            com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
+            ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
             return true
         } catch (_: Exception) {
             return false
@@ -692,7 +696,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
             
             for (device in devices) {
-                com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
+                ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
             }
             return true
         } catch (_: Exception) {
@@ -705,7 +709,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         coroutineScope.launch {
             while (true) {
                 delay(60000) // 每分钟清理一次
-                com.xzyht.notifyrelay.common.core.sync.IconSyncManager.cleanupExpiredRequests()
+                IconSyncManager.cleanupExpiredRequests()
             }
         }
     }
@@ -908,7 +912,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
             // 通过统一加密发送器发回对端
             val deviceInfo = DeviceInfo(remoteUuid, DeviceConnectionManagerUtil.getDisplayNameByUuid(remoteUuid), ip, port)
-            com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_STATUS", ackObj.toString(), 3000L)
+            ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_STATUS", ackObj.toString(), 3000L)
         } catch (_: Exception) {
         }
     }

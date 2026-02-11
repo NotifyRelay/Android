@@ -7,7 +7,7 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import com.xzyht.notifyrelay.common.appslist.AppRepository.loadApps
-import com.xzyht.notifyrelay.common.core.sync.IconSyncManager
+import com.xzyht.notifyrelay.sync.IconSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.flow.MutableStateFlow

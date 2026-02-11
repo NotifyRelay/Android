@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.core.sync
+package com.xzyht.notifyrelay.sync
 
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
@@ -7,6 +7,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeout
+import java.io.OutputStreamWriter
+import java.net.InetSocketAddress
+import java.net.Socket
 
 /**
  * 统一加密发送器
@@ -41,10 +44,10 @@ object ProtocolSender {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     withTimeout(timeoutMs) {
-                        val socket = java.net.Socket()
+                        val socket = Socket()
                         try {
-                            socket.connect(java.net.InetSocketAddress(target.ip, target.port), 5000)
-                            val writer = java.io.OutputStreamWriter(socket.getOutputStream())
+                            socket.connect(InetSocketAddress(target.ip, target.port), 5000)
+                            val writer = OutputStreamWriter(socket.getOutputStream())
                             val encrypted = deviceManager.encryptData(plaintext, auth.sharedSecret)
                             val payload = "$header:${deviceManager.uuid}:${deviceManager.localPublicKey}:${encrypted}"
                             writer.write(payload + "\n")

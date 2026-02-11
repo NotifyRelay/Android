@@ -63,7 +63,7 @@ import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.common.appslist.AppRepository
 import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecord
-import com.xzyht.notifyrelay.common.core.sync.MessageSender
+import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.feature.GuideActivity
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository

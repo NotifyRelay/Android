@@ -1,8 +1,9 @@
 package com.xzyht.notifyrelay.common.core.notification
 
 import android.content.Context
-import com.xzyht.notifyrelay.common.core.sync.MessageSender
+import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
@@ -178,7 +179,7 @@ object StatusProcessor {
                 }
             }
 
-            com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(
+            ProtocolSender.sendEncrypted(
                 deviceManager,
                 deviceInfo,
                 "DATA_STATUS",

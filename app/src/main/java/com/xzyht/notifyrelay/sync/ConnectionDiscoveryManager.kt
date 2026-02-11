@@ -1,14 +1,24 @@
-package com.xzyht.notifyrelay.common.core.sync
+package com.xzyht.notifyrelay.sync
 
+import android.content.Context
 import android.net.ConnectivityManager
+import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import java.net.DatagramPacket
+import java.net.DatagramSocket
+import java.net.Inet4Address
+import java.net.NetworkInterface
+import java.net.SocketTimeoutException
+import kotlin.collections.iterator
 
 /**
  * 负责「网络环境」与「设备发现」的整体协调：
@@ -35,12 +45,12 @@ class ConnectionDiscoveryManager(
 ) {
     private val context get() = deviceManager.contextInternal
     private val connectivityManager: ConnectivityManager
-        get() = context.getSystemService(android.content.Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        get() = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var broadcastThread: Thread? = null
     private var listenThread: Thread? = null
-    private var manualDiscoveryJob: kotlinx.coroutines.Job? = null
+    private var manualDiscoveryJob: Job? = null
     
     // 添加内部变量控制线程运行状态，避免频繁访问deviceManager.udpDiscoveryEnabled
     private var isDiscoveryRunning = false
@@ -66,7 +76,7 @@ class ConnectionDiscoveryManager(
             }
         }
         
-        com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil.updateGlobalDeviceName(device.uuid, device.displayName)
+        DeviceConnectionManagerUtil.updateGlobalDeviceName(device.uuid, device.displayName)
         scope.launch { deviceManager.updateDeviceListInternal() }
     }
     
@@ -93,15 +103,15 @@ class ConnectionDiscoveryManager(
         } catch (_: Exception) {}
         
         listenThread = Thread {
-            var socket: java.net.DatagramSocket? = null
+            var socket: DatagramSocket? = null
             try {
-                socket = java.net.DatagramSocket(23334)
+                socket = DatagramSocket(23334)
                 socket.soTimeout = 1000 // 设置超时，避免线程阻塞在receive()上
                 val buf = ByteArray(256)
                 
                 while (isDiscoveryRunning || deviceManager.isWifiDirectNetworkInternal()) {
                     try {
-                        val packet = java.net.DatagramPacket(buf, buf.size)
+                        val packet = DatagramPacket(buf, buf.size)
                         socket.receive(packet)
                         val msg = String(packet.data, 0, packet.length)
                         val ip = packet.address.hostAddress
@@ -205,7 +215,7 @@ class ConnectionDiscoveryManager(
                                 }
                             }
                         }
-                    } catch (e: java.net.SocketTimeoutException) {
+                    } catch (e: SocketTimeoutException) {
                         // 超时异常，继续循环检查条件
                         continue
                     }
@@ -241,14 +251,14 @@ class ConnectionDiscoveryManager(
 
     internal fun getLocalIpAddressInternal(): String {
         try {
-            val en = java.net.NetworkInterface.getNetworkInterfaces()
+            val en = NetworkInterface.getNetworkInterfaces()
             var bestIp: String? = null
             while (en.hasMoreElements()) {
                 val intf = en.nextElement()
                 val addrs = intf.inetAddresses
                 while (addrs.hasMoreElements()) {
                     val addr = addrs.nextElement()
-                    if (!addr.isLoopbackAddress && addr is java.net.Inet4Address) {
+                    if (!addr.isLoopbackAddress && addr is Inet4Address) {
                         val ip = addr.hostAddress ?: "0.0.0.0"
                         if (ip.startsWith("192.168.") || ip.startsWith("10.") || ip.startsWith("172.")) {
                             if (bestIp == null || ip.startsWith("192.168.43.")) {
@@ -346,7 +356,7 @@ class ConnectionDiscoveryManager(
         networkCallback = object : ConnectivityManager.NetworkCallback() {
             private var wasLanNetwork = false
 
-            override fun onAvailable(network: android.net.Network) {
+            override fun onAvailable(network: Network) {
                 val capabilities = cm.getNetworkCapabilities(network)
                 val isLanNetwork = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true ||
                         capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true ||
@@ -364,12 +374,12 @@ class ConnectionDiscoveryManager(
                 wasLanNetwork = isLanNetwork
             }
 
-            override fun onLost(network: android.net.Network) {
+            override fun onLost(network: Network) {
                 //Logger.d("死神-NotifyRelay", "网络丢失")
                 wasLanNetwork = false
             }
 
-            override fun onCapabilitiesChanged(network: android.net.Network, networkCapabilities: NetworkCapabilities) {
+            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
                 val isLanNetwork = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
                         networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
                         networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_WIFI_P2P)

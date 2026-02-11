@@ -18,7 +18,7 @@ import android.util.Base64
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.R
-import com.xzyht.notifyrelay.common.core.sync.MessageSender
+import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository

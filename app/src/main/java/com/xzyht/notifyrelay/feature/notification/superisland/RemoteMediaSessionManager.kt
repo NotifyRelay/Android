@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.superisland
 
 import android.content.Context
-import com.xzyht.notifyrelay.common.core.sync.ProtocolSender
+import com.xzyht.notifyrelay.sync.ProtocolSender
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import notifyrelay.data.StorageManager.getBoolean
