@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.core.notification.data
+package com.xzyht.notifyrelay.sync.notification.data
 
 // 通知记录数据模型
 data class NotificationRecord(

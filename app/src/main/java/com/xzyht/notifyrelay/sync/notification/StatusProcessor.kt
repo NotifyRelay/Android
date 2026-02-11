@@ -1,8 +1,10 @@
-package com.xzyht.notifyrelay.common.core.notification
+package com.xzyht.notifyrelay.sync.notification
 
 import android.content.Context
-import com.xzyht.notifyrelay.sync.MessageSender
+import android.os.Handler
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import notifyrelay.base.util.Logger
@@ -80,7 +82,7 @@ object StatusProcessor {
             if (!isSuperIslandAck) {
                 // 无论是错误还是正确，都显示响应中的消息信息
                 // 确保在主线程中显示Toast
-                android.os.Handler(context.mainLooper).post {
+                Handler(context.mainLooper).post {
                     if (errorMessage.isNotEmpty()) {
                         ToastUtils.showShortToast(context, errorMessage)
                     } else if (result == "success") {
@@ -157,7 +159,7 @@ object StatusProcessor {
      */
     fun sendStatusResponse(
         deviceManager: DeviceConnectionManager,
-        deviceInfo: com.xzyht.notifyrelay.feature.device.service.DeviceInfo,
+        deviceInfo: DeviceInfo,
         originalHeader: String,
         result: String,
         errorCode: String = "",

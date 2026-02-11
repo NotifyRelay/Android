@@ -1,15 +1,21 @@
-package com.xzyht.notifyrelay.common.core.notification
+package com.xzyht.notifyrelay.sync.notification
 
+import android.app.KeyguardManager
 import android.content.Context
 import com.xzyht.notifyrelay.common.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
+import com.xzyht.notifyrelay.feature.device.repository.remoteNotificationFilter
+import com.xzyht.notifyrelay.feature.device.repository.replicateNotification
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
+import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.sync.IconSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
+import org.json.JSONObject
 
 /**
  * 远程通知处理管线（单条通知级别，不负责网络收发）。
@@ -62,7 +68,7 @@ object NotificationProcessor {
     ) {
         try {
             if (remoteUuid != null) {
-                val json = org.json.JSONObject(decrypted)
+                val json = JSONObject(decrypted)
                 val pkg = json.optString("packageName")
                 val appName = json.optString("appName")
                 val title = json.optString("title")
@@ -70,7 +76,7 @@ object NotificationProcessor {
                 val time = json.optLong("time", System.currentTimeMillis())
 
                 val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
-                val mappedPkg = com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
+                val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
 
                 try {
                     NotificationRepository.addRemoteNotification(mappedPkg, appName, title, text, time, remoteUuid, context)
@@ -91,10 +97,10 @@ object NotificationProcessor {
         decrypted: String,
         remoteUuid: String?
     ) {
-        val result = com.xzyht.notifyrelay.feature.device.repository.remoteNotificationFilter(decrypted, context)
+        val result = remoteNotificationFilter(decrypted, context)
 
         if (result.shouldShow) {
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
             val localIsLocked = keyguardManager.isKeyguardLocked
 
             if (result.needsDelay && localIsLocked) {
@@ -102,7 +108,7 @@ object NotificationProcessor {
                 ChatMemory.append(context, "收到: ${result.rawData}")
             } else {
                 scope.launch {
-                    com.xzyht.notifyrelay.feature.device.repository.replicateNotification(context, result, null, startMonitoring = true)
+                    replicateNotification(context, result, null, startMonitoring = true)
                 }
 
                 if (remoteUuid != null) {
@@ -129,11 +135,11 @@ object NotificationProcessor {
     private fun handleLockedScreenDelayed(
         context: Context,
         scope: CoroutineScope,
-        result: com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter.FilterResult
+        result: BackendRemoteFilter.FilterResult
     ) {
         try {
-            if (com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig.enableDeduplication) {
-                com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter.addPlaceholder(result.title, result.text, result.mappedPkg, 15_000L)
+            if (RemoteFilterConfig.enableDeduplication) {
+                BackendRemoteFilter.addPlaceholder(result.title, result.text, result.mappedPkg, 15_000L)
             }
         } catch (_: Exception) {}
 
@@ -158,25 +164,25 @@ object NotificationProcessor {
                 }
 
                 if (!duplicateFound) {
-                    val placeholderStillExists = try { com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter.isPlaceholderPresent(result.title, result.text, result.mappedPkg) } catch (e: Exception) { true }
+                    val placeholderStillExists = try { BackendRemoteFilter.isPlaceholderPresent(result.title, result.text, result.mappedPkg) } catch (e: Exception) { true }
 
                     if (!placeholderStillExists) {
                         // 占位被移除，跳过复刻
                     } else {
                         try {
-                            com.xzyht.notifyrelay.feature.device.repository.replicateNotification(context, result, null, startMonitoring = false)
+                            replicateNotification(context, result, null, startMonitoring = false)
                         } catch (e: Exception) {
                             Logger.e("智能去重", "锁屏延迟复刻执行复刻时发生错误", e)
                         } finally {
-                            try { com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg) } catch (_: Exception) {}
+                            try { BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg) } catch (_: Exception) {}
                         }
                     }
                 } else {
-                    try { com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg) } catch (_: Exception) {}
+                    try { BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg) } catch (_: Exception) {}
                 }
             } catch (e: Exception) {
                 Logger.e("智能去重", "锁屏延迟复刻异常", e)
-                try { com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg) } catch (_: Exception) {}
+                try { BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg) } catch (_: Exception) {}
             }
         }
     }

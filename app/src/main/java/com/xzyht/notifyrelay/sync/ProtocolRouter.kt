@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Build
 import android.os.Environment
 import com.xzyht.notifyrelay.common.core.clipboard.ClipboardProcessor
-import com.xzyht.notifyrelay.common.core.notification.NotificationProcessor
+import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.ALREADY_RUNNING
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.CONFIG_ERROR
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.FAILED
@@ -14,8 +14,8 @@ import com.xzyht.notifyrelay.sync.ftpServer.StartResult.SUCCESS
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.GuideActivity
-import com.xzyht.notifyrelay.common.core.notification.StatusProcessor
-import com.xzyht.notifyrelay.common.core.notification.SuperIslandProcessor
+import com.xzyht.notifyrelay.sync.notification.StatusProcessor
+import com.xzyht.notifyrelay.sync.notification.SuperIslandProcessor
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager

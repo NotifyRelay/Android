@@ -1,10 +1,11 @@
-package com.xzyht.notifyrelay.common.core.notification
+package com.xzyht.notifyrelay.sync.notification
 
 import android.content.Context
 import android.os.Build
 import android.util.LruCache
 import com.xzyht.notifyrelay.common.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.SuperIslandRemoteStore
@@ -12,6 +13,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandPr
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
 import notifyrelay.base.util.Logger
+import org.json.JSONObject
 
 object SuperIslandProcessor {
     private const val TAG = "SuperIslandProcessor"
@@ -35,7 +37,7 @@ object SuperIslandProcessor {
     ): Boolean {
         try {
             if (remoteUuid == null) return false
-            val json = org.json.JSONObject(decrypted)
+            val json = JSONObject(decrypted)
             val pkg = json.optString("packageName")
             val appName = json.optString("appName")
             val title = json.optString("title")
@@ -43,7 +45,7 @@ object SuperIslandProcessor {
             val time = json.optLong("time", System.currentTimeMillis())
 
             val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
-            val mappedPkg = com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
+            val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
 
             val siType = try { json.optString("type", "") } catch (_: Exception) { "" }
 
