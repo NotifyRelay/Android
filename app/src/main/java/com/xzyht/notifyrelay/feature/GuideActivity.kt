@@ -44,11 +44,12 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import com.xzyht.notifyrelay.common.NotifyRelayTheme
-import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.common.SetupSystemBars
 import com.xzyht.notifyrelay.common.core.appslist.AppListHelper
+import kotlinx.coroutines.delay
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -61,7 +62,6 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import kotlinx.coroutines.delay
 
 class GuideActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -244,11 +244,6 @@ object GuideScreen {
                             showToast("跳转通知访问授权页面")
                             IntentUtils.startActivity(context, Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS, addNewTaskFlag = true)
                         },
-                        onClick = {
-                            showToast("跳转通知访问授权页面")
-                            val intent = Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                            IntentUtils.startActivity(context, intent, true)
-                        },
                         enabled = true
                     )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
@@ -287,10 +282,6 @@ object GuideScreen {
                                 IntentUtils.startActivity(context, Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null), true)
                             }
                         },
-                        onClick = {
-                            showToast("请在应用信息页面的权限管理-其他权限中允许<访问应用列表>")
-                            IntentUtils.startActivity(context, Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null), true)
-                        },
                         enabled = true
                     )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
@@ -299,16 +290,6 @@ object GuideScreen {
                         summary = if (hasPost) "已授权" else "用于发送本地通知，部分功能需开启",
                         checked = hasPost,
                         onCheckedChange = {
-                            showToast("请求通知发送权限")
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                                (context as? Activity)?.requestPermissions(
-                                    arrayOf(Manifest.permission.POST_NOTIFICATIONS), 100
-                                )
-                            } else {
-                                showToast("请在系统设置中开启通知权限")
-                            }
-                        },
-                        onClick = {
                             showToast("请求通知发送权限")
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                                 (context as? Activity)?.requestPermissions(
@@ -347,10 +328,6 @@ object GuideScreen {
                         summary = if (hasManageExternalStorage) "已授权" else "用于支持ftp功能，管理设备文件",
                         checked = hasManageExternalStorage,
                         onCheckedChange = {
-                            showToast("跳转文件管理权限设置")
-                            PermissionHelper.requestManageExternalStoragePermission(context)
-                        },
-                        onClick = {
                             showToast("跳转文件管理权限设置")
                             PermissionHelper.requestManageExternalStoragePermission(context)
                         },

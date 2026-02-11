@@ -1,12 +1,13 @@
 
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.util.Properties
+import java.io.File
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose") version "2.1.21"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.3.10"
     id("kotlin-kapt")
 }
 // 使用 buildSrc 的 JGit 实现计算版本信息（避免启动外部进程，兼容 configuration-cache）
@@ -128,9 +129,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        (this as org.jetbrains.kotlin.gradle.dsl.KotlinJvmOptions).jvmTarget = "11"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -152,6 +150,12 @@ android {
         resources {
             excludes += "META-INF/DEPENDENCIES"
         }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11)
     }
 }
 
@@ -194,8 +198,9 @@ dependencies {
     kapt("androidx.room:room-compiler:2.8.0")
     implementation("androidx.room:room-ktx:2.8.0")
     
-    // Miuix Compose 主题库
+    // Miuix风格ui库
     implementation(libs.miuix.android)
+    implementation("top.yukonga.miuix.kmp:miuix-icons:0.8.1")
     // DataStore 持久化（设备名、规则设置）
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("androidx.datastore:datastore:1.0.0")

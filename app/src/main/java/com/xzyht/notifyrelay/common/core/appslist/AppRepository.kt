@@ -4,7 +4,7 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import com.xzyht.notifyrelay.common.core.appslist.AppRepository.loadApps
+import com.xzyht.notifyrelay.common.core.appslist.AppListHelper
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -51,14 +51,17 @@ object AppRepository {
      * 通知UI层图标已更新
      * @param packageName 应用包名
      */
-    fun notifyIconUpdated(packageName: String) {
-        _iconUpdates.value = packageName
+    fun notifyIconUpdated(packageName: String): Unit {
+        val updatedValue: String? = packageName
+        _iconUpdates.value = updatedValue
     }
     
     // 初始化数据库仓库
-    private fun initDatabaseRepository(context: Context) {
-        if (!::databaseRepository.isInitialized) {
-            databaseRepository = DatabaseRepository.getInstance(context)
+    private fun initDatabaseRepository(context: Context): Unit {
+        val isInitialized: Boolean = ::databaseRepository.isInitialized
+        if (!isInitialized) {
+            val instance: DatabaseRepository = DatabaseRepository.getInstance(context)
+            databaseRepository = instance
         }
     }
 
@@ -72,7 +75,7 @@ object AppRepository {
      * @return 无（在成功或失败后会更新内部状态流 `_apps` 与 `_isLoading`）。
      * @throws Exception 当 PackageManager 访问或数据库操作发生严重错误时向上抛出（调用方可选择捕获）。
      */
-    suspend fun loadApps(context: Context) {
+    suspend fun loadApps(context: Context): Unit {
         initDatabaseRepository(context)
 
         _isLoading.value = true
@@ -211,7 +214,7 @@ object AppRepository {
      *
      * 说明：该方法会清空数据库中的应用与图标缓存。
      */
-    suspend fun clearCache(context: Context) {
+    suspend fun clearCache(context: Context): Unit {
         initDatabaseRepository(context)
 
         // 清除应用数据
@@ -234,7 +237,7 @@ object AppRepository {
      * @param apps 远程应用列表，格式为 Map<包名, 应用名>
      * @param deviceUuid 远程设备UUID
      */
-    suspend fun cacheRemoteAppList(context: Context, apps: Map<String, String>, deviceUuid: String) {
+    suspend fun cacheRemoteAppList(context: Context, apps: Map<String, String>, deviceUuid: String): Unit {
         initDatabaseRepository(context)
 
         val appEntities = mutableListOf<AppEntity>()
@@ -371,7 +374,7 @@ object AppRepository {
      * @param context Android 上下文，用于访问 PackageManager 与数据库（非空）。
      * @param apps 需要加载图标的应用列表（非空，可为空列表）。
      */
-    private suspend fun loadAppIcons(context: Context, apps: List<ApplicationInfo>) {
+    private suspend fun loadAppIcons(context: Context, apps: List<ApplicationInfo>): Unit {
         try {
             //Logger.d(TAG, "开始加载应用图标")
             val pm = context.packageManager
@@ -487,7 +490,7 @@ object AppRepository {
      * @param icon 要缓存的 Bitmap，若为 null 则只在数据库中移除对应条目。
      * @param deviceUuid 设备UUID，用于关联应用与设备
      */
-    suspend fun cacheExternalAppIcon(context: Context, packageName: String, icon: Bitmap?, deviceUuid: String) {
+    suspend fun cacheExternalAppIcon(context: Context, packageName: String, icon: Bitmap?, deviceUuid: String): Unit {
         initDatabaseRepository(context)
         
         // 转换图标为字节数组

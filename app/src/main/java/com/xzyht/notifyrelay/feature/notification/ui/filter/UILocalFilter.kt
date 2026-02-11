@@ -34,8 +34,8 @@ import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.icons.useful.More
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.icon.extended.More
 
 /**
  * UI本机通知过滤设置
@@ -280,7 +280,7 @@ fun UILocalFilter(
                     onClick = { builtinDefaultsExpanded = !builtinDefaultsExpanded }
                 ) {
                     Icon(
-                        imageVector = MiuixIcons.Useful.More,
+                        imageVector = MiuixIcons.More,
                         contentDescription = if (builtinDefaultsExpanded) "折叠" else "展开",
                         tint = MiuixTheme.colorScheme.onBackground
                     )

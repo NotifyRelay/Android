@@ -25,6 +25,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -45,18 +47,18 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.BuildConfig
-import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.common.core.appslist.AppRepository
+import com.xzyht.notifyrelay.common.core.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.common.core.sync.MessageSender
-import notifyrelay.base.util.IntentUtils
-import notifyrelay.base.util.Logger
-import notifyrelay.base.util.ToastUtils
 import com.xzyht.notifyrelay.common.core.util.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.feature.GuideActivity
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.ui.GlobalSelectedDeviceHolder
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.IntentUtils
+import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -66,11 +68,12 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.ToolbarPosition
 import top.yukonga.miuix.kmp.basic.VerticalDivider
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.icons.useful.Delete
+import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import java.time.Instant
@@ -104,7 +107,7 @@ fun DeleteButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
         minWidth = 80.dp
     ) {
         Icon(
-            imageVector = MiuixIcons.Useful.Delete,
+            imageVector = MiuixIcons.Delete,
             contentDescription = "Settings",
             modifier = Modifier.size(24.dp)
         )
@@ -287,6 +290,21 @@ fun NotificationHistoryScreen() {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
     val context = LocalContext.current
+    
+    // 创建协程作用域用于Tab点击事件
+    val coroutineScope = rememberCoroutineScope()
+    
+    // TabRow相关状态
+    val tabTitles = listOf("通知历史", "超级岛历史")
+    
+    // Pager相关状态 - 使用Pager状态作为唯一数据源
+    val pagerState = rememberPagerState(initialPage = 0) {
+        tabTitles.size
+    }
+    
+    // 从Pager状态直接获取当前选中的Tab索引，不使用独立状态
+    val selectedTabIndex = pagerState.currentPage
+    
     // 响应全局设备选中状态
     val selectedDeviceObj by GlobalSelectedDeviceHolder.current()
     val selectedDevice = selectedDeviceObj?.uuid ?: "本机"
@@ -730,12 +748,18 @@ fun NotificationHistoryScreen() {
         }
     }
 
+    // 超级岛历史块
+    @Composable
+    fun SuperIslandHistoryBlock() {
+        com.xzyht.notifyrelay.feature.notification.ui.filter.UISuperIslandSettings()
+    }
+
     // 使用 Miuix Scaffold 重构布局
     Scaffold(
         containerColor = colorScheme.background,
         popupHost = {  },
         floatingToolbar = {
-            if (notifications.isNotEmpty()) {
+            if (notifications.isNotEmpty() && selectedTabIndex == 0) {
                 FloatingToolbar(
                     color = colorScheme.primary,
                     cornerRadius = 20.dp,
@@ -808,32 +832,63 @@ fun NotificationHistoryScreen() {
             Column(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(
-                        top = paddingValues.calculateTopPadding() + 16.dp,
-                        bottom = paddingValues.calculateBottomPadding() + 16.dp,
-                        start = 16.dp,
-                        end = 16.dp
-                    )
+                    .padding(paddingValues)
             ) {
-                Text(
-                    text = "通知历史",
-                    style = textStyles.title2.copy(color = colorScheme.onSurface)
+                TabRowWithContour(
+                    tabs = tabTitles,
+                    selectedTabIndex = selectedTabIndex,
+                    onTabSelected = { index ->
+                        coroutineScope.launch {
+                            pagerState.scrollToPage(index)
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = top.yukonga.miuix.kmp.basic.TabRowDefaults.tabRowColors(
+                        backgroundColor = colorScheme.surface,
+                        contentColor = colorScheme.onSurface,
+                        selectedBackgroundColor = colorScheme.primary,
+                        selectedContentColor = colorScheme.onPrimary
+                    ),
+                    minWidth = 100.dp,
+                    height = 48.dp,
+                    cornerRadius = 16.dp
                 )
-                Spacer(modifier = Modifier.height(16.dp))
-                if (notifications.isEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text(
-                        text = "暂无通知",
-                        style = textStyles.body1.copy(color = colorScheme.onSurfaceSecondary)
-                    )
-                } else {
-                    NotificationListBlock(
-                            notifications = notifications,
-                            mixedList = mixedList,
-                            getCachedAppInfo = { pkg -> getCachedAppInfo(pkg) },
-                            expandedGroups = expandedGroups,
-                            installedPackages = installedPackages
-                        )
+                
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    page ->
+                    when (page) {
+                        0 -> {
+                            // 通知历史 Tab
+                            Column(
+                                modifier = Modifier.fillMaxSize()
+                            ) {
+                                if (notifications.isEmpty()) {
+                                    Spacer(modifier = Modifier.height(16.dp))
+                                    Text(
+                                        text = "暂无通知",
+                                        style = textStyles.body1.copy(color = colorScheme.onSurfaceSecondary)
+                                    )
+                                } else {
+                                    NotificationListBlock(
+                                            notifications = notifications,
+                                            mixedList = mixedList,
+                                            getCachedAppInfo = { pkg -> getCachedAppInfo(pkg) },
+                                            expandedGroups = expandedGroups,
+                                            installedPackages = installedPackages
+                                        )
+                                }
+                            }
+                        }
+                        1 -> {
+                            // 超级岛历史 Tab
+                            SuperIslandHistoryBlock()
+                        }
+                    }
                 }
             }
         }

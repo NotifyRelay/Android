@@ -523,7 +523,7 @@ object RemoteFilterConfig {
     // 对等模式开关（仅本机存在的应用或通用应用）
     var enablePeerMode: Boolean = false
     // 锁屏通知过滤开关
-    var enableLockScreenOnly: Boolean = false
+    var enableLockScreenOnly: Boolean = true
 
     // 加载设置
     fun load(context: Context) {
@@ -547,7 +547,7 @@ object RemoteFilterConfig {
         filterMode = StorageManager.getString(context, KEY_FILTER_MODE, "none", StorageManager.PrefsType.FILTER)
         enableDeduplication = StorageManager.getBoolean(context, KEY_ENABLE_DEDUP, true, StorageManager.PrefsType.FILTER)
         enablePeerMode = StorageManager.getBoolean(context, KEY_ENABLE_PEER, false, StorageManager.PrefsType.FILTER)
-        enableLockScreenOnly = StorageManager.getBoolean(context, "enable_lock_screen_only", false, StorageManager.PrefsType.FILTER)
+        enableLockScreenOnly = StorageManager.getBoolean(context, "enable_lock_screen_only", true, StorageManager.PrefsType.FILTER)
         val filterListStr = StorageManager.getStringSet(context, KEY_FILTER_LIST, emptySet(), StorageManager.PrefsType.FILTER)
         filterList = filterListStr.map {
             val arr = it.split("|", limit=2)

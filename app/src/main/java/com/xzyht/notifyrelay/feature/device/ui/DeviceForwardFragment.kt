@@ -131,7 +131,7 @@ fun DeviceForwardScreen(
         }
     }
     // TabRow相关状态
-    val tabTitles = listOf("远程过滤", "本地过滤", "设备互联", "超级岛", "聊天测试")
+    val tabTitles = listOf("设备互联", "聊天测试")
     
     // Pager相关状态 - 使用Pager状态作为唯一数据源
     val pagerState = rememberPagerState(initialPage = 0) {
@@ -144,7 +144,7 @@ fun DeviceForwardScreen(
     // 连接弹窗与错误弹窗相关状态（暂不在此处管理具体弹窗）
     // 设备认证、删除等逻辑已交由DeviceListFragment统一管理
 
-    // Miuix风格通知弹窗
+    //TODO: 弹窗位置切换
     if (snackbarVisible.value && manualDiscoveryPrompt.value != null) {
         Surface(
             color = MiuixTheme.colorScheme.surface,
@@ -220,23 +220,10 @@ fun DeviceForwardScreen(
             ) {
                 when (page) {
                     0 -> {
-                        // 远程通知过滤 Tab：重构为复用 UIRemoteFilter 组件
-                        com.xzyht.notifyrelay.feature.notification.ui.filter.UIRemoteFilter()
-                    }
-                    1 -> {
-                        // 本地通知过滤 Tab
-                        UILocalFilter()
-                    }
-                    2 -> {
                         // 设备互联 Tab
                         com.xzyht.notifyrelay.feature.notification.ui.filter.DeviceInterconnect()
                     }
-                    3 -> {
-                        // 超级岛设置 Tab
-                        //Logger.d("超级岛", "UI: 打开超级岛设置 Tab")
-                        com.xzyht.notifyrelay.feature.notification.ui.filter.UISuperIslandSettings()
-                    }
-                    4 -> {
+                    1 -> {
                         // 聊天测试 Tab：独立到 UIChatTest 组件
                         com.xzyht.notifyrelay.feature.notification.ui.filter.UIChatTest(deviceManager = deviceManager)
                     }

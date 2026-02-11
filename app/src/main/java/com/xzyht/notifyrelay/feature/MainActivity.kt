@@ -42,26 +42,26 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import com.xzyht.notifyrelay.common.NotifyRelayTheme
-import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.common.SetupSystemBars
 import com.xzyht.notifyrelay.common.core.appslist.AppRepository
-import notifyrelay.base.util.IntentUtils
-import notifyrelay.base.util.Logger
-import notifyrelay.data.config.DeviceInfoManager
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import notifyrelay.core.util.ServiceManager
-import notifyrelay.base.util.ToastUtils
+import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.ui.DeviceForwardFragment
 import com.xzyht.notifyrelay.feature.device.ui.DeviceListFragment
-import com.xzyht.notifyrelay.feature.notification.ui.NotificationHistoryFragment
 import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
-import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
+import com.xzyht.notifyrelay.feature.notification.ui.NotificationHistoryFragment
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.IntentUtils
+import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
+import notifyrelay.base.util.ToastUtils
+import notifyrelay.core.util.ServiceManager
+import notifyrelay.data.config.DeviceInfoManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
@@ -70,8 +70,9 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.icons.basic.Check
-import top.yukonga.miuix.kmp.icon.icons.useful.Settings
+import top.yukonga.miuix.kmp.icon.extended.Community
+import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.icon.extended.Tune
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.MiuixPopupUtils.Companion.MiuixPopupHost
 
@@ -263,12 +264,22 @@ fun NotificationHistoryFragmentView(fragmentContainerId: Int) {
 }
 
 @Composable
+fun SettingsFragmentView(fragmentContainerId: Int) {
+    FragmentContainerView(
+        fragmentContainerId = fragmentContainerId,
+        fragmentTag = "SettingsFragment",
+        fragmentFactory = { SettingsFragment() }
+    )
+}
+
+@Composable
 fun MainAppFragment(modifier: Modifier = Modifier) {
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val fragmentContainerId = remember { View.generateViewId() }
     val items = listOf(
-        NavigationItem("设备与转发", MiuixIcons.Useful.Settings),
-        NavigationItem("通知历史", MiuixIcons.Basic.Check)
+        NavigationItem("历史", MiuixIcons.Community),
+        NavigationItem("互联与测试", MiuixIcons.Settings),
+        NavigationItem("设置", MiuixIcons.Tune)
     )
     val colorScheme = MiuixTheme.colorScheme
     
@@ -299,7 +310,7 @@ fun MainAppFragment(modifier: Modifier = Modifier) {
                         verticalAlignment = Alignment.CenterVertically
                     ) {
                         Icon(
-                            imageVector = MiuixIcons.Useful.Settings,
+                            imageVector = MiuixIcons.Settings,
                             contentDescription = null
                         )
                         Spacer(Modifier.width(10.dp))
@@ -357,8 +368,9 @@ fun MainAppFragment(modifier: Modifier = Modifier) {
                         .fillMaxHeight()
                 ) {
                     when (selectedTab) {
-                        0 -> DeviceForwardFragmentView(fragmentContainerId)
-                        1 -> NotificationHistoryFragmentView(fragmentContainerId)
+                        0 -> NotificationHistoryFragmentView(fragmentContainerId)
+                        1 -> DeviceForwardFragmentView(fragmentContainerId)
+                        2 -> SettingsFragmentView(fragmentContainerId)
                     }
                 }
             }
@@ -384,8 +396,9 @@ fun MainAppFragment(modifier: Modifier = Modifier) {
                         .fillMaxWidth()
                 ) {
                     when (selectedTab) {
-                        0 -> DeviceForwardFragmentView(fragmentContainerId)
-                        1 -> NotificationHistoryFragmentView(fragmentContainerId)
+                        0 -> NotificationHistoryFragmentView(fragmentContainerId)
+                        1 -> DeviceForwardFragmentView(fragmentContainerId)
+                        2 -> SettingsFragmentView(fragmentContainerId)
                     }
                 }
             }
