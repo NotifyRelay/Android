@@ -4,13 +4,14 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.util.Base64
 import com.xzyht.notifyrelay.common.core.appslist.AppRepository
-import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import notifyrelay.base.util.Logger
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
@@ -67,9 +68,11 @@ object IconSyncManager {
             return
         }
         
-        // 获取应用的来源设备UUID列表
+        // 获取应用的来源设备UUID列表（替代原 getAppDeviceUuids 方法）
         val appDeviceUuids = runBlocking {
-            AppRepository.getAppDeviceUuids(context, packageName)
+            val databaseRepository = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+            val appDevices = databaseRepository.getAppDevicesByPackageName(packageName).first()
+            appDevices.map { appDevice -> appDevice.sourceDevice }
         }
         
         // 检查是否应该从当前设备请求图标
@@ -80,8 +83,14 @@ object IconSyncManager {
             CoroutineScope(Dispatchers.IO).launch {
                 try {
                     requestIconsFromDevice(context, listOf(packageName), deviceManager, sourceDevice)
-                    // 请求成功，关联应用包名与当前设备
-                    AppRepository.associateAppWithDevice(context, packageName, sourceDevice.uuid)
+                    // 请求成功，关联应用包名与当前设备（替代原 associateAppWithDevice 方法）
+                    val databaseRepository = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+                    val appDeviceEntity = notifyrelay.data.database.entity.AppDeviceEntity(
+                        packageName = packageName,
+                        sourceDevice = sourceDevice.uuid,
+                        lastUpdated = System.currentTimeMillis()
+                    )
+                    databaseRepository.saveAppDeviceAssociation(appDeviceEntity)
                 } catch (e: Exception) {
                     Logger.e(TAG, "请求图标失败：$packageName", e)
                 } finally {
@@ -111,16 +120,18 @@ object IconSyncManager {
         val need = packageNames.filter { pkg ->
             // 1. 检查 AppRepository 缓存
             val exist = runBlocking {
-                AppRepository.getExternalAppIcon(context, pkg)
-            } != null
+                AppRepository.getExternalAppIcon(context, pkg) != null
+            }
             // 2. 检查本机已安装应用
             val isInstalled = installedPackages.contains(pkg)
             // 3. 检查正在请求的图标
             val last = pendingRequests[pkg]
             val inFlight = last != null && (now - last) < ICON_REQUEST_TIMEOUT
-            // 4. 检查应用与设备的关联关系
+            // 4. 检查应用与设备的关联关系（替代原 getAppDeviceUuids 方法）
             val appDeviceUuids = runBlocking {
-                AppRepository.getAppDeviceUuids(context, pkg)
+                val databaseRepository = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+                val appDevices = databaseRepository.getAppDevicesByPackageName(pkg).first()
+                appDevices.map { appDevice -> appDevice.sourceDevice }
             }
             val isAssociatedWithThisDevice = appDeviceUuids.isEmpty() || appDeviceUuids.contains(sourceDevice.uuid)
             
@@ -137,8 +148,16 @@ object IconSyncManager {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 requestIconsFromDevice(context, need, deviceManager, sourceDevice)
-                // 请求成功，批量关联应用包名与当前设备
-                AppRepository.associateAppsWithDevice(context, need, sourceDeviceUuid)
+                // 请求成功，批量关联应用包名与当前设备（替代原 associateAppsWithDevice 方法）
+                val databaseRepository = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+                val appDeviceEntities = need.map {
+                    notifyrelay.data.database.entity.AppDeviceEntity(
+                        packageName = it,
+                        sourceDevice = sourceDeviceUuid,
+                        lastUpdated = System.currentTimeMillis()
+                    )
+                }
+                databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
             } catch (e: Exception) {
                 Logger.e(TAG, "批量请求失败：$need", e)
             } finally {
@@ -275,9 +294,10 @@ object IconSyncManager {
                 } else if (isMissing) {
                     // 处理单个缺失图标响应
                     //Logger.d(TAG, "单图标缺失：$pkg")
-                    // 标记图标为缺失，避免重复请求
+                    // 标记图标为缺失，避免重复请求（替代原 markIconAsMissing 方法）
                     runBlocking {
-                        AppRepository.markIconAsMissing(context, pkg)
+                        val databaseRepository = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+                        databaseRepository.markAppIconAsMissing(pkg)
                     }
                 }
             }
@@ -289,10 +309,11 @@ object IconSyncManager {
                     val missingPkg = missingArray.optString(i)
                     if (missingPkg.isNotEmpty()) {
                         //Logger.d(TAG, "批量图标缺失：$missingPkg")
-                    // 标记图标为缺失，避免重复请求
-                    runBlocking {
-                        AppRepository.markIconAsMissing(context, missingPkg)
-                    }
+                    // 标记图标为缺失（替代原 markIconAsMissing 方法）
+                        runBlocking {
+                            val databaseRepository = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+                            databaseRepository.markAppIconAsMissing(missingPkg)
+                        }
                     }
                 }
             }

@@ -284,137 +284,6 @@ object AppRepository {
     }
 
     /**
-     * 获取指定包名列表中缺失的图标。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @param packageNames 要检查的包名列表
-     * @return 缺失图标的包名列表
-     */
-    suspend fun getMissingIconsForPackages(context: Context, packageNames: List<String>): List<String> {
-        initDatabaseRepository(context)
-
-        return packageNames.filter { pkg ->
-            val app = databaseRepository.getAppByPackageName(pkg)
-            app?.isIconMissing ?: true
-        }
-    }
-    
-    /**
-     * 标记一个图标为缺失。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @param packageName 要标记的包名
-     */
-    suspend fun markIconAsMissing(context: Context, packageName: String) {
-        initDatabaseRepository(context)
-        databaseRepository.markAppIconAsMissing(packageName)
-        //Logger.d(TAG, "标记图标为缺失：$packageName")
-    }
-    
-    /**
-     * 检查一个图标是否被标记为缺失。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @param packageName 要检查的包名
-     * @return 如果被标记为缺失则返回 true，否则返回 false
-     */
-    suspend fun isIconMarkedMissing(context: Context, packageName: String): Boolean {
-        initDatabaseRepository(context)
-        val app = databaseRepository.getAppByPackageName(packageName)
-        return app?.isIconMissing ?: true
-    }
-    
-    /**
-     * 清除缺失图标记录。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     */
-    suspend fun clearMissingIcons(context: Context) {
-        initDatabaseRepository(context)
-        // 这里可以实现批量更新所有缺失图标记录为非缺失
-        // 暂时留空，因为数据库设计中每个应用的图标缺失状态是独立的
-        //Logger.d(TAG, "清除所有缺失图标记录")
-    }
-    
-    /**
-     * 清除指定包名的缺失图标记录。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @param packageName 要清除记录的包名
-     */
-    suspend fun clearMissingIcon(context: Context, packageName: String) {
-        initDatabaseRepository(context)
-        // 这里可以实现更新指定应用的图标缺失状态为非缺失
-        // 暂时留空，因为当图标被更新时，isIconMissing 会自动设置为 false
-        //Logger.d(TAG, "清除缺失图标记录：$packageName")
-    }
-    
-    /**
-     * 将应用包名与设备UUID关联。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @param packageName 应用包名
-     * @param deviceUuid 设备UUID
-     */
-    suspend fun associateAppWithDevice(context: Context, packageName: String, deviceUuid: String) {
-        initDatabaseRepository(context)
-        val appDeviceEntity = AppDeviceEntity(
-            packageName = packageName,
-            sourceDevice = deviceUuid,
-            lastUpdated = System.currentTimeMillis()
-        )
-        databaseRepository.saveAppDeviceAssociation(appDeviceEntity)
-        //Logger.d(TAG, "关联应用包名与设备：$packageName -> $deviceUuid")
-    }
-    
-    /**
-     * 获取应用包名的来源设备UUID。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @param packageName 应用包名
-     * @return 设备UUID列表，如果没有关联则返回空列表
-     */
-    suspend fun getAppDeviceUuids(context: Context, packageName: String): List<String> {
-        initDatabaseRepository(context)
-        val appDevices = databaseRepository.getAppDevicesByPackageName(packageName).first()
-        return appDevices.map { it.sourceDevice }
-    }
-    
-    /**
-     * 清除应用包名与设备的关联。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @param packageName 应用包名
-     */
-    suspend fun clearAppDeviceAssociation(context: Context, packageName: String) {
-        initDatabaseRepository(context)
-        databaseRepository.deleteAppDeviceAssociationsByPackageName(packageName)
-        //Logger.d(TAG, "清除应用包名与设备的关联：$packageName")
-    }
-    
-    /**
-     * 批量将应用包名与设备UUID关联。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @param packageNames 应用包名列表
-     * @param deviceUuid 设备UUID
-     */
-    suspend fun associateAppsWithDevice(context: Context, packageNames: List<String>, deviceUuid: String) {
-        initDatabaseRepository(context)
-        val appDeviceEntities = mutableListOf<AppDeviceEntity>()
-        packageNames.forEach {
-            val appDeviceEntity = AppDeviceEntity(
-                packageName = it,
-                sourceDevice = deviceUuid,
-                lastUpdated = System.currentTimeMillis()
-            )
-            appDeviceEntities.add(appDeviceEntity)
-        }
-        databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
-        //Logger.d(TAG, "批量关联应用包名与设备：${packageNames.size} 个应用 -> $deviceUuid")
-    }
-
-    /**
      * 获取本机已安装和已缓存图标的包名集合。
      *
      * @param context Android 上下文，用于获取已安装应用列表和访问数据库
@@ -430,25 +299,6 @@ object AppRepository {
             cachedIconPackages.add(it.packageName)
         }
         return installedPackages + cachedIconPackages
-    }
-
-    /**
-     * 获取所有已缓存图标的包名。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @return 已缓存图标的包名集合
-     */
-    suspend fun getAllCachedIconKeys(context: Context): Set<String> {
-        initDatabaseRepository(context)
-        val cachedIconPackages = mutableSetOf<String>()
-        // 从数据库获取所有应用包名
-        val apps = databaseRepository.getAllApps().first()
-        apps.forEach {
-            if (it.iconBytes != null) {
-                cachedIconPackages.add(it.packageName)
-            }
-        }
-        return cachedIconPackages
     }
 
     /**
@@ -573,19 +423,6 @@ object AppRepository {
     }
 
     /**
-     * 获取应用图标（非阻塞版本）。
-     *
-     * 说明：该方法为非阻塞的同步接口，直接返回 null，
-     *       调用方可使用 [getAppIconAsync] 获取图标的异步版本。
-     *
-     * @param packageName 目标应用的包名（非空）。
-     * @return 始终返回 null，让调用方使用异步版本。
-     */
-    fun getAppIcon(packageName: String): Bitmap? {
-        return null // 让调用方使用异步版本
-    }
-
-    /**
      * 异步获取应用图标（确保在返回前数据已加载）。
      *
      * @param context Android 上下文，用于在必要时加载应用列表与访问数据库。
@@ -640,47 +477,6 @@ object AppRepository {
         }
 
         return null
-    }
-
-    /**
-     * 检查图标是否已加载完成。
-     *
-     * @return 若图标加载过程已完成返回 true，否则返回 false。
-     */
-    fun isIconsLoaded(): Boolean {
-        // 由于我们现在使用数据库存储图标，图标加载是按需进行的
-        // 所以这里总是返回 true，表示图标系统已准备就绪
-        return true
-    }
-
-    /**
-     * 获取所有已缓存的图标（只读拷贝）。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @return 包名 -> Bitmap 的映射拷贝，Bitmap 可能为 null 表示缓存占位或失败。
-     */
-    suspend fun getAllCachedIcons(context: Context): Map<String, Bitmap?> {
-        initDatabaseRepository(context)
-        val iconsMap = mutableMapOf<String, Bitmap?>()
-        
-        // 从数据库获取所有应用
-        val apps = databaseRepository.getAllApps().first()
-        for (app in apps) {
-            val iconBytes = app.iconBytes
-            if (iconBytes != null) {
-                try {
-                    val bitmap = BitmapFactory.decodeByteArray(iconBytes, 0, iconBytes.size)
-                    iconsMap[app.packageName] = bitmap
-                } catch (e: Exception) {
-                    Logger.w(TAG, "解码图标失败: ${app.packageName}", e)
-                    iconsMap[app.packageName] = null
-                }
-            } else {
-                iconsMap[app.packageName] = null
-            }
-        }
-        
-        return iconsMap
     }
 
     /**
@@ -742,21 +538,6 @@ object AppRepository {
     }
 
     /**
-     * 移除外部应用图标的缓存（数据库存储）。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @param packageName 目标包名，会从数据库中移除对应记录。
-     */
-    suspend fun removeExternalAppIcon(context: Context, packageName: String) {
-        initDatabaseRepository(context)
-        
-        // 从数据库删除应用
-        databaseRepository.deleteAppByPackageName(packageName)
-
-        //Logger.d(TAG, "移除外部应用图标缓存: $packageName")
-    }
-
-    /**
      * 获取外部应用图标（从数据库加载）。
      *
      * @param context Android 上下文，用于访问数据库（非空）。
@@ -799,7 +580,7 @@ object AppRepository {
                 return localIcon
             }
             
-            // 2. 尝试获取外部应用图标
+            // 2. 尝试从数据库获取应用图标
             val externalIcon = getExternalAppIcon(context, packageName)
             if (externalIcon != null) {
                 return externalIcon
@@ -844,7 +625,7 @@ object AppRepository {
                 return localIcon
             }
             
-            // 2. 尝试获取外部应用图标
+            // 2. 尝试从数据库获取应用图标
             val externalIcon = getExternalAppIcon(context, packageName)
             if (externalIcon != null) {
                 return externalIcon
@@ -864,49 +645,6 @@ object AppRepository {
         } catch (e: Exception) {
             //Logger.e(TAG, "异步获取应用图标失败: $packageName", e)
             return null
-        }
-    }
-
-    /**
-     * 获取持久化图标缓存的统计信息。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @return 包含缓存大小、条目数等统计信息。
-     */
-    suspend fun getCacheStats(context: Context): Map<String, Any> {
-        initDatabaseRepository(context)
-        
-        // 从数据库获取所有应用
-        val apps = databaseRepository.getAllApps().first()
-        val totalApps = apps.size
-        val appsWithIcons = apps.count { app -> app.iconBytes != null }
-        val totalIconSize = apps.sumOf { app -> app.iconBytes?.size?.toLong() ?: 0L }
-        
-        return mapOf(
-            "totalApps" to totalApps,
-            "appsWithIcons" to appsWithIcons,
-            "totalIconSizeBytes" to totalIconSize,
-            "totalIconSizeMB" to totalIconSize / (1024.0 * 1024.0)
-        )
-    }
-
-    /**
-     * 清理过期的持久化图标缓存（挂起函数）。
-     *
-     * 说明：会删除满足过期策略的缓存文件/记录以释放磁盘空间。
-     */
-    suspend fun cleanupExpiredCache(context: Context) {
-        initDatabaseRepository(context)
-        
-        // 计算过期时间（30天前）
-        val expiryTime = System.currentTimeMillis() - (30L * 24 * 60 * 60 * 1000)
-        
-        // 获取过期的应用数据
-        val expiredApps = databaseRepository.getExpiredApps(expiryTime)
-        
-        // 删除过期的应用数据
-        expiredApps.forEach {
-            databaseRepository.deleteAppByPackageName(it.packageName)
         }
     }
 }

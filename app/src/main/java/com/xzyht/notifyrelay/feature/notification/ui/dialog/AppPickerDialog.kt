@@ -176,8 +176,12 @@ fun AppPickerDialog(
                                 items(filteredApps, key = { it.packageName }) { appInfo: ApplicationInfo ->
                                     val pkg = appInfo.packageName
                                     val label = appLabelMap[pkg] ?: pkg
-                                    val iconBitmap = remember(iconUpdateKey, pkg) {
-                                        AppRepository.getAppIcon(pkg)?.asImageBitmap()
+                                    var iconBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
+                                    
+                                    // 异步加载图标
+                                    LaunchedEffect(iconUpdateKey, pkg) {
+                                        val loadedIcon = AppRepository.getAppIconAsync(context, pkg)
+                                        iconBitmap = loadedIcon?.asImageBitmap()
                                     }
                                     Column(
                                         modifier = Modifier
@@ -192,7 +196,7 @@ fun AppPickerDialog(
                                     ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             if (iconBitmap != null) {
-                                                Image(bitmap = iconBitmap, contentDescription = null, modifier = Modifier.size(22.dp))
+                                                Image(bitmap = iconBitmap!!, contentDescription = null, modifier = Modifier.size(22.dp))
                                             } else {
                                                 Image(bitmap = defaultAppIconBitmap, contentDescription = null, modifier = Modifier.size(22.dp))
                                             }

@@ -304,7 +304,7 @@ fun UIRemoteFilter() {
                         group.forEach { pkg ->
                             val isInstalled = installedPkgSet.contains(pkg)
                             // 使用mutableStateOf保存图标状态，这样更新时会触发UI重新渲染
-                            var iconBitmap by remember { mutableStateOf(AppRepository.getAppIcon(pkg)) }
+                            var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
                             
                             // 异步加载缺失的图标，并在加载完成后更新状态
                             LaunchedEffect(pkg) {

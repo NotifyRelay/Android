@@ -133,8 +133,16 @@ object AppListSyncManager {
             runBlocking {
                 AppRepository.cacheRemoteAppList(context, appsMap, deviceUuid)
                 
-                // 将应用包名与来源设备关联
-                AppRepository.associateAppsWithDevice(context, packageNames, deviceUuid)
+                // 关联应用包名与设备（替代原 associateAppsWithDevice 方法）
+                val databaseRepository = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+                val appDeviceEntities = packageNames.map {
+                    notifyrelay.data.database.entity.AppDeviceEntity(
+                        packageName = it,
+                        sourceDevice = deviceUuid,
+                        lastUpdated = System.currentTimeMillis()
+                    )
+                }
+                databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
             }
         } catch (e: Exception) {
             Logger.e(TAG, "处理应用列表响应失败", e)
@@ -155,9 +163,13 @@ object AppListSyncManager {
         deviceManager: DeviceConnectionManager,
         sourceDevice: DeviceInfo
     ) {
-        // 检查缺失的图标
+        // 检查缺失的图标（替代原 getMissingIconsForPackages 方法）
+        val databaseRepository = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
         val missingIcons = runBlocking {
-            AppRepository.getMissingIconsForPackages(context, packageNames)
+            packageNames.filter { pkg ->
+                val app = databaseRepository.getAppByPackageName(pkg)
+                app?.isIconMissing ?: true
+            }
         }
         if (missingIcons.isEmpty()) {
             //Logger.d(TAG, "所有图标已缓存，无需请求")
