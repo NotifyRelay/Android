@@ -18,6 +18,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import kotlinx.coroutines.launch
 import com.xzyht.notifyrelay.common.core.util.MediaControlUtil
+import com.xzyht.notifyrelay.servers.NotifyRelayNotificationListenerService
 import org.json.JSONObject
 
 /**
@@ -165,7 +166,7 @@ object ProtocolRouter {
                             // 媒体播放控制
                             "playPause" -> {
                                 try {
-                                    val sbn = com.xzyht.notifyrelay.common.core.notification.servers.NotifyRelayNotificationListenerService.latestMediaSbn
+                                    val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
                                     val result: String
                                     val errorMessage: String?
                                     if (sbn != null) {
@@ -188,7 +189,7 @@ object ProtocolRouter {
                             }
                             "next" -> {
                                 try {
-                                    val sbn = com.xzyht.notifyrelay.common.core.notification.servers.NotifyRelayNotificationListenerService.latestMediaSbn
+                                    val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
                                     val result: String
                                     val errorMessage: String?
                                     if (sbn != null) {
@@ -211,7 +212,7 @@ object ProtocolRouter {
                             }
                             "previous" -> {
                                 try {
-                                    val sbn = com.xzyht.notifyrelay.common.core.notification.servers.NotifyRelayNotificationListenerService.latestMediaSbn
+                                    val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
                                     val result: String
                                     val errorMessage: String?
                                     if (sbn != null) {

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.core.notification.servers
+package com.xzyht.notifyrelay.servers
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -33,8 +33,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import notifyrelay.core.util.DataUrlUtils
 import notifyrelay.base.util.Logger
+import notifyrelay.core.util.DataUrlUtils
 import notifyrelay.data.StorageManager
 import java.io.ByteArrayOutputStream
 
@@ -68,7 +68,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             val notificationKey = sbn.key ?: (sbn.id.toString() + sbn.packageName)
             processedNotifications.remove(notificationKey)
             Logger.v("NotifyRelay", "通知移除，从缓存中清理: sbnKey=${sbn.key}, pkg=${sbn.packageName}")
-            
+
             // 检查是否为媒体通知
             val isMediaNotification = sbn.notification.category == Notification.CATEGORY_TRANSPORT
             if (isMediaNotification) {
@@ -212,10 +212,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     private val processedNotifications = mutableMapOf<String, Long>()
     // 记录本机转发过的超级岛特征ID，用于在移除时发送终止包
     private val superIslandFeatureByKey = mutableMapOf<String, Pair<String, String>>() // sbnKey -> (superPkg, featureId)
-    
+
     // 媒体播放通知状态管理：使用sbn.key作为会话键，跟踪每个媒体通知的状态
     private val mediaPlayStateByKey = mutableMapOf<String, MediaPlayState>()
-    
+
     // 媒体播放状态数据类
     data class MediaPlayState(
         val title: String,
@@ -225,9 +225,9 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         val coverUrl: String? = null,
         val sentTime: Long = System.currentTimeMillis() // 添加发送时间戳
     )
-    
+
     // 使用通用工具将 Drawable 转换为 Bitmap（参照项目中其他模块的实现）
-    
+
     /**
      * 处理媒体播放通知
      */
@@ -239,7 +239,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         val sbnKey = sbn.key ?: (sbn.id.toString() + "|" + sbn.packageName)
         val title = NotificationRepository.getStringCompat(sbn.notification.extras, "android.title") ?: ""
         val text = NotificationRepository.getStringCompat(sbn.notification.extras, "android.text") ?: ""
-        
+
         // 获取音乐封面图标
         var coverUrl: String? = null
         try {
@@ -260,25 +260,25 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         } catch (e: Exception) {
             Logger.e("NotifyRelay-Media", "获取音乐封面失败", e)
         }
-        
+
         // 记录日志
         //Logger.v("NotifyRelay-Media", "processMediaNotification: title='$title', text='$text', sbnKey=$sbnKey, coverUrl=${coverUrl?.take(20)}...")
-        
+
         // 检查状态是否变化，只在内容变化时发送
         val currentState = MediaPlayState(title, text, sbn.packageName, sbn.postTime, coverUrl)
         val lastState = mediaPlayStateByKey[sbnKey]
-        
+
         // 发送条件：状态变化 或 距离上次发送超过15秒
         val now = System.currentTimeMillis()
-        val sendRequired = lastState == null || 
-                          lastState.title != currentState.title || 
-                          lastState.text != currentState.text || 
+        val sendRequired = lastState == null ||
+                          lastState.title != currentState.title ||
+                          lastState.text != currentState.text ||
                           lastState.coverUrl != currentState.coverUrl ||
                           (now - lastState.sentTime > 15 * 1000) // 超过15秒未发送
-        
+
         if (sendRequired) {
             // 状态变化或超时，发送消息
-            
+
             try {
                 val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(applicationContext)
                 var appName: String? = null
@@ -289,7 +289,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 } catch (_: Exception) {
                     appName = sbn.packageName
                 }
-                
+
                 // 使用专门的协议前缀标记媒体通知,使用报文头（"type":"MEDIA_PLAY"）判断媒体消息
                 MessageSender.sendMediaPlayNotification(
                     applicationContext,
@@ -301,7 +301,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     sbn.postTime,
                     deviceManager
                 )
-                
+
                 // 更新状态缓存，包含发送时间
                 mediaPlayStateByKey[sbnKey] = currentState.copy(sentTime = now)
             } catch (e: Exception) {
@@ -353,7 +353,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 val superData = SuperIslandManager.extractSuperIslandData(sbn, applicationContext)
                 if (superData != null) {
                     Logger.i("超级岛", "超级岛: 检测到超级岛数据，准备转发，pkg=${superData.sourcePackage}, title=${superData.title}")
-                    
+
                     // 过滤本应用的超级岛通知，不进行转发
                     if (sbn.packageName != applicationContext.packageName) {
                         try {
@@ -585,10 +585,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         // 检查剪贴板同步状态，为通知主体添加点击事件
         try {
             val accessibilityEnabled = ClipboardSyncManager.isAccessibilityServiceEnabled(this)
-            
+
             // 为通知主体添加点击事件，实现剪贴板同步功能
             val syncIntent = Intent(this, ClipboardSyncReceiver::class.java).apply {
-                action = ClipboardSyncReceiver.ACTION_MANUAL_SYNC
+                action = ClipboardSyncReceiver.Companion.ACTION_MANUAL_SYNC
             }
             val syncPendingIntent = PendingIntent.getBroadcast(
                 this, 0, syncIntent,
