@@ -103,10 +103,13 @@ object MigrationHelper {
         // 获取所有通知文件
         val files = PersistenceManager.getAllNotificationFiles(context)
         
-        // 添加本地设备（如果不存在）
+        // 添加本地设备（如果不存在）- 仅在有本地通知记录时添加
         val localDeviceUuid = "本机"
+        val hasLocalNotificationFiles = files.any { it.name == "notification_records_local.json" }
+        
+        // 只有在有本地通知记录或者已经存在本地设备时才处理
         val localDevice = deviceDao.getByUuid(localDeviceUuid)
-        if (localDevice == null) {
+        if (localDevice == null && hasLocalNotificationFiles) {
             deviceDao.insert(
                 DeviceEntity(
                     uuid = localDeviceUuid,
