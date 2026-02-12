@@ -22,6 +22,7 @@ class ClipboardMonitorService : Service() {
     private var clipboardManager: ClipboardManager? = null
     private var deviceManager: DeviceConnectionManager? = null
     private var isMonitoring = false
+    private var clipboardListener: ClipboardManager.OnPrimaryClipChangedListener? = null
 
     override fun onCreate() {
         super.onCreate()
@@ -53,6 +54,11 @@ class ClipboardMonitorService : Service() {
         super.onDestroy()
         Logger.d(TAG, "剪贴板监控服务已销毁")
         isMonitoring = false
+        // 注销剪贴板监听器，避免内存泄漏
+        clipboardListener?.let {
+            clipboardManager?.removePrimaryClipChangedListener(it)
+            clipboardListener = null
+        }
     }
 
     /**
@@ -64,12 +70,15 @@ class ClipboardMonitorService : Service() {
         isMonitoring = true
 
         // 监听剪贴板变化事件（Android 12+ 支持）
-        clipboardManager?.addPrimaryClipChangedListener {
+        clipboardListener = ClipboardManager.OnPrimaryClipChangedListener {
             Logger.d(TAG, "剪贴板内容已改变，打开透明活动获取剪贴板")
             // 打开透明活动获取剪贴板内容
             val intent = Intent(this@ClipboardMonitorService, ClipboardSyncActivity::class.java)
             intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION
             startActivity(intent)
+        }
+        clipboardListener?.let {
+            clipboardManager?.addPrimaryClipChangedListener(it)
         }
     }
 }
