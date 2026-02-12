@@ -60,7 +60,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
-import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
+import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord

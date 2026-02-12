@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsl
 import android.content.Context
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
+import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import org.json.JSONObject
 
 /**

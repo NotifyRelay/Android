@@ -20,7 +20,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
-import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
+import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.filter.UILocalFilter
 import com.xzyht.notifyrelay.ui.filter.UIRemoteFilter
 import kotlinx.coroutines.launch

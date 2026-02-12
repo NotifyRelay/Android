@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.ui.fragment
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
+import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import android.content.IntentFilter
 import android.os.Bundle
 import android.view.LayoutInflater

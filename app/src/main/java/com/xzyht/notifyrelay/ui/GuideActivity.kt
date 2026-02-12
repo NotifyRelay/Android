@@ -42,9 +42,9 @@ import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
-import com.xzyht.notifyrelay.common.NotifyRelayTheme
-import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
-import com.xzyht.notifyrelay.common.SetupSystemBars
+import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
+import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
+import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.servers.appslist.AppListHelper
 import kotlinx.coroutines.delay
 import notifyrelay.base.util.IntentUtils

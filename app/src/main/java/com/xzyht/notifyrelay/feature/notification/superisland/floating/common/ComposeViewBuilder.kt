@@ -5,7 +5,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.LifecycleOwner
-import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 
 /**
  * ComposeView 构建器工具类
@@ -55,7 +56,7 @@ object ComposeViewBuilder {
         setContent {
             ProvideNavigationEventDispatcherOwner {
                 if (lifecycleOwner != null) {
-                    androidx.lifecycle.compose.LocalLifecycleOwner.current
+                    LocalLifecycleOwner.current
                     // 这里可以添加 CompositionLocalProvider 来处理自定义 LifecycleOwner
                     // 暂时保持简单实现
                     content()

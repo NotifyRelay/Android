@@ -54,7 +54,7 @@ import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
+import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.dialog.ConnectDeviceDialog
 import com.xzyht.notifyrelay.ui.dialog.HandshakeRequestDialog
