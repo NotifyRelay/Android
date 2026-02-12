@@ -90,12 +90,14 @@ object IconSyncManager {
                     requestIconsFromDevice(context, listOf(packageName), deviceManager, sourceDevice)
                     // 请求成功，关联应用包名与当前设备（替代原 associateAppWithDevice 方法）
                     val databaseRepository = DatabaseRepository.getInstance(context)
+                    val appDeviceEntities = mutableListOf<AppDeviceEntity>()
                     val appDeviceEntity = AppDeviceEntity(
                         packageName = packageName,
                         sourceDevice = sourceDevice.uuid,
                         lastUpdated = System.currentTimeMillis()
                     )
-                    databaseRepository.saveAppDeviceAssociation(appDeviceEntity)
+                    appDeviceEntities.add(appDeviceEntity)
+                    databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
                 } catch (e: Exception) {
                     Logger.e(TAG, "请求图标失败：$packageName", e)
                 } finally {

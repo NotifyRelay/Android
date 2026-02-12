@@ -509,12 +509,14 @@ object AppRepository {
         databaseRepository?.saveApp(appEntity)
         
         // 保存应用设备关联
+        val appDeviceEntities = mutableListOf<AppDeviceEntity>()
         val appDeviceEntity = AppDeviceEntity(
             packageName = packageName,
             sourceDevice = deviceUuid,
             lastUpdated = System.currentTimeMillis()
         )
-        databaseRepository?.saveAppDeviceAssociation(appDeviceEntity)
+        appDeviceEntities.add(appDeviceEntity)
+        databaseRepository?.saveAppDeviceAssociations(appDeviceEntities)
         
         // 通知UI层图标已更新
         _iconUpdates.value = packageName
