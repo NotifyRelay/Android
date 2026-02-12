@@ -683,7 +683,7 @@ object AppRepository {
             
             return null
         } catch (e: Exception) {
-            //Logger.e(TAG, "获取应用图标失败: $packageName", e)
+            Logger.w(TAG, "获取应用图标失败: $packageName", e)
             return null
         }
     }
