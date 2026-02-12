@@ -45,6 +45,7 @@ import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperCheckbox
 import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.extra.WindowDropdown
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -130,55 +131,20 @@ fun UIRemoteFilter() {
         val modeLabels = modes.map { it.second }
         val selectedModeIndex = modes.indexOfFirst { it.first == filterMode }
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
-        // 使用Compose内置的DropdownMenu替代WindowDropdown
-        var expanded by remember { mutableStateOf(false) }
-        val selectedText = modeLabels[selectedModeIndex]
-        
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "过滤模式",
-                style = textStyles.body1,
-                color = colorScheme.onSurface,
-                modifier = Modifier.weight(1f)
-            )
-            Box {
-                OutlinedButton(
-                    onClick = { expanded = true },
-                    modifier = Modifier
-                        .padding(start = 8.dp)
-                        .background(colorScheme.surface),
-                    shape = RoundedCornerShape(8.dp)
-                ) {
-                    Text(text = selectedText, color = colorScheme.onSurface)
-                }
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
-                    modifier = Modifier.background(colorScheme.surfaceContainer),
-                    properties = PopupProperties(
-                        focusable = true
-                    )
-                ) {
-                    modeLabels.forEachIndexed { index, label ->
-                        DropdownMenuItem(
-                            text = { Text(text = label, color = colorScheme.onSurface) },
-                            onClick = {
-                                val (value, _) = modes[index]
-                                RemoteFilterConfig.filterMode = value
-                                RemoteFilterConfig.enablePeerMode = (value == "peer")
-                                RemoteFilterConfig.save(context)
-                                filterMode = value
-                                expanded = false
-                            },
-                            modifier = Modifier.background(colorScheme.surface)
-                        )
-                    }
-                }
+        // 使用WindowDropdown
+        WindowDropdown(
+            title = "过滤模式",
+            summary = "选择过滤模式",
+            items = modeLabels,
+            selectedIndex = selectedModeIndex,
+            onSelectedIndexChange = {
+                val (value, _) = modes[it]
+                RemoteFilterConfig.filterMode = value
+                RemoteFilterConfig.enablePeerMode = (value == "peer")
+                RemoteFilterConfig.save(context)
+                filterMode = value
             }
-        }
+        )
 
         if (filterMode == "black" || filterMode == "white") {
             var showFilterAppPicker by remember { mutableStateOf(false) }
