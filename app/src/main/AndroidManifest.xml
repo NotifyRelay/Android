@@ -97,7 +97,7 @@
         <!-- 剪贴板监控服务 -->
         <service
             android:name=".servers.ClipboardMonitorService"
-            android:exported="true"
+            android:exported="false"
             android:foregroundServiceType="dataSync"
             android:stopWithTask="false" />
             

@@ -46,7 +46,7 @@ object ServiceManager {
      */
     fun startClipboardMonitorService(context: Context): Boolean {
         return try {
-            val cn = ComponentName(context, "com.xzyht.notifyrelay.feature.clipboard.ClipboardMonitorService")
+            val cn = ComponentName(context, "com.xzyht.notifyrelay.servers.ClipboardMonitorService")
             val restartIntent = Intent()
             restartIntent.component = cn
             restartIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
