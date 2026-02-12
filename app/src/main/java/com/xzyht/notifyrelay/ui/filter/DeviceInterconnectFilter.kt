@@ -28,7 +28,7 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.servers.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.sync.ProtocolSender
-import com.xzyht.notifyrelay.common.core.MediaControlUtil
+import com.xzyht.notifyrelay.servers.MediaControlUtil
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardLogDetector
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
