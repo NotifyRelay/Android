@@ -60,7 +60,9 @@ object AppListSyncManager {
     ) {
         try {
             val json = JSONObject(requestData)
-            if (json.optString("type") != "APP_LIST_REQUEST") return
+            val type = json.optString("type")
+            Logger.d(TAG, "解析到的 type 字段值：$type")
+            if (type != "APP_LIST_REQUEST" && type != "DATA_APP_LIST_REQUEST") return
             val scope = json.optString("scope", "user")
 
             val apps = AppListHelper.getInstalledApplications(context)
@@ -90,7 +92,7 @@ object AppListSyncManager {
             }.toString()
 
             sendAppListResponse(deviceManager, sourceDevice, resp)
-            //Logger.d(TAG, "已响应应用列表：${sourceDevice.displayName}，共${appArray.length()}项")
+            Logger.d(TAG, "已响应应用列表：${sourceDevice.displayName}，共${appArray.length()}项")
         } catch (e: Exception) {
             Logger.e(TAG, "处理应用列表请求失败", e)
         }
@@ -115,7 +117,7 @@ object AppListSyncManager {
             val json = JSONObject(responseData)
             if (json.optString("type") != "APP_LIST_RESPONSE") return
             val total = json.optInt("total", -1)
-            //Logger.d(TAG, "收到应用列表响应，共 $total 项，来源设备：$deviceUuid")
+            Logger.d(TAG, "收到应用列表响应，共 $total 项，来源设备：$deviceUuid")
             
             // 解析应用列表
             val appsArray = json.optJSONArray("apps") ?: return

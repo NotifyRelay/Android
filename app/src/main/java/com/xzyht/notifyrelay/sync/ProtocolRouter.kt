@@ -122,7 +122,7 @@ object ProtocolRouter {
                     Logger.d(TAG, "接收到 DATA_MEDIAPLAY 消息: $decrypted")
                     try {
                         val json = JSONObject(decrypted)
-                        val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp)
+                        val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                         Logger.i(TAG, "收到远端媒体播放DATA_MEDIAPLAY: ${json.optString("title", "")} - ${json.optString("text", "")} (来自 ${source?.displayName ?: "未知设备"})")
                         RemoteMediaSessionManager.onMediaMessageReceived(context, json, source!!)
                     } catch (e: Exception) {
@@ -132,9 +132,14 @@ object ProtocolRouter {
                 }
                 // DATA_ICON_REQUEST：对方向本机请求应用图标，本机查找后会通过 DATA_ICON_RESPONSE 回传
                 "DATA_ICON_REQUEST" -> {
-                    Logger.d(TAG, "接收到 DATA_ICON_REQUEST 消息: $decrypted")
-                    val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp)
-                    IconSyncManager.handleIconRequest(decrypted, deviceManager, source, context)
+                    Logger.d(TAG, "接收到 DATA_ICON_REQUEST 消息: $decrypted 丢给IconSyncManager")
+                    val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
+                    Logger.d(TAG, "source device info: $source")
+                    try {
+                        IconSyncManager.handleIconRequest(decrypted, deviceManager, source, context)
+                    } catch (e: Exception) {
+                        Logger.e(TAG, "调用 IconSyncManager.handleIconRequest 异常", e)
+                    }
                     true
                 }
                 // DATA_ICON_RESPONSE：图标请求的响应，更新本机图标缓存供通知复刻使用
@@ -145,9 +150,14 @@ object ProtocolRouter {
                 }
                 // DATA_APP_LIST_REQUEST：对方请求本机应用列表，本机查询后通过 DATA_APP_LIST_RESPONSE 返回
                 "DATA_APP_LIST_REQUEST" -> {
-                    Logger.d(TAG, "接收到 DATA_APP_LIST_REQUEST 消息: $decrypted")
-                    val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp)
-                    AppListSyncManager.handleAppListRequest(decrypted, deviceManager, source, context)
+                    Logger.d(TAG, "接收到 DATA_APP_LIST_REQUEST 消息: $decrypted 丢给AppListSyncManager")
+                    val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
+                    Logger.d(TAG, "source device info: $source")
+                    try {
+                        AppListSyncManager.handleAppListRequest(decrypted, deviceManager, source, context)
+                    } catch (e: Exception) {
+                        Logger.e(TAG, "调用 AppListSyncManager.handleAppListRequest 异常", e)
+                    }
                     true
                 }
                 // DATA_APP_LIST_RESPONSE：应用列表请求的响应，用于更新本机缓存/状态
@@ -242,7 +252,7 @@ object ProtocolRouter {
                                     Logger.w(TAG, "音频转发请求被忽略：非 PC 设备")
                                 } else {
                                     val response = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"accepted\"}"
-                                    ProtocolSender.sendEncrypted(deviceManager, deviceManager.resolveDeviceInfo(remoteUuid, clientIp), "DATA_MEDIA_CONTROL", response)
+                                    ProtocolSender.sendEncrypted(deviceManager, deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333), "DATA_MEDIA_CONTROL", response)
                                 }
                             }
                             "audioResponse" -> {
@@ -289,7 +299,7 @@ object ProtocolRouter {
                                                 Logger.d(TAG, "发送 FTP 服务器信息到 PC")
                                                 ProtocolSender.sendEncrypted(
                                                     deviceManager,
-                                                    deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                                                    deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
                                                     "DATA_FTP",
                                                     responseJson.toString()
                                                 )
@@ -320,7 +330,7 @@ object ProtocolRouter {
                                             }
                                             ProtocolSender.sendEncrypted(
                                                 deviceManager,
-                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
                                                 "DATA_STATUS",
                                                 responseJson.toString()
                                             )
@@ -337,7 +347,7 @@ object ProtocolRouter {
                                             }
                                             ProtocolSender.sendEncrypted(
                                                 deviceManager,
-                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
                                                 "DATA_STATUS",
                                                 responseJson.toString()
                                             )
@@ -354,7 +364,7 @@ object ProtocolRouter {
                                             }
                                             ProtocolSender.sendEncrypted(
                                                 deviceManager,
-                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
                                                 "DATA_STATUS",
                                                 responseJson.toString()
                                             )
@@ -371,7 +381,7 @@ object ProtocolRouter {
                                             }
                                             ProtocolSender.sendEncrypted(
                                                 deviceManager,
-                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
                                                 "DATA_STATUS",
                                                 responseJson.toString()
                                             )
@@ -387,7 +397,7 @@ object ProtocolRouter {
                                     }
                                     ProtocolSender.sendEncrypted(
                                         deviceManager,
-                                        deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                                        deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
                                         "DATA_FTP",
                                         responseJson.toString()
                                     )
@@ -470,7 +480,7 @@ object ProtocolRouter {
             }
             ProtocolSender.sendEncrypted(
                 deviceManager,
-                deviceManager.resolveDeviceInfo(remoteUuid, clientIp),
+                deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
                 "DATA_STATUS",
                 responseJson.toString()
             )
