@@ -37,6 +37,7 @@ import notifyrelay.base.util.Logger
 import notifyrelay.core.util.DataUrlUtils
 import notifyrelay.data.StorageManager
 import java.io.ByteArrayOutputStream
+import java.util.concurrent.ConcurrentHashMap
 
 class NotifyRelayNotificationListenerService : NotificationListenerService() {
     companion object {
@@ -209,12 +210,12 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
 
     // 新增：已处理通知缓存，避免重复处理 (改进版：带时间戳的LRU缓存)
-    private val processedNotifications = mutableMapOf<String, Long>()
+    private val processedNotifications = ConcurrentHashMap<String, Long>()
     // 记录本机转发过的超级岛特征ID，用于在移除时发送终止包
-    private val superIslandFeatureByKey = mutableMapOf<String, Pair<String, String>>() // sbnKey -> (superPkg, featureId)
+    private val superIslandFeatureByKey = ConcurrentHashMap<String, Pair<String, String>>() // sbnKey -> (superPkg, featureId)
 
     // 媒体播放通知状态管理：使用sbn.key作为会话键，跟踪每个媒体通知的状态
-    private val mediaPlayStateByKey = mutableMapOf<String, MediaPlayState>()
+    private val mediaPlayStateByKey = ConcurrentHashMap<String, MediaPlayState>()
 
     // 媒体播放状态数据类
     data class MediaPlayState(
