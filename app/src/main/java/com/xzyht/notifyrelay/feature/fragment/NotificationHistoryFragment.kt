@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
+import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.common.appslist.AppRepository
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
@@ -296,8 +297,10 @@ class NotificationHistoryFragment : Fragment() {
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         return ComposeView(requireContext()).apply {
             setContent {
-                MiuixTheme {
-                    NotificationHistoryScreen()
+                ProvideNavigationEventDispatcherOwner {
+                    MiuixTheme {
+                        NotificationHistoryScreen()
+                    }
                 }
             }
         }

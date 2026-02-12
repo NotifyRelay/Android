@@ -55,6 +55,7 @@ import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.feature.fragment.filter.dialog.ConnectDeviceDialog
 import com.xzyht.notifyrelay.feature.fragment.filter.dialog.HandshakeRequestDialog
 import com.xzyht.notifyrelay.feature.fragment.filter.dialog.RejectedDevicesDialog
@@ -105,8 +106,10 @@ class DeviceListFragment : Fragment() {
         return ComposeView(requireContext()).apply {
             setContent {
                 //Logger.d("NotifyRelay", "[UI] Compose setContent in DeviceListFragment")
-                MiuixTheme {
-                    DeviceListScreen()
+                ProvideNavigationEventDispatcherOwner {
+                    MiuixTheme {
+                        DeviceListScreen()
+                    }
                 }
             }
         }

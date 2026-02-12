@@ -20,6 +20,7 @@ import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
+import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.feature.fragment.filter.UILocalFilter
 import com.xzyht.notifyrelay.feature.fragment.filter.UIRemoteFilter
 import kotlinx.coroutines.launch
@@ -35,8 +36,10 @@ class SettingsFragment : Fragment() {
     ): View {
         return ComposeView(requireContext()).apply {
             setContent {
-                MiuixTheme {
-                    SettingsScreen()
+                ProvideNavigationEventDispatcherOwner {
+                    MiuixTheme {
+                        SettingsScreen()
+                    }
                 }
             }
         }

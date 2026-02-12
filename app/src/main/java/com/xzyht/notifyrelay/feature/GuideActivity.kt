@@ -44,6 +44,7 @@ import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import com.xzyht.notifyrelay.common.NotifyRelayTheme
+import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.common.SetupSystemBars
 import com.xzyht.notifyrelay.common.appslist.AppListHelper
 import kotlinx.coroutines.delay
@@ -82,23 +83,25 @@ class GuideActivity : ComponentActivity() {
         // 颜色设置放到 Compose SideEffect 里统一管理
 
         setContent {
-            val isDarkTheme = isSystemInDarkTheme()
-            // 使用统一的主题
-            NotifyRelayTheme(darkTheme = isDarkTheme) {
-                // 设置系统栏外观
-                SetupSystemBars(isDarkTheme)
-                GuideScreen(onContinue = {
-                    // 首次启动后标记为已启动
-                    StorageManager.putBoolean(this@GuideActivity, "isFirstLaunch", false, StorageManager.PrefsType.GENERAL)
-                    
-                    if (fromftp) {
-                        // 如果是从ftp请求跳转过来的，尝试重新启动ftp服务
-                        Logger.d("GuideActivity", "从ftp请求跳转，尝试重新启动ftp服务")
-                    }
-                    
-                    startActivity(Intent(this@GuideActivity, MainActivity::class.java))
-                    finish()
-                })
+            ProvideNavigationEventDispatcherOwner {
+                val isDarkTheme = isSystemInDarkTheme()
+                // 使用统一的主题
+                NotifyRelayTheme(darkTheme = isDarkTheme) {
+                    // 设置系统栏外观
+                    SetupSystemBars(isDarkTheme)
+                    GuideScreen(onContinue = {
+                        // 首次启动后标记为已启动
+                        StorageManager.putBoolean(this@GuideActivity, "isFirstLaunch", false, StorageManager.PrefsType.GENERAL)
+                        
+                        if (fromftp) {
+                            // 如果是从ftp请求跳转过来的，尝试重新启动ftp服务
+                            Logger.d("GuideActivity", "从ftp请求跳转，尝试重新启动ftp服务")
+                        }
+                        
+                        startActivity(Intent(this@GuideActivity, MainActivity::class.java))
+                        finish()
+                    })
+                }
             }
         }
 

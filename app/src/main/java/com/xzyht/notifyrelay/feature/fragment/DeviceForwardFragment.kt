@@ -3,6 +3,7 @@ package com.xzyht.notifyrelay.feature.fragment
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
 import android.content.IntentFilter
 import android.os.Bundle
 import android.view.LayoutInflater
@@ -113,10 +114,12 @@ class DeviceForwardFragment : Fragment() {
         //Logger.d("NotifyRelay(狂鼠)", "onCreateView called")
         return ComposeView(requireContext()).apply {
             setContent {
-                MiuixTheme {
-                    DeviceForwardScreen(
-                        deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(requireContext())
-                    )
+                ProvideNavigationEventDispatcherOwner {
+                    MiuixTheme {
+                        DeviceForwardScreen(
+                            deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(requireContext())
+                        )
+                    }
                 }
             }
         }

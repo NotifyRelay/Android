@@ -173,7 +173,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
     // Jetpack Compose BOM 统一管理版本
-    implementation(platform("androidx.compose:compose-bom:2025.01.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.02.00"))
     
     // Jetpack Compose 依赖（通过 BOM 统一管理版本）
     implementation("androidx.activity:activity-compose")
@@ -201,6 +201,7 @@ dependencies {
     // Miuix风格ui库
     implementation(libs.miuix.android)
     implementation("top.yukonga.miuix.kmp:miuix-icons:0.8.1")
+    implementation("androidx.navigationevent:navigationevent-compose:1.0.1")
     // DataStore 持久化（设备名、规则设置）
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("androidx.datastore:datastore:1.0.0")

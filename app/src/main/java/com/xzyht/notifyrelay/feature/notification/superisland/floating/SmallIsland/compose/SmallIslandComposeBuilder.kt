@@ -3,6 +3,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsl
 import android.content.Context
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
+import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
 import org.json.JSONObject
 
 /**
@@ -21,12 +22,14 @@ suspend fun buildSmallIslandComposeView(
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
 
         setContent {
-            BigIslandCollapsedCompose(
-                bigIsland = bigIsland,
-                picMap = picMap,
-                fallbackTitle = fallbackTitle,
-                fallbackContent = fallbackContent
-            )
+            ProvideNavigationEventDispatcherOwner {
+                BigIslandCollapsedCompose(
+                    bigIsland = bigIsland,
+                    picMap = picMap,
+                    fallbackTitle = fallbackTitle,
+                    fallbackContent = fallbackContent
+                )
+            }
         }
     }
 }
@@ -47,12 +50,14 @@ fun buildSmallIslandComposeViewSync(
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnDetachedFromWindow)
 
         setContent {
-            BigIslandCollapsedCompose(
-                bigIsland = bigIsland,
-                picMap = picMap,
-                fallbackTitle = fallbackTitle,
-                fallbackContent = fallbackContent
-            )
+            ProvideNavigationEventDispatcherOwner {
+                BigIslandCollapsedCompose(
+                    bigIsland = bigIsland,
+                    picMap = picMap,
+                    fallbackTitle = fallbackTitle,
+                    fallbackContent = fallbackContent
+                )
+            }
         }
     }
 }
