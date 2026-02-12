@@ -1,12 +1,12 @@
 package com.xzyht.notifyrelay.sync
 
 import android.content.Context
-import com.xzyht.notifyrelay.servers.appslist.AppListHelper
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
-import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import kotlinx.coroutines.runBlocking
+import com.xzyht.notifyrelay.servers.appslist.AppListHelper
+import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import kotlinx.coroutines.launch
+import notifyrelay.base.util.Logger
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 import org.json.JSONArray
@@ -110,7 +110,7 @@ object AppListSyncManager {
      * 2. 将应用包名与来源设备关联
      * 3. 检查并批量请求缺失的图标
      */
-    fun handleAppListResponse(responseData: String, context: Context, deviceUuid: String) {
+    fun handleAppListResponse(responseData: String, context: Context, deviceUuid: String, deviceManager: DeviceConnectionManager) {
         try {
             val json = JSONObject(responseData)
             if (json.optString("type") != "APP_LIST_RESPONSE") return
@@ -132,7 +132,7 @@ object AppListSyncManager {
             }
             
             // 缓存到 AppRepository
-            runBlocking {
+            deviceManager.coroutineScopeInternal.launch {
                 AppRepository.cacheRemoteAppList(context, appsMap, deviceUuid)
                 
                 // 关联应用包名与设备（替代原 associateAppsWithDevice 方法）
@@ -165,30 +165,30 @@ object AppListSyncManager {
         deviceManager: DeviceConnectionManager,
         sourceDevice: DeviceInfo
     ) {
-        // 检查缺失的图标（替代原 getMissingIconsForPackages 方法）
-        val databaseRepository = DatabaseRepository.getInstance(context)
-        val missingIcons = runBlocking {
-            packageNames.filter { pkg ->
+        deviceManager.coroutineScopeInternal.launch {
+            // 检查缺失的图标（替代原 getMissingIconsForPackages 方法）
+            val databaseRepository = DatabaseRepository.getInstance(context)
+            val missingIcons = packageNames.filter { pkg ->
                 val app = databaseRepository.getAppByPackageName(pkg)
                 app?.isIconMissing ?: true
             }
+            if (missingIcons.isEmpty()) {
+                //Logger.d(TAG, "所有图标已缓存，无需请求")
+                return@launch
+            }
+            
+            // 过滤掉本机已安装的应用（本机已安装的应用图标可直接获取，无需请求）
+            val installedPackages = AppRepository.getInstalledPackageNames(context)
+            val needRequestIcons = missingIcons.filter { !installedPackages.contains(it) }
+            
+            if (needRequestIcons.isEmpty()) {
+                //Logger.d(TAG, "所有缺失图标为本机已安装应用，无需请求")
+                return@launch
+            }
+            
+            // 批量请求缺失的图标
+            IconSyncManager.requestIconsBatch(context, needRequestIcons, deviceManager, sourceDevice)
+            //Logger.d(TAG, "批量请求缺失图标：${needRequestIcons.size} 个")
         }
-        if (missingIcons.isEmpty()) {
-            //Logger.d(TAG, "所有图标已缓存，无需请求")
-            return
-        }
-        
-        // 过滤掉本机已安装的应用（本机已安装的应用图标可直接获取，无需请求）
-        val installedPackages = AppRepository.getInstalledPackageNames(context)
-        val needRequestIcons = missingIcons.filter { !installedPackages.contains(it) }
-        
-        if (needRequestIcons.isEmpty()) {
-            //Logger.d(TAG, "所有缺失图标为本机已安装应用，无需请求")
-            return
-        }
-        
-        // 批量请求缺失的图标
-        IconSyncManager.requestIconsBatch(context, needRequestIcons, deviceManager, sourceDevice)
-        //Logger.d(TAG, "批量请求缺失图标：${needRequestIcons.size} 个")
     }
 }

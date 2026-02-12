@@ -153,7 +153,7 @@ object ProtocolRouter {
                 // DATA_APP_LIST_RESPONSE：应用列表请求的响应，用于更新本机缓存/状态
                 "DATA_APP_LIST_RESPONSE" -> {
                     Logger.d(TAG, "接收到 DATA_APP_LIST_RESPONSE 消息: $decrypted")
-                    AppListSyncManager.handleAppListResponse(decrypted, context, remoteUuid)
+                    AppListSyncManager.handleAppListResponse(decrypted, context, remoteUuid, deviceManager)
                     true
                 }
                 // DATA_AUDIO_REQUEST：对方请求本机音频转发
