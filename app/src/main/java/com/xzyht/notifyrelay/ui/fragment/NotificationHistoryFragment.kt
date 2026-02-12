@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
+import androidx.lifecycle.lifecycleScope
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
@@ -238,7 +239,6 @@ fun NotificationCard(
 }
 
 // 工具函数：获取应用名和图标（文件级顶层）
-@OptIn(DelicateCoroutinesApi::class)
 suspend fun getAppNameAndIcon(context: Context, packageName: String?): Pair<String, Bitmap?> {
     var name = packageName ?: ""
     var icon: Bitmap? = null
@@ -254,22 +254,7 @@ suspend fun getAppNameAndIcon(context: Context, packageName: String?): Pair<Stri
             }
 
             // 使用统一的图标获取方法，自动处理本地和外部应用
-            // 异步获取图标
-            icon = AppRepository.getAppIconAsync(context, packageName)
-
-            // 如果获取失败，尝试异步加载并更新缓存
-            if (icon == null) {
-                // 异步加载图标，不等待结果
-                GlobalScope.launch {
-                    val loadedIcon = AppRepository.getAppIconAsync(context, packageName)
-                    if (loadedIcon != null) {
-                        // 使用现有的公共方法缓存外部应用图标
-                        AppRepository.cacheExternalAppIcon(context, packageName, loadedIcon, "remote")
-                        // 通知UI更新
-                        AppRepository.notifyIconUpdated(packageName)
-                    }
-                }
-            }
+            icon = AppRepository.getAppIconWithAutoRequest(context, packageName)
         } catch (_: Exception) {
             // 如果所有尝试都失败，使用包名和默认图标
             name = packageName
