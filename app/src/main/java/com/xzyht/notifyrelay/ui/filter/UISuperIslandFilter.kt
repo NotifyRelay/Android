@@ -627,7 +627,7 @@ private fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
             return@produceState
         }
         val fetched = withContext(Dispatchers.IO) {
-            AppRepository.getAppIconWithAutoRequestAsync(context, target)
+            AppRepository.getAppIconWithAutoRequest(context, target)
         }
         value = fetched?.asImageBitmap()
     }

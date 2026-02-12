@@ -616,49 +616,4 @@ object AppRepository {
             return null
         }
     }
-    
-    /**
-     * 异步获取应用图标，自动处理本地和外部应用，并支持自动请求缺失的图标。
-     *
-     * @param context 上下文
-     * @param packageName 应用包名
-     * @param deviceManager 设备连接管理器（可选，用于自动请求图标）
-     * @param sourceDevice 源设备信息（可选，用于自动请求图标）
-     * @return 应用图标，若无法获取则返回 null
-     */
-    suspend fun getAppIconWithAutoRequestAsync(
-        context: Context,
-        packageName: String,
-        deviceManager: DeviceConnectionManager? = null,
-        sourceDevice: DeviceInfo? = null
-    ): Bitmap? {
-        try {
-            // 1. 优先获取本地应用图标
-            val localIcon = getAppIconAsync(context, packageName)
-            if (localIcon != null) {
-                return localIcon
-            }
-            
-            // 2. 尝试从数据库获取应用图标
-            val externalIcon = getExternalAppIcon(context, packageName)
-            if (externalIcon != null) {
-                return externalIcon
-            }
-            
-            // 3. 自动请求缺失的图标
-            if (deviceManager != null && sourceDevice != null) {
-                IconSyncManager.checkAndSyncIcon(
-                    context,
-                    packageName,
-                    deviceManager,
-                    sourceDevice
-                )
-            }
-            
-            return null
-        } catch (e: Exception) {
-            //Logger.e(TAG, "异步获取应用图标失败: $packageName", e)
-            return null
-        }
-    }
 }
