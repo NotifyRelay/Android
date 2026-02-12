@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.fragment.filter
+package com.xzyht.notifyrelay.ui.filter
 
 import android.Manifest
 import android.content.Intent
@@ -33,7 +33,7 @@ import com.xzyht.notifyrelay.feature.clipboard.ClipboardLogDetector
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.fragment.GlobalSelectedDeviceHolder
+import com.xzyht.notifyrelay.ui.fragment.GlobalSelectedDeviceHolder
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers

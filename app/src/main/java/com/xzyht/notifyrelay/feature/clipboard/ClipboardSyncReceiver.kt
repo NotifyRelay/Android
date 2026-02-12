@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
-import com.xzyht.notifyrelay.feature.ClipboardSyncActivity
+import com.xzyht.notifyrelay.ui.ClipboardSyncActivity
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton

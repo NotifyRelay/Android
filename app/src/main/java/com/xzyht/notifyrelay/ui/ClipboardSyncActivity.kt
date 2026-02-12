@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature
+package com.xzyht.notifyrelay.ui
 
 import android.content.ClipDescription
 import android.content.ClipboardManager

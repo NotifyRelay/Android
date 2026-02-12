@@ -1,10 +1,9 @@
-package com.xzyht.notifyrelay.feature
+package com.xzyht.notifyrelay.ui
 
 import android.Manifest
 import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
@@ -412,7 +411,7 @@ object GuideScreen {
                 Button(
                     onClick = {
                         val adbCmd = "adb shell appops set ${context.packageName} RECEIVE_SENSITIVE_NOTIFICATIONS allow"
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                        val clipboard = context.getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
                         val clip = ClipData.newPlainText("adb", adbCmd)
                         clipboard.setPrimaryClip(clip)
                         showToast("已复制adb命令到剪贴板")

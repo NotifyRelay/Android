@@ -49,14 +49,14 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.NotifyRelay">
-        <activity android:name=".feature.GuideActivity"
+        <activity android:name=".ui.GuideActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".feature.MainActivity" android:exported="true" />
+        <activity android:name=".ui.MainActivity" android:exported="true" />
         <!-- 通知监听服务声明，用于系统识别通知访问权限 -->
         <service
             android:name=".servers.NotifyRelayNotificationListenerService"
@@ -103,7 +103,7 @@
             
         <!-- 剪贴板同步透明Activity -->
         <activity
-            android:name=".feature.ClipboardSyncActivity"
+            android:name=".ui.ClipboardSyncActivity"
             android:exported="true"
             android:theme="@style/TransparentTheme"
             android:launchMode="singleInstance"

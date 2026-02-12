@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.fragment
+package com.xzyht.notifyrelay.ui.fragment
 
 import android.app.Activity
 import android.content.Context
@@ -50,15 +50,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.R
-import com.xzyht.notifyrelay.feature.fragment.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
-import com.xzyht.notifyrelay.feature.fragment.filter.dialog.ConnectDeviceDialog
-import com.xzyht.notifyrelay.feature.fragment.filter.dialog.HandshakeRequestDialog
-import com.xzyht.notifyrelay.feature.fragment.filter.dialog.RejectedDevicesDialog
+import com.xzyht.notifyrelay.ui.dialog.ConnectDeviceDialog
+import com.xzyht.notifyrelay.ui.dialog.HandshakeRequestDialog
+import com.xzyht.notifyrelay.ui.dialog.RejectedDevicesDialog
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.BatteryIconConverter
 import notifyrelay.core.util.BatteryUtils
@@ -67,6 +66,7 @@ import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import kotlin.collections.iterator
 
 // 全局设备选中状态单例
 object GlobalSelectedDeviceHolder {

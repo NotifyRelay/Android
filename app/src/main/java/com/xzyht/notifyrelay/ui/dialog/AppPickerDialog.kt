@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.fragment.filter.dialog
+package com.xzyht.notifyrelay.ui.dialog
 
 import android.content.pm.ApplicationInfo
 import android.graphics.drawable.BitmapDrawable

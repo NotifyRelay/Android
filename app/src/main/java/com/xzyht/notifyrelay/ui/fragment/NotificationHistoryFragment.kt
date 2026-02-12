@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.fragment
+package com.xzyht.notifyrelay.ui.fragment
 
 import android.app.Activity
 import android.content.Context
@@ -65,10 +65,10 @@ import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.common.appslist.AppRepository
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.sync.MessageSender
-import com.xzyht.notifyrelay.feature.GuideActivity
+import com.xzyht.notifyrelay.ui.GuideActivity
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
-import com.xzyht.notifyrelay.feature.fragment.filter.UISuperIslandSettings
+import com.xzyht.notifyrelay.ui.filter.UISuperIslandSettings
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch

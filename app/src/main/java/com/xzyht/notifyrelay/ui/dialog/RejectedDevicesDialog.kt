@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.fragment.filter.dialog
+package com.xzyht.notifyrelay.ui.dialog
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.fragment.filter
+package com.xzyht.notifyrelay.ui.filter
 
 import android.content.ClipData
 import android.content.ClipboardManager
@@ -51,13 +51,13 @@ import androidx.compose.ui.unit.dp
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import com.xzyht.notifyrelay.common.appslist.AppRepository
-import com.xzyht.notifyrelay.feature.fragment.DoubleClickConfirmButton
+import com.xzyht.notifyrelay.ui.fragment.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import com.xzyht.notifyrelay.feature.fragment.filter.dialog.SuperIslandTestDialog
+import com.xzyht.notifyrelay.ui.dialog.SuperIslandTestDialog
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.fragment.filter
+package com.xzyht.notifyrelay.ui.filter
 
 import android.content.ClipData
 import android.content.ClipboardManager

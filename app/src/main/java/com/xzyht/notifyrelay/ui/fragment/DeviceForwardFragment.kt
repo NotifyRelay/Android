@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.fragment
+package com.xzyht.notifyrelay.ui.fragment
 
 import android.content.BroadcastReceiver
 import android.content.Context
@@ -35,8 +35,8 @@ import com.xzyht.notifyrelay.common.appslist.AppRepository
 import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.feature.fragment.filter.DeviceInterconnect
-import com.xzyht.notifyrelay.feature.fragment.filter.UIChatTest
+import com.xzyht.notifyrelay.ui.filter.DeviceInterconnect
+import com.xzyht.notifyrelay.ui.filter.UIChatTest
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

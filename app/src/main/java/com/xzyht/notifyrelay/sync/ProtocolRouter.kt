@@ -13,7 +13,7 @@ import com.xzyht.notifyrelay.sync.ftpServer.StartResult.PORT_IN_USE
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.SUCCESS
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
-import com.xzyht.notifyrelay.feature.GuideActivity
+import com.xzyht.notifyrelay.ui.GuideActivity
 import com.xzyht.notifyrelay.sync.notification.StatusProcessor
 import com.xzyht.notifyrelay.sync.notification.SuperIslandProcessor
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo

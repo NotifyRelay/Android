@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.fragment.filter
+package com.xzyht.notifyrelay.ui.filter
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
@@ -29,7 +29,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.common.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.notification.backend.BackendLocalFilter
-import com.xzyht.notifyrelay.feature.fragment.filter.dialog.AppPickerDialog
+import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
