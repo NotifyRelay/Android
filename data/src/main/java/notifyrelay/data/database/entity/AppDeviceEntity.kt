@@ -3,7 +3,6 @@ package notifyrelay.data.database.entity
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
-import androidx.room.PrimaryKey
 
 /**
  * 应用设备关联实体类
