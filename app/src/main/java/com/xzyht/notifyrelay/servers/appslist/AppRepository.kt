@@ -37,7 +37,8 @@ object AppRepository {
     private const val TAG = "AppRepository"
 
     // 数据库仓库
-    private lateinit var databaseRepository: DatabaseRepository
+    private var databaseRepository: DatabaseRepository? = null
+    private val databaseRepositoryLock = Any()
 
     // 状态流
     private val _isLoading = MutableStateFlow(false)
@@ -64,10 +65,11 @@ object AppRepository {
     
     // 初始化数据库仓库
     private fun initDatabaseRepository(context: Context): Unit {
-        val isInitialized: Boolean = ::databaseRepository.isInitialized
-        if (!isInitialized) {
-            val instance: DatabaseRepository = DatabaseRepository.getInstance(context)
-            databaseRepository = instance
+        synchronized(databaseRepositoryLock) {
+            if (databaseRepository == null) {
+                val instance: DatabaseRepository = DatabaseRepository.getInstance(context)
+                databaseRepository = instance
+            }
         }
     }
 
@@ -163,12 +165,12 @@ object AppRepository {
 
             // 批量保存应用到数据库
             if (appEntities.isNotEmpty()) {
-                databaseRepository.saveApps(appEntities)
+                databaseRepository?.saveApps(appEntities)
             }
 
             // 批量保存应用设备关联到数据库
             if (appDeviceEntities.isNotEmpty()) {
-                databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
+                databaseRepository?.saveAppDeviceAssociations(appDeviceEntities)
             }
 
             //Logger.d(TAG, "应用列表加载成功，共 ${apps.size} 个应用")
@@ -232,7 +234,7 @@ object AppRepository {
         // 清除应用数据
         val apps = _apps.value
         apps.forEach {
-            databaseRepository.deleteAppByPackageName(it.packageName)
+            databaseRepository?.deleteAppByPackageName(it.packageName)
         }
 
         // 清除远程应用列表
@@ -257,7 +259,7 @@ object AppRepository {
 
         apps.forEach { (packageName, appName) ->
             // 检查应用是否已存在
-            val existingApp = databaseRepository.getAppByPackageName(packageName)
+            val existingApp = databaseRepository?.getAppByPackageName(packageName)
             val appEntity = if (existingApp != null) {
                 // 更新现有应用
                 existingApp.copy(
@@ -288,10 +290,10 @@ object AppRepository {
 
         // 保存到数据库
         if (appEntities.isNotEmpty()) {
-            databaseRepository.saveApps(appEntities)
+            databaseRepository?.saveApps(appEntities)
         }
         if (appDeviceEntities.isNotEmpty()) {
-            databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
+            databaseRepository?.saveAppDeviceAssociations(appDeviceEntities)
         }
 
         _remoteApps.value = apps
@@ -309,7 +311,7 @@ object AppRepository {
         val installedPackages = getInstalledPackageNames(context)
         val cachedIconPackages = mutableSetOf<String>()
         // 从数据库获取所有应用包名
-        val apps = databaseRepository.getAllApps().first()
+        val apps = databaseRepository?.getAllApps()?.first() ?: emptyList()
         apps.forEach {
             cachedIconPackages.add(it.packageName)
         }
@@ -417,14 +419,14 @@ object AppRepository {
                     val iconBytes = baos.toByteArray()
 
                     // 更新数据库中的图标
-                    val existingApp = databaseRepository.getAppByPackageName(packageName)
+                    val existingApp = databaseRepository?.getAppByPackageName(packageName)
                     if (existingApp != null) {
                         val updatedApp = existingApp.copy(
                             iconBytes = iconBytes,
                             isIconMissing = false,
                             lastUpdated = System.currentTimeMillis()
                         )
-                        databaseRepository.saveApp(updatedApp)
+                        databaseRepository?.saveApp(updatedApp)
                     }
                 } catch (e: Exception) {
                     Logger.w(TAG, "获取应用图标失败: ${appInfo.packageName}", e)
@@ -452,7 +454,7 @@ object AppRepository {
         }
 
         // 从数据库获取应用信息
-        val app = databaseRepository.getAppByPackageName(packageName)
+        val app = databaseRepository?.getAppByPackageName(packageName)
         val iconBytes = app?.iconBytes
         if (iconBytes != null) {
             // 将字节数组转换为 Bitmap
@@ -483,7 +485,7 @@ object AppRepository {
         }
         
         // 检查应用是否已存在
-        val existingApp = databaseRepository.getAppByPackageName(packageName)
+        val existingApp = databaseRepository?.getAppByPackageName(packageName)
         val appEntity = if (existingApp != null) {
             // 更新现有应用
             existingApp.copy(
@@ -504,7 +506,7 @@ object AppRepository {
         }
         
         // 保存应用到数据库
-        databaseRepository.saveApp(appEntity)
+        databaseRepository?.saveApp(appEntity)
         
         // 保存应用设备关联
         val appDeviceEntity = AppDeviceEntity(
@@ -512,7 +514,7 @@ object AppRepository {
             sourceDevice = deviceUuid,
             lastUpdated = System.currentTimeMillis()
         )
-        databaseRepository.saveAppDeviceAssociation(appDeviceEntity)
+        databaseRepository?.saveAppDeviceAssociation(appDeviceEntity)
         
         // 通知UI层图标已更新
         _iconUpdates.value = packageName
@@ -531,7 +533,7 @@ object AppRepository {
         initDatabaseRepository(context)
         
         // 从数据库获取应用信息
-        val app = databaseRepository.getAppByPackageName(packageName)
+        val app = databaseRepository?.getAppByPackageName(packageName)
         val iconBytes = app?.iconBytes
         if (iconBytes != null) {
             // 将字节数组转换为 Bitmap

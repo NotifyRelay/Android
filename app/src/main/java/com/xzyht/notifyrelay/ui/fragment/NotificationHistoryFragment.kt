@@ -465,7 +465,7 @@ fun NotificationHistoryScreen() {
     ) {
         val coroutineScope = rememberCoroutineScope()
         if (notifications.isNotEmpty()) {
-            LazyColumn(modifier = Modifier.Companion.fillMaxSize()) {
+            LazyColumn(modifier = Modifier.fillMaxSize()) {
                 items(
                     items = mixedList,
                     // 为每个分组提供稳定的 key，基于分组的包名
