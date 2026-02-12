@@ -55,6 +55,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
+import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.dialog.ConnectDeviceDialog
 import com.xzyht.notifyrelay.ui.dialog.HandshakeRequestDialog
 import com.xzyht.notifyrelay.ui.dialog.RejectedDevicesDialog
@@ -423,11 +424,17 @@ fun DeviceListScreen() {
                                 authedDeviceUuids = authedDeviceUuids - device.uuid
                             } else {
                                 // 删除失败，显示错误信息
-                                ToastUtils.showShortToast(context, "删除设备失败: 设备不存在或已被删除")
+                                ToastUtils.showShortToast(
+                                    context,
+                                    "删除设备失败: 设备不存在或已被删除"
+                                )
                             }
                         } catch (e: Exception) {
                             // 显示异常信息
-                            ToastUtils.showShortToast(context, "删除设备失败: ${e.message ?: "未知错误"}")
+                            ToastUtils.showShortToast(
+                                context,
+                                "删除设备失败: ${e.message ?: "未知错误"}"
+                            )
                         }
                         selectedDevice = null
                         GlobalSelectedDeviceHolder.selectedDevice = null

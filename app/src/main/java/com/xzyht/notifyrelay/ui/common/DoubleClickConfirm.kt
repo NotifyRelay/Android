@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.fragment
+package com.xzyht.notifyrelay.ui.common
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable

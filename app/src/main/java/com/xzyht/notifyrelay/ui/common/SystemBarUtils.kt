@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.core
+package com.xzyht.notifyrelay.ui.common
 
 import android.view.Window
 import java.lang.reflect.Method
