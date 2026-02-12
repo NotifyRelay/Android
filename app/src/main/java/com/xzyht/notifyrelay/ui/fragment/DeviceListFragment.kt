@@ -66,6 +66,7 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.collections.iterator
 
@@ -129,24 +130,9 @@ fun DeviceListScreen() {
     var authedDeviceUuids by rememberSaveable { mutableStateOf(setOf<String>()) }
     var rejectedDeviceUuids by rememberSaveable { mutableStateOf(setOf<String>()) }
     // 新增：UDP发现开关状态与切换方法
-    var udpDiscoveryEnabled by remember { mutableStateOf(deviceManager.udpDiscoveryEnabled) }
+    var udpDiscoveryEnabled by remember { mutableStateOf(true) }
     fun toggleUdpDiscovery(enabled: Boolean) {
         udpDiscoveryEnabled = enabled
-        deviceManager.udpDiscoveryEnabled = enabled
-        try {
-            val discoveryField = deviceManager.javaClass.getDeclaredField("discoveryManager")
-            discoveryField.isAccessible = true
-            val discovery = discoveryField.get(deviceManager)
-            if (enabled) {
-                val startMethod = discovery.javaClass.getDeclaredMethod("startDiscovery")
-                startMethod.isAccessible = true
-                startMethod.invoke(discovery)
-            } else {
-                val stopMethod = discovery.javaClass.getDeclaredMethod("stopDiscovery")
-                stopMethod.isAccessible = true
-                stopMethod.invoke(discovery)
-            }
-        } catch (_: Exception) {}
     }
     // 新增：未认证设备连接弹窗状态
     var showConnectDialog by remember { mutableStateOf(false) }
@@ -169,9 +155,13 @@ fun DeviceListScreen() {
     val allDevices: List<DeviceInfo?> = listOf<DeviceInfo?>(null) + devices
     // 只展示deviceMap中存在的认证设备，彻底移除已无效的旧UUID设备
     val validAuthedDeviceUuids = authedDeviceUuids.intersect(devices.map { it.uuid }.toSet())
-    // 未认证设备
-    val unauthedDevices = devices.filter { d ->
-        !validAuthedDeviceUuids.contains(d.uuid) && !rejectedDeviceUuids.contains(d.uuid)
+    // 未认证设备，根据 udpDiscoveryEnabled 控制是否显示
+    val unauthedDevices = if (udpDiscoveryEnabled) {
+        devices.filter { d ->
+            !validAuthedDeviceUuids.contains(d.uuid) && !rejectedDeviceUuids.contains(d.uuid)
+        }
+    } else {
+        emptyList()
     }
     // 已拒绝设备（需包含所有被拒绝uuid对应的设备，若deviceMap未包含则手动补全）
     val rejectedDevices = rejectedDeviceUuids.mapNotNull { uuid ->
@@ -242,7 +232,7 @@ fun DeviceListScreen() {
             modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
         ) {
             Text(
-                text = "主动广播和接收",
+                text = "显示未认证设备",
                 style = textStyles.body2,
                 modifier = Modifier.weight(1f)
             )
