@@ -60,19 +60,20 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
-import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.BuildConfig
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
-import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
-import com.xzyht.notifyrelay.sync.MessageSender
-import com.xzyht.notifyrelay.ui.GuideActivity
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
+import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.sync.MessageSender
+import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
+import com.xzyht.notifyrelay.ui.GuideActivity
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
+import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.filter.UISuperIslandSettings
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
@@ -238,7 +239,7 @@ fun NotificationCard(
 
 // 工具函数：获取应用名和图标（文件级顶层）
 @OptIn(DelicateCoroutinesApi::class)
-fun getAppNameAndIcon(context: Context, packageName: String?): Pair<String, Bitmap?> {
+suspend fun getAppNameAndIcon(context: Context, packageName: String?): Pair<String, Bitmap?> {
     var name = packageName ?: ""
     var icon: Bitmap? = null
     if (packageName != null) {
@@ -253,10 +254,10 @@ fun getAppNameAndIcon(context: Context, packageName: String?): Pair<String, Bitm
             }
 
             // 使用统一的图标获取方法，自动处理本地和外部应用
-            // 同步获取图标，确保返回时有图标
-            icon = AppRepository.getAppIconSync(context, packageName)
+            // 异步获取图标
+            icon = AppRepository.getAppIconAsync(context, packageName)
 
-            // 如果同步获取失败，尝试异步加载并更新缓存
+            // 如果获取失败，尝试异步加载并更新缓存
             if (icon == null) {
                 // 异步加载图标，不等待结果
                 GlobalScope.launch {
@@ -424,7 +425,9 @@ fun NotificationHistoryScreen() {
         // 从缓存获取，如果缓存中没有或图标为null，重新获取
         var appInfo = appInfoCache[packageName]
         if (appInfo == null || appInfo.second == null) {
-            appInfo = getAppNameAndIcon(context, packageName)
+            appInfo = runBlocking {
+                getAppNameAndIcon(context, packageName)
+            }
             appInfoCache[packageName] = appInfo
         }
 

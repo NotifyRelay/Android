@@ -214,20 +214,22 @@ object IconSyncManager {
                 // 批量
                 val resultArr = JSONArray()
                 val missingArr = JSONArray()
-                for (i in 0 until multiArray.length()) {
-                    val pkg = multiArray.optString(i)
-                    if (pkg.isNullOrEmpty()) continue
-                    val icon = getLocalAppIcon(context, pkg)
-                    if (icon != null) {
-                        val base64 = bitmapToBase64(icon)
-                        val item = JSONObject().apply { 
-                            put("packageName", pkg)
-                            put("iconData", base64)
+                runBlocking {
+                    for (i in 0 until multiArray.length()) {
+                        val pkg = multiArray.optString(i)
+                        if (pkg.isNullOrEmpty()) continue
+                        val icon = getLocalAppIcon(context, pkg)
+                        if (icon != null) {
+                            val base64 = bitmapToBase64(icon)
+                            val item = JSONObject().apply { 
+                                put("packageName", pkg)
+                                put("iconData", base64)
+                            }
+                            resultArr.put(item)
+                        } else {
+                            // 记录缺失的图标
+                            missingArr.put(pkg)
                         }
-                        resultArr.put(item)
-                    } else {
-                        // 记录缺失的图标
-                        missingArr.put(pkg)
                     }
                 }
                 
@@ -247,7 +249,9 @@ object IconSyncManager {
                 ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", resp, ICON_REQUEST_TIMEOUT)
                 //Logger.d(TAG, "批量图标响应发送(${resultArr.length()}) -> ${sourceDevice.displayName}")
             } else if (single.isNotEmpty()) {
-                val icon = getLocalAppIcon(context, single)
+                val icon = runBlocking {
+                    getLocalAppIcon(context, single)
+                }
                 val resp = JSONObject().apply { 
                     put("type", "ICON_RESPONSE")
                     put("packageName", single)
@@ -345,12 +349,12 @@ object IconSyncManager {
         return Base64.encodeToString(bos.toByteArray(), Base64.DEFAULT)
     }
 
-    private fun getLocalAppIcon(context: Context, packageName: String): Bitmap? {
+    private suspend fun getLocalAppIcon(context: Context, packageName: String): Bitmap? {
         // packageName 应为实际应用包名
         val actualPackageName = packageName
 
         return try {
-            AppRepository.getAppIconSync(context, actualPackageName) ?: run {
+            AppRepository.getAppIconAsync(context, actualPackageName) ?: run {
                 val pm = context.packageManager
                 val appInfo = pm.getApplicationInfo(actualPackageName, 0)
                 val drawable = pm.getApplicationIcon(appInfo)

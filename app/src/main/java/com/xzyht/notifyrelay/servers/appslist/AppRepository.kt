@@ -463,38 +463,6 @@ object AppRepository {
     }
 
     /**
-     * 同步获取应用图标（若未加载应用列表则会同步加载，可能阻塞当前线程）。
-     *
-     * 注意：该方法在必要时会使用 runBlocking 加载数据，请谨慎在 UI 线程中直接调用以避免卡顿。
-     *
-     * @param context Android 上下文，用于加载应用列表与访问数据库。
-     * @param packageName 目标应用的包名（非空）。
-     * @return 应用图标的 Bitmap；若不存在则返回 null。
-     */
-    fun getAppIconSync(context: Context, packageName: String): Bitmap? {
-        initDatabaseRepository(context)
-
-        if (!isDataLoaded()) {
-            // 同步加载，使用runBlocking
-            runBlocking {
-                loadApps(context)
-            }
-        }
-
-        // 从数据库获取应用信息
-        val app = runBlocking {
-            databaseRepository.getAppByPackageName(packageName)
-        }
-        val iconBytes = app?.iconBytes
-        if (iconBytes != null) {
-            // 将字节数组转换为 Bitmap
-            return BitmapFactory.decodeByteArray(iconBytes, 0, iconBytes.size)
-        }
-
-        return null
-    }
-
-    /**
      * 缓存外部应用的图标（数据库存储），用于保存未安装应用或来自远端的图标数据。
      *
      * @param context Android 上下文，用于访问数据库（非空）。
@@ -590,7 +558,7 @@ object AppRepository {
     ): Bitmap? {
         try {
             // 1. 优先获取本地应用图标
-            val localIcon = getAppIconSync(context, packageName)
+            val localIcon = getAppIconAsync(context, packageName)
             if (localIcon != null) {
                 return localIcon
             }
