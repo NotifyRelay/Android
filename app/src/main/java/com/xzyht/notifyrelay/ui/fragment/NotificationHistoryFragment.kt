@@ -354,7 +354,7 @@ fun NotificationHistoryScreen() {
                 // 图标更新，刷新UI
                 refreshTrigger.value = System.currentTimeMillis()
                 // 清除缓存，确保下次获取时能拿到最新图标
-                appInfoCache.remove(it)
+                appInfoCache.remove(it.first)
             }
         }
     }

@@ -51,15 +51,15 @@ object AppRepository {
     val remoteApps: StateFlow<Map<String, String>> = _remoteApps.asStateFlow()
     
     // 图标更新事件流，用于通知UI层图标已更新
-    private val _iconUpdates = MutableStateFlow<String?>(null)
-    val iconUpdates: StateFlow<String?> = _iconUpdates.asStateFlow()
+    private val _iconUpdates = MutableStateFlow<Pair<String, Long>?>(null)
+    val iconUpdates: StateFlow<Pair<String, Long>?> = _iconUpdates.asStateFlow()
     
     /**
      * 通知UI层图标已更新
      * @param packageName 应用包名
      */
     fun notifyIconUpdated(packageName: String): Unit {
-        val updatedValue: String? = packageName
+        val updatedValue: Pair<String, Long>? = Pair(packageName, System.currentTimeMillis())
         _iconUpdates.value = updatedValue
     }
     
@@ -519,7 +519,7 @@ object AppRepository {
         databaseRepository?.saveAppDeviceAssociations(appDeviceEntities)
         
         // 通知UI层图标已更新
-        _iconUpdates.value = packageName
+        _iconUpdates.value = Pair(packageName, System.currentTimeMillis())
 
         //Logger.d(TAG, "缓存外部应用图标: $packageName")
     }
