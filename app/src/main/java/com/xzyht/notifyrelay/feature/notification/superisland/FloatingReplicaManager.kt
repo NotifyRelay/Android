@@ -14,8 +14,8 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import androidx.core.app.NotificationCompat
-import com.xzyht.notifyrelay.common.core.util.IntentUtils
-import com.xzyht.notifyrelay.common.core.util.Logger
+import notifyrelay.base.util.IntentUtils
+import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.parseParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingComposeContainer
@@ -24,8 +24,6 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingW
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
-import com.xzyht.notifyrelay.common.data.StorageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

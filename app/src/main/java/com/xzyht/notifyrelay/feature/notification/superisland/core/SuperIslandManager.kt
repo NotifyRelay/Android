@@ -9,9 +9,9 @@ import android.os.Bundle
 import android.provider.Settings
 import android.service.notification.StatusBarNotification
 import android.util.Base64
-import com.xzyht.notifyrelay.common.core.util.DataUrlUtils
-import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.common.data.StorageManager
+import notifyrelay.core.util.DataUrlUtils
+import notifyrelay.base.util.Logger
+import notifyrelay.data.StorageManager
 import org.json.JSONObject
 
 /**

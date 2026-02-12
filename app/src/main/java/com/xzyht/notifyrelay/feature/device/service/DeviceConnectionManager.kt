@@ -2,18 +2,25 @@ package com.xzyht.notifyrelay.feature.device.service
 
 import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
-import com.xzyht.notifyrelay.common.core.sync.ConnectionDiscoveryManager
-import com.xzyht.notifyrelay.common.core.sync.ServerLineRouter
-import com.xzyht.notifyrelay.common.core.util.EncryptionManager
-import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.common.data.StorageManager
+import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
+import com.xzyht.notifyrelay.sync.ServerLineRouter
+import notifyrelay.core.util.EncryptionManager
+import notifyrelay.base.util.Logger
+import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
+import com.xzyht.notifyrelay.sync.AppListSyncManager
+import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
+import com.xzyht.notifyrelay.sync.IconSyncManager
+import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import notifyrelay.data.config.AppConfig
+import notifyrelay.data.database.entity.DeviceEntity
+import notifyrelay.data.database.repository.DatabaseRepository
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.net.ServerSocket
@@ -144,10 +151,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private fun loadAuthedDevices() {
         // 从Room数据库加载设备信息
         val devices = kotlinx.coroutines.runBlocking {
-            com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context).getDevices()
+            DatabaseRepository.getInstance(context).getDevices()
         }
         
         for (device in devices) {
+            // 过滤掉uuid为"本机"的记录
+            if (device.uuid == "本机") continue
+            
             authenticatedDevices[device.uuid] = AuthInfo(
                 publicKey = device.publicKey,
                 sharedSecret = device.sharedSecret,
@@ -184,12 +194,15 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private fun saveAuthedDevices() {
         try {
             // 保存到Room数据库
-            val deviceEntities = mutableListOf<com.xzyht.notifyrelay.common.data.database.entity.DeviceEntity>()
+            val deviceEntities = mutableListOf<DeviceEntity>()
             for ((uuid, auth) in authenticatedDevices) {
+                // 过滤掉uuid为"本机"的记录
+                if (uuid == "本机") continue
+                
                 if (auth.isAccepted) {
                     val name = auth.displayName ?: deviceInfoCache[uuid]?.displayName ?: DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid)
                     val info = deviceInfoCache[uuid]
-                    val deviceEntity = com.xzyht.notifyrelay.common.data.database.entity.DeviceEntity(
+                    val deviceEntity = DeviceEntity(
                         uuid = uuid,
                         publicKey = auth.publicKey,
                         sharedSecret = auth.sharedSecret,
@@ -204,7 +217,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             
             // 异步保存到数据库
             coroutineScope.launch {
-                val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+                val repository = DatabaseRepository.getInstance(context)
                 
                 // 获取当前数据库中的所有设备
                 val currentDevices = repository.getDevices()
@@ -215,7 +228,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 
                 // 删除数据库中存在但内存中不存在的设备
                 currentDevices.forEach {
-                    if (!deviceUuidsToSave.contains(it.uuid)) {
+                    // 保留uuid为"本机"的记录，避免影响旧数据
+                    if (!deviceUuidsToSave.contains(it.uuid) && it.uuid != "本机") {
                         repository.deleteDevice(it)
                     }
                 }
@@ -292,7 +306,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private val localPrivateKey: String
     internal val listenPort: Int = 23333
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
-    private val keepAlive = com.xzyht.notifyrelay.common.core.sync.ConnectionKeepAlive(this, coroutineScope)
+    private val keepAlive = ConnectionKeepAlive(this, coroutineScope)
     private val discoveryManager = ConnectionDiscoveryManager(this, coroutineScope)
 
     // === 以下为提供给 ServerLineRouter 等内部组件使用的访问器（保持字段本身 private） ===
@@ -377,10 +391,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // 使用AppConfig管理UDP发现配置
     var udpDiscoveryEnabled: Boolean
         get() {
-            return com.xzyht.notifyrelay.common.core.util.AppConfig.getUdpDiscoveryEnabled(context)
+            return AppConfig.getUdpDiscoveryEnabled(context)
         }
         set(value) {
-            com.xzyht.notifyrelay.common.core.util.AppConfig.setUdpDiscoveryEnabled(context, value)
+            AppConfig.setUdpDiscoveryEnabled(context, value)
         }
 
     init {
@@ -404,8 +418,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // 私钥可临时
         localPrivateKey = UUID.randomUUID().toString().replace("-", "")
         // 兼容旧用户：首次运行时如无保存则默认true
-        if (!com.xzyht.notifyrelay.common.core.util.AppConfig.getUdpDiscoveryEnabled(context)) {
-            com.xzyht.notifyrelay.common.core.util.AppConfig.setUdpDiscoveryEnabled(context, true)
+        if (!AppConfig.getUdpDiscoveryEnabled(context)) {
+            AppConfig.setUdpDiscoveryEnabled(context, true)
         }
         loadAuthedDevices()
         // 新增：初始补全本机 deviceInfoCache，便于反向 connectToDevice
@@ -448,6 +462,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             oldMap.count { (uuid, pair) -> pair.second && (authSnapshot[uuid]?.isAccepted == true) }
         } catch (_: Exception) { 0 }
         for (uuid in allUuids) {
+            // 过滤掉uuid为"本机"的记录
+            if (uuid == "本机") continue
+            
+            val deviceInfo = getDeviceInfo(uuid)
+            
             val lastSeen = deviceLastSeen[uuid]
             val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
             // 检查时钟回拨
@@ -461,7 +480,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 // 仅基于心跳包判定在线
                 val diff = if (safeLastSeen != null) now - safeLastSeen else -1L
                 val isOnline = safeLastSeen != null && diff <= authedHeartbeatTimeout
-                val info = getDeviceInfo(uuid) ?: DeviceInfo(uuid, auth.displayName ?: "已认证设备", "", listenPort)
+                val info = deviceInfo ?: DeviceInfo(uuid, auth.displayName ?: "已认证设备", "", listenPort)
                 val oldOnline = oldMap[uuid]?.second
                 if (oldOnline != null && oldOnline != isOnline) {
                     Logger.i("天使-死神-NotifyRelay", "[updateDeviceList] 已认证设备状态变化: uuid=$uuid, isOnline=$isOnline, lastSeen=$safeLastSeen, diff=$diff")
@@ -470,7 +489,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             } else {
                 val diff = if (safeLastSeen != null) now - safeLastSeen else -1L
                 val isOnline = safeLastSeen != null && diff <= unauthedTimeout
-                val info = getDeviceInfo(uuid)
+                val info = deviceInfo
                 val oldOnline = oldMap[uuid]?.second
                 if (oldOnline != null && oldOnline != isOnline) {
                     Logger.i("死神-NotifyRelay", "[updateDeviceList] 未认证设备状态变化: uuid=$uuid, isOnline=$isOnline, lastSeen=$safeLastSeen, diff=$diff")
@@ -606,7 +625,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                     //Logger.d("死神-NotifyRelay", "未认证设备，禁止发送")
                     return@launch
                 }
-                com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this@DeviceConnectionManager, device, "DATA_NOTIFICATION", data, 10000L)
+                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, device, "DATA_NOTIFICATION", data, 10000L)
             } catch (e: Exception) {
                 Logger.e("死神-NotifyRelay", "发送通知数据失败", e)
             }
@@ -618,7 +637,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
      */
     fun requestRemoteAppList(device: DeviceInfo, scope: String = "user") {
         try {
-            com.xzyht.notifyrelay.common.core.sync.AppListSyncManager.requestAppListFromDevice(context, this, device, scope)
+            AppListSyncManager.requestAppListFromDevice(context, this, device, scope)
         } catch (_: Exception) {}
     }
 
@@ -629,7 +648,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     fun requestAudioForwarding(device: DeviceInfo): Boolean {
         try {
             val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioRequest\"}"
-            com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, device, "DATA_MEDIA_CONTROL", request, 10000L)
+            ProtocolSender.sendEncrypted(this, device, "DATA_MEDIA_CONTROL", request, 10000L)
             return true
         } catch (_: Exception) {
             return false
@@ -651,7 +670,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 put("content", content)
                 put("time", System.currentTimeMillis())
             }
-            com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
+            ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
             return true
         } catch (_: Exception) {
             return false
@@ -677,7 +696,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
             
             for (device in devices) {
-                com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
+                ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
             }
             return true
         } catch (_: Exception) {
@@ -690,7 +709,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         coroutineScope.launch {
             while (true) {
                 delay(60000) // 每分钟清理一次
-                com.xzyht.notifyrelay.common.core.sync.IconSyncManager.cleanupExpiredRequests()
+                IconSyncManager.cleanupExpiredRequests()
             }
         }
     }
@@ -791,18 +810,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 if (deviceInfo == null) {
                     deviceInfo = pair.first
                 }
-                
-                // 如果还是没有，从认证信息中构建
-                if (deviceInfo == null) {
-                    val auth = authSnapshot[uuid]
-                    if (auth != null) {
-                        val name = auth.displayName ?: "已认证设备"
-                        val ip = auth.lastIp ?: ""
-                        val port = auth.lastPort ?: listenPort
-                        deviceInfo = DeviceInfo(uuid, name, ip, port)
-                    }
-                }
-                
+
                 Logger.d("死神-NotifyRelay", "[getAuthenticatedOnlineDevices] 在线且已认证设备: $uuid, name=${deviceInfo?.displayName}, ip=${deviceInfo?.ip}")
                 deviceInfo
             }
@@ -840,7 +848,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 if (authenticatedDevices.containsKey(uuid)) {
                     // 直接从数据库中删除设备
                     coroutineScope.launch {
-                        val repository = com.xzyht.notifyrelay.common.data.database.repository.DatabaseRepository.getInstance(context)
+                        val repository = DatabaseRepository.getInstance(context)
                         repository.deleteDeviceByUuid(uuid)
                     }
                     
@@ -904,7 +912,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
             // 通过统一加密发送器发回对端
             val deviceInfo = DeviceInfo(remoteUuid, DeviceConnectionManagerUtil.getDisplayNameByUuid(remoteUuid), ip, port)
-            com.xzyht.notifyrelay.common.core.sync.ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_STATUS", ackObj.toString(), 3000L)
+            ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_STATUS", ackObj.toString(), 3000L)
         } catch (_: Exception) {
         }
     }

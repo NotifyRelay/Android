@@ -1,7 +1,8 @@
 # 通知转发应用
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/xzy-nine/Notification-Relay)
-![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/xzy-nine/Notification-Relay/latest/total)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/xzy-nine/Notification-Relay/total)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/NotifyRelay/Android)
+![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/NotifyRelay/Android/latest/total)
+![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/NotifyRelay/Android/total)
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/NotifyRelay/Android?utm_source=oss&utm_medium=github&utm_campaign=NotifyRelay%2FAndroid&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 ## 应用简介
 本应用可实现多设备间的通知相互转发功能。通过获取设备通知访问权限、应用列表权限及网络权限，设备间可双向转发通知原文。转发消息包含原通知的应用跳转接口，若接收设备安装了对应应用，点击转发消息即可跳转至与发送方一致的应用。
 

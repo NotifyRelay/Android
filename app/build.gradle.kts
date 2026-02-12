@@ -1,12 +1,13 @@
 
 import java.io.ByteArrayOutputStream
-import java.io.File
 import java.util.Properties
+import java.io.File
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose") version "2.1.21"
+    id("org.jetbrains.kotlin.plugin.compose") version "2.3.10"
     id("kotlin-kapt")
 }
 // 使用 buildSrc 的 JGit 实现计算版本信息（避免启动外部进程，兼容 configuration-cache）
@@ -128,9 +129,6 @@ android {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
     }
-    kotlinOptions {
-        (this as org.jetbrains.kotlin.gradle.dsl.KotlinJvmOptions).jvmTarget = "11"
-    }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -155,6 +153,12 @@ android {
     }
 }
 
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_11)
+    }
+}
+
 dependencies {
 
     implementation(libs.androidx.core.ktx)
@@ -169,7 +173,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
     // Jetpack Compose BOM 统一管理版本
-    implementation(platform("androidx.compose:compose-bom:2025.01.00"))
+    implementation(platform("androidx.compose:compose-bom:2026.02.00"))
     
     // Jetpack Compose 依赖（通过 BOM 统一管理版本）
     implementation("androidx.activity:activity-compose")
@@ -194,8 +198,10 @@ dependencies {
     kapt("androidx.room:room-compiler:2.8.0")
     implementation("androidx.room:room-ktx:2.8.0")
     
-    // Miuix Compose 主题库
+    // Miuix风格ui库
     implementation(libs.miuix.android)
+    implementation("top.yukonga.miuix.kmp:miuix-icons:0.8.1")
+    implementation("androidx.navigationevent:navigationevent-compose:1.0.1")
     // DataStore 持久化（设备名、规则设置）
     implementation("androidx.datastore:datastore-preferences:1.0.0")
     implementation("androidx.datastore:datastore:1.0.0")
@@ -215,6 +221,13 @@ dependencies {
     implementation("com.jakewharton:disklrucache:2.0.2")
     // 添加Apache FtpServer依赖用于FTP服务器实现
     implementation(libs.apache.ftpserver)
+    
+    // 依赖数据模块
+    implementation(project(":data"))
+    // 依赖core模块
+    implementation(project(":core"))
+    // 依赖base模块
+    implementation(project(":base"))
 }
 
 tasks.register("printVersionName") {

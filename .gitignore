@@ -2,8 +2,7 @@
 *.iml
 .idea/
 .vscode/
-/.vscode/
-
+.trae/
 # 构建相关文件
 .gradle/
 /build
@@ -15,6 +14,8 @@ debug/
 /buildSrc/build/
 /buildSrc/.gradle/
 /gradle-app.setting
+# 生成的 Gradle 守护进程 JVM 配置文件
+gradle/gradle-daemon-jvm.properties
 
 # 系统相关文件
 .DS_Store
@@ -26,5 +27,5 @@ local.properties
 # 其他文件
 /.kotlin
 /captures
-/.trae/
 .qoder/
+base/build/

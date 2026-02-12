@@ -1,10 +1,10 @@
 package com.xzyht.notifyrelay.feature.notification.superisland
 
 import android.content.Context
-import com.xzyht.notifyrelay.common.core.sync.ProtocolSender
-import com.xzyht.notifyrelay.common.core.util.Logger
-import com.xzyht.notifyrelay.common.data.StorageManager
-import com.xzyht.notifyrelay.common.data.StorageManager.getBoolean
+import com.xzyht.notifyrelay.sync.ProtocolSender
+import notifyrelay.base.util.Logger
+import notifyrelay.data.StorageManager
+import notifyrelay.data.StorageManager.getBoolean
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol

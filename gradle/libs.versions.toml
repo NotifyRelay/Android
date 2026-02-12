@@ -1,13 +1,13 @@
 [versions]
-agp = "8.13.0"
-kotlin = "2.1.21"
+agp = "8.13.2"
+kotlin = "2.3.10"
 coreKtx = "1.17.0-alpha01"
 junit = "4.13.2"
 junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 appcompat = "1.7.1"
 material = "1.12.0"
-miuix = "0.7.2"
+miuix = "0.8.1"
 uiText = "1.10.0"
 material3 = "1.4.0"
 foundationLayout = "1.10.0"
@@ -33,3 +33,4 @@ apache-ftpserver = { group = "org.apache.ftpserver", name = "ftpserver-core", ve
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+android-library = { id = "com.android.library", version.ref = "agp" }

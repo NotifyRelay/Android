@@ -35,7 +35,7 @@
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <!-- 剪贴板访问权限 -->
-    <uses-permission android:name="android.permission.READ_CLIPBOARD_IN_BACKGROUND" android:maxSdkVersion="34" />
+    <uses-permission android:name="android.permission.READ_CLIPBOARD_IN_BACKGROUND" android:maxSdkVersion="34" tools:ignore="ProtectedPermissions" />
     <!-- 日志读取权限，用于检测剪贴板变化 -->
     <uses-permission android:name="android.permission.READ_LOGS" tools:ignore="ProtectedPermissions" />
 
@@ -49,17 +49,17 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.NotifyRelay">
-        <activity android:name=".feature.GuideActivity"
+        <activity android:name=".ui.GuideActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".feature.MainActivity" android:exported="true" />
+        <activity android:name=".ui.MainActivity" android:exported="true" />
         <!-- 通知监听服务声明，用于系统识别通知访问权限 -->
         <service
-            android:name=".common.core.notification.servers.NotifyRelayNotificationListenerService"
+            android:name=".servers.NotifyRelayNotificationListenerService"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true"
@@ -76,7 +76,7 @@
         
         <!-- 剪贴板同步广播接收器 -->
         <receiver
-            android:name=".feature.clipboard.ClipboardSyncReceiver"
+            android:name=".servers.clipboard.ClipboardSyncReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.xzyht.notifyrelay.CLIPBOARD_MANUAL_SYNC" />
@@ -96,14 +96,14 @@
         
         <!-- 剪贴板监控服务 -->
         <service
-            android:name=".feature.clipboard.ClipboardMonitorService"
-            android:exported="true"
+            android:name=".servers.ClipboardMonitorService"
+            android:exported="false"
             android:foregroundServiceType="dataSync"
             android:stopWithTask="false" />
             
         <!-- 剪贴板同步透明Activity -->
         <activity
-            android:name=".feature.clipboard.ClipboardSyncActivity"
+            android:name=".ui.ClipboardSyncActivity"
             android:exported="true"
             android:theme="@style/TransparentTheme"
             android:launchMode="singleInstance"
@@ -113,7 +113,7 @@
             
         <!-- 剪贴板无障碍服务 -->
         <service
-            android:name=".feature.clipboard.ClipboardAccessiblityService"
+            android:name=".servers.ClipboardAccessiblityService"
             android:label="NotifyRelay 设备互联"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="false">
