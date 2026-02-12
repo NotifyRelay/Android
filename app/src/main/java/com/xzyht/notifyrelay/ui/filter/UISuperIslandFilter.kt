@@ -619,9 +619,7 @@ private fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
             value = null
             return@produceState
         }
-        val cached = runBlocking {
-            AppRepository.getExternalAppIcon(context, target)
-        }
+        val cached = AppRepository.getExternalAppIcon(context, target)
         if (cached != null) {
             value = cached.asImageBitmap()
             return@produceState
