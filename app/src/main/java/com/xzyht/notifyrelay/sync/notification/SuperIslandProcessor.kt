@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.sync.notification
 import android.content.Context
 import android.os.Build
 import android.util.LruCache
-import com.xzyht.notifyrelay.common.appslist.AppRepository
+import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager

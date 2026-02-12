@@ -45,7 +45,7 @@ import androidx.core.view.WindowCompat
 import com.xzyht.notifyrelay.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.common.SetupSystemBars
-import com.xzyht.notifyrelay.common.appslist.AppListHelper
+import com.xzyht.notifyrelay.servers.appslist.AppListHelper
 import kotlinx.coroutines.delay
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger

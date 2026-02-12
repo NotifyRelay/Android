@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.appslist
+package com.xzyht.notifyrelay.servers.appslist
 
 import android.content.Context
 import android.content.pm.ApplicationInfo

@@ -1,8 +1,9 @@
-package com.xzyht.notifyrelay.feature.clipboard
+package com.xzyht.notifyrelay.servers.clipboard
 
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
 import com.xzyht.notifyrelay.ui.ClipboardSyncActivity
 import notifyrelay.base.util.Logger
@@ -70,7 +71,7 @@ class ClipboardSyncReceiver : BroadcastReceiver() {
             Logger.e(TAG, "打开无障碍设置失败", e)
             try {
                 val fallbackIntent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
-                    data = android.net.Uri.parse("package:${context.packageName}")
+                    data = Uri.parse("package:${context.packageName}")
                     flags = Intent.FLAG_ACTIVITY_NEW_TASK
                 }
                 context.startActivity(fallbackIntent)

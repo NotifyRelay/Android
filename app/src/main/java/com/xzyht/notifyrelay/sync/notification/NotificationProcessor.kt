@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.sync.notification
 
 import android.app.KeyguardManager
 import android.content.Context
-import com.xzyht.notifyrelay.common.appslist.AppRepository
+import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.repository.remoteNotificationFilter
 import com.xzyht.notifyrelay.feature.device.repository.replicateNotification

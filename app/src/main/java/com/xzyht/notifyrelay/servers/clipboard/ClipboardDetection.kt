@@ -4,12 +4,10 @@
  * Licensed under the Apache License 2.0.
  */
 
-package com.xzyht.notifyrelay.feature.clipboard
+package com.xzyht.notifyrelay.servers.clipboard
 
-import android.util.Log
 import android.view.accessibility.AccessibilityEvent
 import android.view.accessibility.AccessibilityNodeInfo
-import java.util.ArrayList
 
 /**
  * 事件检测谓词

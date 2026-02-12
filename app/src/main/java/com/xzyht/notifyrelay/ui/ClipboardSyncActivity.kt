@@ -5,7 +5,7 @@ import android.content.ClipboardManager
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
-import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
+import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import notifyrelay.base.util.Logger

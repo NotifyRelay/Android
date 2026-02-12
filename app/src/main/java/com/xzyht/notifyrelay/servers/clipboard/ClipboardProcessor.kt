@@ -1,7 +1,6 @@
-package com.xzyht.notifyrelay.common.clipboard
+package com.xzyht.notifyrelay.servers.clipboard
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import notifyrelay.base.util.Logger
 
 /**
@@ -10,7 +9,7 @@ import notifyrelay.base.util.Logger
  */
 object ClipboardProcessor {
     private const val TAG = "ClipboardProcessor"
-    
+
     /**
      * 处理剪贴板消息的输入数据
      */
@@ -20,7 +19,7 @@ object ClipboardProcessor {
         val sharedSecret: String,
         val remoteUuid: String
     )
-    
+
     /**
      * 处理接收到的剪贴板消息
      *
@@ -34,10 +33,10 @@ object ClipboardProcessor {
     ): Boolean {
         try {
             Logger.d(TAG, "Processing clipboard message: ${input.header}")
-            
+
             // 调用 ClipboardSyncManager 处理剪贴板消息
             ClipboardSyncManager.handleClipboardMessage(input.rawData, context)
-            
+
             return true
         } catch (e: Exception) {
             Logger.e(TAG, "Failed to process clipboard message", e)

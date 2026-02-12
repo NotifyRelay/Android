@@ -2,9 +2,9 @@ package com.xzyht.notifyrelay.feature.device.repository
 
 import android.content.Context
 import androidx.compose.runtime.MutableState
-import com.xzyht.notifyrelay.common.appslist.AppRepository
-import notifyrelay.base.util.Logger
+import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import kotlinx.coroutines.delay
+import notifyrelay.base.util.Logger
 
 // 延迟去重缓存（10秒内）
 // private val dedupCache = mutableListOf<Triple<String, String, Long>>() // title, text, time

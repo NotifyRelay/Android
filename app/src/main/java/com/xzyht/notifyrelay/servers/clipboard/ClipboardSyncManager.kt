@@ -1,20 +1,26 @@
-package com.xzyht.notifyrelay.feature.clipboard
+package com.xzyht.notifyrelay.servers.clipboard
 
+import android.Manifest
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import notifyrelay.base.util.PermissionHelper
-import com.xzyht.notifyrelay.sync.ProtocolSender
-import notifyrelay.base.util.Logger
+import android.os.Build
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.servers.ClipboardAccessiblityService
+import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import notifyrelay.core.util.DataUrlUtils
+import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
 /**
@@ -26,7 +32,7 @@ object ClipboardSyncManager {
     private const val CLIPBOARD_TYPE_TEXT = "text"
     private const val CLIPBOARD_TYPE_IMAGE = "image"
     private const val DATA_HEADER = "DATA_CLIPBOARD"
-    private const val ACCESSIBILITY_SERVICE_NAME = "com.xzyht.notifyrelay/com.xzyht.notifyrelay.feature.clipboard.ClipboardAccessiblityService"
+    private const val ACCESSIBILITY_SERVICE_NAME = "com.xzyht.notifyrelay/com.xzyht.notifyrelay.servers.ClipboardAccessiblityService"
     
     private var clipboardManager: ClipboardManager? = null
     private var lastClipboardContent: String = ""
@@ -76,7 +82,7 @@ object ClipboardSyncManager {
         }
         
         // Android 10 (API 29) 之前可以在后台直接访问剪贴板
-        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.Q) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             return Pair(true, "Android 10 之前可以后台访问剪贴板")
         }
         
@@ -102,7 +108,7 @@ object ClipboardSyncManager {
     fun startLogMonitoring(context: Context) {
         try {
             // 只检查是否有READ_LOGS权限
-            val hasReadLogsPermission = context.checkSelfPermission(android.Manifest.permission.READ_LOGS) == android.content.pm.PackageManager.PERMISSION_GRANTED
+            val hasReadLogsPermission = context.checkSelfPermission(Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED
             
             if (!hasReadLogsPermission) {
                 Logger.d(TAG, "没有READ_LOGS权限，无法启动日志监控")
@@ -149,7 +155,7 @@ object ClipboardSyncManager {
         
         isSyncing = true
         CoroutineScope(Dispatchers.IO).launch {
-            var devices = emptyList<com.xzyht.notifyrelay.feature.device.service.DeviceInfo>()
+            var devices = emptyList<DeviceInfo>()
             try {
                 devices = deviceManager.getAuthenticatedOnlineDevices()
                 if (devices.isEmpty()) {
@@ -213,7 +219,7 @@ object ClipboardSyncManager {
      */
     fun handleClipboardMessage(jsonData: String, context: Context) {
         try {
-            val json = org.json.JSONObject(jsonData)
+            val json = JSONObject(jsonData)
             var type = json.getString("clipboardType")
             val content = json.getString("content")
             val time = json.optLong("time", 0)
@@ -386,7 +392,7 @@ object ClipboardSyncManager {
      * 构建剪贴板JSON消息
      */
     private fun buildClipboardJsonString(type: String, content: String, time: Long): String {
-        return org.json.JSONObject().apply {
+        return JSONObject().apply {
             put("clipboardType", type)
             put("content", content)
             put("time", time)
@@ -461,7 +467,7 @@ object ClipboardSyncManager {
                     // 2. 切换到后台线程发送数据
                     CoroutineScope(Dispatchers.IO).launch {
                         try {
-                            var devices = emptyList<com.xzyht.notifyrelay.feature.device.service.DeviceInfo>()
+                            var devices = emptyList<DeviceInfo>()
                             devices = deviceManager.getAuthenticatedOnlineDevices()
                             if (devices.isEmpty()) {
                                 Logger.d(TAG, "没有可用于发送剪贴板内容的在线设备")

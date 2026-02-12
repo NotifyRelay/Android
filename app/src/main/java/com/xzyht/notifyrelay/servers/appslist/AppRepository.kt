@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.common.appslist
+package com.xzyht.notifyrelay.servers.appslist
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
@@ -6,7 +6,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
-import com.xzyht.notifyrelay.common.appslist.AppRepository.loadApps
+import com.xzyht.notifyrelay.servers.appslist.AppRepository.loadApps
 import com.xzyht.notifyrelay.sync.IconSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo

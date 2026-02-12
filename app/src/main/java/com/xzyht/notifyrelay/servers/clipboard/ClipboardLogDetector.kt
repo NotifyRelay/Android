@@ -1,5 +1,6 @@
-package com.xzyht.notifyrelay.feature.clipboard
+package com.xzyht.notifyrelay.servers.clipboard
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -10,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.PermissionHelper
 import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.util.concurrent.atomic.AtomicBoolean
@@ -45,7 +47,7 @@ object ClipboardLogDetector {
         
         try {
             // 检查应用是否处于前台
-            val isForeground = notifyrelay.base.util.PermissionHelper.isAppInForeground(context)
+            val isForeground = PermissionHelper.isAppInForeground(context)
             if (!isForeground) {
                 Logger.d(TAG, "应用未处于前台，无法启动日志监听")
                 isMonitoring.set(false)
@@ -53,7 +55,7 @@ object ClipboardLogDetector {
             }
             
             // 检查是否有READ_LOGS权限
-            if (context.checkSelfPermission(android.Manifest.permission.READ_LOGS) != PackageManager.PERMISSION_GRANTED) {
+            if (context.checkSelfPermission(Manifest.permission.READ_LOGS) != PackageManager.PERMISSION_GRANTED) {
                 Logger.d(TAG, "没有 READ_LOGS 权限，无法启动日志监听")
                 isMonitoring.set(false)
                 return

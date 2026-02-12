@@ -76,7 +76,7 @@
         
         <!-- 剪贴板同步广播接收器 -->
         <receiver
-            android:name=".feature.clipboard.ClipboardSyncReceiver"
+            android:name=".servers.clipboard.ClipboardSyncReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.xzyht.notifyrelay.CLIPBOARD_MANUAL_SYNC" />
@@ -96,7 +96,7 @@
         
         <!-- 剪贴板监控服务 -->
         <service
-            android:name=".feature.clipboard.ClipboardMonitorService"
+            android:name=".servers.ClipboardMonitorService"
             android:exported="true"
             android:foregroundServiceType="dataSync"
             android:stopWithTask="false" />
@@ -113,7 +113,7 @@
             
         <!-- 剪贴板无障碍服务 -->
         <service
-            android:name=".feature.clipboard.ClipboardAccessiblityService"
+            android:name=".servers.ClipboardAccessiblityService"
             android:label="NotifyRelay 设备互联"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="false">
