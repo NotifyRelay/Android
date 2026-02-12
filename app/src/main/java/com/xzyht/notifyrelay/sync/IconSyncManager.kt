@@ -314,7 +314,7 @@ object IconSyncManager {
             if (pkg.isNotEmpty()) {
                 if (base64.isNotEmpty()) {
                     // 处理单个图标响应
-                cacheDecodedIcon(context, pkg, base64)
+                    cacheDecodedIcon(context, pkg, base64)
                     //Logger.d(TAG, "单图标接收：$pkg")
                 } else if (isMissing) {
                     // 处理单个缺失图标响应
