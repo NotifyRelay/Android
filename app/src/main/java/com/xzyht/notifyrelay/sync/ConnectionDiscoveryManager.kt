@@ -53,6 +53,7 @@ class ConnectionDiscoveryManager(
     private var manualDiscoveryJob: Job? = null
     
     // 添加内部变量控制线程运行状态，避免频繁访问deviceManager.udpDiscoveryEnabled
+    @Volatile
     private var isDiscoveryRunning = false
 
     private val manualDiscoveryInterval = 2000L
