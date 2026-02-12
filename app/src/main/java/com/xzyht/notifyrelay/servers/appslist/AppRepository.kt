@@ -100,6 +100,7 @@ object AppRepository {
 
             // 保存应用信息到数据库并加载图标
             val appEntities = mutableListOf<AppEntity>()
+            val appDeviceEntities = mutableListOf<AppDeviceEntity>()
             val pm = context.packageManager
 
             apps.forEach { appInfo ->
@@ -154,7 +155,7 @@ object AppRepository {
                         sourceDevice = "local",
                         lastUpdated = System.currentTimeMillis()
                     )
-                    databaseRepository.saveAppDeviceAssociation(appDeviceEntity)
+                    appDeviceEntities.add(appDeviceEntity)
                 } catch (e: Exception) {
                     Logger.w(TAG, "处理应用信息失败: ${appInfo.packageName}", e)
                 }
@@ -163,6 +164,11 @@ object AppRepository {
             // 批量保存应用到数据库
             if (appEntities.isNotEmpty()) {
                 databaseRepository.saveApps(appEntities)
+            }
+
+            // 批量保存应用设备关联到数据库
+            if (appDeviceEntities.isNotEmpty()) {
+                databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
             }
 
             //Logger.d(TAG, "应用列表加载成功，共 ${apps.size} 个应用")
