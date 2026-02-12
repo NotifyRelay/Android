@@ -14,6 +14,8 @@ debug/
 /buildSrc/build/
 /buildSrc/.gradle/
 /gradle-app.setting
+# 生成的 Gradle 守护进程 JVM 配置文件
+gradle/gradle-daemon-jvm.properties
 
 # 系统相关文件
 .DS_Store
