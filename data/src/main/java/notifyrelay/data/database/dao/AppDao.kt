@@ -27,6 +27,12 @@ interface AppDao {
     suspend fun getByPackageName(packageName: String): AppEntity?
     
     /**
+     * 批量根据包名获取应用
+     */
+    @Query("SELECT * FROM apps WHERE packageName IN (:packageNames)")
+    suspend fun getByPackageNames(packageNames: List<String>): List<AppEntity>
+    
+    /**
      * 插入或更新应用
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)

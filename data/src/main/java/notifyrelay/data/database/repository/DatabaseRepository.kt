@@ -314,6 +314,13 @@ class DatabaseRepository(private val database: AppDatabase) {
     suspend fun getAppByPackageName(packageName: String): AppEntity? {
         return appDao.getByPackageName(packageName)
     }
+    
+    /**
+     * 批量根据包名获取应用
+     */
+    suspend fun getAppsByPackageNames(packageNames: List<String>): List<AppEntity> {
+        return appDao.getByPackageNames(packageNames)
+    }
 
     /**
      * 保存应用
@@ -380,6 +387,13 @@ class DatabaseRepository(private val database: AppDatabase) {
      * 根据包名获取应用设备关联
      */
     fun getAppDevicesByPackageName(packageName: String) = appDeviceDao.getByPackageName(packageName)
+    
+    /**
+     * 批量根据包名获取应用设备关联
+     */
+    suspend fun getAppDevicesByPackageNames(packageNames: List<String>): List<AppDeviceEntity> {
+        return appDeviceDao.getByPackageNames(packageNames)
+    }
 
     /**
      * 根据设备UUID获取应用设备关联

@@ -27,6 +27,12 @@ interface AppDeviceDao {
     fun getByPackageName(packageName: String): Flow<List<AppDeviceEntity>>
     
     /**
+     * 批量根据包名获取应用设备关联
+     */
+    @Query("SELECT * FROM app_devices WHERE packageName IN (:packageNames)")
+    suspend fun getByPackageNames(packageNames: List<String>): List<AppDeviceEntity>
+    
+    /**
      * 根据设备UUID获取应用设备关联
      */
     @Query("SELECT * FROM app_devices WHERE sourceDevice = :deviceUuid")

@@ -11,6 +11,8 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -81,7 +83,7 @@ object IconSyncManager {
         }
         
         // 检查是否应该从当前设备请求图标
-        val shouldRequestFromThisDevice = appDeviceUuids.isEmpty() || appDeviceUuids.contains(sourceDevice.uuid)
+        val shouldRequestFromThisDevice = appDeviceUuids.size == 0 || appDeviceUuids.contains(sourceDevice.uuid)
         
         if (shouldRequestFromThisDevice) {
             pendingRequests[packageName] = now
@@ -112,64 +114,76 @@ object IconSyncManager {
     /**
      * 批量请求多个包名图标（自动过滤已存在或正在请求的）。
      */
-    fun requestIconsBatch(
+    suspend fun requestIconsBatch(
         context: Context,
         packageNames: List<String>,
         deviceManager: DeviceConnectionManager,
         sourceDevice: DeviceInfo
     ) {
         //Logger.d(TAG, "批量请求图标：$packageNames")
-        if (packageNames.isEmpty()) return
+        if (packageNames.size == 0) return
         
         val now = System.currentTimeMillis()
         val installedPackages = AppRepository.getInstalledPackageNames(context)
         
+        // 预获取所有需要的数据
+        val (iconMap, appDeviceMap) = coroutineScope {
+            // 并行预获取应用图标
+            val iconDeferred = async {
+                AppRepository.getExternalAppIcons(context, packageNames)
+            }
+            
+            // 并行预获取应用设备关联关系
+            val appDeviceDeferred = async {
+                val databaseRepository = DatabaseRepository.getInstance(context)
+                val appDevices = databaseRepository.getAppDevicesByPackageNames(packageNames)
+                appDevices.groupBy { it.packageName }
+                    .mapValues { (_, appDeviceEntities) ->
+                        appDeviceEntities.map { it.sourceDevice }
+                    }
+            }
+            
+            Pair(iconDeferred.await(), appDeviceDeferred.await())
+        }
+        
         val need = packageNames.filter { pkg ->
             // 1. 检查 AppRepository 缓存
-            val exist = runBlocking {
-                AppRepository.getExternalAppIcon(context, pkg) != null
-            }
+            val exist = iconMap[pkg] != null
             // 2. 检查本机已安装应用
             val isInstalled = installedPackages.contains(pkg)
             // 3. 检查正在请求的图标
             val last = pendingRequests[pkg]
             val inFlight = last != null && (now - last) < ICON_REQUEST_TIMEOUT
-            // 4. 检查应用与设备的关联关系（替代原 getAppDeviceUuids 方法）
-            val appDeviceUuids = runBlocking {
-                val databaseRepository = DatabaseRepository.getInstance(context)
-                val appDevices = databaseRepository.getAppDevicesByPackageName(pkg).first()
-                appDevices.map { appDevice -> appDevice.sourceDevice }
-            }
-            val isAssociatedWithThisDevice = appDeviceUuids.isEmpty() || appDeviceUuids.contains(sourceDevice.uuid)
+            // 4. 检查应用与设备的关联关系
+            val appDeviceUuids = appDeviceMap[pkg] ?: emptyList()
+            val isAssociatedWithThisDevice = appDeviceUuids.size == 0 || appDeviceUuids.contains(sourceDevice.uuid)
             
             !exist && !isInstalled && !inFlight && isAssociatedWithThisDevice
         }
         
-        if (need.isEmpty()) {
+        if (need.size == 0) {
             //Logger.d(TAG, "所有图标已缓存或已安装，无需批量请求")
             return
         }
         
         need.forEach { pendingRequests[it] = now }
         val sourceDeviceUuid = sourceDevice.uuid
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                requestIconsFromDevice(context, need, deviceManager, sourceDevice)
-                // 请求成功，批量关联应用包名与当前设备（替代原 associateAppsWithDevice 方法）
-                val databaseRepository = DatabaseRepository.getInstance(context)
-                val appDeviceEntities = need.map {
-                    AppDeviceEntity(
-                        packageName = it,
-                        sourceDevice = sourceDeviceUuid,
-                        lastUpdated = System.currentTimeMillis()
-                    )
-                }
-                databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
-            } catch (e: Exception) {
-                Logger.e(TAG, "批量请求失败：$need", e)
-            } finally {
-                need.forEach { pendingRequests.remove(it) }
+        try {
+            requestIconsFromDevice(context, need, deviceManager, sourceDevice)
+            // 请求成功，批量关联应用包名与当前设备（替代原 associateAppsWithDevice 方法）
+            val databaseRepository = DatabaseRepository.getInstance(context)
+            val appDeviceEntities = need.map {
+                AppDeviceEntity(
+                    packageName = it,
+                    sourceDevice = sourceDeviceUuid,
+                    lastUpdated = System.currentTimeMillis()
+                )
             }
+            databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
+        } catch (e: Exception) {
+            Logger.e(TAG, "批量请求失败：$need", e)
+        } finally {
+            need.forEach { pendingRequests.remove(it) }
         }
     }
 
@@ -182,7 +196,7 @@ object IconSyncManager {
         deviceManager: DeviceConnectionManager,
         sourceDevice: DeviceInfo
     ) {
-        if (packages.isEmpty()) return
+        if (packages.size == 0) return
         val json = JSONObject().apply {
             put("type", "ICON_REQUEST")
             if (packages.size == 1) {

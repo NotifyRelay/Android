@@ -546,6 +546,33 @@ object AppRepository {
     }
     
     /**
+     * 批量获取外部应用图标（从数据库加载）。
+     *
+     * @param context Android 上下文，用于访问数据库（非空）。
+     * @param packageNames 目标应用包名列表。
+     * @return 包名到图标的映射，若不存在则对应值为 null。
+     */
+    suspend fun getExternalAppIcons(context: Context, packageNames: List<String>): Map<String, Bitmap?> {
+        initDatabaseRepository(context)
+        
+        // 从数据库批量获取应用信息
+        val apps = databaseRepository?.getAppsByPackageNames(packageNames) ?: emptyList()
+        val appMap = apps.associateBy { it.packageName }
+        
+        // 构建包名到图标的映射
+        return packageNames.associateWith { packageName ->
+            val app = appMap[packageName]
+            val iconBytes = app?.iconBytes
+            if (iconBytes != null) {
+                // 将字节数组转换为 Bitmap
+                BitmapFactory.decodeByteArray(iconBytes, 0, iconBytes.size)
+            } else {
+                null
+            }
+        }
+    }
+    
+    /**
      * 统一获取应用图标，自动处理本地和外部应用，并支持自动请求缺失的图标。
      *
      * @param context 上下文
