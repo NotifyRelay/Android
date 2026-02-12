@@ -573,6 +573,75 @@ object AppRepository {
     }
     
     /**
+     * 从 PackageManager 直接获取应用图标
+     *
+     * @param context Android 上下文，用于访问 PackageManager
+     * @param packageName 目标应用的包名
+     * @return 应用图标的 Bitmap；若不存在则返回 null
+     */
+    private suspend fun getAppIconFromPackageManager(context: Context, packageName: String): Bitmap? {
+        return try {
+            val pm = context.packageManager
+            val appInfo = pm.getApplicationInfo(packageName, 0)
+            val drawable = pm.getApplicationIcon(appInfo)
+            val bitmap = when (drawable) {
+                is BitmapDrawable -> drawable.bitmap
+                else -> {
+                    // 将其他类型的drawable转换为bitmap
+                    val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
+                    val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
+                    val createdBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                    val canvas = Canvas(createdBitmap)
+                    drawable.setBounds(0, 0, width, height)
+                    drawable.draw(canvas)
+                    createdBitmap
+                }
+            }
+            
+            // 将获取到的图标缓存到数据库
+            val baos = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
+            val iconBytes = baos.toByteArray()
+            
+            val existingApp = databaseRepository?.getAppByPackageName(packageName)
+            val appEntity = if (existingApp != null) {
+                existingApp.copy(
+                    iconBytes = iconBytes,
+                    isIconMissing = false,
+                    lastUpdated = System.currentTimeMillis()
+                )
+            } else {
+                AppEntity(
+                    packageName = packageName,
+                    appName = try {
+                        pm.getApplicationLabel(appInfo).toString()
+                    } catch (e: Exception) {
+                        packageName
+                    },
+                    isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                    iconBytes = iconBytes,
+                    isIconMissing = false,
+                    lastUpdated = System.currentTimeMillis()
+                )
+            }
+            databaseRepository?.saveApp(appEntity)
+            
+            // 保存应用设备关联，使用 "local" 作为 sourceDevice
+            val appDeviceEntity = AppDeviceEntity(
+                packageName = packageName,
+                sourceDevice = "local",
+                lastUpdated = System.currentTimeMillis()
+            )
+            databaseRepository?.saveAppDeviceAssociations(listOf(appDeviceEntity))
+            
+            bitmap
+        } catch (e: Exception) {
+            Logger.w(TAG, "从 PackageManager 获取应用图标失败: $packageName", e)
+            null
+        }
+    }
+
+    /**
      * 统一获取应用图标，自动处理本地和外部应用，并支持自动请求缺失的图标。
      *
      * @param context 上下文
@@ -588,16 +657,18 @@ object AppRepository {
         sourceDevice: DeviceInfo? = null
     ): Bitmap? {
         try {
-            // 1. 优先获取本地应用图标
+            initDatabaseRepository(context)
+            
+            // 1. 从数据库获取应用图标
             val localIcon = getAppIconAsync(context, packageName)
             if (localIcon != null) {
                 return localIcon
             }
             
-            // 2. 尝试从数据库获取应用图标
-            val externalIcon = getExternalAppIcon(context, packageName)
-            if (externalIcon != null) {
-                return externalIcon
+            // 2. 尝试从 PackageManager 获取应用图标
+            val packageIcon = getAppIconFromPackageManager(context, packageName)
+            if (packageIcon != null) {
+                return packageIcon
             }
             
             // 3. 自动请求缺失的图标
