@@ -14,21 +14,27 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.dialog.SuperIslandTestDialog
+import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.ToolbarPosition
+import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val SUPER_ISLAND_KEY = "superisland_enabled"
+private const val SUPER_ISLAND_SHOW_KEY = "superisland_show"
+private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "superisland_floating_window"
 
 @Composable
 fun UISuperIslandSettings() {
     val context = LocalContext.current
     var enabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_KEY, true)) }
+    var showSuperIsland by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_SHOW_KEY, true)) }
+    var floatingWindowEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, true)) }
 
     // 测试对话框状态
     val showTestDialog = remember { mutableStateOf(false) }
@@ -39,26 +45,6 @@ fun UISuperIslandSettings() {
 
         Scaffold(
             popupHost = { }, // 置空，避免与顶层Scaffold冲突
-            // 悬浮工具栏
-            floatingToolbar = {
-                FloatingToolbar {
-                    Row(
-                        modifier = Modifier.padding(12.dp),
-                        horizontalArrangement = Arrangement.spacedBy(16.dp),
-                        verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                    ) {
-                        // 测试按钮
-                        Button(
-                            onClick = {
-                                showTestDialog.value = true
-                            }
-                        ) {
-                            top.yukonga.miuix.kmp.basic.Text("测试超级岛分支")
-                        }
-                    }
-                }
-            },
-            floatingToolbarPosition = ToolbarPosition.BottomEnd
         ) {
             Surface(color = colorScheme.background) {
                 Column(
@@ -77,6 +63,34 @@ fun UISuperIslandSettings() {
                         }
                     )
 
+                    SuperSwitch(
+                        title = "超级岛显示",
+                        summary = "控制是否显示来自远端的超级岛",
+                        checked = showSuperIsland,
+                        onCheckedChange = {
+                            showSuperIsland = it
+                            StorageManager.putBoolean(context, SUPER_ISLAND_SHOW_KEY, it)
+                            ToastUtils.showShortToast(context, "功能开发中")
+                        }
+                    )
+
+                    SuperSwitch(
+                        title = "浮窗兼容",
+                        summary = "用于a16的livedata通知api被系统支持前使用浮窗展示超级岛",
+                        checked = floatingWindowEnabled,
+                        onCheckedChange = {
+                            floatingWindowEnabled = it
+                            StorageManager.putBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, it)
+                            ToastUtils.showShortToast(context, "功能开发中")
+                        }
+                    )
+
+                    SuperArrow(
+                        title = "测试超级岛分支",
+                        onClick = {
+                            showTestDialog.value = true
+                        }
+                    )
 
                 }
             }
