@@ -23,6 +23,7 @@ import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.pages.UILocalFilter
 import com.xzyht.notifyrelay.ui.pages.UIRemoteFilter
+import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
@@ -54,8 +55,8 @@ fun SettingsScreen() {
     val coroutineScope = rememberCoroutineScope()
 
     // 简化实现，移除RemoteFilterConfig引用
-    // TabRow相关状态
-    val tabTitles = listOf("远程过滤", "本地过滤")
+        // TabRow相关状态
+        val tabTitles = listOf("远程过滤", "本地过滤", "超级岛")
 
     // Pager相关状态 - 使用Pager状态作为唯一数据源
     val pagerState = rememberPagerState(initialPage = 0) {
@@ -112,6 +113,11 @@ fun SettingsScreen() {
                     1 -> {
                         // 本地通知过滤 Tab
                         UILocalFilter()
+                    }
+
+                    2 -> {
+                        // 超级岛设置 Tab
+                        UISuperIslandSettings()
                     }
                 }
             }

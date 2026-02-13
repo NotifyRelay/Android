@@ -18,7 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
-import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
+import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
@@ -92,7 +92,7 @@ fun HistoryScreen() {
                     }
                     1 -> {
                         // 超级岛历史 Tab
-                        UISuperIslandSettings()
+                        UISuperIslandHistory()
                     }
                 }
         }
