@@ -27,9 +27,8 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsla
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BTextInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
@@ -48,7 +47,7 @@ object NotificationGenerator {
     /**
      * 发送复刻通知，与原通知保持一致
      */
-    internal fun sendReplicaNotification(
+    internal suspend fun sendReplicaNotification(
         context: Context,
         key: String,
         title: String?,
@@ -674,7 +673,7 @@ object NotificationGenerator {
     /**
      * 构建胶囊兼容的通知，添加标准通知字段和 smallIcon 注入
      */
-    private fun buildCapsuleCompatibleNotification(
+    private suspend fun buildCapsuleCompatibleNotification(
         context: Context,
         builder: NotificationCompat.Builder,
         title: String?,
@@ -805,17 +804,35 @@ object NotificationGenerator {
             
             // 处理图标
             if (smallIconBitmap == null) {
+                // 优先使用应用图标（大图标的键值提供的图标）
+                val appIconKey = "miui.focus.pic_app_icon"
+                if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
+                    val appIconUrl = picMap[appIconKey]
+                    if (!appIconUrl.isNullOrBlank()) {
+                        // 同步下载应用图标
+                        val bitmap = runBlocking {
+                            downloadBitmap(context, appIconUrl, 5000)
+                        }
+                        if (bitmap != null) {
+                            smallIconBitmap = bitmap
+                        }
+                    }
+                }
+            }
+            
+            // 如果没有应用图标，再使用 A 区图标
+            if (smallIconBitmap == null) {
                 // 优先使用 A 区图标
                 val picKeyToUse = aPicKey ?: bPicKey
                 if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
                     val picUrl = picMap[picKeyToUse]
                     if (!picUrl.isNullOrBlank()) {
-                        // 尝试下载图标
-                        CoroutineScope(Dispatchers.IO).launch {
-                            val bitmap = downloadBitmap(context, picUrl, 5000)
-                            bitmap?.let {
-                                smallIconBitmap = it
-                            }
+                        // 同步下载图标
+                        val bitmap = runBlocking {
+                            downloadBitmap(context, picUrl, 5000)
+                        }
+                        if (bitmap != null) {
+                            smallIconBitmap = bitmap
                         }
                     }
                 }
@@ -861,7 +878,7 @@ object NotificationGenerator {
     /**
      * 构建胶囊兼容的通知并注入图标
      */
-    private fun buildCapsuleCompatibleNotificationWithIconInjection(
+    private suspend fun buildCapsuleCompatibleNotificationWithIconInjection(
         context: Context,
         builder: NotificationCompat.Builder,
         title: String?,
@@ -963,17 +980,35 @@ object NotificationGenerator {
         
         // 处理图标
         if (smallIconBitmap == null) {
+            // 优先使用应用图标（大图标的键值提供的图标）
+            val appIconKey = "miui.focus.pic_app_icon"
+            if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
+                val appIconUrl = picMap[appIconKey]
+                if (!appIconUrl.isNullOrBlank()) {
+                    // 同步下载应用图标
+                    val bitmap = runBlocking {
+                        downloadBitmap(context, appIconUrl, 5000)
+                    }
+                    if (bitmap != null) {
+                        smallIconBitmap = bitmap
+                    }
+                }
+            }
+        }
+        
+        // 如果没有应用图标，再使用 A 区图标
+        if (smallIconBitmap == null) {
             // 优先使用 A 区图标
             val picKeyToUse = aPicKey ?: bPicKey
             if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
                 val picUrl = picMap[picKeyToUse]
                 if (!picUrl.isNullOrBlank()) {
-                    // 尝试下载图标
-                    CoroutineScope(Dispatchers.IO).launch {
-                        val bitmap = downloadBitmap(context, picUrl, 5000)
-                        bitmap?.let {
-                            smallIconBitmap = it
-                        }
+                    // 同步下载图标
+                    val bitmap = runBlocking {
+                        downloadBitmap(context, picUrl, 5000)
+                    }
+                    if (bitmap != null) {
+                        smallIconBitmap = bitmap
                     }
                 }
             }
