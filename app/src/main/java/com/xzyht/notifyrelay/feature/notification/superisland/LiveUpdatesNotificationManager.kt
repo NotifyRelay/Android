@@ -2,20 +2,22 @@ package com.xzyht.notifyrelay.feature.notification.superisland
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Build
 import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.text.HtmlCompat
-import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.parseParamV2
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.Logger
 
 object LiveUpdatesNotificationManager {
     private const val TAG = "超级岛-LiveUpdates"
@@ -91,18 +93,77 @@ object LiveUpdatesNotificationManager {
                 return
             }
 
+            // 创建删除意图，用于处理用户移除通知时关闭浮窗
+            val deleteIntent = PendingIntent.getBroadcast(
+                appContext,
+                notificationId,
+                Intent(appContext, NotificationBroadcastReceiver::class.java)
+                    .putExtra("notificationId", notificationId)
+                    .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // 创建点击意图，用于处理用户点击通知时切换浮窗显示/隐藏
+            val contentIntent = PendingIntent.getBroadcast(
+                appContext,
+                notificationId,
+                Intent(appContext, NotificationBroadcastReceiver::class.java)
+                    .putExtra("sourceId", sourceId)
+                    .putExtra("title", title)
+                    .putExtra("text", text)
+                    .putExtra("appName", appName)
+                    .putExtra("paramV2Raw", paramV2Raw)
+                    .setAction("com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
             // 构建基础通知
             val notificationBuilder = buildBaseNotification(sourceId)
                 .setContentTitle(title ?: appName ?: "超级岛通知")
                 .setContentText(text ?: "")
                 .setSmallIcon(android.R.drawable.stat_notify_more)
+                .setDeleteIntent(deleteIntent)
+                .setContentIntent(contentIntent)
+            
+            // 尝试使用前进指示器图标作为小图标
+            if (picMap != null && picMap.isNotEmpty()) {
+                // 找到有效的前进图标
+                val possibleIconKeys = listOf(
+                    paramV2?.progressInfo?.picForward,
+                    paramV2?.multiProgressInfo?.picForward,
+                    paramV2?.multiProgressInfo?.picForwardBox,
+                    paramV2?.progressInfo?.picMiddle,
+                    paramV2?.multiProgressInfo?.picMiddle
+                )
+                
+                val iconKey = possibleIconKeys.firstOrNull { key -> 
+                    key != null && picMap.containsKey(key)
+                }
+                
+                if (iconKey != null) {
+                    val iconUrl = picMap[iconKey]
+                    if (iconUrl != null) {
+                        // 尝试从缓存加载图标
+                        val cachedBitmap = iconCache.get(iconUrl)
+                        if (cachedBitmap != null) {
+                            notificationBuilder.setSmallIcon(IconCompat.createWithBitmap(cachedBitmap))
+                        }
+                    }
+                }
+            }
 
             // 直接设置状态栏关键文本，不再使用反射
+            // 使用处理后的标题和内容
+            val processedTitle = paramV2.baseInfo?.title?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
+            val processedContent = paramV2.baseInfo?.content?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
+            
+            // 设置状态栏关键文本，优先使用处理后的标题（预计时间），然后是处理后的内容
             val shortText = when {
-                title?.isNotEmpty() == true && title.length <= 7 -> title
-                appName?.isNotEmpty() == true && appName.length <= 7 -> appName
-                paramV2.baseInfo?.title?.isNotEmpty() == true && paramV2.baseInfo.title.length <= 7 -> paramV2.baseInfo.title
-                else -> "更新"
+                processedTitle.isNotEmpty() -> processedTitle
+                processedContent.isNotEmpty() -> processedContent
+                title?.isNotEmpty() == true -> title
+                appName?.isNotEmpty() == true -> appName
+                else -> " "
             }
             notificationBuilder.setShortCriticalText(shortText)
 
@@ -234,32 +295,7 @@ object LiveUpdatesNotificationManager {
         var progressIconBitmap: Bitmap? = null
         var appIconBitmap: Bitmap? = null
         
-        // 加载进度图标
-        forwardIconKey?.let { key ->
-            val iconUrl = picMap[key]
-            if (iconUrl != null) {
-                Logger.d(TAG, "加载前进图标URL: $iconUrl")
-                
-                val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
-                    context = appContext,
-                    urlOrData = iconUrl,
-                    timeoutMs = 5000
-                )
-                
-                if (bitmap != null) {
-                    Logger.d(TAG, "前进图标加载成功，大小: ${bitmap.width}x${bitmap.height}")
-                    // 缓存图标
-                    iconCache.put(iconUrl, bitmap)
-                    progressIconBitmap = bitmap
-                } else {
-                    Logger.w(TAG, "前进图标加载失败，URL: $iconUrl")
-                }
-            }
-        } ?: run {
-            Logger.w(TAG, "未找到有效的前进图标键")
-        }
-        
-        // 加载应用图标
+        // 优先加载应用图标作为小图标
         paramV2.picInfo?.pic?.let { picKey ->
             val appIconUrl = picMap[picKey]
             if (appIconUrl != null) {
@@ -270,10 +306,40 @@ object LiveUpdatesNotificationManager {
                 )
                 
                 if (bitmap != null) {
+                    Logger.d(TAG, "应用图标加载成功，大小: ${bitmap.width}x${bitmap.height}")
                     // 缓存图标
                     iconCache.put(appIconUrl, bitmap)
                     appIconBitmap = bitmap
+                    // 优先使用应用图标作为小图标
+                    progressIconBitmap = bitmap
                 }
+            }
+        }
+        
+        // 如果没有应用图标，再加载前进图标作为小图标
+        if (progressIconBitmap == null) {
+            forwardIconKey?.let { key ->
+                val iconUrl = picMap[key]
+                if (iconUrl != null) {
+                    Logger.d(TAG, "加载前进图标URL: $iconUrl")
+                    
+                    val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
+                        context = appContext,
+                        urlOrData = iconUrl,
+                        timeoutMs = 5000
+                    )
+                    
+                    if (bitmap != null) {
+                        Logger.d(TAG, "前进图标加载成功，大小: ${bitmap.width}x${bitmap.height}")
+                        // 缓存图标
+                        iconCache.put(iconUrl, bitmap)
+                        progressIconBitmap = bitmap
+                    } else {
+                        Logger.w(TAG, "前进图标加载失败，URL: $iconUrl")
+                    }
+                }
+            } ?: run {
+                Logger.w(TAG, "未找到有效的前进图标键")
             }
         }
         
@@ -299,15 +365,66 @@ object LiveUpdatesNotificationManager {
             
             // 设置基础信息
             paramV2.baseInfo?.let {
+                val title = it.title ?: ""
+                val content = it.content ?: ""
+                
+                // 处理HTML，使用LEGACY模式确保颜色标签被支持
+                val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
+                val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
+                
+                // 参考 NotificationGenerator.kt 的逻辑设置文本
                 updatedBuilder
-                    .setContentTitle(HtmlCompat.fromHtml(it.title ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY))
-                    .setContentText(HtmlCompat.fromHtml(it.content ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY))
+                    .setContentTitle(processedTitle)
+                    .setContentText(processedContent)
             }
             
             // 设置应用图标（如果有）
             appIcon?.let {
                 updatedBuilder.setLargeIcon(it)
             }
+            
+            // 使用前进指示器图标作为小图标
+            progressIcon?.let {
+                updatedBuilder.setSmallIcon(IconCompat.createWithBitmap(it))
+            }
+            
+            // 设置状态栏关键文本，与初始创建通知时保持一致
+            val processedTitle = paramV2.baseInfo?.title?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
+            val processedContent = paramV2.baseInfo?.content?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
+            
+            val shortText = when {
+                processedTitle.isNotEmpty() -> processedTitle
+                processedContent.isNotEmpty() -> processedContent
+                else -> " "
+            }
+            updatedBuilder.setShortCriticalText(shortText)
+            
+            // 创建删除意图，用于处理用户移除通知时关闭浮窗
+            val deleteIntent = PendingIntent.getBroadcast(
+                appContext,
+                notificationId,
+                Intent(appContext, NotificationBroadcastReceiver::class.java)
+                    .putExtra("notificationId", notificationId)
+                    .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // 创建点击意图，用于处理用户点击通知时切换浮窗显示/隐藏
+            val contentIntent = PendingIntent.getBroadcast(
+                appContext,
+                notificationId,
+                Intent(appContext, NotificationBroadcastReceiver::class.java)
+                    .putExtra("sourceId", sourceId)
+                    .putExtra("title", paramV2.baseInfo?.title)
+                    .putExtra("text", paramV2.baseInfo?.content)
+                    .setAction("com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"),
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+            
+            // 设置意图
+            updatedBuilder
+                .setDeleteIntent(deleteIntent)
+                .setContentIntent(contentIntent)
             
             // 处理进度样式通知（仅处理进度类型）
             val progressInfo = paramV2.progressInfo
@@ -374,6 +491,7 @@ object LiveUpdatesNotificationManager {
                 Logger.d(TAG, "处理后标题: $processedTitle")
                 Logger.d(TAG, "处理后内容: $processedContent")
                 
+                // 参考 NotificationGenerator.kt 的逻辑设置文本
                 builder
                     .setContentTitle(processedTitle)
                     .setContentText(processedContent)
@@ -478,9 +596,17 @@ object LiveUpdatesNotificationManager {
             
             // 更新通知标题和内容
             paramV2.baseInfo?.let {
+                val title = it.title ?: ""
+                val content = it.content ?: ""
+                
+                // 处理HTML，使用LEGACY模式确保颜色标签被支持
+                val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
+                val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
+                
+                // 参考 NotificationGenerator.kt 的逻辑设置文本
                 builder
-                    .setContentTitle(HtmlCompat.fromHtml(it.title ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY))
-                    .setContentText(HtmlCompat.fromHtml(it.content ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY))
+                    .setContentTitle(processedTitle)
+                    .setContentText(processedContent)
             }
             
             // 获取进度值
@@ -659,8 +785,6 @@ object LiveUpdatesNotificationManager {
             // 添加Live Updates所需的属性，参照参考实现
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            // 设置默认小图标，确保所有通知都有有效的小图标
-            .setSmallIcon(android.R.drawable.stat_notify_more)
             // 直接调用setRequestPromotedOngoing，不再使用反射
             .setRequestPromotedOngoing(true)
 
@@ -673,6 +797,11 @@ object LiveUpdatesNotificationManager {
             return
         }
         try {
+            // 检查notificationManager是否已初始化
+            if (!::notificationManager.isInitialized) {
+                Logger.w(TAG, "LiveUpdatesNotificationManager未初始化，跳过取消通知")
+                return
+            }
             val notificationId = sourceId.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
             notificationManager.cancel(notificationId)
             Logger.i(TAG, "取消Live Update通知成功: $sourceId")
