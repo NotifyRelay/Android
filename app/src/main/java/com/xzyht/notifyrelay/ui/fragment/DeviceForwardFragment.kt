@@ -35,8 +35,8 @@ import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.ui.filter.DeviceInterconnect
-import com.xzyht.notifyrelay.ui.filter.UIChatTest
+import com.xzyht.notifyrelay.ui.pages.DeviceInterconnect
+import com.xzyht.notifyrelay.ui.pages.UIChatTest
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch

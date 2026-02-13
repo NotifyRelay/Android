@@ -60,7 +60,6 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.fragment.app.Fragment
-import androidx.lifecycle.lifecycleScope
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
@@ -70,9 +69,7 @@ import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.ui.GuideActivity
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
-import com.xzyht.notifyrelay.ui.filter.UISuperIslandSettings
-import kotlinx.coroutines.DelicateCoroutinesApi
-import kotlinx.coroutines.GlobalScope
+import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.IntentUtils

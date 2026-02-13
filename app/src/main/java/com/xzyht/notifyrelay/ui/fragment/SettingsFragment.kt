@@ -21,8 +21,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
-import com.xzyht.notifyrelay.ui.filter.UILocalFilter
-import com.xzyht.notifyrelay.ui.filter.UIRemoteFilter
+import com.xzyht.notifyrelay.ui.pages.UILocalFilter
+import com.xzyht.notifyrelay.ui.pages.UIRemoteFilter
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour

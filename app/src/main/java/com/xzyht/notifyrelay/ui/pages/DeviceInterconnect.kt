@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.filter
+package com.xzyht.notifyrelay.ui.pages
 
 import android.Manifest
 import android.content.Intent
@@ -26,15 +26,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.BuildConfig
-import com.xzyht.notifyrelay.servers.NotifyRelayNotificationListenerService
-import com.xzyht.notifyrelay.sync.ProtocolSender
-import com.xzyht.notifyrelay.servers.MediaControlUtil
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardLogDetector
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.ui.fragment.GlobalSelectedDeviceHolder
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
+import com.xzyht.notifyrelay.servers.MediaControlUtil
+import com.xzyht.notifyrelay.servers.NotifyRelayNotificationListenerService
+import com.xzyht.notifyrelay.servers.clipboard.ClipboardLogDetector
+import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
+import com.xzyht.notifyrelay.sync.ProtocolSender
+import com.xzyht.notifyrelay.ui.fragment.GlobalSelectedDeviceHolder
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay

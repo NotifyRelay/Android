@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.filter
+package com.xzyht.notifyrelay.ui.pages
 
 import android.graphics.Bitmap
 import android.graphics.Canvas
