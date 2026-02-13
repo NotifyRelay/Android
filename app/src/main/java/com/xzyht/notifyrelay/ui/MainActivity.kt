@@ -44,17 +44,17 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
-import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
-import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
-import com.xzyht.notifyrelay.ui.common.SetupSystemBars
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
+import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
+import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
+import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.fragment.DeviceForwardFragment
 import com.xzyht.notifyrelay.ui.fragment.DeviceListFragment
-import com.xzyht.notifyrelay.ui.fragment.NotificationHistoryFragment
+import com.xzyht.notifyrelay.ui.fragment.HistoryFragment
 import com.xzyht.notifyrelay.ui.fragment.SettingsFragment
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -265,8 +265,8 @@ fun DeviceForwardFragmentView(fragmentContainerId: Int) {
 fun NotificationHistoryFragmentView(fragmentContainerId: Int) {
     FragmentContainerView(
         fragmentContainerId = fragmentContainerId,
-        fragmentTag = "NotificationHistoryFragment",
-        fragmentFactory = { NotificationHistoryFragment() }
+        fragmentTag = "HistoryFragment",
+        fragmentFactory = { HistoryFragment() }
     )
 }
 

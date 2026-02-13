@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.fragment
+package com.xzyht.notifyrelay.ui.pages
 
 import android.app.Activity
 import android.content.Context
@@ -7,10 +7,6 @@ import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.AnchoredDraggableState
@@ -35,8 +31,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.pager.HorizontalPager
-import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,7 +45,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
@@ -59,7 +52,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.fragment.app.Fragment
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
@@ -68,8 +60,7 @@ import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.ui.GuideActivity
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
-import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
-import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
+import com.xzyht.notifyrelay.ui.fragment.GlobalSelectedDeviceHolder
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.IntentUtils
@@ -84,8 +75,6 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.TabRowDefaults
-import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.ToolbarPosition
 import top.yukonga.miuix.kmp.basic.VerticalDivider
@@ -277,19 +266,7 @@ fun drawableToBitmap(drawable: Drawable): Bitmap {
 }
 
 
-class NotificationHistoryFragment : Fragment() {
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        return ComposeView(requireContext()).apply {
-            setContent {
-                ProvideNavigationEventDispatcherOwner {
-                    MiuixTheme {
-                        NotificationHistoryScreen()
-                    }
-                }
-            }
-        }
-    }
-}
+
 
 @Composable
 fun NotificationHistoryScreen() {
@@ -297,19 +274,8 @@ fun NotificationHistoryScreen() {
     val textStyles = MiuixTheme.textStyles
     val context = LocalContext.current
 
-    // 创建协程作用域用于Tab点击事件
+    // 创建协程作用域用于删除操作等
     val coroutineScope = rememberCoroutineScope()
-
-    // TabRow相关状态
-    val tabTitles = listOf("通知历史", "超级岛历史")
-
-    // Pager相关状态 - 使用Pager状态作为唯一数据源
-    val pagerState = rememberPagerState(initialPage = 0) {
-        tabTitles.size
-    }
-
-    // 从Pager状态直接获取当前选中的Tab索引，不使用独立状态
-    val selectedTabIndex = pagerState.currentPage
 
     // 响应全局设备选中状态
     val selectedDeviceObj by GlobalSelectedDeviceHolder.current()
@@ -799,18 +765,12 @@ fun NotificationHistoryScreen() {
         }
     }
 
-    // 超级岛历史块
-    @Composable
-    fun SuperIslandHistoryBlock() {
-        UISuperIslandSettings()
-    }
-
     // 使用 Miuix Scaffold 重构布局
     Scaffold(
         containerColor = colorScheme.background,
         popupHost = { },
         floatingToolbar = {
-            if (notifications.isNotEmpty() && selectedTabIndex == 0) {
+            if (notifications.isNotEmpty()) {
                 FloatingToolbar(
                     color = colorScheme.primary,
                     cornerRadius = 20.dp,
@@ -887,62 +847,22 @@ fun NotificationHistoryScreen() {
                 modifier = Modifier.Companion
                     .fillMaxSize()
                     .padding(paddingValues)
+                    .padding(16.dp)
             ) {
-                TabRowWithContour(
-                    tabs = tabTitles,
-                    selectedTabIndex = selectedTabIndex,
-                    onTabSelected = { index ->
-                        coroutineScope.launch {
-                            pagerState.scrollToPage(index)
-                        }
-                    },
-                    modifier = Modifier.Companion.fillMaxWidth(),
-                    colors = TabRowDefaults.tabRowColors(
-                        backgroundColor = colorScheme.surface,
-                        contentColor = colorScheme.onSurface,
-                        selectedBackgroundColor = colorScheme.primary,
-                        selectedContentColor = colorScheme.onPrimary
-                    ),
-                    minWidth = 100.dp,
-                    height = 48.dp,
-                    cornerRadius = 16.dp
-                )
-
-                HorizontalPager(
-                    state = pagerState,
-                    modifier = Modifier.Companion
-                        .fillMaxSize()
-                        .padding(16.dp)
-                ) { page ->
-                    when (page) {
-                        0 -> {
-                            // 通知历史 Tab
-                            Column(
-                                modifier = Modifier.Companion.fillMaxSize()
-                            ) {
-                                if (notifications.isEmpty()) {
-                                    Spacer(modifier = Modifier.Companion.height(16.dp))
-                                    Text(
-                                        text = "暂无通知",
-                                        style = textStyles.body1.copy(color = colorScheme.onSurfaceSecondary)
-                                    )
-                                } else {
-                                    NotificationListBlock(
-                                        notifications = notifications,
-                                        mixedList = mixedList,
-                                        getCachedAppInfo = { pkg -> getCachedAppInfo(pkg) },
-                                        expandedGroups = expandedGroups,
-                                        installedPackages = installedPackages
-                                    )
-                                }
-                            }
-                        }
-
-                        1 -> {
-                            // 超级岛历史 Tab
-                            SuperIslandHistoryBlock()
-                        }
-                    }
+                if (notifications.isEmpty()) {
+                    Spacer(modifier = Modifier.Companion.height(16.dp))
+                    Text(
+                        text = "暂无通知",
+                        style = textStyles.body1.copy(color = colorScheme.onSurfaceSecondary)
+                    )
+                } else {
+                    NotificationListBlock(
+                        notifications = notifications,
+                        mixedList = mixedList,
+                        getCachedAppInfo = { pkg -> getCachedAppInfo(pkg) },
+                        expandedGroups = expandedGroups,
+                        installedPackages = installedPackages
+                    )
                 }
             }
         }
