@@ -7,7 +7,6 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
-import androidx.core.graphics.createBitmap
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.TimerInfo
@@ -217,6 +216,12 @@ object NotificationGenerator {
     private const val NOTIFICATION_CHANNEL_ID = "super_island_replica"
     // 通知ID基础值
     private const val NOTIFICATION_BASE_ID = 20000
+    
+    // 缓存变量，用于优化图标生成
+    private var cachedIconKey = ""
+    private var cachedIconBitmap: android.graphics.Bitmap? = null
+    
+
 
     /**
      * 发送复刻通知，与原通知保持一致
@@ -288,12 +293,16 @@ object NotificationGenerator {
                     "channel_id_focusNotifLyrics",
                     "焦点歌词通知",
                     NotificationManager.IMPORTANCE_HIGH
-                )
+                ).apply {
+                    setSound(null, null)
+                    setShowBadge(false)
+                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                }
                 notificationManager.createNotificationChannel(mediaChannel)
                 
                 var builder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
                     .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
-                    .setContentText(text ?: "")
+                    .setContentText(title ?: "")
                     .setSmallIcon(android.R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
                     // 调整为不可被一键清除的属性，只能手动划去
                     .setAutoCancel(false) // 不允许用户点击清除通知
@@ -305,9 +314,42 @@ object NotificationGenerator {
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .setDeleteIntent(deleteIntent) // 设置删除意图，处理用户移除通知的情况
                     .setContentIntent(pendingContentIntent) // 设置点击意图
+                    .setRequestPromotedOngoing(true)
                 
-                // 不添加胶囊兼容字段，因为媒体类型通知已经有自己的处理逻辑
-                // builder = buildCapsuleCompatibleNotification(context, builder, title, text, appName, paramV2, picMap)
+                // 添加胶囊形式支持
+                try {
+                    // 使用 ProgressStyle 设置胶囊样式
+                    val segment = NotificationCompat.ProgressStyle.Segment(100)
+                    val segments = ArrayList<NotificationCompat.ProgressStyle.Segment>()
+                    segments.add(segment)
+                    
+                    val progressStyle = NotificationCompat.ProgressStyle()
+                        .setProgressSegments(segments)
+                        .setStyledByProgress(true)
+                        .setProgress(0)
+                    
+                    builder.setStyle(progressStyle)
+                } catch (e: Exception) {
+                    Logger.e(TAG, "设置胶囊样式失败: ${e.message}")
+                }
+                
+                // 处理歌词拆分和显示
+                val lyricText = title ?: ""
+                var capsuleText = lyricText
+                var iconText = ""
+                
+                // 当歌词超过9字符时，拆分为图标文本和胶囊文本
+                if (lyricText.length > 9) {
+                    // 优化图标文本长度，使其尽可能少
+                    // 例如：13个字符的标题应将前4个字符作为图标文本
+                    val iconTextLength = maxOf(2, minOf(5, lyricText.length - 9))
+                    iconText = lyricText.take(iconTextLength)
+                    // 剩余部分作为胶囊显示文本
+                    capsuleText = lyricText.substring(iconTextLength)
+                }
+                
+                // 设置胶囊文本
+                builder.setShortCriticalText(capsuleText)
                 
                 // ... (后续构建extras的代码保持不变)
                 // 添加焦点歌词相关的结构化数据
@@ -389,8 +431,31 @@ object NotificationGenerator {
                 extras.putString("superIslandSourcePackage", context.packageName)
                 extras.putString("app_package", context.packageName)
                 
-                // 构建通知并注入图标
+                // 构建通知
                 val notification = builder.build()
+                
+                // 生成并注入动态图标
+                if (iconText.isNotEmpty()) {
+                    val iconBitmap = textToBitmap(iconText)
+                    if (iconBitmap != null) {
+                        injectSmallIcon(notification, iconBitmap)
+                    }
+                } else {
+                    // 没有图标文本时，尝试使用专辑图作为小图标
+                    val coverKey = "miui.focus.pic_cover"
+                    if (!picMap.isNullOrEmpty() && picMap.containsKey(coverKey)) {
+                        val coverUrl = picMap[coverKey]
+                        if (!coverUrl.isNullOrBlank()) {
+                            // 同步下载专辑图
+                            val bitmap = runBlocking {
+                                downloadBitmap(context, coverUrl, 5000)
+                            }
+                            if (bitmap != null) {
+                                injectSmallIcon(notification, bitmap)
+                            }
+                        }
+                    }
+                }
                 
                 // 重新解析param_v2数据，获取进度信息
                 val entry = floatingWindowManager.getEntry(key)
@@ -1050,7 +1115,7 @@ object NotificationGenerator {
     /**
      * 将文本转换为位图，参考 Capsulyric 的实现
      */
-    private fun textToBitmap(text: String, forceFontSize: Float? = null): Bitmap? {
+    private fun textToBitmap(text: String, forceFontSize: Float? = null): android.graphics.Bitmap? {
         try {
             // 检查文本是否为空
             if (text.isBlank()) {
@@ -1092,7 +1157,7 @@ object NotificationGenerator {
             val finalWidth = width.coerceAtMost(maxSize)
             val finalHeight = height.coerceAtMost(maxSize)
             
-            val image = createBitmap(finalWidth, finalHeight)
+            val image = android.graphics.Bitmap.createBitmap(finalWidth, finalHeight, android.graphics.Bitmap.Config.ARGB_8888)
             val canvas = android.graphics.Canvas(image)
             // 绘制时添加小的左内边距
             canvas.drawText(text, 5f, baseline, paint)
@@ -1429,7 +1494,7 @@ object NotificationGenerator {
     /**
      * 注入小图标到通知中
      */
-    private fun injectSmallIcon(notification: android.app.Notification, bitmap: android.graphics.Bitmap?) {
+    private fun injectSmallIcon(notification: android.app.Notification, bitmap: Bitmap?) {
         bitmap?.let {
             try {
                 val icon = android.graphics.drawable.Icon.createWithBitmap(it)
