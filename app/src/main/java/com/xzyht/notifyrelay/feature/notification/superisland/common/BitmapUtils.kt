@@ -17,7 +17,7 @@ object BitmapUtils {
     /**
      * 将文本转换为位图
      * @param text 要转换的文本
-     * @param forceFontSize 强制字体大小，null 表示使用自适应算法
+     * @param forceFontSize 强制字体大小，null 表示使用默认大小
      * @return 生成的位图，失败返回 null
      */
     fun textToBitmap(text: String, forceFontSize: Float? = null): Bitmap? {
@@ -28,46 +28,124 @@ object BitmapUtils {
                 return null
             }
             
-            // 自适应字体大小算法
-            // 基础大小：40f. 最小大小：20f.
-            // 衰减：超过10个字符后每字符减少0.8f.
-            val length = text.length
+            val fontSize = forceFontSize ?: 40f
             
-            val fontSize = forceFontSize ?: if (length <= 10) {
-                40f
-            } else {
-                (40f - (length - 10) * 0.8f).coerceAtLeast(20f)
+            // 计算等价字符长度（小写英语字符为0.5个等价字符）
+            fun calculateEquivalentLength(text: String): Float {
+                var length = 0f
+                for (char in text) {
+                    if (char in 'a'..'z') {
+                        length += 0.5f
+                    } else {
+                        length += 1f
+                    }
+                }
+                return length
             }
             
-            val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                textSize = fontSize
-                color = Color.WHITE
-                textAlign = Paint.Align.LEFT
-                typeface = Typeface.DEFAULT_BOLD
+            // 查找第一行的分割点（等价字符长度不超过7）
+            fun findSplitPoint(text: String): Int {
+                var equivalentLength = 0f
+                for (i in text.indices) {
+                    val char = text[i]
+                    val charLength = if (char in 'a'..'z') 0.5f else 1f
+                    if (equivalentLength + charLength > 7) {
+                        return i
+                    }
+                    equivalentLength += charLength
+                }
+                return text.length
             }
             
-            val baseline = -paint.ascent() // ascent() 为负值
-            // 为紧凑裁剪中的宽字符添加更多缓冲区
-            val width = (paint.measureText(text) + 10).toInt() 
-            val height = (baseline + paint.descent() + 5).toInt()
+            val splitPoint = findSplitPoint(text)
+            val firstLineText = text.substring(0, splitPoint)
+            val secondLineText = text.substring(splitPoint)
             
-            // 空或无效尺寸的安全检查
-            if (width <= 0 || height <= 0) {
-                Logger.w(TAG, "文本位图尺寸无效，width=$width, height=$height")
-                return null
-            }
+            // 处理单行或多行逻辑
+            if (secondLineText.isBlank()) {
+                // 单行文本
+                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    textSize = fontSize
+                    color = Color.WHITE
+                    textAlign = Paint.Align.LEFT
+                    typeface = Typeface.DEFAULT_BOLD
+                }
+                
+                val baseline = -paint.ascent() // ascent() 为负值
+                // 为紧凑裁剪中的宽字符添加更多缓冲区
+                val width = (paint.measureText(firstLineText) + 10).toInt() 
+                val height = (baseline + paint.descent() + 5).toInt()
+                
+                // 空或无效尺寸的安全检查
+                if (width <= 0 || height <= 0) {
+                    Logger.w(TAG, "文本位图尺寸无效，width=$width, height=$height")
+                    return null
+                }
 
-            // 确保尺寸在合理范围内
-            val maxSize = 500
-            val finalWidth = width.coerceAtMost(maxSize)
-            val finalHeight = height.coerceAtMost(maxSize)
-            
-            val image = Bitmap.createBitmap(finalWidth, finalHeight, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(image)
-            // 绘制时添加小的左内边距
-            canvas.drawText(text, 5f, baseline, paint)
-            Logger.d(TAG, "生成文本位图成功，尺寸: ${finalWidth}x${finalHeight}")
-            return image
+                // 确保尺寸在合理范围内
+                val maxSize = 500
+                val finalWidth = width.coerceAtMost(maxSize)
+                val finalHeight = height.coerceAtMost(maxSize)
+                
+                val image = Bitmap.createBitmap(finalWidth, finalHeight, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(image)
+                // 绘制时添加小的左内边距
+                canvas.drawText(firstLineText, 5f, baseline, paint)
+                Logger.d(TAG, "生成文本位图成功，尺寸: ${finalWidth}x${finalHeight}")
+                return image
+            } else {
+                // 多行文本：两行字体大小相同，总高度与单行相同
+                val lineFontSize = fontSize * 0.6f // 调整字体大小以适应两行
+                
+                val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    textSize = lineFontSize
+                    color = Color.WHITE
+                    textAlign = Paint.Align.LEFT
+                    typeface = Typeface.DEFAULT_BOLD
+                }
+                
+                val lineBaseline = -linePaint.ascent()
+                
+                // 计算宽度：取第一行和第二行中较宽的一个
+                val firstLineWidth = linePaint.measureText(firstLineText)
+                val secondLineWidth = linePaint.measureText(secondLineText)
+                val width = (Math.max(firstLineWidth, secondLineWidth) + 10).toInt()
+                
+                // 计算高度：保持和单行高度相同
+                val singleLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                    textSize = fontSize
+                    typeface = Typeface.DEFAULT_BOLD
+                }
+                val height = (-singleLinePaint.ascent() + singleLinePaint.descent() + 5).toInt()
+                
+                // 空或无效尺寸的安全检查
+                if (width <= 0 || height <= 0) {
+                    Logger.w(TAG, "文本位图尺寸无效，width=$width, height=$height")
+                    return null
+                }
+
+                // 确保尺寸在合理范围内
+                val maxSize = 500
+                val finalWidth = width.coerceAtMost(maxSize)
+                val finalHeight = height.coerceAtMost(maxSize)
+                
+                val image = Bitmap.createBitmap(finalWidth, finalHeight, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(image)
+                
+                // 计算两行的垂直位置，确保完整显示
+                val lineHeight = height * 0.5f
+                val firstLineY = lineHeight * 0.8f // 第一行垂直居中
+                val secondLineY = lineHeight + (lineHeight * 0.8f) // 第二行垂直居中
+                
+                // 绘制第一行
+                canvas.drawText(firstLineText, 5f, firstLineY, linePaint)
+                
+                // 绘制第二行
+                canvas.drawText(secondLineText, 5f, secondLineY, linePaint)
+                
+                Logger.d(TAG, "生成文本位图成功，尺寸: ${finalWidth}x${finalHeight}")
+                return image
+            }
         } catch (e: Exception) {
             Logger.w(TAG, "生成文本位图失败: ${e.message}")
             e.printStackTrace()
