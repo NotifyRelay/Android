@@ -18,6 +18,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandI
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import java.lang.ref.WeakReference
@@ -226,8 +227,10 @@ object FloatingReplicaManager {
                         else -> false
                     }
 
-                    // 将所有图片 intern 为引用，避免重复保存相同图片
-                    val internedPicMap = SuperIslandImageStore.internAll(context, picMap)
+                    // 将所有图片 intern 为引用，避免重复保存相同图片 - 移到 IO 线程执行
+                    val internedPicMap = withContext(Dispatchers.IO) {
+                        SuperIslandImageStore.internAll(context, picMap)
+                    }
                     // 生成唯一的entryKey，确保包含sourceId，以便后续能正确移除
                     // 对于同一通知的不同时间更新，应该使用相同的key，所以不能包含时间戳
                     val entryKey = sourceId

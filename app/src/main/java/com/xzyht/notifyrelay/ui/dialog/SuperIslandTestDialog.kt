@@ -22,12 +22,13 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperDialog
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import notifyrelay.data.StorageManager
 
 // 全局变量，用于保存递增循环的进度值
 private var progressCounter = 0
 
 /**
- * 发送开关状态变量，默认关闭，不持久化
+ * 发送开关状态变量，默认关闭，持久化存储
  */
 private var sendToOtherDevices = false
 
@@ -41,20 +42,29 @@ private var sendToOtherDevices = false
  * @param picMap 图片映射
  * @param appName 应用名称
  */
-private fun showTestNotification(
+fun showTestNotification(
     context: Context,
     sourceId: String,
     title: String?,
     text: String?,
     paramV2Raw: String?,
     picMap: Map<String, String>?,
-    appName: String? = "测试应用"
+    appName: String? = "测试应用",
+    forceFullPackage: Boolean = true
 ) {
     if (sendToOtherDevices) {
         // 发送开关开启时，仅发送通知给其他端
         try {
             // 获取设备管理器实例
             val deviceManager = DeviceConnectionManager.getInstance(context)
+            
+            // 当强制发送全量包时，生成唯一的 featureIdOverride
+            val featureIdOverride = if (forceFullPackage) {
+                "${sourceId}_${System.currentTimeMillis()}"
+            } else {
+                null
+            }
+            
             // 发送超级岛数据给其他设备
             MessageSender.sendSuperIslandData(
                 context = context,
@@ -65,7 +75,8 @@ private fun showTestNotification(
                 time = System.currentTimeMillis(),
                 paramV2Raw = paramV2Raw,
                 picMap = picMap,
-                deviceManager = deviceManager
+                deviceManager = deviceManager,
+                featureIdOverride = featureIdOverride
             )
         } catch (e: Exception) {
             // 发送失败时记录日志
@@ -856,8 +867,10 @@ fun SuperIslandTestDialog(
 ) {
     // 进度可变开关状态
     var isVariableProgress by remember { mutableStateOf(false) }
-    // 发送开关状态
-    var isSendEnabled by remember { mutableStateOf(sendToOtherDevices) }
+    // 发送开关状态，从持久化存储中读取
+    var isSendEnabled by remember {
+        mutableStateOf(StorageManager.getBoolean(context, "superisland_send_to_other_devices", false))
+    }
     
     MiuixTheme {
         SuperDialog(
@@ -889,6 +902,7 @@ fun SuperIslandTestDialog(
                     onCheckedChange = {
                         isSendEnabled = it
                         sendToOtherDevices = it
+                        StorageManager.putBoolean(context, "superisland_send_to_other_devices", it)
                     },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 )
