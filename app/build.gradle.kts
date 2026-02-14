@@ -60,7 +60,7 @@ android {
 
     defaultConfig {
         applicationId = "com.xzyht.notifyrelay"
-        minSdk = 26
+        minSdk = 29
         targetSdk = 36
         // 使用自动计算的版本号
         versionCode = computedVersionCode
@@ -168,6 +168,7 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.foundation.layout)
     implementation(libs.androidx.runtime)
+    implementation(libs.androidx.remote.creation.compose)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
