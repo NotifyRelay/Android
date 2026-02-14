@@ -270,7 +270,6 @@ object NotificationGenerator {
                 val updatedBuilder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
                     .setContentTitle(contentTitle ?: "")
                     .setContentText(contentText ?: "")
-                    .setSmallIcon(android.R.drawable.stat_notify_more)
                     .setAutoCancel(false)
                     .setOngoing(true)
                     .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -455,7 +454,8 @@ object NotificationGenerator {
                 // 当歌词超过阈值时，拆分为图标文本和胶囊文本
                 // 远端和本地都保持6字符开始分割
                 val threshold = 6
-                if (lyricText.length > threshold) {
+                val textLength = TextSplitter.calculateTextLength(lyricText)
+                if (textLength > threshold) {
                     // 使用TextSplitter工具类进行歌词拆分
                     val (splitIconText, splitCapsuleText) = TextSplitter.splitLyricWithCharacterType(lyricText, threshold)
                     iconText = splitIconText
@@ -1887,6 +1887,8 @@ object NotificationGenerator {
                 notificationManager.cancel(notificationId)
                 // 移除对应的定时器
                 TimerUpdateManager.instance.removeTimer(key)
+                // 停止对应的滚动更新
+                stopScrollUpdate(key)
                 Logger.i(TAG, "超级岛: 取消复刻通知成功，key=$key, notificationId=$notificationId")
             }
         } catch (e: Exception) {
@@ -1907,6 +1909,8 @@ object NotificationGenerator {
                     notificationManager.cancel(notificationId)
                     // 移除对应的定时器
                     TimerUpdateManager.instance.removeTimer(key)
+                    // 停止对应的滚动更新
+                    stopScrollUpdate(key)
                     Logger.i(TAG, "超级岛: 取消复刻通知成功，key=$key, notificationId=$notificationId")
                 }
             }
@@ -1915,6 +1919,8 @@ object NotificationGenerator {
             entryKeyToNotificationId.clear()
             // 清空所有定时器
             TimerUpdateManager.instance.clearAll()
+            // 清空所有滚动更新
+            clearAllScrollUpdates()
             Logger.i(TAG, "超级岛: 清除所有复刻通知成功")
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 清除所有复刻通知失败: ${e.message}")

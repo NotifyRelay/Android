@@ -12,7 +12,10 @@ object TextSplitter {
     fun calculateTextLength(text: String): Double {
         var length = 0.0
         for (char in text) {
-            if (char.isLetter()) {
+            if (isChineseCharacter(char)) {
+                // 中文字符算1个字符
+                length += 1.0
+            } else if (char.isLetter()) {
                 // 英语字母算0.5个字符
                 length += 0.5
             } else {
@@ -21,6 +24,18 @@ object TextSplitter {
             }
         }
         return length
+    }
+    
+    /**
+     * 判断字符是否为中文字符
+     */
+    private fun isChineseCharacter(c: Char): Boolean {
+        val block = Character.UnicodeBlock.of(c)
+        return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
+            block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A ||
+            block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B ||
+            block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS ||
+            block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS_SUPPLEMENT
     }
     
     /**
@@ -114,23 +129,56 @@ object TextSplitter {
         }
         
         // 确保图标文本长度在2-5个中文字符等价长度之间
-        var currentLength = 0.0
-        var finalSplitPoint = 0
+        var actualSplitPoint = splitPoint
         
-        for (i in 0 until lyricText.length) {
-            val char = lyricText[i]
-            currentLength += if (char.isLetter()) 0.5 else 1.0
+        // 如果找到了空格，检查空格位置是否在合理范围内
+        if (splitPoint > 0) {
+            // 计算空格位置的字符等价长度
+            var spacePositionLength = 0.0
+            for (i in 0 until splitPoint) {
+                val char = lyricText[i]
+                spacePositionLength += if (char.isLetter()) 0.5 else 1.0
+            }
             
-            if (currentLength >= 2.0) {
-                finalSplitPoint = i + 1
-                if (currentLength >= 5.0) {
-                    break
+            // 如果空格位置的长度在合理范围内，使用空格位置
+            if (spacePositionLength >= 2.0 && spacePositionLength <= 5.0) {
+                actualSplitPoint = splitPoint
+            } else {
+                // 否则，计算一个合理的长度位置
+                var currentLength = 0.0
+                var lengthBasedSplitPoint = 0
+                
+                for (i in 0 until lyricText.length) {
+                    val char = lyricText[i]
+                    currentLength += if (char.isLetter()) 0.5 else 1.0
+                    
+                    if (currentLength >= 2.0) {
+                        lengthBasedSplitPoint = i + 1
+                        if (currentLength >= 5.0) {
+                            break
+                        }
+                    }
+                }
+                actualSplitPoint = lengthBasedSplitPoint
+            }
+        } else {
+            // 没有找到空格，计算一个合理的长度位置
+            var currentLength = 0.0
+            var lengthBasedSplitPoint = 0
+            
+            for (i in 0 until lyricText.length) {
+                val char = lyricText[i]
+                currentLength += if (char.isLetter()) 0.5 else 1.0
+                
+                if (currentLength >= 2.0) {
+                    lengthBasedSplitPoint = i + 1
+                    if (currentLength >= 5.0) {
+                        break
+                    }
                 }
             }
+            actualSplitPoint = lengthBasedSplitPoint
         }
-        
-        // 使用找到的空格位置或计算的长度位置
-        val actualSplitPoint = if (splitPoint > 0) splitPoint else finalSplitPoint
         
         // 执行拆分
         val iconText = lyricText.take(actualSplitPoint)
