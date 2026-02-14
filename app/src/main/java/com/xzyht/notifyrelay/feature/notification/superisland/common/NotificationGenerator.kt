@@ -7,6 +7,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
+import androidx.core.graphics.createBitmap
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.TimerInfo
@@ -117,7 +118,6 @@ object NotificationGenerator {
                 )
                 notificationManager.createNotificationChannel(mediaChannel)
                 
-                // ... (原有代码保持不变)
                 var builder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
                     .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
                     .setContentText(text ?: "")
@@ -216,8 +216,107 @@ object NotificationGenerator {
                 extras.putString("superIslandSourcePackage", context.packageName)
                 extras.putString("app_package", context.packageName)
                 
+                // 构建通知并注入图标
+                val notification = builder.build()
+                
+                // 重新解析param_v2数据，获取进度信息
+                val entry = floatingWindowManager.getEntry(key)
+                val paramV2Raw = entry?.paramV2Raw
+                
+                // 尝试从A/B区数据中获取图标或生成位图
+                var smallIconBitmap: android.graphics.Bitmap? = null
+                
+                // 解析param_v2中的bigIsland数据
+                var bigIsland: JSONObject? = null
+                val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
+                
+                paramV2RawValue?.let {
+                    try {
+                        val json = JSONObject(it)
+                        // 尝试从param_island -> bigIslandArea中解析
+                        val paramIsland = json.optJSONObject("param_island")
+                        bigIsland = paramIsland?.optJSONObject("bigIslandArea")
+                        
+                        // 如果没有找到，尝试直接从bigIsland字段解析
+                        if (bigIsland == null) {
+                            bigIsland = json.optJSONObject("bigIsland")
+                        }
+                    } catch (e: Exception) {
+                        Logger.w(TAG, "超级岛: 解析bigIsland失败: ${e.message}")
+                    }
+                }
+                
+                // 解析A/B区数据
+                val bComponent = parseBComponent(bigIsland)
+                
+                // 提取进度数据
+                val bProgress = when (bComponent) {
+                    is BProgressTextInfo -> bComponent.progress
+                    else -> null
+                }
+                
+                val bProgressColorReach = when (bComponent) {
+                    is BProgressTextInfo -> bComponent.colorReach
+                    else -> null
+                }
+                
+                val bProgressColorUnReach = when (bComponent) {
+                    is BProgressTextInfo -> bComponent.colorUnReach
+                    else -> null
+                }
+                
+                val bProgressIsCCW = when (bComponent) {
+                    is BProgressTextInfo -> bComponent.isCCW
+                    else -> false
+                }
+                
+                // 处理进度数据，生成位图
+                if (bProgress != null) {
+                    smallIconBitmap = progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
+                }
+                
+                // 如果没有进度数据，尝试生成文本位图
+                if (smallIconBitmap == null) {
+                    // 优先使用B区文本生成位图
+                    val textToRender = when (bComponent) {
+                        is BImageText2 -> bComponent.title ?: bComponent.content
+                        is BImageText3 -> bComponent.title
+                        is BImageText6 -> bComponent.title
+                        is BTextInfo -> bComponent.title ?: bComponent.content
+                        is BFixedWidthDigitInfo -> bComponent.digit
+                        is BSameWidthDigitInfo -> bComponent.digit
+                        is BProgressTextInfo -> bComponent.title ?: bComponent.content
+                        else -> null
+                    }
+                    
+                    if (!textToRender.isNullOrBlank()) {
+                        smallIconBitmap = textToBitmap(textToRender)
+                    }
+                }
+                
+                // 如果没有文本数据，尝试使用应用图标
+                if (smallIconBitmap == null) {
+                    // 优先使用应用图标（大图标的键值提供的图标）
+                    val appIconKey = "miui.focus.pic_app_icon"
+                    if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
+                        val appIconUrl = picMap[appIconKey]
+                        if (!appIconUrl.isNullOrBlank()) {
+                            // 同步下载应用图标
+                            val bitmap = runBlocking {
+                                downloadBitmap(context, appIconUrl, 5000)
+                            }
+                            if (bitmap != null) {
+                                smallIconBitmap = bitmap
+                            }
+                        }
+                    }
+                }
+                
+                // 注入小图标
+                injectSmallIcon(notification, smallIconBitmap)
+                
                 // 发送通知
-                notificationManager.notify(notificationId, builder.build())
+                notificationManager.notify(notificationId, notification)
             } else {
                 // 非媒体类型，使用原来的通知渠道和构建方式
                 // 创建通知渠道
@@ -246,19 +345,22 @@ object NotificationGenerator {
                 
                 // 检查是否为进度类型通知，如果是，则可能已经通过 LiveUpdatesNotificationManager 处理
                 val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
-                if (!isProgressType) {
+                
+                // 构建通知
+                val notification = if (!isProgressType) {
                     // 非进度类型通知，添加胶囊兼容字段并注入图标
-                val entry = floatingWindowManager.getEntry(key)
-                val paramV2RawValue = entry?.paramV2Raw
-                builder = buildCapsuleCompatibleNotificationWithIconInjection(context, builder, title, text, appName, paramV2, picMap, paramV2RawValue)
+                    val entry = floatingWindowManager.getEntry(key)
+                    val paramV2RawValue = entry?.paramV2Raw
+                    buildCapsuleCompatibleNotificationWithIconInjection(context, builder, title, text, appName, paramV2, picMap, paramV2RawValue)
                 } else {
                     // 进度类型通知，已经通过 LiveUpdatesNotificationManager 处理，不重复添加胶囊兼容字段
                     Logger.i(TAG, "超级岛: 进度类型通知，已通过 LiveUpdatesNotificationManager 处理，不重复添加胶囊兼容字段")
+                    builder.build()
                 }
                 
                 // ... (后续构建extras的代码保持不变)
                 // 添加超级岛相关的结构化数据，严格按照小米官方文档规范和实际通知结构
-                val extras = builder.extras
+                val extras = notification.extras
                 
                 // 获取paramV2原始数据
                 val entry = floatingWindowManager.getEntry(key)
@@ -339,7 +441,7 @@ object NotificationGenerator {
                 extras.putString("app_package", context.packageName)
                 
                 // 发送通知
-                notificationManager.notify(notificationId, builder.build())
+                notificationManager.notify(notificationId, notification)
             }
             
             // 保存entryKey到notificationId的映射
@@ -586,6 +688,12 @@ object NotificationGenerator {
      */
     private fun textToBitmap(text: String, forceFontSize: Float? = null): Bitmap? {
         try {
+            // 检查文本是否为空
+            if (text.isBlank()) {
+                Logger.w(TAG, "超级岛: 文本为空，无法生成位图")
+                return null
+            }
+            
             // 自适应字体大小算法
             // 基础大小：40f. 最小大小：20f.
             // 衰减：超过10个字符后每字符减少0.8f.
@@ -610,15 +718,25 @@ object NotificationGenerator {
             val height = (baseline + paint.descent() + 5).toInt()
             
             // 空或无效尺寸的安全检查
-            if (width <= 0 || height <= 0) return null
+            if (width <= 0 || height <= 0) {
+                Logger.w(TAG, "超级岛: 文本位图尺寸无效，width=$width, height=$height")
+                return null
+            }
 
-            val image = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
+            // 确保尺寸在合理范围内
+            val maxSize = 500
+            val finalWidth = width.coerceAtMost(maxSize)
+            val finalHeight = height.coerceAtMost(maxSize)
+            
+            val image = createBitmap(finalWidth, finalHeight)
             val canvas = android.graphics.Canvas(image)
             // 绘制时添加小的左内边距
             canvas.drawText(text, 5f, baseline, paint)
+            Logger.d(TAG, "超级岛: 生成文本位图成功，尺寸: ${finalWidth}x${finalHeight}")
             return image
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 生成文本位图失败: ${e.message}")
+            e.printStackTrace()
             return null
         }
     }
@@ -628,6 +746,12 @@ object NotificationGenerator {
      */
     private fun progressToBitmap(progress: Int, colorReach: String? = null, colorUnReach: String? = null, isCCW: Boolean = false): Bitmap? {
         try {
+            // 检查进度值是否有效
+            if (progress < 0 || progress > 100) {
+                Logger.w(TAG, "超级岛: 进度值无效，progress=$progress")
+                return null
+            }
+            
             val size = 100 // 位图大小
             val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
             val canvas = android.graphics.Canvas(bitmap)
@@ -643,7 +767,14 @@ object NotificationGenerator {
             val paintUnReach = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
                 strokeWidth = 10f
-                color = colorUnReach?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.GRAY
+                color = colorUnReach?.let { 
+                    try {
+                        android.graphics.Color.parseColor(it)
+                    } catch (e: Exception) {
+                        Logger.w(TAG, "超级岛: 解析未达到部分颜色失败: ${e.message}")
+                        android.graphics.Color.GRAY
+                    }
+                } ?: android.graphics.Color.GRAY
             }
             canvas.drawArc(
                 10f, 10f, (size - 10).toFloat(), (size - 10).toFloat(),
@@ -654,16 +785,25 @@ object NotificationGenerator {
             val paintReach = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
                 style = android.graphics.Paint.Style.STROKE
                 strokeWidth = 10f
-                color = colorReach?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.WHITE
+                color = colorReach?.let { 
+                    try {
+                        android.graphics.Color.parseColor(it)
+                    } catch (e: Exception) {
+                        Logger.w(TAG, "超级岛: 解析已达到部分颜色失败: ${e.message}")
+                        android.graphics.Color.WHITE
+                    }
+                } ?: android.graphics.Color.WHITE
             }
             canvas.drawArc(
                 10f, 10f, (size - 10).toFloat(), (size - 10).toFloat(),
                 startAngle, if (isCCW) -sweepAngle else sweepAngle, false, paintReach
             )
             
+            Logger.d(TAG, "超级岛: 生成进度圈位图成功，进度: $progress%")
             return bitmap
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 生成进度圈位图失败: ${e.message}")
+            e.printStackTrace()
             return null
         }
     }
@@ -673,7 +813,7 @@ object NotificationGenerator {
     /**
      * 构建胶囊兼容的通知，添加标准通知字段和 smallIcon 注入
      */
-    private suspend fun buildCapsuleCompatibleNotification(
+    private fun buildCapsuleCompatibleNotification(
         context: Context,
         builder: NotificationCompat.Builder,
         title: String?,
@@ -685,17 +825,24 @@ object NotificationGenerator {
     ): NotificationCompat.Builder {
         try {
             // 解析 param_v2 中的 bigIsland 数据
-            var bigIsland: JSONObject? = null
-            val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
-            
-            paramV2RawValue?.let {
-                try {
-                    val json = JSONObject(it)
+        var bigIsland: JSONObject? = null
+        val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
+        
+        paramV2RawValue?.let {
+            try {
+                val json = JSONObject(it)
+                // 尝试从 param_island -> bigIslandArea 中解析
+                val paramIsland = json.optJSONObject("param_island")
+                bigIsland = paramIsland?.optJSONObject("bigIslandArea")
+                
+                // 如果没有找到，尝试直接从 bigIsland 字段解析
+                if (bigIsland == null) {
                     bigIsland = json.optJSONObject("bigIsland")
-                } catch (e: Exception) {
-                    Logger.w(TAG, "超级岛: 解析 bigIsland 失败: ${e.message}")
                 }
+            } catch (e: Exception) {
+                Logger.w(TAG, "超级岛: 解析 bigIsland 失败: ${e.message}")
             }
+        }
             
             // 解析 A/B 区数据
             val aComponent = parseAComponent(bigIsland)
@@ -806,17 +953,26 @@ object NotificationGenerator {
             if (smallIconBitmap == null) {
                 // 优先使用应用图标（大图标的键值提供的图标）
                 val appIconKey = "miui.focus.pic_app_icon"
+                Logger.d(TAG, "超级岛: 处理应用图标 - appIconKey: $appIconKey, picMap: ${picMap?.keys}")
                 if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
                     val appIconUrl = picMap[appIconKey]
                     if (!appIconUrl.isNullOrBlank()) {
                         // 同步下载应用图标
+                        Logger.d(TAG, "超级岛: 使用应用图标作为小图标，URL: $appIconUrl")
                         val bitmap = runBlocking {
                             downloadBitmap(context, appIconUrl, 5000)
                         }
                         if (bitmap != null) {
                             smallIconBitmap = bitmap
+                            Logger.d(TAG, "超级岛: 应用图标加载成功")
+                        } else {
+                            Logger.w(TAG, "超级岛: 应用图标加载失败")
                         }
+                    } else {
+                        Logger.w(TAG, "超级岛: 应用图标 URL 为空")
                     }
+                } else {
+                    Logger.d(TAG, "超级岛: 未找到应用图标键 $appIconKey")
                 }
             }
             
@@ -824,17 +980,26 @@ object NotificationGenerator {
             if (smallIconBitmap == null) {
                 // 优先使用 A 区图标
                 val picKeyToUse = aPicKey ?: bPicKey
+                Logger.d(TAG, "超级岛: 处理 A 区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
                 if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
                     val picUrl = picMap[picKeyToUse]
                     if (!picUrl.isNullOrBlank()) {
                         // 同步下载图标
+                        Logger.d(TAG, "超级岛: 使用 A 区图标作为小图标，URL: $picUrl")
                         val bitmap = runBlocking {
                             downloadBitmap(context, picUrl, 5000)
                         }
                         if (bitmap != null) {
                             smallIconBitmap = bitmap
+                            Logger.d(TAG, "超级岛: A 区图标加载成功")
+                        } else {
+                            Logger.w(TAG, "超级岛: A 区图标加载失败")
                         }
+                    } else {
+                        Logger.w(TAG, "超级岛: A 区图标 URL 为空")
                     }
+                } else {
+                    Logger.d(TAG, "超级岛: 未找到 A 区图标键")
                 }
             }
             
@@ -887,12 +1052,13 @@ object NotificationGenerator {
         paramV2: ParamV2?,
         picMap: Map<String, String>?,
         paramV2Raw: String?
-    ): NotificationCompat.Builder {
-        // 先构建胶囊兼容的通知
-        val capsuleBuilder = buildCapsuleCompatibleNotification(context, builder, title, text, appName, paramV2, picMap, paramV2Raw)
-        
-        // 构建通知并注入图标
-        val notification = capsuleBuilder.build()
+    ): android.app.Notification {
+        try {
+            // 先构建胶囊兼容的通知
+            val capsuleBuilder = buildCapsuleCompatibleNotification(context, builder, title, text, appName, paramV2, picMap, paramV2Raw)
+            
+            // 构建通知并注入图标
+            val notification = capsuleBuilder.build()
         
         // 尝试从 A/B 区数据中获取图标或生成位图
         var smallIconBitmap: android.graphics.Bitmap? = null
@@ -904,7 +1070,14 @@ object NotificationGenerator {
         paramV2RawValue?.let {
             try {
                 val json = JSONObject(it)
-                bigIsland = json.optJSONObject("bigIsland")
+                // 尝试从 param_island -> bigIslandArea 中解析
+                val paramIsland = json.optJSONObject("param_island")
+                bigIsland = paramIsland?.optJSONObject("bigIslandArea")
+                
+                // 如果没有找到，尝试直接从 bigIsland 字段解析
+                if (bigIsland == null) {
+                    bigIsland = json.optJSONObject("bigIsland")
+                }
             } catch (e: Exception) {
                 Logger.w(TAG, "超级岛: 解析 bigIsland 失败: ${e.message}")
             }
@@ -951,8 +1124,11 @@ object NotificationGenerator {
         
         // 处理 smallIcon
         // 优先处理进度数据
+        Logger.d(TAG, "超级岛: 处理小图标 - bProgress: $bProgress")
         if (bProgress != null) {
+            Logger.d(TAG, "超级岛: 使用进度数据生成位图")
             smallIconBitmap = progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
+            Logger.d(TAG, "超级岛: 进度位图生成结果: ${smallIconBitmap != null}")
         }
         
         // 处理文本位图
@@ -973,8 +1149,11 @@ object NotificationGenerator {
                 else -> null
             }
             
+            Logger.d(TAG, "超级岛: 处理文本位图 - textToRender: $textToRender")
             if (!textToRender.isNullOrBlank()) {
+                Logger.d(TAG, "超级岛: 使用文本生成位图")
                 smallIconBitmap = textToBitmap(textToRender)
+                Logger.d(TAG, "超级岛: 文本位图生成结果: ${smallIconBitmap != null}")
             }
         }
         
@@ -982,15 +1161,20 @@ object NotificationGenerator {
         if (smallIconBitmap == null) {
             // 优先使用应用图标（大图标的键值提供的图标）
             val appIconKey = "miui.focus.pic_app_icon"
+            Logger.d(TAG, "超级岛: 处理应用图标 - appIconKey: $appIconKey, picMap: ${picMap?.keys}")
             if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
                 val appIconUrl = picMap[appIconKey]
                 if (!appIconUrl.isNullOrBlank()) {
                     // 同步下载应用图标
+                    Logger.d(TAG, "超级岛: 使用应用图标作为小图标")
                     val bitmap = runBlocking {
                         downloadBitmap(context, appIconUrl, 5000)
                     }
                     if (bitmap != null) {
                         smallIconBitmap = bitmap
+                        Logger.d(TAG, "超级岛: 应用图标加载成功")
+                    } else {
+                        Logger.w(TAG, "超级岛: 应用图标加载失败")
                     }
                 }
             }
@@ -1000,25 +1184,43 @@ object NotificationGenerator {
         if (smallIconBitmap == null) {
             // 优先使用 A 区图标
             val picKeyToUse = aPicKey ?: bPicKey
+            Logger.d(TAG, "超级岛: 处理 A 区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
             if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
                 val picUrl = picMap[picKeyToUse]
                 if (!picUrl.isNullOrBlank()) {
                     // 同步下载图标
+                    Logger.d(TAG, "超级岛: 使用 A 区图标作为小图标")
                     val bitmap = runBlocking {
                         downloadBitmap(context, picUrl, 5000)
                     }
                     if (bitmap != null) {
                         smallIconBitmap = bitmap
+                        Logger.d(TAG, "超级岛: A 区图标加载成功")
+                    } else {
+                        Logger.w(TAG, "超级岛: A 区图标加载失败")
                     }
                 }
             }
         }
         
+        // 如果没有生成位图，使用默认图标
+        if (smallIconBitmap == null) {
+            Logger.d(TAG, "超级岛: 没有生成位图，使用默认图标")
+        } else {
+            Logger.d(TAG, "超级岛: 成功生成小图标")
+        }
+        
         // 注入小图标
         injectSmallIcon(notification, smallIconBitmap)
         
-        // 返回构建器
-        return capsuleBuilder
+        // 返回注入图标后的通知对象
+        return notification
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: 构建胶囊兼容通知并注入图标失败: ${e.message}")
+            e.printStackTrace()
+            // 发生异常时，返回原始构建器构建的通知
+            return builder.build()
+        }
     }
 
     // ---- 辅助方法 ----
