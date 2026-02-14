@@ -35,6 +35,7 @@ import com.xzyht.notifyrelay.servers.clipboard.ClipboardLogDetector
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import com.xzyht.notifyrelay.ui.fragment.GlobalSelectedDeviceHolder
+import notifyrelay.data.StorageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -70,6 +71,9 @@ fun DeviceInterconnect() {
 
     // 移除媒体会话相关状态
     var islandEnabled by remember { mutableStateOf(RemoteMediaSessionManager.isEnabled(context)) }
+    
+    // 胶囊歌词开关状态
+    var capsuleLyricsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "capsule_lyrics_enabled")) }
     
     // 无障碍服务状态
     var accessibilityEnabled by remember {
@@ -247,6 +251,33 @@ fun DeviceInterconnect() {
                     if (!enabled) {
                         RemoteMediaSessionManager.clearSession()
                     }
+                }
+            )
+        }
+        
+        // 胶囊歌词开关
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "启用胶囊歌词",
+                    style = textStyles.body1,
+                    color = colorScheme.onSurface
+                )
+                Text(
+                    text = "接收本机媒体播放信息并以超级岛形式显示",
+                    style = textStyles.body2,
+                    color = colorScheme.onSurfaceSecondary
+                )
+            }
+            Switch(
+                checked = capsuleLyricsEnabled,
+                onCheckedChange = { enabled ->
+                    capsuleLyricsEnabled = enabled
+                    StorageManager.putBoolean(context, "capsule_lyrics_enabled", enabled)
                 }
             )
         }

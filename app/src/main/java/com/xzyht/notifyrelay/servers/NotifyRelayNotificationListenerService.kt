@@ -241,29 +241,64 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         val title = NotificationRepository.getStringCompat(sbn.notification.extras, "android.title") ?: ""
         val text = NotificationRepository.getStringCompat(sbn.notification.extras, "android.text") ?: ""
 
-        // 获取音乐封面图标
+        // 初始化封面URL变量
         var coverUrl: String? = null
-        try {
-            // 尝试从通知的大图中获取封面
-            val largeIcon = sbn.notification.getLargeIcon()
-            if (largeIcon != null) {
-                // 将Drawable转换为Bitmap
-                val drawable = largeIcon.loadDrawable(applicationContext)
-                if (drawable != null) {
-                    val bitmap = DataUrlUtils.drawableToBitmap(drawable)
-                    val stream = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
-                    val bytes = stream.toByteArray()
-                    val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                    coverUrl = "data:image/jpeg;base64,$base64"
-                }
-            }
-        } catch (e: Exception) {
-            Logger.e("NotifyRelay-Media", "获取音乐封面失败", e)
-        }
 
-        // 记录日志
-        //Logger.v("NotifyRelay-Media", "processMediaNotification: title='$title', text='$text', sbnKey=$sbnKey, coverUrl=${coverUrl?.take(20)}...")
+        // 检查胶囊歌词开关状态
+        val capsuleLyricsEnabled = try {
+            StorageManager.getBoolean(applicationContext, "capsule_lyrics_enabled", false)
+        } catch (_: Exception) { false }
+
+        // 如果胶囊歌词开关开启，直接在本机内生成浮窗和通知
+        if (capsuleLyricsEnabled) {
+            // 获取音乐封面图标
+            try {
+                // 尝试从通知的大图中获取封面
+                val largeIcon = sbn.notification.getLargeIcon()
+                if (largeIcon != null) {
+                    // 将Drawable转换为Bitmap
+                    val drawable = largeIcon.loadDrawable(applicationContext)
+                    if (drawable != null) {
+                        val bitmap = DataUrlUtils.drawableToBitmap(drawable)
+                        val stream = ByteArrayOutputStream()
+                        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                        val bytes = stream.toByteArray()
+                        val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                        coverUrl = "data:image/jpeg;base64,$base64"
+                    }
+                }
+            } catch (e: Exception) {
+                Logger.e("NotifyRelay-Media", "获取音乐封面失败", e)
+            }
+
+            try {
+                Logger.i("NotifyRelay-Media", "胶囊歌词开关开启，在本机内生成浮窗和通知: title='$title', text='$text'")
+                
+                // 构建图片映射
+                val picMap = mutableMapOf<String, String>()
+                if (!coverUrl.isNullOrBlank()) {
+                    // 添加专辑图，同时添加应用图标键以确保图片能够正确传递
+                    picMap["miui.focus.pic_cover"] = coverUrl
+                    picMap["miui.focus.pic_app_icon"] = coverUrl
+                }
+                
+                // 创建媒体类型的paramV2Raw，确保触发超长后使用图标文本的功能
+                val paramV2Raw = "{\"business\":\"media\",\"protocol\":1,\"scene\":\"music\",\"ticker\":\"$text\",\"content\":\"$title\",\"enableFloat\":false,\"updatable\":true,\"reopen\":\"close\",\"localTransmit\":true}"
+                
+                // 调用 FloatingReplicaManager.showFloating 生成浮窗和通知
+                FloatingReplicaManager.showFloating(
+                    context = applicationContext,
+                    sourceId = sbnKey,
+                    title = title ,  
+                    text = text,  
+                    paramV2Raw = paramV2Raw,  // 添加媒体类型的paramV2Raw
+                    picMap = picMap,
+                    appName = sbn.packageName
+                )
+            } catch (e: Exception) {
+                Logger.e("NotifyRelay-Media", "在本机内生成浮窗和通知失败", e)
+            }
+        }
 
         // 检查状态是否变化，只在内容变化时发送
         val currentState = MediaPlayState(title, text, sbn.packageName, sbn.postTime, coverUrl)
