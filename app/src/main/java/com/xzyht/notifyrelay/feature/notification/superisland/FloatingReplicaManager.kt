@@ -30,8 +30,167 @@ import java.util.concurrent.ConcurrentHashMap
  * 如果没有权限则退化为发送高优先级临时通知来提示用户（不会获得和系统超级岛完全一致的视觉效果）。
  */
 object FloatingReplicaManager {
-    private const val TAG = "超级岛"
+    private const val TAG = "超级岛复刻实现骨架"
     private const val FIXED_WIDTH_DP = 320 // 固定悬浮窗宽度，以确保MultiProgressRenderer完整显示
+
+    /**
+     * 错误处理包装器，统一处理 try-catch 和日志记录
+     * @param actionName 操作名称，用于日志记录
+     * @param block 要执行的代码块
+     */
+    private inline fun runWithErrorHandling(
+        actionName: String, 
+        crossinline block: () -> Unit
+    ) {
+        try {
+            block()
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
+        }
+    }
+
+    /**
+     * 带返回值的错误处理包装器
+     * @param actionName 操作名称，用于日志记录
+     * @param default 默认返回值，当执行失败时返回
+     * @param block 要执行的代码块，返回类型为 T
+     * @return 执行结果，成功返回 block 的返回值，失败返回 default
+     */
+    private inline fun <T> runWithErrorHandling(
+        actionName: String, 
+        default: T, 
+        crossinline block: () -> T
+    ): T {
+        return try {
+            block()
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
+            default
+        }
+    }
+
+    /**
+     * 支持挂起函数的错误处理包装器
+     * @param actionName 操作名称，用于日志记录
+     * @param block 要执行的挂起代码块
+     */
+    private suspend inline fun runWithErrorHandlingSuspend(
+        actionName: String, 
+        crossinline block: suspend () -> Unit
+    ) {
+        try {
+            block()
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
+        }
+    }
+
+    /**
+     * 带返回值的支持挂起函数的错误处理包装器
+     * @param actionName 操作名称，用于日志记录
+     * @param default 默认返回值，当执行失败时返回
+     * @param block 要执行的挂起代码块，返回类型为 T
+     * @return 执行结果，成功返回 block 的返回值，失败返回 default
+     */
+    private suspend inline fun <T> runWithErrorHandlingSuspend(
+        actionName: String, 
+        default: T, 
+        crossinline block: suspend () -> T
+    ): T {
+        return try {
+            block()
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
+            default
+        }
+    }
+
+    /**
+     * 添加 sourceId 到 entryKey 的映射
+     * @param sourceId 来源ID，用于区分不同来源的超级岛通知
+     * @param entryKey 条目唯一标识
+     */
+    private fun addSourceIdMapping(sourceId: String, entryKey: String) {
+        if (sourceId.isNotBlank()) {
+            val entryKeys = sourceIdToEntryKeyMap.getOrPut(sourceId) { mutableListOf() }
+            if (!entryKeys.contains(entryKey)) {
+                entryKeys.add(entryKey)
+            }
+        }
+    }
+
+    /**
+     * 从映射中移除条目并更新列表
+     * @param key 要移除的条目唯一标识
+     * @return 被移除的 sourceId 列表，如果没有则返回 null
+     */
+    private fun removeSourceIdMapping(key: String): List<String>? {
+        val sourceIdsToRemove = mutableListOf<String>()
+        val sourceIdsToUpdate = mutableMapOf<String, MutableList<String>>()
+        
+        sourceIdToEntryKeyMap.forEach { (sourceId, keys) ->
+            if (keys.contains(key)) {
+                val updatedKeys = keys.toMutableList()
+                updatedKeys.remove(key)
+                if (updatedKeys.isEmpty()) {
+                    sourceIdsToRemove.add(sourceId)
+                } else {
+                    sourceIdsToUpdate[sourceId] = updatedKeys
+                }
+            }
+        }
+        
+        sourceIdsToUpdate.forEach {
+            sourceIdToEntryKeyMap[it.key] = it.value
+        }
+        
+        sourceIdsToRemove.forEach {
+            sourceIdToEntryKeyMap.remove(it)
+        }
+        
+        return if (sourceIdsToRemove.isEmpty()) null else sourceIdsToRemove
+    }
+
+    /**
+     * 根据 sourceId 查找并获取 entryKey 列表
+     * @param sourceId 来源ID
+     * @return entryKey 列表，如果没有则返回 null
+     */
+    private fun getSourceIdEntryKeys(sourceId: String): List<String>? {
+        return sourceIdToEntryKeyMap[sourceId]
+    }
+
+    /**
+     * 处理移除原因的逻辑
+     * @param sourceId 来源ID
+     * @param reason 移除原因
+     */
+    private fun handleRemovalReason(
+        sourceId: String, 
+        reason: FloatingWindowManager.RemovalReason
+    ) {
+        // 仅当用户手动移除通知时，将sourceId添加到黑名单，避免短时间内再次弹出
+        // 自动超时关闭或远端移除不应触发黑名单
+        // 如果是用户点击隐藏 (HIDDEN)，也触发黑名单，防止远端更新立即重新显示
+        if (reason == FloatingWindowManager.RemovalReason.MANUAL || reason == FloatingWindowManager.RemovalReason.HIDDEN) {
+            blockInstance(sourceId)
+        }
+
+        // 同时关闭对应的Live Updates复合通知
+        // 只有在彻底移除时才关闭，HIDDEN 模式下保留
+        if (reason != FloatingWindowManager.RemovalReason.HIDDEN && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            runWithErrorHandling("关闭Live Updates复合通知") {
+                val context = overlayView?.get()?.context
+                if (context != null) {
+                    LiveUpdatesNotificationManager.initialize(context)
+                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
+                    Logger.i(TAG, "关闭Live Updates复合通知: sourceId=$sourceId")
+                } else {
+                    Logger.w(TAG, "无法关闭Live Updates复合通知，上下文为空")
+                }
+            }
+        }
+    }
 
     // Compose浮窗管理器
     private val floatingWindowManager = FloatingWindowManager().apply {
@@ -62,72 +221,11 @@ object FloatingReplicaManager {
             }
 
             // 从sourceId映射中移除，并将sourceId添加到黑名单
-            // 创建需要移除的sourceId列表，避免ConcurrentModificationException
-            val sourceIdsToRemove = mutableListOf<String>()
-            val sourceIdsToBlock = mutableListOf<String>()
-            val sourceIdsToUpdate = mutableMapOf<String, MutableList<String>>()
-            
-            // 第一次遍历：找出需要处理的sourceId
-            sourceIdToEntryKeyMap.forEach { (sourceId, keys) ->
-                if (keys.contains(key)) {
-                    // 创建列表副本，避免在遍历期间修改原集合
-                    val updatedKeys = keys.toMutableList()
-                    updatedKeys.remove(key)
-                    if (updatedKeys.isEmpty()) {
-                        sourceIdsToRemove.add(sourceId)
-                        sourceIdsToBlock.add(sourceId)
-                    } else {
-                        sourceIdsToUpdate[sourceId] = updatedKeys
-                    }
-                }
-            }
-            
-            // 更新需要修改的列表
-            sourceIdsToUpdate.forEach {
-                sourceIdToEntryKeyMap[it.key] = it.value
-            }
-            
-            // 第二次遍历：移除空的sourceId条目
-            sourceIdsToRemove.forEach {
-                sourceIdToEntryKeyMap.remove(it)
-            }
+            val sourceIdsToBlock = removeSourceIdMapping(key)
             
             // 第三次遍历：处理需要添加到黑名单和关闭Live Updates通知的sourceId
-            sourceIdsToBlock.forEach { sourceId ->
-                // 仅当用户手动移除通知时，将sourceId添加到黑名单，避免短时间内再次弹出
-                // 自动超时关闭或远端移除不应触发黑名单
-                // 如果是用户点击隐藏 (HIDDEN)，也触发黑名单，防止远端更新立即重新显示
-                if (reason == FloatingWindowManager.RemovalReason.MANUAL || reason == FloatingWindowManager.RemovalReason.HIDDEN) {
-                    blockInstance(sourceId)
-                }
-                
-                // 只有当原因是 HIDDEN 时，才保留通知（不调用 cancelReplicaNotification）
-                // 其他情况（TIMEOUT, MANUAL, REMOTE, OTHER）都应该移除通知
-                if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
-                    // 对于 HIDDEN 以外的情况，我们已经在循环外部调用了 cancelReplicaNotification
-                    // 但这里需要注意：onEntryRemoved 的参数 key 是具体的条目 key
-                    // 而这里是在处理 sourceId 对应的所有条目都移除的情况
-                    // 所以如果 sourceId 被判定为"移除"，那么属于该 sourceId 的所有通知都应该被移除
-                    // 除非是 HIDDEN 模式，这种情况下我们希望通知保留以便用户重新点击
-                }
-
-                // 同时关闭对应的Live Updates复合通知
-                // 只有在彻底移除时才关闭，HIDDEN 模式下保留
-                if (reason != FloatingWindowManager.RemovalReason.HIDDEN && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                    try {
-                        // 确保LiveUpdatesNotificationManager已初始化
-                        val context = overlayView?.get()?.context
-                        if (context != null) {
-                            LiveUpdatesNotificationManager.initialize(context)
-                            LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
-                            Logger.i(TAG, "关闭Live Updates复合通知: sourceId=$sourceId")
-                        } else {
-                            Logger.w(TAG, "无法关闭Live Updates复合通知，上下文为空")
-                        }
-                    } catch (e: Exception) {
-                        Logger.w(TAG, "关闭Live Updates复合通知失败: ${e.message}")
-                    }
-                }
+            sourceIdsToBlock?.forEach { sourceId ->
+                handleRemovalReason(sourceId, reason)
             }
         }
     }
@@ -182,7 +280,7 @@ object FloatingReplicaManager {
     }
 
     /**
-     * 内部显示浮窗方法，增加isRestoring参数
+     * 内部显示浮窗方法
      */
     private fun showFloatingInternal(
         context: Context,
@@ -195,22 +293,22 @@ object FloatingReplicaManager {
         isLocked: Boolean = false,
         isRestoring: Boolean = false // 是否是从隐藏状态恢复
     ) {
-        try {
+        runWithErrorHandling("显示浮窗") {
             // 会话级屏蔽检查：同一个 instanceId 在本轮被用户关闭后不再展示
             // 如果是从隐藏状态恢复，则忽略屏蔽检查
             if (!isRestoring && sourceId.isNotBlank() && isInstanceBlocked(sourceId)) {
                 Logger.i(TAG, "超级岛: instanceId=$sourceId 已在本轮会话中被屏蔽，忽略展示")
-                return
+                return@runWithErrorHandling
             }
 
             if (!canShowOverlay(context)) {
                 Logger.i(TAG, "超级岛: 无悬浮窗权限，尝试请求权限")
                 requestOverlayPermission(context)
-                return
+                return@runWithErrorHandling
             }
 
             CoroutineScope(Dispatchers.Main).launch {
-                try {
+                runWithErrorHandlingSuspend("显示浮窗(协程)") {
                     // 预先准备生命周期所有者，供 Compose 注入 LocalLifecycleOwner 使用
                     if (overlayLifecycleOwner == null) {
                         overlayLifecycleOwner = FloatingWindowLifecycleOwner()
@@ -251,14 +349,7 @@ object FloatingReplicaManager {
                     )
 
                     // 保存sourceId到entryKey的映射，以便后续能正确移除
-                    if (sourceId.isNotBlank()) {
-                        // 如果sourceId已存在，添加到列表中；否则创建新列表
-                        val entryKeys = sourceIdToEntryKeyMap.getOrPut(sourceId) { mutableListOf() }
-                        // 确保每个entryKey只添加一次
-                        if (!entryKeys.contains(entryKey)) {
-                            entryKeys.add(entryKey)
-                        }
-                    }
+                    addSourceIdMapping(sourceId, entryKey)
 
                     // 创建或更新浮窗UI
                     addOrUpdateEntry(context, entryKey, summaryOnly)
@@ -270,7 +361,7 @@ object FloatingReplicaManager {
                     // 如果是从隐藏状态恢复，不重新发送通知，使用现有的通知
                     if (!isRestoring) {
                         if (isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                            try {
+                            runWithErrorHandlingSuspend("发送Live Updates复合通知") {
                                 // 初始化Live Updates通知管理器
                                 LiveUpdatesNotificationManager.initialize(context)
                                 // 发送复合通知
@@ -278,10 +369,6 @@ object FloatingReplicaManager {
                                     sourceId, title, text, paramV2Raw, appName, isLocked, internedPicMap
                                 )
                                 Logger.i(TAG, "浮窗创建时发送Live Updates复合通知作为生命周期管理: sourceId=$sourceId")
-                            } catch (e: Exception) {
-                                Logger.w(TAG, "发送Live Updates复合通知失败: ${e.message}")
-                                // 发送失败时，回退到传统复刻通知
-                                NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
                             }
                         } else {
                             // 非进度类型或Live Updates未启用时，发送传统复刻通知
@@ -290,12 +377,8 @@ object FloatingReplicaManager {
                     } else {
                         Logger.i(TAG, "浮窗从隐藏状态恢复，不重新发送通知，使用现有的通知: sourceId=$sourceId")
                     }
-                } catch (e: Exception) {
-                    Logger.w(TAG, "超级岛: 显示浮窗失败(协程): ${e.message}")
                 }
             }
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 显示浮窗失败，退化为通知: ${e.message}")
         }
     }
 
@@ -311,7 +394,7 @@ object FloatingReplicaManager {
         picMap: Map<String, String>? = null,
         appName: String? = null
     ) {
-        try {
+        runWithErrorHandling("切换浮窗状态") {
             // 检查当前是否已显示
             val entryKeys = sourceIdToEntryKeyMap[sourceId]
             val isShowing = entryKeys?.any { floatingWindowManager.getEntry(it) != null } == true
@@ -347,8 +430,7 @@ object FloatingReplicaManager {
                         existingEntry.paramV2Raw, 
                         existingEntry.picMap, 
                         existingEntry.appName, 
-                        isLocked = false, 
-                        isRestoring = true
+                        isLocked = false, isRestoring = true
                     )
                     // 从 hiddenEntries 中移除条目，因为它已经被恢复
                     hiddenEntries.remove(sourceId)
@@ -361,8 +443,6 @@ object FloatingReplicaManager {
                     )
                 }
             }
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 切换浮窗状态失败: ${e.message}")
         }
     }
 
@@ -418,7 +498,7 @@ object FloatingReplicaManager {
      * 根据通知ID关闭对应的浮窗条目
      */
     fun closeByNotificationId(notificationId: Int) {
-        try {
+        runWithErrorHandling("根据通知ID关闭浮窗条目") {
             // 查找对应的entryKey
             var entryKey = entryKeyToNotificationId.entries.find { it.value == notificationId }?.key
             
@@ -446,15 +526,11 @@ object FloatingReplicaManager {
                 Logger.i(TAG, "超级岛: 根据通知ID关闭浮窗条目成功，notificationId=$notificationId, entryKey=$entryKey")
             } else {
                 // 如果仍然找不到，尝试直接使用notificationId作为entryKey
-                try {
+                runWithErrorHandling("根据通知ID直接关闭浮窗条目") {
                     floatingWindowManager.removeEntry(notificationId.toString(), FloatingWindowManager.RemovalReason.MANUAL)
                     Logger.i(TAG, "超级岛: 根据通知ID直接关闭浮窗条目成功，notificationId=$notificationId")
-                } catch (e: Exception) {
-                    Logger.w(TAG, "超级岛: 根据通知ID直接关闭浮窗条目失败: ${e.message}")
                 }
             }
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 根据通知ID关闭浮窗条目失败: ${e.message}")
         }
     }
     
@@ -462,7 +538,7 @@ object FloatingReplicaManager {
      * 关闭所有浮窗条目
      */
     fun closeAllEntries() {
-        try {
+        runWithErrorHandling("关闭所有浮窗条目") {
             val context = overlayView?.get()?.context
             // 清空所有条目
             floatingWindowManager.clearAllEntries()
@@ -476,8 +552,6 @@ object FloatingReplicaManager {
             // 清空映射
             sourceIdToEntryKeyMap.clear()
             Logger.i(TAG, "超级岛: 关闭所有浮窗条目成功")
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 关闭所有浮窗条目失败: ${e.message}")
         }
     }
 
@@ -486,10 +560,13 @@ object FloatingReplicaManager {
         dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.REMOTE)
     }
 
-    private fun dismissBySourceInternal(sourceId: String, reason: FloatingWindowManager.RemovalReason) {
-        try {
+    private fun dismissBySourceInternal(
+        sourceId: String, 
+        reason: FloatingWindowManager.RemovalReason = FloatingWindowManager.RemovalReason.REMOTE
+    ) {
+        runWithErrorHandling("按来源关闭浮窗") {
             // 从映射中获取所有对应的entryKey
-            val entryKeys = sourceIdToEntryKeyMap[sourceId]
+            val entryKeys = getSourceIdEntryKeys(sourceId)
             if (entryKeys != null) {
                 // 移除所有相关条目，这会触发onEntryRemoved回调，进而取消对应的通知并清理映射
                 entryKeys.forEach { entryKey ->
@@ -506,8 +583,6 @@ object FloatingReplicaManager {
             if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
                 blockedInstanceIds.remove(sourceId)
             }
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 按来源关闭浮窗失败: ${e.message}")
         }
     }
 
@@ -515,7 +590,7 @@ object FloatingReplicaManager {
      * 移除浮窗容器
      */
     private fun removeOverlayContainer() {
-        try {
+        runWithErrorHandling("移除浮窗容器") {
             val view = overlayView?.get()
             val wm = windowManager?.get()
             val lp = overlayLayoutParams
@@ -538,13 +613,11 @@ object FloatingReplicaManager {
                     try { it.onHide() } catch (_: Exception) {}
                 }
             }
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 移除浮窗容器失败: ${e.message}")
-            // 即使移除失败，也要清理资源引用，避免内存泄漏
-            overlayView = null
-            overlayLayoutParams = null
-            windowManager = null
         }
+        // 即使移除失败，也要清理资源引用，避免内存泄漏
+        overlayView = null
+        overlayLayoutParams = null
+        windowManager = null
     }
 
     /**
@@ -558,76 +631,70 @@ object FloatingReplicaManager {
         key: String,
         summaryOnly: Boolean
     ) {
-        try {
+        runWithErrorHandling("addOrUpdateEntry") {
             // 首条条目到来时再创建 Overlay 容器，避免先有空容器
             if (overlayView?.get() == null || windowManager?.get() == null || overlayLayoutParams == null) {
-                    try {
-                        val appCtx = context.applicationContext
-                        val wm = appCtx.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
-                            ?: return
+                runWithErrorHandling("创建浮窗容器") {
+                    val appCtx = context.applicationContext
+                    val wm = appCtx.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+                        ?: return@runWithErrorHandling
 
-                        // 确保存在用于 Compose 的生命周期所有者（不依赖 ViewTree）
-                        val lifecycleOwner = overlayLifecycleOwner ?: FloatingWindowLifecycleOwner().also {
-                            overlayLifecycleOwner = it
-                        }
-                        // 标记浮窗进入前台生命周期，供 Compose 使用
-                        try { lifecycleOwner.onShow() } catch (_: Exception) {}
-                        // 通知Compose生命周期管理器浮窗显示
-                        lifecycleManager.onShow()
+                    // 确保存在用于 Compose 的生命周期所有者（不依赖 ViewTree）
+                    val lifecycleOwner = overlayLifecycleOwner ?: FloatingWindowLifecycleOwner().also {
+                        overlayLifecycleOwner = it
+                    }
+                    // 标记浮窗进入前台生命周期，供 Compose 使用
+                    try { lifecycleOwner.onShow() } catch (_: Exception) {}
+                    // 通知Compose生命周期管理器浮窗显示
+                    lifecycleManager.onShow()
 
-                        val density = context.resources.displayMetrics.density
-                        val layoutParams = WindowManager.LayoutParams(
-                            (FIXED_WIDTH_DP * density).toInt(),
-                            WindowManager.LayoutParams.WRAP_CONTENT,
-                            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                            PixelFormat.TRANSLUCENT
-                        ).apply {
-                            gravity = Gravity.LEFT or Gravity.TOP
-                            x = ((context.resources.displayMetrics.widthPixels - (FIXED_WIDTH_DP * density).toInt()) / 2).coerceAtLeast(0)
-                            y = 100
-                        }
+                    val density = context.resources.displayMetrics.density
+                    val layoutParams = WindowManager.LayoutParams(
+                        (FIXED_WIDTH_DP * density).toInt(),
+                        WindowManager.LayoutParams.WRAP_CONTENT,
+                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                        PixelFormat.TRANSLUCENT
+                    ).apply {
+                        gravity = Gravity.LEFT or Gravity.TOP
+                        x = ((context.resources.displayMetrics.widthPixels - (FIXED_WIDTH_DP * density).toInt()) / 2).coerceAtLeast(0)
+                        y = 100
+                    }
 
-            // 使用Compose容器替代传统的FrameLayout和LinearLayout
-            val composeContainer = FloatingComposeContainer(context).apply {
-                val padding = (12 * density).toInt()
-                setPadding(padding, padding, padding, padding)
-                // 设置浮窗管理器
-                this.floatingWindowManager = this@FloatingReplicaManager.floatingWindowManager
-                // 设置生命周期所有者
-                this.lifecycleOwner = lifecycleOwner
-                // 设置WindowManager和LayoutParams，用于更新浮窗位置
-                this.windowManager = wm
-                this.windowLayoutParams = layoutParams
-                // 设置条目点击回调
-                this.onEntryClick = { entryKey -> onEntryClicked(entryKey) }
-                // 设置容器拖动开始回调
-                this.onContainerDragStart = { onContainerDragStarted() }
-                // 设置容器拖动中回调，移除了关闭区重叠检测逻辑
-                this.onContainerDragging = { }
-                // 设置容器拖动结束回调
-                this.onContainerDragEnd = { onContainerDragEnded() }
-            }
+                    // 使用Compose容器替代传统的FrameLayout和LinearLayout
+                    val composeContainer = FloatingComposeContainer(context).apply {
+                        val padding = (12 * density).toInt()
+                        setPadding(padding, padding, padding, padding)
+                        // 设置浮窗管理器
+                        this.floatingWindowManager = this@FloatingReplicaManager.floatingWindowManager
+                        // 设置生命周期所有者
+                        this.lifecycleOwner = lifecycleOwner
+                        // 设置WindowManager和LayoutParams，用于更新浮窗位置
+                        this.windowManager = wm
+                        this.windowLayoutParams = layoutParams
+                        // 设置条目点击回调
+                        this.onEntryClick = { entryKey -> onEntryClicked(entryKey) }
+                        // 设置容器拖动开始回调
+                        this.onContainerDragStart = { onContainerDragStarted() }
+                        // 设置容器拖动中回调，移除了关闭区重叠检测逻辑
+                        this.onContainerDragging = { }
+                        // 设置容器拖动结束回调
+                        this.onContainerDragEnd = { onContainerDragEnded() }
+                    }
 
-                        var added = false
-                        try {
-                            wm.addView(composeContainer, layoutParams)
-                            added = true
-                        } catch (e: Exception) {
-                            Logger.w(TAG, "超级岛: addView 失败: ${e.message}")
-                        }
-                        if (added) {
-                            overlayView = WeakReference(composeContainer)
-                            overlayLayoutParams = layoutParams
-                            windowManager = WeakReference(wm)
-                            Logger.i(TAG, "超级岛: 浮窗容器已创建(首条条目触发)，x=${layoutParams.x}, y=${layoutParams.y}")
-                        }
-                    } catch (e: Exception) {
-                        Logger.w(TAG, "超级岛: 创建浮窗容器失败: ${e.message}")
+                    var added = false
+                    runWithErrorHandling("addView") {
+                        wm.addView(composeContainer, layoutParams)
+                        added = true
+                    }
+                    if (added) {
+                        overlayView = WeakReference(composeContainer)
+                        overlayLayoutParams = layoutParams
+                        windowManager = WeakReference(wm)
+                        Logger.i(TAG, "超级岛: 浮窗容器已创建(首条条目触发)，x=${layoutParams.x}, y=${layoutParams.y}")
                     }
                 }
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: addOrUpdateEntry 出错: ${e.message}")
+            }
         }
     }
 
@@ -638,12 +705,10 @@ object FloatingReplicaManager {
     }
 
     private fun requestOverlayPermission(context: Context) {
-        try {
+        runWithErrorHandling("请求悬浮窗权限") {
             val intent = IntentUtils.createImplicitIntent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
             intent.data = Uri.parse("package:${context.packageName}")
             IntentUtils.startActivity(context, intent, true)
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 请求悬浮窗权限失败: ${e.message}")
         }
     }
 }
