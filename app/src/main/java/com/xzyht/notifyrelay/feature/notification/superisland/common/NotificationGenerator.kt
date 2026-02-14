@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
@@ -207,6 +209,8 @@ class TimerUpdateManager private constructor() {
     }
 }
 
+
+
 /**
  * 通知生成器，负责处理超级岛通知的生成和注入
  */
@@ -220,6 +224,105 @@ object NotificationGenerator {
     // 缓存变量，用于优化图标生成
     private var cachedIconKey = ""
     private var cachedIconBitmap: android.graphics.Bitmap? = null
+    
+    // 滚动更新相关
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val scrollRunnables = mutableMapOf<String, Runnable>()
+    
+    /**
+     * 设置滚动更新
+     */
+    private fun setupScrollUpdate(
+        key: String,
+        scrollKey: String,
+        capsuleText: String,
+        context: Context,
+        notificationId: Int,
+        originalBuilder: NotificationCompat.Builder,
+        notificationManager: NotificationManager,
+        floatingWindowManager: FloatingWindowManager,
+        entryKeyToNotificationId: ConcurrentHashMap<String, Int>
+    ) {
+        // 移除旧的滚动Runnable
+        scrollRunnables.remove(key)?.let {
+            mainHandler.removeCallbacks(it)
+        }
+        
+        // 创建新的滚动Runnable
+        val scrollRunnable = Runnable {
+            try {
+                // 检查是否需要更新
+                if (!CapsuleScrollManager.shouldUpdateNotification(scrollKey)) {
+                    return@Runnable
+                }
+                
+                // 获取当前应该显示的文本
+                val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText)
+                
+                // 构建原始通知以获取其属性
+                val originalNotification = originalBuilder.build()
+                
+                // 获取原始通知的标题和内容
+                val contentTitle = originalNotification.extras.getString("android.title")
+                val contentText = originalNotification.extras.getString("android.text")
+                
+                // 更新通知
+                val updatedBuilder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
+                    .setContentTitle(contentTitle ?: "")
+                    .setContentText(contentText ?: "")
+                    .setSmallIcon(android.R.drawable.stat_notify_more)
+                    .setAutoCancel(false)
+                    .setOngoing(true)
+                    .setPriority(NotificationCompat.PRIORITY_MAX)
+                    .setShowWhen(false)
+                    .setWhen(System.currentTimeMillis())
+                    .setOnlyAlertOnce(true)
+                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                    .setRequestPromotedOngoing(true)
+                    .setShortCriticalText(displayText)
+                
+                // 复制extras
+                val updatedNotification = updatedBuilder.build()
+                updatedNotification.extras.putAll(originalNotification.extras)
+                
+                // 发送更新后的通知
+                notificationManager.notify(notificationId, updatedNotification)
+                
+                // 继续调度下一次更新
+                val delay = CapsuleScrollManager.getScrollDelay(scrollKey)
+                mainHandler.postDelayed(scrollRunnables[key]!!, delay)
+            } catch (e: Exception) {
+                Logger.e(TAG, "滚动更新失败", e)
+            }
+        }
+        
+        // 存储Runnable
+        scrollRunnables[key] = scrollRunnable
+        
+        // 调度第一次更新，初始延迟为0，确保滚动直接开始
+        mainHandler.postDelayed(scrollRunnable, 0)
+    }
+    
+    /**
+     * 停止滚动更新
+     */
+    fun stopScrollUpdate(key: String) {
+        scrollRunnables.remove(key)?.let {
+            mainHandler.removeCallbacks(it)
+        }
+        CapsuleScrollManager.resetScrollState("${key}_scroll")
+    }
+    
+    /**
+     * 清理所有滚动更新
+     */
+    fun clearAllScrollUpdates() {
+        scrollRunnables.forEach {
+            mainHandler.removeCallbacks(it.value)
+        }
+        scrollRunnables.clear()
+        CapsuleScrollManager.clearAll()
+    }
     
 
 
@@ -350,19 +453,24 @@ object NotificationGenerator {
                 }
                 
                 // 当歌词超过阈值时，拆分为图标文本和胶囊文本
-                // 本地传递时阈值为6，远端传递时阈值为9
-                val threshold = if (isLocalTransmit) 6 else 9
+                // 远端和本地都保持6字符开始分割
+                val threshold = 6
                 if (lyricText.length > threshold) {
-                    // 优化图标文本长度，使其尽可能少
-                    // 本地传递时阈值更低
-                    val iconTextLength = maxOf(2, minOf(5, lyricText.length - threshold))
-                    iconText = lyricText.take(iconTextLength)
-                    // 剩余部分作为胶囊显示文本
-                    capsuleText = lyricText.substring(iconTextLength)
+                    // 使用TextSplitter工具类进行歌词拆分
+                    val (splitIconText, splitCapsuleText) = TextSplitter.splitLyricWithCharacterType(lyricText, threshold)
+                    iconText = splitIconText
+                    capsuleText = splitCapsuleText
                 }
                 
+                // 使用CapsuleScrollManager处理胶囊文本滚动
+                val scrollKey = "${key}_scroll"
+                val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText)
+                
                 // 设置胶囊文本
-                builder.setShortCriticalText(capsuleText)
+                builder.setShortCriticalText(displayText)
+                
+                // 设置滚动更新机制
+                setupScrollUpdate(key, scrollKey, capsuleText, context, notificationId, originalBuilder = builder, notificationManager, floatingWindowManager, entryKeyToNotificationId)
                 
                 // ... (后续构建extras的代码保持不变)
                 // 添加焦点歌词相关的结构化数据
