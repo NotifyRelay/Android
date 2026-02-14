@@ -41,6 +41,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 class NotifyRelayNotificationListenerService : NotificationListenerService() {
     companion object {
+        private const val TAG = "NotifyRelayNotificationListenerService"
         private const val MAX_CACHE_SIZE = 2000
         private const val CACHE_CLEANUP_THRESHOLD = 1500
         private const val CACHE_ENTRY_TTL = 24 * 60 * 60 * 1000L // 24小时TTL
@@ -53,7 +54,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         if (sbn.packageName == applicationContext.packageName
             && sbn.notification.channelId == CHANNEL_ID
             && sbn.id == NOTIFY_ID) {
-            Logger.w("NotifyRelay", "前台服务通知被移除，自动补发！")
+            Logger.w(TAG, "前台服务通知被移除，自动补发！")
             // 立即补发本服务前台通知
             startForegroundService()
         } else if (sbn.packageName == applicationContext.packageName) {
@@ -61,30 +62,22 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             val channelId = sbn.notification.channelId
             if (channelId == "super_island_replica" || channelId == "channel_id_focusNotifLyrics") {
                 // 超级岛相关通知被移除，关闭对应的浮窗条目
-                Logger.i("NotifyRelay", "超级岛相关通知被移除，关闭对应的浮窗条目: id=${sbn.id}, channelId=$channelId")
+                Logger.i(TAG, "超级岛相关通知被移除，关闭对应的浮窗条目: id=${sbn.id}, channelId=$channelId")
                 FloatingReplicaManager.closeByNotificationId(sbn.id)
             }
         } else {
             // 普通通知被移除时，从已处理缓存中移除，允许下次重新处理
-            val notificationKey = sbn.key ?: (sbn.id.toString() + sbn.packageName)
+            val notificationKey = getNotificationKey(sbn, "")
             processedNotifications.remove(notificationKey)
-            Logger.v("NotifyRelay", "通知移除，从缓存中清理: sbnKey=${sbn.key}, pkg=${sbn.packageName}")
+            Logger.v(TAG, "通知移除，从缓存中清理: sbnKey=${sbn.key}, pkg=${sbn.packageName}")
 
             // 检查是否为媒体通知
             val isMediaNotification = sbn.notification.category == Notification.CATEGORY_TRANSPORT
             if (isMediaNotification) {
                 // 媒体通知被移除，发送媒体结束包
                 try {
-                    Logger.i("NotifyRelay-Media", "媒体通知被移除，发送结束包: pkg=${sbn.packageName}")
-                    val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(applicationContext)
-                    var appName: String? = null
-                    try {
-                        val pm = applicationContext.packageManager
-                        val appInfo = pm.getApplicationInfo(sbn.packageName, 0)
-                        appName = pm.getApplicationLabel(appInfo).toString()
-                    } catch (_: Exception) {
-                        appName = sbn.packageName
-                    }
+                    Logger.i(TAG, "媒体通知被移除，发送结束包: pkg=${sbn.packageName}")
+                    val appName = getAppName(sbn.packageName)
                     // 发送媒体结束包
                     MessageSender.sendMediaPlayEndNotification(
                         applicationContext,
@@ -100,14 +93,14 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                         latestMediaSbn = null
                     }
                 } catch (e: Exception) {
-                    Logger.e("NotifyRelay-Media", "发送媒体结束包失败", e)
+                    Logger.e(TAG, "发送媒体结束包失败", e)
                 }
             } else {
                 // 超级岛：发送终止包
                 try {
                     val pair = superIslandFeatureByKey.remove(notificationKey)
                     if (pair != null) {
-                        val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(applicationContext)
+                        val deviceManager = this.deviceManager
                         val (superPkg, featureId) = pair
                         MessageSender.sendSuperIslandEnd(
                             applicationContext,
@@ -115,8 +108,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                             try { applicationContext.packageName } catch (_: Exception) { null },
                             System.currentTimeMillis(),
                             try { SuperIslandManager.extractSuperIslandData(sbn, applicationContext)?.paramV2Raw } catch (_: Exception) { null },
-                            try { NotificationRepository.getStringCompat(sbn.notification.extras, "android.title") } catch (_: Exception) { null },
-                            try { NotificationRepository.getStringCompat(sbn.notification.extras, "android.text") } catch (_: Exception) { null },
+                            getNotificationTitle(sbn),
+                            getNotificationText(sbn),
                             deviceManager,
                             featureIdOverride = featureId
                         )
@@ -126,7 +119,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         }
     }
     override fun onTaskRemoved(rootIntent: Intent?) {
-        Logger.i("黑影 NotifyRelay", "[NotifyListener] onTaskRemoved called, rootIntent=$rootIntent")
+        Logger.i(TAG, "[NotifyListener] onTaskRemoved called, rootIntent=$rootIntent")
         super.onTaskRemoved(rootIntent)
         // 重新启动服务，防止被系统杀死
         val restartIntent =
@@ -138,20 +131,20 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         }
     }
     override fun onCreate() {
-        Logger.i("黑影 NotifyRelay", "[NotifyListener] onCreate called")
+        Logger.i(TAG, "[NotifyListener] onCreate called")
         // 注册缓存清理器
         NotificationRepository.registerCacheCleaner { keysToRemove ->
             if (keysToRemove.isEmpty()) {
                 // 空集合表示清除全部缓存
                 val beforeSize = processedNotifications.size
                 processedNotifications.clear()
-                Logger.i("黑影 NotifyRelay", "[NotifyListener] 清理全部processedNotifications缓存，清除前: $beforeSize 个条目")
+                Logger.i(TAG, "[NotifyListener] 清理全部processedNotifications缓存，清除前: $beforeSize 个条目")
             } else {
                 // 清除指定的缓存项
                 val beforeSize = processedNotifications.size
                 processedNotifications.keys.removeAll(keysToRemove)
                 val afterSize = processedNotifications.size
-                Logger.i("黑影 NotifyRelay", "[NotifyListener] 清理processedNotifications缓存，清除前: $beforeSize，清除后: $afterSize，移除 ${keysToRemove.size} 个条目")
+                Logger.i(TAG, "[NotifyListener] 清理processedNotifications缓存，清除前: $beforeSize，清除后: $afterSize，移除 ${keysToRemove.size} 个条目")
             }
         }
         // 确保本地历史缓存已加载，避免首次拉取时判重失效
@@ -196,7 +189,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     }
 
     override fun onBind(intent: Intent?): IBinder? {
-        Logger.i("黑影 NotifyRelay", "[NotifyListener] onBind called, intent=$intent")
+        Logger.i(TAG, "[NotifyListener] onBind called, intent=$intent")
         return super.onBind(intent)
     }
     private var foregroundJob: Job? = null
@@ -205,6 +198,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
     // 设备连接管理器
     private lateinit var connectionManager: DeviceConnectionManager
+    private val deviceManager by lazy { DeviceConnectionManagerSingleton.getDeviceManager(applicationContext) }
 
     // 网络监听器
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -237,17 +231,15 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         try {
             latestMediaSbn = sbn
         } catch (_: Exception) {}
-        val sbnKey = sbn.key ?: (sbn.id.toString() + "|" + sbn.packageName)
-        val title = NotificationRepository.getStringCompat(sbn.notification.extras, "android.title") ?: ""
-        val text = NotificationRepository.getStringCompat(sbn.notification.extras, "android.text") ?: ""
+        val sbnKey = getNotificationKey(sbn)
+        val title = getNotificationTitle(sbn) ?: ""
+        val text = getNotificationText(sbn) ?: ""
 
         // 初始化封面URL变量
         var coverUrl: String? = null
 
         // 检查胶囊歌词开关状态
-        val capsuleLyricsEnabled = try {
-            StorageManager.getBoolean(applicationContext, "capsule_lyrics_enabled", false)
-        } catch (_: Exception) { false }
+        val capsuleLyricsEnabled = getStorageBoolean("capsule_lyrics_enabled", false)
 
         // 如果胶囊歌词开关开启，直接在本机内生成浮窗和通知
         if (capsuleLyricsEnabled) {
@@ -268,11 +260,11 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     }
                 }
             } catch (e: Exception) {
-                Logger.e("NotifyRelay-Media", "获取音乐封面失败", e)
+                Logger.e(TAG, "获取音乐封面失败", e)
             }
 
             try {
-                Logger.i("NotifyRelay-Media", "胶囊歌词开关开启，在本机内生成浮窗和通知: title='$title', text='$text'")
+                Logger.i(TAG, "胶囊歌词开关开启，在本机内生成浮窗和通知: title='$title', text='$text'")
                 
                 // 构建图片映射
                 val picMap = mutableMapOf<String, String>()
@@ -296,7 +288,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     appName = sbn.packageName
                 )
             } catch (e: Exception) {
-                Logger.e("NotifyRelay-Media", "在本机内生成浮窗和通知失败", e)
+                Logger.e(TAG, "在本机内生成浮窗和通知失败", e)
             }
         }
 
@@ -316,15 +308,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             // 状态变化或超时，发送消息
 
             try {
-                val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(applicationContext)
-                var appName: String? = null
-                try {
-                    val pm = applicationContext.packageManager
-                    val appInfo = pm.getApplicationInfo(sbn.packageName, 0)
-                    appName = pm.getApplicationLabel(appInfo).toString()
-                } catch (_: Exception) {
-                    appName = sbn.packageName
-                }
+                val appName = getAppName(sbn.packageName)
 
                 // 使用专门的协议前缀标记媒体通知,使用报文头（"type":"MEDIA_PLAY"）判断媒体消息
                 MessageSender.sendMediaPlayNotification(
@@ -341,7 +325,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 // 更新状态缓存，包含发送时间
                 mediaPlayStateByKey[sbnKey] = currentState.copy(sentTime = now)
             } catch (e: Exception) {
-                Logger.e("NotifyRelay-Media", "发送媒体播放消息失败", e)
+                Logger.e(TAG, "发送媒体播放消息失败", e)
             }
         }
     }
@@ -355,7 +339,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
         if (expiredKeys.isNotEmpty()) {
             processedNotifications.keys.removeAll(expiredKeys)
-            Logger.i("黑影 NotifyRelay", "[NotifyListener] 清理过期缓存条目: ${expiredKeys.size} 个")
+            Logger.i(TAG, "[NotifyListener] 清理过期缓存条目: ${expiredKeys.size} 个")
         }
 
         // 如果仍然超过最大大小，进行LRU清理
@@ -364,15 +348,13 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             val sortedByTime = processedNotifications.entries.sortedBy { it.value }
             val keysToRemove = sortedByTime.take(entriesToRemove).map { it.key }
             processedNotifications.keys.removeAll(keysToRemove)
-            Logger.i("黑影 NotifyRelay", "[NotifyListener] LRU清理缓存条目: ${keysToRemove.size} 个")
+            Logger.i(TAG, "[NotifyListener] LRU清理缓存条目: ${keysToRemove.size} 个")
         }
     }
 
     private fun processNotification(sbn: StatusBarNotification, checkProcessed: Boolean = false) {
         // 读取超级岛设置开关，决定是否按超级岛专用逻辑处理
-        val superIslandEnabled = try {
-            StorageManager.getBoolean(applicationContext, "superisland_enabled", true)
-        } catch (_: Exception) { true }
+        val superIslandEnabled = getStorageBoolean("superisland_enabled", true)
 
         // 检查是否为媒体播放通知
         val isMediaNotification = sbn.notification.category == Notification.CATEGORY_TRANSPORT
@@ -388,17 +370,17 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             try {
                 val superData = SuperIslandManager.extractSuperIslandData(sbn, applicationContext)
                 if (superData != null) {
-                    Logger.i("超级岛", "超级岛: 检测到超级岛数据，准备转发，pkg=${superData.sourcePackage}, title=${superData.title}")
+                    Logger.i(TAG, "超级岛: 检测到超级岛数据，准备转发，pkg=${superData.sourcePackage}, title=${superData.title}")
 
                     // 过滤本应用的超级岛通知，不进行转发
                     if (sbn.packageName != applicationContext.packageName) {
                         try {
-                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(applicationContext)
+                            val deviceManager = this.deviceManager
                             // 不再使用包名前缀标记；通过通道头 DATA_SUPERISLAND 区分超级岛
                             val superPkg = superData.sourcePackage ?: "unknown"
-                            // 严格以通知 sbn.key 作为会话键：一条系统通知只对应一座“岛”
-                            val sbnInstanceId = sbn.key ?: (sbn.id.toString() + "|" + sbn.packageName)
-                            // 优先复用历史特征ID，避免因字段轻微变化导致“不同岛”的错判
+                            // 严格以通知 sbn.key 作为会话键：一条系统通知只对应一座"岛"
+                            val sbnInstanceId = getNotificationKey(sbn, "")
+                            // 优先复用历史特征ID，避免因字段轻微变化导致"不同岛"的错判
                             val oldId = try { superIslandFeatureByKey[sbnInstanceId]?.second } catch (_: Exception) { null }
                             val computedId = SuperIslandProtocol.computeFeatureId(
                                 superPkg,
@@ -424,7 +406,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                                 featureIdOverride = featureId
                             )
                         } catch (e: Exception) {
-                            Logger.w("超级岛", "超级岛: 转发超级岛数据失败: ${e.message}")
+                            Logger.w(TAG, "超级岛: 转发超级岛数据失败: ${e.message}")
                         }
                     }
                     // 已按超级岛分支处理，本条不再继续普通转发
@@ -479,49 +461,41 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 if (added) {
                     forwardNotificationToRemoteDevices(sbn)
                 } else {
-                    Logger.i("狂鼠 NotifyRelay", "[NotifyListener] 本地已存在该通知，未转发到远程设备: sbnKey=${sbn.key}, pkg=${sbn.packageName}")
+                    Logger.i(TAG, "[NotifyListener] 本地已存在该通知，未转发到远程设备: sbnKey=${sbn.key}, pkg=${sbn.packageName}")
                 }
             } catch (e: Exception) {
-                Logger.e("黑影 NotifyRelay", "[NotifyListener] addNotification error", e)
+                Logger.e(TAG, "[NotifyListener] addNotification error", e)
             }
         }
     }
     override fun onNotificationPosted(sbn: StatusBarNotification) {
-        Logger.i("黑影 NotifyRelay", "[NotifyListener] onNotificationPosted called, sbnKey=${sbn.key}, pkg=${sbn.packageName}")
+        Logger.i(TAG, "[NotifyListener] onNotificationPosted called, sbnKey=${sbn.key}, pkg=${sbn.packageName}")
         processNotification(sbn)
     }
 
     private fun forwardNotificationToRemoteDevices(sbn: StatusBarNotification) {
-        Logger.i("狂鼠 NotifyRelay", "[NotifyListener] forwardNotificationToRemoteDevices called, sbnKey=${sbn.key}, pkg=${sbn.packageName}")
+        Logger.i(TAG, "[NotifyListener] forwardNotificationToRemoteDevices called, sbnKey=${sbn.key}, pkg=${sbn.packageName}")
         try {
-            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(applicationContext)
-            var appName: String? = null
-            try {
-                val pm = applicationContext.packageManager
-                val appInfo = pm.getApplicationInfo(sbn.packageName, 0)
-                appName = pm.getApplicationLabel(appInfo).toString()
-            } catch (_: Exception) {
-                appName = sbn.packageName
-            }
+            val appName = getAppName(sbn.packageName)
 
             // 使用整合的消息发送工具
             MessageSender.sendNotificationMessage(
                 applicationContext,
                 sbn.packageName,
                 appName,
-                NotificationRepository.getStringCompat(sbn.notification.extras, "android.title"),
-                NotificationRepository.getStringCompat(sbn.notification.extras, "android.text"),
+                getNotificationTitle(sbn),
+                getNotificationText(sbn),
                 sbn.postTime,
                 deviceManager
             )
         } catch (e: Exception) {
-            Logger.e("NotifyRelay", "自动转发通知到远程设备失败", e)
+            Logger.e(TAG, "自动转发通知到远程设备失败", e)
         }
     }
 
 
     override fun onListenerConnected() {
-        Logger.i("黑影 NotifyRelay", "[NotifyListener] onListenerConnected called")
+        Logger.i(TAG, "[NotifyListener] onListenerConnected called")
         super.onListenerConnected()
         // 检查监听服务是否启用
         val enabledListeners = Settings.Secure.getString(
@@ -529,21 +503,21 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             "enabled_notification_listeners"
         )
         val isEnabled = enabledListeners?.contains(applicationContext.packageName) == true
-        Logger.i("黑影 NotifyRelay", "[NotifyListener] Listener enabled: $isEnabled, enabledListeners=$enabledListeners")
+        Logger.i(TAG, "[NotifyListener] Listener enabled: $isEnabled, enabledListeners=$enabledListeners")
         if (!isEnabled) {
-            Logger.w("黑影 NotifyRelay", "[NotifyListener] NotificationListenerService 未被系统启用，无法获取通知！")
+            Logger.w(TAG, "[NotifyListener] NotificationListenerService 未被系统启用，无法获取通知！")
         }
         // 启动时同步所有活跃通知到历史，后台处理
         val actives = activeNotifications
         if (actives != null) {
-            Logger.i("黑影 NotifyRelay", "[NotifyListener] onListenerConnected: activeNotifications.size=${actives.size}")
+            Logger.i(TAG, "[NotifyListener] onListenerConnected: activeNotifications.size=${actives.size}")
             CoroutineScope(Dispatchers.Default).launch {
                 for (sbn in actives) {
                     processNotification(sbn, true)
                 }
             }
         } else {
-            Logger.w("黑影 NotifyRelay", "[NotifyListener] activeNotifications is null")
+            Logger.w(TAG, "[NotifyListener] activeNotifications is null")
         }
         // 启动前台服务，保证后台存活
         startForegroundService()
@@ -562,17 +536,17 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     // 定期清理过期的缓存，避免内存泄漏
                     cleanupExpiredCacheEntries(System.currentTimeMillis())
                     if (BuildConfig.DEBUG && processedNotifications.size > CACHE_CLEANUP_THRESHOLD) {
-                        Logger.i("黑影 NotifyRelay", "[NotifyListener] 缓存大小: ${processedNotifications.size}")
+                        Logger.i(TAG, "[NotifyListener] 缓存大小: ${processedNotifications.size}")
                     }
                 } else {
-                    Logger.w("黑影 NotifyRelay", "[NotifyListener] 定时拉取 activeNotifications is null")
+                    Logger.w(TAG, "[NotifyListener] 定时拉取 activeNotifications is null")
                 }
             }
         }
     }
 
     override fun onDestroy() {
-        Logger.i("黑影 NotifyRelay", "[NotifyListener] onDestroy called")
+        Logger.i(TAG, "[NotifyListener] onDestroy called")
         super.onDestroy()
         foregroundJob?.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
@@ -632,7 +606,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             )
             builder.setContentIntent(syncPendingIntent)
         } catch (e: Exception) {
-            Logger.w("NotifyRelay", "添加剪贴板点击事件失败", e)
+            Logger.w(TAG, "添加剪贴板点击事件失败", e)
         }
 
         return builder.build()
@@ -642,7 +616,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         // 使用 DeviceConnectionManager 提供的线程安全方法获取在线且已认证的设备数量
         val onlineDevices = try { connectionManager.getAuthenticatedOnlineCount() } catch (_: Exception) { 0 }
         val accessibilityEnabled = try { ClipboardSyncManager.isAccessibilityServiceEnabled(this) } catch (_: Exception) { false }
-        //Logger.d("黑影 NotifyRelay", "getNotificationText: authenticatedOnlineCount=$onlineDevices")
+        //Logger.d(TAG, "getNotificationText: authenticatedOnlineCount=$onlineDevices")
 
         // 优先显示设备连接数，如果有设备连接
         if (onlineDevices > 0) {
@@ -684,11 +658,47 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
     // 保留通知历史，不做移除处理
 
-    private fun logSbnDetail(prefix: String, sbn: StatusBarNotification) {
-        {
-            NotificationRepository.getStringCompat(sbn.notification.extras, "android.title")
-            NotificationRepository.getStringCompat(sbn.notification.extras, "android.text")
-            //Logger.d("NotifyRelay", "$prefix sbnKey=${sbn.key}, pkg=${sbn.packageName}, id=${sbn.id}, title=$title, text=$text")
+    private fun getAppName(packageName: String): String {
+        return try {
+            val pm = applicationContext.packageManager
+            val appInfo = pm.getApplicationInfo(packageName, 0)
+            pm.getApplicationLabel(appInfo).toString()
+        } catch (_: Exception) {
+            packageName
         }
+    }
+
+    private fun getNotificationTitle(sbn: StatusBarNotification): String? {
+        return NotificationRepository.getStringCompat(sbn.notification.extras, "android.title")
+    }
+
+    private fun getNotificationText(sbn: StatusBarNotification): String? {
+        return NotificationRepository.getStringCompat(sbn.notification.extras, "android.text")
+    }
+
+    private fun getNotificationKey(sbn: StatusBarNotification, separator: String = "|"): String {
+        return sbn.key ?: (sbn.id.toString() + separator + sbn.packageName)
+    }
+
+    private fun getStorageBoolean(key: String, defaultValue: Boolean): Boolean {
+        return try {
+            StorageManager.getBoolean(applicationContext, key, defaultValue)
+        } catch (_: Exception) {
+            defaultValue
+        }
+    }
+
+    private inline fun safeSend(tag: String, crossinline block: () -> Unit) {
+        try {
+            block()
+        } catch (e: Exception) {
+            Logger.e(TAG, "发送消息失败", e)
+        }
+    }
+
+    private fun logSbnDetail(prefix: String, sbn: StatusBarNotification) {
+        val title = getNotificationTitle(sbn) ?: ""
+        val text = getNotificationText(sbn) ?: ""
+        Logger.d(TAG, "$prefix sbnKey=${sbn.key}, pkg=${sbn.packageName}, id=${sbn.id}, title=$title, text=$text")
     }
 }
