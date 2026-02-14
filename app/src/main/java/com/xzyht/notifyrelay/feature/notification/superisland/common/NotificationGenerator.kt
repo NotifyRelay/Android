@@ -557,7 +557,7 @@ object NotificationGenerator {
                 
                 // 生成并注入动态图标
                 if (iconText.isNotEmpty()) {
-                    val iconBitmap = textToBitmap(iconText)
+                    val iconBitmap = BitmapUtils.textToBitmap(iconText)
                     if (iconBitmap != null) {
                         injectSmallIcon(notification, iconBitmap)
                     }
@@ -633,7 +633,7 @@ object NotificationGenerator {
                     
                     // 处理进度数据，生成位图
                     if (bProgress != null) {
-                        smallIconBitmap = progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
+                        smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
                     }
                     
                     // 如果没有进度数据，尝试生成文本位图
@@ -651,7 +651,7 @@ object NotificationGenerator {
                         }
                         
                         if (!textToRender.isNullOrBlank()) {
-                            smallIconBitmap = textToBitmap(textToRender)
+                            smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
                         }
                     }
                     
@@ -1237,133 +1237,6 @@ object NotificationGenerator {
         return BEmpty
     }
 
-    // ---- 胶囊兼容工具方法 ----
-
-    /**
-     * 将文本转换为位图，参考 Capsulyric 的实现
-     */
-    private fun textToBitmap(text: String, forceFontSize: Float? = null): android.graphics.Bitmap? {
-        try {
-            // 检查文本是否为空
-            if (text.isBlank()) {
-                Logger.w(TAG, "超级岛: 文本为空，无法生成位图")
-                return null
-            }
-            
-            // 自适应字体大小算法
-            // 基础大小：40f. 最小大小：20f.
-            // 衰减：超过10个字符后每字符减少0.8f.
-            val length = text.length
-            
-            val fontSize = forceFontSize ?: if (length <= 10) {
-                40f
-            } else {
-                (40f - (length - 10) * 0.8f).coerceAtLeast(20f)
-            }
-            
-            val paint = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                textSize = fontSize
-                color = android.graphics.Color.WHITE
-                textAlign = android.graphics.Paint.Align.LEFT
-                typeface = android.graphics.Typeface.DEFAULT_BOLD
-            }
-            
-            val baseline = -paint.ascent() // ascent() 为负值
-            // 为紧凑裁剪中的宽字符添加更多缓冲区
-            val width = (paint.measureText(text) + 10).toInt() 
-            val height = (baseline + paint.descent() + 5).toInt()
-            
-            // 空或无效尺寸的安全检查
-            if (width <= 0 || height <= 0) {
-                Logger.w(TAG, "超级岛: 文本位图尺寸无效，width=$width, height=$height")
-                return null
-            }
-
-            // 确保尺寸在合理范围内
-            val maxSize = 500
-            val finalWidth = width.coerceAtMost(maxSize)
-            val finalHeight = height.coerceAtMost(maxSize)
-            
-            val image = android.graphics.Bitmap.createBitmap(finalWidth, finalHeight, android.graphics.Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(image)
-            // 绘制时添加小的左内边距
-            canvas.drawText(text, 5f, baseline, paint)
-            Logger.d(TAG, "超级岛: 生成文本位图成功，尺寸: ${finalWidth}x${finalHeight}")
-            return image
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 生成文本位图失败: ${e.message}")
-            e.printStackTrace()
-            return null
-        }
-    }
-
-    /**
-     * 将进度数据转换为环形进度圈位图
-     */
-    private fun progressToBitmap(progress: Int, colorReach: String? = null, colorUnReach: String? = null, isCCW: Boolean = false): Bitmap? {
-        try {
-            // 检查进度值是否有效
-            if (progress < 0 || progress > 100) {
-                Logger.w(TAG, "超级岛: 进度值无效，progress=$progress")
-                return null
-            }
-            
-            val size = 100 // 位图大小
-            val bitmap = android.graphics.Bitmap.createBitmap(size, size, android.graphics.Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(bitmap)
-            
-            // 背景透明
-            canvas.drawColor(android.graphics.Color.TRANSPARENT)
-            
-            // 计算进度角度
-            val sweepAngle = (progress / 100f) * 360f
-            val startAngle = if (isCCW) 90f else -90f
-            
-            // 绘制未达到的部分
-            val paintUnReach = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                style = android.graphics.Paint.Style.STROKE
-                strokeWidth = 10f
-                color = colorUnReach?.let { 
-                    try {
-                        android.graphics.Color.parseColor(it)
-                    } catch (e: Exception) {
-                        Logger.w(TAG, "超级岛: 解析未达到部分颜色失败: ${e.message}")
-                        android.graphics.Color.GRAY
-                    }
-                } ?: android.graphics.Color.GRAY
-            }
-            canvas.drawArc(
-                10f, 10f, (size - 10).toFloat(), (size - 10).toFloat(),
-                0f, 360f, false, paintUnReach
-            )
-            
-            // 绘制已达到的部分
-            val paintReach = android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG).apply {
-                style = android.graphics.Paint.Style.STROKE
-                strokeWidth = 10f
-                color = colorReach?.let { 
-                    try {
-                        android.graphics.Color.parseColor(it)
-                    } catch (e: Exception) {
-                        Logger.w(TAG, "超级岛: 解析已达到部分颜色失败: ${e.message}")
-                        android.graphics.Color.WHITE
-                    }
-                } ?: android.graphics.Color.WHITE
-            }
-            canvas.drawArc(
-                10f, 10f, (size - 10).toFloat(), (size - 10).toFloat(),
-                startAngle, if (isCCW) -sweepAngle else sweepAngle, false, paintReach
-            )
-            
-            Logger.d(TAG, "超级岛: 生成进度圈位图成功，进度: $progress%")
-            return bitmap
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: 生成进度圈位图失败: ${e.message}")
-            e.printStackTrace()
-            return null
-        }
-    }
-
     // ---- 胶囊兼容通知构建方法 ----
 
     /**
@@ -1520,7 +1393,7 @@ object NotificationGenerator {
             
             // 优先处理进度数据
             if (bProgress != null) {
-                smallIconBitmap = progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
+                smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
             }
             
             // 处理文本位图
@@ -1540,7 +1413,7 @@ object NotificationGenerator {
                     }
                 }
                 if (!textToRender.isNullOrBlank()) {
-                    smallIconBitmap = textToBitmap(textToRender)
+                    smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
                 }
             }
             
@@ -1722,7 +1595,7 @@ object NotificationGenerator {
         Logger.d(TAG, "超级岛: 处理小图标 - bProgress: $bProgress")
         if (bProgress != null) {
             Logger.d(TAG, "超级岛: 使用进度数据生成位图")
-            smallIconBitmap = progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
+            smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
             Logger.d(TAG, "超级岛: 进度位图生成结果: ${smallIconBitmap != null}")
         }
         
@@ -1750,7 +1623,7 @@ object NotificationGenerator {
                 Logger.d(TAG, "超级岛: 处理文本位图 - textToRender: $textToRender")
                 if (!textToRender.isNullOrBlank()) {
                     Logger.d(TAG, "超级岛: 使用文本生成位图")
-                    smallIconBitmap = textToBitmap(textToRender)
+                    smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
                     Logger.d(TAG, "超级岛: 文本位图生成结果: ${smallIconBitmap != null}")
                 }
             } else {

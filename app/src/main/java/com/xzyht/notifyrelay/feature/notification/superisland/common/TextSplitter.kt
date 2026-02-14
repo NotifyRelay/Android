@@ -75,17 +75,23 @@ object TextSplitter {
             }
         }
         
-        // 确保图标文本长度在2-5个字符之间
-        val iconTextLength = splitPoint
-        val finalIconTextLength = when {
-            iconTextLength < 2 -> 2
-            iconTextLength > 5 -> 5
-            else -> iconTextLength
+        // 确保胶囊文本长度不超过7个字符
+        val maxCapsuleLength = 7
+        var finalSplitPoint = splitPoint
+        
+        // 计算胶囊文本的长度
+        val capsuleLength = lyricText.length - finalSplitPoint
+        if (capsuleLength > maxCapsuleLength) {
+            // 如果胶囊文本过长，调整拆分点
+            finalSplitPoint = lyricText.length - maxCapsuleLength
         }
         
+        // 确保图标文本长度至少为2个字符
+        finalSplitPoint = maxOf(2, finalSplitPoint)
+        
         // 执行拆分
-        val iconText = lyricText.take(finalIconTextLength)
-        val capsuleText = lyricText.substring(finalIconTextLength)
+        val iconText = lyricText.take(finalSplitPoint)
+        val capsuleText = lyricText.substring(finalSplitPoint)
         
         return Pair(iconText, capsuleText)
     }
@@ -137,7 +143,7 @@ object TextSplitter {
             var spacePositionLength = 0.0
             for (i in 0 until splitPoint) {
                 val char = lyricText[i]
-                spacePositionLength += if (char.isLetter()) 0.5 else 1.0
+                spacePositionLength += if (isChineseCharacter(char)) 1.0 else if (char.isLetter()) 0.5 else 1.0
             }
             
             // 如果空格位置的长度在合理范围内，使用空格位置
@@ -148,14 +154,22 @@ object TextSplitter {
                 var currentLength = 0.0
                 var lengthBasedSplitPoint = 0
                 
-                for (i in 0 until lyricText.length) {
-                    val char = lyricText[i]
-                    currentLength += if (char.isLetter()) 0.5 else 1.0
-                    
-                    if (currentLength >= 2.0) {
-                        lengthBasedSplitPoint = i + 1
-                        if (currentLength >= 5.0) {
-                            break
+                // 对于纯中文文本，使用更合理的拆分比例
+                val isChineseOnly = lyricText.all { isChineseCharacter(it) }
+                if (isChineseOnly) {
+                    // 对于纯中文文本，使用接近50%的拆分比例
+                    lengthBasedSplitPoint = lyricText.length / 2
+                } else {
+                    // 对于混合文本，使用原来的长度计算逻辑
+                    for (i in 0 until lyricText.length) {
+                        val char = lyricText[i]
+                        currentLength += if (isChineseCharacter(char)) 1.0 else if (char.isLetter()) 0.5 else 1.0
+                        
+                        if (currentLength >= 2.0) {
+                            lengthBasedSplitPoint = i + 1
+                            if (currentLength >= 5.0) {
+                                break
+                            }
                         }
                     }
                 }
@@ -166,23 +180,45 @@ object TextSplitter {
             var currentLength = 0.0
             var lengthBasedSplitPoint = 0
             
-            for (i in 0 until lyricText.length) {
-                val char = lyricText[i]
-                currentLength += if (char.isLetter()) 0.5 else 1.0
-                
-                if (currentLength >= 2.0) {
-                    lengthBasedSplitPoint = i + 1
-                    if (currentLength >= 5.0) {
-                        break
+            // 对于纯中文文本，使用更合理的拆分比例
+            val isChineseOnly = lyricText.all { isChineseCharacter(it) }
+            if (isChineseOnly) {
+                // 对于纯中文文本，使用接近50%的拆分比例
+                lengthBasedSplitPoint = lyricText.length / 2
+            } else {
+                // 对于混合文本，使用原来的长度计算逻辑
+                for (i in 0 until lyricText.length) {
+                    val char = lyricText[i]
+                    currentLength += if (isChineseCharacter(char)) 1.0 else if (char.isLetter()) 0.5 else 1.0
+                    
+                    if (currentLength >= 2.0) {
+                        lengthBasedSplitPoint = i + 1
+                        if (currentLength >= 5.0) {
+                            break
+                        }
                     }
                 }
             }
             actualSplitPoint = lengthBasedSplitPoint
         }
         
+        // 确保胶囊文本长度不超过7个字符
+        val maxCapsuleLength = 7
+        var finalSplitPoint = actualSplitPoint
+        
+        // 计算胶囊文本的长度
+        val capsuleLength = lyricText.length - finalSplitPoint
+        if (capsuleLength > maxCapsuleLength) {
+            // 如果胶囊文本过长，调整拆分点
+            finalSplitPoint = lyricText.length - maxCapsuleLength
+        }
+        
+        // 确保图标文本长度至少为2个字符
+        finalSplitPoint = maxOf(2, finalSplitPoint)
+        
         // 执行拆分
-        val iconText = lyricText.take(actualSplitPoint)
-        val capsuleText = lyricText.substring(actualSplitPoint)
+        val iconText = lyricText.take(finalSplitPoint)
+        val capsuleText = lyricText.substring(finalSplitPoint)
         
         return Pair(iconText, capsuleText)
     }
