@@ -92,6 +92,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     if (latestMediaSbn?.key == sbn.key) {
                         latestMediaSbn = null
                     }
+                    // 关闭对应的浮窗条目，像远程通知一样立即结束
+                    val sbnKey = getNotificationKey(sbn)
+                    FloatingReplicaManager.dismissBySource(sbnKey)
+                    Logger.i(TAG, "媒体通知被移除，关闭对应的浮窗条目: sbnKey=$sbnKey")
                 } catch (e: Exception) {
                     Logger.e(TAG, "发送媒体结束包失败", e)
                 }
@@ -223,6 +227,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
     // 使用通用工具将 Drawable 转换为 Bitmap（参照项目中其他模块的实现）
 
+
+
     /**
      * 处理媒体播放通知
      */
@@ -278,6 +284,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 val paramV2Raw = "{\"business\":\"media\",\"protocol\":1,\"scene\":\"music\",\"ticker\":\"$text\",\"content\":\"$title\",\"enableFloat\":false,\"updatable\":true,\"reopen\":\"close\",\"localTransmit\":true}"
                 
                 // 调用 FloatingReplicaManager.showFloating 生成浮窗和通知
+                // 无论播放状态如何，都保持浮窗显示，避免UI变化频繁
                 FloatingReplicaManager.showFloating(
                     context = applicationContext,
                     sourceId = sbnKey,
