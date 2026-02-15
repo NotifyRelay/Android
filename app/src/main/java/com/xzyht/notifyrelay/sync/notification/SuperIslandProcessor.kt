@@ -7,7 +7,7 @@ import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.SuperIslandRemoteStore
 import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory

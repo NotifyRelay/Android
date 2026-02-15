@@ -1,37 +1,45 @@
-package com.xzyht.notifyrelay.feature.notification.superisland
+package com.xzyht.notifyrelay.feature.notification.superisland.lifecyle
 
+import android.R
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.os.Build
+import android.os.Bundle
 import androidx.annotation.RequiresApi
+import androidx.collection.LruCache
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.text.HtmlCompat
+import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.parseParamV2
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
+import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
+import org.json.JSONObject
 
 object LiveUpdatesNotificationManager {
-    private const val TAG = "超级岛-LiveUpdates"
+    private const val TAG = "超级岛-进度类型"
     const val CHANNEL_ID = "live_updates_channel"
     private const val CHANNEL_NAME = "超级岛Live Updates"
     private const val NOTIFICATION_BASE_ID = 10000
     private const val ICON_CACHE_SIZE = 10 // 最大缓存10个图标
-    
+
     private lateinit var notificationManager: NotificationManager
     private lateinit var appContext: Context
-    
+
     // 图标缓存，避免重复加载
-    private val iconCache = object : androidx.collection.LruCache<String, android.graphics.Bitmap>(ICON_CACHE_SIZE) {
-        override fun sizeOf(key: String, value: android.graphics.Bitmap): Int {
+    private val iconCache = object : LruCache<String, Bitmap>(ICON_CACHE_SIZE) {
+        override fun sizeOf(key: String, value: Bitmap): Int {
             // 返回1，表示每个图标计数为1，这样maxSize就表示图标数量
             return 1
         }
@@ -79,7 +87,7 @@ object LiveUpdatesNotificationManager {
         try {
             val notificationId = sourceId.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
             val paramV2 = paramV2Raw?.let { parseParamV2(it) }
-            
+
             // 调试picMap内容
             if (picMap != null && picMap.isNotEmpty()) {
                 Logger.d(TAG, "收到picMap，包含 ${picMap.size} 个图标资源: ${picMap.keys}")
@@ -121,10 +129,10 @@ object LiveUpdatesNotificationManager {
             val notificationBuilder = buildBaseNotification(sourceId)
                 .setContentTitle(title ?: appName ?: "超级岛通知")
                 .setContentText(text ?: "")
-                .setSmallIcon(android.R.drawable.stat_notify_more)
+                .setSmallIcon(R.drawable.stat_notify_more)
                 .setDeleteIntent(deleteIntent)
                 .setContentIntent(contentIntent)
-            
+
             // 尝试使用前进指示器图标作为小图标
             if (picMap != null && picMap.isNotEmpty()) {
                 // 找到有效的前进图标
@@ -135,11 +143,11 @@ object LiveUpdatesNotificationManager {
                     paramV2?.progressInfo?.picMiddle,
                     paramV2?.multiProgressInfo?.picMiddle
                 )
-                
-                val iconKey = possibleIconKeys.firstOrNull { key -> 
+
+                val iconKey = possibleIconKeys.firstOrNull { key ->
                     key != null && picMap.containsKey(key)
                 }
-                
+
                 if (iconKey != null) {
                     val iconUrl = picMap[iconKey]
                     if (iconUrl != null) {
@@ -156,7 +164,7 @@ object LiveUpdatesNotificationManager {
             // 使用处理后的标题和内容
             val processedTitle = paramV2.baseInfo?.title?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
             val processedContent = paramV2.baseInfo?.content?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
-            
+
             // 设置状态栏关键文本，优先使用处理后的标题（预计时间），然后是处理后的内容
             val shortText = when {
                 processedTitle.isNotEmpty() -> processedTitle
@@ -173,8 +181,8 @@ object LiveUpdatesNotificationManager {
                     try {
                         notificationBuilder.addAction(
                             NotificationCompat.Action.Builder(
-                                null, 
-                                action.actionTitle ?: "操作", 
+                                null,
+                                action.actionTitle ?: "操作",
                                 null
                             ).build()
                         )
@@ -191,7 +199,7 @@ object LiveUpdatesNotificationManager {
             addSuperIslandStructuredData(finalBuilder, paramV2, paramV2Raw, picMap)
 
             val notification = finalBuilder.build()
-            
+
             // 验证通知是否具有可提升特性
             try {
                 val hasPromotable = notification.hasPromotableCharacteristics()
@@ -207,7 +215,7 @@ object LiveUpdatesNotificationManager {
             // 发送通知
             notificationManager.notify(notificationId, notification)
             Logger.i(TAG, "发送Live Update进度通知成功: $sourceId")
-            
+
             // 异步加载图标并更新通知，确保图标正确显示
             loadIconsAndUpdateNotification(sourceId, notificationId, paramV2, picMap)
         } catch (e: Exception) {
@@ -215,7 +223,7 @@ object LiveUpdatesNotificationManager {
             e.printStackTrace()
         }
     }
-    
+
     /**
      * 异步加载图标并更新通知
      */
@@ -227,7 +235,7 @@ object LiveUpdatesNotificationManager {
     ) {
         // 只在有图标资源时才异步加载
         if (picMap.isNullOrEmpty() || paramV2 == null) return
-        
+
         // 异步加载图标
         CoroutineScope(Dispatchers.IO).launch {
             try {
@@ -239,7 +247,7 @@ object LiveUpdatesNotificationManager {
             }
         }
     }
-    
+
     /**
      * 加载进度样式的图标并更新通知
      */
@@ -251,23 +259,23 @@ object LiveUpdatesNotificationManager {
     ) {
         val progressInfo = paramV2.progressInfo
         val multiProgressInfo = paramV2.multiProgressInfo
-        
+
         // 检查是否有任何进度信息
         if (progressInfo == null && multiProgressInfo == null) {
             return
         }
-        
+
         // 获取当前进度值
         val currentProgress = progressInfo?.progress ?: multiProgressInfo?.progress ?: 0
-        
+
         // 调试日志：打印picMap内容，确认图标资源是否存在
         Logger.d(TAG, "加载进度图标 - picMap: $picMap")
         Logger.d(TAG, "加载进度图标 - progressInfo: $progressInfo")
         Logger.d(TAG, "加载进度图标 - multiProgressInfo: $multiProgressInfo")
-        
+
         // 根据当前进度和节点状态，为每个节点选择合适的图标
         val allIconKeys = mutableMapOf<String, String>()
-        
+
         // 收集所有可能需要的图标键
         allIconKeys["picForward"] = progressInfo?.picForward ?: multiProgressInfo?.picForward ?: ""
         allIconKeys["picMiddle"] = progressInfo?.picMiddle ?: multiProgressInfo?.picMiddle ?: ""
@@ -275,36 +283,36 @@ object LiveUpdatesNotificationManager {
         allIconKeys["picEnd"] = progressInfo?.picEnd ?: multiProgressInfo?.picEnd ?: ""
         allIconKeys["picEndUnselected"] = progressInfo?.picEndUnselected ?: multiProgressInfo?.picEndUnselected ?: ""
         allIconKeys["picForwardBox"] = multiProgressInfo?.picForwardBox ?: ""
-        
+
         Logger.d(TAG, "所有图标键映射: $allIconKeys")
         Logger.d(TAG, "当前进度: $currentProgress, 进度信息: $progressInfo, 多进度信息: $multiProgressInfo")
-        
+
         // 找到有效的前进图标作为进度指示点
         val forwardIconKey = listOf(
             allIconKeys["picForward"],
             allIconKeys["picForwardBox"],
             allIconKeys["picMiddle"]
-        ).firstOrNull { key -> 
+        ).firstOrNull { key ->
             key != null && key.isNotEmpty() && picMap.containsKey(key)
         }
-        
+
         // 调试日志：打印选中的图标键
         Logger.d(TAG, "选中的前进图标键: $forwardIconKey")
-        
+
         // 并行加载进度图标和应用图标
         var progressIconBitmap: Bitmap? = null
         var appIconBitmap: Bitmap? = null
-        
+
         // 优先加载应用图标作为小图标
         paramV2.picInfo?.pic?.let { picKey ->
             val appIconUrl = picMap[picKey]
             if (appIconUrl != null) {
-                val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
+                val bitmap = SuperIslandImageUtil.loadBitmapSuspend(
                     context = appContext,
                     urlOrData = appIconUrl,
                     timeoutMs = 5000
                 )
-                
+
                 if (bitmap != null) {
                     Logger.d(TAG, "应用图标加载成功，大小: ${bitmap.width}x${bitmap.height}")
                     // 缓存图标
@@ -315,20 +323,20 @@ object LiveUpdatesNotificationManager {
                 }
             }
         }
-        
+
         // 如果没有应用图标，再加载前进图标作为小图标
         if (progressIconBitmap == null) {
             forwardIconKey?.let { key ->
                 val iconUrl = picMap[key]
                 if (iconUrl != null) {
                     Logger.d(TAG, "加载前进图标URL: $iconUrl")
-                    
-                    val bitmap = com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil.loadBitmapSuspend(
+
+                    val bitmap = SuperIslandImageUtil.loadBitmapSuspend(
                         context = appContext,
                         urlOrData = iconUrl,
                         timeoutMs = 5000
                     )
-                    
+
                     if (bitmap != null) {
                         Logger.d(TAG, "前进图标加载成功，大小: ${bitmap.width}x${bitmap.height}")
                         // 缓存图标
@@ -342,13 +350,19 @@ object LiveUpdatesNotificationManager {
                 Logger.w(TAG, "未找到有效的前进图标键")
             }
         }
-        
+
         // 在主线程统一更新通知，确保两个图标都能显示
         withContext(Dispatchers.Main) {
-            updateNotificationWithAllIcons(sourceId, notificationId, paramV2, appIconBitmap, progressIconBitmap)
+            updateNotificationWithAllIcons(
+                sourceId,
+                notificationId,
+                paramV2,
+                appIconBitmap,
+                progressIconBitmap
+            )
         }
     }
-    
+
     /**
      * 更新通知，添加应用图标和进度图标
      */
@@ -362,43 +376,43 @@ object LiveUpdatesNotificationManager {
         try {
             // 构建基础通知
             val updatedBuilder = buildBaseNotification(sourceId)
-            
+
             // 设置基础信息
             paramV2.baseInfo?.let {
                 val title = it.title ?: ""
                 val content = it.content ?: ""
-                
+
                 // 处理HTML，使用LEGACY模式确保颜色标签被支持
                 val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
                 val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                
+
                 // 参考 NotificationGenerator.kt 的逻辑设置文本
                 updatedBuilder
                     .setContentTitle(processedTitle)
                     .setContentText(processedContent)
             }
-            
+
             // 设置应用图标（如果有）
             appIcon?.let {
                 updatedBuilder.setLargeIcon(it)
             }
-            
+
             // 使用前进指示器图标作为小图标
             progressIcon?.let {
                 updatedBuilder.setSmallIcon(IconCompat.createWithBitmap(it))
             }
-            
+
             // 设置状态栏关键文本，与初始创建通知时保持一致
             val processedTitle = paramV2.baseInfo?.title?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
             val processedContent = paramV2.baseInfo?.content?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
-            
+
             val shortText = when {
                 processedTitle.isNotEmpty() -> processedTitle
                 processedContent.isNotEmpty() -> processedContent
                 else -> " "
             }
             updatedBuilder.setShortCriticalText(shortText)
-            
+
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
             val deleteIntent = PendingIntent.getBroadcast(
                 appContext,
@@ -420,16 +434,16 @@ object LiveUpdatesNotificationManager {
                     .setAction("com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"),
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
-            
+
             // 设置意图
             updatedBuilder
                 .setDeleteIntent(deleteIntent)
                 .setContentIntent(contentIntent)
-            
+
             // 处理进度样式通知（仅处理进度类型）
             val progressInfo = paramV2.progressInfo
             val multiProgressInfo = paramV2.multiProgressInfo
-            
+
             // 与官方示例保持一致：先获取基础样式，再增量添加图标和进度
             val progressStyle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                 buildBaseProgressStyle(paramV2)
@@ -437,19 +451,19 @@ object LiveUpdatesNotificationManager {
                 // 在低 API 级别上使用简单的 ProgressStyle
                 NotificationCompat.ProgressStyle()
             }
-            
+
             // 设置进度图标（如果有）
             progressIcon?.let {
                 progressStyle.setProgressTrackerIcon(IconCompat.createWithBitmap(it))
             }
-            
+
             // 设置进度值
             val currentProgress = progressInfo?.progress ?: multiProgressInfo?.progress ?: 0
             progressStyle.setProgress(currentProgress)
-            
+
             // 设置样式
             updatedBuilder.setStyle(progressStyle)
-            
+
             notificationManager.notify(notificationId, updatedBuilder.build())
             Logger.i(TAG, "更新进度通知图标成功: $sourceId")
         } catch (e: Exception) {
@@ -457,7 +471,7 @@ object LiveUpdatesNotificationManager {
             e.printStackTrace()
         }
     }
-    
+
     /**
      * 构建包含图标的进度样式通知，避免图标闪烁
      */
@@ -468,50 +482,50 @@ object LiveUpdatesNotificationManager {
     ): NotificationCompat.Builder {
         val progressInfo = paramV2.progressInfo
         val multiProgressInfo = paramV2.multiProgressInfo
-        
+
         // 检查是否有任何进度信息
         if (progressInfo == null && multiProgressInfo == null) {
             return builder
         }
-        
+
         try {
             // 更新通知标题和内容
             paramV2.baseInfo?.let {
                 val title = it.title ?: ""
                 val content = it.content ?: ""
-                
+
                 // 调试日志：打印原始HTML和处理后的文本
                 Logger.d(TAG, "原始标题HTML: $title")
                 Logger.d(TAG, "原始内容HTML: $content")
-                
+
                 // 处理HTML，使用LEGACY模式确保颜色标签被支持
                 val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
                 val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                
+
                 Logger.d(TAG, "处理后标题: $processedTitle")
                 Logger.d(TAG, "处理后内容: $processedContent")
-                
+
                 // 参考 NotificationGenerator.kt 的逻辑设置文本
                 builder
                     .setContentTitle(processedTitle)
                     .setContentText(processedContent)
             }
-            
+
             // 获取颜色配置
             val progressColor = progressInfo?.colorProgress ?: multiProgressInfo?.color
             val progressEndColor = progressInfo?.colorProgressEnd ?: multiProgressInfo?.color
-            
+
             // 解析颜色值
-            val pointColor = progressColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.BLUE
-            val segmentColor = progressEndColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.CYAN
-            
+            val pointColor = progressColor?.let { Color.parseColor(it) } ?: Color.BLUE
+            val segmentColor = progressEndColor?.let { Color.parseColor(it) } ?: Color.CYAN
+
             // 直接创建ProgressStyle实例
             val progressStyle = NotificationCompat.ProgressStyle()
-            
+
             // 声明变量，用于记录节点和分段数量
             var progressPointsCount = 0
             var progressSegmentsCount = 0
-            
+
             // 只有当 multiProgressInfo 存在时才生成节点和分段
             if (multiProgressInfo != null) {
                 // 根据 multiProgressInfo.points 生成进度点和分段
@@ -519,7 +533,7 @@ object LiveUpdatesNotificationManager {
                 val validNodeCount = maxOf(2, nodeCount) // 最少需要2个节点来创建分段
                 val segmentCount = validNodeCount - 1
                 val segmentSize = 100 / segmentCount
-                
+
                 // 生成进度点
                 val progressPoints = mutableListOf<NotificationCompat.ProgressStyle.Point>()
                 val nodePositions = mutableListOf<Int>()
@@ -530,24 +544,24 @@ object LiveUpdatesNotificationManager {
                     progressPoints.add(point)
                     Logger.d(TAG, "生成节点 $i，位置: $position%")
                 }
-                
+
                 // 生成进度分段
                 val progressSegments = mutableListOf<NotificationCompat.ProgressStyle.Segment>()
                 for (i in 0 until segmentCount) {
                     progressSegments.add(NotificationCompat.ProgressStyle.Segment(segmentSize).setColor(segmentColor))
                 }
-                
+
                 // 设置进度点和分段
                 progressStyle.setProgressPoints(progressPoints)
                 progressStyle.setProgressSegments(progressSegments)
-                
+
                 // 记录节点和分段数量
                 progressPointsCount = progressPoints.size
                 progressSegmentsCount = progressSegments.size
-                
+
                 Logger.d(TAG, "为 multiProgressInfo 生成了 $progressPointsCount 个节点，分别在位置: $nodePositions")
             }
-            
+
             // 尝试直接设置进度跟踪器图标，避免闪烁
             if (picMap != null && picMap.isNotEmpty()) {
                 // 找到有效的前进图标作为进度指示点
@@ -558,11 +572,11 @@ object LiveUpdatesNotificationManager {
                     progressInfo?.picMiddle,
                     multiProgressInfo?.picMiddle
                 )
-                
-                val iconKey = possibleIconKeys.firstOrNull { key -> 
+
+                val iconKey = possibleIconKeys.firstOrNull { key ->
                     key != null && picMap.containsKey(key)
                 }
-                
+
                 if (iconKey != null) {
                     val iconUrl = picMap[iconKey]
                     if (iconUrl != null) {
@@ -578,40 +592,40 @@ object LiveUpdatesNotificationManager {
                     }
                 }
             }
-            
+
             // 获取进度值
             val currentProgress = progressInfo?.progress ?: multiProgressInfo?.progress ?: 0
-            
+
             // 最后设置进度，按照官方示例顺序
             progressStyle.setProgress(currentProgress)
-            
+
             Logger.d(TAG, "设置了 ${progressPointsCount} 个进度点和 ${progressSegmentsCount} 个进度段，与官方示例保持一致")
-            
+
             // 直接调用builder.setStyle方法，符合官方示例的API使用
             return builder.setStyle(progressStyle)
         } catch (e: Exception) {
             // 如果ProgressStyle不可用，回退到简单的进度条
             Logger.w(TAG, "使用ProgressStyle失败，回退到简单进度条: ${e.message}")
             e.printStackTrace()
-            
+
             // 更新通知标题和内容
             paramV2.baseInfo?.let {
                 val title = it.title ?: ""
                 val content = it.content ?: ""
-                
+
                 // 处理HTML，使用LEGACY模式确保颜色标签被支持
                 val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
                 val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                
+
                 // 参考 NotificationGenerator.kt 的逻辑设置文本
                 builder
                     .setContentTitle(processedTitle)
                     .setContentText(processedContent)
             }
-            
+
             // 获取进度值
             val currentProgress = progressInfo?.progress ?: multiProgressInfo?.progress ?: 0
-            
+
             return builder.setProgress(
                 100,
                 currentProgress,
@@ -619,7 +633,7 @@ object LiveUpdatesNotificationManager {
             )
         }
     }
-    
+
     /**
      * 构建基础进度样式，与官方示例保持一致
      */
@@ -627,18 +641,18 @@ object LiveUpdatesNotificationManager {
     private fun buildBaseProgressStyle(paramV2: ParamV2): NotificationCompat.ProgressStyle {
         val progressInfo = paramV2.progressInfo
         val multiProgressInfo = paramV2.multiProgressInfo
-        
+
         // 获取颜色配置
         val progressColor = progressInfo?.colorProgress ?: multiProgressInfo?.color
         val progressEndColor = progressInfo?.colorProgressEnd ?: multiProgressInfo?.color
-        
+
         // 解析颜色值
-        val pointColor = progressColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.BLUE
-        val segmentColor = progressEndColor?.let { android.graphics.Color.parseColor(it) } ?: android.graphics.Color.CYAN
-        
+        val pointColor = progressColor?.let { Color.parseColor(it) } ?: Color.BLUE
+        val segmentColor = progressEndColor?.let { Color.parseColor(it) } ?: Color.CYAN
+
         // 直接创建ProgressStyle实例
         val progressStyle = NotificationCompat.ProgressStyle()
-        
+
         // 只有当 multiProgressInfo 存在时才生成节点和分段
         if (multiProgressInfo != null) {
             // 根据 multiProgressInfo.points 生成进度点和分段
@@ -646,7 +660,7 @@ object LiveUpdatesNotificationManager {
             val validNodeCount = maxOf(2, nodeCount) // 最少需要2个节点来创建分段
             val segmentCount = validNodeCount - 1
             val segmentSize = 100 / segmentCount
-            
+
             // 生成进度点
             val progressPoints = mutableListOf<NotificationCompat.ProgressStyle.Point>()
             for (i in 0 until validNodeCount) {
@@ -659,21 +673,21 @@ object LiveUpdatesNotificationManager {
                 }
                 progressPoints.add(NotificationCompat.ProgressStyle.Point(position).setColor(pointColor))
             }
-            
+
             // 生成进度分段
             val progressSegments = mutableListOf<NotificationCompat.ProgressStyle.Segment>()
             for (i in 0 until segmentCount) {
                 progressSegments.add(NotificationCompat.ProgressStyle.Segment(segmentSize).setColor(segmentColor))
             }
-            
+
             // 设置进度点和分段
             progressStyle.setProgressPoints(progressPoints)
             progressStyle.setProgressSegments(progressSegments)
         }
-        
+
         return progressStyle
     }
-    
+
     /**
      * 构建不包含图标的进度样式通知
      */
@@ -682,29 +696,29 @@ object LiveUpdatesNotificationManager {
         paramV2: ParamV2
     ): NotificationCompat.Builder {
         val progressInfo = paramV2.progressInfo ?: return builder
-        
+
         try {
             // 更新通知标题和内容
             paramV2.baseInfo?.let {
                 val title = it.title ?: ""
                 val content = it.content ?: ""
-                
+
                 // 调试日志：打印原始HTML和处理后的文本
                 Logger.d(TAG, "原始标题HTML: $title")
                 Logger.d(TAG, "原始内容HTML: $content")
-                
+
                 // 处理HTML，使用LEGACY模式确保颜色标签被支持
                 val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
                 val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                
+
                 Logger.d(TAG, "处理后标题: $processedTitle")
                 Logger.d(TAG, "处理后内容: $processedContent")
-                
+
                 builder
                     .setContentTitle(processedTitle)
                     .setContentText(processedContent)
             }
-            
+
             // 与官方示例保持一致：先获取基础样式，再进行增量修改
             val progressStyle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                 buildBaseProgressStyle(paramV2).setProgress(progressInfo.progress)
@@ -712,21 +726,21 @@ object LiveUpdatesNotificationManager {
                 // 在低 API 级别上使用简单的 ProgressStyle
                 NotificationCompat.ProgressStyle().setProgress(progressInfo.progress)
             }
-            
+
             // 直接调用builder.setStyle方法，符合官方示例的API使用
             return builder.setStyle(progressStyle)
         } catch (e: Exception) {
             // 如果ProgressStyle不可用，回退到简单的进度条
             Logger.w(TAG, "使用ProgressStyle失败，回退到简单进度条: ${e.message}")
             e.printStackTrace()
-            
+
             // 更新通知标题和内容
             paramV2.baseInfo?.let {
                 builder
                     .setContentTitle(HtmlCompat.fromHtml(it.title ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY))
                     .setContentText(HtmlCompat.fromHtml(it.content ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY))
             }
-            
+
             return builder.setProgress(
                 100,
                 progressInfo.progress,
@@ -734,7 +748,7 @@ object LiveUpdatesNotificationManager {
             )
         }
     }
-    
+
     /**
      * 构建包含图标的进度样式通知
      */
@@ -744,22 +758,22 @@ object LiveUpdatesNotificationManager {
         progressIcon: Bitmap
     ): NotificationCompat.Builder {
         val progressInfo = paramV2.progressInfo ?: return builder
-        
+
         try {
             // 更新通知标题和内容
             paramV2.baseInfo?.let {
                 val title = it.title ?: ""
                 val content = it.content ?: ""
-                
+
                 // 处理HTML，使用LEGACY模式确保颜色标签被支持
                 val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
                 val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                
+
                 builder
                     .setContentTitle(processedTitle)
                     .setContentText(processedContent)
             }
-            
+
             // 与官方示例保持一致：先获取基础样式，再增量添加图标和进度
             val progressStyle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                 buildBaseProgressStyle(paramV2)
@@ -769,7 +783,7 @@ object LiveUpdatesNotificationManager {
             }
                 .setProgressTrackerIcon(IconCompat.createWithBitmap(progressIcon))
                 .setProgress(progressInfo.progress)
-            
+
             // 直接调用builder.setStyle方法，符合官方示例的API使用
             return builder.setStyle(progressStyle)
         } catch (e: Exception) {
@@ -809,7 +823,7 @@ object LiveUpdatesNotificationManager {
             Logger.e(TAG, "取消Live Update通知失败: ${e.message}")
         }
     }
-    
+
     // 兼容旧方法名
     fun dismissLiveUpdateNotification(sourceId: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
@@ -880,7 +894,7 @@ object LiveUpdatesNotificationManager {
             return false
         }
     }
-    
+
     /**
      * 添加超级岛相关的结构化数据到Live Updates通知
      * @param builder 通知构建器
@@ -897,20 +911,20 @@ object LiveUpdatesNotificationManager {
         try {
             // 获取通知的extras，用于添加结构化数据
             val extras = builder.extras
-            
+
             // 构建符合小米官方规范的完整miui.focus.param结构
             paramV2Raw?.let { rawData ->
                 try {
                     // 解析原始paramV2数据
-                    val paramV2Json = org.json.JSONObject(rawData)
-                    
+                    val paramV2Json = JSONObject(rawData)
+
                     // 构建完整的焦点通知参数结构，包含外层scene、ticker等字段
                     // 从paramV2Json中直接获取baseInfo，确保与FloatingReplicaManager一致
                     val baseInfoJson = paramV2Json.optJSONObject("baseInfo")
                     val tickerValue = baseInfoJson?.optString("title", "") ?: ""
                     val contentValue = baseInfoJson?.optString("content", "") ?: ""
-                    
-                    val fullFocusParam = org.json.JSONObject().apply {
+
+                    val fullFocusParam = JSONObject().apply {
                         put("protocol", 1)
                         put("scene", paramV2Json.optString("business", "default"))
                         put("ticker", tickerValue)
@@ -926,7 +940,7 @@ object LiveUpdatesNotificationManager {
                         put("islandFirstFloat", paramV2Json.optBoolean("islandFirstFloat", false))
                         put("param_v2", paramV2Json) // 将原始paramV2作为嵌套字段
                     }
-                    
+
                     extras.putString("miui.focus.param", fullFocusParam.toString())
                     Logger.i(TAG, "添加miui.focus.param成功")
                 } catch (e: Exception) {
@@ -935,20 +949,20 @@ object LiveUpdatesNotificationManager {
                     Logger.w(TAG, "构建完整焦点通知参数结构失败，回退到原始数据: ${e.message}")
                 }
             }
-            
+
             // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
             picMap?.let { map ->
                 map.forEach { (picKey, picUrl) ->
                     // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
                     if (picKey.startsWith("miui.focus.pic_")) {
                         // 解析图片引用符，获取实际的图片数据
-                        val actualPicUrl = com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore.resolve(appContext, picUrl) ?: picUrl
+                        val actualPicUrl = SuperIslandImageStore.resolve(appContext, picUrl) ?: picUrl
                         extras.putString(picKey, actualPicUrl)
                     }
                 }
-                
+
                 // 添加miui.focus.pics字段，包含所有图片资源的Bundle
-                val picsBundle = android.os.Bundle()
+                val picsBundle = Bundle()
                 map.forEach { (picKey, picUrl) ->
                     if (picKey.startsWith("miui.focus.pic_")) {
                         picsBundle.putString(picKey, picUrl)
@@ -957,16 +971,16 @@ object LiveUpdatesNotificationManager {
                 extras.putBundle("miui.focus.pics", picsBundle)
                 Logger.i(TAG, "添加图片资源成功，共${map.size}个图片")
             }
-            
+
             // 添加焦点通知必要的额外字段
             extras.putBoolean("miui.showAction", true)
-            
+
             // 添加模拟的action字段
-            val actionsBundle = android.os.Bundle()
+            val actionsBundle = Bundle()
             actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
             actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
             extras.putBundle("miui.focus.actions", actionsBundle)
-            
+
             // 添加原始通知中存在的其他字段，这些可能影响UI显示
             // 对于计时器类通知，添加计时器相关字段
             val title = paramV2?.baseInfo?.title ?: ""
@@ -974,20 +988,20 @@ object LiveUpdatesNotificationManager {
                 extras.putBoolean("android.chronometerCountDown", false)
                 extras.putBoolean("android.showChronometer", true)
             }
-            
+
             // 添加应用信息，与原始通知保持一致
             extras.putBoolean("android.reduced.images", true)
-            
+
             // 添加超级岛源包信息，与原始通知保持一致
             extras.putString("superIslandSourcePackage", appContext.packageName)
-            
+
             // 添加包名信息，与原始通知保持一致
             extras.putString("app_package", appContext.packageName)
-            
+
             // 添加MIUI焦点通知所需的额外字段
             extras.putBoolean("miui.isFocusNotification", true)
             extras.putBoolean("miui.showBadge", false)
-            
+
             Logger.i(TAG, "添加超级岛结构化数据成功")
         } catch (e: Exception) {
             Logger.w(TAG, "添加超级岛结构化数据失败: ${e.message}")

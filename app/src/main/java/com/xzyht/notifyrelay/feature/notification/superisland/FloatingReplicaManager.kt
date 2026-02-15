@@ -8,13 +8,14 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import com.xzyht.notifyrelay.feature.notification.superisland.common.NotificationGenerator
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingComposeContainer
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowLifecycleOwner
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.LifecycleManager
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

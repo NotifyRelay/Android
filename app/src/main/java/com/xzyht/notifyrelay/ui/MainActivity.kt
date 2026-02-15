@@ -46,7 +46,7 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme

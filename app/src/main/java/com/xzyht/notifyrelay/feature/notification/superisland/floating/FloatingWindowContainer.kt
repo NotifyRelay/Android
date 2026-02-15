@@ -24,7 +24,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.LifecycleOwner
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.ActionCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.AnimTextInfoCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.BaseInfoCompose
@@ -40,9 +39,8 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.compose.BigIslandCollapsedCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.CommonImageCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandComposeRoot
-import org.json.JSONObject
-
 import notifyrelay.base.util.Logger
+import org.json.JSONObject
 
 /**
  * 浮窗条目数据类，对应原有EntryRecord
@@ -70,8 +68,7 @@ data class FloatingEntry(
 fun FloatingWindowContainer(
     entries: List<FloatingEntry>,
     onEntryClick: (String) -> Unit,
-    lifecycleOwner: LifecycleOwner?,
-    modifier: Modifier = Modifier.Companion,
+    modifier: Modifier = Modifier,
     onUpdateEntryHeight: ((String, Int) -> Unit)? = null,
     isContainerDragging: Boolean = false
 ) {

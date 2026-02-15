@@ -14,6 +14,7 @@ foundationLayout = "1.10.0"
 runtime = "1.10.0"
 ftpserver = "1.2.1"
 remoteCreationCompose = "1.0.0-alpha03"
+runtimeVersion = "1.10.3"
 
 
 [libraries]
@@ -30,6 +31,7 @@ androidx-foundation-layout = { group = "androidx.compose.foundation", name = "fo
 androidx-runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtime" }
 apache-ftpserver = { group = "org.apache.ftpserver", name = "ftpserver-core", version.ref = "ftpserver" }
 androidx-remote-creation-compose = { group = "androidx.compose.remote", name = "remote-creation-compose", version.ref = "remoteCreationCompose" }
+runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtimeVersion" }
 
 
 [plugins]

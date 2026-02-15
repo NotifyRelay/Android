@@ -1,15 +1,23 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.common
+package com.xzyht.notifyrelay.feature.notification.superisland.lifecyle
 
+import android.R
+import android.app.Notification
+import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Icon
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
+import com.xzyht.notifyrelay.feature.notification.superisland.common.BitmapUtils
+import com.xzyht.notifyrelay.feature.notification.superisland.common.CapsuleScrollManager
+import com.xzyht.notifyrelay.feature.notification.superisland.common.TextSplitter
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.TimerInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.parseParamV2
@@ -79,7 +87,7 @@ class TimerUpdateManager private constructor() {
                 
                 // 创建通知渠道（如果不存在）
                 val channelId = "super_island_replica"
-                val channel = android.app.NotificationChannel(
+                val channel = NotificationChannel(
                     channelId,
                     "超级岛复刻通知",
                     NotificationManager.IMPORTANCE_HIGH
@@ -223,7 +231,7 @@ object NotificationGenerator {
     
     // 缓存变量，用于优化图标生成
     private var cachedIconKey = ""
-    private var cachedIconBitmap: android.graphics.Bitmap? = null
+    private var cachedIconBitmap: Bitmap? = null
     
     // 滚动更新相关
     private val mainHandler = Handler(Looper.getMainLooper())
@@ -391,21 +399,21 @@ object NotificationGenerator {
             // 对于媒体类型，使用HyperCeiler焦点歌词的特殊处理
             if (isMediaType) {
                 // 创建媒体类型通知渠道
-                val mediaChannel = android.app.NotificationChannel(
+                val mediaChannel = NotificationChannel(
                     "channel_id_focusNotifLyrics",
                     "焦点歌词通知",
                     NotificationManager.IMPORTANCE_HIGH
                 ).apply {
                     setSound(null, null)
                     setShowBadge(false)
-                    lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC
+                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
                 }
                 notificationManager.createNotificationChannel(mediaChannel)
                 
                 var builder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
                     .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
                     .setContentText(title ?: "")
-                    .setSmallIcon(android.R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
+                    .setSmallIcon(R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
                     // 调整为不可被一键清除的属性，只能手动划去
                     .setAutoCancel(false) // 不允许用户点击清除通知
                     .setOngoing(true) // 不允许通知被一键清除
@@ -585,7 +593,7 @@ object NotificationGenerator {
                 // 检查是否已经有图标文本，如果有，就不再生成新的图标
                 if (iconText.isEmpty()) {
                     // 尝试从A/B区数据中获取图标或生成位图
-                    var smallIconBitmap: android.graphics.Bitmap? = null
+                    var smallIconBitmap: Bitmap? = null
                     
                     // 解析param_v2中的bigIsland数据
                     var bigIsland: JSONObject? = null
@@ -691,7 +699,7 @@ object NotificationGenerator {
             } else {
                 // 非媒体类型，使用原来的通知渠道和构建方式
                 // 创建通知渠道
-                val channel = android.app.NotificationChannel(
+                val channel = NotificationChannel(
                     NOTIFICATION_CHANNEL_ID,
                     "超级岛复刻通知",
                     NotificationManager.IMPORTANCE_HIGH
@@ -702,7 +710,7 @@ object NotificationGenerator {
                 var builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
                     .setContentTitle(title ?: appName ?: "超级岛通知")
                     .setContentText(text ?: "")
-                    .setSmallIcon(android.R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
+                    .setSmallIcon(R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
                     // 调整为与实际超级岛通知一致的属性
                     .setAutoCancel(false) // 实际通知通常不可清除
                     .setOngoing(true) // 实际通知通常是持续的
@@ -729,7 +737,7 @@ object NotificationGenerator {
                     // 构建通知
                     val builtNotification = builder.build()
                     // 尝试从 A/B 区数据中获取图标或生成位图
-                    var smallIconBitmap: android.graphics.Bitmap? = null
+                    var smallIconBitmap: Bitmap? = null
                     
                     // 解析 param_v2 中的 bigIsland 数据
                     var bigIsland: JSONObject? = null
@@ -973,7 +981,7 @@ object NotificationGenerator {
                             // 复制原始构建器的所有属性
                             .setContentTitle(title ?: appName ?: "超级岛通知")
                             .setContentText(text ?: "")
-                            .setSmallIcon(android.R.drawable.stat_notify_more) // 使用默认图标作为基础
+                            .setSmallIcon(R.drawable.stat_notify_more) // 使用默认图标作为基础
                             .setAutoCancel(false)
                             .setOngoing(true)
                             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -1473,11 +1481,11 @@ object NotificationGenerator {
             
             // 如果没有生成位图，使用默认图标
             if (smallIconBitmap == null) {
-                builder.setSmallIcon(android.R.drawable.stat_notify_more)
+                builder.setSmallIcon(R.drawable.stat_notify_more)
             } else {
                 // 使用生成的位图作为小图标
-                val icon = android.graphics.drawable.BitmapDrawable(context.resources, smallIconBitmap)
-                builder.setSmallIcon(android.R.drawable.stat_notify_more) // 设置默认图标作为占位符
+                val icon = BitmapDrawable(context.resources, smallIconBitmap)
+                builder.setSmallIcon(R.drawable.stat_notify_more) // 设置默认图标作为占位符
                 // 注意：在 Android 中，setSmallIcon 只能接受资源 ID，所以我们需要使用其他方式注入位图
                 // 这里我们保持默认图标，实际的位图注入需要在通知构建后处理
             }
@@ -1494,11 +1502,11 @@ object NotificationGenerator {
     /**
      * 注入小图标到通知中
      */
-    private fun injectSmallIcon(notification: android.app.Notification, bitmap: Bitmap?) {
+    private fun injectSmallIcon(notification: Notification, bitmap: Bitmap?) {
         bitmap?.let {
             try {
-                val icon = android.graphics.drawable.Icon.createWithBitmap(it)
-                val field = android.app.Notification::class.java.getDeclaredField("mSmallIcon")
+                val icon = Icon.createWithBitmap(it)
+                val field = Notification::class.java.getDeclaredField("mSmallIcon")
                 field.isAccessible = true
                 field.set(notification, icon)
                 Logger.i(TAG, "超级岛: 成功注入小图标到胶囊通知")
@@ -1520,7 +1528,7 @@ object NotificationGenerator {
         paramV2: ParamV2?,
         picMap: Map<String, String>?,
         paramV2Raw: String?
-    ): android.app.Notification {
+    ): Notification {
         try {
             // 先构建胶囊兼容的通知
             val capsuleBuilder = buildCapsuleCompatibleNotification(context, builder, title, text, appName, paramV2, picMap, paramV2Raw)
@@ -1529,7 +1537,7 @@ object NotificationGenerator {
             val notification = capsuleBuilder.build()
         
         // 尝试从 A/B 区数据中获取图标或生成位图
-        var smallIconBitmap: android.graphics.Bitmap? = null
+        var smallIconBitmap: Bitmap? = null
         
         // 解析 param_v2 中的 bigIsland 数据
         var bigIsland: JSONObject? = null
