@@ -1,7 +1,28 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model
+package com.xzyht.notifyrelay.feature.notification.superisland.model.core
 
-import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.core.parseBigIslandArea
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.ActionInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.AnimTextInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.BaseInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.ChatInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.HighlightInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.HintInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.MultiProgressInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.PicInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.ProgressInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TextButton
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.parseActions
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.parseAnimTextInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.parseBaseInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.parseChatInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.parseHighlightInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.parseHintInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.parseMultiProgressInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.parsePicInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.parseProgressInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.parseTextButton
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.toMultiProgressInfo
+import notifyrelay.base.util.Logger
 import org.json.JSONObject
 
 // 摘要态组件解析
@@ -81,7 +102,11 @@ fun parseParamV2(jsonString: String): ParamV2? {
         }
         
         try {
-            multiProgressInfo = json.optJSONObject("multiProgressInfo")?.let { parseMultiProgressInfo(it) }
+            multiProgressInfo = json.optJSONObject("multiProgressInfo")?.let {
+                parseMultiProgressInfo(
+                    it
+                )
+            }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析multiProgressInfo失败: ${e.message}")
         }

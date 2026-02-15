@@ -1,5 +1,16 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right
+package com.xzyht.notifyrelay.feature.notification.superisland.model
 
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BComponent
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BEmpty
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BFixedWidthDigitInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BImageText2
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BImageText3
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BImageText6
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BPicInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BProgressTextInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BSameWidthDigitInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BTextInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
 import org.json.JSONObject
 
 /**
@@ -102,7 +113,7 @@ fun parseBComponent(bigIsland: JSONObject?): BComponent {
                 val timerWhen = to.optLong("timerWhen", 0)
                 val timerTotal = to.optLong("timerTotal", 0)
                 val timerSystemCurrent = to.optLong("timerSystemCurrent", 0)
-                com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.TimerInfo(
+                TimerInfo(
                     timerType = timerType,
                     timerWhen = timerWhen,
                     timerTotal = timerTotal,

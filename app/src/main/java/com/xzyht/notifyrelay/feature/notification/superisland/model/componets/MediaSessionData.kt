@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model
+package com.xzyht.notifyrelay.feature.notification.superisland.model.componets
 
 data class MediaSessionData(
     val packageName: String,

@@ -18,9 +18,9 @@ import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadc
 import com.xzyht.notifyrelay.feature.notification.superisland.common.BitmapUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.common.CapsuleScrollManager
 import com.xzyht.notifyrelay.feature.notification.superisland.common.TextSplitter
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.TimerInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.parseParamV2
+import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.core.parseParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AComponent
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AImageText1

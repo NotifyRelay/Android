@@ -16,8 +16,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.text.HtmlCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.parseParamV2
+import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
+import com.xzyht.notifyrelay.feature.notification.superisland.model.core.parseParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import kotlinx.coroutines.CoroutineScope

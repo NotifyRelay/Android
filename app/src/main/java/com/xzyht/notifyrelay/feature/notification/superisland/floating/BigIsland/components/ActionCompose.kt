@@ -9,7 +9,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ActionInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.ActionInfo
 
 /**
  * 操作按钮Compose组件

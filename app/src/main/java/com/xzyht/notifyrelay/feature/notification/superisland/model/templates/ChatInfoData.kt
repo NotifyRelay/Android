@@ -1,5 +1,7 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model
+package com.xzyht.notifyrelay.feature.notification.superisland.model.templates
 
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.parseTimerInfo
 import org.json.JSONObject
 
 // 聊天信息模板：IM图文组件，显示头像、主要文本、次要文本

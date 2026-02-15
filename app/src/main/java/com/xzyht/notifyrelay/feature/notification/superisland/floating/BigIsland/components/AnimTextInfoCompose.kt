@@ -19,8 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.AnimTextInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.formatTimerInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.AnimTextInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.formatTimerInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.resolveIconUrl
 import kotlinx.coroutines.delay

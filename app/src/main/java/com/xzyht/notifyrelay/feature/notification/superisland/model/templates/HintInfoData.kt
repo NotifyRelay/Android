@@ -1,5 +1,9 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model
+package com.xzyht.notifyrelay.feature.notification.superisland.model.templates
 
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.ActionInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.parseActionInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.parseTimerInfo
 import org.json.JSONObject
 
 // 提示信息模板：按钮组件2和3，包含文本和按钮

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.core
+package com.xzyht.notifyrelay.feature.notification.superisland.common
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -9,8 +9,9 @@ import android.os.Bundle
 import android.provider.Settings
 import android.service.notification.StatusBarNotification
 import android.util.Base64
-import notifyrelay.core.util.DataUrlUtils
+import com.xzyht.notifyrelay.feature.notification.superisland.model.core.SuperIslandData
 import notifyrelay.base.util.Logger
+import notifyrelay.core.util.DataUrlUtils
 import notifyrelay.data.StorageManager
 import org.json.JSONObject
 

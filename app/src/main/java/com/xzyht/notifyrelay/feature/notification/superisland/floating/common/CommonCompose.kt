@@ -8,24 +8,22 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xzyht.notifyrelay.feature.notification.superisland.common.AutoScrollText
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 
@@ -193,7 +191,7 @@ fun parseColorSafe(s: String?, default: Int): Int = try {
  * 格式化计时器信息
  * 修复了计时逻辑，确保暂停时显示正确进度，解决正计时快3s问题
  */
-fun formatTimerInfo(timer: com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.TimerInfo): String {
+fun formatTimerInfo(timer: TimerInfo): String {
     val now = System.currentTimeMillis()
     val timerType = timer.timerType
     val timerWhen = timer.timerWhen // 正计时：开始时间；倒计时：结束时间

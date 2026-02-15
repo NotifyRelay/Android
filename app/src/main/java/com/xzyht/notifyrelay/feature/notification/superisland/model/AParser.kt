@@ -1,5 +1,8 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left
+package com.xzyht.notifyrelay.feature.notification.superisland.model
 
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AComponent
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AImageText1
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AImageText5
 import org.json.JSONObject
 
 /**

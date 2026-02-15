@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xzyht.notifyrelay.feature.notification.superisland.common.AutoFitText
 import com.xzyht.notifyrelay.feature.notification.superisland.common.AutoScrollText
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.MediaSessionData
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.MediaSessionData
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 

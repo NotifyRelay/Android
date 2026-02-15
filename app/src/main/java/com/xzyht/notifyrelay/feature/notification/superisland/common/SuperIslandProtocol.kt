@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.core
+package com.xzyht.notifyrelay.feature.notification.superisland.common
 
 import org.json.JSONArray
 import org.json.JSONObject

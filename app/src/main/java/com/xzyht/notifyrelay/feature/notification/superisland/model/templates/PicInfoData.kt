@@ -1,5 +1,7 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model
+package com.xzyht.notifyrelay.feature.notification.superisland.model.templates
 
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.ActionInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.parseActionInfo
 import org.json.JSONObject
 
 // 图片信息模板：识别图形组件，显示应用图标或自定义图片

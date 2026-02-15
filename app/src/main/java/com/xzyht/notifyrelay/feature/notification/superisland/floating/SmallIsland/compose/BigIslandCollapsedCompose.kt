@@ -18,10 +18,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AImageText1
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.parseAComponent
+import com.xzyht.notifyrelay.feature.notification.superisland.model.parseAComponent
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BEmpty
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BTextInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.parseBComponent
+import com.xzyht.notifyrelay.feature.notification.superisland.model.parseBComponent
 import org.json.JSONObject
 
 /**

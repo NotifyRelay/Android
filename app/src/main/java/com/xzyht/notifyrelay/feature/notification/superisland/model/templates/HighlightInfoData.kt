@@ -1,5 +1,7 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model
+package com.xzyht.notifyrelay.feature.notification.superisland.model.templates
 
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.parseTimerInfo
 import org.json.JSONObject
 
 // 高亮信息模板：强调图文组件，强调显示数据或内容

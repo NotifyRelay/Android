@@ -1,5 +1,6 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model
+package com.xzyht.notifyrelay.feature.notification.superisland.model.componets
 
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.formatTimerInfo
 import org.json.JSONObject
 
 // 定时器信息：用于计时功能，支持倒计时、正计时等
@@ -23,5 +24,5 @@ fun parseTimerInfo(json: JSONObject): TimerInfo {
 // 格式化计时器信息为显示文本
 // 使用CommonCompose.kt中的公共实现
 fun formatTimerInfo(timerInfo: TimerInfo): String {
-    return com.xzyht.notifyrelay.feature.notification.superisland.floating.common.formatTimerInfo(timerInfo)
+    return formatTimerInfo(timerInfo)
 }
