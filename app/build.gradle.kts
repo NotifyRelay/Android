@@ -1,8 +1,7 @@
 
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.ByteArrayOutputStream
 import java.util.Properties
-import java.io.File
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -202,7 +201,7 @@ dependencies {
     
     // Miuix风格ui库
     implementation(libs.miuix.android)
-    implementation("top.yukonga.miuix.kmp:miuix-icons:0.8.1")
+    implementation("top.yukonga.miuix.kmp:miuix-icons:0.8.3")
     implementation("androidx.navigationevent:navigationevent-compose:1.0.1")
     // DataStore 持久化（设备名、规则设置）
     implementation("androidx.datastore:datastore-preferences:1.0.0")
