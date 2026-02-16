@@ -18,32 +18,29 @@ import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadc
 import com.xzyht.notifyrelay.feature.notification.superisland.common.BitmapUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.common.CapsuleScrollManager
 import com.xzyht.notifyrelay.feature.notification.superisland.common.TextSplitter
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
-import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.parseParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AComponent
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AImageText1
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AImageText5
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BComponent
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BEmpty
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BFixedWidthDigitInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BImageText2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BImageText3
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BImageText6
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BPicInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BProgressTextInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BSameWidthDigitInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BTextInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.formatTimerInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
+import com.xzyht.notifyrelay.feature.notification.superisland.model.core.parseParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.model.parseAComponent
 import com.xzyht.notifyrelay.feature.notification.superisland.model.parseBComponent
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
+import notifyrelay.data.StorageManager
 import org.json.JSONObject
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
@@ -223,6 +220,18 @@ class TimerUpdateManager private constructor() {
 
 /**
  * 通知生成器，负责处理超级岛通知的生成和注入
+ * 
+ * 耦合逻辑说明：
+ * 1. 浮窗功能与通知点击事件的耦合：
+ *    - 当浮窗功能开启时，为通知设置点击意图和删除意图
+ *    - 点击意图的 action 为 com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING
+ *    - 删除意图的 action 为 com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION
+ *    - 这些意图会触发 NotificationBroadcastReceiver 中的相应处理逻辑
+ * 
+ * 2. 通知与浮窗的去耦合：
+ *    - 通过 SUPER_ISLAND_FLOATING_WINDOW_KEY 开关控制浮窗功能
+ *    - 浮窗功能关闭时，不设置与浮窗关联的通知点击和关闭广播/意图
+ *    - 浮窗功能关闭时，仅创建基础通知，不添加与浮窗相关的功能
  */
 object NotificationGenerator {
     private const val TAG = "超级岛通知生成"
@@ -230,6 +239,15 @@ object NotificationGenerator {
     private const val NOTIFICATION_CHANNEL_ID = "super_island_replica"
     // 通知ID基础值
     private const val NOTIFICATION_BASE_ID = 20000
+    // 浮窗功能开关键
+    private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
+    
+    /**
+     * 检查浮窗功能是否开启
+     */
+    private fun isFloatingWindowEnabled(context: Context): Boolean {
+        return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, true)
+    }
     
     // 缓存变量，用于优化图标生成
     private var cachedIconKey = ""
@@ -337,6 +355,7 @@ object NotificationGenerator {
 
     /**
      * 发送复刻通知，与原通知保持一致
+     * @return 通知ID，如果发送失败则返回null
      */
     internal suspend fun sendReplicaNotification(
         context: Context,
@@ -349,54 +368,69 @@ object NotificationGenerator {
         sourceId: String, // 新增sourceId参数
         floatingWindowManager: FloatingWindowManager,
         entryKeyToNotificationId: ConcurrentHashMap<String, Int>
-    ) {
+    ): Int? {
         try {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
             // 生成唯一的通知ID
             val notificationId = key.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
             
+            // 检查浮窗功能是否开启
+            val floatingWindowEnabled = isFloatingWindowEnabled(context)
+            
             // 创建点击意图，用于处理用户点击通知时切换浮窗显示/隐藏
-            val contentIntent = Intent(context, NotificationBroadcastReceiver::class.java).apply {
-                action = "com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"
-                putExtra("sourceId", sourceId)
-                putExtra("title", title)
-                putExtra("text", text)
-                putExtra("appName", appName)
-                putExtra("paramV2Raw", paramV2?.toString()) // 注意：这里可能需要原始的json字符串，但paramV2是对象。如果需要原始串，应该在参数中传入
-                // 优化：传入paramV2Raw
-                val entry = floatingWindowManager.getEntry(key)
-                if (entry?.paramV2Raw != null) {
-                    putExtra("paramV2Raw", entry.paramV2Raw)
+            val contentIntent = if (floatingWindowEnabled) {
+                Intent(context, NotificationBroadcastReceiver::class.java).apply {
+                    action = "com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"
+                    putExtra("sourceId", sourceId)
+                    putExtra("title", title)
+                    putExtra("text", text)
+                    putExtra("appName", appName)
+                    putExtra("paramV2Raw", paramV2?.toString()) // 注意：这里可能需要原始的json字符串，但paramV2是对象。如果需要原始串，应该在参数中传入
+                    // 优化：传入paramV2Raw
+                    val entry = floatingWindowManager.getEntry(key)
+                    if (entry?.paramV2Raw != null) {
+                        putExtra("paramV2Raw", entry.paramV2Raw)
+                    }
+                    
+                    // 传入图片映射
+                    if (!picMap.isNullOrEmpty()) {
+                        val bundle = Bundle()
+                        picMap.forEach { (k, v) -> bundle.putString(k, v) }
+                        putExtra("picMap", bundle)
+                    }
                 }
-                
-                // 传入图片映射
-                if (!picMap.isNullOrEmpty()) {
-                    val bundle = Bundle()
-                    picMap.forEach { (k, v) -> bundle.putString(k, v) }
-                    putExtra("picMap", bundle)
-                }
+            } else {
+                null
             }
             
-            val pendingContentIntent = PendingIntent.getBroadcast(
-                context,
-                notificationId,
-                contentIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val pendingContentIntent = if (floatingWindowEnabled && contentIntent != null) {
+                PendingIntent.getBroadcast(
+                    context,
+                    notificationId,
+                    contentIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                null
+            }
 
             // 检查是否为媒体类型的超级岛浮窗
             val isMediaType = paramV2?.business == "media"
 
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
-            val deleteIntent = PendingIntent.getBroadcast(
-                context,
-                notificationId,
-                Intent(context, NotificationBroadcastReceiver::class.java)
-                    .putExtra("notificationId", notificationId)
-                    .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val deleteIntent = if (floatingWindowEnabled) {
+                PendingIntent.getBroadcast(
+                    context,
+                    notificationId,
+                    Intent(context, NotificationBroadcastReceiver::class.java)
+                        .putExtra("notificationId", notificationId)
+                        .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                null
+            }
             
             // 对于媒体类型，使用HyperCeiler焦点歌词的特殊处理
             if (isMediaType) {
@@ -424,9 +458,14 @@ object NotificationGenerator {
                     .setWhen(System.currentTimeMillis())
                     .setOnlyAlertOnce(true)
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                    .setDeleteIntent(deleteIntent) // 设置删除意图，处理用户移除通知的情况
-                    .setContentIntent(pendingContentIntent) // 设置点击意图
                     .setRequestPromotedOngoing(true)
+
+                // 只有在浮窗功能开启时才设置删除意图和点击意图
+                if (floatingWindowEnabled) {
+                    builder
+                        .setDeleteIntent(deleteIntent) // 设置删除意图，处理用户移除通知的情况
+                        .setContentIntent(pendingContentIntent) // 设置点击意图
+                }
                 
                 // 添加胶囊形式支持
                 try {
@@ -721,8 +760,13 @@ object NotificationGenerator {
                     .setWhen(System.currentTimeMillis()) // 设置时间，但不显示
                     .setOnlyAlertOnce(true) // 只提示一次
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 公开可见
-                    .setDeleteIntent(deleteIntent) // 设置删除意图
-                    .setContentIntent(pendingContentIntent) // 设置点击意图
+
+                // 只有在浮窗功能开启时才设置删除意图和点击意图
+                if (floatingWindowEnabled) {
+                    builder
+                        .setDeleteIntent(deleteIntent) // 设置删除意图
+                        .setContentIntent(pendingContentIntent) // 设置点击意图
+                }
                 
                 // 检查是否为进度类型通知，如果是，则可能已经通过 LiveUpdatesNotificationManager 处理
                 val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
@@ -1014,8 +1058,10 @@ object NotificationGenerator {
         entryKeyToNotificationId[key] = notificationId
         
         Logger.i(TAG, "超级岛: 发送复刻通知成功，key=$key, notificationId=$notificationId")
+        return notificationId
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 发送复刻通知失败: ${e.message}")
+            return null
         }
     }
 

@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.superisland
 
+import android.app.NotificationManager
 import android.content.Context
 import android.graphics.PixelFormat
 import android.net.Uri
@@ -8,20 +9,22 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingComposeContainer
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowLifecycleOwner
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
-import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.NotificationGenerator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
+import notifyrelay.data.StorageManager
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 
@@ -29,10 +32,32 @@ import java.util.concurrent.ConcurrentHashMap
  * 接收端的超级岛复刻实现骨架。
  * 说明：真正的系统级悬浮窗需要用户授予 "悬浮窗/Display over other apps" 权限（TYPE_APPLICATION_OVERLAY），
  * 如果没有权限则退化为发送高优先级临时通知来提示用户（不会获得和系统超级岛完全一致的视觉效果）。
+ * 
+ * 耦合逻辑说明：
+ * 1. 浮窗功能与通知点击事件的耦合：
+ *    - 通知点击后会发送广播到 NotificationBroadcastReceiver
+ *    - NotificationBroadcastReceiver 会调用 FloatingReplicaManager.toggleFloating 方法
+ *    - toggleFloating 方法会检查浮窗状态并执行相应操作
+ * 
+ * 2. 通知与浮窗的去耦合：
+ *    - 通过 SUPER_ISLAND_FLOATING_WINDOW_KEY 开关控制浮窗功能
+ *    - 浮窗功能关闭时，不尝试创建浮窗
+ *    - 浮窗功能关闭时，不处理与浮窗相关的操作
  */
 object FloatingReplicaManager {
     private const val TAG = "超级岛复刻实现骨架"
     private const val FIXED_WIDTH_DP = 320 // 固定悬浮窗宽度，以确保MultiProgressRenderer完整显示
+    private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
+    
+    // 应用上下文，用于在浮窗功能关闭时保存应用上下文
+    private var appContext: Context? = null
+    
+    /**
+     * 检查浮窗功能是否开启
+     */
+    private fun isFloatingWindowEnabled(context: Context): Boolean {
+        return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, true)
+    }
 
     /**
      * 错误处理包装器，统一处理 try-catch 和日志记录
@@ -107,15 +132,25 @@ object FloatingReplicaManager {
     }
 
     /**
-     * 添加 sourceId 到 entryKey 的映射
+     * 添加 sourceId 到 entryKey 和 notificationId 的映射
      * @param sourceId 来源ID，用于区分不同来源的超级岛通知
      * @param entryKey 条目唯一标识
+     * @param notificationId 通知ID，可选
      */
-    private fun addSourceIdMapping(sourceId: String, entryKey: String) {
+    private fun addSourceIdMapping(sourceId: String, entryKey: String, notificationId: Int? = null) {
         if (sourceId.isNotBlank()) {
+            // 添加到 sourceId 到 entryKey 的映射
             val entryKeys = sourceIdToEntryKeyMap.getOrPut(sourceId) { mutableListOf() }
             if (!entryKeys.contains(entryKey)) {
                 entryKeys.add(entryKey)
+            }
+            
+            // 添加到 sourceId 到 notificationId 的直接映射
+            if (notificationId != null) {
+                val notificationIds = sourceIdToNotificationIds.getOrPut(sourceId) { mutableListOf() }
+                if (!notificationIds.contains(notificationId)) {
+                    notificationIds.add(notificationId)
+                }
             }
         }
     }
@@ -135,6 +170,8 @@ object FloatingReplicaManager {
                 updatedKeys.remove(key)
                 if (updatedKeys.isEmpty()) {
                     sourceIdsToRemove.add(sourceId)
+                    // 同步清理 sourceId 到 notificationId 的映射
+                    sourceIdToNotificationIds.remove(sourceId)
                 } else {
                     sourceIdsToUpdate[sourceId] = updatedKeys
                 }
@@ -149,7 +186,15 @@ object FloatingReplicaManager {
             sourceIdToEntryKeyMap.remove(it)
         }
         
-        return if (sourceIdsToRemove.isEmpty()) null else sourceIdsToRemove
+        // 只有当我们确实找到了并移除了对应的 sourceId 时，才返回它
+        // 避免因为错误的 key（如 notificationId.toString()）导致误操作
+        return if (sourceIdsToRemove.isNotEmpty()) {
+            Logger.i(TAG, "removeSourceIdMapping: 成功移除 sourceIds=$sourceIdsToRemove, key=$key")
+            sourceIdsToRemove
+        } else {
+            Logger.i(TAG, "removeSourceIdMapping: 未找到匹配的 sourceId，key=$key")
+            null
+        }
     }
 
     /**
@@ -254,6 +299,12 @@ object FloatingReplicaManager {
     // 保存entryKey到notificationId的映射，用于管理复刻通知
     private val entryKeyToNotificationId = ConcurrentHashMap<String, Int>()
     
+    // 保存sourceId到notificationId列表的直接映射，用于优化通知关闭路径
+    private val sourceIdToNotificationIds = ConcurrentHashMap<String, MutableList<Int>>()
+    
+    // 保存已经关闭过的 sourceId，避免重复关闭
+    private val closedSourceIds = ConcurrentHashMap<String, Long>()
+    
     // 保存被隐藏的条目，以便用户点击通知时恢复
     private val hiddenEntries = ConcurrentHashMap<String, Any>()
     // 通知渠道ID
@@ -277,7 +328,73 @@ object FloatingReplicaManager {
         appName: String? = null,
         isLocked: Boolean = false
     ) {
-        showFloatingInternal(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked, false)
+        // 保存应用上下文，用于后续关闭通知
+        appContext = context.applicationContext
+        
+        // 清理这个 sourceId 的关闭记录，允许它再次显示
+        closedSourceIds.remove(sourceId)
+        Logger.i(TAG, "showFloating: 清理 sourceId=$sourceId 的关闭记录")
+        
+        // 检查浮窗功能是否开启
+        if (isFloatingWindowEnabled(context)) {
+            // 浮窗功能开启，创建浮窗并发送通知
+            showFloatingInternal(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked, false)
+        } else {
+            // 浮窗功能关闭，仅发送通知，不创建浮窗
+            Logger.i(TAG, "超级岛: 浮窗功能已关闭，仅创建通知, sourceId=$sourceId")
+            
+            CoroutineScope(Dispatchers.Main).launch {
+                runWithErrorHandlingSuspend("发送通知") {
+                    // 尝试解析paramV2
+                    val paramV2 = NotificationGenerator.parseParamV2Safe(paramV2Raw)
+
+                    // 将所有图片 intern 为引用，避免重复保存相同图片 - 移到 IO 线程执行
+                    val internedPicMap = withContext(Dispatchers.IO) {
+                        SuperIslandImageStore.internAll(context, picMap)
+                    }
+                    // 生成唯一的entryKey，确保包含sourceId，以便后续能正确移除
+                    val entryKey = sourceId
+
+                    // 保存sourceId到entryKey的映射，以便后续能正确移除
+                    addSourceIdMapping(sourceId, entryKey)
+                    
+                    // 对于进度类型，且Live Updates启用时，只发送复合通知
+                    // 否则发送传统复刻通知
+                    val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
+                    
+                    if (isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                        runWithErrorHandlingSuspend("发送Live Updates复合通知") {
+                            // 初始化Live Updates通知管理器
+                            LiveUpdatesNotificationManager.initialize(context)
+                            // 发送复合通知
+                            LiveUpdatesNotificationManager.showLiveUpdate(
+                                sourceId, title, text, paramV2Raw, appName, isLocked, internedPicMap
+                            )
+                            // Live Updates通知的ID计算方式与传统通知不同，需要手动计算并添加映射
+                            val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
+                            addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
+                            Logger.i(TAG, "浮窗功能关闭时发送Live Updates复合通知: sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
+                        }
+                    } else {
+                        // 非进度类型或Live Updates未启用时，发送传统复刻通知
+                        val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
+                        // 添加到 sourceId 到 notificationId 的直接映射
+                        addSourceIdMapping(sourceId, entryKey, notificationId)
+                        Logger.i(TAG, "浮窗功能关闭时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
+                    }
+                    
+                    // 添加超时自动移除机制，与浮窗保持一致
+                    val timeoutMs = 30 * 1000L // 默认30秒
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(timeoutMs)
+                        runWithErrorHandling("超时自动移除通知") {
+                            dismissBySource(sourceId)
+                            Logger.i(TAG, "超级岛: 通知超时自动移除, sourceId=$sourceId")
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /**
@@ -295,6 +412,12 @@ object FloatingReplicaManager {
         isRestoring: Boolean = false // 是否是从隐藏状态恢复
     ) {
         runWithErrorHandling("显示浮窗") {
+            // 检查浮窗功能是否开启
+            if (!isFloatingWindowEnabled(context)) {
+                Logger.i(TAG, "超级岛: 浮窗功能已关闭，不创建浮窗, sourceId=$sourceId")
+                return@runWithErrorHandling
+            }
+            
             // 会话级屏蔽检查：同一个 instanceId 在本轮被用户关闭后不再展示
             // 如果是从隐藏状态恢复，则忽略屏蔽检查
             if (!isRestoring && sourceId.isNotBlank() && isInstanceBlocked(sourceId)) {
@@ -369,11 +492,17 @@ object FloatingReplicaManager {
                                 LiveUpdatesNotificationManager.showLiveUpdate(
                                     sourceId, title, text, paramV2Raw, appName, isLocked, internedPicMap
                                 )
-                                Logger.i(TAG, "浮窗创建时发送Live Updates复合通知作为生命周期管理: sourceId=$sourceId")
+                                // Live Updates通知的ID计算方式与传统通知不同，需要手动计算并添加映射
+                                val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
+                                addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
+                                Logger.i(TAG, "浮窗创建时发送Live Updates复合通知作为生命周期管理: sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
                             }
                         } else {
                             // 非进度类型或Live Updates未启用时，发送传统复刻通知
-                            NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
+                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
+                            // 添加到 sourceId 到 notificationId 的直接映射
+                            addSourceIdMapping(sourceId, entryKey, notificationId)
+                            Logger.i(TAG, "浮窗创建时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
                         }
                     } else {
                         Logger.i(TAG, "浮窗从隐藏状态恢复，不重新发送通知，使用现有的通知: sourceId=$sourceId")
@@ -395,6 +524,12 @@ object FloatingReplicaManager {
         picMap: Map<String, String>? = null,
         appName: String? = null
     ) {
+        // 检查浮窗功能是否开启
+        if (!isFloatingWindowEnabled(context)) {
+            Logger.i(TAG, "超级岛: 浮窗功能已关闭，不处理浮窗状态切换, sourceId=$sourceId")
+            return
+        }
+        
         runWithErrorHandling("切换浮窗状态") {
             // 检查当前是否已显示
             val entryKeys = sourceIdToEntryKeyMap[sourceId]
@@ -500,6 +635,22 @@ object FloatingReplicaManager {
      */
     fun closeByNotificationId(notificationId: Int) {
         runWithErrorHandling("根据通知ID关闭浮窗条目") {
+            // 首先检查浮窗功能是否开启
+            if (appContext != null && !isFloatingWindowEnabled(appContext!!)) {
+                // 浮窗功能已关闭，直接关闭通知，不处理浮窗
+                Logger.i(TAG, "超级岛: 浮窗功能已关闭，直接关闭通知，notificationId=$notificationId")
+                val context = appContext ?: return@runWithErrorHandling
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                try {
+                    notificationManager.cancel(notificationId)
+                    Logger.i(TAG, "超级岛: 直接关闭通知成功，notificationId=$notificationId")
+                } catch (e: Exception) {
+                    Logger.w(TAG, "超级岛: 直接关闭通知失败: ${e.message}")
+                }
+                return@runWithErrorHandling
+            }
+            
+            // 浮窗功能开启时，才处理浮窗条目
             // 查找对应的entryKey
             var entryKey = entryKeyToNotificationId.entries.find { it.value == notificationId }?.key
             
@@ -566,19 +717,127 @@ object FloatingReplicaManager {
         reason: FloatingWindowManager.RemovalReason = FloatingWindowManager.RemovalReason.REMOTE
     ) {
         runWithErrorHandling("按来源关闭浮窗") {
-            // 从映射中获取所有对应的entryKey
-            val entryKeys = getSourceIdEntryKeys(sourceId)
-            if (entryKeys != null) {
-                // 移除所有相关条目，这会触发onEntryRemoved回调，进而取消对应的通知并清理映射
-                entryKeys.forEach { entryKey ->
-                    floatingWindowManager.removeEntry(entryKey, reason)
-                }
-                // 清理映射关系（如果还有剩余）
-                sourceIdToEntryKeyMap.remove(sourceId)
-            } else {
-                // 如果没有找到映射，尝试直接使用sourceId移除，这会触发onEntryRemoved回调
-                floatingWindowManager.removeEntry(sourceId, reason)
+            // 首先检查是否已经关闭过这个 sourceId，避免重复关闭
+            val now = System.currentTimeMillis()
+            val lastClosedTime = closedSourceIds[sourceId]
+            if (lastClosedTime != null && (now - lastClosedTime) < 60000) { // 60秒内不重复关闭
+                Logger.i(TAG, "dismissBySourceInternal: sourceId=$sourceId 最近已关闭过，跳过, lastClosedTime=$lastClosedTime")
+                return@runWithErrorHandling
             }
+            
+            // 首先检查浮窗功能是否开启
+            val floatingEnabled = if (appContext != null) isFloatingWindowEnabled(appContext!!) else true
+            
+            // 先保存 notificationIds 和 entryKeys，因为后面 floatingWindowManager.removeEntry 可能会清空它们
+            val notificationIdsBefore = sourceIdToNotificationIds[sourceId]?.toList()
+            val entryKeys = getSourceIdEntryKeys(sourceId)
+            Logger.i(TAG, "dismissBySourceInternal: sourceId=$sourceId, floatingEnabled=$floatingEnabled, notificationIdsBefore=$notificationIdsBefore, entryKeys=$entryKeys")
+            
+            if (floatingEnabled) {
+                // 浮窗功能开启，才处理浮窗条目
+                if (entryKeys != null) {
+                    // 移除所有相关条目，这会触发onEntryRemoved回调，进而取消对应的通知并清理映射
+                    entryKeys.forEach { entryKey ->
+                        floatingWindowManager.removeEntry(entryKey, reason)
+                    }
+                    // 清理映射关系（如果还有剩余）
+                    sourceIdToEntryKeyMap.remove(sourceId)
+                } else {
+                    // 如果没有找到映射，尝试直接使用sourceId移除，这会触发onEntryRemoved回调
+                    floatingWindowManager.removeEntry(sourceId, reason)
+                }
+            }
+            
+            // 无论浮窗功能是否开启，都尝试关闭对应的通知
+            // 这确保在仅通知模式下，结束包也能正确关闭通知
+            var context = overlayView?.get()?.context ?: appContext
+            
+            // 如果context仍然为null，尝试从其他方式获取
+            if (context == null) {
+                Logger.w(TAG, "超级岛: 无法从overlayView或appContext获取上下文，尝试其他方式")
+                // 尝试使用静态的application context（这里我们无法直接获取，但我们已经在showFloating中保存了appContext）
+            }
+            
+            if (context != null) {
+                // 尝试关闭Live Updates通知
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                    runWithErrorHandling("关闭Live Updates通知") {
+                        LiveUpdatesNotificationManager.initialize(context)
+                        LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
+                        Logger.i(TAG, "通过LiveUpdatesNotificationManager关闭通知: sourceId=$sourceId")
+                        
+                        // 备用方案：直接计算通知ID并关闭
+                        val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
+                        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        try {
+                            Logger.i(TAG, "尝试直接关闭Live Updates通知，sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
+                            notificationManager.cancel(liveUpdateNotificationId)
+                            Logger.i(TAG, "直接关闭Live Updates通知成功，sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
+                        } catch (e: Exception) {
+                            Logger.w(TAG, "直接关闭Live Updates通知失败: ${e.message}")
+                        }
+                    }
+                }
+                
+                // 尝试关闭传统复刻通知
+                runWithErrorHandling("关闭传统复刻通知") {
+                    // 优先使用保存的 notificationIdsBefore（避免被 floatingWindowManager.removeEntry 清空）
+                    val notificationIds = notificationIdsBefore ?: sourceIdToNotificationIds[sourceId]
+                    Logger.i(TAG, "尝试关闭传统复刻通知，sourceId=$sourceId，notificationIds=$notificationIds, notificationIdsBefore=$notificationIdsBefore")
+                    if (notificationIds != null && notificationIds.isNotEmpty()) {
+                        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        notificationIds.forEach { notificationId ->
+                            try {
+                                Logger.i(TAG, "正在取消通知，sourceId=$sourceId, notificationId=$notificationId")
+                                notificationManager.cancel(notificationId)
+                                Logger.i(TAG, "通过直接映射关闭通知成功，sourceId=$sourceId, notificationId=$notificationId")
+                            } catch (e: Exception) {
+                                Logger.w(TAG, "通过直接映射关闭通知失败: ${e.message}")
+                                e.printStackTrace()
+                            }
+                        }
+                        // 清理映射
+                        sourceIdToNotificationIds.remove(sourceId)
+                    } else {
+                        Logger.w(TAG, "没有找到直接映射的 notificationIds，使用回退方案，sourceId=$sourceId")
+                        // 回退方案1：直接计算通知ID并关闭
+                        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        try {
+                            // 计算传统复刻通知的 ID（与发送时一致）
+                            val traditionalNotificationId = sourceId.hashCode().and(0xffff) + 20000
+                            Logger.i(TAG, "尝试直接关闭传统复刻通知，sourceId=$sourceId, notificationId=$traditionalNotificationId")
+                            notificationManager.cancel(traditionalNotificationId)
+                            Logger.i(TAG, "直接关闭传统复刻通知成功，sourceId=$sourceId, notificationId=$traditionalNotificationId")
+                        } catch (e: Exception) {
+                            Logger.w(TAG, "直接关闭传统复刻通知失败: ${e.message}")
+                        }
+                        
+                        // 回退方案2：尝试从entryKeyToNotificationId映射中获取对应的通知ID并关闭
+                        val keys = entryKeys ?: listOf(sourceId)
+                        keys.forEach { entryKey ->
+                            NotificationGenerator.cancelReplicaNotification(context, entryKey, entryKeyToNotificationId)
+                        }
+                        // 如果没有找到对应的通知ID，尝试清除所有复刻通知
+                        if (keys.isEmpty()) {
+                            NotificationGenerator.clearAllReplicaNotifications(context, entryKeyToNotificationId)
+                        }
+                    }
+                    Logger.i(TAG, "关闭传统复刻通知完成: sourceId=$sourceId")
+                }
+            } else {
+                Logger.w(TAG, "超级岛: 无法获取上下文，无法关闭通知: sourceId=$sourceId")
+                // 即使没有上下文，我们也应该清理映射
+                sourceIdToNotificationIds.remove(sourceId)
+                val keys = entryKeys ?: listOf(sourceId)
+                keys.forEach { entryKey ->
+                    entryKeyToNotificationId.remove(entryKey)
+                }
+            }
+            
+            // 记录这个 sourceId 已经关闭过，避免重复关闭
+            closedSourceIds[sourceId] = System.currentTimeMillis()
+            Logger.i(TAG, "dismissBySourceInternal: 记录 sourceId=$sourceId 已关闭，时间=${closedSourceIds[sourceId]}")
+            
             // 如果对应的会话结束（SI_END），同步移除黑名单，允许后续同一通知重新展示
             // 只有在 REMOTE 或 TIMEOUT 移除时才移除黑名单（因为 MANUAL 会加黑名单）
             if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {

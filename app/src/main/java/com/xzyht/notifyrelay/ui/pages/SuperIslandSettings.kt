@@ -27,7 +27,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val SUPER_ISLAND_KEY = "superisland_enabled"
 private const val SUPER_ISLAND_SHOW_KEY = "superisland_show"
-private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "superisland_floating_window"
+private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
 
 @Composable
 fun UISuperIslandSettings() {
@@ -81,7 +81,6 @@ fun UISuperIslandSettings() {
                         onCheckedChange = {
                             floatingWindowEnabled = it
                             StorageManager.putBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, it)
-                            ToastUtils.showShortToast(context, "功能开发中")
                         }
                     )
 

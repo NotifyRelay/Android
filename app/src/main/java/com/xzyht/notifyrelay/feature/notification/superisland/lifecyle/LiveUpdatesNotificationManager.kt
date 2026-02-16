@@ -25,6 +25,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
+import notifyrelay.data.StorageManager
 import org.json.JSONObject
 
 object LiveUpdatesNotificationManager {
@@ -33,6 +34,28 @@ object LiveUpdatesNotificationManager {
     private const val CHANNEL_NAME = "超级岛Live Updates"
     private const val NOTIFICATION_BASE_ID = 10000
     private const val ICON_CACHE_SIZE = 10 // 最大缓存10个图标
+    private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
+    
+    /**
+     * 检查浮窗功能是否开启
+     */
+    private fun isFloatingWindowEnabled(context: Context): Boolean {
+        return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, true)
+    }
+    
+    /**
+     * 耦合逻辑说明：
+     * 1. 浮窗功能与通知点击事件的耦合：
+     *    - 当浮窗功能开启时，为通知设置点击意图和删除意图
+     *    - 点击意图的 action 为 com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING
+     *    - 删除意图的 action 为 com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION
+     *    - 这些意图会触发 NotificationBroadcastReceiver 中的相应处理逻辑
+     * 
+     * 2. 通知与浮窗的去耦合：
+     *    - 通过 SUPER_ISLAND_FLOATING_WINDOW_KEY 开关控制浮窗功能
+     *    - 浮窗功能关闭时，不设置与浮窗关联的通知点击和关闭广播/意图
+     *    - 浮窗功能关闭时，仅创建基础通知，不添加与浮窗相关的功能
+     */
 
     private lateinit var notificationManager: NotificationManager
     private lateinit var appContext: Context
@@ -101,37 +124,53 @@ object LiveUpdatesNotificationManager {
                 return
             }
 
+            // 检查浮窗功能是否开启
+            val floatingWindowEnabled = isFloatingWindowEnabled(appContext)
+            
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
-            val deleteIntent = PendingIntent.getBroadcast(
-                appContext,
-                notificationId,
-                Intent(appContext, NotificationBroadcastReceiver::class.java)
-                    .putExtra("notificationId", notificationId)
-                    .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val deleteIntent = if (floatingWindowEnabled) {
+                PendingIntent.getBroadcast(
+                    appContext,
+                    notificationId,
+                    Intent(appContext, NotificationBroadcastReceiver::class.java)
+                        .putExtra("notificationId", notificationId)
+                        .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                null
+            }
 
             // 创建点击意图，用于处理用户点击通知时切换浮窗显示/隐藏
-            val contentIntent = PendingIntent.getBroadcast(
-                appContext,
-                notificationId,
-                Intent(appContext, NotificationBroadcastReceiver::class.java)
-                    .putExtra("sourceId", sourceId)
-                    .putExtra("title", title)
-                    .putExtra("text", text)
-                    .putExtra("appName", appName)
-                    .putExtra("paramV2Raw", paramV2Raw)
-                    .setAction("com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val contentIntent = if (floatingWindowEnabled) {
+                PendingIntent.getBroadcast(
+                    appContext,
+                    notificationId,
+                    Intent(appContext, NotificationBroadcastReceiver::class.java)
+                        .putExtra("sourceId", sourceId)
+                        .putExtra("title", title)
+                        .putExtra("text", text)
+                        .putExtra("appName", appName)
+                        .putExtra("paramV2Raw", paramV2Raw)
+                        .setAction("com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                null
+            }
 
             // 构建基础通知
             val notificationBuilder = buildBaseNotification(sourceId)
                 .setContentTitle(title ?: appName ?: "超级岛通知")
                 .setContentText(text ?: "")
                 .setSmallIcon(R.drawable.stat_notify_more)
-                .setDeleteIntent(deleteIntent)
-                .setContentIntent(contentIntent)
+
+            // 只有在浮窗功能开启时才设置删除意图和点击意图
+            if (floatingWindowEnabled) {
+                notificationBuilder
+                    .setDeleteIntent(deleteIntent)
+                    .setContentIntent(contentIntent)
+            }
 
             // 尝试使用前进指示器图标作为小图标
             if (picMap != null && picMap.isNotEmpty()) {
@@ -413,32 +452,45 @@ object LiveUpdatesNotificationManager {
             }
             updatedBuilder.setShortCriticalText(shortText)
 
+            // 检查浮窗功能是否开启
+            val floatingWindowEnabled = isFloatingWindowEnabled(appContext)
+            
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
-            val deleteIntent = PendingIntent.getBroadcast(
-                appContext,
-                notificationId,
-                Intent(appContext, NotificationBroadcastReceiver::class.java)
-                    .putExtra("notificationId", notificationId)
-                    .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val deleteIntent = if (floatingWindowEnabled) {
+                PendingIntent.getBroadcast(
+                    appContext,
+                    notificationId,
+                    Intent(appContext, NotificationBroadcastReceiver::class.java)
+                        .putExtra("notificationId", notificationId)
+                        .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                null
+            }
 
             // 创建点击意图，用于处理用户点击通知时切换浮窗显示/隐藏
-            val contentIntent = PendingIntent.getBroadcast(
-                appContext,
-                notificationId,
-                Intent(appContext, NotificationBroadcastReceiver::class.java)
-                    .putExtra("sourceId", sourceId)
-                    .putExtra("title", paramV2.baseInfo?.title)
-                    .putExtra("text", paramV2.baseInfo?.content)
-                    .setAction("com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"),
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val contentIntent = if (floatingWindowEnabled) {
+                PendingIntent.getBroadcast(
+                    appContext,
+                    notificationId,
+                    Intent(appContext, NotificationBroadcastReceiver::class.java)
+                        .putExtra("sourceId", sourceId)
+                        .putExtra("title", paramV2.baseInfo?.title)
+                        .putExtra("text", paramV2.baseInfo?.content)
+                        .setAction("com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"),
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+                )
+            } else {
+                null
+            }
 
             // 设置意图
-            updatedBuilder
-                .setDeleteIntent(deleteIntent)
-                .setContentIntent(contentIntent)
+            if (floatingWindowEnabled) {
+                updatedBuilder
+                    .setDeleteIntent(deleteIntent)
+                    .setContentIntent(contentIntent)
+            }
 
             // 处理进度样式通知（仅处理进度类型）
             val progressInfo = paramV2.progressInfo
@@ -811,10 +863,16 @@ object LiveUpdatesNotificationManager {
             return
         }
         try {
-            // 检查notificationManager是否已初始化
+            // 检查notificationManager是否已初始化，如果没有则尝试初始化
             if (!::notificationManager.isInitialized) {
-                Logger.w(TAG, "LiveUpdatesNotificationManager未初始化，跳过取消通知")
-                return
+                Logger.w(TAG, "LiveUpdatesNotificationManager未初始化，尝试初始化")
+                // 如果有appContext，则使用appContext初始化
+                if (::appContext.isInitialized) {
+                    initialize(appContext)
+                } else {
+                    Logger.w(TAG, "无法初始化LiveUpdatesNotificationManager，缺少上下文")
+                    return
+                }
             }
             val notificationId = sourceId.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
             notificationManager.cancel(notificationId)
