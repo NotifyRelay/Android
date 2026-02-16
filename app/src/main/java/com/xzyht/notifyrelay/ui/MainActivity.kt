@@ -7,9 +7,11 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -85,6 +87,10 @@ import top.yukonga.miuix.kmp.utils.MiuixPopupUtils.Companion.MiuixPopupHost
 class MainActivity : FragmentActivity() {
     internal var showAutoStartBanner = false
     internal var bannerMessage: String? = null
+    
+    // 用于二次返回退出的标记
+    private var backPressedTime: Long = 0
+    private val EXIT_INTERVAL = 2000L // 2秒内再次返回才退出
 
     /**
      * 检查权限并启动服务
@@ -138,6 +144,22 @@ class MainActivity : FragmentActivity() {
     @OptIn(DelicateCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 注册返回事件回调，确保优先处理
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                Logger.d("MainActivity", "onBackPressedDispatcher callback")
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - backPressedTime < EXIT_INTERVAL) {
+                    // 2秒内再次点击返回，真正退出应用
+                    finish()
+                } else {
+                    // 第一次点击返回，显示提示
+                    ToastUtils.showShortToast(this@MainActivity, "再次返回以退出应用,点击空白关闭弹窗")
+                    backPressedTime = currentTime
+                }
+            }
+        })
 
         // 初始化前后台检测器
         PermissionHelper.AppForegroundDetector.initialize(this)
@@ -218,6 +240,45 @@ class MainActivity : FragmentActivity() {
                 showAutoStartBanner = true
                 bannerMessage = "服务无法启动，可能因系统自启动/后台运行权限被拒绝。请前往系统设置手动允许自启动、后台运行和电池优化白名单，否则通知转发将无法正常工作。"
             }
+        }
+    }
+    
+    /**
+     * 最底层拦截返回按钮事件，确保优先处理
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        Logger.d("MainActivity", "dispatchKeyEvent: keyCode=${event.keyCode}, action=${event.action}")
+        if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
+            Logger.d("MainActivity", "Back button pressed")
+            val currentTime = System.currentTimeMillis()
+            if (currentTime - backPressedTime < EXIT_INTERVAL) {
+                // 2秒内再次点击返回，真正退出应用
+                Logger.d("MainActivity", "Exiting app")
+                finish()
+                return true
+            } else {
+                // 第一次点击返回，显示提示
+                Logger.d("MainActivity", "Showing back press hint")
+                ToastUtils.showShortToast(this, "再次返回以退出应用,点击空白关闭弹窗")
+                backPressedTime = currentTime
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+    
+    /**
+     * 确保 onBackPressed 也被正确处理
+     */
+    override fun onBackPressed() {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - backPressedTime < EXIT_INTERVAL) {
+            // 2秒内再次点击返回，真正退出应用
+            super.onBackPressed()
+        } else {
+            // 第一次点击返回，显示提示
+            ToastUtils.showShortToast(this, "再次返回以退出应用,点击空白关闭弹窗")
+            backPressedTime = currentTime
         }
     }
 }
