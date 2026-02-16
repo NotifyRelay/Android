@@ -70,6 +70,7 @@ import notifyrelay.data.config.DeviceInfoManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
@@ -343,14 +344,30 @@ fun MainAppFragment(modifier: Modifier = Modifier) {
         },
         bottomBar = {
             NavigationBar(
-                items = items,
-                selected = selectedTab,
-                onClick = { index -> selectedTab = index },
                 color = colorScheme.background,
                 modifier = Modifier
                     .height(58.dp)
                     .navigationBarsPadding()
-            )
+            ) {
+                NavigationBarItem(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    icon = MiuixIcons.Community,
+                    label = "历史"
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    icon = MiuixIcons.Settings,
+                    label = "互联与测试"
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    icon = MiuixIcons.Tune,
+                    label = "设置"
+                )
+            }
         },
         containerColor = colorScheme.background
     ) { paddingValues ->
