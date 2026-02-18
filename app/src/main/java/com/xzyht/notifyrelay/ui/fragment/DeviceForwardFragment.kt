@@ -35,8 +35,8 @@ import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.ui.pages.DeviceInterconnect
-import com.xzyht.notifyrelay.ui.pages.UIChatTest
+import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
+import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -147,7 +147,7 @@ fun DeviceForwardScreen(
         }
     }
     // TabRow相关状态
-    val tabTitles = listOf("设备互联", "聊天测试")
+    val tabTitles = listOf("剪贴板同步", "音乐控制")
     
     // Pager相关状态 - 使用Pager状态作为唯一数据源
     val pagerState = rememberPagerState(initialPage = 0) {
@@ -236,12 +236,12 @@ fun DeviceForwardScreen(
             ) {
                 when (page) {
                     0 -> {
-                        // 设备互联 Tab
-                        DeviceInterconnect()
+                        // 剪贴板同步 Tab
+                        ClipboardSyncPage()
                     }
                     1 -> {
-                        // 聊天测试 Tab：独立到 UIChatTest 组件
-                        UIChatTest(deviceManager = deviceManager)
+                        // 音乐控制 Tab
+                        MusicControlPage()
                     }
                 }
             }

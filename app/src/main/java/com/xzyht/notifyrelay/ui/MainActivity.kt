@@ -347,7 +347,7 @@ fun MainAppFragment(modifier: Modifier = Modifier) {
     val fragmentContainerId = remember { View.generateViewId() }
     val items = listOf(
         NavigationItem("历史", MiuixIcons.Community),
-        NavigationItem("互联与测试", MiuixIcons.Settings),
+        NavigationItem("设备互联与增强", MiuixIcons.Settings),
         NavigationItem("设置", MiuixIcons.Tune)
     )
     val colorScheme = MiuixTheme.colorScheme
@@ -420,7 +420,7 @@ fun MainAppFragment(modifier: Modifier = Modifier) {
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
                     icon = MiuixIcons.Settings,
-                    label = "互联与测试"
+                    label = "设备互联与增强"
                 )
                 NavigationBarItem(
                     selected = selectedTab == 2,
