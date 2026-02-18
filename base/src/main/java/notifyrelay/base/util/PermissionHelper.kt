@@ -286,6 +286,38 @@ object PermissionHelper {
     }
 
     /**
+     * 从 FINGERPRINT 中提取详细的 OS 版本信息。
+     *
+     * @return 详细的 OS 版本字符串，例如 "OS3.0.300.4.WNACNXM"。
+     */
+    fun getDetailedOsVersion(): String? {
+        val fingerprint = android.os.Build.FINGERPRINT
+        return try {
+            // 直接搜索包含 "OS" 开头的版本部分
+            // 例如：OS3.0.300.4.WNACNXM
+            val osPattern = Regex("OS\\d+(\\.\\d+)*[\\w\\.]*")
+            val matchResult = osPattern.find(fingerprint)
+            
+            if (matchResult != null) {
+                var osVersion = matchResult.value
+                
+                // 清理结果，确保不包含多余字符
+                osVersion = osVersion
+                    .trim()
+                    .trim('/')
+                    .trim(':')
+                    .trim()
+                
+                return osVersion
+            }
+            
+            null
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
      * 私有工具：检测设备是否为 MIUI/澎湃（基于厂商名或系统权限信息判断）。
      *
      * @param context 用于访问 PackageManager 的上下文。
