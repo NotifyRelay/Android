@@ -19,6 +19,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdat
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.NotificationGenerator
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -305,6 +306,9 @@ object FloatingReplicaManager {
     // 保存已经关闭过的 sourceId，避免重复关闭
     private val closedSourceIds = ConcurrentHashMap<String, Long>()
     
+    // 保存超时任务，确保每个sourceId只有一个活动的超时任务
+    private val timeoutJobs = ConcurrentHashMap<String, Job>()
+    
     // 保存被隐藏的条目，以便用户点击通知时恢复
     private val hiddenEntries = ConcurrentHashMap<String, Any>()
     // 通知渠道ID
@@ -384,14 +388,28 @@ object FloatingReplicaManager {
                     }
                     
                     // 添加超时自动移除机制，与浮窗保持一致
-                    val timeoutMs = 30 * 1000L // 默认30秒
-                    CoroutineScope(Dispatchers.Main).launch {
+                    // 检测是否为媒体类型，设置不同的超时时间
+                    val isMediaType = paramV2?.business == "media" || 
+                                      paramV2Raw?.contains("\"business\":\"media\"") == true
+                    val timeoutMs = 30 * 1000L // 30秒
+                    
+                    Logger.i(TAG, "超级岛: 设置超时时间, sourceId=$sourceId, isMediaType=$isMediaType, timeoutMs=$timeoutMs")
+                    
+                    // 取消现有的超时任务（如果存在）
+                    timeoutJobs[sourceId]?.cancel()
+                    Logger.i(TAG, "超级岛: 取消现有的超时任务（如果存在）, sourceId=$sourceId")
+                    
+                    // 启动新的超时任务并保存
+                    val timeoutJob = CoroutineScope(Dispatchers.Main).launch {
                         delay(timeoutMs)
                         runWithErrorHandling("超时自动移除通知") {
+                            Logger.i(TAG, "超级岛: 超时任务触发，准备移除通知, sourceId=$sourceId, timeoutMs=$timeoutMs")
                             dismissBySource(sourceId)
                             Logger.i(TAG, "超级岛: 通知超时自动移除, sourceId=$sourceId")
                         }
                     }
+                    timeoutJobs[sourceId] = timeoutJob
+                    Logger.i(TAG, "超级岛: 已启动新的超时任务, sourceId=$sourceId, timeoutMs=$timeoutMs")
                 }
             }
         }
@@ -639,6 +657,34 @@ object FloatingReplicaManager {
             if (appContext != null && !isFloatingWindowEnabled(appContext!!)) {
                 // 浮窗功能已关闭，直接关闭通知，不处理浮窗
                 Logger.i(TAG, "超级岛: 浮窗功能已关闭，直接关闭通知，notificationId=$notificationId")
+                
+                // 清理相关的超时任务
+                var sourceIdToClean: String? = null
+                // 从sourceIdToNotificationIds映射中查找对应的sourceId
+                for ((sourceId, notificationIds) in sourceIdToNotificationIds) {
+                    if (notificationIds.contains(notificationId)) {
+                        sourceIdToClean = sourceId
+                        break
+                    }
+                }
+                // 如果找不到，尝试从entryKeyToNotificationId映射中查找entryKey，然后从sourceIdToEntryKeyMap查找sourceId
+                if (sourceIdToClean == null) {
+                    val entryKey = entryKeyToNotificationId.entries.find { it.value == notificationId }?.key
+                    if (entryKey != null) {
+                        for ((sourceId, keys) in sourceIdToEntryKeyMap) {
+                            if (keys.contains(entryKey)) {
+                                sourceIdToClean = sourceId
+                                break
+                            }
+                        }
+                    }
+                }
+                
+                if (sourceIdToClean != null) {
+                    timeoutJobs.remove(sourceIdToClean)?.cancel()
+                    Logger.i(TAG, "超级岛: 清理超时任务, sourceId=$sourceIdToClean, notificationId=$notificationId")
+                }
+                
                 val context = appContext ?: return@runWithErrorHandling
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 try {
@@ -703,7 +749,11 @@ object FloatingReplicaManager {
             }
             // 清空映射
             sourceIdToEntryKeyMap.clear()
-            Logger.i(TAG, "超级岛: 关闭所有浮窗条目成功")
+            
+            // 清理所有超时任务
+            timeoutJobs.values.forEach { it.cancel() }
+            timeoutJobs.clear()
+            Logger.i(TAG, "超级岛: 关闭所有浮窗条目成功，已清理所有超时任务")
         }
     }
 
@@ -724,6 +774,10 @@ object FloatingReplicaManager {
                 Logger.i(TAG, "dismissBySourceInternal: sourceId=$sourceId 最近已关闭过，跳过, lastClosedTime=$lastClosedTime")
                 return@runWithErrorHandling
             }
+            
+            // 清理超时任务
+            timeoutJobs.remove(sourceId)?.cancel()
+            Logger.i(TAG, "dismissBySourceInternal: 清理超时任务, sourceId=$sourceId")
             
             // 首先检查浮窗功能是否开启
             val floatingEnabled = if (appContext != null) isFloatingWindowEnabled(appContext!!) else true
