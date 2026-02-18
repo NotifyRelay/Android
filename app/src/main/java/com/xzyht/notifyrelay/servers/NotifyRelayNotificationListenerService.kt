@@ -244,31 +244,31 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         // 初始化封面URL变量
         var coverUrl: String? = null
 
+        // 获取音乐封面图标（无论胶囊歌词是否开启都提取）
+        try {
+            // 尝试从通知的大图中获取封面
+            val largeIcon = sbn.notification.getLargeIcon()
+            if (largeIcon != null) {
+                // 将Drawable转换为Bitmap
+                val drawable = largeIcon.loadDrawable(applicationContext)
+                if (drawable != null) {
+                    val bitmap = DataUrlUtils.drawableToBitmap(drawable)
+                    val stream = ByteArrayOutputStream()
+                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                    val bytes = stream.toByteArray()
+                    val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                    coverUrl = "data:image/jpeg;base64,$base64"
+                }
+            }
+        } catch (e: Exception) {
+            Logger.e(TAG, "获取音乐封面失败", e)
+        }
+
         // 检查胶囊歌词开关状态
         val capsuleLyricsEnabled = getStorageBoolean("capsule_lyrics_enabled", false)
 
         // 如果胶囊歌词开关开启，直接在本机内生成浮窗和通知
         if (capsuleLyricsEnabled) {
-            // 获取音乐封面图标
-            try {
-                // 尝试从通知的大图中获取封面
-                val largeIcon = sbn.notification.getLargeIcon()
-                if (largeIcon != null) {
-                    // 将Drawable转换为Bitmap
-                    val drawable = largeIcon.loadDrawable(applicationContext)
-                    if (drawable != null) {
-                        val bitmap = DataUrlUtils.drawableToBitmap(drawable)
-                        val stream = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
-                        val bytes = stream.toByteArray()
-                        val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                        coverUrl = "data:image/jpeg;base64,$base64"
-                    }
-                }
-            } catch (e: Exception) {
-                Logger.e(TAG, "获取音乐封面失败", e)
-            }
-
             try {
                 Logger.i(TAG, "胶囊歌词开关开启，在本机内生成浮窗和通知: title='$title', text='$text'")
                 
