@@ -229,6 +229,8 @@ dependencies {
     implementation(project(":core"))
     // 依赖base模块
     implementation(project(":base"))
+    // 依赖checkupdata模块
+    implementation(project(":checkupdata"))
 }
 
 tasks.register("printVersionName") {

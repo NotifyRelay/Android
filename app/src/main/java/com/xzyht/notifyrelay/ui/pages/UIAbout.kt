@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.ui.pages
 
-import android.content.Context
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -10,7 +9,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -20,11 +21,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.BuildConfig
+import com.xzyht.notifyrelay.ui.dialog.UpdateDialog
+import github.xzynine.checkupdata.CheckUpdateManager
+import github.xzynine.checkupdata.model.ReleaseInfo
+import github.xzynine.checkupdata.model.UpdateResult
+import github.xzynine.checkupdata.version.VersionComparator
+import github.xzynine.checkupdata.version.VersionRule
 import kotlinx.coroutines.launch
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperArrow
+import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Date
 
@@ -47,6 +55,13 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
     
     // 检测更新相关状态
     var isCheckingUpdate by remember { mutableStateOf(false) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    var latestReleaseInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
+    var includePrerelease by remember {
+        mutableStateOf(StorageManager.getBoolean(context, "check_update_include_prerelease", false))
+    }
+    
+    val checkUpdateManager = remember { CheckUpdateManager(context) }
 
     MiuixTheme {
         val colorScheme = MiuixTheme.colorScheme
@@ -99,7 +114,6 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            // 检测更新 - 使用SuperArrow
             SuperArrow(
                 title = "检测更新",
                 summary = if (isCheckingUpdate) "检查中..." else "点击检查是否有新版本",
@@ -109,13 +123,53 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                     isCheckingUpdate = true
                     Toast.makeText(context, "正在检查更新...", Toast.LENGTH_SHORT).show()
                     
-                    // 模拟检测更新的网络请求
                     coroutineScope.launch {
-                        kotlinx.coroutines.delay(1500)
-                        // 模拟检查结果
-                        Toast.makeText(context, "当前已是最新版本", Toast.LENGTH_SHORT).show()
+                        val rule = if (includePrerelease) VersionRule.LATEST else VersionRule.STABLE
+                        val result = checkUpdateManager.checkUpdate(
+                            owner = "NotifyRelay",
+                            repo = "Android",
+                            currentVersion = BuildConfig.VERSION_NAME,
+                            rule = rule
+                        )
+                        
                         isCheckingUpdate = false
+                        
+                        when (result) {
+                            is UpdateResult.HasUpdate -> {
+                                latestReleaseInfo = result.releaseInfo
+                                showUpdateDialog = true
+                            }
+                            is UpdateResult.NoUpdate -> {
+                                val comparison = VersionComparator.compare(result.currentVersion, result.remoteVersion)
+                                val statusText = when {
+                                    comparison == 0 -> "等于"
+                                    comparison > 0 -> "大于"
+                                    else -> "小于"
+                                }
+                                Toast.makeText(
+                                    context, 
+                                    "远端版本: ${result.remoteVersion}，当前版本${statusText}远端版本", 
+                                    Toast.LENGTH_LONG
+                                ).show()
+                            }
+                            is UpdateResult.Error -> {
+                                Toast.makeText(context, "检查失败: ${result.message}", Toast.LENGTH_SHORT).show()
+                            }
+                        }
                     }
+                },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
+            
+            SuperSwitch(
+                title = "包含预发布版本",
+                checked = includePrerelease,
+                summary = "检测更新时包含预发布版本(极其不稳定)",
+                onCheckedChange = {
+                    includePrerelease = it
+                    StorageManager.putBoolean(context, "check_update_include_prerelease", it)
                 },
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
@@ -147,6 +201,27 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                     .padding(24.dp)
                     .align(Alignment.CenterHorizontally)
             )
+        }
+        
+        if (showUpdateDialog && latestReleaseInfo != null) {
+            key(latestReleaseInfo!!.id) {
+                val dialogState = remember { mutableStateOf(true) }
+                
+                UpdateDialog(
+                    showDialog = dialogState,
+                    releaseInfo = latestReleaseInfo!!,
+                    currentVersion = BuildConfig.VERSION_NAME,
+                    onDownload = { info ->
+                        coroutineScope.launch {
+                            checkUpdateManager.downloadRelease(info, useProxy = true)
+                        }
+                    },
+                    onDismiss = {
+                        showUpdateDialog = false
+                        latestReleaseInfo = null
+                    }
+                )
+            }
         }
     }
 }

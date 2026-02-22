@@ -38,6 +38,7 @@ composeUi = "1.6.0"
 compileSdk = "36"
 targetSdk = "36"
 minSdk = "29"
+semver = "2.0.0"
 
 
 [libraries]
@@ -77,6 +78,7 @@ androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecyc
 androidx-lifecycle-runtime-android = { group = "androidx.lifecycle", name = "lifecycle-runtime-android", version.ref = "lifecycleRuntimeAndroid" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 accompanist-pager-indicators = { group = "com.google.accompanist", name = "accompanist-pager-indicators", version.ref = "accompanistPager" }
+semver = { group = "io.github.z4kn4fein", name = "semver", version.ref = "semver" }
 
 
 
