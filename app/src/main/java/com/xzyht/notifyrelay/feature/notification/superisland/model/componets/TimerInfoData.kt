@@ -21,8 +21,3 @@ fun parseTimerInfo(json: JSONObject): TimerInfo {
     )
 }
 
-// 格式化计时器信息为显示文本
-// 使用CommonCompose.kt中的公共实现
-fun formatTimerInfo(timerInfo: TimerInfo): String {
-    return formatTimerInfo(timerInfo)
-}
