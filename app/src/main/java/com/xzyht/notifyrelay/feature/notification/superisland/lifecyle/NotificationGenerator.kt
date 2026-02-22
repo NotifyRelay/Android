@@ -637,24 +637,8 @@ object NotificationGenerator {
                     var smallIconBitmap: Bitmap? = null
                     
                     // 解析param_v2中的bigIsland数据
-                    var bigIsland: JSONObject? = null
                     val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
-                    
-                    paramV2RawValue?.let {
-                        try {
-                            val json = JSONObject(it)
-                            // 尝试从param_island -> bigIslandArea中解析
-                            val paramIsland = json.optJSONObject("param_island")
-                            bigIsland = paramIsland?.optJSONObject("bigIslandArea")
-                            
-                            // 如果没有找到，尝试直接从bigIsland字段解析
-                            if (bigIsland == null) {
-                                bigIsland = json.optJSONObject("bigIsland")
-                            }
-                        } catch (e: Exception) {
-                            Logger.w(TAG, "超级岛: 解析bigIsland失败: ${e.message}")
-                        }
-                    }
+                    val bigIsland = parseBigIsland(paramV2RawValue)
                     
                     // 解析A/B区数据
                     val bComponent = parseBComponent(bigIsland)
@@ -775,16 +759,8 @@ object NotificationGenerator {
                 // 对于计时器类通知，添加计时器相关字段
                 if (title?.contains("计时") == true || title?.contains("秒表") == true) {
                     // 解析B区数据，检查是否为计时器类型
-                    val bigIsland: JSONObject? = try {
-                        val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
-                        paramV2RawValue?.let {
-                            val json = JSONObject(it)
-                            val paramIsland = json.optJSONObject("param_island")
-                            paramIsland?.optJSONObject("bigIslandArea") ?: json.optJSONObject("bigIsland")
-                        }
-                    } catch (e: Exception) {
-                        null
-                    }
+                    val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
+                    val bigIsland = parseBigIsland(paramV2RawValue)
                     
                     val bComponent = parseBComponent(bigIsland)
                     if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
@@ -844,25 +820,9 @@ object NotificationGenerator {
                     var smallIconBitmap: Bitmap? = null
                     
                     // 解析 param_v2 中的 bigIsland 数据
-                    var bigIsland: JSONObject? = null
                     val entry = floatingWindowManager.getEntry(key)
                     val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
-                    
-                    paramV2RawValue?.let {
-                        try {
-                            val json = JSONObject(it)
-                            // 尝试从 param_island -> bigIslandArea 中解析
-                            val paramIsland = json.optJSONObject("param_island") 
-                            bigIsland = paramIsland?.optJSONObject("bigIslandArea")
-                            
-                            // 如果没有找到，尝试直接从 bigIsland 字段解析
-                            if (bigIsland == null) {
-                                bigIsland = json.optJSONObject("bigIsland")
-                            }
-                        } catch (e: Exception) {
-                            Logger.w(TAG, "超级岛: 解析 bigIsland 失败: ${e.message}")
-                        }
-                    }
+                    val bigIsland = parseBigIsland(paramV2RawValue)
                     
                     // 解析 A/B 区数据
                     val aComponent = parseAComponent(bigIsland)
@@ -1052,16 +1012,8 @@ object NotificationGenerator {
                 notificationManager.notify(notificationId, notification)
                 
                 // 检查是否需要创建计时器更新定时器
-                val bigIsland: JSONObject? = try {
-                    val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
-                    paramV2RawValue?.let {
-                        val json = JSONObject(it)
-                        val paramIsland = json.optJSONObject("param_island")
-                        paramIsland?.optJSONObject("bigIslandArea") ?: json.optJSONObject("bigIsland")
-                    }
-                } catch (e: Exception) {
-                    null
-                }
+                val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
+                val bigIsland = parseBigIsland(paramV2RawValue)
                 
                 val bComponent = parseBComponent(bigIsland)
                 if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
@@ -1131,24 +1083,8 @@ object NotificationGenerator {
     ): NotificationCompat.Builder {
         try {
             // 解析 param_v2 中的 bigIsland 数据
-        var bigIsland: JSONObject? = null
-        val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
-        
-        paramV2RawValue?.let {
-            try {
-                val json = JSONObject(it)
-                // 尝试从 param_island -> bigIslandArea 中解析
-                val paramIsland = json.optJSONObject("param_island")
-                bigIsland = paramIsland?.optJSONObject("bigIslandArea")
-                
-                // 如果没有找到，尝试直接从 bigIsland 字段解析
-                if (bigIsland == null) {
-                    bigIsland = json.optJSONObject("bigIsland")
-                }
-            } catch (e: Exception) {
-                Logger.w(TAG, "超级岛: 解析 bigIsland 失败: ${e.message}")
-            }
-        }
+            val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
+            val bigIsland = parseBigIsland(paramV2RawValue)
             
             // 解析 A/B 区数据
             val aComponent = parseAComponent(bigIsland)
@@ -1412,6 +1348,27 @@ object NotificationGenerator {
     }
 
     /**
+     * 解析bigIsland数据
+     * 尝试从param_island -> bigIslandArea中解析，如果没有找到，再从bigIsland字段解析
+     */
+    private fun parseBigIsland(paramV2RawValue: String?): JSONObject? {
+        paramV2RawValue?.let {
+            try {
+                val json = JSONObject(it)
+                // 尝试从param_island -> bigIslandArea中解析
+                val paramIsland = json.optJSONObject("param_island")
+                val bigIsland = paramIsland?.optJSONObject("bigIslandArea")
+                
+                // 如果没有找到，尝试直接从bigIsland字段解析
+                return bigIsland ?: json.optJSONObject("bigIsland")
+            } catch (e: Exception) {
+                Logger.w(TAG, "超级岛: 解析bigIsland失败: ${e.message}")
+            }
+        }
+        return null
+    }
+
+    /**
      * 构建胶囊兼容的通知并注入图标
      */
     private suspend fun buildCapsuleCompatibleNotificationWithIconInjection(
@@ -1435,24 +1392,8 @@ object NotificationGenerator {
         var smallIconBitmap: Bitmap? = null
         
         // 解析 param_v2 中的 bigIsland 数据
-        var bigIsland: JSONObject? = null
         val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
-        
-        paramV2RawValue?.let {
-            try {
-                val json = JSONObject(it)
-                // 尝试从 param_island -> bigIslandArea 中解析
-                val paramIsland = json.optJSONObject("param_island")
-                bigIsland = paramIsland?.optJSONObject("bigIslandArea")
-                
-                // 如果没有找到，尝试直接从 bigIsland 字段解析
-                if (bigIsland == null) {
-                    bigIsland = json.optJSONObject("bigIsland")
-                }
-            } catch (e: Exception) {
-                Logger.w(TAG, "超级岛: 解析 bigIsland 失败: ${e.message}")
-            }
-        }
+        val bigIsland = parseBigIsland(paramV2RawValue)
         
         // 解析 A/B 区数据
         val aComponent = parseAComponent(bigIsland)
