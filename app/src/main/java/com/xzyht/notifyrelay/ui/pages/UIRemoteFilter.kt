@@ -6,12 +6,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
@@ -26,13 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
+import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.ui.dialog.AddKeywordDialog
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
@@ -208,23 +205,18 @@ fun UIRemoteFilter() {
             }
         }
         // 包名等价功能总开关
-        Column(modifier = Modifier.fillMaxWidth()) {
-            Row(
-            verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 10.dp)
-        ) {
-            Text("启用包名等价映射", style = textStyles.body2, color = colorScheme.onSurface)
-            Spacer(modifier = Modifier.width(16.dp))
-                Switch(
-                checked = enablePackageGroupMapping,
-                onCheckedChange = {
-                    RemoteFilterConfig.enablePackageGroupMapping = it
-                    RemoteFilterConfig.save(context)
-                    enablePackageGroupMapping = it
-                },
-                modifier = Modifier.size(width = 24.dp, height = 12.dp)
-            )
-        }
+        SuperSwitch(
+            title = "启用包名等价映射",
+            checked = enablePackageGroupMapping,
+            summary = "启用包名等价映射功能",
+            onCheckedChange = {
+                RemoteFilterConfig.enablePackageGroupMapping = it
+                RemoteFilterConfig.save(context)
+                enablePackageGroupMapping = it
+            },
+            modifier = Modifier.padding(top = 16.dp)
+        )
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
 
         // 包名组配置
         Column(modifier = Modifier.fillMaxWidth()) {
@@ -382,5 +374,5 @@ fun UIRemoteFilter() {
             )}
         }
     }
-}}
+}
     
