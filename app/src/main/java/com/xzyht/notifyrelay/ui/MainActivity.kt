@@ -243,44 +243,7 @@ class MainActivity : FragmentActivity() {
         }
     }
     
-    /**
-     * 最底层拦截返回按钮事件，确保优先处理
-     */
-    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-        Logger.d("MainActivity", "dispatchKeyEvent: keyCode=${event.keyCode}, action=${event.action}")
-        if (event.keyCode == KeyEvent.KEYCODE_BACK && event.action == KeyEvent.ACTION_DOWN) {
-            Logger.d("MainActivity", "Back button pressed")
-            val currentTime = System.currentTimeMillis()
-            if (currentTime - backPressedTime < EXIT_INTERVAL) {
-                // 2秒内再次点击返回，真正退出应用
-                Logger.d("MainActivity", "Exiting app")
-                finish()
-                return true
-            } else {
-                // 第一次点击返回，显示提示
-                Logger.d("MainActivity", "Showing back press hint")
-                ToastUtils.showShortToast(this, "再次返回以退出应用,点击空白关闭弹窗")
-                backPressedTime = currentTime
-                return true
-            }
-        }
-        return super.dispatchKeyEvent(event)
-    }
-    
-    /**
-     * 确保 onBackPressed 也被正确处理
-     */
-    override fun onBackPressed() {
-        val currentTime = System.currentTimeMillis()
-        if (currentTime - backPressedTime < EXIT_INTERVAL) {
-            // 2秒内再次点击返回，真正退出应用
-            super.onBackPressed()
-        } else {
-            // 第一次点击返回，显示提示
-            ToastUtils.showShortToast(this, "再次返回以退出应用,点击空白关闭弹窗")
-            backPressedTime = currentTime
-        }
-    }
+
 }
 @Composable
 fun <T : Fragment> FragmentContainerView(
