@@ -1,7 +1,6 @@
 package notifyrelay.base.util
 
 import android.util.Log
-//TODO 记得修改其他文件的替换为Logger
 /**
  * 日志工具类
  * 用于统一管理日志输出，支持按级别控制是否输出到控制台
@@ -19,7 +18,7 @@ object Logger {
     }
 
     // 当前日志级别，可根据需求调整
-    private val CURRENT_LEVEL = Level.VERBOSE
+    var CURRENT_LEVEL = Level.INFO
 
     /**
      * 详细日志（最低级别）
@@ -111,12 +110,5 @@ object Logger {
         }
     }
 
-    /**
-     * 输出SBN详情（用于替换logSbnDetail）
-     */
-    fun logSbnDetail(tag: String, message: String) {
-        if (CURRENT_LEVEL <= Level.DEBUG) {
-            Log.d(tag, message)
-        }
-    }
+
 }

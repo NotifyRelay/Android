@@ -7,9 +7,11 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
+import android.view.KeyEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -44,17 +46,17 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
+import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
-import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.ui.fragment.DeviceForwardFragment
 import com.xzyht.notifyrelay.ui.fragment.DeviceListFragment
-import com.xzyht.notifyrelay.ui.fragment.NotificationHistoryFragment
+import com.xzyht.notifyrelay.ui.fragment.HistoryFragment
 import com.xzyht.notifyrelay.ui.fragment.SettingsFragment
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
@@ -70,6 +72,7 @@ import notifyrelay.data.config.DeviceInfoManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.NavigationItem
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
@@ -84,6 +87,10 @@ import top.yukonga.miuix.kmp.utils.MiuixPopupUtils.Companion.MiuixPopupHost
 class MainActivity : FragmentActivity() {
     internal var showAutoStartBanner = false
     internal var bannerMessage: String? = null
+    
+    // 用于二次返回退出的标记
+    private var backPressedTime: Long = 0
+    private val EXIT_INTERVAL = 2000L // 2秒内再次返回才退出
 
     /**
      * 检查权限并启动服务
@@ -137,6 +144,25 @@ class MainActivity : FragmentActivity() {
     @OptIn(DelicateCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // 初始化日志配置
+        DeveloperModeActivity.initLogConfig(this)
+
+        // 注册返回事件回调，确保优先处理
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                Logger.d("MainActivity", "onBackPressedDispatcher callback")
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - backPressedTime < EXIT_INTERVAL) {
+                    // 2秒内再次点击返回，真正退出应用
+                    finish()
+                } else {
+                    // 第一次点击返回，显示提示
+                    ToastUtils.showShortToast(this@MainActivity, "再次返回以退出应用,点击空白关闭弹窗")
+                    backPressedTime = currentTime
+                }
+            }
+        })
 
         // 初始化前后台检测器
         PermissionHelper.AppForegroundDetector.initialize(this)
@@ -219,6 +245,8 @@ class MainActivity : FragmentActivity() {
             }
         }
     }
+    
+
 }
 @Composable
 fun <T : Fragment> FragmentContainerView(
@@ -265,8 +293,8 @@ fun DeviceForwardFragmentView(fragmentContainerId: Int) {
 fun NotificationHistoryFragmentView(fragmentContainerId: Int) {
     FragmentContainerView(
         fragmentContainerId = fragmentContainerId,
-        fragmentTag = "NotificationHistoryFragment",
-        fragmentFactory = { NotificationHistoryFragment() }
+        fragmentTag = "HistoryFragment",
+        fragmentFactory = { HistoryFragment() }
     )
 }
 
@@ -285,7 +313,7 @@ fun MainAppFragment(modifier: Modifier = Modifier) {
     val fragmentContainerId = remember { View.generateViewId() }
     val items = listOf(
         NavigationItem("历史", MiuixIcons.Community),
-        NavigationItem("互联与测试", MiuixIcons.Settings),
+        NavigationItem("设备互联与增强", MiuixIcons.Settings),
         NavigationItem("设置", MiuixIcons.Tune)
     )
     val colorScheme = MiuixTheme.colorScheme
@@ -343,14 +371,30 @@ fun MainAppFragment(modifier: Modifier = Modifier) {
         },
         bottomBar = {
             NavigationBar(
-                items = items,
-                selected = selectedTab,
-                onClick = { index -> selectedTab = index },
                 color = colorScheme.background,
                 modifier = Modifier
                     .height(58.dp)
                     .navigationBarsPadding()
-            )
+            ) {
+                NavigationBarItem(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    icon = MiuixIcons.Community,
+                    label = "历史"
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    icon = MiuixIcons.Settings,
+                    label = "设备互联与增强"
+                )
+                NavigationBarItem(
+                    selected = selectedTab == 2,
+                    onClick = { selectedTab = 2 },
+                    icon = MiuixIcons.Tune,
+                    label = "设置"
+                )
+            }
         },
         containerColor = colorScheme.background
     ) { paddingValues ->

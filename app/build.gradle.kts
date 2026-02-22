@@ -1,8 +1,7 @@
 
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.io.ByteArrayOutputStream
 import java.util.Properties
-import java.io.File
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.application")
@@ -60,7 +59,7 @@ android {
 
     defaultConfig {
         applicationId = "com.xzyht.notifyrelay"
-        minSdk = 26
+        minSdk = 29
         targetSdk = 36
         // 使用自动计算的版本号
         versionCode = computedVersionCode
@@ -168,6 +167,8 @@ dependencies {
     implementation(libs.androidx.material3)
     implementation(libs.androidx.foundation.layout)
     implementation(libs.androidx.runtime)
+    implementation(libs.androidx.remote.creation.compose)
+    implementation(libs.runtime)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
@@ -200,7 +201,7 @@ dependencies {
     
     // Miuix风格ui库
     implementation(libs.miuix.android)
-    implementation("top.yukonga.miuix.kmp:miuix-icons:0.8.1")
+    implementation("top.yukonga.miuix.kmp:miuix-icons:0.8.3")
     implementation("androidx.navigationevent:navigationevent-compose:1.0.1")
     // DataStore 持久化（设备名、规则设置）
     implementation("androidx.datastore:datastore-preferences:1.0.0")

@@ -24,7 +24,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.LifecycleOwner
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.ActionCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.AnimTextInfoCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.BaseInfoCompose
@@ -35,14 +34,14 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.PicInfoCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.ProgressCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.TextButtonCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamV2
+import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.param.ParamIslandCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.compose.BigIslandCollapsedCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.CommonImageCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandComposeRoot
-import org.json.JSONObject
-
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.MediaSessionData
 import notifyrelay.base.util.Logger
+import org.json.JSONObject
 
 /**
  * 浮窗条目数据类，对应原有EntryRecord
@@ -70,8 +69,7 @@ data class FloatingEntry(
 fun FloatingWindowContainer(
     entries: List<FloatingEntry>,
     onEntryClick: (String) -> Unit,
-    lifecycleOwner: LifecycleOwner?,
-    modifier: Modifier = Modifier.Companion,
+    modifier: Modifier = Modifier,
     onUpdateEntryHeight: ((String, Int) -> Unit)? = null,
     isContainerDragging: Boolean = false
 ) {
@@ -153,12 +151,13 @@ fun FloatingWindowContainer(
                                             paramV2.business == "media" -> {
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 MediaIslandCompose")
                                                 // 构建MediaSessionData
-                                                val mediaSession = com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.MediaSessionData(
+                                                val mediaSession = MediaSessionData(
                                                     packageName = entry.appName ?: "",
                                                     appName = entry.appName,
                                                     title = entry.title ?: "",
                                                     text = entry.text ?: "",
-                                                    coverUrl = entry.picMap?.get("miui.focus.pic_cover") ?: entry.picMap?.values?.firstOrNull(),
+                                                    coverUrl = entry.picMap?.get("miui.focus.pic_cover")
+                                                        ?: entry.picMap?.values?.firstOrNull(),
                                                     deviceName = entry.appName ?: ""
                                                 )
                                                 // 使用媒体类型大岛组件

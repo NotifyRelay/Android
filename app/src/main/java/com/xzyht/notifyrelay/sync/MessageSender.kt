@@ -14,7 +14,7 @@ import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
-import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
+import com.xzyht.notifyrelay.feature.notification.superisland.common.SuperIslandProtocol
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -615,13 +615,6 @@ object MessageSender {
 
             // 将发送任务加入队列（带去重）
             authenticatedDevices.forEach { deviceInfo ->
-                // 检查设备类型，不向PC类型设备发送超级岛结束数据
-                val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[deviceInfo.uuid] }
-                val deviceType = auth?.deviceType
-                if (deviceType?.lowercase() == "pc") {
-                    Logger.i("超级岛", "跳过向PC类型设备发送超级岛结束数据：${deviceInfo.displayName}")
-                    return@forEach
-                }
                 
                 val dedupKey = buildDedupKey(deviceInfo.uuid, payload)
                 // 检查最近是否已发送过相同消息，避免短时间内重复

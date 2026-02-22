@@ -2,10 +2,10 @@ package com.xzyht.notifyrelay.sync
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo
-import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.Logger
 import notifyrelay.core.util.BatteryUtils
 import notifyrelay.core.util.EncryptionManager
 import java.io.BufferedReader
@@ -13,7 +13,6 @@ import java.io.OutputStreamWriter
 import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.net.Socket
-import kotlin.collections.iterator
 
 /**
  * 服务端首行协议路由器
@@ -132,43 +131,57 @@ object ServerLineRouter {
                             Logger.d(TAG, "已更新已认证设备的 deviceType: $remoteDeviceType, lastIp: $ip")
                         }
                     }
-                } else if (deviceManager.handshakeRequestHandler != null) {
-                    // 5. 未认证但有回调：交由 UI 确认是否接受连接
-                    deviceManager.handshakeRequestHandler!!.onHandshakeRequest(remoteDevice, remotePubKey) { accepted ->
-                        if (accepted) {
-                            // 用户点击“接受”：生成共享密钥并写入认证表
-                            val sharedSecret = EncryptionManager.generateSharedSecret(deviceManager.localPublicKey, remotePubKey)
-                            synchronized(deviceManager.authenticatedDevices) {
-                                deviceManager.authenticatedDevices.remove(remoteUuid)
-                                deviceManager.authenticatedDevices[remoteUuid] = AuthInfo(
-                                remotePubKey, sharedSecret, true, remoteDevice.displayName,
-                                deviceType = remoteDeviceType, battery = remoteBattery
-                            )
-                                deviceManager.saveAuthedDevicesInternal()
-                            }
-                            try { deviceManager.updateDeviceListInternal() } catch (_: Exception) {}
-                        } else {
-                            // 用户拒绝：记录到本地拒绝名单，避免反复打扰
-                            synchronized(deviceManager.rejectedDevicesInternal) {
-                                deviceManager.rejectedDevicesInternal.add(remoteUuid)
-                            }
-                        }
-                        // 6. 通过 TCP 回写 ACCEPT/REJECT 结果给对端
-                        deviceManager.coroutineScopeInternal.launch {
-                            val writer = OutputStreamWriter(client.getOutputStream())
-                            val localBattery = getLocalBatteryInfo(deviceManager)
-                            val localDeviceType = "android"
-                            val localIp = getLocalIpAddress(deviceManager)
+                    } else if (deviceManager.handshakeRequestHandler != null) {
+                    // 检查是否启用了UDP发现（显示未认证设备）
+                    if (deviceManager.udpDiscoveryEnabled) {
+                        // 5. 未认证但有回调且启用了显示未认证设备：交由 UI 确认是否接受连接
+                        deviceManager.handshakeRequestHandler!!.onHandshakeRequest(remoteDevice, remotePubKey) { accepted ->
                             if (accepted) {
-                                writer.write("ACCEPT:${deviceManager.uuid}:${deviceManager.localPublicKey}:$localIp:$localBattery:$localDeviceType\n")
+                                // 用户点击"接受"：生成共享密钥并写入认证表
+                                val sharedSecret = EncryptionManager.generateSharedSecret(deviceManager.localPublicKey, remotePubKey)
+                                synchronized(deviceManager.authenticatedDevices) {
+                                    deviceManager.authenticatedDevices.remove(remoteUuid)
+                                    deviceManager.authenticatedDevices[remoteUuid] = AuthInfo(
+                                        remotePubKey, sharedSecret, true, remoteDevice.displayName,
+                                        deviceType = remoteDeviceType, battery = remoteBattery
+                                    )
+                                    deviceManager.saveAuthedDevicesInternal()
+                                }
+                                try { deviceManager.updateDeviceListInternal() } catch (_: Exception) {}
                             } else {
-                                writer.write("REJECT:${deviceManager.uuid}\n")
+                                // 用户拒绝：记录到本地拒绝名单，避免反复打扰
+                                synchronized(deviceManager.rejectedDevicesInternal) {
+                                    deviceManager.rejectedDevicesInternal.add(remoteUuid)
+                                }
                             }
-                            writer.flush()
-                            writer.close()
-                            reader.close()
-                            client.close()
+                            // 6. 通过 TCP 回写 ACCEPT/REJECT 结果给对端
+                            deviceManager.coroutineScopeInternal.launch {
+                                val writer = OutputStreamWriter(client.getOutputStream())
+                                val localBattery = getLocalBatteryInfo(deviceManager)
+                                val localDeviceType = "android"
+                                val localIp = getLocalIpAddress(deviceManager)
+                                if (accepted) {
+                                    writer.write("ACCEPT:${deviceManager.uuid}:${deviceManager.localPublicKey}:$localIp:$localBattery:$localDeviceType\n")
+                                } else {
+                                    writer.write("REJECT:${deviceManager.uuid}\n")
+                                }
+                                writer.flush()
+                                writer.close()
+                                reader.close()
+                                client.close()
+                            }
                         }
+                    } else {
+                        // 未启用显示未认证设备：直接拒绝连接请求
+                        synchronized(deviceManager.rejectedDevicesInternal) {
+                            deviceManager.rejectedDevicesInternal.add(remoteUuid)
+                        }
+                        val writer = OutputStreamWriter(client.getOutputStream())
+                        writer.write("REJECT:${deviceManager.uuid}\n")
+                        writer.flush()
+                        writer.close()
+                        reader.close()
+                        client.close()
                     }
                 } else {
                     // 无 UI 回调时，保守起见一律 REJECT

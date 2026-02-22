@@ -19,8 +19,8 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.HighlightInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.TimerInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.HighlightInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.CommonImageCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.formatTimerInfo

@@ -20,7 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.BaseInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.BaseInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.CommonImageCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 

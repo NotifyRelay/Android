@@ -89,47 +89,35 @@ object HandshakeSender {
 object HeartbeatSender {
 
     private const val TAG = "HeartbeatSender"
-    private const val HEARTBEAT_PORT = 23334 // 与发现端口一致
     
-    fun sendHeartbeat(manager: DeviceConnectionManager, target: DeviceInfo): Boolean {
-        var socket: DatagramSocket? = null
-        return try {
-            socket = DatagramSocket()
-            // 心跳格式：HEARTBEAT:<deviceUuid><<+/->设备电量%>,<设备类型>
-            val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
-            val isCharging = BatteryUtils.isCharging(manager.contextInternal)
-            val chargeSign = if (isCharging) "+" else "-"
-            val payload = "HEARTBEAT:${manager.uuid}$chargeSign$batteryLevel,android"
-            val buf = payload.toByteArray()
-            val address = InetAddress.getByName(target.ip)
-            val packet = DatagramPacket(buf, buf.size, address, HEARTBEAT_PORT)
-            socket.send(packet)
-            true
-        } catch (e: Exception) {
-            //Logger.d(TAG, "heartbeat failed to ${target.uuid}@${target.ip}:${target.port} - ${e.message}")
-            false
-        } finally {
-            try { socket?.close() } catch (_: Exception) {}
-        }
-    }
 }
 
-/** 统一发现广播发送器 */
+/** 统一广播发送器（用于发现和心跳广播） */
 object DiscoveryBroadcaster {
 
     private const val TAG = "DiscoveryBroadcaster"
+    private const val BROADCAST_PORT = 23334 // 广播端口
 
-    fun sendBroadcast(manager: DeviceConnectionManager, encodedDisplayName: String, targetIp: String = "255.255.255.255") {
+    fun sendBroadcast(manager: DeviceConnectionManager): Boolean {
         var socket: DatagramSocket? = null
-        try {
+        return try {
             socket = DatagramSocket()
-            val group = InetAddress.getByName(targetIp)
-            val payload = "NOTIFYRELAY_DISCOVER:${manager.uuid}:${encodedDisplayName}:${manager.listenPort}"
+            socket.broadcast = true // 启用广播
+            // 广播格式：<uuid>:<displayName>:<port>:<+/-><batteryLevel>:<deviceType>
+            val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
+            val isCharging = BatteryUtils.isCharging(manager.contextInternal)
+            val chargeSign = if (isCharging) "+" else "-"
+            val displayName = manager.encodeDisplayNameForTransportInternal(manager.localDisplayNameInternal())
+            val port = manager.listenPort
+            val payload = "${manager.uuid}:${displayName}:${port}:${chargeSign}${batteryLevel}:android"
             val buf = payload.toByteArray()
-            val packet = DatagramPacket(buf, buf.size, group, 23334)
+            val address = InetAddress.getByName("255.255.255.255") // 广播地址
+            val packet = DatagramPacket(buf, buf.size, address, BROADCAST_PORT)
             socket.send(packet)
+            true
         } catch (e: Exception) {
-            //Logger.d(TAG, "broadcast failed to $targetIp: ${e.message}")
+            //Logger.d(TAG, "broadcast failed - ${e.message}")
+            false
         } finally {
             try { socket?.close() } catch (_: Exception) {}
         }

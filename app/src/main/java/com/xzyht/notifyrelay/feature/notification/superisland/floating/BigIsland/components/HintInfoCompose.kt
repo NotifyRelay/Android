@@ -8,7 +8,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.HintInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.templates.HintInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.CommonImageCompose
 
 

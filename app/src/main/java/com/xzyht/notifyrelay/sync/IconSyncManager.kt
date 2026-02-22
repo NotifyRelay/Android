@@ -221,7 +221,9 @@ object IconSyncManager {
     ) {
         try {
             val json = JSONObject(requestData)
-            if (json.optString("type") != "ICON_REQUEST") return
+            val type = json.optString("type")
+            Logger.d(TAG, "解析到的 type 字段值：$type")
+            if (type != "ICON_REQUEST" && type != "DATA_ICON_REQUEST") return
 
             val single = json.optString("packageName")
             val multiArray = json.optJSONArray("packageNames")
@@ -261,9 +263,10 @@ object IconSyncManager {
                     put("time", System.currentTimeMillis())
                 }.toString()
                 
+                Logger.d(TAG, "批量图标响应准备发送，包含 ${resultArr.length()} 个图标，${missingArr.length()} 个缺失图标")
                 // 发送响应，即使没有可用图标，也要通知请求方哪些图标缺失
                 ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", resp, ICON_REQUEST_TIMEOUT)
-                //Logger.d(TAG, "批量图标响应发送(${resultArr.length()}) -> ${sourceDevice.displayName}")
+                Logger.d(TAG, "批量图标响应已发送(${resultArr.length()}) -> ${sourceDevice.displayName}")
             } else if (single.isNotEmpty()) {
                 val icon = runBlocking {
                     getLocalAppIcon(context, single)
@@ -279,9 +282,10 @@ object IconSyncManager {
                     put("time", System.currentTimeMillis())
                 }.toString()
                 
+                Logger.d(TAG, "单图标响应准备发送，包名：$single，${if (icon != null) "有图标" else "无图标"}")
                 // 发送响应，即使没有图标，也要通知请求方
                 ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", resp, ICON_REQUEST_TIMEOUT)
-                //Logger.d(TAG, "单图标响应发送：$single -> ${sourceDevice.displayName}")
+                Logger.d(TAG, "单图标响应已发送：$single -> ${sourceDevice.displayName}")
             }
         } catch (e: Exception) {
             Logger.e(TAG, "处理ICON_REQUEST异常", e)
@@ -362,7 +366,7 @@ object IconSyncManager {
     private fun bitmapToBase64(icon: Bitmap): String {
         val bos = ByteArrayOutputStream()
         icon.compress(Bitmap.CompressFormat.PNG, 100, bos)
-        return Base64.encodeToString(bos.toByteArray(), Base64.DEFAULT)
+        return Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP)
     }
 
     private suspend fun getLocalAppIcon(context: Context, packageName: String): Bitmap? {

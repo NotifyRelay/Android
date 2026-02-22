@@ -7,8 +7,8 @@ import notifyrelay.data.StorageManager
 import notifyrelay.data.StorageManager.getBoolean
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.MediaSessionData
+import com.xzyht.notifyrelay.feature.notification.superisland.common.SuperIslandProtocol
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.MediaSessionData
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 

@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland.image
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
+import com.xzyht.notifyrelay.feature.notification.superisland.common.SuperIslandProtocol
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
 import java.io.File
 

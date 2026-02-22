@@ -7,7 +7,7 @@ import com.xzyht.notifyrelay.sync.ServerLineRouter
 import notifyrelay.core.util.EncryptionManager
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
-import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
+import com.xzyht.notifyrelay.feature.notification.superisland.common.SuperIslandProtocol
 import com.xzyht.notifyrelay.sync.AppListSyncManager
 import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
 import com.xzyht.notifyrelay.sync.IconSyncManager

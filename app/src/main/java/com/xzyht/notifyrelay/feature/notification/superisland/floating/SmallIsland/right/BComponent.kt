@@ -1,5 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right
 
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
+
 /**
  * B区（右侧 imageTextInfoRight + 其它文本/图片/进度组件）模型。
  * imageTextInfoRight 的 type 映射：2、3、4、6。
@@ -84,7 +86,7 @@ data class BFixedWidthDigitInfo(
  */
 data class BSameWidthDigitInfo(
     val digit: String? = null,
-    val timer: com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.TimerInfo? = null,
+    val timer: TimerInfo? = null,
     val content: String? = null,
     val showHighlightColor: Boolean = false
 ) : BComponent { override val kind: String = "sameWidthDigitInfo" }

@@ -15,14 +15,22 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+import com.xzyht.notifyrelay.sync.MessageSender
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.SuperDialog
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import notifyrelay.data.StorageManager
 
 // 全局变量，用于保存递增循环的进度值
 private var progressCounter = 0
+
+/**
+ * 发送开关状态变量，默认关闭，持久化存储
+ */
+private var sendToOtherDevices = false
 
 /**
  * 根据Live Updates开关选择合适的通道显示测试弹窗
@@ -34,27 +42,59 @@ private var progressCounter = 0
  * @param picMap 图片映射
  * @param appName 应用名称
  */
-private fun showTestNotification(
+fun showTestNotification(
     context: Context,
     sourceId: String,
     title: String?,
     text: String?,
     paramV2Raw: String?,
     picMap: Map<String, String>?,
-    appName: String? = "测试应用"
+    appName: String? = "测试应用",
+    forceFullPackage: Boolean = true
 ) {
-    // 总是使用FloatingReplicaManager创建浮窗
-    // 由FloatingReplicaManager内部决定是否需要发送Live Updates复合通知
-    FloatingReplicaManager.showFloating(
-        context = context,
-        sourceId = sourceId,
-        title = title,
-        text = text,
-        paramV2Raw = paramV2Raw,
-        picMap = picMap,
-        isLocked = false,
-        appName = appName
-    )
+    if (sendToOtherDevices) {
+        // 发送开关开启时，仅发送通知给其他端
+        try {
+            // 获取设备管理器实例
+            val deviceManager = DeviceConnectionManager.getInstance(context)
+            
+            // 当强制发送全量包时，生成唯一的 featureIdOverride
+            val featureIdOverride = if (forceFullPackage) {
+                "${sourceId}_${System.currentTimeMillis()}"
+            } else {
+                null
+            }
+            
+            // 发送超级岛数据给其他设备
+            MessageSender.sendSuperIslandData(
+                context = context,
+                superPkg = sourceId,
+                appName = appName,
+                title = title,
+                text = text,
+                time = System.currentTimeMillis(),
+                paramV2Raw = paramV2Raw,
+                picMap = picMap,
+                deviceManager = deviceManager,
+                featureIdOverride = featureIdOverride
+            )
+        } catch (e: Exception) {
+            // 发送失败时记录日志
+            android.util.Log.e("SuperIslandTest", "发送超级岛数据失败: ${e.message}")
+        }
+    } else {
+        // 发送开关关闭时，仅在本地显示通知
+        FloatingReplicaManager.showFloating(
+            context = context,
+            sourceId = sourceId,
+            title = title,
+            text = text,
+            paramV2Raw = paramV2Raw,
+            picMap = picMap,
+            isLocked = false,
+            appName = appName
+        )
+    }
 }
 
 /**
@@ -827,6 +867,10 @@ fun SuperIslandTestDialog(
 ) {
     // 进度可变开关状态
     var isVariableProgress by remember { mutableStateOf(false) }
+    // 发送开关状态，从持久化存储中读取
+    var isSendEnabled by remember {
+        mutableStateOf(StorageManager.getBoolean(context, "superisland_send_to_other_devices", false))
+    }
     
     MiuixTheme {
         SuperDialog(
@@ -847,6 +891,19 @@ fun SuperIslandTestDialog(
                     summary = if (isVariableProgress) "进度可变 (测试动画效果)" else "进度固定 (测试静态效果)",
                     checked = isVariableProgress,
                     onCheckedChange = { isVariableProgress = it },
+                    modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                )
+                
+                // 发送开关
+                SuperSwitch(
+                    title = "发送设置",
+                    summary = if (isSendEnabled) "发送到其他设备" else "仅本地测试",
+                    checked = isSendEnabled,
+                    onCheckedChange = {
+                        isSendEnabled = it
+                        sendToOtherDevices = it
+                        StorageManager.putBoolean(context, "superisland_send_to_other_devices", it)
+                    },
                     modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
                 )
                 

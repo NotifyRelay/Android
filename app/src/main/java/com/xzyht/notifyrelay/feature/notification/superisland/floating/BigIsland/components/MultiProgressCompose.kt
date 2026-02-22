@@ -30,7 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.MultiProgressInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.MultiProgressInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.CommonImageCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import kotlin.math.max

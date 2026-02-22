@@ -7,9 +7,9 @@ import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.SuperIslandRemoteStore
-import com.xzyht.notifyrelay.feature.notification.superisland.core.SuperIslandProtocol
+import com.xzyht.notifyrelay.feature.notification.superisland.common.SuperIslandProtocol
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
 import notifyrelay.base.util.Logger
@@ -40,8 +40,8 @@ object SuperIslandProcessor {
             val json = JSONObject(decrypted)
             val pkg = json.optString("packageName")
             val appName = json.optString("appName")
-            val title = json.optString("title")
-            val text = json.optString("text")
+            val title = json.optString("title").takeIf { it.isNotEmpty() }
+            val text = json.optString("text").takeIf { it.isNotEmpty() }
             val time = json.optLong("time", System.currentTimeMillis())
 
             val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
@@ -169,36 +169,37 @@ object SuperIslandProcessor {
                 try { manager.sendSuperIslandAckInternal(remoteUuid, sharedSecret, recvHash, featureId, mappedPkg) } catch (_: Exception) {}
             }
 
-            if (merged != null) {
-                val finalTitle = merged.title ?: mTitle
-                val finalText = merged.text ?: mText
-                val mParam2 = merged.paramV2Raw
-                val mPics = merged.pics
-                
-                // 初始化 Live Updates 通知管理器（仅第一次调用时初始化）
-                try {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                        LiveUpdatesNotificationManager.initialize(context)
-                    }
-                } catch (e: Exception) {
-                    Logger.e(TAG, "初始化 Live Updates 通知管理器失败: ${e.message}")
+            val finalTitle = merged?.title ?: mTitle
+            val finalText = merged?.text ?: mText
+            val mParam2 = merged?.paramV2Raw ?: paramV2Raw
+            val mPics = merged?.pics ?: emptyMap()
+            
+            // 初始化 Live Updates 通知管理器（仅第一次调用时初始化）
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                    LiveUpdatesNotificationManager.initialize(context)
                 }
+            } catch (e: Exception) {
+                Logger.e(TAG, "初始化 Live Updates 通知管理器失败: ${e.message}")
+            }
 
-                try {
-                    // 仅在有实际可展示内容时才创建浮窗
-                    val hasContent = !finalTitle.isNullOrBlank() || !finalText.isNullOrBlank() || !mParam2.isNullOrBlank() || (mPics.isNotEmpty())
-                    if (hasContent) {
-                        // 对于所有类型，都显示传统浮窗
-                        // 复合通知将在浮窗创建时由FloatingReplicaManager处理
-                        FloatingReplicaManager.showFloating(context, sourceKey, finalTitle, finalText, mParam2, mPics, appName, isLocked)
-                        Logger.i("超级岛", "使用浮窗显示通知: sourceKey=$sourceKey")
-                    } else {
-                        Logger.i("超级岛", "收到内容为空的超级岛包，跳过创建通知: sourceKey=$sourceKey")
-                    }
-                } catch (e: Exception) {
-                    Logger.w("超级岛", "显示超级岛通知失败: ${e.message}")
+            try {
+                // 仅在有实际可展示内容时才创建浮窗
+                val hasContent = !finalTitle.isNullOrBlank() || !finalText.isNullOrBlank() || !mParam2.isNullOrBlank() || (mPics.isNotEmpty())
+                if (hasContent) {
+                    // 对于所有类型，都显示传统浮窗
+                    // 复合通知将在浮窗创建时由FloatingReplicaManager处理
+                    FloatingReplicaManager.showFloating(context, sourceKey, finalTitle, finalText, mParam2, mPics, appName, isLocked)
+                    Logger.i("超级岛", "使用浮窗显示通知: sourceKey=$sourceKey")
+                } else {
+                    Logger.i("超级岛", "收到内容为空的超级岛包，跳过创建通知: sourceKey=$sourceKey")
                 }
+            } catch (e: Exception) {
+                Logger.w("超级岛", "显示超级岛通知失败: ${e.message}")
+            }
 
+            // 检查是否为测试数据，如果是则跳过保存到历史记录
+            if (!pkg.startsWith("test_")) {
                 val historyEntry = SuperIslandHistoryEntry(
                     id = System.currentTimeMillis(),
                     sourceDeviceUuid = remoteUuid,
@@ -228,15 +229,16 @@ object SuperIslandProcessor {
                         )
                     )
                 }
-
-                return true
             } else {
-                if (isLocked) {
-                    superIslandDeduplicationCache.remove(dedupKey)
-                    Logger.i("超级岛", "合并失败，移除去重缓存: $dedupKey")
-                }
-                return true
+                Logger.i("超级岛", "跳过保存测试数据到历史记录: pkg=$pkg")
             }
+
+            if (merged == null && isLocked) {
+                superIslandDeduplicationCache.remove(dedupKey)
+                Logger.i("超级岛", "合并失败，移除去重缓存: $dedupKey")
+            }
+
+            return true
         } catch (e: Exception) {
             Logger.e(TAG, "SuperIslandProcessor.process 异常: ${e.message}")
             return false

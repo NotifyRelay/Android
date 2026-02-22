@@ -23,8 +23,8 @@ import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.ProgressInfoCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ActionInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.model.ParamIsland
+import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.ActionInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamIsland
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.CommonImageCompose
 import top.yukonga.miuix.kmp.basic.TextButton
 

@@ -235,8 +235,7 @@ class FloatingComposeContainer @JvmOverloads constructor(
                 FloatingWindowContainer(
                     entries = floatingWindowManager.entriesList,
                     onEntryClick = { key -> onEntryClick?.invoke(key) },
-                    lifecycleOwner = currentLifecycleOwner,
-                    onUpdateEntryHeight = { key, height -> 
+                    onUpdateEntryHeight = { key, height ->
                         floatingWindowManager.updateEntryHeight(key, height)
                     },
                     isContainerDragging = isDragging

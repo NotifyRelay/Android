@@ -60,11 +60,7 @@ class ConnectionKeepAlive(
             while (true) {
                 var success = false
                 try {
-                    val info = synchronized(deviceManager.deviceInfoCacheInternal) { deviceManager.deviceInfoCacheInternal[uuid] }
-                    val targetIp = info?.ip?.takeIf { it.isNotEmpty() && it != "0.0.0.0" } ?: initialIp
-                    val targetPort = info?.port ?: initialPort
-                    val target = DeviceInfo(uuid, "", targetIp, targetPort)
-                    success = HeartbeatSender.sendHeartbeat(deviceManager, target)
+                    success = DiscoveryBroadcaster.sendBroadcast(deviceManager)
                 } catch (e: Exception) {
                     //Logger.d("死神-NotifyRelay", "[KeepAlive] 心跳发送失败: $uuid, ${e.message}")
                 }
