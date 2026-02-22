@@ -564,7 +564,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     val discoveryField = connectionManager.javaClass.getDeclaredField("discoveryManager")
                     discoveryField.isAccessible = true
                     val discovery = discoveryField.get(connectionManager)
-                    val stopMethod = discovery.javaClass.getDeclaredMethod("stopAll")
+                    val stopMethod = discovery.javaClass.getDeclaredMethod("stopDiscovery")
                     stopMethod.isAccessible = true
                     stopMethod.invoke(discovery)
                 } catch (_: Exception) {}

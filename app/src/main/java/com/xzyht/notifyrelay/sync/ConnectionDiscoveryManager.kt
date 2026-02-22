@@ -130,7 +130,7 @@ class ConnectionDiscoveryManager(
                             val rawDisplay = parts[1]
                             val portStr = parts[2]
                             val batteryStr = parts[3]
-                            val deviceType = if (parts.size >= 5) parts[4] else "unknown"
+                            val deviceType = parts[4]
                             
                             if (!uuid.isNullOrEmpty() && uuid != deviceManager.uuid && !ip.isNullOrEmpty()) {
                                 // 解析端口
@@ -228,8 +228,6 @@ class ConnectionDiscoveryManager(
                                 } else {
                                     // 非认证设备更新设备信息缓存
                                     updateDeviceInfoCache(device)
-                                    // 连接到已认证设备（非认证设备不会执行）
-                                    connectToAuthedDevice(device)
                                 }
                             }
                         }
@@ -358,26 +356,7 @@ class ConnectionDiscoveryManager(
         }
     }
 
-    fun stopAll() {
-        try {
-            synchronized(this) {
-                broadcastThread?.interrupt()
-                broadcastThread = null
-            }
-        } catch (_: Exception) {}
-        try {
-            synchronized(this) {
-                listenThread?.interrupt()
-                listenThread = null
-            }
-        } catch (_: Exception) {}
-        try {
-            val cm = connectivityManager
-            networkCallback?.let { cm.unregisterNetworkCallback(it) }
-            networkCallback = null
-        } catch (_: Exception) {}
-        manualDiscoveryJob?.cancel()
-    }
+
 
     fun registerNetworkCallback() {
         val cm = connectivityManager
