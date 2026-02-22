@@ -253,7 +253,10 @@ class ConnectionDiscoveryManager(
                 } catch (_: Exception) {
                 }
                 synchronized(this@ConnectionDiscoveryManager) {
-                    listenThread = null
+                    // 只有当当前线程仍是 listenThread 时才置 null，避免覆盖新线程引用
+                    if (listenThread === Thread.currentThread()) {
+                        listenThread = null
+                    }
                 }
             }
         }
@@ -504,7 +507,10 @@ class ConnectionDiscoveryManager(
                         e.printStackTrace()
                     } finally {
                         synchronized(this@ConnectionDiscoveryManager) {
-                            broadcastThread = null
+                            // 只有当当前线程仍是 broadcastThread 时才置 null，避免覆盖新线程引用
+                            if (broadcastThread === Thread.currentThread()) {
+                                broadcastThread = null
+                            }
                         }
                     }
                 }
