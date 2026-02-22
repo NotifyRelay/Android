@@ -768,6 +768,64 @@ object NotificationGenerator {
                         .setContentIntent(pendingContentIntent) // 设置点击意图
                 }
                 
+                // 获取paramV2原始数据
+                val entry = floatingWindowManager.getEntry(key)
+                val paramV2Raw = entry?.paramV2Raw
+                
+                // 对于计时器类通知，添加计时器相关字段
+                if (title?.contains("计时") == true || title?.contains("秒表") == true) {
+                    // 解析B区数据，检查是否为计时器类型
+                    val bigIsland: JSONObject? = try {
+                        val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
+                        paramV2RawValue?.let {
+                            val json = JSONObject(it)
+                            val paramIsland = json.optJSONObject("param_island")
+                            paramIsland?.optJSONObject("bigIslandArea") ?: json.optJSONObject("bigIsland")
+                        }
+                    } catch (e: Exception) {
+                        null
+                    }
+                    
+                    val bComponent = parseBComponent(bigIsland)
+                    if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
+                        // 根据timerType设置计时模式
+                        val timer = bComponent.timer
+                        val timerType = timer.timerType
+                        // timerType: -2倒计时暂停，-1倒计时开始，0默认，1正计时开始，2正计时暂停
+                        
+                        // 只对正在进行中的计时器启用自动流逝
+                        if (timerType == -1 || timerType == 1) {
+                            val isCountDown = timerType < 0
+                            
+                            // 使用NotificationCompat的计时器功能
+                            if (isCountDown) {
+                                // 倒计时：计算剩余时间并设置
+                                val now = System.currentTimeMillis()
+                                val remaining = timer.timerWhen - now
+                                if (remaining > 0) {
+                                    // 对于倒计时，我们需要特殊处理
+                                    // 由于通知系统的限制，我们使用当前时间作为基准
+                                    builder.setUsesChronometer(true)
+                                    builder.setChronometerCountDown(true)
+                                    // 设置倒计时的终点时间
+                                    builder.setWhen(timer.timerWhen)
+                                }
+                            } else {
+                                // 正计时：使用timerWhen作为起点
+                                builder.setUsesChronometer(true)
+                                builder.setChronometerCountDown(false)
+                                // 设置正计时的起点时间
+                                builder.setWhen(timer.timerWhen)
+                            }
+                        }
+                    } else {
+                        // 非计时器类型或计时器已暂停，不启用自动流逝
+                        builder.setUsesChronometer(true)
+                        builder.setChronometerCountDown(false)
+                        builder.setWhen(System.currentTimeMillis())
+                    }
+                }
+                
                 // 检查是否为进度类型通知，如果是，则可能已经通过 LiveUpdatesNotificationManager 处理
                 val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
                 
@@ -871,15 +929,63 @@ object NotificationGenerator {
                 // 添加超级岛相关的结构化数据，严格按照小米官方文档规范和实际通知结构
                 val extras = notification.extras
                 
-                // 获取paramV2原始数据
-                val entry = floatingWindowManager.getEntry(key)
-                val paramV2Raw = entry?.paramV2Raw
-                
                 // 构建符合小米官方规范的完整miui.focus.param结构
                 paramV2Raw?.let {
                     try {
                         // 解析原始paramV2数据
                         val paramV2Json = JSONObject(it)
+                        
+                        // 确保右胶囊文本被正确设置
+                        val bigIslandJson = paramV2Json.optJSONObject("bigIsland") ?: JSONObject()
+                        val islandAreaJson = bigIslandJson.optJSONObject("imageTextInfoRight") ?: JSONObject()
+                        
+                        // 解析 A/B 区数据以获取右胶囊文本
+                        val aComponent = parseAComponent(bigIslandJson)
+                        val bComponent = parseBComponent(bigIslandJson)
+                        
+                        val bTitle = when (bComponent) {
+                            is BImageText2 -> bComponent.title
+                            is BImageText3 -> bComponent.title
+                            is BImageText6 -> bComponent.title
+                            is BTextInfo -> bComponent.title
+                            is BFixedWidthDigitInfo -> bComponent.digit
+                            is BSameWidthDigitInfo -> {
+                                if (bComponent.timer != null) {
+                                    formatTimerInfo(bComponent.timer)
+                                } else {
+                                    bComponent.digit
+                                }
+                            }
+                            is BProgressTextInfo -> bComponent.title
+                            else -> null
+                        }
+                        
+                        val bContent = when (bComponent) {
+                            is BImageText2 -> bComponent.content
+                            is BTextInfo -> bComponent.content
+                            is BFixedWidthDigitInfo -> bComponent.content
+                            is BSameWidthDigitInfo -> {
+                                if (bComponent.timer != null) {
+                                    formatTimerInfo(bComponent.timer)
+                                } else {
+                                    bComponent.content
+                                }
+                            }
+                            is BProgressTextInfo -> bComponent.content
+                            else -> null
+                        }
+                        
+                        // 设置右胶囊文本
+                        if (bTitle != null) {
+                            islandAreaJson.put("title", bTitle)
+                        }
+                        if (bContent != null) {
+                            islandAreaJson.put("content", bContent)
+                        }
+                        
+                        // 更新 bigIsland 和 paramV2Json
+                        bigIslandJson.put("imageTextInfoRight", islandAreaJson)
+                        paramV2Json.put("bigIsland", bigIslandJson)
                         
                         // 构建完整的焦点通知参数结构，包含外层scene、ticker等字段
                         val fullFocusParam = JSONObject().apply {
@@ -892,7 +998,7 @@ object NotificationGenerator {
                             put("timerSystemCurrent", 0)
                             put("enableFloat", false)
                             put("updatable", true)
-                            put("param_v2", paramV2Json) // 将原始paramV2作为嵌套字段
+                            put("param_v2", paramV2Json) // 将更新后的paramV2作为嵌套字段
                         }
                         
                         extras.putString("miui.focus.param", fullFocusParam.toString())
@@ -932,61 +1038,6 @@ object NotificationGenerator {
                 actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
                 actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
                 extras.putBundle("miui.focus.actions", actionsBundle)
-                
-                // 添加原始通知中存在的其他字段，这些可能影响UI显示
-                // 对于计时器类通知，添加计时器相关字段
-                if (title?.contains("计时") == true || title?.contains("秒表") == true) {
-                    // 解析B区数据，检查是否为计时器类型
-                    val bigIsland: JSONObject? = try {
-                        val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
-                        paramV2RawValue?.let {
-                            val json = JSONObject(it)
-                            val paramIsland = json.optJSONObject("param_island")
-                            paramIsland?.optJSONObject("bigIslandArea") ?: json.optJSONObject("bigIsland")
-                        }
-                    } catch (e: Exception) {
-                        null
-                    }
-                    
-                    val bComponent = parseBComponent(bigIsland)
-                    if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
-                        // 根据timerType设置计时模式
-                        val timer = bComponent.timer
-                        val timerType = timer.timerType
-                        // timerType: -2倒计时暂停，-1倒计时开始，0默认，1正计时开始，2正计时暂停
-                        
-                        // 只对正在进行中的计时器启用自动流逝
-                        if (timerType == -1 || timerType == 1) {
-                            val isCountDown = timerType < 0
-                            
-                            // 使用NotificationCompat的计时器功能
-                            if (isCountDown) {
-                                // 倒计时：计算剩余时间并设置
-                                val now = System.currentTimeMillis()
-                                val remaining = timer.timerWhen - now
-                                if (remaining > 0) {
-                                    // 对于倒计时，我们需要特殊处理
-                                    // 由于通知系统的限制，我们使用当前时间作为基准
-                                    builder.setUsesChronometer(true)
-                                    builder.setChronometerCountDown(true)
-                                    // 设置倒计时的终点时间
-                                    builder.setWhen(timer.timerWhen)
-                                }
-                            } else {
-                                // 正计时：使用timerWhen作为起点
-                                builder.setUsesChronometer(true)
-                                builder.setChronometerCountDown(false)
-                                // 设置正计时的起点时间
-                                builder.setWhen(timer.timerWhen)
-                            }
-                        }
-                    } else {
-                        // 非计时器类型或计时器已暂停，不启用自动流逝
-                        builder.setUsesChronometer(true)
-                        builder.setChronometerCountDown(false)
-                        builder.setWhen(System.currentTimeMillis())
-                    }
-                }
                 
                 // 添加应用信息，与原始通知保持一致
                 extras.putBoolean("android.reduced.images", true)
@@ -1213,6 +1264,32 @@ object NotificationGenerator {
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setRequestPromotedOngoing(true)
+            
+            // 确保右胶囊文本被正确设置到 miui.focus.param 字段
+            paramV2RawValue?.let {
+                try {
+                    val paramV2Json = JSONObject(it)
+                    val bigIslandJson = paramV2Json.optJSONObject("bigIsland") ?: JSONObject()
+                    val islandAreaJson = bigIslandJson.optJSONObject("imageTextInfoRight") ?: JSONObject()
+                    
+                    // 设置右胶囊文本
+                    if (bTitle != null) {
+                        islandAreaJson.put("title", bTitle)
+                    }
+                    if (bContent != null) {
+                        islandAreaJson.put("content", bContent)
+                    }
+                    
+                    // 更新 bigIsland 和 paramV2Json
+                    bigIslandJson.put("imageTextInfoRight", islandAreaJson)
+                    paramV2Json.put("bigIsland", bigIslandJson)
+                    
+                    // 更新原始 paramV2RawValue
+                    // 注意：这里我们不能直接修改原始字符串，而是需要在构建 miui.focus.param 时使用更新后的数据
+                } catch (e: Exception) {
+                    Logger.w(TAG, "超级岛: 设置右胶囊文本失败: ${e.message}")
+                }
+            }
             
             // 处理 smallIcon
             var smallIconBitmap: Bitmap? = null
