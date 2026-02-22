@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
@@ -24,6 +25,7 @@ import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.pages.UILocalFilter
 import com.xzyht.notifyrelay.ui.pages.UIRemoteFilter
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
+import com.xzyht.notifyrelay.ui.pages.UIAbout
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
@@ -54,9 +56,15 @@ fun SettingsScreen() {
     // 创建协程作用域用于Tab点击事件
     val coroutineScope = rememberCoroutineScope()
 
+    // 处理开发者模式触发
+    val handleDeveloperModeTriggered = {
+        val intent = android.content.Intent(context, com.xzyht.notifyrelay.ui.DeveloperModeActivity::class.java)
+        context.startActivity(intent)
+    }
+
     // 简化实现，移除RemoteFilterConfig引用
         // TabRow相关状态
-        val tabTitles = listOf("远程过滤", "本地过滤", "超级岛")
+        val tabTitles = listOf("远程过滤", "本地过滤", "超级岛", "关于")
 
     // Pager相关状态 - 使用Pager状态作为唯一数据源
     val pagerState = rememberPagerState(initialPage = 0) {
@@ -118,6 +126,11 @@ fun SettingsScreen() {
                     2 -> {
                         // 超级岛设置 Tab
                         UISuperIslandSettings()
+                    }
+
+                    3 -> {
+                        // 关于 Tab
+                        UIAbout(onDeveloperModeTriggered = handleDeveloperModeTriggered)
                     }
                 }
             }

@@ -145,6 +145,9 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        // 初始化日志配置
+        DeveloperModeActivity.initLogConfig(this)
+
         // 注册返回事件回调，确保优先处理
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {

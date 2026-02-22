@@ -19,7 +19,7 @@ object Logger {
     }
 
     // 当前日志级别，可根据需求调整
-    private val CURRENT_LEVEL = Level.VERBOSE
+    var CURRENT_LEVEL = Level.INFO
 
     /**
      * 详细日志（最低级别）

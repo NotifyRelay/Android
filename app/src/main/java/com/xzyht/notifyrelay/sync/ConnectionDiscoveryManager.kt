@@ -116,8 +116,6 @@ class ConnectionDiscoveryManager(
                         socket.receive(packet)
                         val msg = String(packet.data, 0, packet.length)
                         val ip = packet.address.hostAddress
-                        // 添加调试日志，打印收到的原始消息
-                        Logger.d("调试1", "收到心跳消息: $msg, 来源IP: $ip")
                         // 解析新格式的心跳消息：<uuid>:<displayName>:<port>:<+/-><batteryLevel>:<deviceType>
                         val parts = msg.split(":")
                         if (parts.size >= 5) {

@@ -111,6 +111,12 @@
             android:excludeFromRecents="true"
             android:taskAffinity="" />
             
+        <!-- 开发者模式Activity -->
+        <activity
+            android:name=".ui.DeveloperModeActivity"
+            android:exported="true"
+            android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar" />
+            
         <!-- 剪贴板无障碍服务 -->
         <service
             android:name=".servers.ClipboardAccessiblityService"
