@@ -449,9 +449,8 @@ object NotificationGenerator {
                 var builder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
                     .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
                     .setContentText(title ?: "")
-                    .setSmallIcon(R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
+                    .setSmallIcon(R.drawable.stat_notify_more) // 使用系统默认图标
                     // 调整为不可被一键清除的属性，只能手动划去
-                    .setAutoCancel(false) // 不允许用户点击清除通知
                     .setOngoing(true) // 不允许通知被一键清除
                     .setPriority(NotificationCompat.PRIORITY_MAX)
                     .setShowWhen(false)
@@ -577,11 +576,11 @@ object NotificationGenerator {
                 extras.putBundle("miui.focus.actions", actionsBundle)
                 
                 // 添加图片资源
-                picMap?.let { map ->
+                picMap?.let { map: Map<String, String> ->
                     // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
                     map.forEach { (picKey, picUrl) ->
                         if (picKey.startsWith("miui.focus.pic_")) {
-                            val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
+                            val actualPicUrl: String = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
                             extras.putString(picKey, actualPicUrl)
                         }
                     }
@@ -735,9 +734,8 @@ object NotificationGenerator {
                 var builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
                     .setContentTitle(title ?: appName ?: "超级岛通知")
                     .setContentText(text ?: "")
-                    .setSmallIcon(R.drawable.stat_notify_more) // TODO: 使用应用自己的小图标
+                    .setSmallIcon(R.drawable.stat_notify_more) // 使用系统默认图标
                     // 调整为与实际超级岛通知一致的属性
-                    .setAutoCancel(false) // 实际通知通常不可清除
                     .setOngoing(true) // 实际通知通常是持续的
                     .setPriority(NotificationCompat.PRIORITY_MAX) // 提高优先级到最高，与原始通知一致
                     .setShowWhen(false) // 不显示时间，与原始通知一致
@@ -1258,7 +1256,34 @@ object NotificationGenerator {
             
             // 处理图标
             if (smallIconBitmap == null) {
-                // 优先使用应用图标（大图标的键值提供的图标）
+                // 优先使用 A 区图标或B区图标
+                val picKeyToUse = aPicKey ?: bPicKey
+                Logger.d(TAG, "超级岛: 处理 A 区图标或B区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
+                if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
+                    val picUrl = picMap[picKeyToUse]
+                    if (!picUrl.isNullOrBlank()) {
+                        // 同步下载图标
+                        Logger.d(TAG, "超级岛: 使用 A 区图标或B区图标作为小图标，URL: $picUrl")
+                        val bitmap = runBlocking {
+                            downloadBitmap(context, picUrl, 5000)
+                        }
+                        if (bitmap != null) {
+                            smallIconBitmap = bitmap
+                            Logger.d(TAG, "超级岛: A 区图标或B区图标加载成功")
+                        } else {
+                            Logger.w(TAG, "超级岛: A 区图标或B区图标加载失败")
+                        }
+                    } else {
+                        Logger.w(TAG, "超级岛: A 区图标或B区图标 URL 为空")
+                    }
+                } else {
+                    Logger.d(TAG, "超级岛: 未找到 A 区图标或B区图标键")
+                }
+            }
+            
+            // 如果没有 A 区图标或B区图标，再使用应用图标
+            if (smallIconBitmap == null) {
+                // 使用应用图标（大图标的键值提供的图标）
                 val appIconKey = "miui.focus.pic_app_icon"
                 Logger.d(TAG, "超级岛: 处理应用图标 - appIconKey: $appIconKey, picMap: ${picMap?.keys}")
                 if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
@@ -1283,40 +1308,16 @@ object NotificationGenerator {
                 }
             }
             
-            // 如果没有应用图标，再使用 A 区图标
+            // 如果没有生成位图，使用系统默认图标
             if (smallIconBitmap == null) {
-                // 优先使用 A 区图标
-                val picKeyToUse = aPicKey ?: bPicKey
-                Logger.d(TAG, "超级岛: 处理 A 区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
-                if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
-                    val picUrl = picMap[picKeyToUse]
-                    if (!picUrl.isNullOrBlank()) {
-                        // 同步下载图标
-                        Logger.d(TAG, "超级岛: 使用 A 区图标作为小图标，URL: $picUrl")
-                        val bitmap = runBlocking {
-                            downloadBitmap(context, picUrl, 5000)
-                        }
-                        if (bitmap != null) {
-                            smallIconBitmap = bitmap
-                            Logger.d(TAG, "超级岛: A 区图标加载成功")
-                        } else {
-                            Logger.w(TAG, "超级岛: A 区图标加载失败")
-                        }
-                    } else {
-                        Logger.w(TAG, "超级岛: A 区图标 URL 为空")
-                    }
-                } else {
-                    Logger.d(TAG, "超级岛: 未找到 A 区图标键")
-                }
-            }
-            
-            // 如果没有生成位图，使用默认图标
-            if (smallIconBitmap == null) {
+                // 使用系统默认图标
                 builder.setSmallIcon(R.drawable.stat_notify_more)
+                Logger.d(TAG, "超级岛: 使用系统默认图标")
             } else {
                 // 使用生成的位图作为小图标
                 val icon = BitmapDrawable(context.resources, smallIconBitmap)
-                builder.setSmallIcon(R.drawable.stat_notify_more) // 设置默认图标作为占位符
+                // 设置系统默认图标作为占位符
+                builder.setSmallIcon(R.drawable.stat_notify_more)
                 // 注意：在 Android 中，setSmallIcon 只能接受资源 ID，所以我们需要使用其他方式注入位图
                 // 这里我们保持默认图标，实际的位图注入需要在通知构建后处理
             }
@@ -1478,7 +1479,30 @@ object NotificationGenerator {
         
         // 处理图标
         if (smallIconBitmap == null) {
-            // 优先使用应用图标（大图标的键值提供的图标）
+            // 优先使用 A 区图标或B区图标
+            val picKeyToUse = aPicKey ?: bPicKey
+            Logger.d(TAG, "超级岛: 处理 A 区图标或B区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
+            if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
+                val picUrl = picMap[picKeyToUse]
+                if (!picUrl.isNullOrBlank()) {
+                    // 同步下载图标
+                    Logger.d(TAG, "超级岛: 使用 A 区图标或B区图标作为小图标")
+                    val bitmap = runBlocking {
+                        downloadBitmap(context, picUrl, 5000)
+                    }
+                    if (bitmap != null) {
+                        smallIconBitmap = bitmap
+                        Logger.d(TAG, "超级岛: A 区图标或B区图标加载成功")
+                    } else {
+                        Logger.w(TAG, "超级岛: A 区图标或B区图标加载失败")
+                    }
+                }
+            }
+        }
+        
+        // 如果没有 A 区图标或B区图标，再使用应用图标
+        if (smallIconBitmap == null) {
+            // 使用应用图标（大图标的键值提供的图标）
             val appIconKey = "miui.focus.pic_app_icon"
             Logger.d(TAG, "超级岛: 处理应用图标 - appIconKey: $appIconKey, picMap: ${picMap?.keys}")
             if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
@@ -1499,32 +1523,9 @@ object NotificationGenerator {
             }
         }
         
-        // 如果没有应用图标，再使用 A 区图标
+        // 如果没有生成位图，使用默认图标（改为本应用图标）
         if (smallIconBitmap == null) {
-            // 优先使用 A 区图标
-            val picKeyToUse = aPicKey ?: bPicKey
-            Logger.d(TAG, "超级岛: 处理 A 区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
-            if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
-                val picUrl = picMap[picKeyToUse]
-                if (!picUrl.isNullOrBlank()) {
-                    // 同步下载图标
-                    Logger.d(TAG, "超级岛: 使用 A 区图标作为小图标")
-                    val bitmap = runBlocking {
-                        downloadBitmap(context, picUrl, 5000)
-                    }
-                    if (bitmap != null) {
-                        smallIconBitmap = bitmap
-                        Logger.d(TAG, "超级岛: A 区图标加载成功")
-                    } else {
-                        Logger.w(TAG, "超级岛: A 区图标加载失败")
-                    }
-                }
-            }
-        }
-        
-        // 如果没有生成位图，使用默认图标
-        if (smallIconBitmap == null) {
-            Logger.d(TAG, "超级岛: 没有生成位图，使用默认图标")
+            Logger.d(TAG, "超级岛: 没有生成位图，使用本应用图标作为默认图标")
         } else {
             Logger.d(TAG, "超级岛: 成功生成小图标")
         }
