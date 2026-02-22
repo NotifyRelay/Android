@@ -48,7 +48,9 @@ class ConnectionDiscoveryManager(
         get() = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    @Volatile
     private var broadcastThread: Thread? = null
+    @Volatile
     private var listenThread: Thread? = null
     private var manualDiscoveryJob: Job? = null
     
@@ -88,7 +90,10 @@ class ConnectionDiscoveryManager(
         val isAuthed = synchronized(deviceManager.authenticatedDevices) { 
             deviceManager.authenticatedDevices.containsKey(device.uuid) 
         }
-        if (isAuthed && !deviceManager.heartbeatedDevicesInternal.contains(device.uuid)) {
+        val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
+            deviceManager.heartbeatedDevicesInternal.contains(device.uuid)
+        }
+        if (isAuthed && !isHeartbeated) {
             deviceManager.connectToDevice(device)
         }
     }
@@ -99,11 +104,13 @@ class ConnectionDiscoveryManager(
     private fun extractUdpListenThread(threadName: String) {
         // 先停止旧线程，确保状态正确
         try {
-            listenThread?.interrupt()
-            listenThread = null
+            synchronized(this) {
+                listenThread?.interrupt()
+                listenThread = null
+            }
         } catch (_: Exception) {}
         
-        listenThread = Thread {
+        val newThread = Thread {
             var socket: DatagramSocket? = null
             try {
                 socket = DatagramSocket(23334)
@@ -123,7 +130,7 @@ class ConnectionDiscoveryManager(
                             val rawDisplay = parts[1]
                             val portStr = parts[2]
                             val batteryStr = parts[3]
-                            val deviceType = if (parts.size >= 5) parts[4] else "unknown"
+                            val deviceType = parts[4]
                             
                             if (!uuid.isNullOrEmpty() && uuid != deviceManager.uuid && !ip.isNullOrEmpty()) {
                                 // 解析端口
@@ -159,42 +166,68 @@ class ConnectionDiscoveryManager(
                                     deviceManager.authenticatedDevices.containsKey(uuid)
                                 }
                                 
-                                // 所有设备都更新设备信息缓存
-                                updateDeviceInfoCache(device)
-                                
-                                // 连接到已认证设备
-                                connectToAuthedDevice(device)
-                                
                                 // 仅已在认证表中的设备才更新心跳状态
                                 if (isAuthed) {
-                                    // 更新认证信息中的 lastIp 和 deviceType
+                                    // 合并已认证设备的更新逻辑，减少冗余操作
+                                    var needSave = false
+                                    
                                     synchronized(deviceManager.authenticatedDevices) {
                                         val auth = deviceManager.authenticatedDevices[uuid]
                                         if (auth != null) {
-                                            deviceManager.authenticatedDevices[uuid] = auth.copy(
-                                                lastIp = ip,
-                                                deviceType = deviceType
-                                            )
-                                            deviceManager.saveAuthedDevicesInternal()
+                                            // 检查是否需要更新认证信息
+                                            val needsUpdate = auth.displayName != device.displayName ||
+                                                    auth.lastIp != ip ||
+                                                    auth.deviceType != deviceType
+                                            
+                                            if (needsUpdate) {
+                                                deviceManager.authenticatedDevices[uuid] = auth.copy(
+                                                    displayName = device.displayName,
+                                                    lastIp = ip,
+                                                    deviceType = deviceType
+                                                )
+                                                needSave = true
+                                            }
                                         }
                                     }
                                     
                                     // 用心跳驱动在线状态：刷新 lastSeen + 标记已建立心跳
                                     deviceManager.deviceLastSeenInternal[uuid] = System.currentTimeMillis()
-                                    deviceManager.heartbeatedDevicesInternal.add(uuid)
+                                    synchronized(deviceManager.heartbeatedDevicesInternal) {
+                                        deviceManager.heartbeatedDevicesInternal.add(uuid)
+                                    }
                                     
-                                    // 立即更新设备列表，确保在线状态能够及时反映
+                                    // 只调用一次 saveAuthedDevicesInternal
+                                    if (needSave) {
+                                        deviceManager.saveAuthedDevicesInternal()
+                                    }
+                                    
+                                    // 只更新一次设备信息缓存（不触发额外的 updateDeviceListInternal）
+                                    synchronized(deviceManager.deviceInfoCacheInternal) {
+                                        deviceManager.deviceInfoCacheInternal[uuid] = device
+                                    }
+                                    DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, displayName)
+                                    
+                                    // 只调用一次 updateDeviceListInternal
                                     deviceManager.coroutineScopeInternal.launch { 
                                         deviceManager.updateDeviceListInternal() 
                                     }
                                     
-                                    // 若本端尚未给对方发心跳，则自动反向 connectToDevice
-                                    if (!deviceManager.heartbeatJobsInternal.containsKey(uuid)) {
+                                    // 连接到已认证设备（避免双重连接尝试）
+                                    val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
+                                        deviceManager.heartbeatedDevicesInternal.contains(uuid)
+                                    }
+                                    if (!isHeartbeated) {
+                                        deviceManager.connectToDevice(device)
+                                    } else if (!deviceManager.heartbeatJobsInternal.containsKey(uuid)) {
+                                        // 若本端尚未给对方发心跳，则自动反向 connectToDevice
                                         val info = deviceManager.getDeviceInfoInternal(uuid)
                                         if (info != null && info.ip.isNotEmpty() && info.ip != "0.0.0.0") {
                                             deviceManager.connectToDevice(info)
                                         }
                                     }
+                                } else {
+                                    // 非认证设备更新设备信息缓存
+                                    updateDeviceInfoCache(device)
                                 }
                             }
                         }
@@ -219,11 +252,20 @@ class ConnectionDiscoveryManager(
                     socket?.close()
                 } catch (_: Exception) {
                 }
-                listenThread = null
+                synchronized(this@ConnectionDiscoveryManager) {
+                    // 只有当当前线程仍是 listenThread 时才置 null，避免覆盖新线程引用
+                    if (listenThread === Thread.currentThread()) {
+                        listenThread = null
+                    }
+                }
             }
         }
-        listenThread?.isDaemon = true
-        listenThread?.start()
+        
+        synchronized(this) {
+            listenThread = newThread
+            listenThread?.isDaemon = true
+            listenThread?.start()
+        }
     }
 
     enum class NetworkType {
@@ -317,22 +359,7 @@ class ConnectionDiscoveryManager(
         }
     }
 
-    fun stopAll() {
-        try {
-            broadcastThread?.interrupt()
-            broadcastThread = null
-        } catch (_: Exception) {}
-        try {
-            listenThread?.interrupt()
-            listenThread = null
-        } catch (_: Exception) {}
-        try {
-            val cm = connectivityManager
-            networkCallback?.let { cm.unregisterNetworkCallback(it) }
-            networkCallback = null
-        } catch (_: Exception) {}
-        manualDiscoveryJob?.cancel()
-    }
+
 
     fun registerNetworkCallback() {
         val cm = connectivityManager
@@ -396,7 +423,10 @@ class ConnectionDiscoveryManager(
                 //Logger.d("死神-NotifyRelay", "网络恢复，主动连接 ${authed.size} 个已认证设备")
                 for ((deviceUuid, auth) in authed) {
                     if (deviceUuid == deviceManager.uuid) continue
-                    if (deviceManager.heartbeatedDevicesInternal.contains(deviceUuid)) continue
+                    val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
+                        deviceManager.heartbeatedDevicesInternal.contains(deviceUuid)
+                    }
+                    if (isHeartbeated) continue
 
                     val info = deviceManager.getDeviceInfoInternal(deviceUuid)
                     val ip = info?.ip ?: auth.lastIp
@@ -433,12 +463,16 @@ class ConnectionDiscoveryManager(
         isDiscoveryRunning = false
         
         try {
-            broadcastThread?.interrupt()
-            broadcastThread = null
+            synchronized(this) {
+                broadcastThread?.interrupt()
+                broadcastThread = null
+            }
         } catch (_: Exception) {}
         try {
-            listenThread?.interrupt()
-            listenThread = null
+            synchronized(this) {
+                listenThread?.interrupt()
+                listenThread = null
+            }
         } catch (_: Exception) {}
         manualDiscoveryJob?.cancel()
     }
@@ -456,26 +490,33 @@ class ConnectionDiscoveryManager(
         isDiscoveryRunning = true
         
         // 启动心跳广播线程，定期广播发送心跳消息
-        if (broadcastThread == null) {
-            broadcastThread = Thread {
-                try {
-                    while (isDiscoveryRunning) {
-                        DiscoveryBroadcaster.sendBroadcast(deviceManager)
-                        Thread.sleep(2000) // 每2秒广播一次
+        synchronized(this) {
+            if (broadcastThread == null) {
+                broadcastThread = Thread {
+                    try {
+                        while (isDiscoveryRunning) {
+                            DiscoveryBroadcaster.sendBroadcast(deviceManager)
+                            Thread.sleep(2000) // 每2秒广播一次
+                        }
+                        Logger.i("卢西奥-死神-NotifyRelay", "心跳广播线程已关闭")
+                    } catch (e: InterruptedException) {
+                        // 正常中断，退出线程
+                        Logger.i("卢西奥-死神-NotifyRelay", "心跳广播线程被中断")
+                    } catch (e: Exception) {
+                        Logger.e("卢西奥-死神-NotifyRelay", "心跳广播异常: ${e.message}")
+                        e.printStackTrace()
+                    } finally {
+                        synchronized(this@ConnectionDiscoveryManager) {
+                            // 只有当当前线程仍是 broadcastThread 时才置 null，避免覆盖新线程引用
+                            if (broadcastThread === Thread.currentThread()) {
+                                broadcastThread = null
+                            }
+                        }
                     }
-                    Logger.i("卢西奥-死神-NotifyRelay", "心跳广播线程已关闭")
-                } catch (e: InterruptedException) {
-                    // 正常中断，退出线程
-                    Logger.i("卢西奥-死神-NotifyRelay", "心跳广播线程被中断")
-                } catch (e: Exception) {
-                    Logger.e("卢西奥-死神-NotifyRelay", "心跳广播异常: ${e.message}")
-                    e.printStackTrace()
-                } finally {
-                    broadcastThread = null
                 }
+                broadcastThread?.isDaemon = true
+                broadcastThread?.start()
             }
-            broadcastThread?.isDaemon = true
-            broadcastThread?.start()
         }
         
         // 确保监听线程运行（无论之前状态如何，都检查并创建）
@@ -487,7 +528,10 @@ class ConnectionDiscoveryManager(
             val authed = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices.toMap() }
             for ((uuid, _) in authed) {
                 if (uuid == deviceManager.uuid) continue
-                if (deviceManager.heartbeatedDevicesInternal.contains(uuid)) continue
+                val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
+                    deviceManager.heartbeatedDevicesInternal.contains(uuid)
+                }
+                if (isHeartbeated) continue
                 val info = deviceManager.getDeviceInfoInternal(uuid)
                 val ip = info?.ip
                 val port = info?.port ?: deviceManager.listenPort
@@ -510,14 +554,16 @@ class ConnectionDiscoveryManager(
                 val authed = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices.toMap() }
                 for ((uuid, _) in authed) {
                     if (uuid == deviceManager.uuid) continue
-                    if (deviceManager.heartbeatedDevicesInternal.contains(uuid)) continue
+                    val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
+                        deviceManager.heartbeatedDevicesInternal.contains(uuid)
+                    }
+                    if (isHeartbeated) continue
                     if (failMap[uuid] != null && failMap[uuid]!! >= maxFail) continue
                     val info = deviceManager.getDeviceInfoInternal(uuid)
                     val ip = info?.ip
                     val port = info?.port ?: deviceManager.listenPort
                     if (!ip.isNullOrEmpty() && ip != "0.0.0.0") {
                         val device = DeviceInfo(uuid, info.displayName, ip, port)
-                        connectToAuthedDevice(device)
                         deviceManager.connectToDevice(device) { success, _ ->
                             if (success) {
                                 failMap.remove(uuid)
@@ -545,7 +591,10 @@ class ConnectionDiscoveryManager(
 
             for ((uuid, auth) in authed) {
                 if (uuid == deviceManager.uuid) continue
-                if (deviceManager.heartbeatedDevicesInternal.contains(uuid)) continue
+                val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
+                    deviceManager.heartbeatedDevicesInternal.contains(uuid)
+                }
+                if (isHeartbeated) continue
                 val ip = auth.lastIp
                 val port = auth.lastPort ?: deviceManager.listenPort
                 if (!ip.isNullOrEmpty() && ip != "0.0.0.0") {

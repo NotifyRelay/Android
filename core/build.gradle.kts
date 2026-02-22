@@ -7,10 +7,10 @@ plugins {
 
 android {
     namespace = "notifyrelay.core"
-    compileSdk = 36
+    compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        minSdk = 29
+        minSdk = libs.versions.minSdk.get().toInt()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
@@ -46,11 +46,11 @@ dependencies {
     implementation(project(":base"))
     
     // Compose相关依赖
-    implementation("androidx.compose.ui:ui:1.6.0")
+    implementation(libs.androidx.compose.ui)
     
     // Coil图片加载库
-    implementation("io.coil-kt:coil:2.4.0")
-    implementation("io.coil-kt:coil-compose:2.4.0")
+    implementation(libs.coil)
+    implementation(libs.coil.compose)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

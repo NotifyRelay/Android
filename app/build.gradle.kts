@@ -6,7 +6,7 @@ import java.util.Properties
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
-    id("org.jetbrains.kotlin.plugin.compose") version "2.3.10"
+    id("org.jetbrains.kotlin.plugin.compose") version libs.versions.kotlinPluginCompose
     id("kotlin-kapt")
 }
 // 使用 buildSrc 的 JGit 实现计算版本信息（避免启动外部进程，兼容 configuration-cache）
@@ -55,12 +55,12 @@ val computedVersionCode = versionInfo.versionCode
 
 android {
     namespace = "com.xzyht.notifyrelay"
-    compileSdk = 36
+    compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
         applicationId = "com.xzyht.notifyrelay"
-        minSdk = 29
-        targetSdk = 36
+        minSdk = libs.versions.minSdk.get().toInt()
+        targetSdk = libs.versions.targetSdk.get().toInt()
         // 使用自动计算的版本号
         versionCode = computedVersionCode
         versionName = computedVersionName
@@ -174,7 +174,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
     // Jetpack Compose BOM 统一管理版本
-    implementation(platform("androidx.compose:compose-bom:2026.02.00"))
+    implementation(platform(libs.androidx.compose.bom))
     
     // Jetpack Compose 依赖（通过 BOM 统一管理版本）
     implementation("androidx.activity:activity-compose")
@@ -187,39 +187,39 @@ dependencies {
     implementation("androidx.compose.runtime:runtime")
     implementation("androidx.compose.runtime:runtime-livedata")
     // Compose Pager 用于实现滑动切换（直接指定有效版本）
-    implementation("com.google.accompanist:accompanist-pager-indicators:0.36.0")
+    implementation(libs.accompanist.pager.indicators)
 
     // AndroidX Lifecycle（提供 ViewTreeLifecycleOwner 等）
-    implementation("androidx.lifecycle:lifecycle-runtime:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.7")
-    implementation("androidx.lifecycle:lifecycle-runtime-android:2.8.7")
+    implementation(libs.androidx.lifecycle.runtime)
+    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.androidx.lifecycle.runtime.android)
 
     // Room Database
-    implementation("androidx.room:room-runtime:2.8.0")
-    kapt("androidx.room:room-compiler:2.8.0")
-    implementation("androidx.room:room-ktx:2.8.0")
+    implementation(libs.androidx.room.runtime)
+    kapt(libs.androidx.room.compiler)
+    implementation(libs.androidx.room.ktx)
     
     // Miuix风格ui库
     implementation(libs.miuix.android)
-    implementation("top.yukonga.miuix.kmp:miuix-icons:0.8.3")
-    implementation("androidx.navigationevent:navigationevent-compose:1.0.1")
+    implementation(libs.miuix.icons)
+    implementation(libs.androidx.navigationevent.compose)
     // DataStore 持久化（设备名、规则设置）
-    implementation("androidx.datastore:datastore-preferences:1.0.0")
-    implementation("androidx.datastore:datastore:1.0.0")
+    implementation(libs.androidx.datastore.preferences)
+    implementation(libs.androidx.datastore)
     // Gson 用于通知历史 JSON 文件读写
-    implementation("com.google.code.gson:gson:2.10.1")
+    implementation(libs.gson)
     // OkHttp & Okio 用于 WebSocket 和 IO
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okio:okio:3.7.0")
+    implementation(libs.okhttp)
+    implementation(libs.okio)
     // 局域网设备发现 jmdns
-    implementation("org.jmdns:jmdns:3.5.7")
+    implementation(libs.jmdns)
     
     // Coil: image loading (Kotlin + Coroutines friendly)
-    implementation("io.coil-kt:coil:2.4.0")
+    implementation(libs.coil)
     // Coil Compose: Jetpack Compose integration for image loading
-    implementation("io.coil-kt:coil-compose:2.4.0")
+    implementation(libs.coil.compose)
     // DiskLruCache: stable disk-based LRU cache for icons
-    implementation("com.jakewharton:disklrucache:2.0.2")
+    implementation(libs.disklrucache)
     // 添加Apache FtpServer依赖用于FTP服务器实现
     implementation(libs.apache.ftpserver)
     

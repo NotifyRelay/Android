@@ -15,6 +15,29 @@ runtime = "1.10.0"
 ftpserver = "1.2.1"
 remoteCreationCompose = "1.0.0-alpha03"
 runtimeVersion = "1.10.3"
+kotlinPluginCompose = "2.3.10"
+fooJayResolver = "1.0.0"
+composeBom = "2026.02.00"
+accompanistPager = "0.36.0"
+lifecycleRuntime = "2.8.7"
+lifecycleRuntimeKtx = "2.8.7"
+lifecycleRuntimeAndroid = "2.8.7"
+room = "2.8.0"
+navigationEventCompose = "1.0.1"
+datastorePreferences = "1.0.0"
+datastore = "1.0.0"
+gson = "2.10.1"
+okhttp = "4.12.0"
+okio = "3.7.0"
+jmdns = "3.5.7"
+coil = "2.4.0"
+coilCompose = "2.4.0"
+diskLruCache = "2.0.2"
+kotlinxCoroutines = "1.8.1"
+composeUi = "1.6.0"
+compileSdk = "36"
+targetSdk = "36"
+minSdk = "29"
 
 
 [libraries]
@@ -32,6 +55,37 @@ androidx-runtime = { group = "androidx.compose.runtime", name = "runtime", versi
 apache-ftpserver = { group = "org.apache.ftpserver", name = "ftpserver-core", version.ref = "ftpserver" }
 androidx-remote-creation-compose = { group = "androidx.compose.remote", name = "remote-creation-compose", version.ref = "remoteCreationCompose" }
 runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtimeVersion" }
+miuix-icons = { group = "top.yukonga.miuix.kmp", name = "miuix-icons", version.ref = "miuix" }
+androidx-navigationevent-compose = { group = "androidx.navigationevent", name = "navigationevent-compose", version.ref = "navigationEventCompose" }
+androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
+androidx-datastore = { group = "androidx.datastore", name = "datastore", version.ref = "datastore" }
+gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
+okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }
+okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
+jmdns = { group = "org.jmdns", name = "jmdns", version.ref = "jmdns" }
+coil = { group = "io.coil-kt", name = "coil", version.ref = "coil" }
+coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose" }
+disklrucache = { group = "com.jakewharton", name = "disklrucache", version.ref = "diskLruCache" }
+kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+androidx-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "composeUi" }
+androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
+androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
+androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-lifecycle-runtime = { group = "androidx.lifecycle", name = "lifecycle-runtime", version.ref = "lifecycleRuntime" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
+androidx-lifecycle-runtime-android = { group = "androidx.lifecycle", name = "lifecycle-runtime-android", version.ref = "lifecycleRuntimeAndroid" }
+androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
+accompanist-pager-indicators = { group = "com.google.accompanist", name = "accompanist-pager-indicators", version.ref = "accompanistPager" }
+
+
+
+[bundles]
+room = ["androidx-room-runtime", "androidx-room-compiler", "androidx-room-ktx"]
+lifecycle = ["androidx-lifecycle-runtime", "androidx-lifecycle-runtime-ktx", "androidx-lifecycle-runtime-android"]
+coil = ["coil", "coil-compose"]
+datastore = ["androidx-datastore-preferences", "androidx-datastore"]
+kotlinx-coroutines = ["kotlinx-coroutines-core", "kotlinx-coroutines-android"]
 
 
 [plugins]
