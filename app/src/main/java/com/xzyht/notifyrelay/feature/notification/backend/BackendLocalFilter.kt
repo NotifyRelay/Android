@@ -216,7 +216,8 @@ object BackendLocalFilter {
         val title = NotificationRepository.getStringCompat(sbn.notification.extras, "android.title") ?: ""
         val text = NotificationRepository.getStringCompat(sbn.notification.extras, "android.text") ?: ""
         if (!isFromPeriodicCheck) {
-            Logger.v("NotifyRelay-Filter", "shouldForward: title='$title', text='$text'")
+            val titlePreview = if (title.length > 10) "${title.take(10)}..." else title
+            Logger.v("NotifyRelay-Filter", "shouldForward: packageName='${sbn.packageName}', titlePreview='$titlePreview'")
         }
 
         // 持久化/前台服务过滤，包含服务相关关键词

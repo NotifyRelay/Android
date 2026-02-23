@@ -542,7 +542,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     // 定期清理过期的缓存，避免内存泄漏
                     cleanupExpiredCacheEntries(System.currentTimeMillis())
                     if (processedNotifications.size > CACHE_CLEANUP_THRESHOLD) {
-                        Logger.i(TAG, "[NotifyListener] 缓存大小: ${processedNotifications.size}")
+                        Logger.d(TAG, "[NotifyListener] 缓存大小: ${processedNotifications.size}")
                     }
                 } else {
                     Logger.w(TAG, "[NotifyListener] 定时拉取 activeNotifications is null")
