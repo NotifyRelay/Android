@@ -799,7 +799,7 @@ fun NotificationHistoryScreen() {
                             confirmTextColor = Color.Companion.White
                         )
 
-                        if (DeveloperModeActivity.DEBUG_UI_ENABLED) {
+                        if (DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
                             VerticalDivider(
                                 thickness = 1.dp,
                                 modifier = Modifier.Companion.height(40.dp)

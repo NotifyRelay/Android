@@ -86,8 +86,7 @@ fun UISuperIslandSettings() {
         // 版本比较结果
         val versionComparisonResult = isVersionGreaterThan(currentOsVersion, "OS3.0.300")
         // 在debug构建下显示预设默认值和当前版本及比较结果
-        @Suppress("ConstantConditionIf")
-        if (DeveloperModeActivity.DEBUG_UI_ENABLED) {
+        if (DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
             "$baseSummary (当前版本: $currentOsVersion, 版本比较: ${if (versionComparisonResult) "高于" else "低于或等于"} OS3.0.300, 有用户设置: ${if (hasFloatingWindowSetting) "是" else "否"}, 预设默认值: ${if (defaultFloatingWindowEnabled) "开启" else "关闭"})"
         } else {
             baseSummary

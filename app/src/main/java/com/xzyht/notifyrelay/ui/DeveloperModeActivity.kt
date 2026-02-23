@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,7 +35,7 @@ class DeveloperModeActivity : AppCompatActivity() {
         private const val KEY_LOG_LEVEL = "log_level"
         private const val KEY_DEBUG_UI_ENABLED = "debug_ui_enabled"
 
-        var DEBUG_UI_ENABLED = false
+        val DEBUG_UI_ENABLED: MutableState<Boolean> = mutableStateOf(false)
 
         fun initLogConfig(context: Context) {
             val logLevelOrdinal = StorageManager.getInt(context, KEY_LOG_LEVEL, Logger.Level.INFO.ordinal)
@@ -42,7 +43,7 @@ class DeveloperModeActivity : AppCompatActivity() {
         }
 
         fun initDebugUiConfig(context: Context) {
-            DEBUG_UI_ENABLED = StorageManager.getBoolean(context, KEY_DEBUG_UI_ENABLED, false)
+            DEBUG_UI_ENABLED.value = StorageManager.getBoolean(context, KEY_DEBUG_UI_ENABLED, false)
         }
     }
 
@@ -115,7 +116,7 @@ class DeveloperModeActivity : AppCompatActivity() {
                 modifier = Modifier
                     .fillMaxSize()
             ) {
-                var debugUiEnabled by remember { mutableStateOf(DEBUG_UI_ENABLED) }
+                var debugUiEnabled by DEBUG_UI_ENABLED
 
                 SuperSwitch(
                     title = "调试UI显示",
@@ -123,7 +124,6 @@ class DeveloperModeActivity : AppCompatActivity() {
                     checked = debugUiEnabled,
                     onCheckedChange = {
                         debugUiEnabled = it
-                        DEBUG_UI_ENABLED = it
                         StorageManager.putBoolean(context, KEY_DEBUG_UI_ENABLED, it)
                     }
                 )
