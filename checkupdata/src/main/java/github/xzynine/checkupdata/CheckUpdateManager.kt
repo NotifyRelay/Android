@@ -6,7 +6,6 @@ import github.xzynine.checkupdata.download.SystemDownloader
 import github.xzynine.checkupdata.model.CheckUpdateConfig
 import github.xzynine.checkupdata.model.ReleaseInfo
 import github.xzynine.checkupdata.model.UpdateResult
-import github.xzynine.checkupdata.proxy.GitHubProxyDetector
 import github.xzynine.checkupdata.version.VersionComparator
 import github.xzynine.checkupdata.version.VersionRule
 import kotlinx.coroutines.Dispatchers
@@ -63,28 +62,12 @@ class CheckUpdateManager(private val context: Context) {
         }
     }
     
-    suspend fun downloadRelease(
+    fun downloadRelease(
         releaseInfo: ReleaseInfo,
-        useProxy: Boolean = true,
+        proxyUrl: String = "",
         assetFilter: ((ReleaseInfo.ReleaseAsset) -> Boolean)? = null
     ): SystemDownloader.DownloadResult {
-        return downloader.downloadRelease(releaseInfo, useProxy, assetFilter)
-    }
-    
-    fun downloadReleaseSync(
-        releaseInfo: ReleaseInfo,
-        useProxy: Boolean = true,
-        assetFilter: ((ReleaseInfo.ReleaseAsset) -> Boolean)? = null
-    ): SystemDownloader.DownloadResult {
-        return downloader.downloadReleaseSync(releaseInfo, useProxy, assetFilter)
-    }
-    
-    fun openReleasePage(releaseInfo: ReleaseInfo): SystemDownloader.DownloadResult {
-        return downloader.openReleasePage(releaseInfo)
-    }
-    
-    suspend fun detectBestProxy(forceRefresh: Boolean = false) {
-        GitHubProxyDetector.detectBestProxy(forceRefresh)
+        return downloader.downloadRelease(releaseInfo, proxyUrl, assetFilter)
     }
     
     companion object {

@@ -2,12 +2,9 @@ package github.xzynine.checkupdata.download
 
 import android.app.DownloadManager
 import android.content.Context
-import android.content.Intent
 import android.net.Uri
 import android.os.Environment
 import github.xzynine.checkupdata.model.ReleaseInfo
-import github.xzynine.checkupdata.proxy.GitHubProxy
-import github.xzynine.checkupdata.proxy.GitHubProxyDetector
 
 class SystemDownloader(private val context: Context) {
     
@@ -15,9 +12,9 @@ class SystemDownloader(private val context: Context) {
         context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
     }
     
-    suspend fun downloadRelease(
+    fun downloadRelease(
         releaseInfo: ReleaseInfo,
-        useProxy: Boolean = true,
+        proxyUrl: String = "",
         assetFilter: ((ReleaseInfo.ReleaseAsset) -> Boolean)? = null
     ): DownloadResult {
         val asset = assetFilter?.let { filter ->
@@ -30,51 +27,13 @@ class SystemDownloader(private val context: Context) {
             return DownloadResult.NoAsset
         }
         
-        val downloadUrl = if (useProxy) {
-            val proxy = GitHubProxyDetector.detectBestProxy()
-            proxy.wrapUrl(asset.browserDownloadUrl)
+        val downloadUrl = if (proxyUrl.isNotEmpty()) {
+            "$proxyUrl${asset.browserDownloadUrl}"
         } else {
             asset.browserDownloadUrl
         }
         
         return startDownload(asset.name, downloadUrl)
-    }
-    
-    fun downloadReleaseSync(
-        releaseInfo: ReleaseInfo,
-        useProxy: Boolean = true,
-        assetFilter: ((ReleaseInfo.ReleaseAsset) -> Boolean)? = null
-    ): DownloadResult {
-        val asset = assetFilter?.let { filter ->
-            releaseInfo.assets.find(filter)
-        } ?: releaseInfo.assets.firstOrNull { 
-            it.name.endsWith(".apk", ignoreCase = true) 
-        } ?: releaseInfo.assets.firstOrNull()
-        
-        if (asset == null) {
-            return DownloadResult.NoAsset
-        }
-        
-        val downloadUrl = if (useProxy) {
-            val proxy = GitHubProxyDetector.getCachedProxy() ?: GitHubProxy.DIRECT
-            proxy.wrapUrl(asset.browserDownloadUrl)
-        } else {
-            asset.browserDownloadUrl
-        }
-        
-        return startDownload(asset.name, downloadUrl)
-    }
-    
-    fun openReleasePage(releaseInfo: ReleaseInfo): DownloadResult {
-        return try {
-            val intent = Intent(Intent.ACTION_VIEW, Uri.parse(releaseInfo.htmlUrl)).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
-            context.startActivity(intent)
-            DownloadResult.Success
-        } catch (e: Exception) {
-            DownloadResult.Error(e.message ?: "Failed to open browser", e)
-        }
     }
     
     private fun startDownload(fileName: String, url: String): DownloadResult {

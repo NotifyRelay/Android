@@ -28,10 +28,14 @@ import kotlinx.coroutines.launch
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Date
+
+private const val DEFAULT_PROXY_URL = "https://gh.llkk.cc/"
+private const val PROXY_URL_KEY = "check_update_proxy_url"
 
 @Composable
 fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
@@ -51,6 +55,9 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
     var hasUpdate by remember { mutableStateOf(false) }
     var includePrerelease by remember {
         mutableStateOf(StorageManager.getBoolean(context, "check_update_include_prerelease", false))
+    }
+    var proxyUrl by remember {
+        mutableStateOf(StorageManager.getString(context, PROXY_URL_KEY, DEFAULT_PROXY_URL))
     }
     
     val checkUpdateManager = remember { CheckUpdateManager(context) }
@@ -150,6 +157,26 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                 },
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "下载代理设置",
+                style = textStyles.main,
+                color = colorScheme.onSurfaceSecondary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+            TextField(
+                value = proxyUrl,
+                onValueChange = {
+                    proxyUrl = it
+                    StorageManager.putString(context, PROXY_URL_KEY, it)
+                },
+                label = "需完整https地址，以/结尾，如：https://gh.llkk.cc/",
+                modifier = Modifier.padding(horizontal = 16.dp),
+                singleLine = true
+            )
+            
+
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -190,9 +217,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                 currentVersion = BuildConfig.VERSION_NAME,
                 hasUpdate = hasUpdate,
                 onDownload = { info ->
-                    coroutineScope.launch {
-                        checkUpdateManager.downloadRelease(info, useProxy = true)
-                    }
+                    checkUpdateManager.downloadRelease(info, proxyUrl)
                 },
                 onDismiss = {
                     showUpdateDialog = false
