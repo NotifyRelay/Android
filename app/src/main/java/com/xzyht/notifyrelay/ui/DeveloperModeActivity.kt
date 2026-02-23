@@ -11,8 +11,10 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -21,6 +23,7 @@ import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
+import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.extra.WindowDropdown
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -29,13 +32,17 @@ class DeveloperModeActivity : AppCompatActivity() {
     companion object {
         private const val KEY_LOG_ENABLED = "log_enabled"
         private const val KEY_LOG_LEVEL = "log_level"
+        private const val KEY_DEBUG_UI_ENABLED = "debug_ui_enabled"
 
-        // 初始化日志配置
+        var DEBUG_UI_ENABLED = false
+
         fun initLogConfig(context: Context) {
             val logLevelOrdinal = StorageManager.getInt(context, KEY_LOG_LEVEL, Logger.Level.INFO.ordinal)
-
-            // 应用保存的配置
             Logger.CURRENT_LEVEL = Logger.Level.values().getOrElse(logLevelOrdinal) { Logger.Level.INFO }
+        }
+
+        fun initDebugUiConfig(context: Context) {
+            DEBUG_UI_ENABLED = StorageManager.getBoolean(context, KEY_DEBUG_UI_ENABLED, false)
         }
     }
 
@@ -108,7 +115,19 @@ class DeveloperModeActivity : AppCompatActivity() {
                 modifier = Modifier
                     .fillMaxSize()
             ) {
-                // 日志级别控制 - 使用WindowDropdown
+                var debugUiEnabled by remember { mutableStateOf(DEBUG_UI_ENABLED) }
+
+                SuperSwitch(
+                    title = "调试UI显示",
+                    summary = "显示调试信息、测试按钮等开发调试元素",
+                    checked = debugUiEnabled,
+                    onCheckedChange = {
+                        debugUiEnabled = it
+                        DEBUG_UI_ENABLED = it
+                        StorageManager.putBoolean(context, KEY_DEBUG_UI_ENABLED, it)
+                    }
+                )
+
                 WindowDropdown(
                     title = "日志级别",
                     summary = "当前级别: ${logLevelOptions[selectedLevelIndex.value].first}",
@@ -118,7 +137,6 @@ class DeveloperModeActivity : AppCompatActivity() {
                         selectedLevelIndex.value = it
                         logLevel.value = logLevelOptions[it].second
                         Logger.CURRENT_LEVEL = logLevel.value
-                        // 保存到 StorageManager
                         StorageManager.putInt(context, KEY_LOG_LEVEL, logLevel.value.ordinal)
                     }
                 )

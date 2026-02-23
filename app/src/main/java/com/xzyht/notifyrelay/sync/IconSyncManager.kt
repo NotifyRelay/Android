@@ -32,7 +32,7 @@ import java.io.ByteArrayOutputStream
  *  - 接收并处理图标请求（ICON_REQUEST）和图标响应（ICON_RESPONSE）。
  *  - 将接收到的图标解码并缓存到本地仓库。
  *
- * 所有日志仅在 BuildConfig.DEBUG 为 true 时打印，以避免在生产环境泄露信息。
+ * 所有日志通过 Logger 的日志级别筛选机制控制输出。
  */
 object IconSyncManager {
 

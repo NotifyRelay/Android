@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.backend
 
 import android.content.Context
-import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import notifyrelay.base.util.Logger
@@ -359,8 +358,8 @@ object BackendRemoteFilter {
             val matches = pendingNotifications.filter { pending ->
                 normalizeTitle(pending.title) == normalizedPendingTitle && pending.text == pendingText && pending.packageName == packageName
             }
-            if (matches.isNotEmpty() && BuildConfig.DEBUG) {
-                //Logger.d("智能去重", "被动命中待撤回通知 - 本机入队 标题:${title}, 内容:${text}, 匹配数量:${matches.size}")
+            if (matches.isNotEmpty()) {
+                Logger.d("智能去重", "被动命中待撤回通知 - 本机入队 标题:${title}, 内容:${text}, 匹配数量:${matches.size}")
             }
             matches.forEach { matched ->
                 try {
