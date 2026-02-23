@@ -4,7 +4,6 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.service.notification.StatusBarNotification
-import com.xzyht.notifyrelay.BuildConfig
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
@@ -216,9 +215,9 @@ object BackendLocalFilter {
         val flags = sbn.notification.flags
         val title = NotificationRepository.getStringCompat(sbn.notification.extras, "android.title") ?: ""
         val text = NotificationRepository.getStringCompat(sbn.notification.extras, "android.text") ?: ""
-        // 日志辅助排查过滤内容 - 只在非定时检查时输出，避免刷屏
-        if (BuildConfig.DEBUG && !isFromPeriodicCheck) {
-            Logger.v("NotifyRelay-Filter", "shouldForward: title='$title', text='$text'")
+        if (!isFromPeriodicCheck) {
+            val titlePreview = if (title.length > 10) "${title.take(10)}..." else title
+            Logger.v("NotifyRelay-Filter", "shouldForward: packageName='${sbn.packageName}', titlePreview='$titlePreview'")
         }
 
         // 持久化/前台服务过滤，包含服务相关关键词

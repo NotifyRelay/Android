@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.backend
 
 import android.content.Context
-import com.xzyht.notifyrelay.BuildConfig
+import com.xzyht.notifyrelay.ui.DeveloperModeActivity
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import notifyrelay.base.util.Logger
@@ -80,7 +80,6 @@ object BackendRemoteFilter {
             var pkg = json.optString("packageName")
             val title = json.optString("title")
             val text = json.optString("text")
-            System.currentTimeMillis()
             val isLocked = json.optBoolean("isLocked", false)
 
             //Logger.d("NotifyRelay(狂鼠)智能去重", "收到远程通知 - 时间:$time, 包名:$pkg, 标题:$title, 内容:$text, 锁屏:$isLocked")
@@ -236,9 +235,6 @@ object BackendRemoteFilter {
                 val finalMatch = match
                 if (finalMatch) {
                     hasDuplicate = true
-                    {
-                        //Logger.d("智能去重", "命中内存历史重复 - 标题:$title, 内容:$text, 时间差:${Math.abs(notification.time - now)}ms")
-                    }
                 }
                 // 收集时间区间内的所有通知（用于调试）
                 if (Math.abs(notification.time - now) <= 5000) {
@@ -359,8 +355,9 @@ object BackendRemoteFilter {
             val matches = pendingNotifications.filter { pending ->
                 normalizeTitle(pending.title) == normalizedPendingTitle && pending.text == pendingText && pending.packageName == packageName
             }
-            if (matches.isNotEmpty() && BuildConfig.DEBUG) {
-                //Logger.d("智能去重", "被动命中待撤回通知 - 本机入队 标题:${title}, 内容:${text}, 匹配数量:${matches.size}")
+            if (matches.isNotEmpty() && DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
+                val titlePreview = if ((title?.length ?: 0) > 10) "${title?.take(10)}..." else (title ?: "")
+                Logger.d("智能去重", "被动命中待撤回通知 - 包名:${packageName}, 标题预览:${titlePreview}, 匹配数量:${matches.size}")
             }
             matches.forEach { matched ->
                 try {
@@ -448,10 +445,7 @@ object BackendRemoteFilter {
                 // 清理过期占位，避免内存泄露
                 val now2 = System.currentTimeMillis()
                 synchronized(pendingPlaceholders) {
-                    pendingPlaceholders.size
                     pendingPlaceholders.removeAll { now2 - it.createTime > it.ttl }
-                    pendingPlaceholders.size
-                    //Logger.d ("智能去重", "清理过期占位: removed=${before - after}")
                 }
 
                 if (pendingNotifications.isEmpty()) {

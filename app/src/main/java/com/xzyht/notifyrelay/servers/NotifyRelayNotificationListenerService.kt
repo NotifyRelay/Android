@@ -16,7 +16,6 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import androidx.core.app.NotificationCompat
-import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.R
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
@@ -542,8 +541,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     }
                     // 定期清理过期的缓存，避免内存泄漏
                     cleanupExpiredCacheEntries(System.currentTimeMillis())
-                    if (BuildConfig.DEBUG && processedNotifications.size > CACHE_CLEANUP_THRESHOLD) {
-                        Logger.i(TAG, "[NotifyListener] 缓存大小: ${processedNotifications.size}")
+                    if (processedNotifications.size > CACHE_CLEANUP_THRESHOLD) {
+                        Logger.d(TAG, "[NotifyListener] 缓存大小: ${processedNotifications.size}")
                     }
                 } else {
                     Logger.w(TAG, "[NotifyListener] 定时拉取 activeNotifications is null")

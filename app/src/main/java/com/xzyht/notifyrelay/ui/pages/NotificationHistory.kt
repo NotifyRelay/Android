@@ -52,7 +52,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
-import com.xzyht.notifyrelay.BuildConfig
+import com.xzyht.notifyrelay.ui.DeveloperModeActivity
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
@@ -799,14 +799,12 @@ fun NotificationHistoryScreen() {
                             confirmTextColor = Color.Companion.White
                         )
 
-                        // 垂直分割线
-                        VerticalDivider(
-                            thickness = 1.dp,
-                            modifier = Modifier.Companion.height(40.dp)
-                        )
+                        if (DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
+                            VerticalDivider(
+                                thickness = 1.dp,
+                                modifier = Modifier.Companion.height(40.dp)
+                            )
 
-                        // 引导按钮 - 仅在DEBUG模式下显示
-                        if (BuildConfig.DEBUG) {
                             Button(
                                 onClick = {
                                     try {
