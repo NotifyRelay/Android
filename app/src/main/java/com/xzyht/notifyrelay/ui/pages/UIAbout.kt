@@ -20,11 +20,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.ui.dialog.UpdateDialog
+import com.xzyht.notifyrelay.util.ApkArchMatcher
 import github.xzynine.checkupdata.CheckUpdateManager
 import github.xzynine.checkupdata.model.ReleaseInfo
 import github.xzynine.checkupdata.model.UpdateResult
 import github.xzynine.checkupdata.version.VersionRule
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
@@ -36,6 +38,7 @@ import java.util.Date
 
 private const val DEFAULT_PROXY_URL = "https://gh.llkk.cc/"
 private const val PROXY_URL_KEY = "check_update_proxy_url"
+private const val TAG = "UIAbout"
 
 @Composable
 fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
@@ -128,18 +131,25 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                         
                         when (result) {
                             is UpdateResult.HasUpdate -> {
+                                Logger.i(TAG, "发现新版本: ${result.releaseInfo.version}")
+                                result.errorLog?.let { Logger.d(TAG, it) }
                                 hasUpdate = true
                                 latestReleaseInfo = result.releaseInfo
                                 allReleases = result.allReleases
                                 showUpdateDialog = true
                             }
                             is UpdateResult.NoUpdate -> {
+                                Logger.i(TAG, "当前已是最新版本，远端版本: ${result.remoteVersion}")
+                                result.errorLog?.let { Logger.d(TAG, it) }
                                 hasUpdate = false
                                 latestReleaseInfo = result.releaseInfo
                                 allReleases = result.allReleases
                                 showUpdateDialog = true
                             }
                             is UpdateResult.Error -> {
+                                Logger.e(TAG, "检查更新失败: ${result.message}")
+                                result.errorLog?.let { Logger.e(TAG, it) }
+                                result.exception?.let { Logger.e(TAG, "异常信息", it) }
                                 Toast.makeText(context, "检查失败: ${result.message}", Toast.LENGTH_SHORT).show()
                             }
                         }
@@ -219,7 +229,24 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                 hasUpdate = hasUpdate,
                 allReleases = allReleases,
                 onDownload = { info ->
-                    checkUpdateManager.downloadRelease(info, proxyUrl)
+                    val appAbi = ApkArchMatcher.getInstalledAppAbiOrDevice(context)
+                    val assetFilter = ApkArchMatcher.createAssetFilter(appAbi)
+                    val downloadResult = checkUpdateManager.downloadRelease(info, proxyUrl, assetFilter)
+                    when (downloadResult) {
+                        is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Success -> {
+                            Logger.i(TAG, "开始下载: ${downloadResult.fileName}")
+                            Toast.makeText(context, "开始下载 ${downloadResult.fileName}", Toast.LENGTH_SHORT).show()
+                        }
+                        is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.NoAsset -> {
+                            Logger.e(TAG, "未找到匹配的资源: ${downloadResult.message}")
+                            Toast.makeText(context, "未找到匹配的APK", Toast.LENGTH_SHORT).show()
+                        }
+                        is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Error -> {
+                            Logger.e(TAG, "下载失败: ${downloadResult.message}")
+                            downloadResult.exception?.let { Logger.e(TAG, "下载异常", it) }
+                            Toast.makeText(context, "下载失败: ${downloadResult.message}", Toast.LENGTH_SHORT).show()
+                        }
+                    }
                 },
                 onDismiss = {
                     showUpdateDialog = false

@@ -24,7 +24,11 @@ class SystemDownloader(private val context: Context) {
         } ?: releaseInfo.assets.firstOrNull()
         
         if (asset == null) {
-            return DownloadResult.NoAsset
+            val availableAssets = releaseInfo.assets.map { it.name }
+            return DownloadResult.NoAsset(
+                message = "No matching asset found",
+                availableAssets = availableAssets
+            )
         }
         
         val downloadUrl = if (proxyUrl.isNotEmpty()) {
@@ -33,10 +37,10 @@ class SystemDownloader(private val context: Context) {
             asset.browserDownloadUrl
         }
         
-        return startDownload(asset.name, downloadUrl)
+        return startDownload(asset.name, downloadUrl, asset.size)
     }
     
-    private fun startDownload(fileName: String, url: String): DownloadResult {
+    private fun startDownload(fileName: String, url: String, fileSize: Long): DownloadResult {
         return try {
             val request = DownloadManager.Request(Uri.parse(url)).apply {
                 setTitle(fileName)
@@ -47,16 +51,35 @@ class SystemDownloader(private val context: Context) {
                 setAllowedOverRoaming(true)
             }
             
-            downloadManager.enqueue(request)
-            DownloadResult.Success
+            val downloadId = downloadManager.enqueue(request)
+            DownloadResult.Success(downloadId, fileName, fileSize)
         } catch (e: Exception) {
-            DownloadResult.Error(e.message ?: "Failed to start download", e)
+            DownloadResult.Error(
+                message = "Failed to start download: ${e.message}",
+                exception = e,
+                fileName = fileName,
+                url = url
+            )
         }
     }
     
     sealed class DownloadResult {
-        object Success : DownloadResult()
-        object NoAsset : DownloadResult()
-        data class Error(val message: String, val exception: Throwable? = null) : DownloadResult()
+        data class Success(
+            val downloadId: Long,
+            val fileName: String,
+            val fileSize: Long
+        ) : DownloadResult()
+        
+        data class NoAsset(
+            val message: String,
+            val availableAssets: List<String>
+        ) : DownloadResult()
+        
+        data class Error(
+            val message: String,
+            val exception: Throwable? = null,
+            val fileName: String? = null,
+            val url: String? = null
+        ) : DownloadResult()
     }
 }
