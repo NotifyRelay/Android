@@ -1,8 +1,6 @@
 package com.xzyht.notifyrelay.ui.dialog
 
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -16,7 +14,6 @@ import androidx.compose.ui.unit.dp
 import github.xzynine.checkupdata.model.ReleaseInfo
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.extra.LocalWindowDialogState
 import top.yukonga.miuix.kmp.extra.WindowDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -41,8 +38,6 @@ fun UpdateDialog(
             onDismiss()
         }
     ) {
-        val dismiss = LocalWindowDialogState.current
-        
         Column(
             modifier = Modifier
                 .fillMaxWidth()
