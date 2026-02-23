@@ -53,6 +53,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
     var showUpdateDialog by remember { mutableStateOf(false) }
     var latestReleaseInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
     var hasUpdate by remember { mutableStateOf(false) }
+    var allReleases by remember { mutableStateOf<List<ReleaseInfo>>(emptyList()) }
     var includePrerelease by remember {
         mutableStateOf(StorageManager.getBoolean(context, "check_update_include_prerelease", false))
     }
@@ -129,11 +130,13 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                             is UpdateResult.HasUpdate -> {
                                 hasUpdate = true
                                 latestReleaseInfo = result.releaseInfo
+                                allReleases = result.allReleases
                                 showUpdateDialog = true
                             }
                             is UpdateResult.NoUpdate -> {
                                 hasUpdate = false
                                 latestReleaseInfo = result.releaseInfo
+                                allReleases = result.allReleases
                                 showUpdateDialog = true
                             }
                             is UpdateResult.Error -> {
@@ -175,8 +178,6 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                 modifier = Modifier.padding(horizontal = 16.dp),
                 singleLine = true
             )
-            
-
 
             Spacer(modifier = Modifier.height(16.dp))
 
@@ -216,12 +217,14 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                 releaseInfo = latestReleaseInfo,
                 currentVersion = BuildConfig.VERSION_NAME,
                 hasUpdate = hasUpdate,
+                allReleases = allReleases,
                 onDownload = { info ->
                     checkUpdateManager.downloadRelease(info, proxyUrl)
                 },
                 onDismiss = {
                     showUpdateDialog = false
                     latestReleaseInfo = null
+                    allReleases = emptyList()
                 }
             )
         }

@@ -43,6 +43,12 @@ class CheckUpdateManager(private val context: Context) {
             if (releases.isEmpty()) {
                 UpdateResult.Error("No releases found")
             } else {
+                val filteredReleases = when (rule) {
+                    VersionRule.STABLE -> releases.filter { !it.isPrerelease && !it.isDraft }
+                    VersionRule.LATEST -> releases.filter { !it.isDraft }
+                    VersionRule.PRERELEASE -> releases.filter { it.isPrerelease && !it.isDraft }
+                }
+                
                 val latestRelease = VersionComparator.findLatestRelease(
                     releases = releases,
                     currentVersion = currentVersion,
@@ -50,11 +56,11 @@ class CheckUpdateManager(private val context: Context) {
                 )
                 
                 if (latestRelease != null) {
-                    UpdateResult.HasUpdate(latestRelease, currentVersion)
+                    UpdateResult.HasUpdate(latestRelease, currentVersion, filteredReleases)
                 } else {
                     val remoteReleaseInfo = VersionComparator.getLatestReleaseInfo(releases, rule)
                     val remoteVersion = remoteReleaseInfo?.version ?: "unknown"
-                    UpdateResult.NoUpdate(currentVersion, remoteVersion, remoteReleaseInfo)
+                    UpdateResult.NoUpdate(currentVersion, remoteVersion, remoteReleaseInfo, filteredReleases)
                 }
             }
         } catch (e: Exception) {

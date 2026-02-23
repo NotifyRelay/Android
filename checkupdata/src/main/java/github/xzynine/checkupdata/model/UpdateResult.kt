@@ -3,13 +3,15 @@ package github.xzynine.checkupdata.model
 sealed class UpdateResult {
     data class HasUpdate(
         val releaseInfo: ReleaseInfo,
-        val currentVersion: String
+        val currentVersion: String,
+        val allReleases: List<ReleaseInfo> = emptyList()
     ) : UpdateResult()
     
     data class NoUpdate(
         val currentVersion: String,
         val remoteVersion: String,
-        val releaseInfo: ReleaseInfo?
+        val releaseInfo: ReleaseInfo?,
+        val allReleases: List<ReleaseInfo> = emptyList()
     ) : UpdateResult()
     
     data class Error(
