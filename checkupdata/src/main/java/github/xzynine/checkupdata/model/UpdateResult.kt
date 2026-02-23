@@ -8,7 +8,8 @@ sealed class UpdateResult {
     
     data class NoUpdate(
         val currentVersion: String,
-        val remoteVersion: String
+        val remoteVersion: String,
+        val releaseInfo: ReleaseInfo?
     ) : UpdateResult()
     
     data class Error(

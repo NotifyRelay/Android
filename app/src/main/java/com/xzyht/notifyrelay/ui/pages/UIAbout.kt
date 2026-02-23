@@ -9,9 +9,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -25,7 +23,6 @@ import com.xzyht.notifyrelay.ui.dialog.UpdateDialog
 import github.xzynine.checkupdata.CheckUpdateManager
 import github.xzynine.checkupdata.model.ReleaseInfo
 import github.xzynine.checkupdata.model.UpdateResult
-import github.xzynine.checkupdata.version.VersionComparator
 import github.xzynine.checkupdata.version.VersionRule
 import kotlinx.coroutines.launch
 import notifyrelay.data.StorageManager
@@ -36,27 +33,22 @@ import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Date
 
-/**
- * 关于页面组件
- * 显示应用版本信息并提供检测更新功能
- */
 @Composable
 fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     
-    // 开发者模式触发相关状态
     var clickCount by remember { mutableStateOf(0) }
     var lastClickTime by remember { mutableStateOf(0L) }
     var isDeveloperModeEnabled by remember {
         mutableStateOf(StorageManager.getBoolean(context, "developer_mode_enabled", false))
     }
     
-    // 检测更新相关状态
     var isCheckingUpdate by remember { mutableStateOf(false) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     var latestReleaseInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
+    var hasUpdate by remember { mutableStateOf(false) }
     var includePrerelease by remember {
         mutableStateOf(StorageManager.getBoolean(context, "check_update_include_prerelease", false))
     }
@@ -72,7 +64,6 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                 .fillMaxWidth()
                 .verticalScroll(scrollState)
         ) {
-            // 应用名称
             Text(
                 text = "Notify Relay",
                 style = textStyles.title1,
@@ -82,13 +73,11 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                     .align(Alignment.CenterHorizontally)
             )
 
-            // 版本信息 - 使用SuperArrow
             SuperArrow(
                 title = "版本信息",
                 summary = "主版本: ${BuildConfig.VERSION_NAME}\n内部版本: ${BuildConfig.VERSION_CODE}",
                 onClick = {
                     val currentTime = Date().time
-                    // 检查是否在3秒内点击
                     if (currentTime - lastClickTime < 3000) {
                         clickCount++
                     } else {
@@ -96,16 +85,12 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                     }
                     lastClickTime = currentTime
                     
-                    // 提供点击反馈
                     if (clickCount >= 3 && clickCount < 5) {
                         Toast.makeText(context, "再点击 ${5 - clickCount} 次进入开发者模式", Toast.LENGTH_SHORT).show()
                     } else if (clickCount >= 5) {
-                        // 激活开发者模式
                         Toast.makeText(context, "开发者模式已激活", Toast.LENGTH_SHORT).show()
                         isDeveloperModeEnabled = true
-                        // 保存到 StorageManager
                         StorageManager.putBoolean(context, "developer_mode_enabled", true)
-                        // 重置计数器
                         clickCount = 0
                     }
                 },
@@ -121,7 +106,6 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                     if (isCheckingUpdate) return@SuperArrow
                     
                     isCheckingUpdate = true
-                    Toast.makeText(context, "正在检查更新...", Toast.LENGTH_SHORT).show()
                     
                     coroutineScope.launch {
                         val rule = if (includePrerelease) VersionRule.LATEST else VersionRule.STABLE
@@ -136,21 +120,14 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                         
                         when (result) {
                             is UpdateResult.HasUpdate -> {
+                                hasUpdate = true
                                 latestReleaseInfo = result.releaseInfo
                                 showUpdateDialog = true
                             }
                             is UpdateResult.NoUpdate -> {
-                                val comparison = VersionComparator.compare(result.currentVersion, result.remoteVersion)
-                                val statusText = when {
-                                    comparison == 0 -> "等于"
-                                    comparison > 0 -> "大于"
-                                    else -> "小于"
-                                }
-                                Toast.makeText(
-                                    context, 
-                                    "远端版本: ${result.remoteVersion}，当前版本${statusText}远端版本", 
-                                    Toast.LENGTH_LONG
-                                ).show()
+                                hasUpdate = false
+                                latestReleaseInfo = result.releaseInfo
+                                showUpdateDialog = true
                             }
                             is UpdateResult.Error -> {
                                 Toast.makeText(context, "检查失败: ${result.message}", Toast.LENGTH_SHORT).show()
@@ -161,7 +138,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
             
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
+            Spacer(modifier = Modifier.height(8.dp))
             
             SuperSwitch(
                 title = "包含预发布版本",
@@ -174,7 +151,10 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                 modifier = Modifier.padding(horizontal = 16.dp)
             )
 
-            // 开发者模式 - 使用SuperArrow（仅当激活后显示）
+            Spacer(modifier = Modifier.height(16.dp))
+
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
             if (isDeveloperModeEnabled) {
                 Spacer(modifier = Modifier.height(8.dp))
                 SuperArrow(
@@ -189,10 +169,8 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
 
             Spacer(modifier = Modifier.height(32.dp))
 
-            // 分割线
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-            // 版权信息
             Text(
                 text = "© 2026 Notify Relay",
                 style = textStyles.body2,
@@ -203,25 +181,24 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
             )
         }
         
-        if (showUpdateDialog && latestReleaseInfo != null) {
-            key(latestReleaseInfo!!.id) {
-                val dialogState = remember { mutableStateOf(true) }
-                
-                UpdateDialog(
-                    showDialog = dialogState,
-                    releaseInfo = latestReleaseInfo!!,
-                    currentVersion = BuildConfig.VERSION_NAME,
-                    onDownload = { info ->
-                        coroutineScope.launch {
-                            checkUpdateManager.downloadRelease(info, useProxy = true)
-                        }
-                    },
-                    onDismiss = {
-                        showUpdateDialog = false
-                        latestReleaseInfo = null
+        if (showUpdateDialog) {
+            val dialogState = remember { mutableStateOf(true) }
+            
+            UpdateDialog(
+                showDialog = dialogState,
+                releaseInfo = latestReleaseInfo,
+                currentVersion = BuildConfig.VERSION_NAME,
+                hasUpdate = hasUpdate,
+                onDownload = { info ->
+                    coroutineScope.launch {
+                        checkUpdateManager.downloadRelease(info, useProxy = true)
                     }
-                )
-            }
+                },
+                onDismiss = {
+                    showUpdateDialog = false
+                    latestReleaseInfo = null
+                }
+            )
         }
     }
 }

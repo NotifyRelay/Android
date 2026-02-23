@@ -77,6 +77,26 @@ object VersionComparator {
             ?.version
     }
     
+    fun getLatestReleaseInfo(
+        releases: List<ReleaseInfo>,
+        rule: VersionRule
+    ): ReleaseInfo? {
+        val filteredReleases = when (rule) {
+            VersionRule.STABLE -> releases.filter { !it.isPrerelease && !it.isDraft }
+            VersionRule.LATEST -> releases.filter { !it.isDraft }
+            VersionRule.PRERELEASE -> releases.filter { it.isPrerelease && !it.isDraft }
+        }
+        
+        return filteredReleases
+            .maxWithOrNull(compareBy { release ->
+                try {
+                    parseVersion(release.version)
+                } catch (e: Exception) {
+                    Version(0, 0, 0)
+                }
+            })
+    }
+    
     private fun parseVersion(version: String): Version {
         var normalizedVersion = version.trim()
         

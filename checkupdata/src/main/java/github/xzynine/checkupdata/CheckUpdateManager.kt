@@ -53,8 +53,9 @@ class CheckUpdateManager(private val context: Context) {
                 if (latestRelease != null) {
                     UpdateResult.HasUpdate(latestRelease, currentVersion)
                 } else {
-                    val remoteVersion = VersionComparator.getRemoteVersion(releases, rule) ?: "unknown"
-                    UpdateResult.NoUpdate(currentVersion, remoteVersion)
+                    val remoteReleaseInfo = VersionComparator.getLatestReleaseInfo(releases, rule)
+                    val remoteVersion = remoteReleaseInfo?.version ?: "unknown"
+                    UpdateResult.NoUpdate(currentVersion, remoteVersion, remoteReleaseInfo)
                 }
             }
         } catch (e: Exception) {
