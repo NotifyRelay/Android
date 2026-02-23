@@ -9,11 +9,13 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -25,6 +27,10 @@ import github.xzynine.checkupdata.CheckUpdateManager
 import github.xzynine.checkupdata.model.ReleaseInfo
 import github.xzynine.checkupdata.model.UpdateResult
 import github.xzynine.checkupdata.version.VersionRule
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
@@ -39,7 +45,9 @@ import java.util.Date
 private const val DEFAULT_PROXY_URL = "https://gh.llkk.cc/"
 private const val PROXY_URL_KEY = "check_update_proxy_url"
 private const val TAG = "UIAbout"
+private const val SAVE_DEBOUNCE_MS = 500L
 
+@OptIn(FlowPreview::class)
 @Composable
 fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
     val context = LocalContext.current
@@ -53,7 +61,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
     }
     
     var isCheckingUpdate by remember { mutableStateOf(false) }
-    var showUpdateDialog by remember { mutableStateOf(false) }
+    val showUpdateDialog = remember { mutableStateOf(false) }
     var latestReleaseInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
     var hasUpdate by remember { mutableStateOf(false) }
     var allReleases by remember { mutableStateOf<List<ReleaseInfo>>(emptyList()) }
@@ -64,7 +72,16 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
         mutableStateOf(StorageManager.getString(context, PROXY_URL_KEY, DEFAULT_PROXY_URL))
     }
     
-    val checkUpdateManager = remember { CheckUpdateManager(context) }
+    val checkUpdateManager = remember { CheckUpdateManager(context.applicationContext) }
+    
+    LaunchedEffect(proxyUrl) {
+        snapshotFlow { proxyUrl }
+            .debounce(SAVE_DEBOUNCE_MS)
+            .onEach { url ->
+                StorageManager.putString(context, PROXY_URL_KEY, url)
+            }
+            .launchIn(this)
+    }
 
     MiuixTheme {
         val colorScheme = MiuixTheme.colorScheme
@@ -136,7 +153,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                                 hasUpdate = true
                                 latestReleaseInfo = result.releaseInfo
                                 allReleases = result.allReleases
-                                showUpdateDialog = true
+                                showUpdateDialog.value = true
                             }
                             is UpdateResult.NoUpdate -> {
                                 Logger.i(TAG, "当前已是最新版本，远端版本: ${result.remoteVersion}")
@@ -144,7 +161,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                                 hasUpdate = false
                                 latestReleaseInfo = result.releaseInfo
                                 allReleases = result.allReleases
-                                showUpdateDialog = true
+                                showUpdateDialog.value = true
                             }
                             is UpdateResult.Error -> {
                                 Logger.e(TAG, "检查更新失败: ${result.message}")
@@ -180,10 +197,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
             )
             TextField(
                 value = proxyUrl,
-                onValueChange = {
-                    proxyUrl = it
-                    StorageManager.putString(context, PROXY_URL_KEY, it)
-                },
+                onValueChange = { proxyUrl = it },
                 label = "需完整https地址，以/结尾，如：https://gh.llkk.cc/",
                 modifier = Modifier.padding(horizontal = 16.dp),
                 singleLine = true
@@ -219,41 +233,37 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
             )
         }
         
-        if (showUpdateDialog) {
-            val dialogState = remember { mutableStateOf(true) }
-            
-            UpdateDialog(
-                showDialog = dialogState,
-                releaseInfo = latestReleaseInfo,
-                currentVersion = BuildConfig.VERSION_NAME,
-                hasUpdate = hasUpdate,
-                allReleases = allReleases,
-                onDownload = { info ->
-                    val appAbi = ApkArchMatcher.getInstalledAppAbiOrDevice(context)
-                    val assetFilter = ApkArchMatcher.createAssetFilter(appAbi)
-                    val downloadResult = checkUpdateManager.downloadRelease(info, proxyUrl, assetFilter)
-                    when (downloadResult) {
-                        is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Success -> {
-                            Logger.i(TAG, "开始下载: ${downloadResult.fileName}")
-                            Toast.makeText(context, "开始下载 ${downloadResult.fileName}", Toast.LENGTH_SHORT).show()
-                        }
-                        is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.NoAsset -> {
-                            Logger.e(TAG, "未找到匹配的资源: ${downloadResult.message}")
-                            Toast.makeText(context, "未找到匹配的APK", Toast.LENGTH_SHORT).show()
-                        }
-                        is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Error -> {
-                            Logger.e(TAG, "下载失败: ${downloadResult.message}")
-                            downloadResult.exception?.let { Logger.e(TAG, "下载异常", it) }
-                            Toast.makeText(context, "下载失败: ${downloadResult.message}", Toast.LENGTH_SHORT).show()
-                        }
+        UpdateDialog(
+            showDialog = showUpdateDialog,
+            releaseInfo = latestReleaseInfo,
+            currentVersion = BuildConfig.VERSION_NAME,
+            hasUpdate = hasUpdate,
+            allReleases = allReleases,
+            onDownload = { info ->
+                val appAbi = ApkArchMatcher.getInstalledAppAbiOrDevice(context)
+                val assetFilter = ApkArchMatcher.createAssetFilter(appAbi)
+                val downloadResult = checkUpdateManager.downloadRelease(info, proxyUrl, assetFilter)
+                when (downloadResult) {
+                    is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Success -> {
+                        Logger.i(TAG, "开始下载: ${downloadResult.fileName}")
+                        Toast.makeText(context, "开始下载 ${downloadResult.fileName}", Toast.LENGTH_SHORT).show()
                     }
-                },
-                onDismiss = {
-                    showUpdateDialog = false
-                    latestReleaseInfo = null
-                    allReleases = emptyList()
+                    is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.NoAsset -> {
+                        Logger.e(TAG, "未找到匹配的资源: ${downloadResult.message}")
+                        Toast.makeText(context, "未找到匹配的APK", Toast.LENGTH_SHORT).show()
+                    }
+                    is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Error -> {
+                        Logger.e(TAG, "下载失败: ${downloadResult.message}")
+                        downloadResult.exception?.let { Logger.e(TAG, "下载异常", it) }
+                        Toast.makeText(context, "下载失败: ${downloadResult.message}", Toast.LENGTH_SHORT).show()
+                    }
                 }
-            )
-        }
+            },
+            onDismiss = {
+                showUpdateDialog.value = false
+                latestReleaseInfo = null
+                allReleases = emptyList()
+            }
+        )
     }
 }
