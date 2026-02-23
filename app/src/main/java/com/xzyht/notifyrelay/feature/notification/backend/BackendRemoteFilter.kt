@@ -359,7 +359,7 @@ object BackendRemoteFilter {
                 normalizeTitle(pending.title) == normalizedPendingTitle && pending.text == pendingText && pending.packageName == packageName
             }
             if (matches.isNotEmpty()) {
-                val titlePreview = if (title.length > 10) "${title.take(10)}..." else title
+                val titlePreview = if ((title?.length ?: 0) > 10) "${title?.take(10)}..." else (title ?: "")
                 Logger.d("智能去重", "被动命中待撤回通知 - 包名:${packageName}, 标题预览:${titlePreview}, 匹配数量:${matches.size}")
             }
             matches.forEach { matched ->
