@@ -39,62 +39,44 @@ object VersionComparator {
         currentVersion: String,
         rule: VersionRule
     ): ReleaseInfo? {
-        val filteredReleases = when (rule) {
-            VersionRule.STABLE -> releases.filter { !it.isPrerelease && !it.isDraft }
-            VersionRule.LATEST -> releases.filter { !it.isDraft }
-            VersionRule.PRERELEASE -> releases.filter { it.isPrerelease && !it.isDraft }
-        }
+        val filteredReleases = filterReleasesByRule(releases, rule)
         
         return filteredReleases
             .filter { isNewer(currentVersion, it.version) }
-            .maxWithOrNull(compareBy { release ->
-                try {
-                    parseVersion(release.version)
-                } catch (e: Exception) {
-                    Version(0, 0, 0)
-                }
-            })
+            .maxWithOrNull(compareByReleaseVersion())
     }
     
     fun getRemoteVersion(
         releases: List<ReleaseInfo>,
         rule: VersionRule
     ): String? {
-        val filteredReleases = when (rule) {
-            VersionRule.STABLE -> releases.filter { !it.isPrerelease && !it.isDraft }
-            VersionRule.LATEST -> releases.filter { !it.isDraft }
-            VersionRule.PRERELEASE -> releases.filter { it.isPrerelease && !it.isDraft }
-        }
-        
-        return filteredReleases
-            .maxWithOrNull(compareBy { release ->
-                try {
-                    parseVersion(release.version)
-                } catch (e: Exception) {
-                    Version(0, 0, 0)
-                }
-            })
-            ?.version
+        return getLatestReleaseInfo(releases, rule)?.version
     }
     
     fun getLatestReleaseInfo(
         releases: List<ReleaseInfo>,
         rule: VersionRule
     ): ReleaseInfo? {
-        val filteredReleases = when (rule) {
+        val filteredReleases = filterReleasesByRule(releases, rule)
+        return filteredReleases.maxWithOrNull(compareByReleaseVersion())
+    }
+    
+    private fun filterReleasesByRule(releases: List<ReleaseInfo>, rule: VersionRule): List<ReleaseInfo> {
+        return when (rule) {
             VersionRule.STABLE -> releases.filter { !it.isPrerelease && !it.isDraft }
             VersionRule.LATEST -> releases.filter { !it.isDraft }
             VersionRule.PRERELEASE -> releases.filter { it.isPrerelease && !it.isDraft }
         }
-        
-        return filteredReleases
-            .maxWithOrNull(compareBy { release ->
-                try {
-                    parseVersion(release.version)
-                } catch (e: Exception) {
-                    Version(0, 0, 0)
-                }
-            })
+    }
+    
+    private fun compareByReleaseVersion(): Comparator<ReleaseInfo> {
+        return compareBy { release ->
+            try {
+                parseVersion(release.version)
+            } catch (e: Exception) {
+                Version(0, 0, 0)
+            }
+        }
     }
     
     private fun parseVersion(version: String): Version {
@@ -111,12 +93,7 @@ object VersionComparator {
             val major = parts.getOrNull(0)?.filter { it.isDigit() }?.toIntOrNull() ?: 0
             val minor = parts.getOrNull(1)?.filter { it.isDigit() }?.toIntOrNull() ?: 0
             val patch = parts.getOrNull(2)?.filter { it.isDigit() }?.toIntOrNull() ?: 0
-            
-            val preRelease = if (normalizedVersion.contains("-")) {
-                normalizedVersion.substringAfter("-")
-            } else null
-            
-            Version(major, minor, patch, preRelease)
+            Version(major, minor, patch)
         }
     }
 }
