@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.ui.dialog
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -8,7 +9,7 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Modifier
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.extra.SuperDialog
+import top.yukonga.miuix.kmp.extra.WindowDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -26,12 +27,13 @@ fun ConnectDeviceDialog(
     MiuixTheme.colorScheme
     MiuixTheme.textStyles
 
-    SuperDialog(
+    WindowDialog(
         show = showDialog,
         title = "连接设备",
         summary = "是否连接设备：${device.displayName} \n(${device.uuid})？\n对方将收到认证请求。",
         onDismissRequest = onDismiss
     ) {
+        BackHandler(onBack = onDismiss)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End

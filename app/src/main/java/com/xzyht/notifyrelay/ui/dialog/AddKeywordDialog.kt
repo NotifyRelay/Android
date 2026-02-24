@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.ui.dialog
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,7 +19,7 @@ import androidx.compose.ui.unit.dp
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.extra.SuperDialog
+import top.yukonga.miuix.kmp.extra.WindowDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -36,11 +37,12 @@ fun AddKeywordDialog(
     val textStyles = MiuixTheme.textStyles
     var keyword by remember { mutableStateOf(initialKeyword) }
 
-    SuperDialog(
+    WindowDialog(
         show = showDialog,
         title = "为包名添加关键词(可选)",
         onDismissRequest = onDismiss
     ) {
+        BackHandler(onBack = onDismiss)
         Column {
             Text(packageName, style = textStyles.body2, color = colorScheme.primary)
             TextField(

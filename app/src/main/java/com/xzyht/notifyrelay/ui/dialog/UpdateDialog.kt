@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.ui.dialog
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -60,6 +61,10 @@ fun UpdateDialog(
             onDismiss()
         }
     ) {
+        BackHandler(onBack = {
+            showDialog.value = false
+            onDismiss()
+        })
         Column(
             modifier = Modifier
                 .fillMaxWidth()

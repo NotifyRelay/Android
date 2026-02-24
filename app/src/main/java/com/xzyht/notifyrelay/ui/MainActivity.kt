@@ -158,7 +158,7 @@ class MainActivity : FragmentActivity() {
                     finish()
                 } else {
                     // 第一次点击返回，显示提示
-                    ToastUtils.showShortToast(this@MainActivity, "再次返回以退出应用,点击空白关闭弹窗")
+                    ToastUtils.showShortToast(this@MainActivity, "再次返回以退出应用")
                     backPressedTime = currentTime
                 }
             }

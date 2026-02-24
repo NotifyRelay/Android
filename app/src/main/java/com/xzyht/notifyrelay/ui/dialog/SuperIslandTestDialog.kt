@@ -1,6 +1,7 @@
 package com.xzyht.notifyrelay.ui.dialog
 
 import android.content.Context
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,15 +15,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.sync.MessageSender
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.extra.SuperDialog
 import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.extra.WindowDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import notifyrelay.data.StorageManager
 
 // 全局变量，用于保存递增循环的进度值
 private var progressCounter = 0
@@ -873,13 +874,13 @@ fun SuperIslandTestDialog(
     }
     
     MiuixTheme {
-        SuperDialog(
+        WindowDialog(
             title = "超级岛测试",
             summary = "点击下方按钮测试不同分支下的超级岛效果",
             show = show,
             onDismissRequest = { show.value = false },
-            enableWindowDim = true
         ) {
+            BackHandler(onBack = { show.value = false })
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
