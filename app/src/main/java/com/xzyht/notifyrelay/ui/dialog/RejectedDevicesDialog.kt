@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.ui.dialog
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -12,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.extra.SuperBottomSheet
+import top.yukonga.miuix.kmp.extra.WindowBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -28,11 +29,12 @@ fun RejectedDevicesDialog(
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
 
-    SuperBottomSheet(
+    WindowBottomSheet(
         show = showDialog,
         title = "已拒绝设备",
         onDismissRequest = onDismiss
     ) {
+        BackHandler(onBack = onDismiss)
         if (rejectedDevices.isEmpty()) {
             Text(
                 text = "暂无已拒绝设备",

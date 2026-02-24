@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.ui.dialog
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,7 +14,7 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.extra.SuperDialog
+import top.yukonga.miuix.kmp.extra.WindowDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -33,7 +34,7 @@ fun HandshakeRequestDialog(
     val textStyles = MiuixTheme.textStyles
     val req = handshakeRequest
 
-    SuperDialog(
+    WindowDialog(
         show = showDialog,
         title = "新设备连接请求",
         onDismissRequest = {
@@ -41,6 +42,10 @@ fun HandshakeRequestDialog(
             onDismiss()
         }
     ) {
+        BackHandler(onBack = {
+            onReject(req)
+            onDismiss()
+        })
         Column {
             Text(
                 text = "设备名: ${req.device.displayName}",

@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.ui.dialog
 
 import android.content.pm.ApplicationInfo
 import android.graphics.drawable.BitmapDrawable
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -40,7 +41,7 @@ import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.SearchBar
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.extra.SuperBottomSheet
+import top.yukonga.miuix.kmp.extra.WindowBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -118,13 +119,14 @@ fun AppPickerDialog(
     }
 
     MiuixTheme {
-        SuperBottomSheet(
+        WindowBottomSheet(
             show = showDialog,
             title = title,
             onDismissRequest = { 
                 showDialog.value = false; onDismiss(); appSearchQuery = "" 
             }
         ) {
+            BackHandler(onBack = { showDialog.value = false; onDismiss(); appSearchQuery = "" })
             Column {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
