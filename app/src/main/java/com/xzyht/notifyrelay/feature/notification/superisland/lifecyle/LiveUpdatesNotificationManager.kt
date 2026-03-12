@@ -35,12 +35,66 @@ object LiveUpdatesNotificationManager {
     private const val NOTIFICATION_BASE_ID = 10000
     private const val ICON_CACHE_SIZE = 10 // 最大缓存10个图标
     private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
+    // 规范信息注入模式键
+    private const val SPEC_INJECTION_MODE_KEY = "spec_injection_mode"
+    
+    // 注入方式枚举
+    enum class SpecInjectionMode {
+        SUPER_ISLAND,      // 仅超级岛规范信息注入
+        LIVE_UPDATES,      // 仅Live Updates规范信息注入
+        BOTH,              // 两者都注入
+        NONE               // 都不注入（不应该使用，但为了完整性保留）
+    }
     
     /**
      * 检查浮窗功能是否开启
      */
     private fun isFloatingWindowEnabled(context: Context): Boolean {
         return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, true)
+    }
+
+    /**
+     * 获取规范信息注入模式
+     */
+    private fun getSpecInjectionMode(context: Context): SpecInjectionMode {
+        val modeOrdinal = StorageManager.getInt(context, SPEC_INJECTION_MODE_KEY, SpecInjectionMode.BOTH.ordinal)
+        return SpecInjectionMode.values().getOrElse(modeOrdinal) { SpecInjectionMode.BOTH }
+    }
+
+    /**
+     * 检查超级岛规范信息注入是否开启
+     */
+    private fun isSuperIslandSpecInjectionEnabled(context: Context): Boolean {
+        val mode = getSpecInjectionMode(context)
+        return mode == SpecInjectionMode.SUPER_ISLAND || mode == SpecInjectionMode.BOTH
+    }
+
+    /**
+     * 检查Live Updates规范信息注入是否开启
+     */
+    private fun isLiveUpdatesSpecInjectionEnabled(context: Context): Boolean {
+        val mode = getSpecInjectionMode(context)
+        return mode == SpecInjectionMode.LIVE_UPDATES || mode == SpecInjectionMode.BOTH
+    }
+
+    /**
+     * 检查是否至少有一种规范信息注入开启
+     * @return true 如果至少有一种注入开启，false 如果都关闭
+     */
+    private fun isAnySpecInjectionEnabled(context: Context): Boolean {
+        return isSuperIslandSpecInjectionEnabled(context) || isLiveUpdatesSpecInjectionEnabled(context)
+    }
+
+    /**
+     * 验证规范信息注入开关状态，确保至少有一种开启
+     * 如果都关闭，则默认开启两者都注入
+     */
+    private fun validateSpecInjectionSwitches(context: Context) {
+        if (!isAnySpecInjectionEnabled(context)) {
+            // 如果都关闭，默认开启两者都注入
+            StorageManager.putInt(context, SPEC_INJECTION_MODE_KEY, SpecInjectionMode.BOTH.ordinal)
+            Logger.w(TAG, "规范信息注入模式无效，已默认设置为两者都注入")
+        }
     }
     
     /**
@@ -101,6 +155,9 @@ object LiveUpdatesNotificationManager {
             Logger.w(TAG, "当前Android版本不支持Live Updates")
             return
         }
+
+        // 验证规范信息注入开关状态，确保至少有一种开启
+        validateSpecInjectionSwitches(appContext)
 
         // 检查是否可以使用Live Updates，但即使不可用也继续尝试发送通知
         if (!canUseLiveUpdates()) {
@@ -970,8 +1027,10 @@ object LiveUpdatesNotificationManager {
             // 获取通知的extras，用于添加结构化数据
             val extras = builder.extras
 
-            // 构建符合小米官方规范的完整miui.focus.param结构
-            paramV2Raw?.let { rawData ->
+            // 检查超级岛规范信息注入是否开启
+            if (isSuperIslandSpecInjectionEnabled(appContext)) {
+                // 构建符合小米官方规范的完整miui.focus.param结构
+                paramV2Raw?.let { rawData ->
                 try {
                     // 解析原始paramV2数据
                     val paramV2Json = JSONObject(rawData)
@@ -1061,6 +1120,7 @@ object LiveUpdatesNotificationManager {
             extras.putBoolean("miui.showBadge", false)
 
             Logger.i(TAG, "添加超级岛结构化数据成功")
+            } // 结束 if (isSuperIslandSpecInjectionEnabled(appContext))
         } catch (e: Exception) {
             Logger.w(TAG, "添加超级岛结构化数据失败: ${e.message}")
             e.printStackTrace()
