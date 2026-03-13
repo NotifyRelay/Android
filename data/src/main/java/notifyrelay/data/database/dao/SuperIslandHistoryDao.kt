@@ -8,6 +8,12 @@ import androidx.room.Query
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.entity.SuperIslandHistorySummary
 
+data class SuperIslandPackageCount(
+    val packageName: String,
+    val count: Int,
+    val latestTime: Long
+)
+
 /**
  * 超级岛历史记录DAO
  * 定义超级岛历史记录的数据库操作
@@ -101,4 +107,91 @@ interface SuperIslandHistoryDao {
      */
     @Delete
     suspend fun delete(history: SuperIslandHistoryEntity)
+
+    /**
+     * 获取按包名分组的统计信息
+     * 优先使用 mappedPackage，如果为空则使用 originalPackage
+     */
+    @Query("""
+        SELECT mappedPackage as packageName, COUNT(*) as count, MAX(id) as latestTime
+        FROM super_island_history
+        WHERE mappedPackage IS NOT NULL AND mappedPackage != ''
+        GROUP BY mappedPackage
+        UNION
+        SELECT originalPackage as packageName, COUNT(*) as count, MAX(id) as latestTime
+        FROM super_island_history
+        WHERE (mappedPackage IS NULL OR mappedPackage = '') AND originalPackage IS NOT NULL AND originalPackage != ''
+        GROUP BY originalPackage
+        ORDER BY latestTime DESC
+    """)
+    suspend fun getPackageCount(): List<SuperIslandPackageCount>
+
+    /**
+     * 获取未知包名（无包名）的记录统计
+     */
+    @Query("""
+        SELECT '(未知应用)' as packageName, COUNT(*) as count, MAX(id) as latestTime
+        FROM super_island_history
+        WHERE (mappedPackage IS NULL OR mappedPackage = '') AND (originalPackage IS NULL OR originalPackage = '')
+    """)
+    suspend fun getUnknownPackageCount(): SuperIslandPackageCount?
+
+    /**
+     * 按包名分页获取历史记录摘要
+     * @param packageName 包名，传入 null 表示获取未知包名的记录
+     * @param limit 每页数量
+     * @param offset 偏移量
+     */
+    @Query("""
+        SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, picMap, featureId
+        FROM super_island_history
+        WHERE 
+            CASE 
+                WHEN :packageName IS NULL THEN (mappedPackage IS NULL OR mappedPackage = '') AND (originalPackage IS NULL OR originalPackage = '')
+                ELSE (mappedPackage = :packageName OR (mappedPackage IS NULL OR mappedPackage = '') AND originalPackage = :packageName)
+            END
+        ORDER BY id DESC
+        LIMIT :limit OFFSET :offset
+    """)
+    suspend fun getByPackage(packageName: String?, limit: Int, offset: Int): List<SuperIslandHistorySummary>
+
+    /**
+     * 按包名获取所有历史记录摘要（不分页，用于分组内展示）
+     */
+    @Query("""
+        SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, picMap, featureId
+        FROM super_island_history
+        WHERE 
+            CASE 
+                WHEN :packageName IS NULL THEN (mappedPackage IS NULL OR mappedPackage = '') AND (originalPackage IS NULL OR originalPackage = '')
+                ELSE (mappedPackage = :packageName OR (mappedPackage IS NULL OR mappedPackage = '') AND originalPackage = :packageName)
+            END
+        ORDER BY id DESC
+    """)
+    suspend fun getAllByPackage(packageName: String?): List<SuperIslandHistorySummary>
+
+    /**
+     * 按包名删除历史记录
+     */
+    @Query("""
+        DELETE FROM super_island_history
+        WHERE 
+            CASE 
+                WHEN :packageName IS NULL THEN (mappedPackage IS NULL OR mappedPackage = '') AND (originalPackage IS NULL OR originalPackage = '')
+                ELSE (mappedPackage = :packageName OR (mappedPackage IS NULL OR mappedPackage = '') AND originalPackage = :packageName)
+            END
+    """)
+    suspend fun deleteByPackage(packageName: String?)
+
+    /**
+     * 按ID删除单条记录
+     */
+    @Query("DELETE FROM super_island_history WHERE id = :id")
+    suspend fun deleteById(id: Long)
+
+    /**
+     * 获取总记录数
+     */
+    @Query("SELECT COUNT(*) FROM super_island_history")
+    suspend fun getCount(): Int
 }

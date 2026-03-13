@@ -317,6 +317,61 @@ class DatabaseRepository(private val database: AppDatabase) {
         superIslandHistoryDao.delete(history)
     }
 
+    /**
+     * 获取按包名分组的统计信息
+     */
+    suspend fun getSuperIslandPackageCount(): List<notifyrelay.data.database.dao.SuperIslandPackageCount> {
+        val counts = superIslandHistoryDao.getPackageCount().toMutableList()
+        val unknownCount = superIslandHistoryDao.getUnknownPackageCount()
+        if (unknownCount != null && unknownCount.count > 0) {
+            counts.add(unknownCount)
+        }
+        return counts.sortedByDescending { it.latestTime }
+    }
+
+    /**
+     * 按包名获取所有历史记录摘要（用于分组内展示）
+     */
+    suspend fun getSuperIslandHistoryByPackage(packageName: String?): List<SuperIslandHistoryEntity> {
+        val summaries = superIslandHistoryDao.getAllByPackage(packageName)
+        return summaries.map { s ->
+            SuperIslandHistoryEntity(
+                id = s.id,
+                sourceDeviceUuid = s.sourceDeviceUuid,
+                originalPackage = s.originalPackage,
+                mappedPackage = s.mappedPackage,
+                appName = s.appName,
+                title = s.title,
+                text = s.text,
+                paramV2Raw = s.paramV2Raw,
+                picMap = s.picMap,
+                rawPayload = null,
+                featureId = s.featureId
+            )
+        }
+    }
+
+    /**
+     * 按包名删除历史记录
+     */
+    suspend fun deleteSuperIslandHistoryByPackage(packageName: String?) {
+        superIslandHistoryDao.deleteByPackage(packageName)
+    }
+
+    /**
+     * 按ID删除单条历史记录
+     */
+    suspend fun deleteSuperIslandHistoryById(id: Long) {
+        superIslandHistoryDao.deleteById(id)
+    }
+
+    /**
+     * 获取超级岛历史记录总数
+     */
+    suspend fun getSuperIslandHistoryCount(): Int {
+        return superIslandHistoryDao.getCount()
+    }
+
     // 应用相关方法
 
     /**
