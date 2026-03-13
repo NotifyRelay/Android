@@ -2,6 +2,8 @@ package notifyrelay.data.database.repository
 
 import android.content.Context
 import notifyrelay.data.database.AppDatabase
+import androidx.paging.PagingSource
+import notifyrelay.data.database.dao.PackageCount
 import notifyrelay.data.database.entity.AppConfigEntity
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
@@ -82,6 +84,20 @@ class DatabaseRepository(private val database: AppDatabase) {
      */
     suspend fun getNotificationsByDevice(deviceUuid: String): List<NotificationRecordEntity> {
         return notificationRecordDao.getByDevice(deviceUuid)
+    }
+
+    /**
+     * 获取通知记录的分页数据源
+     */
+    fun getNotificationPagingSourceByDevice(deviceUuid: String): PagingSource<Int, NotificationRecordEntity> {
+        return notificationRecordDao.getPagingSourceByDevice(deviceUuid)
+    }
+
+    /**
+     * 获取设备的包名统计
+     */
+    suspend fun getPackageCountByDevice(deviceUuid: String): List<PackageCount> {
+        return notificationRecordDao.getPackageCountByDevice(deviceUuid)
     }
     
     /**

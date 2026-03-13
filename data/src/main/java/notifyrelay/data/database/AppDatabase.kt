@@ -37,7 +37,7 @@ import notifyrelay.data.database.migration.MigrationHelper
         NotificationRecordEntity::class,
         SuperIslandHistoryEntity::class
     ],
-    version = 4,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -79,7 +79,7 @@ abstract class AppDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                 .build().also { INSTANCE = it }
             }
         }
@@ -170,6 +170,18 @@ abstract class AppDatabase : RoomDatabase() {
                 
                 // 3. 创建索引
                 database.execSQL("CREATE INDEX IF NOT EXISTS index_app_devices_source_device ON app_devices(sourceDevice)")
+            }
+        }
+
+        /**
+         * 数据库迁移：从版本4到版本5
+         * 为通知记录表添加复合索引
+         */
+        private val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_notification_records_device_package_time ON notification_records(deviceUuid, packageName, time)"
+                )
             }
         }
         

@@ -41,6 +41,7 @@ compileSdk = "36"
 targetSdk = "36"
 minSdk = "29"
 semver = "2.0.0"
+paging = "3.3.6"
 
 
 [libraries]
@@ -78,21 +79,27 @@ androidx-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref 
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
 androidx-room-ktx = { group = "androidx.room", name = "room-ktx", version.ref = "room" }
+androidx-room-paging = { group = "androidx.room", name = "room-paging", version.ref = "room" }
 androidx-lifecycle-runtime = { group = "androidx.lifecycle", name = "lifecycle-runtime", version.ref = "lifecycleRuntime" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "lifecycleRuntimeKtx" }
 androidx-lifecycle-runtime-android = { group = "androidx.lifecycle", name = "lifecycle-runtime-android", version.ref = "lifecycleRuntimeAndroid" }
+androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "lifecycle" }
+androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 accompanist-pager-indicators = { group = "com.google.accompanist", name = "accompanist-pager-indicators", version.ref = "accompanistPager" }
 semver = { group = "io.github.z4kn4fein", name = "semver", version.ref = "semver" }
+androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
+androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 
 
 
 [bundles]
-room = ["androidx-room-runtime", "androidx-room-compiler", "androidx-room-ktx"]
+room = ["androidx-room-runtime", "androidx-room-compiler", "androidx-room-ktx", "androidx-room-paging"]
 lifecycle = ["androidx-lifecycle-runtime", "androidx-lifecycle-runtime-ktx", "androidx-lifecycle-runtime-android"]
 coil = ["coil", "coil-compose"]
 datastore = ["androidx-datastore-preferences", "androidx-datastore"]
 kotlinx-coroutines = ["kotlinx-coroutines-core", "kotlinx-coroutines-android"]
+paging = ["androidx-paging-runtime", "androidx-paging-compose"]
 
 
 [plugins]

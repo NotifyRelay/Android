@@ -5,6 +5,7 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.paging.PagingSource
 import notifyrelay.data.database.entity.NotificationRecordEntity
 
 /**
@@ -97,4 +98,31 @@ interface NotificationRecordDao {
      */
     @Query("DELETE FROM notification_records WHERE key IN (SELECT key FROM notification_records WHERE packageName = :packageName AND deviceUuid = :deviceUuid ORDER BY time ASC LIMIT :limit)")
     suspend fun deleteOldestByPackageAndDevice(packageName: String, deviceUuid: String, limit: Int)
+
+    /**
+     * 获取分页数据源（按设备分组使用）
+     */
+    @Query("SELECT * FROM notification_records WHERE deviceUuid = :deviceUuid ORDER BY time DESC")
+    fun getPagingSourceByDevice(deviceUuid: String): PagingSource<Int, NotificationRecordEntity>
+
+    /**
+     * 获取分组后的通知数量统计（按最新时间排序）
+     */
+    @Query("""
+        SELECT packageName, COUNT(*) as count, MAX(time) as latestTime
+        FROM notification_records
+        WHERE deviceUuid = :deviceUuid
+        GROUP BY packageName
+        ORDER BY latestTime DESC
+    """)
+    suspend fun getPackageCountByDevice(deviceUuid: String): List<PackageCount>
 }
+
+/**
+ * 包名统计
+ */
+data class PackageCount(
+    val packageName: String,
+    val count: Int,
+    val latestTime: Long
+)

@@ -13,7 +13,8 @@ import androidx.room.PrimaryKey
     indices = [
         Index(value = ["deviceUuid"]),
         Index(value = ["time"]),
-        Index(value = ["packageName"])
+        Index(value = ["packageName"]),
+        Index(value = ["deviceUuid", "packageName", "time"])
     ]
 )
 data class NotificationRecordEntity(
