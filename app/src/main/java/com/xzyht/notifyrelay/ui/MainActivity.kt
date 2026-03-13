@@ -31,6 +31,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -172,14 +173,6 @@ class MainActivity : FragmentActivity() {
                             onBack = {
                                 if (navigator.backStackSize() > 1) {
                                     navigator.pop()
-                                } else {
-                                    val currentTime = System.currentTimeMillis()
-                                    if (currentTime - backPressedTime < EXIT_INTERVAL) {
-                                        finish()
-                                    } else {
-                                        ToastUtils.showShortToast(this@MainActivity, "再次返回以退出应用")
-                                        backPressedTime = currentTime
-                                    }
                                 }
                             },
                             entryProvider = entryProvider {
@@ -234,7 +227,7 @@ class MainActivity : FragmentActivity() {
 
 @Composable
 fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
-    var selectedTab by rememberSaveable { mutableIntStateOf(1) }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val colorScheme = MiuixTheme.colorScheme
     
     val errorColor = Color(0xFFD32F2F)
@@ -250,7 +243,7 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
     
     val deviceListState = remember { DeviceListScreenState() }
     
-    MainScreenBackHandler(selectedTab, navigator, deviceListState) { selectedTab = 1 }
+    MainScreenBackHandler(selectedTab, navigator, deviceListState) { selectedTab = 0 }
     
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -381,12 +374,14 @@ private fun MainScreenBackHandler(
     deviceListState: DeviceListScreenState,
     onBackToFirstTab: () -> Unit
 ) {
+    val activity = LocalContext.current as? MainActivity
+    var backPressedTime by remember { mutableLongStateOf(0L) }
+    val EXIT_INTERVAL = 2000L
+
     val isBackHandlerEnabled by remember {
         derivedStateOf {
-            (navigator.current() is Route.Main && 
-            navigator.backStackSize() == 1 && 
-            selectedTab != 1) ||
-            deviceListState.hasAnyDialogShowing()
+            navigator.current() is Route.Main &&
+            navigator.backStackSize() == 1
         }
     }
 
@@ -398,8 +393,16 @@ private fun MainScreenBackHandler(
         onBackCompleted = {
             if (deviceListState.hasAnyDialogShowing()) {
                 deviceListState.dismissAllDialogs()
-            } else {
+            } else if (selectedTab != 0) {
                 onBackToFirstTab()
+            } else {
+                val currentTime = System.currentTimeMillis()
+                if (currentTime - backPressedTime < EXIT_INTERVAL) {
+                    activity?.finish()
+                } else {
+                    ToastUtils.showShortToast(activity ?: return@NavigationBackHandler, "再次返回以退出应用")
+                    backPressedTime = currentTime
+                }
             }
         }
     )
