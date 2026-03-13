@@ -592,15 +592,7 @@ fun NotificationHistoryScreen() {
                                             )
                                         }
                                     } else {
-                                        // 优化：限制展开时显示的通知数量，避免性能问题
-                                        val expandedList = sortedList
-                                        val maxExpandedItems = 50 // 限制最多显示50条通知
-                                        val displayList =
-                                            if (expandedList.size > maxExpandedItems) {
-                                                expandedList.take(maxExpandedItems)
-                                            } else {
-                                                expandedList
-                                            }
+                                        val displayList = sortedList
 
                                         // 使用IndexedValue获取索引，便于后续处理
                                         displayList.forEachIndexed { index, record ->
@@ -689,15 +681,6 @@ fun NotificationHistoryScreen() {
                                                     )
                                                 }
                                             }
-                                        }
-
-                                        // 如果通知数量超过限制，显示提示信息
-                                        if (expandedList.size > maxExpandedItems) {
-                                            Spacer(modifier = Modifier.Companion.height(8.dp))
-                                            Text(
-                                                text = "... 仅显示前${maxExpandedItems}条，共${expandedList.size}条通知",
-                                                style = textStyles.body2.copy(color = colorScheme.outline)
-                                            )
                                         }
                                     }
                                 }
