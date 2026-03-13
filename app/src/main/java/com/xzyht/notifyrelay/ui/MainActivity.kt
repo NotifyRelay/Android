@@ -7,7 +7,6 @@ import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
-import android.view.View
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
@@ -17,23 +16,25 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -61,9 +62,9 @@ import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
 import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.navigation.rememberNavigator
+import com.xzyht.notifyrelay.ui.screen.DeviceForwardScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreenState
-import com.xzyht.notifyrelay.ui.screen.DeviceForwardScreen
 import com.xzyht.notifyrelay.ui.screen.HistoryScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
 import kotlinx.coroutines.DelicateCoroutinesApi
@@ -81,6 +82,7 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
+import top.yukonga.miuix.kmp.basic.NavigationDisplayMode
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
@@ -208,7 +210,7 @@ class MainActivity : FragmentActivity() {
     private suspend fun startServicesAndUpdateBanner() {
         val result = ServiceManager.startAllServices(this)
         val serviceStarted = result.first
-        val errorMessage = result.second as? String
+        val errorMessage = result.second
         if (errorMessage != null) {
             withContext(Dispatchers.Main) {
                 showAutoStartBanner = true
@@ -227,7 +229,6 @@ class MainActivity : FragmentActivity() {
 
 @Composable
 fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val colorScheme = MiuixTheme.colorScheme
     
     val errorColor = Color(0xFFD32F2F)
@@ -243,7 +244,15 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
     
     val deviceListState = remember { DeviceListScreenState() }
     
-    MainScreenBackHandler(selectedTab, navigator, deviceListState) { selectedTab = 0 }
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    val coroutineScope = rememberCoroutineScope()
+    
+    LaunchedEffect(pagerState.currentPage) {
+        selectedTab = pagerState.currentPage
+    }
+    
+    MainScreenBackHandler(selectedTab, pagerState, navigator, deviceListState)
     
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
@@ -287,26 +296,42 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
             },
             bottomBar = {
                 NavigationBar(
+                    mode = NavigationDisplayMode.IconAndText,
                     color = colorScheme.background,
                     modifier = Modifier
-                        .height(58.dp)
+                        .height(75.dp)
                         .navigationBarsPadding()
                 ) {
                     NavigationBarItem(
+                        modifier = Modifier.weight(1f),
                         selected = selectedTab == 0,
-                        onClick = { selectedTab = 0 },
+                        onClick = { 
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(0)
+                            }
+                        },
                         icon = MiuixIcons.Community,
                         label = "历史"
                     )
                     NavigationBarItem(
+                        modifier = Modifier.weight(1f),
                         selected = selectedTab == 1,
-                        onClick = { selectedTab = 1 },
+                        onClick = { 
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(1)
+                            }
+                        },
                         icon = MiuixIcons.Settings,
                         label = "设备互联与增强"
                     )
                     NavigationBarItem(
+                        modifier = Modifier.weight(1f),
                         selected = selectedTab == 2,
-                        onClick = { selectedTab = 2 },
+                        onClick = { 
+                            coroutineScope.launch {
+                                pagerState.animateScrollToPage(2)
+                            }
+                        },
                         icon = MiuixIcons.Tune,
                         label = "设置"
                     )
@@ -329,12 +354,14 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
                     ) {
                         DeviceListScreen(navigator, deviceListState)
                     }
-                    Box(
+                    HorizontalPager(
+                        state = pagerState,
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxHeight()
-                    ) {
-                        when (selectedTab) {
+                            .fillMaxHeight(),
+                        userScrollEnabled = false
+                    ) { page ->
+                        when (page) {
                             0 -> HistoryScreen(navigator)
                             1 -> DeviceForwardScreen(navigator)
                             2 -> SettingsScreen(navigator)
@@ -349,12 +376,14 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
                         .padding(paddingValues)
                 ) {
                     DeviceListScreen(navigator, deviceListState)
-                    Box(
+                    HorizontalPager(
+                        state = pagerState,
                         modifier = Modifier
                             .weight(1f)
-                            .fillMaxWidth()
-                    ) {
-                        when (selectedTab) {
+                            .fillMaxWidth(),
+                        userScrollEnabled = false
+                    ) { page ->
+                        when (page) {
                             0 -> HistoryScreen(navigator)
                             1 -> DeviceForwardScreen(navigator)
                             2 -> SettingsScreen(navigator)
@@ -370,13 +399,14 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
 @Composable
 private fun MainScreenBackHandler(
     selectedTab: Int,
+    pagerState: PagerState,
     navigator: com.xzyht.notifyrelay.ui.navigation.Navigator,
-    deviceListState: DeviceListScreenState,
-    onBackToFirstTab: () -> Unit
+    deviceListState: DeviceListScreenState
 ) {
     val activity = LocalContext.current as? MainActivity
     var backPressedTime by remember { mutableLongStateOf(0L) }
     val EXIT_INTERVAL = 2000L
+    val coroutineScope = rememberCoroutineScope()
 
     val isBackHandlerEnabled by remember {
         derivedStateOf {
@@ -394,7 +424,9 @@ private fun MainScreenBackHandler(
             if (deviceListState.hasAnyDialogShowing()) {
                 deviceListState.dismissAllDialogs()
             } else if (selectedTab != 0) {
-                onBackToFirstTab()
+                coroutineScope.launch {
+                    pagerState.animateScrollToPage(0)
+                }
             } else {
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - backPressedTime < EXIT_INTERVAL) {
