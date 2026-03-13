@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.ui.dialog
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,7 +33,6 @@ fun RejectedDevicesDialog(
         title = "已拒绝设备",
         onDismissRequest = onDismiss
     ) {
-        BackHandler(onBack = onDismiss)
         if (rejectedDevices.isEmpty()) {
             Text(
                 text = "暂无已拒绝设备",

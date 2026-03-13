@@ -26,7 +26,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSession
 import com.xzyht.notifyrelay.servers.MediaControlUtil
 import com.xzyht.notifyrelay.servers.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.sync.ProtocolSender
-import com.xzyht.notifyrelay.ui.fragment.GlobalSelectedDeviceHolder
+import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.StorageManager

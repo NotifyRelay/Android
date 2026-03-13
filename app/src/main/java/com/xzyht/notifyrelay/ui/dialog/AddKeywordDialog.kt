@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.ui.dialog
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -42,7 +41,6 @@ fun AddKeywordDialog(
         title = "为包名添加关键词(可选)",
         onDismissRequest = onDismiss
     ) {
-        BackHandler(onBack = onDismiss)
         Column {
             Text(packageName, style = textStyles.body2, color = colorScheme.primary)
             TextField(

@@ -60,7 +60,7 @@ import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.ui.GuideActivity
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
-import com.xzyht.notifyrelay.ui.fragment.GlobalSelectedDeviceHolder
+import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.IntentUtils

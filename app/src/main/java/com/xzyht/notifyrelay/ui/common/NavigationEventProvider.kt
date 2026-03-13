@@ -5,6 +5,13 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
 
+/**
+ * 提供 NavigationEvent Dispatcher Owner
+ * 此组件用于需要独立 NavigationEvent 调度器的场景
+ * 
+ * Provide NavigationEvent Dispatcher Owner
+ * This component is used for scenarios requiring an independent NavigationEvent dispatcher
+ */
 @Composable
 fun ProvideNavigationEventDispatcherOwner(content: @Composable () -> Unit) {
     val dispatcherOwner = rememberNavigationEventDispatcherOwner(true, null)

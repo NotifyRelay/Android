@@ -7,7 +7,9 @@ junitVersion = "1.2.1"
 espressoCore = "3.6.1"
 appcompat = "1.7.1"
 material = "1.12.0"
-miuix = "0.8.3"
+miuix = "0.8.6"
+navigation3 = "1.1.0-alpha05"
+lifecycle = "2.10.0"
 uiText = "1.10.0"
 material3 = "1.4.0"
 foundationLayout = "1.10.0"
@@ -23,7 +25,7 @@ lifecycleRuntime = "2.8.7"
 lifecycleRuntimeKtx = "2.8.7"
 lifecycleRuntimeAndroid = "2.8.7"
 room = "2.8.0"
-navigationEventCompose = "1.0.1"
+navigationEventCompose = "1.0.2"
 datastorePreferences = "1.0.0"
 datastore = "1.0.0"
 gson = "2.10.1"
@@ -49,6 +51,9 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 miuix-android = { group = "top.yukonga.miuix.kmp", name = "miuix-android", version.ref = "miuix" }
+miuix-navigation3-ui = { group = "top.yukonga.miuix.kmp", name = "miuix-navigation3-ui-android", version.ref = "miuix" }
+androidx-navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3" }
+androidx-lifecycle-viewmodel-navigation3 = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-navigation3", version.ref = "lifecycle" }
 androidx-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.ref = "uiText" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
 androidx-foundation-layout = { group = "androidx.compose.foundation", name = "foundation-layout", version.ref = "foundationLayout" }

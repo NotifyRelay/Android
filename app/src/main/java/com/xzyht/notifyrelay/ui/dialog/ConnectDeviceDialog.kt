@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.ui.dialog
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -14,6 +13,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 连接设备弹窗
+ * 返回逻辑由父组件的 NavigationBackHandler 统一处理
  */
 @Composable
 fun ConnectDeviceDialog(
@@ -33,7 +33,6 @@ fun ConnectDeviceDialog(
         summary = "是否连接设备：${device.displayName} \n(${device.uuid})？\n对方将收到认证请求。",
         onDismissRequest = onDismiss
     ) {
-        BackHandler(onBack = onDismiss)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.End
@@ -42,7 +41,6 @@ fun ConnectDeviceDialog(
                 text = "连接",
                 onClick = {
                     onConnect(device)
-                    // 不在这里调用onDismiss，让调用方决定何时关闭弹窗
                 }
             )
             TextButton(
