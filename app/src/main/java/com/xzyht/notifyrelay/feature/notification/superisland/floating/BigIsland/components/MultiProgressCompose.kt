@@ -52,9 +52,9 @@ private const val TITLE_PADDING_DP = 12 // 标题与进度条之间的间距
 @Composable
 fun MultiProgressCompose(
     multiProgressInfo: MultiProgressInfo,
+    modifier: Modifier = Modifier,
     picMap: Map<String, String>? = null,
-    business: String? = null,
-    modifier: Modifier = Modifier
+    business: String? = null
 ) {
     val colorValue: Int =
         SuperIslandImageUtil.parseColor(multiProgressInfo.color) ?: DEFAULT_PRIMARY_COLOR.toInt()

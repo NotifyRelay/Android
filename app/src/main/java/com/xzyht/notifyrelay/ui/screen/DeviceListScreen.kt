@@ -290,8 +290,8 @@ fun DeviceListScreen(
         val isCharging = remember { mutableStateOf(device.chargingStatus) }
 
         LaunchedEffect(device.batteryLevel) {
-            if (device.batteryLevel != -1 && device.batteryLevel != batteryLevel.value) {
-                batteryLevel.value = device.batteryLevel.coerceIn(0, 100)
+            if (device.batteryLevel != -1 && device.batteryLevel != batteryLevel.intValue) {
+                batteryLevel.intValue = device.batteryLevel.coerceIn(0, 100)
             }
         }
         
@@ -301,7 +301,7 @@ fun DeviceListScreen(
             }
         }
         
-        val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel.value, isCharging.value)
+        val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel.intValue, isCharging.value)
         
         val buttonColors = if (selectedDevice?.uuid == device.uuid) {
             ButtonDefaults.buttonColorsPrimary()
@@ -344,7 +344,7 @@ fun DeviceListScreen(
                                 text = batteryIcon,
                                 fontFamily = FontFamily(Font(resId = R.font.segsmdl2)),
                                 fontSize = 16.sp,
-                                color = BatteryIconConverter.getBatteryColor(batteryLevel.value),
+                                color = BatteryIconConverter.getBatteryColor(batteryLevel.intValue),
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                         }

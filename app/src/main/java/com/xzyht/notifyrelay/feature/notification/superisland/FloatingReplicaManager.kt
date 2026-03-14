@@ -970,7 +970,7 @@ object FloatingReplicaManager {
                         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                         PixelFormat.TRANSLUCENT
                     ).apply {
-                        gravity = Gravity.LEFT or Gravity.TOP
+                        gravity = Gravity.START or Gravity.TOP
                         x = ((context.resources.displayMetrics.widthPixels - (FIXED_WIDTH_DP * density).toInt()) / 2).coerceAtLeast(0)
                         y = 100
                     }

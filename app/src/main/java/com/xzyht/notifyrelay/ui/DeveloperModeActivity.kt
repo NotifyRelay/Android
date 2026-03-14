@@ -131,11 +131,11 @@ class DeveloperModeActivity : AppCompatActivity() {
 
                 WindowDropdown(
                     title = "日志级别",
-                    summary = "当前级别: ${logLevelOptions[selectedLevelIndex.value].first}",
+                    summary = "当前级别: ${logLevelOptions[selectedLevelIndex.intValue].first}",
                     items = logLevelOptions.map { it.first },
-                    selectedIndex = selectedLevelIndex.value,
+                    selectedIndex = selectedLevelIndex.intValue,
                     onSelectedIndexChange = {
-                        selectedLevelIndex.value = it
+                        selectedLevelIndex.intValue = it
                         logLevel.value = logLevelOptions[it].second
                         Logger.CURRENT_LEVEL = logLevel.value
                         StorageManager.putInt(context, KEY_LOG_LEVEL, logLevel.value.ordinal)

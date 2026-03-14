@@ -271,7 +271,7 @@ fun FloatingWindowContainer(
 
                                         // 进度组件
                                         paramV2.multiProgressInfo?.let {
-                                            MultiProgressCompose(it, entry.picMap, entry.business)
+                                            MultiProgressCompose(it, picMap = entry.picMap, business = entry.business)
                                         } ?: paramV2.progressInfo?.let {
                                             ProgressCompose(it, entry.picMap)
                                         }
