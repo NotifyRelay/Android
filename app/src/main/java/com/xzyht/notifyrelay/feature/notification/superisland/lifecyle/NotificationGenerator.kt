@@ -577,6 +577,13 @@ object NotificationGenerator {
                 // 设置滚动更新机制
                 setupScrollUpdate(key, scrollKey, capsuleText, context, notificationId, originalBuilder = builder, notificationManager, floatingWindowManager, entryKeyToNotificationId)
                 
+                // 预先解析picMap中的图片ID
+                val resolvedPicMap = if (picMap.isNullOrEmpty()) {
+                    picMap
+                } else {
+                    SuperIslandImageStore.resolvePicMap(context, picMap)
+                }
+                
                 // ... (后续构建extras的代码保持不变)
                 // 添加焦点歌词相关的结构化数据
                 SuperIslandStructuredDataHelper.addMediaSuperIslandStructuredData(
@@ -584,7 +591,7 @@ object NotificationGenerator {
                     context = context,
                     title = title,
                     text = text,
-                    picMap = picMap
+                    picMap = resolvedPicMap
                 )
                 
                 // 构建通知

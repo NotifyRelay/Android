@@ -16,6 +16,7 @@ import kotlinx.coroutines.sync.withLock
 import notifyrelay.data.StorageManager
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.base.util.Logger
 import java.io.File
 
 /**
@@ -98,11 +99,25 @@ object SuperIslandImageStore {
         return out
     }
 
+    suspend fun resolveSuspend(context: Context?, value: String?): String? {
+        if (value.isNullOrBlank()) return value
+        val trimmed = value.trim()
+        val imageId = trimmed.toLongOrNull() ?: return value
+        if (imageId <= 0 || context == null) return value
+        ensureMigrated(context)
+        return DatabaseRepository.getInstance(context).resolveSuperIslandImageById(imageId) ?: value
+    }
+
     fun resolve(context: Context?, value: String?): String? {
         if (value.isNullOrBlank()) return value
         val trimmed = value.trim()
         val imageId = trimmed.toLongOrNull() ?: return value
-        if (imageId <= 0 || context == null || isMainThread()) return value
+        if (imageId <= 0 || context == null || isMainThread()) {
+            if (isMainThread()) {
+                Logger.w("SuperIslandImageStore", "resolve在主线程调用，无法解析图片ID: $imageId，请使用resolveSuspend或resolvePicMap")
+            }
+            return value
+        }
         return runBlocking(Dispatchers.IO) {
             DatabaseRepository.getInstance(context).resolveSuperIslandImageById(imageId) ?: value
         }

@@ -142,7 +142,7 @@ object LiveUpdatesNotificationManager {
         notificationManager.createNotificationChannel(channel)
     }
 
-    fun showLiveUpdate(
+    suspend fun showLiveUpdate(
         sourceId: String,
         title: String?,
         text: String?,
@@ -1015,20 +1015,26 @@ object LiveUpdatesNotificationManager {
      * @param builder 通知构建器
      * @param paramV2 ParamV2对象
      * @param paramV2Raw ParamV2原始JSON字符串
-     * @param picMap 图片映射
+     * @param picMap 图片映射（可能包含图片ID，需要解析）
      */
-    private fun addSuperIslandStructuredData(
+    private suspend fun addSuperIslandStructuredData(
         builder: NotificationCompat.Builder,
         paramV2: ParamV2?,
         paramV2Raw: String?,
         picMap: Map<String, String>?
     ) {
+        // 预先解析picMap中的图片ID
+        val resolvedPicMap = if (picMap.isNullOrEmpty()) {
+            picMap
+        } else {
+            SuperIslandImageStore.resolvePicMap(appContext, picMap)
+        }
         // 使用公共工具类添加超级岛结构化数据
         SuperIslandStructuredDataHelper.addSuperIslandStructuredData(
             builder = builder,
             context = appContext,
             paramV2Raw = paramV2Raw,
-            picMap = picMap,
+            picMap = resolvedPicMap,
             title = paramV2?.baseInfo?.title,
             text = paramV2?.baseInfo?.content,
             isSuperIslandSpecInjectionEnabled = isSuperIslandSpecInjectionEnabled(appContext)

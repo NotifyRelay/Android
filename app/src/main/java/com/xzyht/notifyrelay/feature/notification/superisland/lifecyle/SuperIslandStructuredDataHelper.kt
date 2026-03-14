@@ -3,7 +3,6 @@ package com.xzyht.notifyrelay.feature.notification.superisland.lifecyle
 import android.content.Context
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
-import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
 
@@ -82,9 +81,7 @@ object SuperIslandStructuredDataHelper {
                     map.forEach { (picKey, picUrl) ->
                         // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
                         if (picKey.startsWith("miui.focus.pic_")) {
-                                // 解析图片绑定ID，获取实际的图片数据
-                            val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
-                            extras.putString(picKey, actualPicUrl)
+                            extras.putString(picKey, picUrl)
                         }
                     }
 
@@ -92,8 +89,7 @@ object SuperIslandStructuredDataHelper {
                     val picsBundle = Bundle()
                     map.forEach { (picKey, picUrl) ->
                         if (picKey.startsWith("miui.focus.pic_")) {
-                            val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
-                            picsBundle.putString(picKey, actualPicUrl)
+                            picsBundle.putString(picKey, picUrl)
                         }
                     }
                     extras.putBundle("miui.focus.pics", picsBundle)
@@ -212,8 +208,7 @@ object SuperIslandStructuredDataHelper {
                 // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
                 map.forEach { (picKey, picUrl) ->
                     if (picKey.startsWith("miui.focus.pic_")) {
-                        val actualPicUrl: String = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
-                        extras.putString(picKey, actualPicUrl)
+                        extras.putString(picKey, picUrl)
                     }
                 }
 
@@ -221,8 +216,7 @@ object SuperIslandStructuredDataHelper {
                 val picsBundle = Bundle()
                 map.forEach { (picKey, picUrl) ->
                     if (picKey.startsWith("miui.focus.pic_")) {
-                        val actualPicUrl: String = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
-                        picsBundle.putString(picKey, actualPicUrl)
+                        picsBundle.putString(picKey, picUrl)
                     }
                 }
                 extras.putBundle("miui.focus.pics", picsBundle)
@@ -314,9 +308,7 @@ object SuperIslandStructuredDataHelper {
                 map.forEach { (picKey, picUrl) ->
                     // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
                     if (picKey.startsWith("miui.focus.pic_")) {
-                            // 解析图片绑定ID，获取实际的图片数据
-                        val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
-                        extras.putString(picKey, actualPicUrl)
+                        extras.putString(picKey, picUrl)
                     }
                 }
 
@@ -324,8 +316,7 @@ object SuperIslandStructuredDataHelper {
                 val picsBundle = Bundle()
                 map.forEach { (picKey, picUrl) ->
                     if (picKey.startsWith("miui.focus.pic_")) {
-                        val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
-                        picsBundle.putString(picKey, actualPicUrl)
+                        picsBundle.putString(picKey, picUrl)
                     }
                 }
                 extras.putBundle("miui.focus.pics", picsBundle)
