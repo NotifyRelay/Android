@@ -39,7 +39,7 @@ class SuperIslandHistoryViewModel(
         Pager(
             config = PagingConfig(pageSize = 20, enablePlaceholders = false)
         ) {
-            SuperIslandPagingSource(repository)
+            SuperIslandPagingSource(repository, application)
         }.flow
     }.cachedIn(viewModelScope)
 

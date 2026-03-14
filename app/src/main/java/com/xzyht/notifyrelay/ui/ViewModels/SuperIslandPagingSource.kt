@@ -1,16 +1,19 @@
 package com.xzyht.notifyrelay.ui.ViewModels
 
+import android.content.Context
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
+import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import notifyrelay.data.database.dao.SuperIslandPackageCount
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 
 class SuperIslandPagingSource(
-    private val repository: DatabaseRepository
+    private val repository: DatabaseRepository,
+    private val context: Context
 ) : PagingSource<Int, GroupedSuperIslandHistory>() {
     private val gson = Gson()
     private val stringStringMapType = object : TypeToken<Map<String, String>>() {}.type
@@ -41,7 +44,7 @@ class SuperIslandPagingSource(
                 val entities = repository.getSuperIslandHistoryByPackage(
                     if (group.packageName == "(未知应用)") null else group.packageName
                 )
-                val entries = entities.map { it.toSuperIslandHistoryEntry() }
+                val entries = entities.map { it.toSuperIslandHistoryEntry(context) }
                 val appName = entries.firstOrNull()?.appName?.takeIf { !it.isNullOrBlank() }
                     ?: group.packageName
 
@@ -72,7 +75,19 @@ class SuperIslandPagingSource(
         return page.prevKey?.let { it + state.config.pageSize } ?: page.nextKey?.let { it - state.config.pageSize }
     }
 
-    private fun SuperIslandHistoryEntity.toSuperIslandHistoryEntry(): SuperIslandHistoryEntry {
+    private suspend fun SuperIslandHistoryEntity.toSuperIslandHistoryEntry(
+        context: Context
+    ): SuperIslandHistoryEntry {
+        val rawMap: Map<String, String> = try {
+            gson.fromJson(picMap, stringStringMapType) ?: emptyMap()
+        } catch (_: Exception) {
+            emptyMap()
+        }
+        val resolvedMap = try {
+            SuperIslandImageStore.resolvePicMap(context, rawMap)
+        } catch (_: Exception) {
+            rawMap
+        }
         return SuperIslandHistoryEntry(
             id = id,
             sourceDeviceUuid = sourceDeviceUuid,
@@ -82,7 +97,7 @@ class SuperIslandPagingSource(
             title = title,
             text = text,
             paramV2Raw = paramV2Raw,
-            picMap = gson.fromJson(picMap, stringStringMapType) ?: emptyMap(),
+            picMap = resolvedMap,
             rawPayload = rawPayload,
             featureId = featureId
         )

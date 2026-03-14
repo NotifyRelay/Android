@@ -215,6 +215,7 @@ object SuperIslandManager {
             } catch (_: Exception) {}
             // 支持单独的 pic keys
             for (k in extras.keySet()) {
+                if (k == "miui.focus.pics") continue
                 if (k.startsWith("miui.focus.pic_") || k.startsWith("miui.focus.pic")) {
                     try {
                         // 优先使用 getString

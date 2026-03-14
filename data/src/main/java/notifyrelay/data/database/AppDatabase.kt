@@ -13,12 +13,15 @@ import notifyrelay.data.database.dao.AppDeviceDao
 import notifyrelay.data.database.dao.DeviceDao
 import notifyrelay.data.database.dao.NotificationRecordDao
 import notifyrelay.data.database.dao.SuperIslandHistoryDao
+import notifyrelay.data.database.dao.SuperIslandImageDao
 import notifyrelay.data.database.entity.AppConfigEntity
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.entity.DeviceEntity
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
+import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
+import notifyrelay.data.database.entity.SuperIslandImageEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -35,9 +38,11 @@ import notifyrelay.data.database.migration.MigrationHelper
         AppDeviceEntity::class,
         DeviceEntity::class,
         NotificationRecordEntity::class,
-        SuperIslandHistoryEntity::class
+        SuperIslandHistoryEntity::class,
+        SuperIslandImageEntity::class,
+        SuperIslandImageBindingEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -48,6 +53,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun deviceDao(): DeviceDao
     abstract fun notificationRecordDao(): NotificationRecordDao
     abstract fun superIslandHistoryDao(): SuperIslandHistoryDao
+    abstract fun superIslandImageDao(): SuperIslandImageDao
     
     companion object {
         // 数据库名称
@@ -79,7 +85,7 @@ abstract class AppDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                 .build().also { INSTANCE = it }
             }
         }
@@ -181,6 +187,49 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
                     "CREATE INDEX IF NOT EXISTS index_notification_records_device_package_time ON notification_records(deviceUuid, packageName, time)"
+                )
+            }
+        }
+
+        /**
+         * 数据库迁移：从版本5到版本6
+         * 添加超级岛图片去重表与绑定表
+         */
+        private val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS super_island_images (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        contentHash TEXT NOT NULL,
+                        data TEXT NOT NULL,
+                        lastUpdated INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS index_super_island_images_contentHash ON super_island_images(contentHash)"
+                )
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS super_island_image_bindings (
+                        packageName TEXT NOT NULL,
+                        imageKey TEXT NOT NULL,
+                        imageId INTEGER NOT NULL,
+                        lastUpdated INTEGER NOT NULL,
+                        PRIMARY KEY (packageName, imageKey),
+                        FOREIGN KEY (imageId) REFERENCES super_island_images(id) ON DELETE CASCADE
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_super_island_image_bindings_imageId ON super_island_image_bindings(imageId)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_super_island_image_bindings_packageName ON super_island_image_bindings(packageName)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS index_super_island_image_bindings_imageKey ON super_island_image_bindings(imageKey)"
                 )
             }
         }

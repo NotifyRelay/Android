@@ -74,7 +74,7 @@ fun getFocusIconUrl(picMap: Map<String, String>?, primaryKey: String?, isDarkThe
 }
 
 /**
- * 解析图标URL，支持ref: URL和data: URL
+ * 解析图标URL，支持数据库绑定ID
  */
 fun resolveIconUrl(
     picMap: Map<String, String>?,
@@ -87,8 +87,8 @@ fun resolveIconUrl(
     var url = picMap[iconKey]
     if (url.isNullOrEmpty()) return null
 
-    // 2. 处理ref: URL
-    if (url.startsWith("ref:", ignoreCase = true)) {
+    // 2. 处理数据库绑定ID
+    if (context != null) {
         url = try {
             SuperIslandImageStore.resolve(context, url) ?: url
         } catch (_: Exception) {
@@ -105,19 +105,19 @@ fun resolveIconUrl(
 fun resolveFocusIconUrl(
     picMap: Map<String, String>?, 
     primaryKey: String?,
-    isDarkTheme: Boolean = false
+    isDarkTheme: Boolean = false,
+    context: android.content.Context? = null
 ): String? {
     val url = getFocusIconUrl(picMap, primaryKey, isDarkTheme)
     if (url.isNullOrEmpty()) return null
 
-    // 处理ref: URL
-    if (url.startsWith("ref:", ignoreCase = true)) {
-        return try {
-            SuperIslandImageStore.resolve(null, url) ?: url
+    return if (context != null) {
+        try {
+            SuperIslandImageStore.resolve(context, url) ?: url
         } catch (_: Exception) {
             url
         }
+    } else {
+        url
     }
-
-    return url
 }

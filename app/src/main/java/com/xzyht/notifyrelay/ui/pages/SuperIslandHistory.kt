@@ -390,8 +390,8 @@ private fun SuperIslandHistoryGroupCard(
             color = colorScheme.surface,
             contentColor = colorScheme.onSurface
         ),
-        showIndication = true,
-        pressFeedbackType = PressFeedbackType.Tilt
+        showIndication = !isExpanded,
+        pressFeedbackType = if (isExpanded) PressFeedbackType.None else PressFeedbackType.Sink
     ) {
         Column(
             modifier = Modifier
@@ -1055,8 +1055,7 @@ private fun triggerFloatingReplica(context: Context, entry: SuperIslandHistoryEn
 
 private fun sanitizeImageContent(source: String, includeImageDataOnCopy: Boolean): String {
     if (includeImageDataOnCopy) return source
-    var sanitized = REF_URL_REGEX.replace(source) { "图片" }
-    sanitized = DATA_URL_REGEX.replace(sanitized) { "图片" }
+    var sanitized = DATA_URL_REGEX.replace(source) { "图片" }
     sanitized = IMAGE_URL_REGEX.replace(sanitized) { "图片" }
     return sanitized
 }
@@ -1070,8 +1069,6 @@ private val IMAGE_URL_REGEX = Regex(
     pattern = "https?:[^\\s\"]+\\.(?:png|jpe?g|gif|webp|bmp|svg)",
     options = setOf(RegexOption.IGNORE_CASE)
 )
-
-private val REF_URL_REGEX = Regex(pattern = "(?i)ref:[0-9a-f]{16,}")
 
 private fun formatMultilineContent(content: String): List<String> {
     if (content.isBlank()) return emptyList()

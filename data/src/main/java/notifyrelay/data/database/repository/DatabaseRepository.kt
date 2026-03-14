@@ -10,6 +10,8 @@ import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.entity.DeviceEntity
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
+import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
+import notifyrelay.data.database.entity.SuperIslandImageEntity
 import kotlin.collections.iterator
 
 /**
@@ -29,6 +31,8 @@ class DatabaseRepository(private val database: AppDatabase) {
     val notificationRecordDao = database.notificationRecordDao()
     // 超级岛历史记录相关
     private val superIslandHistoryDao = database.superIslandHistoryDao()
+    // 超级岛图片去重相关
+    private val superIslandImageDao = database.superIslandImageDao()
     
     /**
      * 获取应用配置值
@@ -234,6 +238,13 @@ class DatabaseRepository(private val database: AppDatabase) {
             )
         }
     }
+
+    /**
+     * 获取完整的超级岛历史记录（包含 rawPayload），仅用于迁移与后台处理
+     */
+    suspend fun getSuperIslandHistoryFull(): List<SuperIslandHistoryEntity> {
+        return superIslandHistoryDao.getAllHistory()
+    }
     
     /**
      * 获取每个特征ID对应的最新一条超级岛历史记录
@@ -370,6 +381,112 @@ class DatabaseRepository(private val database: AppDatabase) {
      */
     suspend fun getSuperIslandHistoryCount(): Int {
         return superIslandHistoryDao.getCount()
+    }
+
+    // 超级岛图片去重相关方法
+
+    /**
+     * 插入或复用图片并更新绑定，返回图片ID
+     */
+    suspend fun upsertSuperIslandImageBinding(
+        packageName: String,
+        imageKey: String,
+        contentHash: String,
+        data: String,
+        lastUpdated: Long
+    ): Long {
+        val existingId = superIslandImageDao.getImageIdByHash(contentHash)
+        val imageId = if (existingId != null) {
+            superIslandImageDao.touchImage(existingId, lastUpdated)
+            existingId
+        } else {
+            val insertedId = superIslandImageDao.insertImage(
+                SuperIslandImageEntity(
+                    contentHash = contentHash,
+                    data = data,
+                    lastUpdated = lastUpdated
+                )
+            )
+            if (insertedId == -1L) {
+                superIslandImageDao.getImageIdByHash(contentHash) ?: -1L
+            } else {
+                insertedId
+            }
+        }
+
+        if (imageId > 0) {
+            superIslandImageDao.upsertBinding(
+                SuperIslandImageBindingEntity(
+                    packageName = packageName,
+                    imageKey = imageKey,
+                    imageId = imageId,
+                    lastUpdated = lastUpdated
+                )
+            )
+        }
+
+        return imageId
+    }
+
+    /**
+     * 插入或复用图片（无绑定）并返回图片ID
+     */
+    suspend fun upsertSuperIslandImage(contentHash: String, data: String, lastUpdated: Long): Long {
+        val existingId = superIslandImageDao.getImageIdByHash(contentHash)
+        val imageId = if (existingId != null) {
+            superIslandImageDao.touchImage(existingId, lastUpdated)
+            existingId
+        } else {
+            val insertedId = superIslandImageDao.insertImage(
+                SuperIslandImageEntity(
+                    contentHash = contentHash,
+                    data = data,
+                    lastUpdated = lastUpdated
+                )
+            )
+            if (insertedId == -1L) {
+                superIslandImageDao.getImageIdByHash(contentHash) ?: -1L
+            } else {
+                insertedId
+            }
+        }
+        return imageId
+    }
+
+    /**
+     * 根据图片ID获取原始数据
+     */
+    suspend fun resolveSuperIslandImageById(imageId: Long): String? {
+        return superIslandImageDao.getImageDataById(imageId)
+    }
+
+    /**
+     * 根据包名与图片键获取原始数据
+     */
+    suspend fun resolveSuperIslandImageByBinding(packageName: String, imageKey: String): String? {
+        return superIslandImageDao.getImageDataByBinding(packageName, imageKey)
+    }
+
+    /**
+     * 清理超级岛图片：按时间与数量限制
+     */
+    suspend fun pruneSuperIslandImages(maxEntries: Int, maxAgeDays: Int) {
+        val now = System.currentTimeMillis()
+        if (maxAgeDays > 0) {
+            val cutoff = now - maxAgeDays * 24L * 60L * 60L * 1000L
+            superIslandImageDao.deleteImagesOlderThan(cutoff)
+        }
+        if (maxEntries > 0) {
+            superIslandImageDao.deleteImagesKeepingLatest(maxEntries)
+        }
+    }
+
+    /**
+     * 清空所有超级岛图片与绑定
+     */
+    suspend fun clearSuperIslandImages() {
+        superIslandImageDao.clearAllBindings()
+        superIslandImageDao.clearAllImages()
     }
 
     // 应用相关方法

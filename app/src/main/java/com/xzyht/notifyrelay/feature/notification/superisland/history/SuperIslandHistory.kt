@@ -37,6 +37,16 @@ object SuperIslandHistory {
             null
         }
         return entity?.let { e ->
+            val rawPicMap: Map<String, String> = try {
+                gson.fromJson(e.picMap, stringStringMapType) ?: emptyMap()
+            } catch (_: Exception) {
+                emptyMap()
+            }
+            val resolvedPicMap = try {
+                SuperIslandImageStore.resolvePicMap(context, rawPicMap)
+            } catch (_: Exception) {
+                rawPicMap
+            }
             SuperIslandHistoryEntry(
                 id = e.id,
                 sourceDeviceUuid = e.sourceDeviceUuid,
@@ -46,7 +56,7 @@ object SuperIslandHistory {
                 title = e.title,
                 text = e.text,
                 paramV2Raw = e.paramV2Raw,
-                picMap = gson.fromJson(e.picMap, stringStringMapType),
+                picMap = resolvedPicMap,
                 rawPayload = e.rawPayload,
                 featureId = e.featureId
             )
@@ -54,11 +64,12 @@ object SuperIslandHistory {
     }
 
     fun append(context: Context, entry: SuperIslandHistoryEntry) {
-        val interned = SuperIslandImageStore.internAll(context, entry.picMap)
-        val sanitizedEntry = entry.copy(picMap = interned.toMap())
+        val packageName = resolvePackageName(entry)
 
         CoroutineScope(Dispatchers.IO).launch {
             try {
+                val boundPicMap = SuperIslandImageStore.bindAll(context, packageName, entry.picMap)
+                val sanitizedEntry = entry.copy(picMap = boundPicMap)
                 val repository = DatabaseRepository.getInstance(context)
                 val entity = SuperIslandHistoryEntity(
                     id = sanitizedEntry.id,
@@ -89,7 +100,17 @@ object SuperIslandHistory {
         }
 
         try {
-            SuperIslandImageStore.prune(context, maxEntries = 0, maxAgeDays = 0)
+            CoroutineScope(Dispatchers.IO).launch {
+                SuperIslandImageStore.clearAll(context)
+            }
         } catch (_: Exception) {}
+    }
+
+    private fun resolvePackageName(entry: SuperIslandHistoryEntry): String? {
+        val mapped = entry.mappedPackage?.takeIf { it.isNotBlank() }
+        if (!mapped.isNullOrBlank()) return mapped
+        val original = entry.originalPackage?.takeIf { it.isNotBlank() }
+        if (!original.isNullOrBlank()) return original
+        return entry.appName?.takeIf { it.isNotBlank() }
     }
 }

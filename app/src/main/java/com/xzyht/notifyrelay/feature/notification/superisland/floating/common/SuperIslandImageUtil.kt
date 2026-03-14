@@ -28,7 +28,7 @@ object SuperIslandImageUtil {
      */
     suspend fun loadBitmapSuspend(context: Context, urlOrData: String, timeoutMs: Int = 5000): Bitmap? {
         return try {
-            // 若为引用则先解析为真实值
+            // 若为数据库绑定ID则先解析为真实值
             val finalUrl = resolveReferenceUrl(context, urlOrData)
             
             if (finalUrl.startsWith("data:", ignoreCase = true)) {
@@ -70,7 +70,7 @@ object SuperIslandImageUtil {
             }
         }
 
-        // 处理ref: URL
+        // 处理数据库绑定ID
         val processedUrl = remember(resolvedUrl) {
             if (!resolvedUrl.isNullOrEmpty()) {
                 resolveReferenceUrl(null, resolvedUrl)
@@ -274,17 +274,17 @@ object SuperIslandImageUtil {
     }
 
     /**
-     * 解析引用URL，如果是ref:开头则解析为真实URL
+     * 解析图片标识，优先解析为数据库中的真实URL
      */
     private fun resolveReferenceUrl(context: Context?, urlOrRef: String): String {
-        return if (urlOrRef.startsWith("ref:", ignoreCase = true)) {
+        return if (context == null) {
+            urlOrRef
+        } else {
             try {
                 SuperIslandImageStore.resolve(context, urlOrRef) ?: urlOrRef
             } catch (_: Exception) {
                 urlOrRef
             }
-        } else {
-            urlOrRef
         }
     }
 }

@@ -82,7 +82,7 @@ object SuperIslandStructuredDataHelper {
                     map.forEach { (picKey, picUrl) ->
                         // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
                         if (picKey.startsWith("miui.focus.pic_")) {
-                            // 解析图片引用符，获取实际的图片数据
+                                // 解析图片绑定ID，获取实际的图片数据
                             val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
                             extras.putString(picKey, actualPicUrl)
                         }
@@ -312,7 +312,7 @@ object SuperIslandStructuredDataHelper {
                 map.forEach { (picKey, picUrl) ->
                     // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
                     if (picKey.startsWith("miui.focus.pic_")) {
-                        // 解析图片引用符，获取实际的图片数据
+                            // 解析图片绑定ID，获取实际的图片数据
                         val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
                         extras.putString(picKey, actualPicUrl)
                     }
