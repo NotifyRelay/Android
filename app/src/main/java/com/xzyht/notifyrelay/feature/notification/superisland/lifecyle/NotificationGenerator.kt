@@ -41,181 +41,7 @@ import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import org.json.JSONObject
-import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.ScheduledFuture
-import java.util.concurrent.TimeUnit
-
-/**
- * 计时器更新管理器，负责定期更新包含计时器的通知
- */
-class TimerUpdateManager private constructor() {
-    private val executor: ScheduledExecutorService = Executors.newScheduledThreadPool(5)
-    private val timers = ConcurrentHashMap<String, ScheduledFuture<*>?>()
-    
-    /**
-     * 定时器任务
-     */
-    private class TimerTask(
-        private val contextRef: WeakReference<Context>,
-        private val notificationId: Int,
-        private val timerInfo: TimerInfo,
-        private val onComplete: () -> Unit
-    ) : Runnable {
-        override fun run() {
-            try {
-                val context = contextRef.get() ?: run {
-                    onComplete()
-                    return
-                }
-                
-                // 检查计时器是否已停止
-                if (timerInfo.timerType == 0) {
-                    onComplete()
-                    return
-                }
-                
-                // 计算当前计时器时间
-                val timerText = formatTimerInfo(timerInfo)
-                
-                // 获取通知管理器
-                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                
-                // 创建通知渠道（如果不存在）
-                val channelId = "super_island_replica"
-                val channel = NotificationChannel(
-                    channelId,
-                    "超级岛复刻通知",
-                    NotificationManager.IMPORTANCE_HIGH
-                )
-                notificationManager.createNotificationChannel(channel)
-                
-                // 创建通知构建器，确保设置了所有必要的属性
-                val builder = NotificationCompat.Builder(context, channelId)
-                    // 设置必要的文本内容
-                    .setContentText(timerText)
-                    .setShortCriticalText(timerText)
-                    // 设置为ongoing，保持通知不可清除
-                    .setOngoing(true)
-                    // 保持高优先级
-                    .setPriority(NotificationCompat.PRIORITY_MAX)
-                    // 不显示时间
-                    .setShowWhen(false)
-                    // 只提示一次
-                    .setOnlyAlertOnce(true)
-                    // 公开可见
-                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                
-                // 根据计时器类型设置自动计时功能
-                when (timerInfo.timerType) {
-                    -1 -> {
-                        // 倒计时进行中：使用系统的自动倒计时功能
-                        builder.setUsesChronometer(true)
-                            .setChronometerCountDown(true)
-                            .setWhen(timerInfo.timerWhen) // 设置为倒计时结束时间
-                    }
-                    1 -> {
-                        // 正计时进行中：使用系统的自动正计时功能
-                        builder.setUsesChronometer(true)
-                            .setChronometerCountDown(false)
-                            .setWhen(timerInfo.timerWhen) // 设置为正计时开始时间
-                    }
-                    else -> {
-                        // 暂停或停止状态：不使用自动计时功能
-                        builder.setWhen(System.currentTimeMillis())
-                    }
-                }
-                
-                // 更新通知
-                notificationManager.notify(notificationId, builder.build())
-                
-                // 检查是否需要停止（倒计时结束或计时器已暂停）
-                if (timerInfo.timerType == -1 || timerInfo.timerType == -2) {
-                    val now = System.currentTimeMillis()
-                    if (now >= timerInfo.timerWhen) {
-                        onComplete()
-                    }
-                } else if (timerInfo.timerType == 2) {
-                    // 正计时已暂停，停止更新
-                    onComplete()
-                }
-                
-                // 记录更新日志
-                Logger.d("TimerUpdateManager", "更新计时器通知成功，notificationId=$notificationId, timerText=$timerText")
-            } catch (e: Exception) {
-                Logger.e("TimerUpdateManager", "更新计时器通知失败", e)
-                onComplete()
-            }
-        }
-    }
-    
-    /**
-     * 添加或更新计时器通知
-     */
-    fun addOrUpdateTimer(
-        key: String,
-        context: Context,
-        notificationId: Int,
-        timerInfo: TimerInfo
-    ) {
-        // 移除旧的定时器
-        removeTimer(key)
-        
-        // 创建新的定时器任务
-        val contextRef = WeakReference(context)
-        val task = TimerTask(contextRef, notificationId, timerInfo) { 
-            removeTimer(key) 
-        }
-        
-        // 立即执行一次，然后每秒执行一次
-        val future = executor.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS)
-        timers[key] = future
-        
-        // 记录定时器创建日志
-        Logger.d("TimerUpdateManager", "创建计时器更新定时器成功，key=$key, notificationId=$notificationId")
-    }
-    
-    /**
-     * 移除计时器通知
-     */
-    fun removeTimer(key: String) {
-        timers.remove(key)?.cancel(false)
-    }
-    
-    /**
-     * 清理所有定时器
-     */
-    fun clearAll() {
-        timers.forEach { (_, future) ->
-            future?.cancel(false)
-        }
-        timers.clear()
-    }
-    
-    /**
-     * 停止executor，释放资源
-     */
-    fun shutdown() {
-        clearAll()
-        executor.shutdown()
-        try {
-            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                executor.shutdownNow()
-            }
-        } catch (e: InterruptedException) {
-            executor.shutdownNow()
-            Thread.currentThread().interrupt()
-        }
-    }
-    
-    companion object {
-        val instance by lazy { TimerUpdateManager() }
-    }
-}
-
-
 
 /**
  * 通知生成器，负责处理超级岛通知的生成和注入
@@ -723,16 +549,63 @@ object NotificationGenerator {
                 )
                 notificationManager.createNotificationChannel(channel)
                 
+                // 获取paramV2原始数据，提前解析用于判断是否为计时器类型
+                val entry = floatingWindowManager.getEntry(key)
+                val paramV2Raw = entry?.paramV2Raw
+                val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
+                val bigIsland = parseBigIsland(paramV2RawValue)
+                val bComponent = parseBComponent(bigIsland)
+                
+                // 判断是否为计时器类型（包括运行中和暂停状态）
+                val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
+                
+                // 计时器通知的标题和内容设置
+                // 标题显示状态，内容显示应用名，时间流逝由chronometer自动处理
+                val timerTitle: String
+                val timerContent: String
+                if (isTimerType && bComponent is BSameWidthDigitInfo) {
+                    val timer = bComponent.timer!!
+                    when (timer.timerType) {
+                        -2 -> {
+                            timerTitle = "暂停"
+                            timerContent = appName ?: "计时器"
+                        }
+                        -1 -> {
+                            timerTitle = "倒计时中"
+                            timerContent = appName ?: "计时器"
+                        }
+                        1 -> {
+                            timerTitle = "正计时中"
+                            timerContent = appName ?: "秒表"
+                        }
+                        2 -> {
+                            timerTitle = "暂停"
+                            timerContent = appName ?: "秒表"
+                        }
+                        else -> {
+                            timerTitle = title ?: appName ?: "超级岛通知"
+                            timerContent = text ?: ""
+                        }
+                    }
+                } else {
+                    timerTitle = title ?: appName ?: "超级岛通知"
+                    timerContent = text ?: ""
+                }
+                
+                // 判断是否为正在运行的计时器类型（用于chronometer）
+                val isRunningTimer = isTimerType && 
+                    (bComponent?.timer?.timerType == -1 || bComponent?.timer?.timerType == 1)
+                
                 // 构建基础通知，调整属性使其更接近实际超级岛通知
                 var builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-                    .setContentTitle(title ?: appName ?: "超级岛通知")
-                    .setContentText(text ?: "")
+                    .setContentTitle(timerTitle)
+                    .setContentText(timerContent)
                     .setSmallIcon(android.R.drawable.stat_notify_more) // 使用系统默认图标
                     // 调整为与实际超级岛通知一致的属性
                     .setOngoing(true) // 实际通知通常是持续的
                     .setPriority(NotificationCompat.PRIORITY_MAX) // 提高优先级到最高，与原始通知一致
-                    .setShowWhen(false) // 不显示时间，与原始通知一致
-                    .setWhen(System.currentTimeMillis()) // 设置时间，但不显示
+                    .setShowWhen(isRunningTimer) // 计时器需要显示时间以支持chronometer自动流逝
+                    .setWhen(System.currentTimeMillis()) // 设置时间
                     .setOnlyAlertOnce(true) // 只提示一次
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 公开可见
 
@@ -743,17 +616,8 @@ object NotificationGenerator {
                         .setContentIntent(pendingContentIntent) // 设置点击意图
                 }
                 
-                // 获取paramV2原始数据
-                val entry = floatingWindowManager.getEntry(key)
-                val paramV2Raw = entry?.paramV2Raw
-                
                 // 对于计时器类通知，添加计时器相关字段
                 if (title?.contains("计时") == true || title?.contains("秒表") == true) {
-                    // 解析B区数据，检查是否为计时器类型
-                    val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
-                    val bigIsland = parseBigIsland(paramV2RawValue)
-                    
-                    val bComponent = parseBComponent(bigIsland)
                     if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
                         // 根据timerType设置计时模式
                         val timer = bComponent.timer
@@ -770,10 +634,10 @@ object NotificationGenerator {
                                 val now = System.currentTimeMillis()
                                 val remaining = timer.timerWhen - now
                                 if (remaining > 0) {
-                                    // 对于倒计时，我们需要特殊处理
-                                    // 由于通知系统的限制，我们使用当前时间作为基准
+                                    // 对于倒计时，设置chronometer自动倒计时
                                     builder.setUsesChronometer(true)
                                     builder.setChronometerCountDown(true)
+                                    builder.setShowWhen(true) // 确保显示时间
                                     // 设置倒计时的终点时间
                                     builder.setWhen(timer.timerWhen)
                                 }
@@ -781,26 +645,16 @@ object NotificationGenerator {
                                 // 正计时：使用timerWhen作为起点
                                 builder.setUsesChronometer(true)
                                 builder.setChronometerCountDown(false)
+                                builder.setShowWhen(true) // 确保显示时间
                                 // 设置正计时的起点时间
                                 builder.setWhen(timer.timerWhen)
                             }
                         }
-                    } else {
-                        // 非计时器类型或计时器已暂停，不启用自动流逝
-                        builder.setUsesChronometer(true)
-                        builder.setChronometerCountDown(false)
-                        builder.setWhen(System.currentTimeMillis())
                     }
                 }
                 
                 // 检查是否为进度类型通知，如果是，则可能已经通过 LiveUpdatesNotificationManager 处理
                 val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
-                
-                // 解析 param_v2 中的 bigIsland 数据，用于计时器检查
-                // entry 变量已经在第741行声明
-                val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
-                val bigIsland = parseBigIsland(paramV2RawValue)
-                val bComponent = parseBComponent(bigIsland)
                 
                 // 构建通知
                 val notification = if (!isProgressType) {
@@ -877,46 +731,8 @@ object NotificationGenerator {
                 // 发送通知
                 notificationManager.notify(notificationId, notification)
                 
-                // 检查是否需要创建计时器更新定时器
-                if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
-                    val timer = bComponent.timer
-                    // 检查计时器是否已停止
-                    if (timer.timerType == 0) {
-                        // 计时器已停止，移除定时器
-                        TimerUpdateManager.instance.removeTimer(key)
-                        Logger.i(TAG, "超级岛: 计时器已停止，移除定时器，key=$key")
-                    } else {
-                        // 创建或更新计时器更新定时器
-                        // 创建一个新的通知构建器，基于当前通知的内容
-                        val updatedBuilder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-                            // 复制原始构建器的所有属性
-                            .setContentTitle(title ?: appName ?: "超级岛通知")
-                            .setContentText(text ?: "")
-                            .setSmallIcon(android.R.drawable.stat_notify_more) // 使用默认图标作为基础
-                            .setAutoCancel(false)
-                            .setOngoing(true)
-                            .setPriority(NotificationCompat.PRIORITY_MAX)
-                            .setShowWhen(false)
-                            .setWhen(System.currentTimeMillis())
-                            .setOnlyAlertOnce(true)
-                            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                            .setDeleteIntent(deleteIntent)
-                            .setContentIntent(pendingContentIntent)
-                        
-                        // 创建或更新计时器更新定时器
-                        TimerUpdateManager.instance.addOrUpdateTimer(
-                            key,
-                            context,
-                            notificationId,
-                            timer
-                        )
-                        Logger.i(TAG, "超级岛: 创建计时器更新定时器成功，key=$key")
-                    }
-                } else {
-                    // 没有计时器信息或不是计时器类型，移除定时器
-                    TimerUpdateManager.instance.removeTimer(key)
-                    Logger.i(TAG, "超级岛: 没有计时器信息或不是计时器类型，移除定时器，key=$key")
-                }
+                // 计时器通知使用系统chronometer API自动更新，无需手动创建定时器
+                Logger.i(TAG, "超级岛: 计时器通知已发送，使用系统chronometer自动更新，key=$key")
         }
         
         // 保存entryKey到notificationId的映射
@@ -1034,29 +850,52 @@ object NotificationGenerator {
             }
             
             // 设置标准通知字段
-            // 优先检查是否有计时器信息
-            val timerText = when (bComponent) {
-                is BSameWidthDigitInfo -> {
-                    // 优先使用timer信息计算计时值
-                    if (bComponent.timer != null) {
-                        formatTimerInfo(bComponent.timer)
-                    } else {
-                        null
-                    }
+            // 判断是否为计时器类型（包括运行中和暂停状态）
+            val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
+            
+            // 根据计时器状态设置标题和内容
+            if (isTimerType && bComponent is BSameWidthDigitInfo) {
+                val timer = bComponent.timer!!
+                val timerTitle = when (timer.timerType) {
+                    -2 -> "暂停中"
+                    -1 -> "倒计时中"
+                    1 -> "正计时中"
+                    2 -> "暂停中"
+                    else -> title ?: appName ?: "超级岛通知"
                 }
-                else -> null
+                val timerContent = appName ?: "超级岛通知"
+                
+                builder
+                    .setContentTitle(timerTitle)
+                    .setContentText(timerContent)
+                    .setSubText(appName ?: "超级岛通知")
+                    .setShortCriticalText(timerTitle)
+            } else {
+                // 非计时器类型，使用原有逻辑
+                val timerText = when (bComponent) {
+                    is BSameWidthDigitInfo -> {
+                        if (bComponent.timer != null) {
+                            formatTimerInfo(bComponent.timer)
+                        } else {
+                            null
+                        }
+                    }
+                    else -> null
+                }
+                
+                val capsuleTitle = aTitle ?: bTitle ?: title
+                val capsuleText = timerText ?: aContent ?: bContent ?: text
+                val capsuleSubText = appName ?: "超级岛通知"
+                val capsuleShortText = timerText ?: bTitle ?: bContent ?: aTitle ?: aContent ?: text
+                
+                builder
+                    .setContentTitle(capsuleTitle ?: capsuleSubText)
+                    .setContentText(capsuleText ?: "")
+                    .setSubText(capsuleSubText)
+                    .setShortCriticalText(capsuleShortText ?: "")
             }
             
-            val capsuleTitle = aTitle ?: bTitle ?: title
-            val capsuleText = timerText ?: aContent ?: bContent ?: text
-            val capsuleSubText = appName ?: "超级岛通知"
-            val capsuleShortText = timerText ?: bTitle ?: bContent ?: aTitle ?: aContent ?: text
-            
             builder
-                .setContentTitle(capsuleTitle ?: capsuleSubText)
-                .setContentText(capsuleText ?: "")
-                .setSubText(capsuleSubText)
-                .setShortCriticalText(capsuleShortText ?: "")
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -1467,8 +1306,6 @@ object NotificationGenerator {
             if (notificationId != null) {
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 notificationManager.cancel(notificationId)
-                // 移除对应的定时器
-                TimerUpdateManager.instance.removeTimer(key)
                 // 停止对应的滚动更新
                 stopScrollUpdate(key)
                 Logger.i(TAG, "超级岛: 取消复刻通知成功，key=$key, notificationId=$notificationId")
@@ -1489,8 +1326,6 @@ object NotificationGenerator {
                 // 取消所有映射中的通知
                 entryKeyToNotificationId.forEach { (key, notificationId) ->
                     notificationManager.cancel(notificationId)
-                    // 移除对应的定时器
-                    TimerUpdateManager.instance.removeTimer(key)
                     // 停止对应的滚动更新
                     stopScrollUpdate(key)
                     Logger.i(TAG, "超级岛: 取消复刻通知成功，key=$key, notificationId=$notificationId")
@@ -1499,8 +1334,6 @@ object NotificationGenerator {
             
             // 清空映射
             entryKeyToNotificationId.clear()
-            // 清空所有定时器
-            TimerUpdateManager.instance.clearAll()
             // 清空所有滚动更新
             clearAllScrollUpdates()
             Logger.i(TAG, "超级岛: 清除所有复刻通知成功")
