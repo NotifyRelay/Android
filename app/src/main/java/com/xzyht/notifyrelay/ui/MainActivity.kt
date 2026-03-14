@@ -33,6 +33,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -93,15 +94,15 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.MiuixPopupUtils.Companion.MiuixPopupHost
 
 class MainActivity : FragmentActivity() {
-    internal var showAutoStartBanner = false
-    internal var bannerMessage: String? = null
+    internal val showAutoStartBanner = mutableStateOf(false)
+    internal val bannerMessage = mutableStateOf<String?>(null)
     
     private var backPressedTime: Long = 0
     private val EXIT_INTERVAL = 2000L
 
     private fun checkPermissionsAndStartServices() {
-        showAutoStartBanner = false
-        bannerMessage = null
+        showAutoStartBanner.value = false
+        bannerMessage.value = null
 
         if (!PermissionHelper.checkAllPermissions(this)) {
             Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
@@ -116,13 +117,13 @@ class MainActivity : FragmentActivity() {
         val serviceStarted = result.first
         val errorMessage = result.second as? String
         if (errorMessage != null) {
-            showAutoStartBanner = true
-            bannerMessage = errorMessage
+            showAutoStartBanner.value = true
+            bannerMessage.value = errorMessage
         }
 
         if (!serviceStarted) {
-            showAutoStartBanner = true
-            bannerMessage = "服务无法启动，可能因系统自启动/后台运行权限被拒绝。请前往系统设置手动允许自启动、后台运行和电池优化白名单，否则通知转发将无法正常工作。"
+            showAutoStartBanner.value = true
+            bannerMessage.value = "服务无法启动，可能因系统自启动/后台运行权限被拒绝。请前往系统设置手动允许自启动、后台运行和电池优化白名单，否则通知转发将无法正常工作。"
         }
     }
 
@@ -211,15 +212,15 @@ class MainActivity : FragmentActivity() {
         val errorMessage = result.second
         if (errorMessage != null) {
             withContext(Dispatchers.Main) {
-                showAutoStartBanner = true
-                bannerMessage = errorMessage
+                showAutoStartBanner.value = true
+                bannerMessage.value = errorMessage
             }
         }
 
         if (!serviceStarted) {
             withContext(Dispatchers.Main) {
-                showAutoStartBanner = true
-                bannerMessage = "服务无法启动，可能因系统自启动/后台运行权限被拒绝。请前往系统设置手动允许自启动、后台运行和电池优化白名单，否则通知转发将无法正常工作。"
+                showAutoStartBanner.value = true
+                bannerMessage.value = "服务无法启动，可能因系统自启动/后台运行权限被拒绝。请前往系统设置手动允许自启动、后台运行和电池优化白名单，否则通知转发将无法正常工作。"
             }
         }
     }
@@ -236,8 +237,8 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     
     val activity = LocalContext.current as? MainActivity
-    val showBanner = activity?.showAutoStartBanner == true
-    val bannerMsg = activity?.bannerMessage
+    val showBanner = activity?.showAutoStartBanner?.value == true
+    val bannerMsg = activity?.bannerMessage?.value
     val context = LocalContext.current
     
     val deviceListState = remember { DeviceListScreenState() }
