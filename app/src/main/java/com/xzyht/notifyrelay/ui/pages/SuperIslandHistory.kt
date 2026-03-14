@@ -5,7 +5,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -41,6 +40,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -60,6 +60,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.scale
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -100,7 +101,6 @@ import kotlin.math.max
 import kotlin.math.roundToInt
 
 private const val SUPER_ISLAND_IMAGE_MAX_DIMENSION = 320
-private const val SUPER_ISLAND_DOWNLOAD_MAX_BYTES = 4 * 1024 * 1024
 
 enum class SuperIslandDragValue { Center, End }
 
@@ -141,20 +141,11 @@ fun UISuperIslandHistory() {
     }
 
     val uiState by viewModel.uiState.collectAsState()
-    val appIconCache by viewModel.appIconCache.collectAsState()
     val pagingItems = viewModel.groupedPagingFlow.collectAsLazyPagingItems()
 
     val groupPackages = pagingItems.itemSnapshotList.items.map { it.packageName }.distinct()
     LaunchedEffect(groupPackages) {
         viewModel.preloadAppIcons(groupPackages)
-    }
-
-    val getCachedAppInfo: (String?) -> Pair<String, Bitmap?> = { packageName ->
-        if (packageName.isNullOrBlank() || packageName == "(未知应用)") {
-            "" to null
-        } else {
-            appIconCache[packageName] ?: (packageName to null)
-        }
     }
 
     val clearHistory: () -> Unit = {
@@ -236,7 +227,6 @@ fun UISuperIslandHistory() {
                     } else {
                         SuperIslandHistoryListBlock(
                             pagingItems = pagingItems,
-                            getCachedAppInfo = getCachedAppInfo,
                             expandedGroups = uiState.expandedGroups,
                             includeImageDataOnCopy = includeImageDataOnCopy,
                             onToggleGroup = { packageName -> viewModel.toggleGroupExpansion(packageName) },
@@ -257,7 +247,6 @@ fun UISuperIslandHistory() {
 @Composable
 private fun SuperIslandHistoryListBlock(
     pagingItems: androidx.paging.compose.LazyPagingItems<GroupedSuperIslandHistory>,
-    getCachedAppInfo: (String?) -> Pair<String, Bitmap?>,
     expandedGroups: Set<String>,
     includeImageDataOnCopy: Boolean,
     onToggleGroup: (String) -> Unit,
@@ -267,9 +256,6 @@ private fun SuperIslandHistoryListBlock(
     deleteWidthPx: Float,
     deleteWidth: Dp
 ) {
-    val colorScheme = MiuixTheme.colorScheme
-    val textStyles = MiuixTheme.textStyles
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     LazyColumn(
@@ -299,14 +285,13 @@ private fun SuperIslandHistoryListBlock(
                 anchoredDraggableState.updateAnchors(anchors)
             }
 
-            val offset = remember(
-                anchoredDraggableState.currentValue,
-                anchoredDraggableState.offset
-            ) {
-                when {
-                    anchoredDraggableState.currentValue == SuperIslandDragValue.End -> -deleteWidthPx
-                    anchoredDraggableState.offset.isNaN() -> 0f
-                    else -> anchoredDraggableState.offset
+            val offset by remember {
+                derivedStateOf {
+                    when {
+                        anchoredDraggableState.currentValue == SuperIslandDragValue.End -> -deleteWidthPx
+                        anchoredDraggableState.offset.isNaN() -> 0f
+                        else -> anchoredDraggableState.offset
+                    }
                 }
             }
 
@@ -322,7 +307,6 @@ private fun SuperIslandHistoryListBlock(
                 ) {
                     SuperIslandHistoryGroupCard(
                         group = group,
-                        getCachedAppInfo = getCachedAppInfo,
                         includeImageDataOnCopy = includeImageDataOnCopy,
                         isExpanded = expandedGroups.contains(groupKey),
                         onToggleExpand = { onToggleGroup(groupKey) },
@@ -356,7 +340,6 @@ private fun SuperIslandHistoryListBlock(
 @Composable
 private fun SuperIslandHistoryGroupCard(
     group: GroupedSuperIslandHistory,
-    getCachedAppInfo: (String?) -> Pair<String, Bitmap?>,
     includeImageDataOnCopy: Boolean,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
@@ -367,7 +350,6 @@ private fun SuperIslandHistoryGroupCard(
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val headerEntry = group.entries.firstOrNull()
     val groupTitle = headerEntry?.appName?.takeIf { it.isNotBlank() }
@@ -456,14 +438,13 @@ private fun SuperIslandHistoryGroupCard(
                         entryAnchoredDraggableState.updateAnchors(entryAnchors)
                     }
 
-                    val entryOffset = remember(
-                        entryAnchoredDraggableState.currentValue,
-                        entryAnchoredDraggableState.offset
-                    ) {
-                        when {
-                            entryAnchoredDraggableState.currentValue == SuperIslandDragValue.End -> -deleteWidthPx
-                            entryAnchoredDraggableState.offset.isNaN() -> 0f
-                            else -> entryAnchoredDraggableState.offset
+                    val entryOffset by remember {
+                        derivedStateOf {
+                            when {
+                                entryAnchoredDraggableState.currentValue == SuperIslandDragValue.End -> -deleteWidthPx
+                                entryAnchoredDraggableState.offset.isNaN() -> 0f
+                                else -> entryAnchoredDraggableState.offset
+                            }
                         }
                     }
 
@@ -722,7 +703,7 @@ private fun SuperIslandHistoryEntryCard(
 
         var loadedDetail by remember { mutableStateOf<SuperIslandHistoryEntry?>(null) }
         val displayPayload = remember(loadedDetail, sanitizedPayload, includeImageDataOnCopy) {
-            loadedDetail?.rawPayload?.takeIf { !it.isNullOrBlank() }?.let {
+            loadedDetail?.rawPayload?.takeIf { it.isNotBlank() }?.let {
                 if (includeImageDataOnCopy) it else sanitizeImageContent(it, false)
             } ?: sanitizedPayload
         }
@@ -755,7 +736,7 @@ private fun SuperIslandHistoryImage(imageKey: String, data: String, modifier: Mo
     val textStyles = MiuixTheme.textStyles
     val context = LocalContext.current
 
-    val bitmap by produceState<Bitmap?>(initialValue = SuperIslandImageCache.get(data), key1 = data) {
+    val bitmap by produceState(initialValue = SuperIslandImageCache.get(data), key1 = data) {
         val cached = SuperIslandImageCache.get(data)
         if (cached != null) {
             value = cached
@@ -895,28 +876,6 @@ private suspend fun downloadBitmap(context: Context, urlString: String, timeoutM
     } catch (_: Exception) { null }
 }
 
-private fun decodeSampledBitmap(bytes: ByteArray, maxDimension: Int): Bitmap? {
-    if (bytes.isEmpty()) return null
-    val boundsOptions = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-    BitmapFactory.decodeByteArray(bytes, 0, bytes.size, boundsOptions)
-    val sampleSize = computeInSampleSize(boundsOptions.outWidth, boundsOptions.outHeight, maxDimension)
-    val decodeOptions = BitmapFactory.Options().apply {
-        inSampleSize = sampleSize
-        inPreferredConfig = Bitmap.Config.ARGB_8888
-    }
-    return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, decodeOptions)
-}
-
-private fun computeInSampleSize(width: Int, height: Int, maxDimension: Int): Int {
-    if (width <= 0 || height <= 0) return 1
-    var sampleSize = 1
-    var largestSide = max(width, height)
-    while (largestSide / sampleSize > maxDimension) {
-        sampleSize *= 2
-    }
-    return sampleSize
-}
-
 private object SuperIslandImageCache {
     private const val MAX_CACHE_SIZE = 32
     private val cache = object : LinkedHashMap<String, Bitmap>(MAX_CACHE_SIZE, 0.75f, true) {
@@ -955,7 +914,7 @@ private object SuperIslandImageCache {
             val scale = SUPER_ISLAND_IMAGE_MAX_DIMENSION.toFloat() / largestSide.toFloat()
             val targetWidth = max(1, (width * scale).roundToInt())
             val targetHeight = max(1, (height * scale).roundToInt())
-            working = Bitmap.createScaledBitmap(source, targetWidth, targetHeight, true)
+            working = source.scale(targetWidth, targetHeight)
         }
 
         if (working.config == Bitmap.Config.HARDWARE) {
