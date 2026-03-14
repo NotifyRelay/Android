@@ -45,6 +45,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.navigation3.rememberViewModelStoreNavEntryDecorator
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
@@ -67,9 +68,7 @@ import com.xzyht.notifyrelay.ui.screen.DeviceListScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreenState
 import com.xzyht.notifyrelay.ui.screen.HistoryScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
-import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.IntentUtils
@@ -139,7 +138,6 @@ class MainActivity : FragmentActivity() {
         recreate()
     }
 
-    @OptIn(DelicateCoroutinesApi::class)
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -200,7 +198,7 @@ class MainActivity : FragmentActivity() {
         DeviceInfoManager.generateDeviceInfoFile(this)
         LiveUpdatesNotificationManager.initialize(this)
         
-        GlobalScope.launch {
+        lifecycleScope.launch {
             NotificationRepository.init(this@MainActivity)
             AppRepository.loadApps(this@MainActivity)
             startServicesAndUpdateBanner()
