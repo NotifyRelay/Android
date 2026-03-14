@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.ui
 
-import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -131,9 +130,6 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         checkPermissionsAndStartServices()
-        if (checkSelfPermission(Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED) {
-            ClipboardSyncManager.startLogMonitoring(this)
-        }
     }
 
     private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->

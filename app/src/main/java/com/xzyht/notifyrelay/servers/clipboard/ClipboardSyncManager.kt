@@ -1,14 +1,11 @@
 package com.xzyht.notifyrelay.servers.clipboard
 
-import android.Manifest
 import android.content.ClipData
 import android.content.ClipDescription
 import android.content.ClipboardManager
 import android.content.Context
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.os.Build
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.servers.ClipboardAccessiblityService
@@ -23,10 +20,6 @@ import notifyrelay.core.util.DataUrlUtils
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
-/**
- * 剪贴板同步管理器
- * 负责监听剪贴板变化并同步到其他设备
- */
 object ClipboardSyncManager {
     private const val TAG = "ClipboardSyncManager"
     private const val CLIPBOARD_TYPE_TEXT = "text"
@@ -43,20 +36,13 @@ object ClipboardSyncManager {
     private var lastReceivedType: String = ""
     private var lastReceivedTime: Long = 0
     private var isInternalUpdate = false
-    private var isManualSyncMode = false // 手动同步模式，通过通知点击触发
+    private var isManualSyncMode = false
     private val ANTI_LOOP_DELAY = 1000L
     
-    /**
-     * 检查无障碍服务是否已启用
-     */
     fun isAccessibilityServiceEnabled(context: Context): Boolean {
         return PermissionHelper.isAccessibilityServiceEnabled(context, ACCESSIBILITY_SERVICE_NAME)
     }
     
-    /**
-     * 设置手动同步模式
-     * @param enabled 是否启用手动同步模式
-     */
     fun setManualSyncMode(context: Context, enabled: Boolean) {
         isManualSyncMode = enabled
         if (enabled) {
@@ -66,17 +52,11 @@ object ClipboardSyncManager {
         }
     }
     
-    /**
-     * 检查是否可以进行剪贴板同步
-     * @return Pair<Boolean, String> 第一个值为是否可以同步，第二个值为原因描述
-     */
     private fun canSyncClipboard(context: Context): Pair<Boolean, String> {
-        // 如果是手动同步模式，允许同步
         if (isManualSyncMode) {
             return Pair(true, "手动同步模式")
         }
         
-        // 检查应用是否处于前台
         if (PermissionHelper.isAppInForeground(context)) {
             return Pair(true, "应用处于前台")
         }
@@ -84,49 +64,14 @@ object ClipboardSyncManager {
         return Pair(false, "应用不在前台，需要通过透明Activity获取剪贴板")
     }
     
-    /**
-     * 初始化剪贴板同步管理器
-     */
     fun init(context: Context) {
         clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         Logger.d(TAG, "剪贴板同步管理器已初始化")
-        // 初始化应用前后台检测器
         PermissionHelper.AppForegroundDetector.initialize(context)
-        
-        // 尝试启动日志监控
-        startLogMonitoring(context)
-    }
-    
-    /**
-     * 尝试启动日志监控（如果有权限）
-     */
-    fun startLogMonitoring(context: Context) {
-        try {
-            // 只检查是否有READ_LOGS权限
-            val hasReadLogsPermission = context.checkSelfPermission(Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED
-            
-            if (!hasReadLogsPermission) {
-                Logger.d(TAG, "没有READ_LOGS权限，无法启动日志监控")
-                return
-            }
-            
-            // 启动日志监控
-            ClipboardLogDetector.startMonitoring(context)
-        } catch (e: SecurityException) {
-            Logger.e(TAG, "启动日志监控时发生安全异常", e)
-        } catch (e: Exception) {
-            Logger.e(TAG, "启动日志监控失败", e)
-        }
     }
 
-    /**
-     * 抑制剪贴板监听（包括日志监听和无障碍服务监听）
-     * 用于在程序主动写入剪贴板时防止回环触发
-     * @param durationMs 抑制时长（毫秒）
-     */
     fun suppressClipboardMonitoring(durationMs: Long = 2000) {
         Logger.d(TAG, "抑制所有剪贴板监听 $durationMs ms")
-        ClipboardLogDetector.pauseDetectionTemporary(durationMs)
         ClipboardAccessiblityService.pauseDetectionTemporary(durationMs)
     }
 
