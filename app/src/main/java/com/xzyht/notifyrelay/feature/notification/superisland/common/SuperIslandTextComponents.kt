@@ -9,6 +9,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -89,7 +90,7 @@ fun AutoScrollText(
     maxWidth: Int? = null
 ) {
     // 父容器可用宽度
-    var parentWidth by remember { mutableStateOf(0) }
+    var parentWidth by remember { mutableIntStateOf(0) }
     // 文本滚动偏移量，用于控制文本位置
     val offset = remember { Animatable(0f) }
     // 文本测量器，用于测量文本宽度

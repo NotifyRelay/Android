@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -66,7 +67,7 @@ fun MultiProgressCompose(
     val pointerIndex = stageFloat.toInt().coerceIn(0, if (nodeCount == 0) 0 else nodeCount - 1)
 
     // 计算指针位置
-    var containerWidth by remember { mutableStateOf(0f) }
+    var containerWidth by remember { mutableFloatStateOf(0f) }
 
     // 容器宽度变化时更新
     fun updateContainerWidth(width: Int) {

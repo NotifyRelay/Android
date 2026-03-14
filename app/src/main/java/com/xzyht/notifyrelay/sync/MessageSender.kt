@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.sync
 
-import android.R
 import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
@@ -941,7 +940,7 @@ object MessageSender {
             val builder = Notification.Builder(context, channelId).apply {
                 setContentTitle(title ?: "(无标题)")
                 setContentText(text ?: "(无内容)")
-                setSmallIcon(R.drawable.ic_dialog_info)
+                setSmallIcon(android.R.drawable.ic_dialog_info)
                 setCategory(Notification.CATEGORY_MESSAGE)
                 setAutoCancel(true)
                 setVisibility(Notification.VISIBILITY_PUBLIC)

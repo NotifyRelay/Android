@@ -81,11 +81,6 @@ object ClipboardSyncManager {
             return Pair(true, "应用处于前台")
         }
         
-        // Android 10 (API 29) 之前可以在后台直接访问剪贴板
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            return Pair(true, "Android 10 之前可以后台访问剪贴板")
-        }
-        
         return Pair(false, "应用不在前台，需要通过透明Activity获取剪贴板")
     }
     

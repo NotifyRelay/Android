@@ -1013,9 +1013,7 @@ object FloatingReplicaManager {
     }
 
     private fun canShowOverlay(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(context)
-        } else true
+        return Settings.canDrawOverlays(context)
     }
 
     private fun requestOverlayPermission(context: Context) {

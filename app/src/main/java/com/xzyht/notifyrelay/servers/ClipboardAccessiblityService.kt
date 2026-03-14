@@ -65,8 +65,7 @@ class ClipboardAccessiblityService : AccessibilityService() {
             }
 
             // Android 10+ 检测复制操作
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                clipboardDetector.getSupportedEventTypes(event)) {
+            if (clipboardDetector.getSupportedEventTypes(event)) {
 
                 // 防抖处理
                 if (currentTimeMs - lastDetectionTimeMs < minDetectionInterval) {

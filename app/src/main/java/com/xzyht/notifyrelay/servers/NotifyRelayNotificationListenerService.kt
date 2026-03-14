@@ -127,11 +127,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         // 重新启动服务，防止被系统杀死
         val restartIntent =
             Intent(applicationContext, NotifyRelayNotificationListenerService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            applicationContext.startForegroundService(restartIntent)
-        } else {
-            applicationContext.startService(restartIntent)
-        }
+        applicationContext.startForegroundService(restartIntent)
     }
     override fun onCreate() {
         Logger.i(TAG, "[NotifyListener] onCreate called")

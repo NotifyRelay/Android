@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -95,7 +96,7 @@ class DeveloperModeActivity : AppCompatActivity() {
 
         // 当前选中的日志级别索引
         val selectedLevelIndex = remember {
-            mutableStateOf(logLevelOptions.indexOfFirst { it.second == logLevel.value })
+            mutableIntStateOf(logLevelOptions.indexOfFirst { it.second == logLevel.value })
         }
 
         val textStyles = MiuixTheme.textStyles

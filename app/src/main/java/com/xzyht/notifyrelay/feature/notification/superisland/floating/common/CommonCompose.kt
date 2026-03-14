@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import java.util.Locale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -228,9 +229,9 @@ fun formatTimerInfo(timer: TimerInfo): String {
     val hours = minutes / 60
     
     return if (hours > 0) {
-        String.format("%02d:%02d:%02d", hours, minutes % 60, seconds % 60)
+        String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes % 60, seconds % 60)
     } else {
-        String.format("%02d:%02d", minutes % 60, seconds % 60)
+        String.format(Locale.ROOT, "%02d:%02d", minutes % 60, seconds % 60)
     }
 }
 
@@ -243,9 +244,9 @@ fun formatDuration(ms: Long): String {
     val hours = minutes / 60
     
     return if (hours > 0) {
-        String.format("%02d:%02d:%02d", hours, minutes % 60, seconds % 60)
+        String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes % 60, seconds % 60)
     } else {
-        String.format("%02d:%02d", minutes % 60, seconds % 60)
+        String.format(Locale.ROOT, "%02d:%02d", minutes % 60, seconds % 60)
     }
 }
 

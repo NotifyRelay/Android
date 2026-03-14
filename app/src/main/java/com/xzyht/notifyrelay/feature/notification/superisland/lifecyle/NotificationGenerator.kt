@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.lifecyle
 
-import android.R
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -506,7 +505,7 @@ object NotificationGenerator {
                 var builder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
                     .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
                     .setContentText(title ?: "")
-                    .setSmallIcon(R.drawable.stat_notify_more) // 使用系统默认图标
+                    .setSmallIcon(android.R.drawable.stat_notify_more) // 使用系统默认图标
                     // 调整为不可被一键清除的属性，只能手动划去
                     .setOngoing(true) // 不允许通知被一键清除
                     .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -728,7 +727,7 @@ object NotificationGenerator {
                 var builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
                     .setContentTitle(title ?: appName ?: "超级岛通知")
                     .setContentText(text ?: "")
-                    .setSmallIcon(R.drawable.stat_notify_more) // 使用系统默认图标
+                    .setSmallIcon(android.R.drawable.stat_notify_more) // 使用系统默认图标
                     // 调整为与实际超级岛通知一致的属性
                     .setOngoing(true) // 实际通知通常是持续的
                     .setPriority(NotificationCompat.PRIORITY_MAX) // 提高优先级到最高，与原始通知一致
@@ -893,7 +892,7 @@ object NotificationGenerator {
                             // 复制原始构建器的所有属性
                             .setContentTitle(title ?: appName ?: "超级岛通知")
                             .setContentText(text ?: "")
-                            .setSmallIcon(R.drawable.stat_notify_more) // 使用默认图标作为基础
+                            .setSmallIcon(android.R.drawable.stat_notify_more) // 使用默认图标作为基础
                             .setAutoCancel(false)
                             .setOngoing(true)
                             .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -1176,13 +1175,13 @@ object NotificationGenerator {
             // 如果没有生成位图，使用系统默认图标
             if (smallIconBitmap == null) {
                 // 使用系统默认图标
-                builder.setSmallIcon(R.drawable.stat_notify_more)
+                builder.setSmallIcon(android.R.drawable.stat_notify_more)
                 Logger.d(TAG, "超级岛: 使用系统默认图标")
             } else {
                 // 使用生成的位图作为小图标
                 val icon = BitmapDrawable(context.resources, smallIconBitmap)
                 // 设置系统默认图标作为占位符
-                builder.setSmallIcon(R.drawable.stat_notify_more)
+                builder.setSmallIcon(android.R.drawable.stat_notify_more)
                 // 注意：在 Android 中，setSmallIcon 只能接受资源 ID，所以我们需要使用其他方式注入位图
                 // 这里我们保持默认图标，实际的位图注入需要在通知构建后处理
             }

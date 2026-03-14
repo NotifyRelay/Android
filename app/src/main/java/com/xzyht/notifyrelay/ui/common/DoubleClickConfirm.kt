@@ -70,11 +70,11 @@ fun rememberDoubleClickConfirm(): DoubleClickConfirmState {
  */
 @Composable
 fun DoubleClickConfirmButton(
+    modifier: Modifier = Modifier,
     text: String,
     confirmText: String = "确认?",
     onClick: () -> Unit,
     onConfirm: () -> Unit,
-    modifier: Modifier = Modifier.Companion,
     colors: ButtonColors = ButtonDefaults.buttonColors(),
     confirmColors: ButtonColors = ButtonDefaults.buttonColors(color = Color.Companion.Red),
     textColor: Color? = null,
