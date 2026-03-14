@@ -13,10 +13,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
-import notifyrelay.base.util.Logger
 import java.io.File
 
 /**
@@ -49,7 +49,7 @@ object SuperIslandImageStore {
         val normalizedPackage = normalizePackageName(packageName)
         val now = System.currentTimeMillis()
         for ((key, value) in input) {
-            if (value.isNullOrBlank()) continue
+            if (value.isBlank()) continue
             val hash = SuperIslandProtocol.sha256(value)
             repo.upsertSuperIslandImageBinding(normalizedPackage, key, hash, value, now)
         }
@@ -68,7 +68,7 @@ object SuperIslandImageStore {
         val now = System.currentTimeMillis()
         val out = mutableMapOf<String, String>()
         for ((key, value) in input) {
-            if (value.isNullOrBlank()) continue
+            if (value.isBlank()) continue
             val hash = SuperIslandProtocol.sha256(value)
             val imageId = repo.upsertSuperIslandImageBinding(normalizedPackage, key, hash, value, now)
             if (imageId > 0) {
@@ -87,7 +87,7 @@ object SuperIslandImageStore {
         val repo = DatabaseRepository.getInstance(context)
         val out = mutableMapOf<String, String>()
         for ((key, value) in picMap) {
-            if (value.isNullOrBlank()) continue
+            if (value.isBlank()) continue
             val imageId = value.toLongOrNull()
             if (imageId == null || imageId <= 0) {
                 out[key] = value

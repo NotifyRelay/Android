@@ -18,7 +18,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
-import java.util.Locale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
@@ -28,6 +27,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.common.AutoScrollT
 import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
+import java.util.Locale
 
 /**
  * 通用图片加载组件
@@ -242,12 +242,10 @@ fun formatDuration(ms: Long): String {
     val seconds = (ms / 1000).toInt()
     val minutes = seconds / 60
     val hours = minutes / 60
-    
-    return if (hours > 0) {
-        String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes % 60, seconds % 60)
-    } else {
+
+    return if (hours > 0)
+        String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes % 60, seconds % 60) else
         String.format(Locale.ROOT, "%02d:%02d", minutes % 60, seconds % 60)
-    }
 }
 
 /**

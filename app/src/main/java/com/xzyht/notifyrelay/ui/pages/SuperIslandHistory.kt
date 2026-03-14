@@ -370,12 +370,12 @@ private fun SuperIslandHistoryGroupCard(
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val headerEntry = group.entries.firstOrNull()
-    val groupTitle = headerEntry?.appName?.takeIf { !it.isNullOrBlank() }
-        ?: headerEntry?.title?.takeIf { !it.isNullOrBlank() }
+    val groupTitle = headerEntry?.appName?.takeIf { it.isNotBlank() }
+        ?: headerEntry?.title?.takeIf { it.isNotBlank() }
         ?: group.packageName
     val iconPackage = remember(headerEntry, group.packageName) {
-        headerEntry?.mappedPackage?.takeIf { !it.isNullOrBlank() }
-            ?: headerEntry?.originalPackage?.takeIf { !it.isNullOrBlank() }
+        headerEntry?.mappedPackage?.takeIf { it.isNotBlank() }
+            ?: headerEntry?.originalPackage?.takeIf { it.isNotBlank() }
             ?: group.packageName.takeIf { group.packageName != "(未知应用)" }
     }
     val appIconBitmap = rememberAppIconBitmap(iconPackage)

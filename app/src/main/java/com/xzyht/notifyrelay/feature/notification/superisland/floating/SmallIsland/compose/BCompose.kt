@@ -206,7 +206,7 @@ fun BCompose(
                     CircularProgressCompose(
                         progress = bComp.progress,
                         colorReach = Color(parseColorSafe(bComp.colorReach, 0xFF3482FF.toInt())),
-                        colorUnReach = Color(parseColorSafe(bComp.colorUnReach, 0x33333333.toInt())),
+                        colorUnReach = Color(parseColorSafe(bComp.colorUnReach, 0x33333333)),
                         strokeWidth = 2.5.dp,
                         isClockwise = !bComp.isCCW,
                         size = size
