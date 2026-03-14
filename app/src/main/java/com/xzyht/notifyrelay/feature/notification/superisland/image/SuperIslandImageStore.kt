@@ -5,8 +5,14 @@ import android.os.Looper
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.xzyht.notifyrelay.feature.notification.superisland.common.SuperIslandProtocol
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.async
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import notifyrelay.data.StorageManager
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
@@ -27,10 +33,9 @@ object SuperIslandImageStore {
 
     private val gson = Gson()
     private val stringStringMapType = object : TypeToken<Map<String, String>>() {}.type
-    private val migrationLock = Any()
-
-    @Volatile
-    private var migrationChecked = false
+    private val migrationMutex = Mutex()
+    private val migrationScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+    private var migrationDeferred: Deferred<Unit>? = null
 
     suspend fun internAll(
         context: Context,
@@ -123,21 +128,26 @@ object SuperIslandImageStore {
     }
 
     private suspend fun ensureMigrated(context: Context) {
-        if (migrationChecked) return
-        synchronized(migrationLock) {
-            if (migrationChecked) return
-            migrationChecked = true
-        }
         if (StorageManager.getBoolean(context, MIGRATION_FLAG_KEY, false)) return
 
-        try {
-            migrateLegacyData(context)
-            StorageManager.putBoolean(context, MIGRATION_FLAG_KEY, true)
-        } catch (_: Exception) {
-            synchronized(migrationLock) {
-                migrationChecked = false
-            }
+        val deferredToAwait: Deferred<Unit>? = migrationMutex.withLock {
+            if (StorageManager.getBoolean(context, MIGRATION_FLAG_KEY, false)) return
+
+            migrationDeferred?.let { return@withLock it }
+
+            migrationScope.async {
+                try {
+                    migrateLegacyData(context)
+                    StorageManager.putBoolean(context, MIGRATION_FLAG_KEY, true)
+                } catch (_: Exception) {
+                    migrationMutex.withLock {
+                        migrationDeferred = null
+                    }
+                }
+            }.also { migrationDeferred = it }
         }
+
+        deferredToAwait?.await()
     }
 
     private suspend fun migrateLegacyData(context: Context) {

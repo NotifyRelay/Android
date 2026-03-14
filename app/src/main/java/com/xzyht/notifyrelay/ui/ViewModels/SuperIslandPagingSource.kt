@@ -7,7 +7,6 @@ import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import notifyrelay.data.database.dao.SuperIslandPackageCount
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 
@@ -45,7 +44,7 @@ class SuperIslandPagingSource(
                     if (group.packageName == "(未知应用)") null else group.packageName
                 )
                 val entries = entities.map { it.toSuperIslandHistoryEntry(context) }
-                val appName = entries.firstOrNull()?.appName?.takeIf { !it.isNullOrBlank() }
+                val appName = entries.firstOrNull()?.appName?.takeIf { it.isNotBlank() }
                     ?: group.packageName
 
                 GroupedSuperIslandHistory(

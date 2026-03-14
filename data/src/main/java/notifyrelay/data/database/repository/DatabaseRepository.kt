@@ -1,8 +1,8 @@
 package notifyrelay.data.database.repository
 
 import android.content.Context
-import notifyrelay.data.database.AppDatabase
 import androidx.paging.PagingSource
+import notifyrelay.data.database.AppDatabase
 import notifyrelay.data.database.dao.PackageCount
 import notifyrelay.data.database.entity.AppConfigEntity
 import notifyrelay.data.database.entity.AppDeviceEntity
@@ -12,7 +12,6 @@ import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
 import notifyrelay.data.database.entity.SuperIslandImageEntity
-import kotlin.collections.iterator
 
 /**
  * 数据库仓库类
@@ -646,7 +645,7 @@ class DatabaseRepository(private val database: AppDatabase) {
          */
         fun getInstance(context: Context): DatabaseRepository {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: DatabaseRepository(AppDatabase.Companion.getDatabase(context)).also { INSTANCE = it }
+                INSTANCE ?: DatabaseRepository(AppDatabase.getDatabase(context)).also { INSTANCE = it }
             }
         }
     }
