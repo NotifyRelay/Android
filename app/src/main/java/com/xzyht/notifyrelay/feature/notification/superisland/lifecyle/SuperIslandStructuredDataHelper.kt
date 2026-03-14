@@ -92,7 +92,8 @@ object SuperIslandStructuredDataHelper {
                     val picsBundle = Bundle()
                     map.forEach { (picKey, picUrl) ->
                         if (picKey.startsWith("miui.focus.pic_")) {
-                            picsBundle.putString(picKey, picUrl)
+                            val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
+                            picsBundle.putString(picKey, actualPicUrl)
                         }
                     }
                     extras.putBundle("miui.focus.pics", picsBundle)
@@ -220,7 +221,8 @@ object SuperIslandStructuredDataHelper {
                 val picsBundle = Bundle()
                 map.forEach { (picKey, picUrl) ->
                     if (picKey.startsWith("miui.focus.pic_")) {
-                        picsBundle.putString(picKey, picUrl)
+                        val actualPicUrl: String = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
+                        picsBundle.putString(picKey, actualPicUrl)
                     }
                 }
                 extras.putBundle("miui.focus.pics", picsBundle)
@@ -322,7 +324,8 @@ object SuperIslandStructuredDataHelper {
                 val picsBundle = Bundle()
                 map.forEach { (picKey, picUrl) ->
                     if (picKey.startsWith("miui.focus.pic_")) {
-                        picsBundle.putString(picKey, picUrl)
+                        val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
+                        picsBundle.putString(picKey, actualPicUrl)
                     }
                 }
                 extras.putBundle("miui.focus.pics", picsBundle)
