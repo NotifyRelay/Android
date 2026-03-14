@@ -10,6 +10,7 @@ import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.entity.DeviceEntity
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
+import notifyrelay.data.database.entity.SuperIslandHistorySummary
 import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
 import notifyrelay.data.database.entity.SuperIslandImageEntity
 
@@ -219,23 +220,24 @@ class DatabaseRepository(private val database: AppDatabase) {
      * 包含所有记录，不进行去重，用于调试
      */
     suspend fun getSuperIslandHistory(): List<SuperIslandHistoryEntity> {
-        // 使用只读取小字段的摘要查询，然后构造实体（rawPayload 设为 null）
         val summaries = superIslandHistoryDao.getAllHistorySummary()
-        return summaries.map { s ->
-            SuperIslandHistoryEntity(
-                id = s.id,
-                sourceDeviceUuid = s.sourceDeviceUuid,
-                originalPackage = s.originalPackage,
-                mappedPackage = s.mappedPackage,
-                appName = s.appName,
-                title = s.title,
-                text = s.text,
-                paramV2Raw = s.paramV2Raw,
-                picMap = s.picMap,
-                rawPayload = null,
-                featureId = s.featureId
-            )
-        }
+        return summaries.map { mapToSuperIslandHistoryEntity(it) }
+    }
+
+    private fun mapToSuperIslandHistoryEntity(s: SuperIslandHistorySummary): SuperIslandHistoryEntity {
+        return SuperIslandHistoryEntity(
+            id = s.id,
+            sourceDeviceUuid = s.sourceDeviceUuid,
+            originalPackage = s.originalPackage,
+            mappedPackage = s.mappedPackage,
+            appName = s.appName,
+            title = s.title,
+            text = s.text,
+            paramV2Raw = s.paramV2Raw,
+            picMap = s.picMap,
+            rawPayload = null,
+            featureId = s.featureId
+        )
     }
 
     /**
@@ -344,21 +346,7 @@ class DatabaseRepository(private val database: AppDatabase) {
      */
     suspend fun getSuperIslandHistoryByPackage(packageName: String?): List<SuperIslandHistoryEntity> {
         val summaries = superIslandHistoryDao.getAllByPackage(packageName)
-        return summaries.map { s ->
-            SuperIslandHistoryEntity(
-                id = s.id,
-                sourceDeviceUuid = s.sourceDeviceUuid,
-                originalPackage = s.originalPackage,
-                mappedPackage = s.mappedPackage,
-                appName = s.appName,
-                title = s.title,
-                text = s.text,
-                paramV2Raw = s.paramV2Raw,
-                picMap = s.picMap,
-                rawPayload = null,
-                featureId = s.featureId
-            )
-        }
+        return summaries.map { mapToSuperIslandHistoryEntity(it) }
     }
 
     /**
@@ -384,18 +372,9 @@ class DatabaseRepository(private val database: AppDatabase) {
 
     // 超级岛图片去重相关方法
 
-    /**
-     * 插入或复用图片并更新绑定，返回图片ID
-     */
-    suspend fun upsertSuperIslandImageBinding(
-        packageName: String,
-        imageKey: String,
-        contentHash: String,
-        data: String,
-        lastUpdated: Long
-    ): Long {
+    private suspend fun upsertOrReuseImage(contentHash: String, data: String, lastUpdated: Long): Long {
         val existingId = superIslandImageDao.getImageIdByHash(contentHash)
-        val imageId = if (existingId != null) {
+        return if (existingId != null) {
             superIslandImageDao.touchImage(existingId, lastUpdated)
             existingId
         } else {
@@ -412,6 +391,19 @@ class DatabaseRepository(private val database: AppDatabase) {
                 insertedId
             }
         }
+    }
+
+    /**
+     * 插入或复用图片并更新绑定，返回图片ID
+     */
+    suspend fun upsertSuperIslandImageBinding(
+        packageName: String,
+        imageKey: String,
+        contentHash: String,
+        data: String,
+        lastUpdated: Long
+    ): Long {
+        val imageId = upsertOrReuseImage(contentHash, data, lastUpdated)
 
         if (imageId > 0) {
             superIslandImageDao.upsertBinding(
@@ -431,25 +423,7 @@ class DatabaseRepository(private val database: AppDatabase) {
      * 插入或复用图片（无绑定）并返回图片ID
      */
     suspend fun upsertSuperIslandImage(contentHash: String, data: String, lastUpdated: Long): Long {
-        val existingId = superIslandImageDao.getImageIdByHash(contentHash)
-        val imageId = if (existingId != null) {
-            superIslandImageDao.touchImage(existingId, lastUpdated)
-            existingId
-        } else {
-            val insertedId = superIslandImageDao.insertImage(
-                SuperIslandImageEntity(
-                    contentHash = contentHash,
-                    data = data,
-                    lastUpdated = lastUpdated
-                )
-            )
-            if (insertedId == -1L) {
-                superIslandImageDao.getImageIdByHash(contentHash) ?: -1L
-            } else {
-                insertedId
-            }
-        }
-        return imageId
+        return upsertOrReuseImage(contentHash, data, lastUpdated)
     }
 
     /**
