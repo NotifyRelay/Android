@@ -21,7 +21,7 @@ data class SuperIslandHistoryEntity(
     val title: String? = null,
     val text: String? = null,
     val paramV2Raw: String? = null,
-    val picMap: String = "{}", // 存储为JSON字符串
+    val picMap: String = "{}", // 存储为JSON字符串（图片键到数据库ID）
     val rawPayload: String? = null,
     val featureId: String? = null // 特征ID，用于标识同一座“岛”的一次会话
 )

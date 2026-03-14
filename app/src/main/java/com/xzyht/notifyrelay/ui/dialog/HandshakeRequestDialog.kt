@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.ui.dialog
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -19,6 +18,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
  * 握手请求弹窗
+ * 返回逻辑由父组件的 NavigationBackHandler 统一处理
  */
 @Composable
 fun HandshakeRequestDialog(
@@ -42,10 +42,6 @@ fun HandshakeRequestDialog(
             onDismiss()
         }
     ) {
-        BackHandler(onBack = {
-            onReject(req)
-            onDismiss()
-        })
         Column {
             Text(
                 text = "设备名: ${req.device.displayName}",

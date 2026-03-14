@@ -1,14 +1,18 @@
 package notifyrelay.data.database.repository
 
 import android.content.Context
+import androidx.paging.PagingSource
 import notifyrelay.data.database.AppDatabase
+import notifyrelay.data.database.dao.PackageCount
 import notifyrelay.data.database.entity.AppConfigEntity
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.entity.DeviceEntity
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
-import kotlin.collections.iterator
+import notifyrelay.data.database.entity.SuperIslandHistorySummary
+import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
+import notifyrelay.data.database.entity.SuperIslandImageEntity
 
 /**
  * 数据库仓库类
@@ -27,6 +31,8 @@ class DatabaseRepository(private val database: AppDatabase) {
     val notificationRecordDao = database.notificationRecordDao()
     // 超级岛历史记录相关
     private val superIslandHistoryDao = database.superIslandHistoryDao()
+    // 超级岛图片去重相关
+    private val superIslandImageDao = database.superIslandImageDao()
     
     /**
      * 获取应用配置值
@@ -82,6 +88,20 @@ class DatabaseRepository(private val database: AppDatabase) {
      */
     suspend fun getNotificationsByDevice(deviceUuid: String): List<NotificationRecordEntity> {
         return notificationRecordDao.getByDevice(deviceUuid)
+    }
+
+    /**
+     * 获取通知记录的分页数据源
+     */
+    fun getNotificationPagingSourceByDevice(deviceUuid: String): PagingSource<Int, NotificationRecordEntity> {
+        return notificationRecordDao.getPagingSourceByDevice(deviceUuid)
+    }
+
+    /**
+     * 获取设备的包名统计
+     */
+    suspend fun getPackageCountByDevice(deviceUuid: String): List<PackageCount> {
+        return notificationRecordDao.getPackageCountByDevice(deviceUuid)
     }
     
     /**
@@ -200,23 +220,31 @@ class DatabaseRepository(private val database: AppDatabase) {
      * 包含所有记录，不进行去重，用于调试
      */
     suspend fun getSuperIslandHistory(): List<SuperIslandHistoryEntity> {
-        // 使用只读取小字段的摘要查询，然后构造实体（rawPayload 设为 null）
         val summaries = superIslandHistoryDao.getAllHistorySummary()
-        return summaries.map { s ->
-            SuperIslandHistoryEntity(
-                id = s.id,
-                sourceDeviceUuid = s.sourceDeviceUuid,
-                originalPackage = s.originalPackage,
-                mappedPackage = s.mappedPackage,
-                appName = s.appName,
-                title = s.title,
-                text = s.text,
-                paramV2Raw = s.paramV2Raw,
-                picMap = s.picMap,
-                rawPayload = null,
-                featureId = s.featureId
-            )
-        }
+        return summaries.map { mapToSuperIslandHistoryEntity(it) }
+    }
+
+    private fun mapToSuperIslandHistoryEntity(s: SuperIslandHistorySummary): SuperIslandHistoryEntity {
+        return SuperIslandHistoryEntity(
+            id = s.id,
+            sourceDeviceUuid = s.sourceDeviceUuid,
+            originalPackage = s.originalPackage,
+            mappedPackage = s.mappedPackage,
+            appName = s.appName,
+            title = s.title,
+            text = s.text,
+            paramV2Raw = s.paramV2Raw,
+            picMap = s.picMap,
+            rawPayload = null,
+            featureId = s.featureId
+        )
+    }
+
+    /**
+     * 获取完整的超级岛历史记录（包含 rawPayload），仅用于迁移与后台处理
+     */
+    suspend fun getSuperIslandHistoryFull(): List<SuperIslandHistoryEntity> {
+        return superIslandHistoryDao.getAllHistory()
     }
     
     /**
@@ -299,6 +327,139 @@ class DatabaseRepository(private val database: AppDatabase) {
      */
     suspend fun deleteSuperIslandHistory(history: SuperIslandHistoryEntity) {
         superIslandHistoryDao.delete(history)
+    }
+
+    /**
+     * 获取按包名分组的统计信息
+     */
+    suspend fun getSuperIslandPackageCount(): List<notifyrelay.data.database.dao.SuperIslandPackageCount> {
+        val counts = superIslandHistoryDao.getPackageCount().toMutableList()
+        val unknownCount = superIslandHistoryDao.getUnknownPackageCount()
+        if (unknownCount != null && unknownCount.count > 0) {
+            counts.add(unknownCount)
+        }
+        return counts.sortedByDescending { it.latestTime }
+    }
+
+    /**
+     * 按包名获取所有历史记录摘要（用于分组内展示）
+     */
+    suspend fun getSuperIslandHistoryByPackage(packageName: String?): List<SuperIslandHistoryEntity> {
+        val summaries = superIslandHistoryDao.getAllByPackage(packageName)
+        return summaries.map { mapToSuperIslandHistoryEntity(it) }
+    }
+
+    /**
+     * 按包名删除历史记录
+     */
+    suspend fun deleteSuperIslandHistoryByPackage(packageName: String?) {
+        superIslandHistoryDao.deleteByPackage(packageName)
+    }
+
+    /**
+     * 按ID删除单条历史记录
+     */
+    suspend fun deleteSuperIslandHistoryById(id: Long) {
+        superIslandHistoryDao.deleteById(id)
+    }
+
+    /**
+     * 获取超级岛历史记录总数
+     */
+    suspend fun getSuperIslandHistoryCount(): Int {
+        return superIslandHistoryDao.getCount()
+    }
+
+    // 超级岛图片去重相关方法
+
+    private suspend fun upsertOrReuseImage(contentHash: String, data: String, lastUpdated: Long): Long {
+        val existingId = superIslandImageDao.getImageIdByHash(contentHash)
+        return if (existingId != null) {
+            superIslandImageDao.touchImage(existingId, lastUpdated)
+            existingId
+        } else {
+            val insertedId = superIslandImageDao.insertImage(
+                SuperIslandImageEntity(
+                    contentHash = contentHash,
+                    data = data,
+                    lastUpdated = lastUpdated
+                )
+            )
+            if (insertedId == -1L) {
+                superIslandImageDao.getImageIdByHash(contentHash) ?: -1L
+            } else {
+                insertedId
+            }
+        }
+    }
+
+    /**
+     * 插入或复用图片并更新绑定，返回图片ID
+     */
+    suspend fun upsertSuperIslandImageBinding(
+        packageName: String,
+        imageKey: String,
+        contentHash: String,
+        data: String,
+        lastUpdated: Long
+    ): Long {
+        val imageId = upsertOrReuseImage(contentHash, data, lastUpdated)
+
+        if (imageId > 0) {
+            superIslandImageDao.upsertBinding(
+                SuperIslandImageBindingEntity(
+                    packageName = packageName,
+                    imageKey = imageKey,
+                    imageId = imageId,
+                    lastUpdated = lastUpdated
+                )
+            )
+        }
+
+        return imageId
+    }
+
+    /**
+     * 插入或复用图片（无绑定）并返回图片ID
+     */
+    suspend fun upsertSuperIslandImage(contentHash: String, data: String, lastUpdated: Long): Long {
+        return upsertOrReuseImage(contentHash, data, lastUpdated)
+    }
+
+    /**
+     * 根据图片ID获取原始数据
+     */
+    suspend fun resolveSuperIslandImageById(imageId: Long): String? {
+        return superIslandImageDao.getImageDataById(imageId)
+    }
+
+    /**
+     * 根据包名与图片键获取原始数据
+     */
+    suspend fun resolveSuperIslandImageByBinding(packageName: String, imageKey: String): String? {
+        return superIslandImageDao.getImageDataByBinding(packageName, imageKey)
+    }
+
+    /**
+     * 清理超级岛图片：按时间与数量限制
+     */
+    suspend fun pruneSuperIslandImages(maxEntries: Int, maxAgeDays: Int) {
+        val now = System.currentTimeMillis()
+        if (maxAgeDays > 0) {
+            val cutoff = now - maxAgeDays * 24L * 60L * 60L * 1000L
+            superIslandImageDao.deleteImagesOlderThan(cutoff)
+        }
+        if (maxEntries > 0) {
+            superIslandImageDao.deleteImagesKeepingLatest(maxEntries)
+        }
+    }
+
+    /**
+     * 清空所有超级岛图片与绑定
+     */
+    suspend fun clearSuperIslandImages() {
+        superIslandImageDao.clearAllBindings()
+        superIslandImageDao.clearAllImages()
     }
 
     // 应用相关方法
@@ -458,7 +619,7 @@ class DatabaseRepository(private val database: AppDatabase) {
          */
         fun getInstance(context: Context): DatabaseRepository {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: DatabaseRepository(AppDatabase.Companion.getDatabase(context)).also { INSTANCE = it }
+                INSTANCE ?: DatabaseRepository(AppDatabase.getDatabase(context)).also { INSTANCE = it }
             }
         }
     }

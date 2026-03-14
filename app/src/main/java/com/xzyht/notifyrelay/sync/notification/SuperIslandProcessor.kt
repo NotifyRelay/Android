@@ -172,7 +172,8 @@ object SuperIslandProcessor {
             val finalTitle = merged?.title ?: mTitle
             val finalText = merged?.text ?: mText
             val mParam2 = merged?.paramV2Raw ?: paramV2Raw
-            val mPics = merged?.pics ?: emptyMap()
+            val rawPics = merged?.pics ?: emptyMap()
+            val mPics = if (rawPics.isEmpty()) rawPics else rawPics.filterKeys { it != "miui.focus.pics" }
             
             // 初始化 Live Updates 通知管理器（仅第一次调用时初始化）
             try {

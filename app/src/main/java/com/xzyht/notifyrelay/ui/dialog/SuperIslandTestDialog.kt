@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.ui.dialog
 
 import android.content.Context
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -880,7 +879,6 @@ fun SuperIslandTestDialog(
             show = show,
             onDismissRequest = { show.value = false },
         ) {
-            BackHandler(onBack = { show.value = false })
             Column(
                 modifier = Modifier
                     .fillMaxWidth()

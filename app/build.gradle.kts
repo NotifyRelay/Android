@@ -8,6 +8,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose") version libs.versions.kotlinPluginCompose
     id("kotlin-kapt")
+    id("kotlin-parcelize")
 }
 // 使用 buildSrc 的 JGit 实现计算版本信息（避免启动外部进程，兼容 configuration-cache）
 // （注意：版本信息在下面会被再次计算；避免重复定义同名 top-level 属性以消除编译歧义）
@@ -193,15 +194,25 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.lifecycle.runtime.android)
+    implementation(libs.androidx.lifecycle.viewmodel.ktx)
+    implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     // Room Database
     implementation(libs.androidx.room.runtime)
     kapt(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
+
+    // Paging 3
+    implementation(libs.androidx.paging.runtime)
+    implementation(libs.androidx.paging.compose)
     
     // Miuix风格ui库
     implementation(libs.miuix.android)
     implementation(libs.miuix.icons)
+    implementation(libs.miuix.navigation3.ui)
+    // Navigation3
+    implementation(libs.androidx.navigation3.runtime)
+    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(libs.androidx.navigationevent.compose)
     // DataStore 持久化（设备名、规则设置）
     implementation(libs.androidx.datastore.preferences)

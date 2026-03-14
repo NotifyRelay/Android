@@ -1,27 +1,22 @@
-package com.xzyht.notifyrelay.ui.fragment
+package com.xzyht.notifyrelay.ui.screen
 
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
+import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.fragment.app.Fragment
-import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
+import com.xzyht.notifyrelay.ui.DeveloperModeActivity
+import com.xzyht.notifyrelay.ui.navigation.Navigator
 import com.xzyht.notifyrelay.ui.pages.UILocalFilter
 import com.xzyht.notifyrelay.ui.pages.UIRemoteFilter
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
@@ -31,53 +26,29 @@ import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-class SettingsFragment : Fragment() {
-    override fun onCreateView(
-        inflater: LayoutInflater,
-        container: ViewGroup?,
-        savedInstanceState: Bundle?
-    ): View {
-        return ComposeView(requireContext()).apply {
-            setContent {
-                ProvideNavigationEventDispatcherOwner {
-                    MiuixTheme {
-                        SettingsScreen()
-                    }
-                }
-            }
-        }
-    }
-}
-
+/**
+ * 设置页面屏幕
+ * 纯 Compose 实现
+ */
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(
+    navigator: Navigator
+) {
     val context = LocalContext.current
-
-    // 创建协程作用域用于Tab点击事件
     val coroutineScope = rememberCoroutineScope()
 
-    // 处理开发者模式触发
     val handleDeveloperModeTriggered = {
-        val intent = android.content.Intent(context, com.xzyht.notifyrelay.ui.DeveloperModeActivity::class.java)
+        val intent = Intent(context, DeveloperModeActivity::class.java)
         context.startActivity(intent)
     }
 
-    // 简化实现，移除RemoteFilterConfig引用
-        // TabRow相关状态
-        val tabTitles = listOf("远程过滤", "本地过滤", "超级岛", "关于")
-
-    // Pager相关状态 - 使用Pager状态作为唯一数据源
-    val pagerState = rememberPagerState(initialPage = 0) {
-        tabTitles.size
-    }
-
-    // 从Pager状态直接获取当前选中的Tab索引，不使用独立状态
+    val tabTitles = listOf("远程过滤", "本地过滤", "超级岛", "关于")
+    val pagerState = rememberPagerState(initialPage = 0) { tabTitles.size }
     val selectedTabIndex = pagerState.currentPage
-
     val colorScheme = MiuixTheme.colorScheme
 
     Column(
-        modifier = Modifier.Companion
+        modifier = Modifier
             .fillMaxSize()
             .background(colorScheme.background)
             .padding(12.dp)
@@ -90,7 +61,7 @@ fun SettingsScreen() {
                     pagerState.scrollToPage(index)
                 }
             },
-            modifier = Modifier.Companion.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(),
             colors = TabRowDefaults.tabRowColors(
                 backgroundColor = colorScheme.surface,
                 contentColor = colorScheme.onSurface,
@@ -104,34 +75,19 @@ fun SettingsScreen() {
 
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.Companion.fillMaxSize()
+            modifier = Modifier.fillMaxSize()
         ) { page ->
             Box(
-                modifier = Modifier.Companion
+                modifier = Modifier
                     .fillMaxSize()
                     .padding(10.dp),
-                contentAlignment = Alignment.Companion.TopStart
+                contentAlignment = Alignment.TopStart
             ) {
                 when (page) {
-                    0 -> {
-                        // 远程通知过滤 Tab
-                        UIRemoteFilter()
-                    }
-
-                    1 -> {
-                        // 本地通知过滤 Tab
-                        UILocalFilter()
-                    }
-
-                    2 -> {
-                        // 超级岛设置 Tab
-                        UISuperIslandSettings()
-                    }
-
-                    3 -> {
-                        // 关于 Tab
-                        UIAbout(onDeveloperModeTriggered = handleDeveloperModeTriggered)
-                    }
+                    0 -> UIRemoteFilter()
+                    1 -> UILocalFilter()
+                    2 -> UISuperIslandSettings()
+                    3 -> UIAbout(onDeveloperModeTriggered = handleDeveloperModeTriggered)
                 }
             }
         }

@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.ui.pages
 
+import android.app.Activity
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
@@ -7,35 +8,44 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.text.format.DateFormat
 import android.widget.Toast
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.AnchoredDraggableState
+import androidx.compose.foundation.gestures.DraggableAnchors
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.anchoredDraggable
+import androidx.compose.foundation.gestures.snapTo
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,17 +55,23 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.paging.compose.collectAsLazyPagingItems
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.ui.ViewModels.GroupedSuperIslandHistory
+import com.xzyht.notifyrelay.ui.ViewModels.SuperIslandHistoryViewModel
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -65,10 +81,19 @@ import notifyrelay.core.util.DataUrlUtils
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.FloatingToolbar
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.basic.ToolbarPosition
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import java.util.Date
 import java.util.Locale
 import kotlin.math.max
@@ -77,109 +102,277 @@ import kotlin.math.roundToInt
 private const val SUPER_ISLAND_IMAGE_MAX_DIMENSION = 320
 private const val SUPER_ISLAND_DOWNLOAD_MAX_BYTES = 4 * 1024 * 1024
 
-private data class SuperIslandHistoryGroup(
-    val packageName: String,
-    val entries: List<SuperIslandHistoryEntry>
-)
+enum class SuperIslandDragValue { Center, End }
+
+@Composable
+fun SuperIslandDeleteButton(onClick: () -> Unit, modifier: Modifier = Modifier) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier.fillMaxHeight().width(80.dp),
+        backgroundColor = Color.Red,
+        cornerRadius = 8.dp,
+        minHeight = 40.dp,
+        minWidth = 80.dp
+    ) {
+        Icon(
+            imageVector = MiuixIcons.Delete,
+            contentDescription = "删除",
+            modifier = Modifier.size(24.dp)
+        )
+    }
+}
 
 @Composable
 fun UISuperIslandHistory() {
     val context = LocalContext.current
     var includeImageDataOnCopy by remember { mutableStateOf(StorageManager.getBoolean(context, "superisland_copy_image_data", false)) }
 
-    val historyState = remember(context) { SuperIslandHistory.historyState(context) }
-    val history by historyState.collectAsState()
-    val groups = remember(history) {
-        val sorted = history.sortedByDescending { it.id }
-        val grouped = sorted.groupBy { entry ->
-            entry.mappedPackage?.takeIf { it.isNotBlank() }
-                ?: entry.originalPackage?.takeIf { it.isNotBlank() }
-                ?: "(未知应用)"
+    val viewModel: SuperIslandHistoryViewModel = viewModel(
+        factory = SuperIslandHistoryViewModel.Factory(context.applicationContext as android.app.Application)
+    )
+
+    val isDarkTheme = isSystemInDarkTheme()
+    LaunchedEffect(isDarkTheme) {
+        val window = (context as? Activity)?.window
+        window?.let {
+            val decorView = it.decorView
+            WindowInsetsControllerCompat(it, decorView).isAppearanceLightStatusBars = !isDarkTheme
         }
-        grouped.entries
-            .map { (pkg, items) ->
-                SuperIslandHistoryGroup(pkg, items.sortedByDescending { it.id })
-            }
-            .sortedByDescending { it.entries.firstOrNull()?.id ?: Long.MIN_VALUE }
+    }
+
+    val uiState by viewModel.uiState.collectAsState()
+    val appIconCache by viewModel.appIconCache.collectAsState()
+    val pagingItems = viewModel.groupedPagingFlow.collectAsLazyPagingItems()
+
+    val groupPackages = pagingItems.itemSnapshotList.items.map { it.packageName }.distinct()
+    LaunchedEffect(groupPackages) {
+        viewModel.preloadAppIcons(groupPackages)
+    }
+
+    val getCachedAppInfo: (String?) -> Pair<String, Bitmap?> = { packageName ->
+        if (packageName.isNullOrBlank() || packageName == "(未知应用)") {
+            "" to null
+        } else {
+            appIconCache[packageName] ?: (packageName to null)
+        }
+    }
+
+    val clearHistory: () -> Unit = {
+        try {
+            viewModel.clearHistory()
+        } catch (e: Exception) {
+            Logger.e("NotifyRelay", "清除超级岛历史异常", e)
+            Toast.makeText(context, "清除失败: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
     }
 
     MiuixTheme {
         val colorScheme = MiuixTheme.colorScheme
         val textStyles = MiuixTheme.textStyles
+        val density = LocalDensity.current
+        val deleteWidthPx = with(density) { 80.dp.toPx() }
+        val deleteWidth = 80.dp
 
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(colorScheme.background)
-                .padding(12.dp)
-        ) {
-            SuperSwitch(
-                title = "复制图片详细信息",
-                summary = "长按条目可复制原始消息，关闭时图片数据将在文本中替换为 \"图片\"。",
-                checked = includeImageDataOnCopy,
-                onCheckedChange = {
-                    includeImageDataOnCopy = it
-                    StorageManager.putBoolean(context, "superisland_copy_image_data", it)
+        Scaffold(
+            containerColor = colorScheme.background,
+            popupHost = { },
+            floatingToolbar = {
+                if (pagingItems.itemCount > 0) {
+                    FloatingToolbar(
+                        color = colorScheme.primary,
+                        cornerRadius = 20.dp,
+                        showDivider = false
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(8.dp),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            DoubleClickConfirmButton(
+                                text = "清空超级岛历史",
+                                confirmText = "确认?",
+                                onClick = {},
+                                onConfirm = clearHistory,
+                                colors = ButtonDefaults.buttonColors(color = colorScheme.onSurface),
+                                confirmColors = ButtonDefaults.buttonColors(color = Color.Red)
+                            )
+                        }
+                    }
                 }
-            )
-
-            Spacer(modifier = Modifier.height(12.dp))
-
-            if (groups.isEmpty()) {
-                Text("暂无超级岛历史记录", style = textStyles.body2, color = colorScheme.onSurfaceVariantSummary)
-            } else {
-                Row(
+            },
+            floatingToolbarPosition = ToolbarPosition.BottomEnd,
+            content = { paddingValues ->
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.End
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .padding(12.dp)
                 ) {
-                    DoubleClickConfirmButton(
-                        text = "清空超级岛历史",
-                        confirmText = "确认?",
-                        onClick = {
-                            // 第一次点击，显示提示信息
-                        },
-                        onConfirm = {
-                            SuperIslandHistory.clearAll(context)
-                        },
-                        colors = ButtonDefaults.buttonColors(color = colorScheme.onSurface),
-                        confirmColors = ButtonDefaults.buttonColors(color = Color.Red)
-                    )
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = "复制图片详细信息",
+                            style = textStyles.body2,
+                            color = colorScheme.onSurface
+                        )
+                        Switch(
+                            checked = includeImageDataOnCopy,
+                            onCheckedChange = {
+                                includeImageDataOnCopy = it
+                                StorageManager.putBoolean(context, "superisland_copy_image_data", it)
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    if (pagingItems.itemCount == 0) {
+                        Text("暂无超级岛历史记录", style = textStyles.body2, color = colorScheme.onSurfaceVariantSummary)
+                    } else {
+                        SuperIslandHistoryListBlock(
+                            pagingItems = pagingItems,
+                            getCachedAppInfo = getCachedAppInfo,
+                            expandedGroups = uiState.expandedGroups,
+                            includeImageDataOnCopy = includeImageDataOnCopy,
+                            onToggleGroup = { packageName -> viewModel.toggleGroupExpansion(packageName) },
+                            onDeleteGroup = { packageName -> viewModel.deleteGroup(packageName) },
+                            onDeleteEntry = { id -> viewModel.deleteEntry(id) },
+                            loadEntryDetail = { id -> viewModel.loadEntryDetail(id) },
+                            deleteWidthPx = deleteWidthPx,
+                            deleteWidth = deleteWidth
+                        )
+                    }
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun SuperIslandHistoryListBlock(
+    pagingItems: androidx.paging.compose.LazyPagingItems<GroupedSuperIslandHistory>,
+    getCachedAppInfo: (String?) -> Pair<String, Bitmap?>,
+    expandedGroups: Set<String>,
+    includeImageDataOnCopy: Boolean,
+    onToggleGroup: (String) -> Unit,
+    onDeleteGroup: (String) -> Unit,
+    onDeleteEntry: (Long) -> Unit,
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
+    deleteWidthPx: Float,
+    deleteWidth: Dp
+) {
+    val colorScheme = MiuixTheme.colorScheme
+    val textStyles = MiuixTheme.textStyles
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        items(
+            count = pagingItems.itemCount,
+            key = { index -> pagingItems[index]?.packageName ?: "group-$index" }
+        ) { index ->
+            val group = pagingItems[index] ?: return@items
+            val groupKey = group.packageName
+            val anchoredDraggableState = remember(groupKey, group.entries.size) {
+                AnchoredDraggableState(
+                    initialValue = SuperIslandDragValue.Center
+                )
+            }
+
+            val anchors = remember(groupKey, deleteWidthPx) {
+                DraggableAnchors {
+                    SuperIslandDragValue.Center at 0f
+                    SuperIslandDragValue.End at -deleteWidthPx
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+            LaunchedEffect(anchoredDraggableState, anchors) {
+                anchoredDraggableState.updateAnchors(anchors)
+            }
+
+            val offset = remember(
+                anchoredDraggableState.currentValue,
+                anchoredDraggableState.offset
             ) {
-                if (groups.isNotEmpty()) {
-                    itemsIndexed(groups, key = { _, it -> it.packageName }) { index, group ->
-                        SuperIslandHistoryGroupCard(group, includeImageDataOnCopy)
-                        if (index < groups.lastIndex) {
-                            HorizontalDivider(color = colorScheme.outline)
-                        }
-                    }
+                when {
+                    anchoredDraggableState.currentValue == SuperIslandDragValue.End -> -deleteWidthPx
+                    anchoredDraggableState.offset.isNaN() -> 0f
+                    else -> anchoredDraggableState.offset
+                }
+            }
+
+            Box(modifier = Modifier.fillMaxWidth()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .anchoredDraggable(
+                            state = anchoredDraggableState,
+                            orientation = Orientation.Horizontal
+                        )
+                        .offset { IntOffset(offset.roundToInt(), 0) }
+                ) {
+                    SuperIslandHistoryGroupCard(
+                        group = group,
+                        getCachedAppInfo = getCachedAppInfo,
+                        includeImageDataOnCopy = includeImageDataOnCopy,
+                        isExpanded = expandedGroups.contains(groupKey),
+                        onToggleExpand = { onToggleGroup(groupKey) },
+                        loadEntryDetail = loadEntryDetail,
+                        deleteWidthPx = deleteWidthPx,
+                        deleteWidth = deleteWidth,
+                        onDeleteEntry = onDeleteEntry
+                    )
+                }
+
+                if (anchoredDraggableState.currentValue == SuperIslandDragValue.End) {
+                    SuperIslandDeleteButton(
+                        onClick = {
+                            coroutineScope.launch {
+                                anchoredDraggableState.snapTo(SuperIslandDragValue.Center)
+                            }
+                            onDeleteGroup(groupKey)
+                        },
+                        modifier = Modifier
+                            .align(Alignment.CenterEnd)
+                            .width(deleteWidth)
+                            .fillMaxHeight()
+                    )
                 }
             }
         }
     }
 }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
 private fun SuperIslandHistoryGroupCard(
-    group: SuperIslandHistoryGroup,
-    includeImageDataOnCopy: Boolean
+    group: GroupedSuperIslandHistory,
+    getCachedAppInfo: (String?) -> Pair<String, Bitmap?>,
+    includeImageDataOnCopy: Boolean,
+    isExpanded: Boolean,
+    onToggleExpand: () -> Unit,
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
+    deleteWidthPx: Float,
+    deleteWidth: Dp,
+    onDeleteEntry: (Long) -> Unit
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
+    val context = LocalContext.current
+    val coroutineScope = rememberCoroutineScope()
     val headerEntry = group.entries.firstOrNull()
     val groupTitle = headerEntry?.appName?.takeIf { !it.isNullOrBlank() }
         ?: headerEntry?.title?.takeIf { !it.isNullOrBlank() }
         ?: group.packageName
-    var expanded by rememberSaveable(group.packageName) { mutableStateOf(false) }
     val iconPackage = remember(headerEntry, group.packageName) {
         headerEntry?.mappedPackage?.takeIf { !it.isNullOrBlank() }
             ?: headerEntry?.originalPackage?.takeIf { !it.isNullOrBlank() }
@@ -190,7 +383,17 @@ private fun SuperIslandHistoryGroupCard(
         headerEntry?.let { formatTimestamp(it.id) }
     }
 
-    Card(modifier = Modifier.fillMaxWidth()) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        cornerRadius = 8.dp,
+        insideMargin = PaddingValues(12.dp),
+        colors = CardDefaults.defaultColors(
+            color = colorScheme.surface,
+            contentColor = colorScheme.onSurface
+        ),
+        showIndication = !isExpanded,
+        pressFeedbackType = if (isExpanded) PressFeedbackType.None else PressFeedbackType.Sink
+    ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -200,7 +403,7 @@ private fun SuperIslandHistoryGroupCard(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .clickable { expanded = !expanded },
+                    .clickable { onToggleExpand() },
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 SuperIslandAppIcon(appIconBitmap, iconPackage, 48.dp)
@@ -228,15 +431,77 @@ private fun SuperIslandHistoryGroupCard(
                     }
                 }
                 Text(
-                    text = if (expanded) "收起" else "展开",
+                    text = if (isExpanded) "收起" else "展开",
                     style = textStyles.body2,
                     color = colorScheme.primary
                 )
             }
 
-            if (expanded) {
+            if (isExpanded) {
                 group.entries.forEachIndexed { index, entry ->
-                    SuperIslandHistoryEntryCard(entry, includeImageDataOnCopy, appIconBitmap, iconPackage)
+                    val entryAnchoredDraggableState = remember(entry.id) {
+                        AnchoredDraggableState(
+                            initialValue = SuperIslandDragValue.Center
+                        )
+                    }
+
+                    val entryAnchors = remember(entry.id, deleteWidthPx) {
+                        DraggableAnchors {
+                            SuperIslandDragValue.Center at 0f
+                            SuperIslandDragValue.End at -deleteWidthPx
+                        }
+                    }
+
+                    LaunchedEffect(entryAnchoredDraggableState, entryAnchors) {
+                        entryAnchoredDraggableState.updateAnchors(entryAnchors)
+                    }
+
+                    val entryOffset = remember(
+                        entryAnchoredDraggableState.currentValue,
+                        entryAnchoredDraggableState.offset
+                    ) {
+                        when {
+                            entryAnchoredDraggableState.currentValue == SuperIslandDragValue.End -> -deleteWidthPx
+                            entryAnchoredDraggableState.offset.isNaN() -> 0f
+                            else -> entryAnchoredDraggableState.offset
+                        }
+                    }
+
+                    Box(modifier = Modifier.fillMaxWidth()) {
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .anchoredDraggable(
+                                    state = entryAnchoredDraggableState,
+                                    orientation = Orientation.Horizontal
+                                )
+                                .offset { IntOffset(entryOffset.roundToInt(), 0) }
+                        ) {
+                            SuperIslandHistoryEntryCard(
+                                entry = entry,
+                                includeImageDataOnCopy = includeImageDataOnCopy,
+                                appIconBitmap = appIconBitmap,
+                                iconPackage = iconPackage,
+                                loadEntryDetail = loadEntryDetail
+                            )
+                        }
+
+                        if (entryAnchoredDraggableState.currentValue == SuperIslandDragValue.End) {
+                            SuperIslandDeleteButton(
+                                onClick = {
+                                    coroutineScope.launch {
+                                        entryAnchoredDraggableState.snapTo(SuperIslandDragValue.Center)
+                                    }
+                                    onDeleteEntry(entry.id)
+                                },
+                                modifier = Modifier
+                                    .align(Alignment.CenterEnd)
+                                    .width(deleteWidth)
+                                    .fillMaxHeight()
+                            )
+                        }
+                    }
+
                     if (index < group.entries.lastIndex) {
                         Spacer(modifier = Modifier.height(8.dp))
                         HorizontalDivider(color = colorScheme.outline)
@@ -245,7 +510,13 @@ private fun SuperIslandHistoryGroupCard(
             } else {
                 val previewList = group.entries.take(3)
                 previewList.forEachIndexed { index, entry ->
-                    SuperIslandHistorySummaryRow(entry, includeImageDataOnCopy, appIconBitmap, iconPackage)
+                    SuperIslandHistorySummaryRow(
+                        entry = entry,
+                        includeImageDataOnCopy = includeImageDataOnCopy,
+                        appIconBitmap = appIconBitmap,
+                        iconPackage = iconPackage,
+                        loadEntryDetail = loadEntryDetail
+                    )
                     if (index < previewList.lastIndex) {
                         Spacer(modifier = Modifier.height(8.dp))
                     }
@@ -268,7 +539,8 @@ private fun SuperIslandHistorySummaryRow(
     entry: SuperIslandHistoryEntry,
     includeImageDataOnCopy: Boolean,
     appIconBitmap: ImageBitmap?,
-    iconPackage: String?
+    iconPackage: String?,
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
@@ -293,7 +565,7 @@ private fun SuperIslandHistorySummaryRow(
                 },
                 onLongClick = {
                     coroutineScope.launch(Dispatchers.IO) {
-                        val full = try { SuperIslandHistory.loadEntryDetail(context, entry.id) } catch (_: Exception) { null }
+                        val full = try { loadEntryDetail(entry.id) } catch (_: Exception) { null }
                         val final = full ?: entry
                         val text = buildEntryCopyText(final, includeImageDataOnCopy)
                         withContext(Dispatchers.Main) {
@@ -348,7 +620,8 @@ private fun SuperIslandHistoryEntryCard(
     entry: SuperIslandHistoryEntry,
     includeImageDataOnCopy: Boolean,
     appIconBitmap: ImageBitmap?,
-    iconPackage: String?
+    iconPackage: String?,
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
@@ -380,7 +653,7 @@ private fun SuperIslandHistoryEntryCard(
                 },
                 onLongClick = {
                     coroutineScope.launch(Dispatchers.IO) {
-                        val full = try { SuperIslandHistory.loadEntryDetail(context, entry.id) } catch (_: Exception) { null }
+                        val full = try { loadEntryDetail(entry.id) } catch (_: Exception) { null }
                         val final = full ?: entry
                         val text = buildEntryCopyText(final, includeImageDataOnCopy)
                         withContext(Dispatchers.Main) {
@@ -462,10 +735,9 @@ private fun SuperIslandHistoryEntryCard(
                 overflow = TextOverflow.Ellipsis
             )
         } else {
-            // 未加载 rawPayload，提供按需加载按钮
             TextButton(onClick = {
                 coroutineScope.launch {
-                    val full = try { SuperIslandHistory.loadEntryDetail(context, entry.id) } catch (_: Exception) { null }
+                    val full = try { loadEntryDetail(entry.id) } catch (_: Exception) { null }
                     if (full != null) {
                         loadedDetail = full
                     }
@@ -492,7 +764,6 @@ private fun SuperIslandHistoryImage(imageKey: String, data: String, modifier: Mo
 
         val loaded = withContext(Dispatchers.IO) {
             try {
-                // 先尝试将可能的 ref: 引用解析为原始 data: 或 http URL
                 val resolved = try {
                     SuperIslandImageStore.resolve(context, data) ?: data
                 } catch (_: Exception) { data }
@@ -502,7 +773,6 @@ private fun SuperIslandHistoryImage(imageKey: String, data: String, modifier: Mo
                     resolved.startsWith("http", ignoreCase = true) -> downloadBitmap(context, resolved)
                     else -> null
                 }
-                // 缓存仍以传入的 key (可能是 ref:...) 作为索引，便于下次直接命中
                 decoded?.let { SuperIslandImageCache.put(data, it) }
             } catch (_: Exception) {
                 null
@@ -647,7 +917,6 @@ private fun computeInSampleSize(width: Int, height: Int, maxDimension: Int): Int
     return sampleSize
 }
 
-// Keeps a small in-memory cache of decoded bitmaps to avoid repeated work during recompositions.
 private object SuperIslandImageCache {
     private const val MAX_CACHE_SIZE = 32
     private val cache = object : LinkedHashMap<String, Bitmap>(MAX_CACHE_SIZE, 0.75f, true) {
@@ -787,10 +1056,7 @@ private fun triggerFloatingReplica(context: Context, entry: SuperIslandHistoryEn
 
 private fun sanitizeImageContent(source: String, includeImageDataOnCopy: Boolean): String {
     if (includeImageDataOnCopy) return source
-    // 先替换可能存在的 ref: 引用为占位，避免在 UI 上显示内部引用字符串
-    var sanitized = REF_URL_REGEX.replace(source) { "图片" }
-    // 替换 data: URI 与常见图片 URL
-    sanitized = DATA_URL_REGEX.replace(sanitized) { "图片" }
+    var sanitized = DATA_URL_REGEX.replace(source) { "图片" }
     sanitized = IMAGE_URL_REGEX.replace(sanitized) { "图片" }
     return sanitized
 }
@@ -804,9 +1070,6 @@ private val IMAGE_URL_REGEX = Regex(
     pattern = "https?:[^\\s\"]+\\.(?:png|jpe?g|gif|webp|bmp|svg)",
     options = setOf(RegexOption.IGNORE_CASE)
 )
-
-// 匹配已被 intern 为引用的图片标识（例如 ref:abcdef...），展示时应替换为占位而非原样显示
-private val REF_URL_REGEX = Regex(pattern = "(?i)ref:[0-9a-f]{16,}")
 
 private fun formatMultilineContent(content: String): List<String> {
     if (content.isBlank()) return emptyList()

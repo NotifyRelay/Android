@@ -241,12 +241,66 @@ object NotificationGenerator {
     private const val NOTIFICATION_BASE_ID = 20000
     // 浮窗功能开关键
     private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
+    // 规范信息注入模式键
+    private const val SPEC_INJECTION_MODE_KEY = "spec_injection_mode"
+    
+    // 注入方式枚举
+    enum class SpecInjectionMode {
+        SUPER_ISLAND,      // 仅超级岛规范信息注入
+        LIVE_UPDATES,      // 仅Live Updates规范信息注入
+        BOTH,              // 两者都注入
+        NONE               // 都不注入（不应该使用，但为了完整性保留）
+    }
     
     /**
      * 检查浮窗功能是否开启
      */
     private fun isFloatingWindowEnabled(context: Context): Boolean {
         return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, true)
+    }
+
+    /**
+     * 获取规范信息注入模式
+     */
+    private fun getSpecInjectionMode(context: Context): SpecInjectionMode {
+        val modeOrdinal = StorageManager.getInt(context, SPEC_INJECTION_MODE_KEY, SpecInjectionMode.BOTH.ordinal)
+        return SpecInjectionMode.values().getOrElse(modeOrdinal) { SpecInjectionMode.BOTH }
+    }
+
+    /**
+     * 检查超级岛规范信息注入是否开启
+     */
+    private fun isSuperIslandSpecInjectionEnabled(context: Context): Boolean {
+        val mode = getSpecInjectionMode(context)
+        return mode == SpecInjectionMode.SUPER_ISLAND || mode == SpecInjectionMode.BOTH
+    }
+
+    /**
+     * 检查Live Updates规范信息注入是否开启
+     */
+    private fun isLiveUpdatesSpecInjectionEnabled(context: Context): Boolean {
+        val mode = getSpecInjectionMode(context)
+        return mode == SpecInjectionMode.LIVE_UPDATES || mode == SpecInjectionMode.BOTH
+    }
+
+    /**
+     * 检查是否至少有一种规范信息注入开启
+     * @return true 如果至少有一种注入开启，false 如果都关闭
+     */
+    private fun isAnySpecInjectionEnabled(context: Context): Boolean {
+        return isSuperIslandSpecInjectionEnabled(context) || isLiveUpdatesSpecInjectionEnabled(context)
+    }
+
+    /**
+     * 验证规范信息注入开关状态，确保至少有一种开启
+     * 如果都关闭，则默认开启两者都注入
+     */
+    private fun validateSpecInjectionSwitches(context: Context) {
+        if (!isAnySpecInjectionEnabled(context)) {
+            // 如果都关闭，默认开启两者都注入
+            StorageManager.putInt(context, SPEC_INJECTION_MODE_KEY, SpecInjectionMode.BOTH.ordinal)
+            Logger.w(TAG, "规范信息注入模式无效，已默认设置为两者都注入")
+        }
     }
     
     // 缓存变量，用于优化图标生成
@@ -370,6 +424,9 @@ object NotificationGenerator {
         entryKeyToNotificationId: ConcurrentHashMap<String, Int>
     ): Int? {
         try {
+            // 验证规范信息注入开关状态，确保至少有一种开启
+            validateSpecInjectionSwitches(context)
+            
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
             // 生成唯一的通知ID
@@ -520,85 +577,22 @@ object NotificationGenerator {
                 // 设置滚动更新机制
                 setupScrollUpdate(key, scrollKey, capsuleText, context, notificationId, originalBuilder = builder, notificationManager, floatingWindowManager, entryKeyToNotificationId)
                 
+                // 预先解析picMap中的图片ID
+                val resolvedPicMap = if (picMap.isNullOrEmpty()) {
+                    picMap
+                } else {
+                    SuperIslandImageStore.resolvePicMap(context, picMap)
+                }
+                
                 // ... (后续构建extras的代码保持不变)
                 // 添加焦点歌词相关的结构化数据
-                val extras = builder.extras
-                
-                // 构建符合HyperIslandApi标准的媒体类型miui.focus.param，优化数据结构
-                val fullFocusParam = JSONObject().apply {
-                    put("protocol", 1)
-                    put("scene", "music") // 媒体类型固定使用music场景
-                    put("ticker", title ?: "")
-                    put("content", text ?: "")
-                    put("enableFloat", false)
-                    put("updatable", true)
-                    put("reopen", "close")
-                    
-                    // 媒体类型需要的animTextInfo字段
-                    put("animTextInfo", JSONObject().apply {
-                        put("title", title ?: "")
-                        put("content", text ?: "")
-                    })
-                    
-                    // 优化媒体类型param_v2结构，符合小米官方标准
-                    val paramV2Json = JSONObject().apply {
-                        put("business", "music")
-                        put("protocol", 1)
-                        put("scene", "music")
-                        put("ticker", title ?: "")
-                        put("content", text ?: "")
-                        put("enableFloat", false)
-                        put("updatable", true)
-                        put("reopen", "close")
-                        put("timerType", 0)
-                        put("timerWhen", 0)
-                        put("timerSystemCurrent", 0)
-                        
-                        // 媒体类型必须包含的baseInfo字段
-                        put("baseInfo", JSONObject().apply {
-                            put("title", title ?: "")
-                            put("content", text ?: "")
-                        })
-                    }
-                    
-                    put("param_v2", paramV2Json)
-                }
-                
-                extras.putString("miui.focus.param", fullFocusParam.toString())
-                
-                // 添加其他必要的焦点通知字段
-                extras.putBoolean("miui.showAction", true)
-                
-                // 添加模拟的action字段
-                val actionsBundle = Bundle()
-                actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
-                actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
-                extras.putBundle("miui.focus.actions", actionsBundle)
-                
-                // 添加图片资源
-                picMap?.let { map: Map<String, String> ->
-                    // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
-                    map.forEach { (picKey, picUrl) ->
-                        if (picKey.startsWith("miui.focus.pic_")) {
-                            val actualPicUrl: String = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
-                            extras.putString(picKey, actualPicUrl)
-                        }
-                    }
-                    
-                    // 添加miui.focus.pics字段，包含所有图片资源的Bundle
-                    val picsBundle = Bundle()
-                    map.forEach { (picKey, picUrl) ->
-                        if (picKey.startsWith("miui.focus.pic_")) {
-                            picsBundle.putString(picKey, picUrl)
-                        }
-                    }
-                    extras.putBundle("miui.focus.pics", picsBundle)
-                }
-                
-                // 添加应用信息
-                extras.putBoolean("android.reduced.images", true)
-                extras.putString("superIslandSourcePackage", context.packageName)
-                extras.putString("app_package", context.packageName)
+                SuperIslandStructuredDataHelper.addMediaSuperIslandStructuredData(
+                    builder = builder,
+                    context = context,
+                    title = title,
+                    text = text,
+                    picMap = resolvedPicMap
+                )
                 
                 // 构建通知
                 val notification = builder.build()
@@ -803,11 +797,15 @@ object NotificationGenerator {
                 // 检查是否为进度类型通知，如果是，则可能已经通过 LiveUpdatesNotificationManager 处理
                 val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
                 
+                // 解析 param_v2 中的 bigIsland 数据，用于计时器检查
+                // entry 变量已经在第741行声明
+                val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
+                val bigIsland = parseBigIsland(paramV2RawValue)
+                val bComponent = parseBComponent(bigIsland)
+                
                 // 构建通知
                 val notification = if (!isProgressType) {
                     // 非进度类型通知，添加胶囊兼容字段并注入图标
-                    val entry = floatingWindowManager.getEntry(key)
-                    val paramV2RawValue = entry?.paramV2Raw
                     buildCapsuleCompatibleNotificationWithIconInjection(context, builder, title, text, appName, paramV2, picMap, paramV2RawValue)
                 } else {
                     // 进度类型通知，已经通过 LiveUpdatesNotificationManager 处理，不重复添加胶囊兼容字段
@@ -817,14 +815,8 @@ object NotificationGenerator {
                     // 尝试从 A/B 区数据中获取图标或生成位图
                     var smallIconBitmap: Bitmap? = null
                     
-                    // 解析 param_v2 中的 bigIsland 数据
-                    val entry = floatingWindowManager.getEntry(key)
-                    val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
-                    val bigIsland = parseBigIsland(paramV2RawValue)
-                    
                     // 解析 A/B 区数据
                     val aComponent = parseAComponent(bigIsland)
-                    val bComponent = parseBComponent(bigIsland)
                     
                     // 提取 A/B 区数据
                     val aPicKey = when (aComponent) {
@@ -883,137 +875,10 @@ object NotificationGenerator {
                     builtNotification
                 }
                 
-                // ... (后续构建extras的代码保持不变)
-                // 添加超级岛相关的结构化数据，严格按照小米官方文档规范和实际通知结构
-                val extras = notification.extras
-                
-                // 构建符合小米官方规范的完整miui.focus.param结构
-                paramV2Raw?.let {
-                    try {
-                        // 解析原始paramV2数据
-                        val paramV2Json = JSONObject(it)
-                        
-                        // 确保右胶囊文本被正确设置
-                        val bigIslandJson = paramV2Json.optJSONObject("bigIsland") ?: JSONObject()
-                        val islandAreaJson = bigIslandJson.optJSONObject("imageTextInfoRight") ?: JSONObject()
-                        
-                        // 解析 A/B 区数据以获取右胶囊文本
-                        val aComponent = parseAComponent(bigIslandJson)
-                        val bComponent = parseBComponent(bigIslandJson)
-                        
-                        val bTitle = when (bComponent) {
-                            is BImageText2 -> bComponent.title
-                            is BImageText3 -> bComponent.title
-                            is BImageText6 -> bComponent.title
-                            is BTextInfo -> bComponent.title
-                            is BFixedWidthDigitInfo -> bComponent.digit
-                            is BSameWidthDigitInfo -> {
-                                if (bComponent.timer != null) {
-                                    formatTimerInfo(bComponent.timer)
-                                } else {
-                                    bComponent.digit
-                                }
-                            }
-                            is BProgressTextInfo -> bComponent.title
-                            else -> null
-                        }
-                        
-                        val bContent = when (bComponent) {
-                            is BImageText2 -> bComponent.content
-                            is BTextInfo -> bComponent.content
-                            is BFixedWidthDigitInfo -> bComponent.content
-                            is BSameWidthDigitInfo -> {
-                                if (bComponent.timer != null) {
-                                    formatTimerInfo(bComponent.timer)
-                                } else {
-                                    bComponent.content
-                                }
-                            }
-                            is BProgressTextInfo -> bComponent.content
-                            else -> null
-                        }
-                        
-                        // 设置右胶囊文本
-                        if (bTitle != null) {
-                            islandAreaJson.put("title", bTitle)
-                        }
-                        if (bContent != null) {
-                            islandAreaJson.put("content", bContent)
-                        }
-                        
-                        // 更新 bigIsland 和 paramV2Json
-                        bigIslandJson.put("imageTextInfoRight", islandAreaJson)
-                        paramV2Json.put("bigIsland", bigIslandJson)
-                        
-                        // 构建完整的焦点通知参数结构，包含外层scene、ticker等字段
-                        val fullFocusParam = JSONObject().apply {
-                            put("protocol", 1)
-                            put("scene", paramV2Json.optString("business", "default"))
-                            put("ticker", title ?: "")
-                            put("content", text ?: "")
-                            put("timerType", 0)
-                            put("timerWhen", 0)
-                            put("timerSystemCurrent", 0)
-                            put("enableFloat", false)
-                            put("updatable", true)
-                            put("param_v2", paramV2Json) // 将更新后的paramV2作为嵌套字段
-                        }
-                        
-                        extras.putString("miui.focus.param", fullFocusParam.toString())
-                    } catch (e: Exception) {
-                        // 如果构建完整结构失败，回退到直接使用原始数据
-                        extras.putString("miui.focus.param", it)
-                    }
-                }
-                
-                // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
-                picMap?.let {map ->
-                    map.forEach { (picKey, picUrl) ->
-                        // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
-                        if (picKey.startsWith("miui.focus.pic_")) {
-                            // 解析图片引用符，获取实际的图片数据
-                            val actualPicUrl = SuperIslandImageStore.resolve(context, picUrl) ?: picUrl
-                            extras.putString(picKey, actualPicUrl)
-                        }
-                    }
-                    
-                    // 添加miui.focus.pics字段，包含所有图片资源的Bundle
-                    val picsBundle = Bundle()
-                    map.forEach { (picKey, picUrl) ->
-                        if (picKey.startsWith("miui.focus.pic_")) {
-                            // 这里简化处理，实际应该创建Icon对象
-                            picsBundle.putString(picKey, picUrl)
-                        }
-                    }
-                    extras.putBundle("miui.focus.pics", picsBundle)
-                }
-                
-                // 添加焦点通知必要的额外字段
-                extras.putBoolean("miui.showAction", true)
-                
-                // 添加模拟的action字段，实际应该包含真实的Notification.Action对象
-                val actionsBundle = Bundle()
-                actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
-                actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
-                extras.putBundle("miui.focus.actions", actionsBundle)
-                
-                // 添加应用信息，与原始通知保持一致
-                extras.putBoolean("android.reduced.images", true)
-                
-                // 添加超级岛源包信息，与原始通知保持一致
-                extras.putString("superIslandSourcePackage", context.packageName)
-                
-                // 包名信息
-                extras.putString("app_package", context.packageName)
-                
                 // 发送通知
                 notificationManager.notify(notificationId, notification)
                 
                 // 检查是否需要创建计时器更新定时器
-                val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
-                val bigIsland = parseBigIsland(paramV2RawValue)
-                
-                val bComponent = parseBComponent(bigIsland)
                 if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
                     val timer = bComponent.timer
                     // 检查计时器是否已停止

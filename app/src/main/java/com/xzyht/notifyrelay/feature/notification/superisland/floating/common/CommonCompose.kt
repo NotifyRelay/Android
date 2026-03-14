@@ -15,6 +15,7 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -45,10 +46,11 @@ fun CommonImageCompose(
     // 获取当前主题
     val isDarkTheme = isSystemInDarkTheme()
     
+    val context = LocalContext.current
     val iconUrl = if (isFocusIcon) {
-        resolveFocusIconUrl(picMap, picKey, isDarkTheme)
+        resolveFocusIconUrl(picMap, picKey, isDarkTheme, context)
     } else {
-        resolveIconUrl(picMap, picKey)
+        resolveIconUrl(picMap, picKey, context)
     }
     
     val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(iconUrl, picMap)

@@ -352,9 +352,9 @@ object FloatingReplicaManager {
                     // 尝试解析paramV2
                     val paramV2 = NotificationGenerator.parseParamV2Safe(paramV2Raw)
 
-                    // 将所有图片 intern 为引用，避免重复保存相同图片 - 移到 IO 线程执行
+                    // 将所有图片写入数据库绑定，避免重复保存相同图片 - 移到 IO 线程执行
                     val internedPicMap = withContext(Dispatchers.IO) {
-                        SuperIslandImageStore.internAll(context, picMap)
+                        SuperIslandImageStore.internAll(context, sourceId, picMap)
                     }
                     // 生成唯一的entryKey，确保包含sourceId，以便后续能正确移除
                     val entryKey = sourceId
@@ -467,9 +467,9 @@ object FloatingReplicaManager {
                         else -> false
                     }
 
-                    // 将所有图片 intern 为引用，避免重复保存相同图片 - 移到 IO 线程执行
+                    // 将所有图片写入数据库绑定，避免重复保存相同图片 - 移到 IO 线程执行
                     val internedPicMap = withContext(Dispatchers.IO) {
-                        SuperIslandImageStore.internAll(context, picMap)
+                        SuperIslandImageStore.internAll(context, sourceId, picMap)
                     }
                     // 生成唯一的entryKey，确保包含sourceId，以便后续能正确移除
                     // 对于同一通知的不同时间更新，应该使用相同的key，所以不能包含时间戳

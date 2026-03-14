@@ -1,9 +1,6 @@
-package com.xzyht.notifyrelay.ui.fragment
+package com.xzyht.notifyrelay.ui.screen
 
-import android.os.Bundle
-import android.view.LayoutInflater
-import android.view.View
-import android.view.ViewGroup
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -13,55 +10,37 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.fragment.app.Fragment
-import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.ui.navigation.Navigator
 import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
 import com.xzyht.notifyrelay.ui.pages.UIChatTest
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-class HistoryFragment : Fragment() {
-    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
-        return ComposeView(requireContext()).apply {
-            setContent {
-                ProvideNavigationEventDispatcherOwner {
-                    MiuixTheme {
-                        HistoryScreen()
-                    }
-                }
-            }
-        }
-    }
-}
-
+/**
+ * 历史页面屏幕
+ * 纯 Compose 实现
+ */
 @Composable
-fun HistoryScreen() {
-    // 创建协程作用域用于Tab点击事件
+fun HistoryScreen(
+    navigator: Navigator
+) {
     val coroutineScope = rememberCoroutineScope()
-
-    // TabRow相关状态
     val tabTitles = listOf("通知历史", "超级岛历史", "聊天测试")
-
-    // Pager相关状态 - 使用Pager状态作为唯一数据源
-    val pagerState = rememberPagerState(initialPage = 0) {
-        tabTitles.size
-    }
-
-    // 从Pager状态直接获取当前选中的Tab索引，不使用独立状态
+    val pagerState = rememberPagerState(initialPage = 0) { tabTitles.size }
     val selectedTabIndex = pagerState.currentPage
-
     val colorScheme = MiuixTheme.colorScheme
+    val context = LocalContext.current
 
     Column(
         modifier = Modifier
             .fillMaxSize()
+            .background(colorScheme.background)
             .padding(12.dp)
     ) {
         TabRowWithContour(
@@ -89,21 +68,12 @@ fun HistoryScreen() {
             modifier = Modifier.fillMaxSize()
         ) {
             when (it) {
-                    0 -> {
-                        // 通知历史 Tab
-                        NotificationHistoryScreen()
-                    }
-                    1 -> {
-                        // 超级岛历史 Tab
-                        UISuperIslandHistory()
-                    }
-                    2 -> {
-                        // 聊天测试 Tab
-                        UIChatTest(
-                            deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(LocalContext.current)
-                        )
-                    }
-                }
+                0 -> NotificationHistoryScreen()
+                1 -> UISuperIslandHistory()
+                2 -> UIChatTest(
+                    deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                )
+            }
         }
     }
 }

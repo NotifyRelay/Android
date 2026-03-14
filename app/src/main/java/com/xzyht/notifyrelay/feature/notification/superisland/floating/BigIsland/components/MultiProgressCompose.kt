@@ -203,7 +203,7 @@ fun MultiProgressCompose(
                 // 当picForward为null时，使用picForwardBox作为备选
                 val pointerKey = multiProgressInfo.picForward ?: multiProgressInfo.picForwardBox
 
-                // 使用统一的图片加载逻辑，处理ref: URL和picMap查找
+                // 使用统一的图片加载逻辑，处理picMap查找
                 val pointerSize = (PROGRESS_BAR_HEIGHT_DP * 4 + POINTER_SIZE_EXTRA_DP).dp
                 val density = LocalDensity.current
                 // 计算位置统一使用 px，再转换为 dp，避免 px/dp 混用导致的偏移误差

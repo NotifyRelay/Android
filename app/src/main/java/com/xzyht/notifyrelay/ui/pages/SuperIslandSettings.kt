@@ -13,6 +13,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.NotificationGenerator.SpecInjectionMode
 import com.xzyht.notifyrelay.ui.DeveloperModeActivity
 import com.xzyht.notifyrelay.ui.dialog.SuperIslandTestDialog
 import notifyrelay.base.util.PermissionHelper
@@ -22,11 +23,20 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.extra.WindowDropdown
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val SUPER_ISLAND_KEY = "superisland_enabled"
 private const val SUPER_ISLAND_SHOW_KEY = "superisland_show"
 private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
+private const val SPEC_INJECTION_MODE_KEY = "spec_injection_mode"
+
+// 注入方式选项
+val specInjectionOptions = listOf(
+    "仅超级岛规范信息注入" to SpecInjectionMode.SUPER_ISLAND,
+    "仅Live Updates规范信息注入" to SpecInjectionMode.LIVE_UPDATES,
+    "两者都注入" to SpecInjectionMode.BOTH
+)
 
 @Composable
 fun UISuperIslandSettings() {
@@ -71,6 +81,11 @@ fun UISuperIslandSettings() {
     var enabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_KEY, true)) }
     var showSuperIsland by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_SHOW_KEY, true)) }
     var floatingWindowEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, defaultFloatingWindowEnabled)) }
+    
+    // 读取注入模式，如果不存在则默认为BOTH（两者都注入）
+    val savedInjectionModeOrdinal = StorageManager.getInt(context, SPEC_INJECTION_MODE_KEY, SpecInjectionMode.BOTH.ordinal)
+    val savedInjectionMode = SpecInjectionMode.values().getOrElse(savedInjectionModeOrdinal) { SpecInjectionMode.BOTH }
+    var specInjectionMode by remember { mutableStateOf(savedInjectionMode) }
     
     // 检查是否已有用户设置
     val hasFloatingWindowSetting = StorageManager.getString(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, "") != ""
@@ -136,6 +151,19 @@ fun UISuperIslandSettings() {
                         onCheckedChange = {
                             floatingWindowEnabled = it
                             StorageManager.putBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, it)
+                        }
+                    )
+
+                    WindowDropdown(
+                        title = "规范信息注入方式",
+                        summary = "控制通知中注入的规范信息类型",
+                        items = specInjectionOptions.map { it.first },
+                        selectedIndex = specInjectionOptions.indexOfFirst { it.second == specInjectionMode },
+                        onSelectedIndexChange = { index ->
+                            if (index in specInjectionOptions.indices) {
+                                specInjectionMode = specInjectionOptions[index].second
+                                StorageManager.putInt(context, SPEC_INJECTION_MODE_KEY, specInjectionMode.ordinal)
+                            }
                         }
                     )
 

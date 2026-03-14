@@ -2,7 +2,6 @@ package com.xzyht.notifyrelay.ui.dialog
 
 import android.content.pm.ApplicationInfo
 import android.graphics.drawable.BitmapDrawable
-import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -126,7 +125,6 @@ fun AppPickerDialog(
                 showDialog.value = false; onDismiss(); appSearchQuery = "" 
             }
         ) {
-            BackHandler(onBack = { showDialog.value = false; onDismiss(); appSearchQuery = "" })
             Column {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
