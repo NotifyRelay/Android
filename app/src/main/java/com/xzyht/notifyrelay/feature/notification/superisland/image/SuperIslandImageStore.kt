@@ -146,7 +146,7 @@ object SuperIslandImageStore {
         if (StorageManager.getBoolean(context, MIGRATION_FLAG_KEY, false)) return
 
         val deferredToAwait: Deferred<Unit>? = migrationMutex.withLock {
-            if (StorageManager.getBoolean(context, MIGRATION_FLAG_KEY, false)) return
+            if (StorageManager.getBoolean(context, MIGRATION_FLAG_KEY, false)) return@withLock null
 
             migrationDeferred?.let { return@withLock it }
 
