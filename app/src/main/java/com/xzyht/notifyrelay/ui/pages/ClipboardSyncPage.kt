@@ -11,16 +11,18 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
@@ -28,8 +30,6 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.WindowDropdown
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 
 enum class ClipboardSyncMode(val displayName: String) {
     OFF("关闭"),
@@ -41,7 +41,7 @@ fun ClipboardSyncPage() {
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
-    val coroutineScope = rememberCoroutineScope()
+    val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
     
     var accessibilityEnabled by remember {
         mutableStateOf(ClipboardSyncManager.isAccessibilityServiceEnabled(context))
@@ -60,6 +60,18 @@ fun ClipboardSyncPage() {
     
     LaunchedEffect(Unit) {
         refreshPermissionStatus()
+    }
+    
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            if (event == Lifecycle.Event.ON_RESUME) {
+                refreshPermissionStatus()
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose {
+            lifecycleOwner.lifecycle.removeObserver(observer)
+        }
     }
     
     LaunchedEffect(accessibilityEnabled) {
@@ -120,10 +132,6 @@ fun ClipboardSyncPage() {
                                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                 context.startActivity(intent)
                                 ToastUtils.showShortToast(context, "请在设置中启用无障碍服务")
-                                coroutineScope.launch {
-                                    delay(1000)
-                                    refreshPermissionStatus()
-                                }
                             } catch (e: Exception) {
                                 Logger.e("ClipboardSyncPage", "打开无障碍设置失败", e)
                                 ToastUtils.showShortToast(context, "打开设置失败，请手动前往设置")
