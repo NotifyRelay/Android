@@ -30,9 +30,8 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsla
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BTextInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.formatTimerInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.parseParamV2
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import java.util.concurrent.ConcurrentHashMap
@@ -384,12 +383,8 @@ object NotificationGenerator {
                 setupScrollUpdate(key, scrollKey, capsuleText, context, notificationId, originalBuilder = builder, notificationManager
                 )
                 
-                // 预先解析picMap中的图片ID
-                val resolvedPicMap = if (picMap.isNullOrEmpty()) {
-                    picMap
-                } else {
-                    SuperIslandImageStore.resolvePicMap(context, picMap)
-                }
+                // picMap 已在调用方通过 SuperIslandDataFormatter 解析，直接使用
+                val resolvedPicMap = picMap ?: emptyMap()
                 
                 // ... (后续构建extras的代码保持不变)
                 // 添加焦点歌词相关的结构化数据
@@ -627,12 +622,13 @@ object NotificationGenerator {
                 }
 
                 // 检查是否为进度类型通知，如果是，则可能已经通过 LiveUpdatesNotificationManager 处理
-                val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
+                val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
 
                 // 构建通知
                 val notification = if (!isProgressType) {
                     // 非进度类型通知，添加胶囊兼容字段并注入图标
-                    val builtNotification = buildCapsuleCompatibleNotificationWithIconInjection(context, builder, title, text, appName, paramV2, picMap, paramV2Raw, aComponent, bComponent)
+                    val builtNotification = buildCapsuleCompatibleNotificationWithIconInjection(context, builder, title, text, appName,
+                        picMap, paramV2Raw, aComponent, bComponent)
                     Logger.i(TAG, "超级岛: 非进度类型通知已构建，key=$key")
                     builtNotification
                 } else {
@@ -992,7 +988,6 @@ object NotificationGenerator {
         title: String?,
         text: String?,
         appName: String?,
-        paramV2: ParamV2?,
         picMap: Map<String, String>?,
         paramV2Raw: String?,
         aComponent: AComponent?,
@@ -1149,16 +1144,6 @@ object NotificationGenerator {
     }
 
     // ---- 辅助方法 ----
-
-    /**
-     * 兼容空值的 param_v2 解析包装
-     */
-    internal fun parseParamV2Safe(raw: String?): ParamV2? {
-        return try {
-            val s = raw ?: return null
-            if (s.isBlank()) null else parseParamV2(s)
-        } catch (_: Exception) { null }
-    }
 
     /**
      * 下载位图
