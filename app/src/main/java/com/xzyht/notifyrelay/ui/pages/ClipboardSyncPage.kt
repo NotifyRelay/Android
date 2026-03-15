@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -27,8 +28,6 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.extra.WindowDropdown
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -42,6 +41,7 @@ fun ClipboardSyncPage() {
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
+    val coroutineScope = rememberCoroutineScope()
     
     var accessibilityEnabled by remember {
         mutableStateOf(ClipboardSyncManager.isAccessibilityServiceEnabled(context))
@@ -120,7 +120,7 @@ fun ClipboardSyncPage() {
                                 intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
                                 context.startActivity(intent)
                                 ToastUtils.showShortToast(context, "请在设置中启用无障碍服务")
-                                CoroutineScope(Dispatchers.Main).launch {
+                                coroutineScope.launch {
                                     delay(1000)
                                     refreshPermissionStatus()
                                 }
