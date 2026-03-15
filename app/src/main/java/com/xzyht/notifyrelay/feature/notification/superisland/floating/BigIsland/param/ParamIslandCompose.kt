@@ -34,9 +34,9 @@ import top.yukonga.miuix.kmp.basic.TextButton
 @Composable
 fun ParamIslandCompose(
     paramIsland: ParamIsland,
+    modifier: Modifier = Modifier,
     actions: List<ActionInfo>? = null,
-    picMap: Map<String, String>? = null,
-    modifier: Modifier = Modifier
+    picMap: Map<String, String>? = null
 ) {
     // 调试日志
     paramIsland.bigIslandArea?.let {

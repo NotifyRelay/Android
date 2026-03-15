@@ -30,6 +30,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -125,7 +126,7 @@ class GuideActivity : ComponentActivity() {
 
 object GuideScreen {
     // 用于触发刷新
-    var refreshTrigger by mutableStateOf(0)
+    var refreshTrigger by mutableIntStateOf(0)
 }
 
 @Composable

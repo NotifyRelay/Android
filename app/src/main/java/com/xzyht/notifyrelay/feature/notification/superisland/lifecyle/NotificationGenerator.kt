@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.lifecyle
 
-import android.R
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -8,7 +7,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Icon
 import android.os.Bundle
 import android.os.Handler
@@ -31,192 +29,15 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsla
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.formatTimerInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.model.core.parseParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.model.parseAComponent
 import com.xzyht.notifyrelay.feature.notification.superisland.model.parseBComponent
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import org.json.JSONObject
-import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.Executors
-import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.ScheduledFuture
-import java.util.concurrent.TimeUnit
-
-/**
- * 计时器更新管理器，负责定期更新包含计时器的通知
- */
-class TimerUpdateManager private constructor() {
-    private val executor: ScheduledExecutorService = Executors.newScheduledThreadPool(5)
-    private val timers = ConcurrentHashMap<String, ScheduledFuture<*>?>()
-    
-    /**
-     * 定时器任务
-     */
-    private class TimerTask(
-        private val contextRef: WeakReference<Context>,
-        private val notificationId: Int,
-        private val timerInfo: TimerInfo,
-        private val onComplete: () -> Unit
-    ) : Runnable {
-        override fun run() {
-            try {
-                val context = contextRef.get() ?: run {
-                    onComplete()
-                    return
-                }
-                
-                // 检查计时器是否已停止
-                if (timerInfo.timerType == 0) {
-                    onComplete()
-                    return
-                }
-                
-                // 计算当前计时器时间
-                val timerText = formatTimerInfo(timerInfo)
-                
-                // 获取通知管理器
-                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                
-                // 创建通知渠道（如果不存在）
-                val channelId = "super_island_replica"
-                val channel = NotificationChannel(
-                    channelId,
-                    "超级岛复刻通知",
-                    NotificationManager.IMPORTANCE_HIGH
-                )
-                notificationManager.createNotificationChannel(channel)
-                
-                // 创建通知构建器，确保设置了所有必要的属性
-                val builder = NotificationCompat.Builder(context, channelId)
-                    // 设置必要的文本内容
-                    .setContentText(timerText)
-                    .setShortCriticalText(timerText)
-                    // 设置为ongoing，保持通知不可清除
-                    .setOngoing(true)
-                    // 保持高优先级
-                    .setPriority(NotificationCompat.PRIORITY_MAX)
-                    // 不显示时间
-                    .setShowWhen(false)
-                    // 只提示一次
-                    .setOnlyAlertOnce(true)
-                    // 公开可见
-                    .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                
-                // 根据计时器类型设置自动计时功能
-                when (timerInfo.timerType) {
-                    -1 -> {
-                        // 倒计时进行中：使用系统的自动倒计时功能
-                        builder.setUsesChronometer(true)
-                            .setChronometerCountDown(true)
-                            .setWhen(timerInfo.timerWhen) // 设置为倒计时结束时间
-                    }
-                    1 -> {
-                        // 正计时进行中：使用系统的自动正计时功能
-                        builder.setUsesChronometer(true)
-                            .setChronometerCountDown(false)
-                            .setWhen(timerInfo.timerWhen) // 设置为正计时开始时间
-                    }
-                    else -> {
-                        // 暂停或停止状态：不使用自动计时功能
-                        builder.setWhen(System.currentTimeMillis())
-                    }
-                }
-                
-                // 更新通知
-                notificationManager.notify(notificationId, builder.build())
-                
-                // 检查是否需要停止（倒计时结束或计时器已暂停）
-                if (timerInfo.timerType == -1 || timerInfo.timerType == -2) {
-                    val now = System.currentTimeMillis()
-                    if (now >= timerInfo.timerWhen) {
-                        onComplete()
-                    }
-                } else if (timerInfo.timerType == 2) {
-                    // 正计时已暂停，停止更新
-                    onComplete()
-                }
-                
-                // 记录更新日志
-                Logger.d("TimerUpdateManager", "更新计时器通知成功，notificationId=$notificationId, timerText=$timerText")
-            } catch (e: Exception) {
-                Logger.e("TimerUpdateManager", "更新计时器通知失败", e)
-                onComplete()
-            }
-        }
-    }
-    
-    /**
-     * 添加或更新计时器通知
-     */
-    fun addOrUpdateTimer(
-        key: String,
-        context: Context,
-        notificationId: Int,
-        timerInfo: TimerInfo
-    ) {
-        // 移除旧的定时器
-        removeTimer(key)
-        
-        // 创建新的定时器任务
-        val contextRef = WeakReference(context)
-        val task = TimerTask(contextRef, notificationId, timerInfo) { 
-            removeTimer(key) 
-        }
-        
-        // 立即执行一次，然后每秒执行一次
-        val future = executor.scheduleAtFixedRate(task, 0, 1, TimeUnit.SECONDS)
-        timers[key] = future
-        
-        // 记录定时器创建日志
-        Logger.d("TimerUpdateManager", "创建计时器更新定时器成功，key=$key, notificationId=$notificationId")
-    }
-    
-    /**
-     * 移除计时器通知
-     */
-    fun removeTimer(key: String) {
-        timers.remove(key)?.cancel(false)
-    }
-    
-    /**
-     * 清理所有定时器
-     */
-    fun clearAll() {
-        timers.forEach { (_, future) ->
-            future?.cancel(false)
-        }
-        timers.clear()
-    }
-    
-    /**
-     * 停止executor，释放资源
-     */
-    fun shutdown() {
-        clearAll()
-        executor.shutdown()
-        try {
-            if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
-                executor.shutdownNow()
-            }
-        } catch (e: InterruptedException) {
-            executor.shutdownNow()
-            Thread.currentThread().interrupt()
-        }
-    }
-    
-    companion object {
-        val instance by lazy { TimerUpdateManager() }
-    }
-}
-
-
 
 /**
  * 通知生成器，负责处理超级岛通知的生成和注入
@@ -264,7 +85,7 @@ object NotificationGenerator {
      */
     private fun getSpecInjectionMode(context: Context): SpecInjectionMode {
         val modeOrdinal = StorageManager.getInt(context, SPEC_INJECTION_MODE_KEY, SpecInjectionMode.BOTH.ordinal)
-        return SpecInjectionMode.values().getOrElse(modeOrdinal) { SpecInjectionMode.BOTH }
+        return SpecInjectionMode.entries.toTypedArray().getOrElse(modeOrdinal) { SpecInjectionMode.BOTH }
     }
 
     /**
@@ -302,14 +123,10 @@ object NotificationGenerator {
             Logger.w(TAG, "规范信息注入模式无效，已默认设置为两者都注入")
         }
     }
-    
-    // 缓存变量，用于优化图标生成
-    private var cachedIconKey = ""
-    private var cachedIconBitmap: Bitmap? = null
-    
+
     // 滚动更新相关
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val scrollRunnables = mutableMapOf<String, Runnable>()
+    private val scrollRunnable = mutableMapOf<String, Runnable>()
     
     /**
      * 设置滚动更新
@@ -321,12 +138,10 @@ object NotificationGenerator {
         context: Context,
         notificationId: Int,
         originalBuilder: NotificationCompat.Builder,
-        notificationManager: NotificationManager,
-        floatingWindowManager: FloatingWindowManager,
-        entryKeyToNotificationId: ConcurrentHashMap<String, Int>
+        notificationManager: NotificationManager
     ) {
         // 移除旧的滚动Runnable
-        scrollRunnables.remove(key)?.let {
+        scrollRunnable.remove(key)?.let {
             mainHandler.removeCallbacks(it)
         }
         
@@ -371,14 +186,14 @@ object NotificationGenerator {
                 
                 // 继续调度下一次更新
                 val delay = CapsuleScrollManager.getScrollDelay(scrollKey)
-                mainHandler.postDelayed(scrollRunnables[key]!!, delay)
+                this.scrollRunnable[key]?.let { mainHandler.postDelayed(it, delay) }
             } catch (e: Exception) {
                 Logger.e(TAG, "滚动更新失败", e)
             }
         }
         
         // 存储Runnable
-        scrollRunnables[key] = scrollRunnable
+        NotificationGenerator.scrollRunnable[key] = scrollRunnable
         
         // 调度第一次更新，初始延迟为0，确保滚动直接开始
         mainHandler.postDelayed(scrollRunnable, 0)
@@ -388,7 +203,7 @@ object NotificationGenerator {
      * 停止滚动更新
      */
     fun stopScrollUpdate(key: String) {
-        scrollRunnables.remove(key)?.let {
+        scrollRunnable.remove(key)?.let {
             mainHandler.removeCallbacks(it)
         }
         CapsuleScrollManager.resetScrollState("${key}_scroll")
@@ -398,10 +213,10 @@ object NotificationGenerator {
      * 清理所有滚动更新
      */
     fun clearAllScrollUpdates() {
-        scrollRunnables.forEach {
+        scrollRunnable.forEach {
             mainHandler.removeCallbacks(it.value)
         }
-        scrollRunnables.clear()
+        scrollRunnable.clear()
         CapsuleScrollManager.clearAll()
     }
     
@@ -418,8 +233,9 @@ object NotificationGenerator {
         text: String?,
         appName: String?,
         paramV2: ParamV2?,
+        paramV2Raw: String?,
         picMap: Map<String, String>?,
-        sourceId: String, // 新增sourceId参数
+        sourceId: String,
         floatingWindowManager: FloatingWindowManager,
         entryKeyToNotificationId: ConcurrentHashMap<String, Int>
     ): Int? {
@@ -503,10 +319,10 @@ object NotificationGenerator {
                 }
                 notificationManager.createNotificationChannel(mediaChannel)
                 
-                var builder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
+                val builder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
                     .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
                     .setContentText(title ?: "")
-                    .setSmallIcon(R.drawable.stat_notify_more) // 使用系统默认图标
+                    .setSmallIcon(android.R.drawable.stat_notify_more) // 使用系统默认图标
                     // 调整为不可被一键清除的属性，只能手动划去
                     .setOngoing(true) // 不允许通知被一键清除
                     .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -546,16 +362,7 @@ object NotificationGenerator {
                 var iconText = ""
                 
                 // 检查是否为本地传递
-                val isLocalTransmit = try {
-                    // 从现有entry中获取paramV2Raw
-                    val entry = floatingWindowManager.getEntry(key)
-                    val paramV2RawValue = entry?.paramV2Raw
-                    val paramV2Json = JSONObject(paramV2RawValue ?: paramV2?.toString() ?: "{}")
-                    paramV2Json.optBoolean("localTransmit", false)
-                } catch (_: Exception) {
-                    false
-                }
-                
+
                 // 当歌词超过阈值时，拆分为图标文本和胶囊文本
                 // 远端和本地都保持6字符开始分割
                 val threshold = 6
@@ -575,7 +382,8 @@ object NotificationGenerator {
                 builder.setShortCriticalText(displayText)
                 
                 // 设置滚动更新机制
-                setupScrollUpdate(key, scrollKey, capsuleText, context, notificationId, originalBuilder = builder, notificationManager, floatingWindowManager, entryKeyToNotificationId)
+                setupScrollUpdate(key, scrollKey, capsuleText, context, notificationId, originalBuilder = builder, notificationManager
+                )
                 
                 // 预先解析picMap中的图片ID
                 val resolvedPicMap = if (picMap.isNullOrEmpty()) {
@@ -610,9 +418,7 @@ object NotificationGenerator {
                         val coverUrl = picMap[coverKey]
                         if (!coverUrl.isNullOrBlank()) {
                             // 同步下载专辑图
-                            val bitmap = runBlocking {
-                                downloadBitmap(context, coverUrl, 5000)
-                            }
+                            val bitmap = downloadBitmap(context, coverUrl, 5000)
                             if (bitmap != null) {
                                 injectSmallIcon(notification, bitmap)
                             }
@@ -630,57 +436,58 @@ object NotificationGenerator {
                     var smallIconBitmap: Bitmap? = null
                     
                     // 解析param_v2中的bigIsland数据
-                    val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
+                    val paramV2RawValue = paramV2Raw ?: paramV2.toString()
                     val bigIsland = parseBigIsland(paramV2RawValue)
                     
-                    // 解析A/B区数据
-                    val bComponent = parseBComponent(bigIsland)
-                    
+                    // 解析A/B区数据，传入 aodPic 作为 fallback
+                    val aodPic = extractAodPic(paramV2RawValue)
+                    val bComponent = parseBComponent(bigIsland, aodPic)
+
                     // 提取进度数据
                     val bProgress = when (bComponent) {
                         is BProgressTextInfo -> bComponent.progress
                         else -> null
                     }
-                    
+
                     val bProgressColorReach = when (bComponent) {
                         is BProgressTextInfo -> bComponent.colorReach
                         else -> null
                     }
-                    
+
                     val bProgressColorUnReach = when (bComponent) {
                         is BProgressTextInfo -> bComponent.colorUnReach
                         else -> null
                     }
-                    
+
                     val bProgressIsCCW = when (bComponent) {
                         is BProgressTextInfo -> bComponent.isCCW
                         else -> false
                     }
-                    
+
                     // 处理进度数据，生成位图
                     if (bProgress != null) {
                         smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
                     }
-                    
+
                     // 如果没有进度数据，尝试生成文本位图
                     if (smallIconBitmap == null) {
                         // 优先使用B区文本生成位图
                         val textToRender = when (bComponent) {
-                            is BImageText2 -> bComponent.title ?: bComponent.content
+                            is BImageText2 -> bComponent.title
                             is BImageText3 -> bComponent.title
                             is BImageText6 -> bComponent.title
-                            is BTextInfo -> bComponent.title ?: bComponent.content
+                            is BTextInfo -> bComponent.title
                             is BFixedWidthDigitInfo -> bComponent.digit
                             is BSameWidthDigitInfo -> bComponent.digit
                             is BProgressTextInfo -> bComponent.title ?: bComponent.content
                             else -> null
                         }
-                        
+
                         if (!textToRender.isNullOrBlank()) {
                             smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
                         }
                     }
-                    
+
                     // 如果没有文本数据，尝试使用应用图标
                     if (smallIconBitmap == null) {
                         // 优先使用应用图标（大图标的键值提供的图标）
@@ -689,16 +496,14 @@ object NotificationGenerator {
                             val appIconUrl = picMap[appIconKey]
                             if (!appIconUrl.isNullOrBlank()) {
                                 // 同步下载应用图标
-                                val bitmap = runBlocking {
-                                    downloadBitmap(context, appIconUrl, 5000)
-                                }
+                                val bitmap = downloadBitmap(context, appIconUrl, 5000)
                                 if (bitmap != null) {
                                     smallIconBitmap = bitmap
                                 }
                             }
                         }
                     }
-                    
+
                     // 注入小图标
                     // 只有当smallIconBitmap不为null时才注入，否则保留之前的图标
                     if (smallIconBitmap != null) {
@@ -711,7 +516,7 @@ object NotificationGenerator {
                     // 已经有图标文本，保留之前的图标，不进行修改
                     Logger.i(TAG, "超级岛: 已有图标文本，保留之前的小图标，不进行修改")
                 }
-                
+
                 // 发送通知
                 notificationManager.notify(notificationId, notification)
             } else {
@@ -723,17 +528,66 @@ object NotificationGenerator {
                     NotificationManager.IMPORTANCE_HIGH
                 )
                 notificationManager.createNotificationChannel(channel)
-                
+
+                // 获取paramV2原始数据，提前解析用于判断是否为计时器类型
+                // 优先使用传入的paramV2Raw参数，其次从entry中获取
+                val entry = floatingWindowManager.getEntry(key)
+                val paramV2RawValue = paramV2Raw ?: entry?.paramV2Raw
+                val bigIsland = parseBigIsland(paramV2RawValue)
+                val aodPic = extractAodPic(paramV2RawValue)
+                val bComponent = parseBComponent(bigIsland, aodPic)
+
+                // 判断是否为计时器类型（包括运行中和暂停状态）
+                val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
+
+                // 计时器通知的标题和内容设置
+                // 标题显示状态，内容显示应用名，时间流逝由chronometer自动处理
+                val timerTitle: String
+                val timerContent: String
+                if (isTimerType && true) {
+                    val timer = bComponent.timer
+                    when (timer.timerType) {
+                        -2 -> {
+                            timerTitle = "暂停"
+                            timerContent = appName ?: "计时器"
+                        }
+                        -1 -> {
+                            timerTitle = "倒计时中"
+                            timerContent = appName ?: "计时器"
+                        }
+                        1 -> {
+                            timerTitle = "正计时中"
+                            timerContent = appName ?: "秒表"
+                        }
+                        2 -> {
+                            timerTitle = "暂停"
+                            timerContent = appName ?: "秒表"
+                        }
+                        else -> {
+                            timerTitle = title ?: appName ?: "超级岛通知"
+                            timerContent = text ?: ""
+                        }
+                    }
+                } else {
+                    timerTitle = title ?: appName ?: "超级岛通知"
+                    timerContent = text ?: ""
+                }
+
+                // 判断是否为正在运行的计时器类型（用于chronometer）
+                val isRunningTimer = isTimerType &&
+                    (bComponent.timer.timerType == -1 || bComponent.timer.timerType == 1)
+
                 // 构建基础通知，调整属性使其更接近实际超级岛通知
-                var builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-                    .setContentTitle(title ?: appName ?: "超级岛通知")
-                    .setContentText(text ?: "")
-                    .setSmallIcon(R.drawable.stat_notify_more) // 使用系统默认图标
+                val builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
+                    .setContentTitle(timerTitle)
+                    .setContentText(timerContent)
+                    .setSmallIcon(android.R.drawable.stat_notify_more) // 使用系统默认图标
                     // 调整为与实际超级岛通知一致的属性
                     .setOngoing(true) // 实际通知通常是持续的
                     .setPriority(NotificationCompat.PRIORITY_MAX) // 提高优先级到最高，与原始通知一致
-                    .setShowWhen(false) // 不显示时间，与原始通知一致
-                    .setWhen(System.currentTimeMillis()) // 设置时间，但不显示
+                    .setShowWhen(isRunningTimer) // 计时器需要显示时间以支持chronometer自动流逝
+                    .setUsesChronometer(isRunningTimer) // 计时器需要使用chronometer功能
+                    .setWhen(System.currentTimeMillis()) // 设置时间
                     .setOnlyAlertOnce(true) // 只提示一次
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 公开可见
 
@@ -743,70 +597,55 @@ object NotificationGenerator {
                         .setDeleteIntent(deleteIntent) // 设置删除意图
                         .setContentIntent(pendingContentIntent) // 设置点击意图
                 }
-                
-                // 获取paramV2原始数据
-                val entry = floatingWindowManager.getEntry(key)
-                val paramV2Raw = entry?.paramV2Raw
-                
+
                 // 对于计时器类通知，添加计时器相关字段
                 if (title?.contains("计时") == true || title?.contains("秒表") == true) {
-                    // 解析B区数据，检查是否为计时器类型
-                    val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
-                    val bigIsland = parseBigIsland(paramV2RawValue)
-                    
-                    val bComponent = parseBComponent(bigIsland)
                     if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
                         // 根据timerType设置计时模式
                         val timer = bComponent.timer
                         val timerType = timer.timerType
                         // timerType: -2倒计时暂停，-1倒计时开始，0默认，1正计时开始，2正计时暂停
-                        
+
                         // 只对正在进行中的计时器启用自动流逝
                         if (timerType == -1 || timerType == 1) {
                             val isCountDown = timerType < 0
-                            
-                            // 使用NotificationCompat的计时器功能
-                            if (isCountDown) {
-                                // 倒计时：计算剩余时间并设置
-                                val now = System.currentTimeMillis()
-                                val remaining = timer.timerWhen - now
-                                if (remaining > 0) {
-                                    // 对于倒计时，我们需要特殊处理
-                                    // 由于通知系统的限制，我们使用当前时间作为基准
-                                    builder.setUsesChronometer(true)
-                                    builder.setChronometerCountDown(true)
-                                    // 设置倒计时的终点时间
-                                    builder.setWhen(timer.timerWhen)
-                                }
-                            } else {
-                                // 正计时：使用timerWhen作为起点
-                                builder.setUsesChronometer(true)
-                                builder.setChronometerCountDown(false)
-                                // 设置正计时的起点时间
-                                builder.setWhen(timer.timerWhen)
-                            }
+
+// 使用NotificationCompat的计时器功能
+                             if (isCountDown) {
+                                 // 倒计时：计算剩余时间并设置
+                                 val now = System.currentTimeMillis()
+                                 val remaining = timer.timerWhen - now
+                                 if (remaining > 0) {
+                                     // 对于倒计时，设置chronometer自动倒计时
+                                     builder.setUsesChronometer(true)
+                                     builder.setChronometerCountDown(true)
+                                     builder.setShowWhen(true) // 确保显示时间
+                                     // 设置倒计时的终点时间
+                                     builder.setWhen(timer.timerWhen)
+                                     Logger.i(TAG, "超级岛: 倒计时通知已设置chronometer，自动更新，key=$key")
+                                 }
+                             } else {
+                                 // 正计时：使用timerWhen作为起点
+                                 builder.setUsesChronometer(true)
+                                 builder.setChronometerCountDown(false)
+                                 builder.setShowWhen(true) // 确保显示时间
+                                 // 设置正计时的起点时间
+                                 builder.setWhen(timer.timerWhen)
+                                 Logger.i(TAG, "超级岛: 正计时通知已设置chronometer，自动更新，key=$key")
+                             }
                         }
-                    } else {
-                        // 非计时器类型或计时器已暂停，不启用自动流逝
-                        builder.setUsesChronometer(true)
-                        builder.setChronometerCountDown(false)
-                        builder.setWhen(System.currentTimeMillis())
                     }
                 }
-                
+
                 // 检查是否为进度类型通知，如果是，则可能已经通过 LiveUpdatesNotificationManager 处理
                 val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
-                
-                // 解析 param_v2 中的 bigIsland 数据，用于计时器检查
-                // entry 变量已经在第741行声明
-                val paramV2RawValue = entry?.paramV2Raw ?: paramV2?.toString()
-                val bigIsland = parseBigIsland(paramV2RawValue)
-                val bComponent = parseBComponent(bigIsland)
-                
+
                 // 构建通知
                 val notification = if (!isProgressType) {
                     // 非进度类型通知，添加胶囊兼容字段并注入图标
-                    buildCapsuleCompatibleNotificationWithIconInjection(context, builder, title, text, appName, paramV2, picMap, paramV2RawValue)
+                    val builtNotification = buildCapsuleCompatibleNotificationWithIconInjection(context, builder, title, text, appName, paramV2, picMap, paramV2RawValue)
+                    Logger.i(TAG, "超级岛: 非进度类型通知已构建，key=$key")
+                    builtNotification
                 } else {
                     // 进度类型通知，已经通过 LiveUpdatesNotificationManager 处理，不重复添加胶囊兼容字段
                     Logger.i(TAG, "超级岛: 进度类型通知，已通过 LiveUpdatesNotificationManager 处理，不重复添加胶囊兼容字段")
@@ -814,17 +653,18 @@ object NotificationGenerator {
                     val builtNotification = builder.build()
                     // 尝试从 A/B 区数据中获取图标或生成位图
                     var smallIconBitmap: Bitmap? = null
-                    
-                    // 解析 A/B 区数据
-                    val aComponent = parseAComponent(bigIsland)
-                    
+
+                    // 解析 A/B 区数据，传入 aodPic 作为 fallback
+                    val aodPic = extractAodPic(paramV2RawValue)
+                    val aComponent = parseAComponent(bigIsland, aodPic)
+
                     // 提取 A/B 区数据
                     val aPicKey = when (aComponent) {
                         is AImageText1 -> aComponent.picKey
                         is AImageText5 -> aComponent.picKey
                         else -> null
                     }
-                    
+
                     val bPicKey = when (bComponent) {
                         is BImageText2 -> bComponent.picKey
                         is BImageText3 -> bComponent.picKey
@@ -832,97 +672,52 @@ object NotificationGenerator {
                         is BProgressTextInfo -> bComponent.picKey
                         else -> null
                     }
-                    
+
                     // 处理图标
-                    // 优先使用应用图标（大图标的键值提供的图标）
-                    val appIconKey = "miui.focus.pic_app_icon"
-                    if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
-                        val appIconUrl = picMap[appIconKey]
-                        if (!appIconUrl.isNullOrBlank()) {
-                            // 同步下载应用图标
-                            val bitmap = runBlocking {
-                                downloadBitmap(context, appIconUrl, 5000)
-                            }
+                    // 优先使用 A 区图标或B区图标
+                    val picKeyToUse = aPicKey ?: bPicKey
+                    if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
+                        val picUrl = picMap[picKeyToUse]
+                        if (!picUrl.isNullOrBlank()) {
+                            // 同步下载图标
+                            val bitmap = downloadBitmap(context, picUrl, 5000)
                             if (bitmap != null) {
                                 smallIconBitmap = bitmap
                             }
                         }
                     }
-                    
-                    // 如果没有应用图标，再使用 A 区图标
+
+                    // 如果没有 A 区图标或B区图标，再使用应用图标
                     if (smallIconBitmap == null) {
-                        // 优先使用 A 区图标
-                        val picKeyToUse = aPicKey ?: bPicKey
-                        if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
-                            val picUrl = picMap[picKeyToUse]
-                            if (!picUrl.isNullOrBlank()) {
-                                // 同步下载图标
-                                val bitmap = runBlocking {
-                                    downloadBitmap(context, picUrl, 5000)
-                                }
+                        val appIconKey = "miui.focus.pic_app_icon"
+                        if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
+                            val appIconUrl = picMap[appIconKey]
+                            if (!appIconUrl.isNullOrBlank()) {
+                                // 同步下载应用图标
+                                val bitmap = downloadBitmap(context, appIconUrl, 5000)
                                 if (bitmap != null) {
                                     smallIconBitmap = bitmap
                                 }
                             }
                         }
                     }
-                    
+
                     // 注入小图标
                     if (smallIconBitmap != null) {
                         injectSmallIcon(builtNotification, smallIconBitmap)
                     }
-                    
+
+                    Logger.i(TAG, "超级岛: 进度类型通知已构建，key=$key")
                     builtNotification
                 }
-                
+
                 // 发送通知
                 notificationManager.notify(notificationId, notification)
-                
-                // 检查是否需要创建计时器更新定时器
-                if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
-                    val timer = bComponent.timer
-                    // 检查计时器是否已停止
-                    if (timer.timerType == 0) {
-                        // 计时器已停止，移除定时器
-                        TimerUpdateManager.instance.removeTimer(key)
-                        Logger.i(TAG, "超级岛: 计时器已停止，移除定时器，key=$key")
-                    } else {
-                        // 创建或更新计时器更新定时器
-                        // 创建一个新的通知构建器，基于当前通知的内容
-                        val updatedBuilder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
-                            // 复制原始构建器的所有属性
-                            .setContentTitle(title ?: appName ?: "超级岛通知")
-                            .setContentText(text ?: "")
-                            .setSmallIcon(R.drawable.stat_notify_more) // 使用默认图标作为基础
-                            .setAutoCancel(false)
-                            .setOngoing(true)
-                            .setPriority(NotificationCompat.PRIORITY_MAX)
-                            .setShowWhen(false)
-                            .setWhen(System.currentTimeMillis())
-                            .setOnlyAlertOnce(true)
-                            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                            .setDeleteIntent(deleteIntent)
-                            .setContentIntent(pendingContentIntent)
-                        
-                        // 创建或更新计时器更新定时器
-                        TimerUpdateManager.instance.addOrUpdateTimer(
-                            key,
-                            context,
-                            notificationId,
-                            timer
-                        )
-                        Logger.i(TAG, "超级岛: 创建计时器更新定时器成功，key=$key")
-                    }
-                } else {
-                    // 没有计时器信息或不是计时器类型，移除定时器
-                    TimerUpdateManager.instance.removeTimer(key)
-                    Logger.i(TAG, "超级岛: 没有计时器信息或不是计时器类型，移除定时器，key=$key")
-                }
         }
-        
+
         // 保存entryKey到notificationId的映射
         entryKeyToNotificationId[key] = notificationId
-        
+
         Logger.i(TAG, "超级岛: 发送复刻通知成功，key=$key, notificationId=$notificationId")
         return notificationId
         } catch (e: Exception) {
@@ -948,30 +743,31 @@ object NotificationGenerator {
             // 解析 param_v2 中的 bigIsland 数据
             val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
             val bigIsland = parseBigIsland(paramV2RawValue)
-            
-            // 解析 A/B 区数据
-            val aComponent = parseAComponent(bigIsland)
-            val bComponent = parseBComponent(bigIsland)
-            
+
+            // 解析 A/B 区数据，传入 aodPic 作为 fallback
+            val aodPic = extractAodPic(paramV2RawValue)
+            val aComponent = parseAComponent(bigIsland, aodPic)
+            val bComponent = parseBComponent(bigIsland, aodPic)
+
             // 提取 A/B 区数据
             val aTitle = when (aComponent) {
                 is AImageText1 -> aComponent.title
                 is AImageText5 -> aComponent.title
                 else -> null
             }
-            
+
             val aContent = when (aComponent) {
                 is AImageText1 -> aComponent.content
                 is AImageText5 -> aComponent.content
                 else -> null
             }
-            
+
             val aPicKey = when (aComponent) {
                 is AImageText1 -> aComponent.picKey
                 is AImageText5 -> aComponent.picKey
                 else -> null
             }
-            
+
             val bTitle = when (bComponent) {
                 is BImageText2 -> bComponent.title
                 is BImageText3 -> bComponent.title
@@ -989,7 +785,7 @@ object NotificationGenerator {
                 is BProgressTextInfo -> bComponent.title
                 else -> null
             }
-            
+
             val bContent = when (bComponent) {
                 is BImageText2 -> bComponent.content
                 is BTextInfo -> bComponent.content
@@ -1005,7 +801,7 @@ object NotificationGenerator {
                 is BProgressTextInfo -> bComponent.content
                 else -> null
             }
-            
+
             val bPicKey = when (bComponent) {
                 is BImageText2 -> bComponent.picKey
                 is BImageText3 -> bComponent.picKey
@@ -1013,64 +809,83 @@ object NotificationGenerator {
                 is BProgressTextInfo -> bComponent.picKey
                 else -> null
             }
-            
+
             val bProgress = when (bComponent) {
                 is BProgressTextInfo -> bComponent.progress
                 else -> null
             }
-            
+
             val bProgressColorReach = when (bComponent) {
                 is BProgressTextInfo -> bComponent.colorReach
                 else -> null
             }
-            
+
             val bProgressColorUnReach = when (bComponent) {
                 is BProgressTextInfo -> bComponent.colorUnReach
                 else -> null
             }
-            
+
             val bProgressIsCCW = when (bComponent) {
                 is BProgressTextInfo -> bComponent.isCCW
                 else -> false
             }
-            
+
             // 设置标准通知字段
-            // 优先检查是否有计时器信息
-            val timerText = when (bComponent) {
-                is BSameWidthDigitInfo -> {
-                    // 优先使用timer信息计算计时值
-                    if (bComponent.timer != null) {
-                        formatTimerInfo(bComponent.timer)
-                    } else {
+            // 判断是否为计时器类型（包括运行中和暂停状态）
+            val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
+
+            // 根据计时器状态设置标题和内容
+            if (isTimerType && true) {
+                val timer = bComponent.timer
+                val timerTitle = when (timer.timerType) {
+                    -2 -> "暂停中"
+                    -1 -> "倒计时中"
+                    1 -> "正计时中"
+                    2 -> "暂停中"
+                    else -> title ?: appName ?: "超级岛通知"
+                }
+                val timerContent = appName ?: "超级岛通知"
+
+                builder
+                    .setContentTitle(timerTitle)
+                    .setContentText(timerContent)
+                    .setSubText(appName ?: "超级岛通知")
+                    .setShortCriticalText(timerTitle)
+            } else {
+                // 非计时器类型，使用原有逻辑
+                val timerText = when (bComponent) {
+                    is BSameWidthDigitInfo -> {
                         null
                     }
+                    else -> null
                 }
-                else -> null
+
+                val capsuleTitle = aTitle ?: bTitle ?: title
+                val capsuleText = timerText ?: aContent ?: bContent ?: text
+                val capsuleSubText = appName ?: "超级岛通知"
+                val capsuleShortText = timerText ?: bTitle ?: bContent ?: aTitle ?: aContent ?: text
+
+                builder
+                    .setContentTitle(capsuleTitle ?: capsuleSubText)
+                    .setContentText(capsuleText ?: "")
+                    .setSubText(capsuleSubText)
+                    .setShortCriticalText(capsuleShortText ?: "")
             }
-            
-            val capsuleTitle = aTitle ?: bTitle ?: title
-            val capsuleText = timerText ?: aContent ?: bContent ?: text
-            val capsuleSubText = appName ?: "超级岛通知"
-            val capsuleShortText = timerText ?: bTitle ?: bContent ?: aTitle ?: aContent ?: text
-            
+
             builder
-                .setContentTitle(capsuleTitle ?: capsuleSubText)
-                .setContentText(capsuleText ?: "")
-                .setSubText(capsuleSubText)
-                .setShortCriticalText(capsuleShortText ?: "")
                 .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setRequestPromotedOngoing(true)
-            
+
             // 确保右胶囊文本被正确设置到 miui.focus.param 字段
             paramV2RawValue?.let {
                 try {
                     val paramV2Json = JSONObject(it)
                     val bigIslandJson = paramV2Json.optJSONObject("bigIsland") ?: JSONObject()
                     val islandAreaJson = bigIslandJson.optJSONObject("imageTextInfoRight") ?: JSONObject()
-                    
+
                     // 设置右胶囊文本
                     if (bTitle != null) {
                         islandAreaJson.put("title", bTitle)
@@ -1078,26 +893,26 @@ object NotificationGenerator {
                     if (bContent != null) {
                         islandAreaJson.put("content", bContent)
                     }
-                    
+
                     // 更新 bigIsland 和 paramV2Json
                     bigIslandJson.put("imageTextInfoRight", islandAreaJson)
                     paramV2Json.put("bigIsland", bigIslandJson)
-                    
+
                     // 更新原始 paramV2RawValue
                     // 注意：这里我们不能直接修改原始字符串，而是需要在构建 miui.focus.param 时使用更新后的数据
                 } catch (e: Exception) {
                     Logger.w(TAG, "超级岛: 设置右胶囊文本失败: ${e.message}")
                 }
             }
-            
+
             // 处理 smallIcon
             var smallIconBitmap: Bitmap? = null
-            
+
             // 优先处理进度数据
             if (bProgress != null) {
                 smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
             }
-            
+
             // 处理文本位图
             if (smallIconBitmap == null) {
                 // 优先使用 B 区文本生成位图
@@ -1118,7 +933,7 @@ object NotificationGenerator {
                     smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
                 }
             }
-            
+
             // 处理图标
             if (smallIconBitmap == null) {
                 // 优先使用 A 区图标或B区图标
@@ -1145,7 +960,7 @@ object NotificationGenerator {
                     Logger.d(TAG, "超级岛: 未找到 A 区图标或B区图标键")
                 }
             }
-            
+
             // 如果没有 A 区图标或B区图标，再使用应用图标
             if (smallIconBitmap == null) {
                 // 使用应用图标（大图标的键值提供的图标）
@@ -1172,25 +987,21 @@ object NotificationGenerator {
                     Logger.d(TAG, "超级岛: 未找到应用图标键 $appIconKey")
                 }
             }
-            
+
             // 如果没有生成位图，使用系统默认图标
             if (smallIconBitmap == null) {
                 // 使用系统默认图标
-                builder.setSmallIcon(R.drawable.stat_notify_more)
+                builder.setSmallIcon(android.R.drawable.stat_notify_more)
                 Logger.d(TAG, "超级岛: 使用系统默认图标")
             } else {
-                // 使用生成的位图作为小图标
-                val icon = BitmapDrawable(context.resources, smallIconBitmap)
                 // 设置系统默认图标作为占位符
-                builder.setSmallIcon(R.drawable.stat_notify_more)
-                // 注意：在 Android 中，setSmallIcon 只能接受资源 ID，所以我们需要使用其他方式注入位图
-                // 这里我们保持默认图标，实际的位图注入需要在通知构建后处理
+                builder.setSmallIcon(android.R.drawable.stat_notify_more)
             }
-            
+
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 构建胶囊兼容通知失败: ${e.message}")
         }
-        
+
         return builder
     }
 
@@ -1224,7 +1035,7 @@ object NotificationGenerator {
                 // 尝试从param_island -> bigIslandArea中解析
                 val paramIsland = json.optJSONObject("param_island")
                 val bigIsland = paramIsland?.optJSONObject("bigIslandArea")
-                
+
                 // 如果没有找到，尝试直接从bigIsland字段解析
                 return bigIsland ?: json.optJSONObject("bigIsland")
             } catch (e: Exception) {
@@ -1235,9 +1046,24 @@ object NotificationGenerator {
     }
 
     /**
+     * 从paramV2Raw中提取aodPic字段
+     */
+    private fun extractAodPic(paramV2RawValue: String?): String? {
+        paramV2RawValue?.let {
+            try {
+                val json = JSONObject(it)
+                return json.optString("aodPic", "").takeIf { it.isNotBlank() }
+            } catch (e: Exception) {
+                Logger.w(TAG, "超级岛: 提取aodPic失败: ${e.message}")
+            }
+        }
+        return null
+    }
+
+    /**
      * 构建胶囊兼容的通知并注入图标
      */
-    private suspend fun buildCapsuleCompatibleNotificationWithIconInjection(
+    private fun buildCapsuleCompatibleNotificationWithIconInjection(
         context: Context,
         builder: NotificationCompat.Builder,
         title: String?,
@@ -1250,20 +1076,21 @@ object NotificationGenerator {
         try {
             // 先构建胶囊兼容的通知
             val capsuleBuilder = buildCapsuleCompatibleNotification(context, builder, title, text, appName, paramV2, picMap, paramV2Raw)
-            
+
             // 构建通知并注入图标
             val notification = capsuleBuilder.build()
-        
+
         // 尝试从 A/B 区数据中获取图标或生成位图
         var smallIconBitmap: Bitmap? = null
-        
+
         // 解析 param_v2 中的 bigIsland 数据
         val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
         val bigIsland = parseBigIsland(paramV2RawValue)
-        
-        // 解析 A/B 区数据
-        val aComponent = parseAComponent(bigIsland)
-        val bComponent = parseBComponent(bigIsland)
+
+        // 解析 A/B 区数据，传入 aodPic 作为 fallback
+        val aodPic = extractAodPic(paramV2RawValue)
+        val aComponent = parseAComponent(bigIsland, aodPic)
+        val bComponent = parseBComponent(bigIsland, aodPic)
         
         // 提取 A/B 区数据
         val aPicKey = when (aComponent) {
@@ -1316,17 +1143,17 @@ object NotificationGenerator {
             if (!isTimerType) {
                 // 优先使用 B 区文本生成位图
                 val textToRender = when (bComponent) {
-                    is BImageText2 -> bComponent.title ?: bComponent.content
+                    is BImageText2 -> bComponent.title
                     is BImageText3 -> bComponent.title
                     is BImageText6 -> bComponent.title
-                    is BTextInfo -> bComponent.title ?: bComponent.content
+                    is BTextInfo -> bComponent.title
                     is BFixedWidthDigitInfo -> bComponent.digit
                     is BSameWidthDigitInfo -> bComponent.digit
                     is BProgressTextInfo -> bComponent.title ?: bComponent.content
                     else -> null
                 } ?: when (aComponent) {
                     is AImageText1 -> aComponent.title ?: aComponent.content
-                    is AImageText5 -> aComponent.title ?: aComponent.content
+                    is AImageText5 -> aComponent.title
                     else -> null
                 }
                 
@@ -1421,33 +1248,6 @@ object NotificationGenerator {
     }
 
     /**
-     * 根据键下载位图
-     */
-    private suspend fun downloadBitmapByKey(context: Context, picMap: Map<String, String>?, key: String?): Bitmap? {
-        if (picMap.isNullOrEmpty() || key.isNullOrBlank()) return null
-        val raw = picMap[key] ?: return null
-        val url = SuperIslandImageStore.resolve(context, raw) ?: raw
-        return withContext(Dispatchers.IO) { downloadBitmap(context, url, 5000) }
-    }
-
-    /**
-     * 下载第一个可用的图片
-     */
-    private suspend fun downloadFirstAvailableImage(context: Context, picMap: Map<String, String>?): Bitmap? {
-        if (picMap.isNullOrEmpty()) return null
-        for ((_, url) in picMap) {
-            try {
-                val resolved = SuperIslandImageStore.resolve(context, url) ?: url
-                val bmp = withContext(Dispatchers.IO) { downloadBitmap(context, resolved, 5000) }
-                if (bmp != null) return bmp
-            } catch (e: Exception) {
-                Logger.w(TAG, "超级岛: 下载图片失败: ${e.message}")
-            }
-        }
-        return null
-    }
-
-    /**
      * 下载位图
      */
     private suspend fun downloadBitmap(context: Context, url: String, timeoutMs: Int): Bitmap? {
@@ -1468,8 +1268,6 @@ object NotificationGenerator {
             if (notificationId != null) {
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 notificationManager.cancel(notificationId)
-                // 移除对应的定时器
-                TimerUpdateManager.instance.removeTimer(key)
                 // 停止对应的滚动更新
                 stopScrollUpdate(key)
                 Logger.i(TAG, "超级岛: 取消复刻通知成功，key=$key, notificationId=$notificationId")
@@ -1490,8 +1288,6 @@ object NotificationGenerator {
                 // 取消所有映射中的通知
                 entryKeyToNotificationId.forEach { (key, notificationId) ->
                     notificationManager.cancel(notificationId)
-                    // 移除对应的定时器
-                    TimerUpdateManager.instance.removeTimer(key)
                     // 停止对应的滚动更新
                     stopScrollUpdate(key)
                     Logger.i(TAG, "超级岛: 取消复刻通知成功，key=$key, notificationId=$notificationId")
@@ -1500,8 +1296,6 @@ object NotificationGenerator {
             
             // 清空映射
             entryKeyToNotificationId.clear()
-            // 清空所有定时器
-            TimerUpdateManager.instance.clearAll()
             // 清空所有滚动更新
             clearAllScrollUpdates()
             Logger.i(TAG, "超级岛: 清除所有复刻通知成功")

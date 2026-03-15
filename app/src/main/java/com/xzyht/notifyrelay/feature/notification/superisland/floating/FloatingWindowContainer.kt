@@ -34,12 +34,12 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.PicInfoCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.ProgressCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.TextButtonCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.param.ParamIslandCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.compose.BigIslandCollapsedCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.CommonImageCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandComposeRoot
 import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.MediaSessionData
+import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
 
@@ -271,7 +271,7 @@ fun FloatingWindowContainer(
 
                                         // 进度组件
                                         paramV2.multiProgressInfo?.let {
-                                            MultiProgressCompose(it, entry.picMap, entry.business)
+                                            MultiProgressCompose(it, picMap = entry.picMap, business = entry.business)
                                         } ?: paramV2.progressInfo?.let {
                                             ProgressCompose(it, entry.picMap)
                                         }
@@ -350,13 +350,40 @@ fun FloatingWindowContainer(
                             }
                         }
 
+                        // 从paramV2Raw中提取aodPic
+                        val aodPic = remember(entry.paramV2Raw) {
+                            entry.paramV2Raw?.let {
+                                try {
+                                    val root = JSONObject(it)
+                                    root.optString("aodPic", "").takeIf { it.isNotBlank() }
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }
+                        }
+
+                        // 从paramV2Raw中提取 highlightInfo.picFunction
+                        val picFunction = remember(entry.paramV2Raw) {
+                            entry.paramV2Raw?.let {
+                                try {
+                                    val root = JSONObject(it)
+                                    val highlightInfo = root.optJSONObject("highlightInfo")
+                                    highlightInfo?.optString("picFunction", "")?.takeIf { it.isNotBlank() }
+                                } catch (e: Exception) {
+                                    null
+                                }
+                            }
+                        }
+
                         // 直接显示摘要态内容，不添加额外的Box包装，避免方形背景
                         BigIslandCollapsedCompose(
                             bigIsland = bigIslandJson,
                             picMap = entry.picMap,
                             fallbackTitle = fallbackTitle,
                             fallbackContent = fallbackContent,
-                            isOverlapping = entry.isOverlapping
+                            isOverlapping = entry.isOverlapping,
+                            picFunction = picFunction,
+                            aodPic = aodPic
                         )
                     }
                     // 闭合Box组件

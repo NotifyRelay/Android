@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.ui
 
-import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.res.Configuration
@@ -41,6 +40,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -130,9 +130,6 @@ class MainActivity : FragmentActivity() {
     override fun onResume() {
         super.onResume()
         checkPermissionsAndStartServices()
-        if (checkSelfPermission(Manifest.permission.READ_LOGS) == PackageManager.PERMISSION_GRANTED) {
-            ClipboardSyncManager.startLogMonitoring(this)
-        }
     }
 
     private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
@@ -236,7 +233,7 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
     
-    val activity = LocalContext.current as? MainActivity
+    val activity = LocalActivity.current as? MainActivity
     val showBanner = activity?.showAutoStartBanner?.value == true
     val bannerMsg = activity?.bannerMessage?.value
     val context = LocalContext.current
@@ -402,7 +399,7 @@ private fun MainScreenBackHandler(
     navigator: com.xzyht.notifyrelay.ui.navigation.Navigator,
     deviceListState: DeviceListScreenState
 ) {
-    val activity = LocalContext.current as? MainActivity
+    val activity = LocalActivity.current as? MainActivity
     var backPressedTime by remember { mutableLongStateOf(0L) }
     val EXIT_INTERVAL = 2000L
     val coroutineScope = rememberCoroutineScope()

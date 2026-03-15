@@ -97,7 +97,7 @@ object ToastDebounce {
 }
 
 @Composable
-fun DeleteButton(onClick: () -> Unit, modifier: Modifier = Modifier.Companion) {
+fun DeleteButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
     IconButton(
         onClick = {
             onClick()

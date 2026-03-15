@@ -3,7 +3,6 @@ package com.xzyht.notifyrelay.servers
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
-import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardDetection
 import com.xzyht.notifyrelay.ui.ClipboardSyncActivity
@@ -55,25 +54,38 @@ class ClipboardAccessiblityService : AccessibilityService() {
     }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+        if (event == null) return
 
         try {
             val currentTimeMs = System.currentTimeMillis()
 
-            // 如果处于暂停状态，直接忽略事件
             if (currentTimeMs < pausedUntilTime) {
                 return
             }
 
-            // Android 10+ 检测复制操作
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
-                clipboardDetector.getSupportedEventTypes(event)) {
+            val packageName = event.packageName?.toString() ?: "unknown"
+            val eventType = when (event.eventType) {
+                AccessibilityEvent.TYPE_VIEW_CLICKED -> "VIEW_CLICKED"
+                AccessibilityEvent.TYPE_VIEW_FOCUSED -> "VIEW_FOCUSED"
+                AccessibilityEvent.TYPE_VIEW_LONG_CLICKED -> "VIEW_LONG_CLICKED"
+                AccessibilityEvent.TYPE_VIEW_SELECTED -> "VIEW_SELECTED"
+                AccessibilityEvent.TYPE_VIEW_TEXT_CHANGED -> "VIEW_TEXT_CHANGED"
+                AccessibilityEvent.TYPE_VIEW_TEXT_SELECTION_CHANGED -> "VIEW_TEXT_SELECTION_CHANGED"
+                AccessibilityEvent.TYPE_WINDOW_CONTENT_CHANGED -> "WINDOW_CONTENT_CHANGED"
+                AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> "WINDOW_STATE_CHANGED"
+                AccessibilityEvent.TYPE_NOTIFICATION_STATE_CHANGED -> "NOTIFICATION_STATE_CHANGED"
+                else -> "OTHER(${event.eventType})"
+            }
+            
+            Logger.d(TAG, "收到事件: $eventType, 包名: $packageName, 类名: ${event.className}")
 
-                // 防抖处理
+            if (clipboardDetector.getSupportedEventTypes(event)) {
                 if (currentTimeMs - lastDetectionTimeMs < minDetectionInterval) {
                     return
                 }
 
                 lastDetectionTimeMs = currentTimeMs
+                Logger.i(TAG, "检测到复制事件，启动透明Activity")
                 startTransparentActivity()
             }
         } catch (e: Exception) {

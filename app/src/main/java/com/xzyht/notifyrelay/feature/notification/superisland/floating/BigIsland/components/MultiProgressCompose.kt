@@ -15,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -51,9 +52,9 @@ private const val TITLE_PADDING_DP = 12 // 标题与进度条之间的间距
 @Composable
 fun MultiProgressCompose(
     multiProgressInfo: MultiProgressInfo,
+    modifier: Modifier = Modifier,
     picMap: Map<String, String>? = null,
-    business: String? = null,
-    modifier: Modifier = Modifier
+    business: String? = null
 ) {
     val colorValue: Int =
         SuperIslandImageUtil.parseColor(multiProgressInfo.color) ?: DEFAULT_PRIMARY_COLOR.toInt()
@@ -66,7 +67,7 @@ fun MultiProgressCompose(
     val pointerIndex = stageFloat.toInt().coerceIn(0, if (nodeCount == 0) 0 else nodeCount - 1)
 
     // 计算指针位置
-    var containerWidth by remember { mutableStateOf(0f) }
+    var containerWidth by remember { mutableFloatStateOf(0f) }
 
     // 容器宽度变化时更新
     fun updateContainerWidth(width: Int) {

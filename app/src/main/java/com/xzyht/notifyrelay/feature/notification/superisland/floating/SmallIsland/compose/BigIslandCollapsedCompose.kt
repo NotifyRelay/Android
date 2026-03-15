@@ -18,9 +18,9 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AImageText1
-import com.xzyht.notifyrelay.feature.notification.superisland.model.parseAComponent
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BEmpty
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BTextInfo
+import com.xzyht.notifyrelay.feature.notification.superisland.model.parseAComponent
 import com.xzyht.notifyrelay.feature.notification.superisland.model.parseBComponent
 import org.json.JSONObject
 
@@ -34,7 +34,9 @@ fun BigIslandCollapsedCompose(
     picMap: Map<String, String>? = null,
     fallbackTitle: String? = null,
     fallbackContent: String? = null,
-    isOverlapping: Boolean = false
+    isOverlapping: Boolean = false,
+    picFunction: String? = null,
+    aodPic: String? = null
 ) {
     // 使用真正的圆角形状
     val cornerRadius = 999.dp
@@ -47,9 +49,9 @@ fun BigIslandCollapsedCompose(
         Color(0xCC000000.toInt()) // 半透明黑
     }
     
-    // 解析A区和B区组件
-    var aComp = parseAComponent(bigIsland)
-    var bComp = parseBComponent(bigIsland)
+    // 解析A区和B区组件，传入 picFunction 和 aodPic 作为 fallback
+    var aComp = parseAComponent(bigIsland, picFunction, aodPic)
+    var bComp = parseBComponent(bigIsland, picFunction, aodPic)
     
     // 如果A区组件为空，创建一个默认的AImageText1对象来显示兜底应用图标
     if (aComp == null) {
@@ -111,7 +113,7 @@ fun BigIslandCollapsedCompose(
                     modifier = Modifier.wrapContentWidth(),
                     contentAlignment = Alignment.CenterEnd
                 ) {
-                    BCompose(bComp, picMap)
+                    bComp?.let { BCompose(it, picMap) }
                 }
             }
         }

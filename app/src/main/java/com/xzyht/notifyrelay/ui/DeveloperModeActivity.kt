@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -95,7 +96,7 @@ class DeveloperModeActivity : AppCompatActivity() {
 
         // 当前选中的日志级别索引
         val selectedLevelIndex = remember {
-            mutableStateOf(logLevelOptions.indexOfFirst { it.second == logLevel.value })
+            mutableIntStateOf(logLevelOptions.indexOfFirst { it.second == logLevel.value })
         }
 
         val textStyles = MiuixTheme.textStyles
@@ -130,11 +131,11 @@ class DeveloperModeActivity : AppCompatActivity() {
 
                 WindowDropdown(
                     title = "日志级别",
-                    summary = "当前级别: ${logLevelOptions[selectedLevelIndex.value].first}",
+                    summary = "当前级别: ${logLevelOptions[selectedLevelIndex.intValue].first}",
                     items = logLevelOptions.map { it.first },
-                    selectedIndex = selectedLevelIndex.value,
+                    selectedIndex = selectedLevelIndex.intValue,
                     onSelectedIndexChange = {
-                        selectedLevelIndex.value = it
+                        selectedLevelIndex.intValue = it
                         logLevel.value = logLevelOptions[it].second
                         Logger.CURRENT_LEVEL = logLevel.value
                         StorageManager.putInt(context, KEY_LOG_LEVEL, logLevel.value.ordinal)

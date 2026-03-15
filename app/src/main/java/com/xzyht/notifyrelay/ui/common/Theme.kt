@@ -43,9 +43,7 @@ fun SetupSystemBars(isDarkTheme: Boolean) {
         SystemBarUtils.setStatusBarColor(win, barColor, false)
         SystemBarUtils.setNavigationBarColor(win, barColor, false)
         
-        // Android 10+ 关闭导航栏对比度强制
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            win.isNavigationBarContrastEnforced = false
-        }
+        // 关闭导航栏对比度强制
+        win.isNavigationBarContrastEnforced = false
     }
 }

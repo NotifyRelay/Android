@@ -77,26 +77,6 @@ object FloatingReplicaManager {
     }
 
     /**
-     * 带返回值的错误处理包装器
-     * @param actionName 操作名称，用于日志记录
-     * @param default 默认返回值，当执行失败时返回
-     * @param block 要执行的代码块，返回类型为 T
-     * @return 执行结果，成功返回 block 的返回值，失败返回 default
-     */
-    private inline fun <T> runWithErrorHandling(
-        actionName: String, 
-        default: T, 
-        crossinline block: () -> T
-    ): T {
-        return try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
-            default
-        }
-    }
-
-    /**
      * 支持挂起函数的错误处理包装器
      * @param actionName 操作名称，用于日志记录
      * @param block 要执行的挂起代码块
@@ -109,26 +89,6 @@ object FloatingReplicaManager {
             block()
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
-        }
-    }
-
-    /**
-     * 带返回值的支持挂起函数的错误处理包装器
-     * @param actionName 操作名称，用于日志记录
-     * @param default 默认返回值，当执行失败时返回
-     * @param block 要执行的挂起代码块，返回类型为 T
-     * @return 执行结果，成功返回 block 的返回值，失败返回 default
-     */
-    private suspend inline fun <T> runWithErrorHandlingSuspend(
-        actionName: String, 
-        default: T, 
-        crossinline block: suspend () -> T
-    ): T {
-        return try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
-            default
         }
     }
 
@@ -311,10 +271,6 @@ object FloatingReplicaManager {
     
     // 保存被隐藏的条目，以便用户点击通知时恢复
     private val hiddenEntries = ConcurrentHashMap<String, Any>()
-    // 通知渠道ID
-    private const val NOTIFICATION_CHANNEL_ID = "super_island_replica"
-    // 通知ID基础值
-    private const val NOTIFICATION_BASE_ID = 20000
 
     /**
      * 显示超级岛复刻悬浮窗。
@@ -381,7 +337,7 @@ object FloatingReplicaManager {
                         }
                     } else {
                         // 非进度类型或Live Updates未启用时，发送传统复刻通知
-                        val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
+                        val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, paramV2Raw, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
                         // 添加到 sourceId 到 notificationId 的直接映射
                         addSourceIdMapping(sourceId, entryKey, notificationId)
                         Logger.i(TAG, "浮窗功能关闭时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
@@ -517,7 +473,7 @@ object FloatingReplicaManager {
                             }
                         } else {
                             // 非进度类型或Live Updates未启用时，发送传统复刻通知
-                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
+                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, paramV2Raw, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
                             // 添加到 sourceId 到 notificationId 的直接映射
                             addSourceIdMapping(sourceId, entryKey, notificationId)
                             Logger.i(TAG, "浮窗创建时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
@@ -731,31 +687,6 @@ object FloatingReplicaManager {
             }
         }
     }
-    
-    /**
-     * 关闭所有浮窗条目
-     */
-    fun closeAllEntries() {
-        runWithErrorHandling("关闭所有浮窗条目") {
-            val context = overlayView?.get()?.context
-            // 清空所有条目
-            floatingWindowManager.clearAllEntries()
-            // 取消所有复刻通知
-            if (context != null) {
-                NotificationGenerator.clearAllReplicaNotifications(context, entryKeyToNotificationId)
-            } else {
-                // 如果没有上下文，直接清空映射
-                entryKeyToNotificationId.clear()
-            }
-            // 清空映射
-            sourceIdToEntryKeyMap.clear()
-            
-            // 清理所有超时任务
-            timeoutJobs.values.forEach { it.cancel() }
-            timeoutJobs.clear()
-            Logger.i(TAG, "超级岛: 关闭所有浮窗条目成功，已清理所有超时任务")
-        }
-    }
 
     // 新增：按来源键立刻移除指定浮窗（用于接收终止事件SI_END时立即消除）
     fun dismissBySource(sourceId: String) {
@@ -804,7 +735,7 @@ object FloatingReplicaManager {
             
             // 无论浮窗功能是否开启，都尝试关闭对应的通知
             // 这确保在仅通知模式下，结束包也能正确关闭通知
-            var context = overlayView?.get()?.context ?: appContext
+            val context = overlayView?.get()?.context ?: appContext
             
             // 如果context仍然为null，尝试从其他方式获取
             if (context == null) {
@@ -970,7 +901,7 @@ object FloatingReplicaManager {
                         WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
                         PixelFormat.TRANSLUCENT
                     ).apply {
-                        gravity = Gravity.LEFT or Gravity.TOP
+                        gravity = Gravity.START or Gravity.TOP
                         x = ((context.resources.displayMetrics.widthPixels - (FIXED_WIDTH_DP * density).toInt()) / 2).coerceAtLeast(0)
                         y = 100
                     }
@@ -1013,9 +944,7 @@ object FloatingReplicaManager {
     }
 
     private fun canShowOverlay(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(context)
-        } else true
+        return Settings.canDrawOverlays(context)
     }
 
     private fun requestOverlayPermission(context: Context) {

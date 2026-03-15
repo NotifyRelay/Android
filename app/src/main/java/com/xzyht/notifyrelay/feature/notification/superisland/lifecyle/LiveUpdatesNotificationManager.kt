@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.lifecyle
 
-import android.R
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -132,7 +131,6 @@ object LiveUpdatesNotificationManager {
         createNotificationChannel()
     }
 
-    @RequiresApi(Build.VERSION_CODES.O)
     private fun createNotificationChannel() {
         val channel = NotificationChannel(
             CHANNEL_ID,
@@ -220,7 +218,7 @@ object LiveUpdatesNotificationManager {
             val notificationBuilder = buildBaseNotification(sourceId)
                 .setContentTitle(title ?: appName ?: "超级岛通知")
                 .setContentText(text ?: "")
-                .setSmallIcon(R.drawable.stat_notify_more)
+                .setSmallIcon(android.R.drawable.stat_notify_more)
 
             // 只有在浮窗功能开启时才设置删除意图和点击意图
             if (floatingWindowEnabled) {

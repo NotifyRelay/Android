@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -38,6 +39,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
@@ -284,12 +286,12 @@ fun DeviceListScreen(
         val isOnline = deviceStates[device.uuid] == true
         val context = LocalContext.current
         
-        val batteryLevel = remember { mutableStateOf(100) }
+        val batteryLevel = remember { mutableIntStateOf(100) }
         val isCharging = remember { mutableStateOf(device.chargingStatus) }
 
         LaunchedEffect(device.batteryLevel) {
-            if (device.batteryLevel != -1 && device.batteryLevel != batteryLevel.value) {
-                batteryLevel.value = device.batteryLevel.coerceIn(0, 100)
+            if (device.batteryLevel != -1 && device.batteryLevel != batteryLevel.intValue) {
+                batteryLevel.intValue = device.batteryLevel.coerceIn(0, 100)
             }
         }
         
@@ -299,7 +301,7 @@ fun DeviceListScreen(
             }
         }
         
-        val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel.value, isCharging.value)
+        val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel.intValue, isCharging.value)
         
         val buttonColors = if (selectedDevice?.uuid == device.uuid) {
             ButtonDefaults.buttonColorsPrimary()
@@ -342,7 +344,7 @@ fun DeviceListScreen(
                                 text = batteryIcon,
                                 fontFamily = FontFamily(Font(resId = R.font.segsmdl2)),
                                 fontSize = 16.sp,
-                                color = BatteryIconConverter.getBatteryColor(batteryLevel.value),
+                                color = BatteryIconConverter.getBatteryColor(batteryLevel.intValue),
                                 modifier = Modifier.padding(end = 8.dp)
                             )
                         }
@@ -479,7 +481,7 @@ fun DeviceListScreen(
     }
 
     if (state.showConnectDialog && state.pendingConnectDevice != null) {
-        val activity = LocalContext.current as? Activity
+        val activity = LocalActivity.current as? Activity
         val showDialog = remember { mutableStateOf(true) }
         ConnectDeviceDialog(
             showDialog = showDialog,

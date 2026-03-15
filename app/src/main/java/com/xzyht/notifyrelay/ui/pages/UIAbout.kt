@@ -11,6 +11,8 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -54,8 +56,8 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     
-    var clickCount by remember { mutableStateOf(0) }
-    var lastClickTime by remember { mutableStateOf(0L) }
+    var clickCount by remember { mutableIntStateOf(0) }
+    var lastClickTime by remember { mutableLongStateOf(0L) }
     var isDeveloperModeEnabled by remember {
         mutableStateOf(StorageManager.getBoolean(context, "developer_mode_enabled", false))
     }

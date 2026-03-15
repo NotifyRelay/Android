@@ -27,6 +27,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.common.AutoScrollT
 import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.TimerInfo
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
+import java.util.Locale
 
 /**
  * 通用图片加载组件
@@ -228,9 +229,9 @@ fun formatTimerInfo(timer: TimerInfo): String {
     val hours = minutes / 60
     
     return if (hours > 0) {
-        String.format("%02d:%02d:%02d", hours, minutes % 60, seconds % 60)
+        String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes % 60, seconds % 60)
     } else {
-        String.format("%02d:%02d", minutes % 60, seconds % 60)
+        String.format(Locale.ROOT, "%02d:%02d", minutes % 60, seconds % 60)
     }
 }
 
@@ -241,12 +242,10 @@ fun formatDuration(ms: Long): String {
     val seconds = (ms / 1000).toInt()
     val minutes = seconds / 60
     val hours = minutes / 60
-    
-    return if (hours > 0) {
-        String.format("%02d:%02d:%02d", hours, minutes % 60, seconds % 60)
-    } else {
-        String.format("%02d:%02d", minutes % 60, seconds % 60)
-    }
+
+    return if (hours > 0)
+        String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes % 60, seconds % 60) else
+        String.format(Locale.ROOT, "%02d:%02d", minutes % 60, seconds % 60)
 }
 
 /**
