@@ -641,7 +641,9 @@ object NotificationGenerator {
                 // 构建通知
                 val notification = if (!isProgressType) {
                     // 非进度类型通知，添加胶囊兼容字段并注入图标
-                    buildCapsuleCompatibleNotificationWithIconInjection(context, builder, title, text, appName, paramV2, picMap, paramV2RawValue)
+                    val builtNotification = buildCapsuleCompatibleNotificationWithIconInjection(context, builder, title, text, appName, paramV2, picMap, paramV2RawValue)
+                    Logger.i(TAG, "超级岛: 非进度类型通知已构建，key=$key")
+                    builtNotification
                 } else {
                     // 进度类型通知，已经通过 LiveUpdatesNotificationManager 处理，不重复添加胶囊兼容字段
                     Logger.i(TAG, "超级岛: 进度类型通知，已通过 LiveUpdatesNotificationManager 处理，不重复添加胶囊兼容字段")
@@ -703,13 +705,12 @@ object NotificationGenerator {
                         injectSmallIcon(builtNotification, smallIconBitmap)
                     }
                     
+                    Logger.i(TAG, "超级岛: 进度类型通知已构建，key=$key")
                     builtNotification
                 }
                 
                 // 发送通知
                 notificationManager.notify(notificationId, notification)
-                
-                Logger.i(TAG, "超级岛: 进度类型通知已发送，key=$key")
         }
         
         // 保存entryKey到notificationId的映射
