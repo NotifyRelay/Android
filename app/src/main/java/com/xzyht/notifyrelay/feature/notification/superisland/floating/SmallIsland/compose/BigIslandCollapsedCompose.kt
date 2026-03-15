@@ -103,7 +103,7 @@ fun BigIslandCollapsedCompose(
             }
             
             // 只有当B区存在内容时，才显示中间间距和B区
-            if (bComp !is BEmpty) {
+            if (bComp != null && bComp !is BEmpty) {
                 // 动态中间间距：根据两侧内容宽度调整
                 val dynamicSpacing = 48.dp // 加宽侧与链接处的空隙宽度
                 Spacer(modifier = Modifier.width(dynamicSpacing))
@@ -113,7 +113,7 @@ fun BigIslandCollapsedCompose(
                     modifier = Modifier.wrapContentWidth(),
                     contentAlignment = Alignment.CenterEnd
                 ) {
-                    bComp?.let { BCompose(it, picMap) }
+                    BCompose(bComp, picMap)
                 }
             }
         }

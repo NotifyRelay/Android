@@ -1,5 +1,9 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.core
 
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AComponent
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BComponent
+import com.xzyht.notifyrelay.feature.notification.superisland.model.parseAComponent
+import com.xzyht.notifyrelay.feature.notification.superisland.model.parseBComponent
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
 
@@ -13,10 +17,12 @@ data class BigIslandArea(
     val leftImage: String? = null,
     val rightImage: String? = null,
     val verificationCode: String? = null,
-    val isVerificationCode: Boolean = false
+    val isVerificationCode: Boolean = false,
+    val aComponent: AComponent? = null,
+    val bComponent: BComponent? = null
 )
 
-fun parseBigIslandArea(json: JSONObject?): BigIslandArea? {
+fun parseBigIslandArea(json: JSONObject?, picFunction: String? = null, aodPic: String? = null): BigIslandArea? {
     if (json == null) return null
 
     val leftPic = json.optJSONObject("imageTextInfoLeft")
@@ -77,13 +83,19 @@ fun parseBigIslandArea(json: JSONObject?): BigIslandArea? {
         verCode = finalPrimary
     }
 
+    // 解析 A/B 区组件
+    val aComponent = parseAComponent(json, picFunction, aodPic)
+    val bComponent = parseBComponent(json, picFunction, aodPic)
+
     return BigIslandArea(
         primaryText = finalPrimary,
         secondaryText = finalSecondary,
         leftImage = leftPic,
         rightImage = rightPic,
         verificationCode = verCode,
-        isVerificationCode = isVerCode
+        isVerificationCode = isVerCode,
+        aComponent = aComponent,
+        bComponent = bComponent
     )
 }
 

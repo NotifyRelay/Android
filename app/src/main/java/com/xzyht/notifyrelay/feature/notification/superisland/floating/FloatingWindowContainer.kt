@@ -144,7 +144,7 @@ fun FloatingWindowContainer(
 
                                 val context = LocalContext.current
                                 if (hasParamV2) {
-                                    entry.paramV2?.let { paramV2 ->
+                                    entry.paramV2.let { paramV2 ->
                                         Logger.d("超级岛", "FloatingWindowContainer渲染: paramIsland=${paramV2.paramIsland != null}, highlight=${paramV2.highlightInfo != null}, baseInfo=${paramV2.baseInfo != null}")
                                         when {
                                             // 媒体类型处理
@@ -193,7 +193,7 @@ fun FloatingWindowContainer(
                                                     }
                                                 )
                                             }
-                                            
+
                                             paramV2.paramIsland != null -> {
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 ParamIslandCompose")
                                                 ParamIslandCompose(paramV2.paramIsland, actions = paramV2.actions, picMap = entry.picMap)
@@ -334,45 +334,38 @@ fun FloatingWindowContainer(
 
                         // 从paramV2Raw中正确解析bigIslandJson，与传统实现保持一致
                         // 使用remember块确保entry.paramV2Raw变化时重新解析
-                        val bigIslandJson = remember(entry.paramV2Raw) {
+                        // 合并三次解析为一次，避免重复解析同一个字符串
+                        val parsedRoot = remember(entry.paramV2Raw) {
                             entry.paramV2Raw?.let {
                                 try {
-                                    val root = JSONObject(it)
-                                    val island = root.optJSONObject("param_island")
-                                        ?: root.optJSONObject("paramIsland")
-                                        ?: root.optJSONObject("islandParam")
-                                    island?.optJSONObject("bigIslandArea") ?: island?.optJSONObject(
-                                        "bigIsland"
-                                    )
+                                    JSONObject(it)
                                 } catch (e: Exception) {
                                     null
                                 }
                             }
                         }
 
-                        // 从paramV2Raw中提取aodPic
-                        val aodPic = remember(entry.paramV2Raw) {
-                            entry.paramV2Raw?.let {
-                                try {
-                                    val root = JSONObject(it)
-                                    root.optString("aodPic", "").takeIf { it.isNotBlank() }
-                                } catch (e: Exception) {
-                                    null
-                                }
+                        // 从parsedRoot中提取bigIslandJson
+                        val bigIslandJson = remember(parsedRoot) {
+                            parsedRoot?.let { root ->
+                                val island = root.optJSONObject("param_island")
+                                    ?: root.optJSONObject("paramIsland")
+                                    ?: root.optJSONObject("islandParam")
+                                island?.optJSONObject("bigIslandArea") ?: island?.optJSONObject(
+                                    "bigIsland"
+                                )
                             }
                         }
 
-                        // 从paramV2Raw中提取 highlightInfo.picFunction
-                        val picFunction = remember(entry.paramV2Raw) {
-                            entry.paramV2Raw?.let {
-                                try {
-                                    val root = JSONObject(it)
-                                    val highlightInfo = root.optJSONObject("highlightInfo")
-                                    highlightInfo?.optString("picFunction", "")?.takeIf { it.isNotBlank() }
-                                } catch (e: Exception) {
-                                    null
-                                }
-                            }
+                        // 从parsedRoot中提取aodPic
+                        val aodPic = remember(parsedRoot) {
+                            parsedRoot?.optString("aodPic", "")?.takeIf { it.isNotBlank() }
+                        }
+
+                        // 从parsedRoot中提取 highlightInfo.picFunction
+                        val picFunction = remember(parsedRoot) {
+                            parsedRoot?.optJSONObject("highlightInfo")
+                                ?.optString("picFunction", "")?.takeIf { it.isNotBlank() }
                         }
 
                         // 直接显示摘要态内容，不添加额外的Box包装，避免方形背景
