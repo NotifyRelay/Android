@@ -186,7 +186,7 @@ object NotificationGenerator {
                 
                 // 继续调度下一次更新
                 val delay = CapsuleScrollManager.getScrollDelay(scrollKey)
-                mainHandler.postDelayed(scrollRunnable[key]!!, delay)
+                this.scrollRunnable[key]?.let { mainHandler.postDelayed(it, delay) }
             } catch (e: Exception) {
                 Logger.e(TAG, "滚动更新失败", e)
             }
