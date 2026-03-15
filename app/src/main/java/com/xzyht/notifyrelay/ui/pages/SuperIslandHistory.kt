@@ -285,7 +285,7 @@ private fun SuperIslandHistoryListBlock(
                 anchoredDraggableState.updateAnchors(anchors)
             }
 
-            val offset by remember {
+            val offset by remember(anchoredDraggableState.currentValue, anchoredDraggableState.offset) {
                 derivedStateOf {
                     when {
                         anchoredDraggableState.currentValue == SuperIslandDragValue.End -> -deleteWidthPx
@@ -438,7 +438,7 @@ private fun SuperIslandHistoryGroupCard(
                         entryAnchoredDraggableState.updateAnchors(entryAnchors)
                     }
 
-                    val entryOffset by remember {
+                    val entryOffset by remember(entryAnchoredDraggableState.currentValue, entryAnchoredDraggableState.offset) {
                         derivedStateOf {
                             when {
                                 entryAnchoredDraggableState.currentValue == SuperIslandDragValue.End -> -deleteWidthPx
