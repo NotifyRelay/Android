@@ -233,8 +233,9 @@ object NotificationGenerator {
         text: String?,
         appName: String?,
         paramV2: ParamV2?,
+        paramV2Raw: String?,
         picMap: Map<String, String>?,
-        sourceId: String, // 新增sourceId参数
+        sourceId: String,
         floatingWindowManager: FloatingWindowManager,
         entryKeyToNotificationId: ConcurrentHashMap<String, Int>
     ): Int? {
@@ -528,9 +529,9 @@ object NotificationGenerator {
                 notificationManager.createNotificationChannel(channel)
                 
                 // 获取paramV2原始数据，提前解析用于判断是否为计时器类型
+                // 优先使用传入的paramV2Raw参数，其次从entry中获取
                 val entry = floatingWindowManager.getEntry(key)
-                val paramV2Raw = entry?.paramV2Raw
-                val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
+                val paramV2RawValue = paramV2Raw ?: entry?.paramV2Raw
                 val bigIsland = parseBigIsland(paramV2RawValue)
                 val bComponent = parseBComponent(bigIsland)
                 
@@ -583,6 +584,7 @@ object NotificationGenerator {
                     .setOngoing(true) // 实际通知通常是持续的
                     .setPriority(NotificationCompat.PRIORITY_MAX) // 提高优先级到最高，与原始通知一致
                     .setShowWhen(isRunningTimer) // 计时器需要显示时间以支持chronometer自动流逝
+                    .setUsesChronometer(isRunningTimer) // 计时器需要使用chronometer功能
                     .setWhen(System.currentTimeMillis()) // 设置时间
                     .setOnlyAlertOnce(true) // 只提示一次
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 公开可见
@@ -594,42 +596,30 @@ object NotificationGenerator {
                         .setContentIntent(pendingContentIntent) // 设置点击意图
                 }
                 
-                // 对于计时器类通知，添加计时器相关字段
-                if (title?.contains("计时") == true || title?.contains("秒表") == true) {
-                    if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
-                        // 根据timerType设置计时模式
-                        val timer = bComponent.timer
-                        val timerType = timer.timerType
-                        // timerType: -2倒计时暂停，-1倒计时开始，0默认，1正计时开始，2正计时暂停
-                        
-                        // 只对正在进行中的计时器启用自动流逝
-                        if (timerType == -1 || timerType == 1) {
-                            val isCountDown = timerType < 0
-                            
-// 使用NotificationCompat的计时器功能
-                             if (isCountDown) {
-                                 // 倒计时：计算剩余时间并设置
-                                 val now = System.currentTimeMillis()
-                                 val remaining = timer.timerWhen - now
-                                 if (remaining > 0) {
-                                     // 对于倒计时，设置chronometer自动倒计时
-                                     builder.setUsesChronometer(true)
-                                     builder.setChronometerCountDown(true)
-                                     builder.setShowWhen(true) // 确保显示时间
-                                     // 设置倒计时的终点时间
-                                     builder.setWhen(timer.timerWhen)
-                                     Logger.i(TAG, "超级岛: 倒计时通知已设置chronometer，自动更新，key=$key")
-                                 }
-                             } else {
-                                 // 正计时：使用timerWhen作为起点
-                                 builder.setUsesChronometer(true)
-                                 builder.setChronometerCountDown(false)
-                                 builder.setShowWhen(true) // 确保显示时间
-                                 // 设置正计时的起点时间
-                                 builder.setWhen(timer.timerWhen)
-                                 Logger.i(TAG, "超级岛: 正计时通知已设置chronometer，自动更新，key=$key")
-                             }
+                // 对于计时器类通知，设置计时器的倒计时方向和目标时间
+                if (isRunningTimer && bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
+                    val timer = bComponent.timer
+                    val timerType = timer.timerType
+                    // timerType: -2倒计时暂停，-1倒计时开始，0默认，1正计时开始，2正计时暂停
+                    
+                    val isCountDown = timerType < 0
+                    
+                    // 使用NotificationCompat的计时器功能设置倒计时方向和目标时间
+                    if (isCountDown) {
+                        // 倒计时：计算剩余时间并设置
+                        val now = System.currentTimeMillis()
+                        val remaining = timer.timerWhen - now
+                        if (remaining > 0) {
+                            // 设置倒计时的方向和时间
+                            builder.setChronometerCountDown(true)
+                            builder.setWhen(timer.timerWhen)
+                            Logger.i(TAG, "超级岛: 倒计时通知已设置chronometer方向和时间，自动更新，key=$key")
                         }
+                    } else {
+                        // 正计时：使用timerWhen作为起点
+                        builder.setChronometerCountDown(false)
+                        builder.setWhen(timer.timerWhen)
+                        Logger.i(TAG, "超级岛: 正计时通知已设置chronometer方向和时间，自动更新，key=$key")
                     }
                 }
                 

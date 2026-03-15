@@ -381,7 +381,7 @@ object FloatingReplicaManager {
                         }
                     } else {
                         // 非进度类型或Live Updates未启用时，发送传统复刻通知
-                        val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
+                        val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, paramV2Raw, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
                         // 添加到 sourceId 到 notificationId 的直接映射
                         addSourceIdMapping(sourceId, entryKey, notificationId)
                         Logger.i(TAG, "浮窗功能关闭时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
@@ -517,7 +517,7 @@ object FloatingReplicaManager {
                             }
                         } else {
                             // 非进度类型或Live Updates未启用时，发送传统复刻通知
-                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
+                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, paramV2Raw, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
                             // 添加到 sourceId 到 notificationId 的直接映射
                             addSourceIdMapping(sourceId, entryKey, notificationId)
                             Logger.i(TAG, "浮窗创建时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
