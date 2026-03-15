@@ -3,7 +3,6 @@ package com.xzyht.notifyrelay.servers
 import android.accessibilityservice.AccessibilityService
 import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
-import android.os.Build
 import android.view.accessibility.AccessibilityEvent
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardDetection
 import com.xzyht.notifyrelay.ui.ClipboardSyncActivity
@@ -78,7 +77,7 @@ class ClipboardAccessiblityService : AccessibilityService() {
                 else -> "OTHER(${event.eventType})"
             }
             
-            Logger.d(TAG, "收到事件: $eventType, 包名: $packageName, 类名: ${event.className}, 文本: ${event.text}, 描述: ${event.contentDescription}")
+            Logger.d(TAG, "收到事件: $eventType, 包名: $packageName, 类名: ${event.className}")
 
             if (clipboardDetector.getSupportedEventTypes(event)) {
                 if (currentTimeMs - lastDetectionTimeMs < minDetectionInterval) {
