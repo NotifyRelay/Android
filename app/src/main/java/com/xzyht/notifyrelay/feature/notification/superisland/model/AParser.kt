@@ -7,8 +7,11 @@ import org.json.JSONObject
 
 /**
  * 解析 A区（imageTextInfoLeft）。
+ * @param bigIsland 大岛区域 JSON
+ * @param picFunction 功能图标键（来自 highlightInfo.picFunction）
+ * @param aodPic AOD 图片键
  */
-fun parseAComponent(bigIsland: JSONObject?): AComponent? {
+fun parseAComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic: String? = null): AComponent? {
     val left = bigIsland?.optJSONObject("imageTextInfoLeft") ?: return null
     val type = left.optInt("type", 0)
 
@@ -24,19 +27,25 @@ fun parseAComponent(bigIsland: JSONObject?): AComponent? {
 
             val picInfo = left.optJSONObject("picInfo")
             val t = picInfo?.optInt("type", 0) ?: 0
-            // 兼容多类：
-    // - type=1/4：按 pic 字段作为 picKey 使用（4 为静态图资源键）
-    // - type=2（系统内置资源占位）：本应用不读取系统资源，此处不设主键，渲染时仅从 picMap 的 miui.focus.pic_* 集合中挑选（“第二位优先”）
-    // - type=3：系统内置图标，pic字段可能不是有效的miui.focus键，允许picKey为空，交由渲染期处理
-    val picKey: String? = when (t) {
-        1, 4 -> picInfo?.optString("pic", "")?.takeIf { it.isNotBlank() }
-        2, 3 -> null
-        else -> null
-    }
-    // 对于 type=4（静态图资源键），pic 字段必须有效；对于 type=1/2/3，允许 picKey 为空，交由渲染期从 pic_* 集合中挑选
-    // 注意：type=1 不再强制要求picKey，因为有些系统通知可能没有有效的pic字段，但有picMap中的图标
-    val mustHavePicKey = (t == 4)
-    if (mustHavePicKey && picKey == null) return null
+            // picInfo.type 含义：
+            // - type=1: appIcon - 应用图标
+            // - type=2: middle - 中等尺寸图片
+            // - type=3: large - 大尺寸图片
+            // - type=4: 静态图标
+            // 图标选择优先级：
+            // 1. pic 字段（如果是 miui.focus.pic_ 前缀）
+            // 2. picFunction（来自 highlightInfo.picFunction）
+            // 3. aodPic
+            val picRaw = picInfo?.optString("pic", "")?.takeIf { it.isNotBlank() }
+            val picKey: String? = when {
+                picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
+                picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
+                aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
+                else -> null
+            }
+            // 对于 type=4（静态图资源键），pic 字段必须有效
+            val mustHavePicKey = (t == 4)
+            if (mustHavePicKey && picKey == null) return null
 
             AImageText1(
                 title = title,
@@ -56,7 +65,17 @@ fun parseAComponent(bigIsland: JSONObject?): AComponent? {
 
             val picInfo = left.optJSONObject("picInfo")
             val picTypeOk = (picInfo?.optInt("type", 0) == 4)
-            val picKey = picInfo?.optString("pic", "")?.takeIf { it.isNotBlank() }
+            val picRaw = picInfo?.optString("pic", "")?.takeIf { it.isNotBlank() }
+            // 图标选择优先级：
+            // 1. pic 字段（如果是 miui.focus.pic_ 前缀）
+            // 2. picFunction（来自 highlightInfo.picFunction）
+            // 3. aodPic
+            val picKey: String? = when {
+                picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
+                picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
+                aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
+                else -> null
+            }
 
             // 必填：title、picInfo.type==4、picKey
             if (title == null || !picTypeOk || picKey == null) return null

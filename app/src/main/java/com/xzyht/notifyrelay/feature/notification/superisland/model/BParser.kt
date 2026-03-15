@@ -16,8 +16,11 @@ import org.json.JSONObject
 /**
  * 解析 B区（优先识别 imageTextInfoRight 的 type，其次识别 text/digit/progress/pic）。
  * 若均未命中，返回 BEmpty。
+ * @param bigIsland 大岛区域 JSON
+ * @param picFunction 功能图标键（来自 highlightInfo.picFunction）
+ * @param aodPic AOD 图片键
  */
-fun parseBComponent(bigIsland: JSONObject?): BComponent {
+fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic: String? = null): BComponent? {
     val right = bigIsland?.optJSONObject("imageTextInfoRight")
     if (right != null) {
         val type = right.optInt("type", 0)
@@ -32,7 +35,17 @@ fun parseBComponent(bigIsland: JSONObject?): BComponent {
 
         val picInfo = right.optJSONObject("picInfo")
         val picTypeOk = (picInfo?.optInt("type", 0) == 1)
-        val picKey = picInfo?.optString("pic", "")?.takeIf { it.isNotBlank() }
+        // 图标选择优先级：
+        // 1. pic 字段（如果是 miui.focus.pic_ 前缀）
+        // 2. picFunction（来自 highlightInfo.picFunction）
+        // 3. aodPic
+        val picRaw = picInfo?.optString("pic", "")?.takeIf { it.isNotBlank() }
+        val picKey: String? = when {
+            picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
+            picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
+            aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
+            else -> null
+        }
 
         return when (type) {
             2 -> {
@@ -158,10 +171,20 @@ fun parseBComponent(bigIsland: JSONObject?): BComponent {
 
         // picInfo (optional but if present must be type=1 & pic required)
         val picObj = root.optJSONObject("picInfo")
-        val picKey = picObj?.let { po ->
+        val picRaw = picObj?.let { po ->
             val typeOk = po.optInt("type", 0) == 1
             val key = po.optString("pic", "").takeIf { it.isNotBlank() }
             if (typeOk) key else null
+        }
+        // 图标选择优先级：
+        // 1. pic 字段（如果是 miui.focus.pic_ 前缀）
+        // 2. picFunction（来自 highlightInfo.picFunction）
+        // 3. aodPic
+        val picKey: String? = when {
+            picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
+            picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
+            aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
+            else -> picRaw
         }
 
         return BProgressTextInfo(
@@ -181,8 +204,18 @@ fun parseBComponent(bigIsland: JSONObject?): BComponent {
     bigIsland?.optJSONObject("picInfo")?.let { pi ->
         val type = pi.optInt("type", -1)
         if (type != 1 && type != 4) return@let
-        val picKey = pi.optString("pic", "").takeIf { it.isNotBlank() } ?: return@let
-        return BPicInfo(picKey = picKey, type = type)
+        val picRaw = pi.optString("pic", "").takeIf { it.isNotBlank() } ?: return@let
+        // 图标选择优先级：
+        // 1. pic 字段（如果是 miui.focus.pic_ 前缀）
+        // 2. picFunction（来自 highlightInfo.picFunction）
+        // 3. aodPic
+        val picKey: String? = when {
+            picRaw.startsWith("miui.focus.pic_") -> picRaw
+            picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
+            aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
+            else -> picRaw
+        }
+        return picKey?.let { BPicInfo(picKey = it, type = type) }
     }
 
     return BEmpty
