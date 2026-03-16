@@ -82,7 +82,7 @@ object TextSplitter {
      * @param text 原始文本
      * @return 截断后的文本
      */
-    private fun truncateText(text: String): String {
+    fun truncateText(text: String): String {
         // 最长13等价字符（7+6），超长的直接截断
         val maxEquivalentLength = 13.0
         val maxAllowedLength = 18 // 允许最多超出5个字符
