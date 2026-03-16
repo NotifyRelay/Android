@@ -192,33 +192,30 @@ object TextSplitter {
         iconSplitPoint = maxOf(minSplitPoint, iconSplitPoint)
         iconSplitPoint = min(iconSplitPoint, truncatedText.length)
         
-        // 处理空字符串情况
-        if (truncatedText.isEmpty()) {
-            return Pair("", "")
-        }
-        
         // 确保索引不超出范围
-        val safeIconSplitPoint = min(iconSplitPoint, truncatedText.lastIndex)
+        val safeIconSplitPoint = min(iconSplitPoint, truncatedText.lastIndex.coerceAtLeast(0))
         
-        // 在图标拆分点附近寻找空格或标点符号，范围为从minSplitPoint到图标拆分点+3
-        val searchStart = minSplitPoint
-        val searchEnd = minOf(capsuleSplitPoint, iconSplitPoint + 3)
+        // 计算安全的搜索范围
+        val searchStart = maxOf(minSplitPoint, 0)
+        val searchEnd = minOf(capsuleSplitPoint, iconSplitPoint + 3, truncatedText.length)
         
         // 从图标拆分点开始，向左寻找最近的空格或标点符号
         var splitPoint = safeIconSplitPoint
         var foundSplitPoint = false
-        for (i in safeIconSplitPoint downTo searchStart) {
-            if (truncatedText[i] == ' ' || isPunctuation(truncatedText[i])) {
-                splitPoint = i
-                foundSplitPoint = true
-                break
+        if (truncatedText.isNotEmpty() && safeIconSplitPoint >= searchStart) {
+            for (i in safeIconSplitPoint downTo searchStart) {
+                if (truncatedText[i] == ' ' || isPunctuation(truncatedText[i])) {
+                    splitPoint = i
+                    foundSplitPoint = true
+                    break
+                }
             }
         }
         
         // 如果向左没找到空格或标点，向右寻找
-        if (!foundSplitPoint) {
+        if (!foundSplitPoint && truncatedText.isNotEmpty() && safeIconSplitPoint < searchEnd) {
             for (i in safeIconSplitPoint until searchEnd) {
-                if (i < truncatedText.length && (truncatedText[i] == ' ' || isPunctuation(truncatedText[i]))) {
+                if (truncatedText[i] == ' ' || isPunctuation(truncatedText[i])) {
                     splitPoint = i
                     break
                 }
