@@ -77,17 +77,74 @@ class TextSplitterUnitTest {
         val resultFile = File(outputDir, "test_results.txt")
         val resultBuilder = StringBuilder()
         
+        var testFailed = false
+        
         testCases.forEachIndexed { index, text ->
             // 使用修复后的TextSplitter逻辑
             val (iconText, capsuleText) = TextSplitter.splitLyricWithCharacterType(text, 6)
             
-            val result = formatTestResult(index, text, iconText, capsuleText)
-            resultBuilder.append(result)
-            print(result)
+            try {
+                // 添加断言验证
+                validateSplitResult(text, iconText, capsuleText)
+                
+                // 测试通过，只打印基本信息
+                val result = formatTestResult(index, text, iconText, capsuleText)
+                resultBuilder.append(result)
+                print(result)
+            } catch (e: AssertionError) {
+                // 测试失败，打印详细数据值
+                val result = formatFailedTestResult(index, text, iconText, capsuleText)
+                resultBuilder.append(result)
+                print(result)
+                // 记录测试失败，但继续执行后续测试
+                testFailed = true
+            }
+        }
+        
+        // 如果有测试失败，最后抛出异常，确保测试整体失败
+        if (testFailed) {
+            throw AssertionError("部分测试用例失败，请查看详细输出")
         }
         
         resultFile.writeText(resultBuilder.toString(), Charsets.UTF_8)
         println("测试结果已保存到: ${resultFile.absolutePath}")
+    }
+    
+    /**
+     * 验证拆分结果是否符合预期
+     */
+    private fun validateSplitResult(text: String, iconText: String, capsuleText: String) {
+        val textLength = TextSplitter.calculateTextLength(text)
+        val iconLength = TextSplitter.calculateTextLength(iconText)
+        val capsuleLength = TextSplitter.calculateTextLength(capsuleText)
+        val totalSplitLength = iconLength + capsuleLength
+        
+        // 验证短文本不会被拆分（iconText 为空）
+        if (textLength <= 6.0) {
+            assert(iconText.isEmpty()) { "短文本应该不会被拆分，iconText 应该为空" }
+            assert(capsuleText == text) { "短文本应该完全显示在胶囊中" }
+        }
+        
+        // 验证拆分后的等价长度在预期范围内
+        if (iconText.isNotEmpty()) {
+            // 图标长度不超过7等价
+            assert(iconLength <= 7.0) { "图标文本长度不应超过7等价长度" }
+            // 胶囊长度至少为1等价
+            assert(capsuleLength >= 1.0) { "胶囊文本长度不应小于1等价长度" }
+        }
+        
+        // 在原文本长于13等价长度后，图标加胶囊至少等价10
+        if (textLength > 13.0) {
+            assert(totalSplitLength >= 10.0) { "原文本长于13等价长度时，图标加胶囊至少等价10" }
+        }
+        
+        // 在原始文本很短的时候胶囊加图标等于原始
+        if (textLength <= 13.0) {
+            assert(totalSplitLength == textLength) { "原始文本很短时，胶囊加图标长度应等于原始长度" }
+        }
+        
+        // 验证胶囊文本长度不超过18个字符
+        assert(capsuleText.length <= 18) { "胶囊文本长度不应超过18个字符" }
     }
     
     /**
@@ -98,8 +155,35 @@ class TextSplitterUnitTest {
         
         builder.appendLine("=== 测试用例 ${index + 1} ===")
         builder.appendLine("原始文本: $text")
+        
+        // 只有当图标文本不为空时才显示图标部分信息
+        if (iconText.isNotEmpty()) {
+            builder.appendLine("图标文本: $iconText")
+        }
+        
+        builder.appendLine("胶囊文本: $capsuleText")
+        builder.appendLine()
+        
+        // 仅在追加到resultBuilder时添加分隔线
+        builder.appendLine("-".repeat(50))
+        builder.appendLine()
+        
+        return builder.toString()
+    }
+    
+    /**
+     * 格式化故障测试结果，打印详细数据值
+     */
+    private fun formatFailedTestResult(index: Int, text: String, iconText: String, capsuleText: String): String {
+        val builder = StringBuilder()
+        val textLength = TextSplitter.calculateTextLength(text)
+        val iconLength = TextSplitter.calculateTextLength(iconText)
+        val capsuleLength = TextSplitter.calculateTextLength(capsuleText)
+        
+        builder.appendLine("=== 测试用例 ${index + 1} (故障) ===")
+        builder.appendLine("原始文本: $text")
         builder.appendLine("总长度: ${text.length}")
-        builder.appendLine("等价长度: ${TextSplitter.calculateTextLength(text)}")
+        builder.appendLine("等价长度: $textLength")
         builder.appendLine()
         builder.appendLine("分割结果:")
         
@@ -107,13 +191,13 @@ class TextSplitterUnitTest {
         if (iconText.isNotEmpty()) {
             builder.appendLine("图标文本: $iconText")
             builder.appendLine("图标文本长度: ${iconText.length}")
-            builder.appendLine("图标文本等价长度: ${TextSplitter.calculateTextLength(iconText)}")
+            builder.appendLine("图标文本等价长度: $iconLength")
             builder.appendLine()
         }
         
         builder.appendLine("胶囊文本: $capsuleText")
         builder.appendLine("胶囊文本长度: ${capsuleText.length}")
-        builder.appendLine("胶囊文本等价长度: ${TextSplitter.calculateTextLength(capsuleText)}")
+        builder.appendLine("胶囊文本等价长度: $capsuleLength")
         builder.appendLine()
         
         // 仅在追加到resultBuilder时添加分隔线
