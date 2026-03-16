@@ -13,7 +13,6 @@ object TextSplitter {
      * 2个数字视为1个中文字符
      * 2个小写西里尔字母视为1个中文字符
      * 2个半角标点视为1个中文字符
-     * 2个空格视为1个中文字符
      * 日语片假名视为1个中文字符
      */
     fun calculateTextLength(text: String): Double {
@@ -22,8 +21,8 @@ object TextSplitter {
             if (isChineseCharacter(char) || isKanaCharacter(char)) {
                 // 中文字符和日语片假名算1个字符
                 length += 1.0
-            } else if (char.isLetter() || char.isDigit() || isHalfWidthPunctuation(char) || char == ' ') {
-                // 英语字母、数字、半角标点和空格算0.5个字符
+            } else if (isLowercaseLetter(char) || char.isDigit() || isHalfWidthPunctuation(char)) {
+                // 小写字母（英语和西里尔）、数字、半角标点算0.5个字符
                 length += 0.5
             } else {
                 // 其他字符算1个字符
@@ -31,6 +30,15 @@ object TextSplitter {
             }
         }
         return length
+    }
+    
+    /**
+     * 判断字符是否为小写字母（包括英语和西里尔）
+     */
+    private fun isLowercaseLetter(c: Char): Boolean {
+        // 英语小写字母范围：a-z
+        // 小写西里尔字母范围：U+0430 到 U+044F
+        return c in 'a'..'z' || c in 'а'..'я'
     }
     
     /**
@@ -91,7 +99,7 @@ object TextSplitter {
         
         for (i in 0 until text.length) {
             val char = text[i]
-            currentLength += if (isChineseCharacter(char) || isKanaCharacter(char)) 1.0 else if (char.isLetter() || char.isDigit() || isHalfWidthPunctuation(char) || char == ' ') 0.5 else 1.0
+            currentLength += if (isChineseCharacter(char) || isKanaCharacter(char)) 1.0 else if (isLowercaseLetter(char) || char.isDigit() || isHalfWidthPunctuation(char)) 0.5 else 1.0
             
             if (currentLength >= maxEquivalentLength) {
                 truncatePoint = i + 1
@@ -157,7 +165,7 @@ object TextSplitter {
         var currentLength = 0.0
         for (i in truncatedText.length - 1 downTo 0) {
             val char = truncatedText[i]
-            currentLength += if (isChineseCharacter(char) || isKanaCharacter(char)) 1.0 else if (char.isLetter() || char.isDigit() || isHalfWidthPunctuation(char) || char == ' ') 0.5 else 1.0
+            currentLength += if (isChineseCharacter(char) || isKanaCharacter(char)) 1.0 else if (isLowercaseLetter(char) || char.isDigit() || isHalfWidthPunctuation(char)) 0.5 else 1.0
             
             if (currentLength >= capsuleEquivalentLength) {
                 capsuleSplitPoint = i
@@ -173,7 +181,7 @@ object TextSplitter {
         currentLength = 0.0
         for (i in 0 until capsuleSplitPoint) {
             val char = truncatedText[i]
-            currentLength += if (isChineseCharacter(char) || isKanaCharacter(char)) 1.0 else if (char.isLetter() || char.isDigit() || isHalfWidthPunctuation(char) || char == ' ') 0.5 else 1.0
+            currentLength += if (isChineseCharacter(char) || isKanaCharacter(char)) 1.0 else if (isLowercaseLetter(char) || char.isDigit() || isHalfWidthPunctuation(char)) 0.5 else 1.0
             
             if (currentLength >= maxIconEquivalentLength) {
                 iconSplitPoint = i + 1
