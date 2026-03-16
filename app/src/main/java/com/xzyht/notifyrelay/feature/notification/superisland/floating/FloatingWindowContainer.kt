@@ -357,13 +357,14 @@ fun FloatingWindowContainer(
                             }
                         }
 
-                        // 从parsedRoot中提取aodPic
-                        val aodPic = remember(parsedRoot) {
-                            parsedRoot?.optString("aodPic", "")?.takeIf { it.isNotBlank() }
+                        // 优先从entry.paramV2中提取aodPic，然后回退到parsedRoot
+                        val aodPic = remember(entry.paramV2, parsedRoot) {
+                            entry.paramV2?.aodPic ?: parsedRoot?.optString("aodPic", "")?.takeIf { it.isNotBlank() }
                         }
 
-                        // 从parsedRoot中提取 highlightInfo.picFunction
-                        val picFunction = remember(parsedRoot) {
+                        // 优先从entry.paramV2中提取picFunction，然后回退到parsedRoot
+                        val picFunction = remember(entry.paramV2, parsedRoot) {
+                            entry.paramV2?.picFunction ?: entry.paramV2?.highlightInfo?.picFunction ?: 
                             parsedRoot?.optJSONObject("highlightInfo")
                                 ?.optString("picFunction", "")?.takeIf { it.isNotBlank() }
                         }

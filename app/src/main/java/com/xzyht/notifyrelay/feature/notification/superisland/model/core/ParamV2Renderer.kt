@@ -74,7 +74,7 @@ fun parseParamV2(jsonString: String): ParamV2? {
         
         try {
             highlight = json.optJSONObject("highlightInfo")?.let { parseHighlightInfo(it) }
-                ?: parseHighlightFromIconText(json)
+                ?: parseHighlightFromIconText(json, null, null)
         } catch (e: Exception) {
             Logger.w("超级岛", "解析highlightInfo失败: ${e.message}")
         }
@@ -133,7 +133,7 @@ fun parseParamV2(jsonString: String): ParamV2? {
         
         // 提取 aodPic 和 picFunction 用于解析 A/B 区组件
         val aodPic = json.optString("aodPic", "").takeIf { it.isNotBlank() }
-        val picFunction = json.optJSONObject("highlightInfo")
+        val picFunction = highlight?.picFunction ?: json.optJSONObject("highlightInfo")
             ?.optString("picFunction", "")?.takeIf { it.isNotBlank() }
         
         try {
@@ -164,7 +164,7 @@ fun parseParamV2(jsonString: String): ParamV2? {
         textButton = textButton,
         paramIsland = paramIsland,
         aodPic = aodPic,
-        picFunction = picFunction
+        picFunction = highlight?.picFunction ?: picFunction
     )
     
     Logger.d("超级岛", "ParamV2解析结果: paramIsland=${paramIsland != null}, highlight=${highlight != null}, baseInfo=${baseInfo != null}, actions=${actions?.size}")
@@ -184,7 +184,7 @@ fun parseParamV2(jsonString: String): ParamV2? {
     }
 }
 
-private fun parseHighlightFromIconText(root: JSONObject): HighlightInfo? {
+private fun parseHighlightFromIconText(root: JSONObject, picFunction: String?, aodPic: String?): HighlightInfo? {
     val iconText = root.optJSONObject("iconTextInfo") ?: return null
     val title = iconText.optString("title", "").takeIf { it.isNotBlank() }
     val content = iconText.optString("content", "").takeIf { it.isNotBlank() }
@@ -203,7 +203,9 @@ private fun parseHighlightFromIconText(root: JSONObject): HighlightInfo? {
     val big = parseBigIslandArea(
         paramIsland?.optJSONObject("bigIslandArea") ?: paramIsland?.optJSONObject(
             "bigIsland"
-        )
+        ),
+        picFunction,
+        aodPic
     )
     val leftPic = big?.leftImage
     val rightPic = big?.rightImage

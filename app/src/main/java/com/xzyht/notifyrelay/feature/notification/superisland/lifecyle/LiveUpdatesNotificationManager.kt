@@ -16,6 +16,7 @@ import androidx.core.graphics.toColorInt
 import androidx.core.text.HtmlCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
+import com.xzyht.notifyrelay.feature.notification.superisland.formatter.FormattedSuperIslandData
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
 import kotlinx.coroutines.CoroutineScope
@@ -138,13 +139,12 @@ object LiveUpdatesNotificationManager {
         notificationManager.createNotificationChannel(channel)
     }
 
-    suspend fun showLiveUpdate(
+    fun showLiveUpdate(
         sourceId: String,
         title: String?,
         text: String?,
-        paramV2Raw: String?,
         appName: String?,
-        picMap: Map<String, String>? = null
+        formattedData: FormattedSuperIslandData
     ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
             Logger.w(TAG, "当前Android版本不支持Live Updates")
@@ -162,8 +162,6 @@ object LiveUpdatesNotificationManager {
         try {
             val notificationId = sourceId.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
             
-            // 使用统一的格式化服务解析数据
-            val formattedData = SuperIslandDataFormatter.formatForDisplay(appContext, paramV2Raw, picMap)
             val paramV2 = formattedData.paramV2
 
             // 调试picMap内容
@@ -206,7 +204,7 @@ object LiveUpdatesNotificationManager {
                         .putExtra("title", title)
                         .putExtra("text", text)
                         .putExtra("appName", appName)
-                        .putExtra("paramV2Raw", paramV2Raw)
+                        .putExtra("paramV2Raw", formattedData.paramV2Raw)
                         .setAction("com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )

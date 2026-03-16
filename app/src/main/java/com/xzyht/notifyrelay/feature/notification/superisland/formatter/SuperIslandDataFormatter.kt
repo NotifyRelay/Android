@@ -4,6 +4,8 @@ import android.content.Context
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.model.core.parseParamV2
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
 
 data class FormattedSuperIslandData(
@@ -50,7 +52,9 @@ object SuperIslandDataFormatter {
             if (picMap.isNullOrEmpty()) {
                 emptyMap()
             } else {
-                SuperIslandImageStore.resolvePicMap(context, picMap)
+                withContext(Dispatchers.IO) {
+                    SuperIslandImageStore.resolvePicMap(context, picMap)
+                }
             }
         } catch (e: Exception) {
             Logger.w(TAG, "解析picMap失败: ${e.message}")

@@ -329,10 +329,9 @@ object FloatingReplicaManager {
                         runWithErrorHandlingSuspend("发送Live Updates复合通知") {
                             // 初始化Live Updates通知管理器
                             LiveUpdatesNotificationManager.initialize(context)
-                            // 发送复合通知
+                            // 发送复合通知（使用预格式化数据重载）
                             LiveUpdatesNotificationManager.showLiveUpdate(
-                                sourceId, title, text, formattedData.paramV2Raw, appName,
-                                formattedData.resolvedPicMap
+                                sourceId, title, text, appName, formattedData
                             )
                             // Live Updates通知的ID计算方式与传统通知不同，需要手动计算并添加映射
                             val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
@@ -468,10 +467,9 @@ object FloatingReplicaManager {
                             runWithErrorHandlingSuspend("发送Live Updates复合通知") {
                                 // 初始化Live Updates通知管理器
                                 LiveUpdatesNotificationManager.initialize(context)
-                                // 发送复合通知
+                                // 发送复合通知（使用预格式化数据重载）
                                 LiveUpdatesNotificationManager.showLiveUpdate(
-                                    sourceId, title, text, formattedData.paramV2Raw, appName,
-                                    formattedData.resolvedPicMap
+                                    sourceId, title, text, appName, formattedData
                                 )
                                 // Live Updates通知的ID计算方式与传统通知不同，需要手动计算并添加映射
                                 val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000

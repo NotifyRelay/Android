@@ -22,7 +22,7 @@ data class BigIslandArea(
     val bComponent: BComponent? = null
 )
 
-fun parseBigIslandArea(json: JSONObject?, picFunction: String? = null, aodPic: String? = null): BigIslandArea? {
+fun parseBigIslandArea(json: JSONObject?, picFunction: String?, aodPic: String?): BigIslandArea? {
     if (json == null) return null
 
     val leftPic = json.optJSONObject("imageTextInfoLeft")

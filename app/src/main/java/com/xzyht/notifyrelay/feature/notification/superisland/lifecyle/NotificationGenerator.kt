@@ -865,83 +865,7 @@ object NotificationGenerator {
             )
 
             // 处理 smallIcon
-            var smallIconBitmap: Bitmap? = null
-
-            // 优先处理进度数据
-            if (bProgress != null) {
-                smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
-            }
-
-            // 处理文本位图
-            if (smallIconBitmap == null) {
-                // 优先使用 B 区文本生成位图
-                val textToRender = when (bComponent) {
-                    is BSameWidthDigitInfo -> {
-                        // 优先使用timer信息计算计时值
-                        if (bComponent.timer != null) {
-                            formatTimerInfo(bComponent.timer)
-                        } else {
-                            bComponent.digit ?: bComponent.content
-                        }
-                    }
-                    else -> {
-                        bTitle ?: bContent ?: aTitle ?: aContent
-                    }
-                }
-                if (!textToRender.isNullOrBlank()) {
-                    smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
-                }
-            }
-
-            // 处理图标
-            if (smallIconBitmap == null) {
-                // 优先使用 A 区图标或B区图标
-                val picKeyToUse = aPicKey ?: bPicKey
-                Logger.d(TAG, "超级岛: 处理 A 区图标或B区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
-                if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
-                    val picUrl = picMap[picKeyToUse]
-                    if (!picUrl.isNullOrBlank()) {
-                        // 异步下载图标
-                        Logger.d(TAG, "超级岛: 使用 A 区图标或B区图标作为小图标，URL: $picUrl")
-                        val bitmap = downloadBitmap(context, picUrl, 5000)
-                        if (bitmap != null) {
-                            smallIconBitmap = bitmap
-                            Logger.d(TAG, "超级岛: A 区图标或B区图标加载成功")
-                        } else {
-                            Logger.w(TAG, "超级岛: A 区图标或B区图标加载失败")
-                        }
-                    } else {
-                        Logger.w(TAG, "超级岛: A 区图标或B区图标 URL 为空")
-                    }
-                } else {
-                    Logger.d(TAG, "超级岛: 未找到 A 区图标或B区图标键")
-                }
-            }
-
-            // 如果没有 A 区图标或B区图标，再使用应用图标
-            if (smallIconBitmap == null) {
-                // 使用应用图标（大图标的键值提供的图标）
-                val appIconKey = "miui.focus.pic_app_icon"
-                Logger.d(TAG, "超级岛: 处理应用图标 - appIconKey: $appIconKey, picMap: ${picMap?.keys}")
-                if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
-                    val appIconUrl = picMap[appIconKey]
-                    if (!appIconUrl.isNullOrBlank()) {
-                        // 异步下载应用图标
-                        Logger.d(TAG, "超级岛: 使用应用图标作为小图标，URL: $appIconUrl")
-                        val bitmap = downloadBitmap(context, appIconUrl, 5000)
-                        if (bitmap != null) {
-                            smallIconBitmap = bitmap
-                            Logger.d(TAG, "超级岛: 应用图标加载成功")
-                        } else {
-                            Logger.w(TAG, "超级岛: 应用图标加载失败")
-                        }
-                    } else {
-                        Logger.w(TAG, "超级岛: 应用图标 URL 为空")
-                    }
-                } else {
-                    Logger.d(TAG, "超级岛: 未找到应用图标键 $appIconKey")
-                }
-            }
+            val smallIconBitmap = resolveSmallIconBitmap(context, picMap, aComponent, bComponent)
 
             // 如果没有生成位图，使用系统默认图标
             if (smallIconBitmap == null) {
@@ -982,28 +906,15 @@ object NotificationGenerator {
     /**
      * 构建胶囊兼容的通知并注入图标
      */
-    private suspend fun buildCapsuleCompatibleNotificationWithIconInjection(
+    /**
+     * 解析小图标位图，遵循优先级：progress -> text -> picMap aPicKey/bPicKey -> appIconKey -> null
+     */
+    private suspend fun resolveSmallIconBitmap(
         context: Context,
-        builder: NotificationCompat.Builder,
-        title: String?,
-        text: String?,
-        appName: String?,
         picMap: Map<String, String>?,
-        paramV2Raw: String?,
         aComponent: AComponent?,
         bComponent: BComponent?
-    ): Notification {
-        try {
-            // 先构建胶囊兼容的通知
-            val capsuleBuilder = buildCapsuleCompatibleNotification(context, builder, title, text, appName,
-                picMap, paramV2Raw, aComponent, bComponent)
-
-            // 构建通知并注入图标
-            val notification = capsuleBuilder.build()
-
-        // 尝试从 A/B 区数据中获取图标或生成位图（使用已解析的组件）
-        var smallIconBitmap: Bitmap? = null
-        
+    ): Bitmap? {
         // 提取 A/B 区数据
         val aPicKey = when (aComponent) {
             is AImageText1 -> aComponent.picKey
@@ -1044,97 +955,120 @@ object NotificationGenerator {
         Logger.d(TAG, "超级岛: 处理小图标 - bProgress: $bProgress")
         if (bProgress != null) {
             Logger.d(TAG, "超级岛: 使用进度数据生成位图")
-            smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
-            Logger.d(TAG, "超级岛: 进度位图生成结果: ${smallIconBitmap != null}")
+            val bitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
+            Logger.d(TAG, "超级岛: 进度位图生成结果: ${bitmap != null}")
+            if (bitmap != null) return bitmap
         }
         
         // 处理文本位图
-        if (smallIconBitmap == null) {
-            // 检查是否为计时器类型，如果是，不生成文本位图，保留之前的图标
-            val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
-            if (!isTimerType) {
-                // 优先使用 B 区文本生成位图
-                val textToRender = when (bComponent) {
-                    is BImageText2 -> bComponent.title
-                    is BImageText3 -> bComponent.title
-                    is BImageText6 -> bComponent.title
-                    is BTextInfo -> bComponent.title
-                    is BFixedWidthDigitInfo -> bComponent.digit
-                    is BSameWidthDigitInfo -> bComponent.digit
-                    is BProgressTextInfo -> bComponent.title ?: bComponent.content
-                    else -> null
-                } ?: when (aComponent) {
-                    is AImageText1 -> aComponent.title ?: aComponent.content
-                    is AImageText5 -> aComponent.title
-                    else -> null
-                }
-                
-                Logger.d(TAG, "超级岛: 处理文本位图 - textToRender: $textToRender")
-                if (!textToRender.isNullOrBlank()) {
-                    Logger.d(TAG, "超级岛: 使用文本生成位图")
-                    smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
-                    Logger.d(TAG, "超级岛: 文本位图生成结果: ${smallIconBitmap != null}")
-                }
-            } else {
-                // 计时器类型，不生成文本位图，保留之前的图标
-                Logger.d(TAG, "超级岛: 计时器类型，保留之前的小图标，不生成文本位图")
+        // 检查是否为计时器类型，如果是，不生成文本位图，保留之前的图标
+        val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
+        if (!isTimerType) {
+            // 优先使用 B 区文本生成位图
+            val textToRender = when (bComponent) {
+                is BImageText2 -> bComponent.title
+                is BImageText3 -> bComponent.title
+                is BImageText6 -> bComponent.title
+                is BTextInfo -> bComponent.title
+                is BFixedWidthDigitInfo -> bComponent.digit
+                is BSameWidthDigitInfo -> bComponent.digit
+                is BProgressTextInfo -> bComponent.title ?: bComponent.content
+                else -> null
+            } ?: when (aComponent) {
+                is AImageText1 -> aComponent.title ?: aComponent.content
+                is AImageText5 -> aComponent.title
+                else -> null
             }
+            
+            Logger.d(TAG, "超级岛: 处理文本位图 - textToRender: $textToRender")
+            if (!textToRender.isNullOrBlank()) {
+                Logger.d(TAG, "超级岛: 使用文本生成位图")
+                val bitmap = BitmapUtils.textToBitmap(textToRender)
+                Logger.d(TAG, "超级岛: 文本位图生成结果: ${bitmap != null}")
+                if (bitmap != null) return bitmap
+            }
+        } else {
+            // 计时器类型，不生成文本位图，保留之前的图标
+            Logger.d(TAG, "超级岛: 计时器类型，保留之前的小图标，不生成文本位图")
         }
         
         // 处理图标
-        if (smallIconBitmap == null) {
-            // 优先使用 A 区图标或B区图标
-            val picKeyToUse = aPicKey ?: bPicKey
-            Logger.d(TAG, "超级岛: 处理 A 区图标或B区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
-            if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
-                val picUrl = picMap[picKeyToUse]
-                if (!picUrl.isNullOrBlank()) {
-                    // 异步下载图标
-                    Logger.d(TAG, "超级岛: 使用 A 区图标或B区图标作为小图标")
-                    val bitmap = downloadBitmap(context, picUrl, 5000)
-                    if (bitmap != null) {
-                        smallIconBitmap = bitmap
-                        Logger.d(TAG, "超级岛: A 区图标或B区图标加载成功")
-                    } else {
-                        Logger.w(TAG, "超级岛: A 区图标或B区图标加载失败")
-                    }
+        // 优先使用 A 区图标或B区图标
+        val picKeyToUse = aPicKey ?: bPicKey
+        Logger.d(TAG, "超级岛: 处理 A 区图标或B区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
+        if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
+            val picUrl = picMap[picKeyToUse]
+            if (!picUrl.isNullOrBlank()) {
+                // 异步下载图标
+                Logger.d(TAG, "超级岛: 使用 A 区图标或B区图标作为小图标")
+                val bitmap = downloadBitmap(context, picUrl, 5000)
+                if (bitmap != null) {
+                    Logger.d(TAG, "超级岛: A 区图标或B区图标加载成功")
+                    return bitmap
+                } else {
+                    Logger.w(TAG, "超级岛: A 区图标或B区图标加载失败")
                 }
             }
         }
         
         // 如果没有 A 区图标或B区图标，再使用应用图标
-        if (smallIconBitmap == null) {
-            // 使用应用图标（大图标的键值提供的图标）
-            val appIconKey = "miui.focus.pic_app_icon"
-            Logger.d(TAG, "超级岛: 处理应用图标 - appIconKey: $appIconKey, picMap: ${picMap?.keys}")
-            if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
-                val appIconUrl = picMap[appIconKey]
-                if (!appIconUrl.isNullOrBlank()) {
-                    // 异步下载应用图标
-                    Logger.d(TAG, "超级岛: 使用应用图标作为小图标")
-                    val bitmap = downloadBitmap(context, appIconUrl, 5000)
-                    if (bitmap != null) {
-                        smallIconBitmap = bitmap
-                        Logger.d(TAG, "超级岛: 应用图标加载成功")
-                    } else {
-                        Logger.w(TAG, "超级岛: 应用图标加载失败")
-                    }
+        // 使用应用图标（大图标的键值提供的图标）
+        val appIconKey = "miui.focus.pic_app_icon"
+        Logger.d(TAG, "超级岛: 处理应用图标 - appIconKey: $appIconKey, picMap: ${picMap?.keys}")
+        if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
+            val appIconUrl = picMap[appIconKey]
+            if (!appIconUrl.isNullOrBlank()) {
+                // 异步下载应用图标
+                Logger.d(TAG, "超级岛: 使用应用图标作为小图标")
+                val bitmap = downloadBitmap(context, appIconUrl, 5000)
+                if (bitmap != null) {
+                    Logger.d(TAG, "超级岛: 应用图标加载成功")
+                    return bitmap
+                } else {
+                    Logger.w(TAG, "超级岛: 应用图标加载失败")
                 }
             }
         }
         
-        // 如果没有生成位图，使用默认图标（改为本应用图标）
-        if (smallIconBitmap == null) {
-            Logger.d(TAG, "超级岛: 没有生成位图，使用本应用图标作为默认图标")
-        } else {
-            Logger.d(TAG, "超级岛: 成功生成小图标")
-        }
-        
-        // 注入小图标
-        injectSmallIcon(notification, smallIconBitmap)
-        
-        // 返回注入图标后的通知对象
-        return notification
+        // 如果没有生成位图，返回 null
+        Logger.d(TAG, "超级岛: 没有生成小图标")
+        return null
+    }
+
+    private suspend fun buildCapsuleCompatibleNotificationWithIconInjection(
+        context: Context,
+        builder: NotificationCompat.Builder,
+        title: String?,
+        text: String?,
+        appName: String?,
+        picMap: Map<String, String>?,
+        paramV2Raw: String?,
+        aComponent: AComponent?,
+        bComponent: BComponent?
+    ): Notification {
+        try {
+            // 先构建胶囊兼容的通知
+            val capsuleBuilder = buildCapsuleCompatibleNotification(context, builder, title, text, appName,
+                picMap, paramV2Raw, aComponent, bComponent)
+
+            // 构建通知并注入图标
+            val notification = capsuleBuilder.build()
+
+            // 解析小图标位图
+            val smallIconBitmap = resolveSmallIconBitmap(context, picMap, aComponent, bComponent)
+            
+            // 如果没有生成位图，使用默认图标（改为本应用图标）
+            if (smallIconBitmap == null) {
+                Logger.d(TAG, "超级岛: 没有生成位图，使用本应用图标作为默认图标")
+            } else {
+                Logger.d(TAG, "超级岛: 成功生成小图标")
+            }
+            
+            // 注入小图标
+            injectSmallIcon(notification, smallIconBitmap)
+            
+            // 返回注入图标后的通知对象
+            return notification
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 构建胶囊兼容通知并注入图标失败: ${e.message}")
             e.printStackTrace()
