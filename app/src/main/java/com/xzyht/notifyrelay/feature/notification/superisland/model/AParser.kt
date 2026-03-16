@@ -32,17 +32,8 @@ fun parseAComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
             // - type=2: middle - 中等尺寸图片
             // - type=3: large - 大尺寸图片
             // - type=4: 静态图标
-            // 图标选择优先级：
-            // 1. pic 字段（如果是 miui.focus.pic_ 前缀）
-            // 2. picFunction（来自 highlightInfo.picFunction）
-            // 3. aodPic
             val picRaw = picInfo?.optString("pic", "")?.takeIf { it.isNotBlank() }
-            val picKey: String? = when {
-                picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
-                picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
-                aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
-                else -> null
-            }
+            val picKey = resolvePicKey(picRaw, picFunction, aodPic)
             // 对于 type=4（静态图资源键），pic 字段必须有效
             val mustHavePicKey = (t == 4)
             if (mustHavePicKey && picKey == null) return null
@@ -66,16 +57,7 @@ fun parseAComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
             val picInfo = left.optJSONObject("picInfo")
             val picTypeOk = (picInfo?.optInt("type", 0) == 4)
             val picRaw = picInfo?.optString("pic", "")?.takeIf { it.isNotBlank() }
-            // 图标选择优先级：
-            // 1. pic 字段（如果是 miui.focus.pic_ 前缀）
-            // 2. picFunction（来自 highlightInfo.picFunction）
-            // 3. aodPic
-            val picKey: String? = when {
-                picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
-                picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
-                aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
-                else -> null
-            }
+            val picKey = resolvePicKey(picRaw, picFunction, aodPic)
 
             // 必填：title、picInfo.type==4、picKey
             if (title == null || !picTypeOk || picKey == null) return null
@@ -87,6 +69,22 @@ fun parseAComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
                 picKey = picKey
             )
         }
+        else -> null
+    }
+}
+
+/**
+ * 解析 picKey 的辅助函数
+ * 图标选择优先级：
+ * 1. picRaw 字段（如果是 miui.focus.pic_ 前缀）
+ * 2. picFunction（来自 highlightInfo.picFunction）
+ * 3. aodPic
+ */
+private fun resolvePicKey(picRaw: String?, picFunction: String?, aodPic: String?): String? {
+    return when {
+        picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
+        picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
+        aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
         else -> null
     }
 }

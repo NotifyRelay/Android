@@ -1,15 +1,10 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.common
 
-import android.os.Handler
-import android.os.Looper
-import notifyrelay.base.util.Logger
-
 /**
  * 胶囊文本滚动管理器，用于处理超长文本的滚动显示
  */
 object CapsuleScrollManager {
-    private const val TAG = "CapsuleScrollManager"
-    
+
     // 滚动状态机
     private enum class ScrollState {
         SCROLLING,      // 主动滚动
@@ -29,22 +24,14 @@ object CapsuleScrollManager {
     
     // 存储不同通知的滚动状态
     private val scrollDataMap = mutableMapOf<String, ScrollData>()
-    private val mainHandler = Handler(Looper.getMainLooper())
-    
+
     // 基于视觉权重的滚动（CJK=2，西文=1）
-    private const val maxDisplayWeight = 18  // 视觉容量：约11个CJK字符或约22个西文字符
-    private const val compensationThreshold = 8  // 如果剩余权重小于此值则停止滚动（保持胶囊稳定）
-    
-    // 时间常量
-    private const val initialPauseDuration = 1000L  // 1秒用于阅读开头
+    private const val maxDisplayWeight = 17  // 视觉容量：约10个CJK字符或约20个西文字符
+    private const val compensationThreshold = 7  // 如果剩余权重小于此值则停止滚动（保持胶囊稳定）
+
     private const val finalPauseDuration = 500L     // 下一句文本前的0.5秒
-    private const val baseFocusDelay = 500L         // 每次切换的眼睛重聚焦时间
-    private const val staticTimeReserve = 1500L     // 初始+最终暂停预留时间
     private const val SCROLL_STEP_DELAY = 1800L     // 滚动步长延迟
-    private const val minScrollDelay = 500L         // 最小滚动延迟
-    private const val maxScrollDelay = 5000L         // 最大滚动延迟
-    private const val minCharDuration = 50L         // 最小字符持续时间
-    
+
     // 自适应滚动速度跟踪
     private data class AdaptiveData(
         var lastTextChangeTime: Long = 0,
@@ -144,96 +131,7 @@ object CapsuleScrollManager {
             }
         }
     }
-    
-    /**
-     * 记录文本变化，用于自适应滚动速度
-     */
-    fun recordTextChange(key: String, newText: String) {
-        val now = System.currentTimeMillis()
-        val adaptiveData = adaptiveDataMap.getOrPut(key) { AdaptiveData() }
-        
-        // 跳过第一句文本（没有之前的时间记录）
-        if (adaptiveData.lastTextChangeTime == 0L) {
-            adaptiveData.lastTextChangeTime = now
-            adaptiveData.lastTextLength = newText.length
-            return
-        }
-        
-        val duration = now - adaptiveData.lastTextChangeTime
-        val avgCharDuration = if (adaptiveData.lastTextLength > 0) duration / adaptiveData.lastTextLength else 0
-        
-        // 过滤噪音：如果更新太快则忽略（每字符<50ms）
-        if (avgCharDuration < minCharDuration) {
-            Logger.d(TAG, "忽略快速更新: ${avgCharDuration}ms/字符")
-            return
-        }
-        
-        // 过滤暂停：如果太慢则忽略（总时长>30s）
-        if (duration > 30000) {
-            Logger.d(TAG, "忽略长暂停: ${duration}ms")
-            adaptiveData.lastTextChangeTime = now
-            adaptiveData.lastTextLength = newText.length
-            return
-        }
-        
-        // 添加到历史记录（滑动窗口）
-        adaptiveData.textDurations.add(duration)
-        if (adaptiveData.textDurations.size > adaptiveData.maxHistory) {
-            adaptiveData.textDurations.removeAt(0)
-        }
-        
-        // 更新状态
-        adaptiveData.lastTextChangeTime = now
-        adaptiveData.lastTextLength = newText.length
-        
-        // 重新计算自适应延迟
-        calculateAdaptiveDelay(key)
-    }
-    
-    /**
-     * 计算自适应滚动延迟
-     */
-    private fun calculateAdaptiveDelay(key: String) {
-        val adaptiveData = adaptiveDataMap[key] ?: return
-        val scrollData = scrollDataMap[key] ?: return
-        
-        val avgDuration = if (adaptiveData.textDurations.isEmpty()) {
-            scrollData.adaptiveDelay = SCROLL_STEP_DELAY
-            return
-        } else {
-            adaptiveData.textDurations.average().toLong()
-        }
-        
-        // 计算最近文本的总视觉权重
-        val avgTextWeight = calculateWeight(scrollData.lastText)
-        
-        if (avgTextWeight == 0 || avgDuration < staticTimeReserve) {
-            scrollData.adaptiveDelay = SCROLL_STEP_DELAY
-            return
-        }
-        
-        // 估计需要的滚动步数
-        val estimatedSteps = maxOf(1, (avgTextWeight / 5))  // 每次移动约5个权重
-        
-        // T_per_unit = (T_total - T_static - N*T_base) / L_total
-        val availableTime = avgDuration - staticTimeReserve - (estimatedSteps * baseFocusDelay)
-        val timePerUnit = if (availableTime > 0 && avgTextWeight > 0) {
-            availableTime / avgTextWeight
-        } else {
-            100L  // 回退值
-        }
-        
-        // T_wait = T_base + (T_per_unit × W_shift)
-        // 假设平均移动权重约为5（2-3个CJK字符或3-4个西文字符）
-        val avgShiftWeight = 5
-        val calculatedDelay = baseFocusDelay + (timePerUnit * avgShiftWeight)
-        
-        // 限制在合理范围内
-        scrollData.adaptiveDelay = calculatedDelay.coerceIn(minScrollDelay, maxScrollDelay)
-        
-        Logger.d(TAG, "自适应滚动: ${scrollData.adaptiveDelay}ms (平均权重: $avgTextWeight, 每单位时间: ${timePerUnit}ms)")
-    }
-    
+
     /**
      * 获取当前应该显示的文本片段
      */

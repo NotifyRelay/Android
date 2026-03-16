@@ -8,24 +8,23 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.os.Build
-import android.os.Bundle
 import androidx.annotation.RequiresApi
 import androidx.collection.LruCache
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
+import androidx.core.graphics.toColorInt
 import androidx.core.text.HtmlCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.parseParamV2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
-import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.formatter.FormattedSuperIslandData
+import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
+import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
-import org.json.JSONObject
 
 object LiveUpdatesNotificationManager {
     private const val TAG = "超级岛-进度类型"
@@ -57,7 +56,7 @@ object LiveUpdatesNotificationManager {
      */
     private fun getSpecInjectionMode(context: Context): SpecInjectionMode {
         val modeOrdinal = StorageManager.getInt(context, SPEC_INJECTION_MODE_KEY, SpecInjectionMode.BOTH.ordinal)
-        return SpecInjectionMode.values().getOrElse(modeOrdinal) { SpecInjectionMode.BOTH }
+        return SpecInjectionMode.entries.toTypedArray().getOrElse(modeOrdinal) { SpecInjectionMode.BOTH }
     }
 
     /**
@@ -140,14 +139,12 @@ object LiveUpdatesNotificationManager {
         notificationManager.createNotificationChannel(channel)
     }
 
-    suspend fun showLiveUpdate(
+    fun showLiveUpdate(
         sourceId: String,
         title: String?,
         text: String?,
-        paramV2Raw: String?,
         appName: String?,
-        isLocked: Boolean,
-        picMap: Map<String, String>? = null
+        formattedData: FormattedSuperIslandData
     ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
             Logger.w(TAG, "当前Android版本不支持Live Updates")
@@ -164,17 +161,18 @@ object LiveUpdatesNotificationManager {
 
         try {
             val notificationId = sourceId.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
-            val paramV2 = paramV2Raw?.let { parseParamV2(it) }
+            
+            val paramV2 = formattedData.paramV2
 
             // 调试picMap内容
-            if (picMap != null && picMap.isNotEmpty()) {
-                Logger.d(TAG, "收到picMap，包含 ${picMap.size} 个图标资源: ${picMap.keys}")
+            if (formattedData.resolvedPicMap.isNotEmpty()) {
+                Logger.d(TAG, "收到picMap，包含 ${formattedData.resolvedPicMap.size} 个图标资源: ${formattedData.resolvedPicMap.keys}")
             } else {
                 Logger.d(TAG, "picMap为空或null")
             }
 
             // 仅处理进度类型通知
-            if (paramV2?.progressInfo == null && paramV2?.multiProgressInfo == null) {
+            if (!SuperIslandDataFormatter.isProgressType(paramV2)) {
                 Logger.i(TAG, "非进度类型通知，跳过处理: $sourceId")
                 return
             }
@@ -206,7 +204,7 @@ object LiveUpdatesNotificationManager {
                         .putExtra("title", title)
                         .putExtra("text", text)
                         .putExtra("appName", appName)
-                        .putExtra("paramV2Raw", paramV2Raw)
+                        .putExtra("paramV2Raw", formattedData.paramV2Raw)
                         .setAction("com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"),
                     PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
                 )
@@ -215,7 +213,7 @@ object LiveUpdatesNotificationManager {
             }
 
             // 构建基础通知
-            val notificationBuilder = buildBaseNotification(sourceId)
+            val notificationBuilder = buildBaseNotification()
                 .setContentTitle(title ?: appName ?: "超级岛通知")
                 .setContentText(text ?: "")
                 .setSmallIcon(android.R.drawable.stat_notify_more)
@@ -228,7 +226,7 @@ object LiveUpdatesNotificationManager {
             }
 
             // 尝试使用前进指示器图标作为小图标
-            if (picMap != null && picMap.isNotEmpty()) {
+            if (formattedData.resolvedPicMap.isNotEmpty()) {
                 // 找到有效的前进图标
                 val possibleIconKeys = listOf(
                     paramV2?.progressInfo?.picForward,
@@ -239,11 +237,11 @@ object LiveUpdatesNotificationManager {
                 )
 
                 val iconKey = possibleIconKeys.firstOrNull { key ->
-                    key != null && picMap.containsKey(key)
+                    key != null && formattedData.resolvedPicMap.containsKey(key)
                 }
 
                 if (iconKey != null) {
-                    val iconUrl = picMap[iconKey]
+                    val iconUrl = formattedData.resolvedPicMap[iconKey]
                     if (iconUrl != null) {
                         // 尝试从缓存加载图标
                         val cachedBitmap = iconCache.get(iconUrl)
@@ -256,8 +254,8 @@ object LiveUpdatesNotificationManager {
 
             // 直接设置状态栏关键文本，不再使用反射
             // 使用处理后的标题和内容
-            val processedTitle = paramV2.baseInfo?.title?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
-            val processedContent = paramV2.baseInfo?.content?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
+            val processedTitle = paramV2?.baseInfo?.title?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
+            val processedContent = paramV2?.baseInfo?.content?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
 
             // 设置状态栏关键文本，优先使用处理后的标题（预计时间），然后是处理后的内容
             val shortText = when {
@@ -270,7 +268,7 @@ object LiveUpdatesNotificationManager {
             notificationBuilder.setShortCriticalText(shortText)
 
             // 添加操作按钮（如果有）
-            paramV2.actions?.let {
+            paramV2?.actions?.let {
                 for (action in it) {
                     try {
                         notificationBuilder.addAction(
@@ -287,20 +285,23 @@ object LiveUpdatesNotificationManager {
             }
 
             // 构建最终通知 - 仅处理进度类型
-            val finalBuilder = buildProgressStyleNotification(notificationBuilder, paramV2, picMap)
+            val finalBuilder =
+                paramV2?.let { buildProgressStyleNotification(notificationBuilder, it, formattedData.resolvedPicMap) }
 
             // 添加超级岛相关的结构化数据
-            addSuperIslandStructuredData(finalBuilder, paramV2, paramV2Raw, picMap)
+            finalBuilder?.let { addSuperIslandStructuredData(it, paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap) }
 
-            val notification = finalBuilder.build()
+            val notification = finalBuilder?.build()
 
             // 验证通知是否具有可提升特性
             try {
-                val hasPromotable = notification.hasPromotableCharacteristics()
-                if (!hasPromotable) {
-                    Logger.w(TAG, "通知不具有可提升特性 - Live Updates可能无法正常显示")
-                } else {
-                    Logger.i(TAG, "通知具有可提升特性")
+                val hasPromotable = notification?.hasPromotableCharacteristics()
+                hasPromotable?.let {
+                    if (!it) {
+                        Logger.w(TAG, "通知不具有可提升特性 - Live Updates可能无法正常显示")
+                    } else {
+                        Logger.i(TAG, "通知具有可提升特性")
+                    }
                 }
             } catch (e: Exception) {
                 Logger.w(TAG, "检查通知可提升特性失败: ${e.message}")
@@ -311,7 +312,7 @@ object LiveUpdatesNotificationManager {
             Logger.i(TAG, "发送Live Update进度通知成功: $sourceId")
 
             // 异步加载图标并更新通知，确保图标正确显示
-            loadIconsAndUpdateNotification(sourceId, notificationId, paramV2, picMap)
+            loadIconsAndUpdateNotification(sourceId, notificationId, paramV2, formattedData.resolvedPicMap)
         } catch (e: Exception) {
             Logger.e(TAG, "发送Live Update通知失败: ${e.message}")
             e.printStackTrace()
@@ -469,7 +470,7 @@ object LiveUpdatesNotificationManager {
     ) {
         try {
             // 构建基础通知
-            val updatedBuilder = buildBaseNotification(sourceId)
+            val updatedBuilder = buildBaseNotification()
 
             // 设置基础信息
             paramV2.baseInfo?.let {
@@ -623,8 +624,8 @@ object LiveUpdatesNotificationManager {
             val progressEndColor = progressInfo?.colorProgressEnd ?: multiProgressInfo?.color
 
             // 解析颜色值
-            val pointColor = progressColor?.let { Color.parseColor(it) } ?: Color.BLUE
-            val segmentColor = progressEndColor?.let { Color.parseColor(it) } ?: Color.CYAN
+            val pointColor = progressColor?.toColorInt() ?: Color.BLUE
+            val segmentColor = progressEndColor?.toColorInt() ?: Color.CYAN
 
             // 直接创建ProgressStyle实例
             val progressStyle = NotificationCompat.ProgressStyle()
@@ -754,8 +755,8 @@ object LiveUpdatesNotificationManager {
         val progressEndColor = progressInfo?.colorProgressEnd ?: multiProgressInfo?.color
 
         // 解析颜色值
-        val pointColor = progressColor?.let { Color.parseColor(it) } ?: Color.BLUE
-        val segmentColor = progressEndColor?.let { Color.parseColor(it) } ?: Color.CYAN
+        val pointColor = progressColor?.toColorInt() ?: Color.BLUE
+        val segmentColor = progressEndColor?.toColorInt() ?: Color.CYAN
 
         // 直接创建ProgressStyle实例
         val progressStyle = NotificationCompat.ProgressStyle()
@@ -795,111 +796,7 @@ object LiveUpdatesNotificationManager {
         return progressStyle
     }
 
-    /**
-     * 构建不包含图标的进度样式通知
-     */
-    private fun buildProgressStyleNotificationWithoutIcons(
-        builder: NotificationCompat.Builder,
-        paramV2: ParamV2
-    ): NotificationCompat.Builder {
-        val progressInfo = paramV2.progressInfo ?: return builder
-
-        try {
-            // 更新通知标题和内容
-            paramV2.baseInfo?.let {
-                val title = it.title ?: ""
-                val content = it.content ?: ""
-
-                // 调试日志：打印原始HTML和处理后的文本
-                Logger.d(TAG, "原始标题HTML: $title")
-                Logger.d(TAG, "原始内容HTML: $content")
-
-                // 处理HTML，使用LEGACY模式确保颜色标签被支持
-                val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
-
-                Logger.d(TAG, "处理后标题: $processedTitle")
-                Logger.d(TAG, "处理后内容: $processedContent")
-
-                builder
-                    .setContentTitle(processedTitle)
-                    .setContentText(processedContent)
-            }
-
-            // 与官方示例保持一致：先获取基础样式，再进行增量修改
-            val progressStyle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                buildBaseProgressStyle(paramV2).setProgress(progressInfo.progress)
-            } else {
-                // 在低 API 级别上使用简单的 ProgressStyle
-                NotificationCompat.ProgressStyle().setProgress(progressInfo.progress)
-            }
-
-            // 直接调用builder.setStyle方法，符合官方示例的API使用
-            return builder.setStyle(progressStyle)
-        } catch (e: Exception) {
-            // 如果ProgressStyle不可用，回退到简单的进度条
-            Logger.w(TAG, "使用ProgressStyle失败，回退到简单进度条: ${e.message}")
-            e.printStackTrace()
-
-            // 更新通知标题和内容
-            paramV2.baseInfo?.let {
-                builder
-                    .setContentTitle(HtmlCompat.fromHtml(it.title ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY))
-                    .setContentText(HtmlCompat.fromHtml(it.content ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY))
-            }
-
-            return builder.setProgress(
-                100,
-                progressInfo.progress,
-                false
-            )
-        }
-    }
-
-    /**
-     * 构建包含图标的进度样式通知
-     */
-    private fun buildProgressStyleNotificationWithIcon(
-        builder: NotificationCompat.Builder,
-        paramV2: ParamV2,
-        progressIcon: Bitmap
-    ): NotificationCompat.Builder {
-        val progressInfo = paramV2.progressInfo ?: return builder
-
-        try {
-            // 更新通知标题和内容
-            paramV2.baseInfo?.let {
-                val title = it.title ?: ""
-                val content = it.content ?: ""
-
-                // 处理HTML，使用LEGACY模式确保颜色标签被支持
-                val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
-
-                builder
-                    .setContentTitle(processedTitle)
-                    .setContentText(processedContent)
-            }
-
-            // 与官方示例保持一致：先获取基础样式，再增量添加图标和进度
-            val progressStyle = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                buildBaseProgressStyle(paramV2)
-            } else {
-                // 在低 API 级别上使用简单的 ProgressStyle
-                NotificationCompat.ProgressStyle()
-            }
-                .setProgressTrackerIcon(IconCompat.createWithBitmap(progressIcon))
-                .setProgress(progressInfo.progress)
-
-            // 直接调用builder.setStyle方法，符合官方示例的API使用
-            return builder.setStyle(progressStyle)
-        } catch (e: Exception) {
-            Logger.w(TAG, "构建包含图标的进度样式通知失败: ${e.message}")
-            return builder
-        }
-    }
-
-    private fun buildBaseNotification(sourceId: String): NotificationCompat.Builder {
+    private fun buildBaseNotification(): NotificationCompat.Builder {
         val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
@@ -946,15 +843,6 @@ object LiveUpdatesNotificationManager {
         cancelLiveUpdate(sourceId)
     }
 
-    fun cancelAllLiveUpdates() {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
-            Logger.w(TAG, "当前Android版本不支持Live Updates")
-            return
-        }
-        notificationManager.cancelAll()
-        Logger.i(TAG, "取消所有Live Update通知成功")
-    }
-
     fun canUseLiveUpdates(): Boolean {
         // 检查设备是否支持Live Updates
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
@@ -992,47 +880,26 @@ object LiveUpdatesNotificationManager {
         }
     }
 
-    fun hasPromotableCharacteristics(notification: NotificationCompat.Builder): Boolean {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
-            Logger.w(TAG, "当前Android版本不支持Live Updates")
-            return false
-        }
-        val builtNotification = notification.build()
-        // 使用反射检查通知是否具有可提升特性
-        try {
-            val hasPromotableCharacteristicsMethod = builtNotification.javaClass.getMethod("hasPromotableCharacteristics")
-            return hasPromotableCharacteristicsMethod.invoke(builtNotification) as Boolean
-        } catch (e: Exception) {
-            Logger.w(TAG, "检查通知可提升特性失败: ${e.message}")
-            return false
-        }
-    }
-
     /**
      * 添加超级岛相关的结构化数据到Live Updates通知
      * @param builder 通知构建器
      * @param paramV2 ParamV2对象
      * @param paramV2Raw ParamV2原始JSON字符串
-     * @param picMap 图片映射（可能包含图片ID，需要解析）
+     * @param picMap 图片映射（已解析）
      */
-    private suspend fun addSuperIslandStructuredData(
+    private fun addSuperIslandStructuredData(
         builder: NotificationCompat.Builder,
         paramV2: ParamV2?,
         paramV2Raw: String?,
         picMap: Map<String, String>?
     ) {
-        // 预先解析picMap中的图片ID
-        val resolvedPicMap = if (picMap.isNullOrEmpty()) {
-            picMap
-        } else {
-            SuperIslandImageStore.resolvePicMap(appContext, picMap)
-        }
+        // picMap 已在调用方通过 SuperIslandDataFormatter 解析，直接使用
         // 使用公共工具类添加超级岛结构化数据
         SuperIslandStructuredDataHelper.addSuperIslandStructuredData(
             builder = builder,
             context = appContext,
             paramV2Raw = paramV2Raw,
-            picMap = resolvedPicMap,
+            picMap = picMap,
             title = paramV2?.baseInfo?.title,
             text = paramV2?.baseInfo?.content,
             isSuperIslandSpecInjectionEnabled = isSuperIslandSpecInjectionEnabled(appContext)

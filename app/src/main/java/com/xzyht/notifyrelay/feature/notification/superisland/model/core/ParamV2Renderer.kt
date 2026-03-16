@@ -40,7 +40,9 @@ data class ParamV2(
     val hintInfo: HintInfo? = null, // 提示组件（按钮组件2/3）
     val textButton: TextButton? = null, // 文本按钮组件
     val paramIsland: ParamIsland? = null, // 摘要态组件
-    val business: String? = null // 可选的业务标识（例如 miui_flashlight）
+    val business: String? = null, // 可选的业务标识（例如 miui_flashlight）
+    val aodPic: String? = null, // AOD图片键
+    val picFunction: String? = null // 功能图标键
 )
 
 // 解析param_v2总容器，根据不同字段选择对应的子组件解析
@@ -72,7 +74,7 @@ fun parseParamV2(jsonString: String): ParamV2? {
         
         try {
             highlight = json.optJSONObject("highlightInfo")?.let { parseHighlightInfo(it) }
-                ?: parseHighlightFromIconText(json)
+                ?: parseHighlightFromIconText(json, null, null)
         } catch (e: Exception) {
             Logger.w("超级岛", "解析highlightInfo失败: ${e.message}")
         }
@@ -129,10 +131,15 @@ fun parseParamV2(jsonString: String): ParamV2? {
             Logger.w("超级岛", "解析textButton失败: ${e.message}")
         }
         
+        // 提取 aodPic 和 picFunction 用于解析 A/B 区组件
+        val aodPic = json.optString("aodPic", "").takeIf { it.isNotBlank() }
+        val picFunction = highlight?.picFunction ?: json.optJSONObject("highlightInfo")
+            ?.optString("picFunction", "")?.takeIf { it.isNotBlank() }
+        
         try {
             paramIsland = (json.optJSONObject("param_island")
                 ?: json.optJSONObject("paramIsland")
-                ?: json.optJSONObject("islandParam"))?.let { parseParamIsland(it) }
+                ?: json.optJSONObject("islandParam"))?.let { parseParamIsland(it, picFunction, aodPic) }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析paramIsland失败: ${e.message}")
         }
@@ -155,7 +162,9 @@ fun parseParamV2(jsonString: String): ParamV2? {
         actions = actions,
         hintInfo = hintInfo,
         textButton = textButton,
-        paramIsland = paramIsland
+        paramIsland = paramIsland,
+        aodPic = aodPic,
+        picFunction = highlight?.picFunction ?: picFunction
     )
     
     Logger.d("超级岛", "ParamV2解析结果: paramIsland=${paramIsland != null}, highlight=${highlight != null}, baseInfo=${baseInfo != null}, actions=${actions?.size}")
@@ -175,7 +184,7 @@ fun parseParamV2(jsonString: String): ParamV2? {
     }
 }
 
-private fun parseHighlightFromIconText(root: JSONObject): HighlightInfo? {
+private fun parseHighlightFromIconText(root: JSONObject, picFunction: String?, aodPic: String?): HighlightInfo? {
     val iconText = root.optJSONObject("iconTextInfo") ?: return null
     val title = iconText.optString("title", "").takeIf { it.isNotBlank() }
     val content = iconText.optString("content", "").takeIf { it.isNotBlank() }
@@ -194,7 +203,9 @@ private fun parseHighlightFromIconText(root: JSONObject): HighlightInfo? {
     val big = parseBigIslandArea(
         paramIsland?.optJSONObject("bigIslandArea") ?: paramIsland?.optJSONObject(
             "bigIsland"
-        )
+        ),
+        picFunction,
+        aodPic
     )
     val leftPic = big?.leftImage
     val rightPic = big?.rightImage

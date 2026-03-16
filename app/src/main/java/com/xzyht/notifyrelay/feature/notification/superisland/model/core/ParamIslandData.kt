@@ -22,11 +22,11 @@ data class SmallIslandArea(
     val progressInfo: ProgressInfo? = null
 )
 
-fun parseParamIsland(json: JSONObject): ParamIsland {
+fun parseParamIsland(json: JSONObject, picFunction: String? = null, aodPic: String? = null): ParamIsland {
     val small = json.optJSONObject("smallIslandArea")?.let { parseSmallIslandArea(it) }
         ?: json.optJSONObject("smallIsland")?.let { parseSmallIslandArea(it) }
     val bigJson = json.optJSONObject("bigIslandArea") ?: json.optJSONObject("bigIsland")
-    val big = parseBigIslandArea(bigJson)
+    val big = parseBigIslandArea(bigJson, picFunction, aodPic)
     return ParamIsland(smallIslandArea = small, bigIslandArea = big)
 }
 

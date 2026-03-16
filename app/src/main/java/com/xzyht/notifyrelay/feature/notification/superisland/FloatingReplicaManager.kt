@@ -3,16 +3,17 @@ package com.xzyht.notifyrelay.feature.notification.superisland
 import android.app.NotificationManager
 import android.content.Context
 import android.graphics.PixelFormat
-import android.net.Uri
 import android.os.Build
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
+import androidx.core.net.toUri
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingComposeContainer
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowLifecycleOwner
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
+import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
@@ -305,13 +306,15 @@ object FloatingReplicaManager {
             
             CoroutineScope(Dispatchers.Main).launch {
                 runWithErrorHandlingSuspend("发送通知") {
-                    // 尝试解析paramV2
-                    val paramV2 = NotificationGenerator.parseParamV2Safe(paramV2Raw)
-
                     // 将所有图片写入数据库绑定，避免重复保存相同图片 - 移到 IO 线程执行
                     val internedPicMap = withContext(Dispatchers.IO) {
                         SuperIslandImageStore.internAll(context, sourceId, picMap)
                     }
+                    
+                    // 使用统一的格式化服务解析数据
+                    val formattedData = SuperIslandDataFormatter.formatForDisplay(context, paramV2Raw, internedPicMap)
+                    val paramV2 = formattedData.paramV2
+                    
                     // 生成唯一的entryKey，确保包含sourceId，以便后续能正确移除
                     val entryKey = sourceId
 
@@ -320,15 +323,15 @@ object FloatingReplicaManager {
                     
                     // 对于进度类型，且Live Updates启用时，只发送复合通知
                     // 否则发送传统复刻通知
-                    val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
+                    val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
                     
                     if (isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                         runWithErrorHandlingSuspend("发送Live Updates复合通知") {
                             // 初始化Live Updates通知管理器
                             LiveUpdatesNotificationManager.initialize(context)
-                            // 发送复合通知
+                            // 发送复合通知（使用预格式化数据重载）
                             LiveUpdatesNotificationManager.showLiveUpdate(
-                                sourceId, title, text, paramV2Raw, appName, isLocked, internedPicMap
+                                sourceId, title, text, appName, formattedData
                             )
                             // Live Updates通知的ID计算方式与传统通知不同，需要手动计算并添加映射
                             val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
@@ -337,7 +340,7 @@ object FloatingReplicaManager {
                         }
                     } else {
                         // 非进度类型或Live Updates未启用时，发送传统复刻通知
-                        val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, paramV2Raw, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
+                        val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
                         // 添加到 sourceId 到 notificationId 的直接映射
                         addSourceIdMapping(sourceId, entryKey, notificationId)
                         Logger.i(TAG, "浮窗功能关闭时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
@@ -345,8 +348,7 @@ object FloatingReplicaManager {
                     
                     // 添加超时自动移除机制，与浮窗保持一致
                     // 检测是否为媒体类型，设置不同的超时时间
-                    val isMediaType = paramV2?.business == "media" || 
-                                      paramV2Raw?.contains("\"business\":\"media\"") == true
+                    val isMediaType = SuperIslandDataFormatter.isMediaType(paramV2, paramV2Raw)
                     val timeoutMs = 30 * 1000L // 30秒
                     
                     Logger.i(TAG, "超级岛: 设置超时时间, sourceId=$sourceId, isMediaType=$isMediaType, timeoutMs=$timeoutMs")
@@ -413,8 +415,15 @@ object FloatingReplicaManager {
                     }
                     // 通知Compose生命周期管理器浮窗显示
                     lifecycleManager.onShow()
-                    // 尝试解析paramV2
-                    val paramV2 = NotificationGenerator.parseParamV2Safe(paramV2Raw)
+                    
+                    // 将所有图片写入数据库绑定，避免重复保存相同图片 - 移到 IO 线程执行
+                    val internedPicMap = withContext(Dispatchers.IO) {
+                        SuperIslandImageStore.internAll(context, sourceId, picMap)
+                    }
+                    
+                    // 使用统一的格式化服务解析数据
+                    val formattedData = SuperIslandDataFormatter.formatForDisplay(context, paramV2Raw, internedPicMap)
+                    val paramV2 = formattedData.paramV2
 
                     // 判断是否为摘要态
                     val summaryOnly = when {
@@ -423,10 +432,6 @@ object FloatingReplicaManager {
                         else -> false
                     }
 
-                    // 将所有图片写入数据库绑定，避免重复保存相同图片 - 移到 IO 线程执行
-                    val internedPicMap = withContext(Dispatchers.IO) {
-                        SuperIslandImageStore.internAll(context, sourceId, picMap)
-                    }
                     // 生成唯一的entryKey，确保包含sourceId，以便后续能正确移除
                     // 对于同一通知的不同时间更新，应该使用相同的key，所以不能包含时间戳
                     val entryKey = sourceId
@@ -436,8 +441,8 @@ object FloatingReplicaManager {
                     floatingWindowManager.addOrUpdateEntry(
                         key = entryKey,
                         paramV2 = paramV2,
-                        paramV2Raw = paramV2Raw,
-                        picMap = internedPicMap,
+                        paramV2Raw = formattedData.paramV2Raw,
+                        picMap = formattedData.resolvedPicMap,
                         isExpanded = if (isLocked) false else !summaryOnly,
                         summaryOnly = summaryOnly,
                         business = paramV2?.business,
@@ -454,7 +459,7 @@ object FloatingReplicaManager {
                     
                     // 对于进度类型，且Live Updates启用时，只发送复合通知作为浮窗的生命周期管理
                     // 否则发送传统复刻通知
-                    val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
+                    val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
                     
                     // 如果是从隐藏状态恢复，不重新发送通知，使用现有的通知
                     if (!isRestoring) {
@@ -462,9 +467,9 @@ object FloatingReplicaManager {
                             runWithErrorHandlingSuspend("发送Live Updates复合通知") {
                                 // 初始化Live Updates通知管理器
                                 LiveUpdatesNotificationManager.initialize(context)
-                                // 发送复合通知
+                                // 发送复合通知（使用预格式化数据重载）
                                 LiveUpdatesNotificationManager.showLiveUpdate(
-                                    sourceId, title, text, paramV2Raw, appName, isLocked, internedPicMap
+                                    sourceId, title, text, appName, formattedData
                                 )
                                 // Live Updates通知的ID计算方式与传统通知不同，需要手动计算并添加映射
                                 val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
@@ -473,7 +478,7 @@ object FloatingReplicaManager {
                             }
                         } else {
                             // 非进度类型或Live Updates未启用时，发送传统复刻通知
-                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, paramV2, paramV2Raw, internedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
+                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
                             // 添加到 sourceId 到 notificationId 的直接映射
                             addSourceIdMapping(sourceId, entryKey, notificationId)
                             Logger.i(TAG, "浮窗创建时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
@@ -950,7 +955,7 @@ object FloatingReplicaManager {
     private fun requestOverlayPermission(context: Context) {
         runWithErrorHandling("请求悬浮窗权限") {
             val intent = IntentUtils.createImplicitIntent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-            intent.data = Uri.parse("package:${context.packageName}")
+            intent.data = "package:${context.packageName}".toUri()
             IntentUtils.startActivity(context, intent, true)
         }
     }

@@ -17,8 +17,10 @@ import com.xzyht.notifyrelay.feature.notification.superisland.common.BitmapUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.common.CapsuleScrollManager
 import com.xzyht.notifyrelay.feature.notification.superisland.common.TextSplitter
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AComponent
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AImageText1
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AImageText5
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BComponent
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BFixedWidthDigitInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BImageText2
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BImageText3
@@ -28,15 +30,10 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsla
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BTextInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.formatTimerInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.parseParamV2
-import com.xzyht.notifyrelay.feature.notification.superisland.model.parseAComponent
-import com.xzyht.notifyrelay.feature.notification.superisland.model.parseBComponent
-import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
-import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -259,11 +256,12 @@ object NotificationGenerator {
                     putExtra("title", title)
                     putExtra("text", text)
                     putExtra("appName", appName)
-                    putExtra("paramV2Raw", paramV2?.toString()) // 注意：这里可能需要原始的json字符串，但paramV2是对象。如果需要原始串，应该在参数中传入
-                    // 优化：传入paramV2Raw
+                    
+                    // 优先使用传入的paramV2Raw参数，其次从entry中获取
                     val entry = floatingWindowManager.getEntry(key)
-                    if (entry?.paramV2Raw != null) {
-                        putExtra("paramV2Raw", entry.paramV2Raw)
+                    val rawParamV2 = paramV2Raw ?: entry?.paramV2Raw
+                    if (!rawParamV2.isNullOrBlank()) {
+                        putExtra("paramV2Raw", rawParamV2)
                     }
                     
                     // 传入图片映射
@@ -385,12 +383,8 @@ object NotificationGenerator {
                 setupScrollUpdate(key, scrollKey, capsuleText, context, notificationId, originalBuilder = builder, notificationManager
                 )
                 
-                // 预先解析picMap中的图片ID
-                val resolvedPicMap = if (picMap.isNullOrEmpty()) {
-                    picMap
-                } else {
-                    SuperIslandImageStore.resolvePicMap(context, picMap)
-                }
+                // picMap 已在调用方通过 SuperIslandDataFormatter 解析，直接使用
+                val resolvedPicMap = picMap ?: emptyMap()
                 
                 // ... (后续构建extras的代码保持不变)
                 // 添加焦点歌词相关的结构化数据
@@ -425,23 +419,16 @@ object NotificationGenerator {
                         }
                     }
                 }
-                
-                // 重新解析param_v2数据，获取进度信息
-                val progressEntry = floatingWindowManager.getEntry(key)
-                val paramV2Raw = progressEntry?.paramV2Raw
-                
+
+
                 // 检查是否已经有图标文本，如果有，就不再生成新的图标
                 if (iconText.isEmpty()) {
                     // 尝试从A/B区数据中获取图标或生成位图
                     var smallIconBitmap: Bitmap? = null
                     
-                    // 解析param_v2中的bigIsland数据
-                    val paramV2RawValue = paramV2Raw ?: paramV2.toString()
-                    val bigIsland = parseBigIsland(paramV2RawValue)
-                    
-                    // 解析A/B区数据，传入 aodPic 作为 fallback
-                    val aodPic = extractAodPic(paramV2RawValue)
-                    val bComponent = parseBComponent(bigIsland, aodPic)
+                    // 使用已解析的 paramV2 中的组件数据
+                    val bigIslandArea = paramV2.paramIsland?.bigIslandArea
+                    val bComponent = bigIslandArea?.bComponent
 
                     // 提取进度数据
                     val bProgress = when (bComponent) {
@@ -495,7 +482,7 @@ object NotificationGenerator {
                         if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
                             val appIconUrl = picMap[appIconKey]
                             if (!appIconUrl.isNullOrBlank()) {
-                                // 同步下载应用图标
+                                // 异步下载应用图标
                                 val bitmap = downloadBitmap(context, appIconUrl, 5000)
                                 if (bitmap != null) {
                                     smallIconBitmap = bitmap
@@ -529,13 +516,10 @@ object NotificationGenerator {
                 )
                 notificationManager.createNotificationChannel(channel)
 
-                // 获取paramV2原始数据，提前解析用于判断是否为计时器类型
-                // 优先使用传入的paramV2Raw参数，其次从entry中获取
-                val entry = floatingWindowManager.getEntry(key)
-                val paramV2RawValue = paramV2Raw ?: entry?.paramV2Raw
-                val bigIsland = parseBigIsland(paramV2RawValue)
-                val aodPic = extractAodPic(paramV2RawValue)
-                val bComponent = parseBComponent(bigIsland, aodPic)
+                // 使用已解析的 paramV2 中的组件数据，避免重复解析
+                val bigIslandArea = paramV2?.paramIsland?.bigIslandArea
+                val aComponent = bigIslandArea?.aComponent
+                val bComponent = bigIslandArea?.bComponent
 
                 // 判断是否为计时器类型（包括运行中和暂停状态）
                 val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
@@ -544,7 +528,7 @@ object NotificationGenerator {
                 // 标题显示状态，内容显示应用名，时间流逝由chronometer自动处理
                 val timerTitle: String
                 val timerContent: String
-                if (isTimerType && true) {
+                if (isTimerType) {
                     val timer = bComponent.timer
                     when (timer.timerType) {
                         -2 -> {
@@ -638,12 +622,13 @@ object NotificationGenerator {
                 }
 
                 // 检查是否为进度类型通知，如果是，则可能已经通过 LiveUpdatesNotificationManager 处理
-                val isProgressType = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
+                val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
 
                 // 构建通知
                 val notification = if (!isProgressType) {
                     // 非进度类型通知，添加胶囊兼容字段并注入图标
-                    val builtNotification = buildCapsuleCompatibleNotificationWithIconInjection(context, builder, title, text, appName, paramV2, picMap, paramV2RawValue)
+                    val builtNotification = buildCapsuleCompatibleNotificationWithIconInjection(context, builder, title, text, appName,
+                        picMap, paramV2Raw, aComponent, bComponent)
                     Logger.i(TAG, "超级岛: 非进度类型通知已构建，key=$key")
                     builtNotification
                 } else {
@@ -654,11 +639,7 @@ object NotificationGenerator {
                     // 尝试从 A/B 区数据中获取图标或生成位图
                     var smallIconBitmap: Bitmap? = null
 
-                    // 解析 A/B 区数据，传入 aodPic 作为 fallback
-                    val aodPic = extractAodPic(paramV2RawValue)
-                    val aComponent = parseAComponent(bigIsland, aodPic)
-
-                    // 提取 A/B 区数据
+                    // 提取 A/B 区数据（使用已解析的组件）
                     val aPicKey = when (aComponent) {
                         is AImageText1 -> aComponent.picKey
                         is AImageText5 -> aComponent.picKey
@@ -679,7 +660,7 @@ object NotificationGenerator {
                     if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
                         val picUrl = picMap[picKeyToUse]
                         if (!picUrl.isNullOrBlank()) {
-                            // 同步下载图标
+                            // 异步下载图标
                             val bitmap = downloadBitmap(context, picUrl, 5000)
                             if (bitmap != null) {
                                 smallIconBitmap = bitmap
@@ -729,27 +710,19 @@ object NotificationGenerator {
     /**
      * 构建胶囊兼容的通知，添加标准通知字段和 smallIcon 注入
      */
-    private fun buildCapsuleCompatibleNotification(
+    private suspend fun buildCapsuleCompatibleNotification(
         context: Context,
         builder: NotificationCompat.Builder,
         title: String?,
         text: String?,
         appName: String?,
-        paramV2: ParamV2?,
         picMap: Map<String, String>?,
-        paramV2Raw: String?
+        paramV2Raw: String?,
+        aComponent: AComponent?,
+        bComponent: BComponent?
     ): NotificationCompat.Builder {
         try {
-            // 解析 param_v2 中的 bigIsland 数据
-            val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
-            val bigIsland = parseBigIsland(paramV2RawValue)
-
-            // 解析 A/B 区数据，传入 aodPic 作为 fallback
-            val aodPic = extractAodPic(paramV2RawValue)
-            val aComponent = parseAComponent(bigIsland, aodPic)
-            val bComponent = parseBComponent(bigIsland, aodPic)
-
-            // 提取 A/B 区数据
+            // 提取 A/B 区数据（使用已解析的组件）
             val aTitle = when (aComponent) {
                 is AImageText1 -> aComponent.title
                 is AImageText5 -> aComponent.title
@@ -835,7 +808,7 @@ object NotificationGenerator {
             val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
 
             // 根据计时器状态设置标题和内容
-            if (isTimerType && true) {
+            if (isTimerType) {
                 val timer = bComponent.timer
                 val timerTitle = when (timer.timerType) {
                     -2 -> "暂停中"
@@ -879,124 +852,20 @@ object NotificationGenerator {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setRequestPromotedOngoing(true)
 
-            // 确保右胶囊文本被正确设置到 miui.focus.param 字段
-            paramV2RawValue?.let {
-                try {
-                    val paramV2Json = JSONObject(it)
-                    val bigIslandJson = paramV2Json.optJSONObject("bigIsland") ?: JSONObject()
-                    val islandAreaJson = bigIslandJson.optJSONObject("imageTextInfoRight") ?: JSONObject()
+ // 确保右胶囊文本被正确设置到 miui.focus.param 字段
+            // 使用 SuperIslandStructuredDataHelper 添加结构化数据
+            SuperIslandStructuredDataHelper.addSuperIslandStructuredData(
+                builder = builder,
+                context = context,
+                paramV2Raw = paramV2Raw,
+                picMap = picMap,
+                title = title,
+                text = text,
+                isSuperIslandSpecInjectionEnabled = isSuperIslandSpecInjectionEnabled(context)
+            )
 
-                    // 设置右胶囊文本
-                    if (bTitle != null) {
-                        islandAreaJson.put("title", bTitle)
-                    }
-                    if (bContent != null) {
-                        islandAreaJson.put("content", bContent)
-                    }
-
-                    // 更新 bigIsland 和 paramV2Json
-                    bigIslandJson.put("imageTextInfoRight", islandAreaJson)
-                    paramV2Json.put("bigIsland", bigIslandJson)
-
-                    // 更新原始 paramV2RawValue
-                    // 注意：这里我们不能直接修改原始字符串，而是需要在构建 miui.focus.param 时使用更新后的数据
-                } catch (e: Exception) {
-                    Logger.w(TAG, "超级岛: 设置右胶囊文本失败: ${e.message}")
-                }
-            }
-
-            // 处理 smallIcon
-            var smallIconBitmap: Bitmap? = null
-
-            // 优先处理进度数据
-            if (bProgress != null) {
-                smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
-            }
-
-            // 处理文本位图
-            if (smallIconBitmap == null) {
-                // 优先使用 B 区文本生成位图
-                val textToRender = when (bComponent) {
-                    is BSameWidthDigitInfo -> {
-                        // 优先使用timer信息计算计时值
-                        if (bComponent.timer != null) {
-                            formatTimerInfo(bComponent.timer)
-                        } else {
-                            bComponent.digit ?: bComponent.content
-                        }
-                    }
-                    else -> {
-                        bTitle ?: bContent ?: aTitle ?: aContent
-                    }
-                }
-                if (!textToRender.isNullOrBlank()) {
-                    smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
-                }
-            }
-
-            // 处理图标
-            if (smallIconBitmap == null) {
-                // 优先使用 A 区图标或B区图标
-                val picKeyToUse = aPicKey ?: bPicKey
-                Logger.d(TAG, "超级岛: 处理 A 区图标或B区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
-                if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
-                    val picUrl = picMap[picKeyToUse]
-                    if (!picUrl.isNullOrBlank()) {
-                        // 同步下载图标
-                        Logger.d(TAG, "超级岛: 使用 A 区图标或B区图标作为小图标，URL: $picUrl")
-                        val bitmap = runBlocking {
-                            downloadBitmap(context, picUrl, 5000)
-                        }
-                        if (bitmap != null) {
-                            smallIconBitmap = bitmap
-                            Logger.d(TAG, "超级岛: A 区图标或B区图标加载成功")
-                        } else {
-                            Logger.w(TAG, "超级岛: A 区图标或B区图标加载失败")
-                        }
-                    } else {
-                        Logger.w(TAG, "超级岛: A 区图标或B区图标 URL 为空")
-                    }
-                } else {
-                    Logger.d(TAG, "超级岛: 未找到 A 区图标或B区图标键")
-                }
-            }
-
-            // 如果没有 A 区图标或B区图标，再使用应用图标
-            if (smallIconBitmap == null) {
-                // 使用应用图标（大图标的键值提供的图标）
-                val appIconKey = "miui.focus.pic_app_icon"
-                Logger.d(TAG, "超级岛: 处理应用图标 - appIconKey: $appIconKey, picMap: ${picMap?.keys}")
-                if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
-                    val appIconUrl = picMap[appIconKey]
-                    if (!appIconUrl.isNullOrBlank()) {
-                        // 同步下载应用图标
-                        Logger.d(TAG, "超级岛: 使用应用图标作为小图标，URL: $appIconUrl")
-                        val bitmap = runBlocking {
-                            downloadBitmap(context, appIconUrl, 5000)
-                        }
-                        if (bitmap != null) {
-                            smallIconBitmap = bitmap
-                            Logger.d(TAG, "超级岛: 应用图标加载成功")
-                        } else {
-                            Logger.w(TAG, "超级岛: 应用图标加载失败")
-                        }
-                    } else {
-                        Logger.w(TAG, "超级岛: 应用图标 URL 为空")
-                    }
-                } else {
-                    Logger.d(TAG, "超级岛: 未找到应用图标键 $appIconKey")
-                }
-            }
-
-            // 如果没有生成位图，使用系统默认图标
-            if (smallIconBitmap == null) {
-                // 使用系统默认图标
-                builder.setSmallIcon(android.R.drawable.stat_notify_more)
-                Logger.d(TAG, "超级岛: 使用系统默认图标")
-            } else {
-                // 设置系统默认图标作为占位符
-                builder.setSmallIcon(android.R.drawable.stat_notify_more)
-            }
+            // 处理 smallIcon - 设置系统默认图标作为占位符
+            builder.setSmallIcon(android.R.drawable.stat_notify_more)
 
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 构建胶囊兼容通知失败: ${e.message}")
@@ -1025,73 +894,17 @@ object NotificationGenerator {
     }
 
     /**
-     * 解析bigIsland数据
-     * 尝试从param_island -> bigIslandArea中解析，如果没有找到，再从bigIsland字段解析
-     */
-    private fun parseBigIsland(paramV2RawValue: String?): JSONObject? {
-        paramV2RawValue?.let {
-            try {
-                val json = JSONObject(it)
-                // 尝试从param_island -> bigIslandArea中解析
-                val paramIsland = json.optJSONObject("param_island")
-                val bigIsland = paramIsland?.optJSONObject("bigIslandArea")
-
-                // 如果没有找到，尝试直接从bigIsland字段解析
-                return bigIsland ?: json.optJSONObject("bigIsland")
-            } catch (e: Exception) {
-                Logger.w(TAG, "超级岛: 解析bigIsland失败: ${e.message}")
-            }
-        }
-        return null
-    }
-
-    /**
-     * 从paramV2Raw中提取aodPic字段
-     */
-    private fun extractAodPic(paramV2RawValue: String?): String? {
-        paramV2RawValue?.let {
-            try {
-                val json = JSONObject(it)
-                return json.optString("aodPic", "").takeIf { it.isNotBlank() }
-            } catch (e: Exception) {
-                Logger.w(TAG, "超级岛: 提取aodPic失败: ${e.message}")
-            }
-        }
-        return null
-    }
-
-    /**
      * 构建胶囊兼容的通知并注入图标
      */
-    private fun buildCapsuleCompatibleNotificationWithIconInjection(
+    /**
+     * 解析小图标位图，遵循优先级：progress -> text -> picMap aPicKey/bPicKey -> appIconKey -> null
+     */
+    private suspend fun resolveSmallIconBitmap(
         context: Context,
-        builder: NotificationCompat.Builder,
-        title: String?,
-        text: String?,
-        appName: String?,
-        paramV2: ParamV2?,
         picMap: Map<String, String>?,
-        paramV2Raw: String?
-    ): Notification {
-        try {
-            // 先构建胶囊兼容的通知
-            val capsuleBuilder = buildCapsuleCompatibleNotification(context, builder, title, text, appName, paramV2, picMap, paramV2Raw)
-
-            // 构建通知并注入图标
-            val notification = capsuleBuilder.build()
-
-        // 尝试从 A/B 区数据中获取图标或生成位图
-        var smallIconBitmap: Bitmap? = null
-
-        // 解析 param_v2 中的 bigIsland 数据
-        val paramV2RawValue = paramV2Raw ?: paramV2?.toString()
-        val bigIsland = parseBigIsland(paramV2RawValue)
-
-        // 解析 A/B 区数据，传入 aodPic 作为 fallback
-        val aodPic = extractAodPic(paramV2RawValue)
-        val aComponent = parseAComponent(bigIsland, aodPic)
-        val bComponent = parseBComponent(bigIsland, aodPic)
-        
+        aComponent: AComponent?,
+        bComponent: BComponent?
+    ): Bitmap? {
         // 提取 A/B 区数据
         val aPicKey = when (aComponent) {
             is AImageText1 -> aComponent.picKey
@@ -1132,101 +945,120 @@ object NotificationGenerator {
         Logger.d(TAG, "超级岛: 处理小图标 - bProgress: $bProgress")
         if (bProgress != null) {
             Logger.d(TAG, "超级岛: 使用进度数据生成位图")
-            smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
-            Logger.d(TAG, "超级岛: 进度位图生成结果: ${smallIconBitmap != null}")
+            val bitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
+            Logger.d(TAG, "超级岛: 进度位图生成结果: ${bitmap != null}")
+            if (bitmap != null) return bitmap
         }
         
         // 处理文本位图
-        if (smallIconBitmap == null) {
-            // 检查是否为计时器类型，如果是，不生成文本位图，保留之前的图标
-            val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
-            if (!isTimerType) {
-                // 优先使用 B 区文本生成位图
-                val textToRender = when (bComponent) {
-                    is BImageText2 -> bComponent.title
-                    is BImageText3 -> bComponent.title
-                    is BImageText6 -> bComponent.title
-                    is BTextInfo -> bComponent.title
-                    is BFixedWidthDigitInfo -> bComponent.digit
-                    is BSameWidthDigitInfo -> bComponent.digit
-                    is BProgressTextInfo -> bComponent.title ?: bComponent.content
-                    else -> null
-                } ?: when (aComponent) {
-                    is AImageText1 -> aComponent.title ?: aComponent.content
-                    is AImageText5 -> aComponent.title
-                    else -> null
-                }
-                
-                Logger.d(TAG, "超级岛: 处理文本位图 - textToRender: $textToRender")
-                if (!textToRender.isNullOrBlank()) {
-                    Logger.d(TAG, "超级岛: 使用文本生成位图")
-                    smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
-                    Logger.d(TAG, "超级岛: 文本位图生成结果: ${smallIconBitmap != null}")
-                }
-            } else {
-                // 计时器类型，不生成文本位图，保留之前的图标
-                Logger.d(TAG, "超级岛: 计时器类型，保留之前的小图标，不生成文本位图")
+        // 检查是否为计时器类型，如果是，不生成文本位图，保留之前的图标
+        val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
+        if (!isTimerType) {
+            // 优先使用 B 区文本生成位图
+            val textToRender = when (bComponent) {
+                is BImageText2 -> bComponent.title
+                is BImageText3 -> bComponent.title
+                is BImageText6 -> bComponent.title
+                is BTextInfo -> bComponent.title
+                is BFixedWidthDigitInfo -> bComponent.digit
+                is BSameWidthDigitInfo -> bComponent.digit
+                is BProgressTextInfo -> bComponent.title ?: bComponent.content
+                else -> null
+            } ?: when (aComponent) {
+                is AImageText1 -> aComponent.title ?: aComponent.content
+                is AImageText5 -> aComponent.title
+                else -> null
             }
+            
+            Logger.d(TAG, "超级岛: 处理文本位图 - textToRender: $textToRender")
+            if (!textToRender.isNullOrBlank()) {
+                Logger.d(TAG, "超级岛: 使用文本生成位图")
+                val bitmap = BitmapUtils.textToBitmap(textToRender)
+                Logger.d(TAG, "超级岛: 文本位图生成结果: ${bitmap != null}")
+                if (bitmap != null) return bitmap
+            }
+        } else {
+            // 计时器类型，不生成文本位图，保留之前的图标
+            Logger.d(TAG, "超级岛: 计时器类型，保留之前的小图标，不生成文本位图")
         }
         
         // 处理图标
-        if (smallIconBitmap == null) {
-            // 优先使用 A 区图标或B区图标
-            val picKeyToUse = aPicKey ?: bPicKey
-            Logger.d(TAG, "超级岛: 处理 A 区图标或B区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
-            if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
-                val picUrl = picMap[picKeyToUse]
-                if (!picUrl.isNullOrBlank()) {
-                    // 同步下载图标
-                    Logger.d(TAG, "超级岛: 使用 A 区图标或B区图标作为小图标")
-                    val bitmap = runBlocking {
-                        downloadBitmap(context, picUrl, 5000)
-                    }
-                    if (bitmap != null) {
-                        smallIconBitmap = bitmap
-                        Logger.d(TAG, "超级岛: A 区图标或B区图标加载成功")
-                    } else {
-                        Logger.w(TAG, "超级岛: A 区图标或B区图标加载失败")
-                    }
+        // 优先使用 A 区图标或B区图标
+        val picKeyToUse = aPicKey ?: bPicKey
+        Logger.d(TAG, "超级岛: 处理 A 区图标或B区图标 - picKeyToUse: $picKeyToUse, picMap: ${picMap?.keys}")
+        if (!picKeyToUse.isNullOrBlank() && !picMap.isNullOrEmpty()) {
+            val picUrl = picMap[picKeyToUse]
+            if (!picUrl.isNullOrBlank()) {
+                // 异步下载图标
+                Logger.d(TAG, "超级岛: 使用 A 区图标或B区图标作为小图标")
+                val bitmap = downloadBitmap(context, picUrl, 5000)
+                if (bitmap != null) {
+                    Logger.d(TAG, "超级岛: A 区图标或B区图标加载成功")
+                    return bitmap
+                } else {
+                    Logger.w(TAG, "超级岛: A 区图标或B区图标加载失败")
                 }
             }
         }
         
         // 如果没有 A 区图标或B区图标，再使用应用图标
-        if (smallIconBitmap == null) {
-            // 使用应用图标（大图标的键值提供的图标）
-            val appIconKey = "miui.focus.pic_app_icon"
-            Logger.d(TAG, "超级岛: 处理应用图标 - appIconKey: $appIconKey, picMap: ${picMap?.keys}")
-            if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
-                val appIconUrl = picMap[appIconKey]
-                if (!appIconUrl.isNullOrBlank()) {
-                    // 同步下载应用图标
-                    Logger.d(TAG, "超级岛: 使用应用图标作为小图标")
-                    val bitmap = runBlocking {
-                        downloadBitmap(context, appIconUrl, 5000)
-                    }
-                    if (bitmap != null) {
-                        smallIconBitmap = bitmap
-                        Logger.d(TAG, "超级岛: 应用图标加载成功")
-                    } else {
-                        Logger.w(TAG, "超级岛: 应用图标加载失败")
-                    }
+        // 使用应用图标（大图标的键值提供的图标）
+        val appIconKey = "miui.focus.pic_app_icon"
+        Logger.d(TAG, "超级岛: 处理应用图标 - appIconKey: $appIconKey, picMap: ${picMap?.keys}")
+        if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
+            val appIconUrl = picMap[appIconKey]
+            if (!appIconUrl.isNullOrBlank()) {
+                // 异步下载应用图标
+                Logger.d(TAG, "超级岛: 使用应用图标作为小图标")
+                val bitmap = downloadBitmap(context, appIconUrl, 5000)
+                if (bitmap != null) {
+                    Logger.d(TAG, "超级岛: 应用图标加载成功")
+                    return bitmap
+                } else {
+                    Logger.w(TAG, "超级岛: 应用图标加载失败")
                 }
             }
         }
         
-        // 如果没有生成位图，使用默认图标（改为本应用图标）
-        if (smallIconBitmap == null) {
-            Logger.d(TAG, "超级岛: 没有生成位图，使用本应用图标作为默认图标")
-        } else {
-            Logger.d(TAG, "超级岛: 成功生成小图标")
-        }
-        
-        // 注入小图标
-        injectSmallIcon(notification, smallIconBitmap)
-        
-        // 返回注入图标后的通知对象
-        return notification
+        // 如果没有生成位图，返回 null
+        Logger.d(TAG, "超级岛: 没有生成小图标")
+        return null
+    }
+
+    private suspend fun buildCapsuleCompatibleNotificationWithIconInjection(
+        context: Context,
+        builder: NotificationCompat.Builder,
+        title: String?,
+        text: String?,
+        appName: String?,
+        picMap: Map<String, String>?,
+        paramV2Raw: String?,
+        aComponent: AComponent?,
+        bComponent: BComponent?
+    ): Notification {
+        try {
+            // 先构建胶囊兼容的通知
+            val capsuleBuilder = buildCapsuleCompatibleNotification(context, builder, title, text, appName,
+                picMap, paramV2Raw, aComponent, bComponent)
+
+            // 构建通知并注入图标
+            val notification = capsuleBuilder.build()
+
+            // 解析小图标位图
+            val smallIconBitmap = resolveSmallIconBitmap(context, picMap, aComponent, bComponent)
+            
+            // 如果没有生成位图，使用默认图标（改为本应用图标）
+            if (smallIconBitmap == null) {
+                Logger.d(TAG, "超级岛: 没有生成位图，使用本应用图标作为默认图标")
+            } else {
+                Logger.d(TAG, "超级岛: 成功生成小图标")
+            }
+            
+            // 注入小图标
+            injectSmallIcon(notification, smallIconBitmap)
+            
+            // 返回注入图标后的通知对象
+            return notification
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 构建胶囊兼容通知并注入图标失败: ${e.message}")
             e.printStackTrace()
@@ -1236,16 +1068,6 @@ object NotificationGenerator {
     }
 
     // ---- 辅助方法 ----
-
-    /**
-     * 兼容空值的 param_v2 解析包装
-     */
-    internal fun parseParamV2Safe(raw: String?): ParamV2? {
-        return try {
-            val s = raw ?: return null
-            if (s.isBlank()) null else parseParamV2(s)
-        } catch (_: Exception) { null }
-    }
 
     /**
      * 下载位图
