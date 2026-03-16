@@ -22,7 +22,9 @@ object SuperIslandDataFormatter {
         paramV2Raw: String?,
         picMap: Map<String, String>?
     ): FormattedSuperIslandData {
-        val paramV2 = parseParamV2Safe(paramV2Raw)
+        val paramV2 = withContext(Dispatchers.IO) {
+            parseParamV2Safe(paramV2Raw)
+        }
         val resolvedPicMap = resolvePicMapSafe(context, picMap)
         
         Logger.d(TAG, "formatForDisplay: paramV2=${paramV2 != null}, picMapSize=${resolvedPicMap.size}")
