@@ -188,7 +188,7 @@ object TextSplitter {
         }
         
         // 确保图标文本长度至少为2个字符，且不超过文本长度
-        val minSplitPoint = maxOf(2, 0)
+        val minSplitPoint = 2
         iconSplitPoint = maxOf(minSplitPoint, iconSplitPoint)
         iconSplitPoint = min(iconSplitPoint, truncatedText.length)
         
@@ -196,7 +196,7 @@ object TextSplitter {
         val safeIconSplitPoint = min(iconSplitPoint, truncatedText.lastIndex.coerceAtLeast(0))
         
         // 计算安全的搜索范围
-        val searchStart = maxOf(minSplitPoint, 0)
+        val searchStart = minSplitPoint
         val searchEnd = minOf(capsuleSplitPoint, iconSplitPoint + 3, truncatedText.length)
         
         // 从图标拆分点开始，向左寻找最近的空格或标点符号
