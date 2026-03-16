@@ -340,6 +340,7 @@ fun FloatingWindowContainer(
                                 try {
                                     JSONObject(it)
                                 } catch (e: Exception) {
+                                    Logger.w("超级岛", "解析paramV2Raw失败: ${e.message}, 原始数据: $it")
                                     null
                                 }
                             }
