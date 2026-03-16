@@ -864,18 +864,8 @@ object NotificationGenerator {
                 isSuperIslandSpecInjectionEnabled = isSuperIslandSpecInjectionEnabled(context)
             )
 
-            // 处理 smallIcon
-            val smallIconBitmap = resolveSmallIconBitmap(context, picMap, aComponent, bComponent)
-
-            // 如果没有生成位图，使用系统默认图标
-            if (smallIconBitmap == null) {
-                // 使用系统默认图标
-                builder.setSmallIcon(android.R.drawable.stat_notify_more)
-                Logger.d(TAG, "超级岛: 使用系统默认图标")
-            } else {
-                // 设置系统默认图标作为占位符
-                builder.setSmallIcon(android.R.drawable.stat_notify_more)
-            }
+            // 处理 smallIcon - 设置系统默认图标作为占位符
+            builder.setSmallIcon(android.R.drawable.stat_notify_more)
 
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛: 构建胶囊兼容通知失败: ${e.message}")
