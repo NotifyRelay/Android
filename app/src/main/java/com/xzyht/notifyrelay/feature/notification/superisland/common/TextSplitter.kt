@@ -78,13 +78,15 @@ object TextSplitter {
     }
     
     /**
-     * 截断文本，最长21等价字符（14+7），允许最多超出5个字符
+     * 截断文本，最长13等价字符，允许最多超出5个字符
      * @param text 原始文本
-     * @param maxEquivalentLength 最大等价字符长度
-     * @param maxAllowedLength 最大允许字符数
      * @return 截断后的文本
      */
-    private fun truncateText(text: String, maxEquivalentLength: Double, maxAllowedLength: Int): String {
+    private fun truncateText(text: String): String {
+        // 最长13等价字符（7+6），超长的直接截断
+        val maxEquivalentLength = 13.0
+        val maxAllowedLength = 18 // 允许最多超出5个字符
+        
         if (text.isEmpty()) {
             return text
         }
@@ -141,12 +143,8 @@ object TextSplitter {
      * @return Pair(图标文本, 胶囊文本)
      */
     fun splitLyric(lyricText: String, threshold: Int): Pair<String, String> {
-        // 最长13等价字符（7+6），超长的直接截断
-        val maxEquivalentLength = 13.0
-        val maxAllowedLength = 18 // 允许最多超出5个字符
-        
         // 截断文本
-        val truncatedText = truncateText(lyricText, maxEquivalentLength, maxAllowedLength)
+        val truncatedText = truncateText(lyricText)
         
         if (truncatedText.isEmpty()) {
             return Pair("", "")
@@ -189,18 +187,27 @@ object TextSplitter {
             }
         }
         
-        // 确保图标文本长度至少为2个字符
+        // 确保图标文本长度至少为2个字符，且不超过文本长度
         val minSplitPoint = maxOf(2, 0)
         iconSplitPoint = maxOf(minSplitPoint, iconSplitPoint)
+        iconSplitPoint = min(iconSplitPoint, truncatedText.length)
+        
+        // 处理空字符串情况
+        if (truncatedText.isEmpty()) {
+            return Pair("", "")
+        }
+        
+        // 确保索引不超出范围
+        val safeIconSplitPoint = min(iconSplitPoint, truncatedText.lastIndex)
         
         // 在图标拆分点附近寻找空格或标点符号，范围为从minSplitPoint到图标拆分点+3
         val searchStart = minSplitPoint
         val searchEnd = minOf(capsuleSplitPoint, iconSplitPoint + 3)
         
         // 从图标拆分点开始，向左寻找最近的空格或标点符号
-        var splitPoint = iconSplitPoint
+        var splitPoint = safeIconSplitPoint
         var foundSplitPoint = false
-        for (i in iconSplitPoint downTo searchStart) {
+        for (i in safeIconSplitPoint downTo searchStart) {
             if (truncatedText[i] == ' ' || isPunctuation(truncatedText[i])) {
                 splitPoint = i
                 foundSplitPoint = true
@@ -210,8 +217,8 @@ object TextSplitter {
         
         // 如果向左没找到空格或标点，向右寻找
         if (!foundSplitPoint) {
-            for (i in iconSplitPoint until searchEnd) {
-                if (truncatedText[i] == ' ' || isPunctuation(truncatedText[i])) {
+            for (i in safeIconSplitPoint until searchEnd) {
+                if (i < truncatedText.length && (truncatedText[i] == ' ' || isPunctuation(truncatedText[i]))) {
                     splitPoint = i
                     break
                 }
