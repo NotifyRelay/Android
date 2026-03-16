@@ -32,8 +32,8 @@ object CapsuleScrollManager {
     private val mainHandler = Handler(Looper.getMainLooper())
     
     // 基于视觉权重的滚动（CJK=2，西文=1）
-    private const val maxDisplayWeight = 18  // 视觉容量：约11个CJK字符或约22个西文字符
-    private const val compensationThreshold = 8  // 如果剩余权重小于此值则停止滚动（保持胶囊稳定）
+    private const val maxDisplayWeight = 17  // 视觉容量：约10个CJK字符或约20个西文字符
+    private const val compensationThreshold = 7  // 如果剩余权重小于此值则停止滚动（保持胶囊稳定）
     
     // 时间常量
     private const val initialPauseDuration = 1000L  // 1秒用于阅读开头
