@@ -22,3 +22,12 @@
 - **悬浮通知权限**: 请手动选择并打开具体的通知类别的悬浮通知权限，以提升通知体验
 - **敏感通知访问权限 (Android 15+，可选)**: 未授权时部分通知内容只能获取到'已隐藏敏感通知',因此建议开启以完整接收通知。
 
+## Star History
+
+<a href="https://www.star-history.com/?repos=NotifyRelay%2FAndroid&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/image?repos=NotifyRelay/Android&type=date&theme=dark&legend=top-left" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/image?repos=NotifyRelay/Android&type=date&legend=top-left" />
+   <img alt="Star History Chart" src="https://api.star-history.com/image?repos=NotifyRelay/Android&type=date&legend=top-left" />
+ </picture>
+</a>
