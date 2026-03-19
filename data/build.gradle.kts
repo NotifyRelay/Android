@@ -48,19 +48,18 @@ dependencies {
     
     // Room Database
     implementation(libs.androidx.room.runtime)
-    kapt(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.paging)
+    kapt(libs.androidx.room.compiler)
 
     // Paging 3 (DAO PagingSource)
-    implementation(libs.androidx.paging.runtime)
+    implementation(libs.bundles.paging)
     
     // Gson
     implementation(libs.gson)
     
     // Kotlin Coroutines
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.bundles.kotlinx.coroutines)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

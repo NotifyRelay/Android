@@ -49,8 +49,7 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     
     // Coil图片加载库
-    implementation(libs.coil)
-    implementation(libs.coil.compose)
+    implementation(libs.bundles.coil)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

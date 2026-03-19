@@ -191,20 +191,18 @@ dependencies {
     implementation(libs.accompanist.pager.indicators)
 
     // AndroidX Lifecycle（提供 ViewTreeLifecycleOwner 等）
-    implementation(libs.androidx.lifecycle.runtime)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.runtime.android)
+    implementation(libs.bundles.lifecycle)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     // Room Database
     implementation(libs.androidx.room.runtime)
-    kapt(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.room.paging)
+    kapt(libs.androidx.room.compiler)
 
     // Paging 3
-    implementation(libs.androidx.paging.runtime)
-    implementation(libs.androidx.paging.compose)
+    implementation(libs.bundles.paging)
     
     // Miuix风格ui库
     implementation(libs.miuix.android)
@@ -215,8 +213,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(libs.androidx.navigationevent.compose)
     // DataStore 持久化（设备名、规则设置）
-    implementation(libs.androidx.datastore.preferences)
-    implementation(libs.androidx.datastore)
+    implementation(libs.bundles.datastore)
     // Gson 用于通知历史 JSON 文件读写
     implementation(libs.gson)
     // OkHttp & Okio 用于 WebSocket 和 IO
@@ -226,9 +223,7 @@ dependencies {
     implementation(libs.jmdns)
     
     // Coil: image loading (Kotlin + Coroutines friendly)
-    implementation(libs.coil)
-    // Coil Compose: Jetpack Compose integration for image loading
-    implementation(libs.coil.compose)
+    implementation(libs.bundles.coil)
     // DiskLruCache: stable disk-based LRU cache for icons
     implementation(libs.disklrucache)
     // 添加Apache FtpServer依赖用于FTP服务器实现

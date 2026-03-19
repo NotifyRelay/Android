@@ -40,8 +40,7 @@ kotlin {
 dependencies {
     implementation(libs.okhttp)
     implementation(libs.gson)
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.bundles.kotlinx.coroutines)
     implementation(libs.semver)
     
     testImplementation(libs.junit)

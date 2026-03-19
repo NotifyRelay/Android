@@ -6,12 +6,11 @@ plugins {
 
 android {
     namespace = "github.xzynine.superislandui"
-    compileSdk {
-        version = release(36)
-    }
+    compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
-        minSdk = 29
+        minSdk = libs.versions.minSdk.get().toInt()
+        targetSdk = libs.versions.targetSdk.get().toInt()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
@@ -55,14 +54,12 @@ dependencies {
     implementation("androidx.compose.runtime:runtime")
     
     // AndroidX Lifecycle
-    implementation(libs.androidx.lifecycle.runtime)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
+    implementation(libs.bundles.lifecycle)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
     
     // 其他依赖
     implementation(libs.gson)
-    implementation(libs.coil)
-    implementation(libs.coil.compose)
+    implementation(libs.bundles.coil)
     
     // Miuix 风格 UI 库
     implementation(libs.miuix.android)
