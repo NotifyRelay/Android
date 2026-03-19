@@ -9,6 +9,4 @@ data class MediaSessionData(
     val appIconUrl: String? = null,
     val deviceName: String,
     val timestamp: Long = System.currentTimeMillis()
-) {
-    fun isValid(): Boolean = title.isNotBlank() || text.isNotBlank()
-}
+)

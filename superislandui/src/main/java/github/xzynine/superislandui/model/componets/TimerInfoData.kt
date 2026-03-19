@@ -1,6 +1,5 @@
 package github.xzynine.superislandui.model.componets
 
-import github.xzynine.superislandui.floating.common.formatTimerInfo
 import org.json.JSONObject
 
 // 定时器信息：用于计时功能，支持倒计时、正计时等

@@ -5,6 +5,8 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import androidx.core.graphics.createBitmap
+import androidx.core.graphics.toColorInt
 import notifyrelay.base.util.Logger
 
 
@@ -29,20 +31,7 @@ object BitmapUtils {
             }
             
             val fontSize = forceFontSize ?: 40f
-            
-            // 计算等价字符长度（小写英语字符为0.5个等价字符）
-            fun calculateEquivalentLength(text: String): Float {
-                var length = 0f
-                for (char in text) {
-                    if (char in 'a'..'z') {
-                        length += 0.5f
-                    } else {
-                        length += 1f
-                    }
-                }
-                return length
-            }
-            
+
             // 查找第一行的分割点（等价字符长度不超过7）
             fun findSplitPoint(text: String): Int {
                 var equivalentLength = 0f
@@ -87,7 +76,7 @@ object BitmapUtils {
                 val finalWidth = width.coerceAtMost(maxSize)
                 val finalHeight = height.coerceAtMost(maxSize)
                 
-                val image = Bitmap.createBitmap(finalWidth, finalHeight, Bitmap.Config.ARGB_8888)
+                val image = createBitmap(finalWidth, finalHeight)
                 val canvas = Canvas(image)
                 // 绘制时添加小的左内边距
                 canvas.drawText(firstLineText, 5f, baseline, paint)
@@ -103,9 +92,7 @@ object BitmapUtils {
                     textAlign = Paint.Align.LEFT
                     typeface = Typeface.DEFAULT_BOLD
                 }
-                
-                val lineBaseline = -linePaint.ascent()
-                
+
                 // 计算宽度：取第一行和第二行中较宽的一个
                 val firstLineWidth = linePaint.measureText(firstLineText)
                 val secondLineWidth = linePaint.measureText(secondLineText)
@@ -129,7 +116,7 @@ object BitmapUtils {
                 val finalWidth = width.coerceAtMost(maxSize)
                 val finalHeight = height.coerceAtMost(maxSize)
                 
-                val image = Bitmap.createBitmap(finalWidth, finalHeight, Bitmap.Config.ARGB_8888)
+                val image = createBitmap(finalWidth, finalHeight)
                 val canvas = Canvas(image)
                 
                 // 计算两行的垂直位置，确保完整显示
@@ -170,7 +157,7 @@ object BitmapUtils {
             }
             
             val size = 100 // 位图大小
-            val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+            val bitmap = createBitmap(size, size)
             val canvas = Canvas(bitmap)
             
             // 背景透明
@@ -186,12 +173,12 @@ object BitmapUtils {
                 strokeWidth = 10f
                 color = colorUnReach?.let { 
                     try {
-                        Color.parseColor(it)
+                        it.toColorInt()
                     } catch (e: Exception) {
                         Logger.w(TAG, "解析未达到部分颜色失败: ${e.message}")
-                        Color.parseColor("#888888") // 默认灰色
+                        "#888888".toColorInt() // 默认灰色
                     }
-                } ?: Color.parseColor("#888888") // 默认灰色
+                } ?: "#888888".toColorInt() // 默认灰色
             }
             
             val centerX = size / 2f
@@ -211,12 +198,12 @@ object BitmapUtils {
                 strokeWidth = 10f
                 color = colorReach?.let { 
                     try {
-                        Color.parseColor(it)
+                        it.toColorInt()
                     } catch (e: Exception) {
                         Logger.w(TAG, "解析已达到部分颜色失败: ${e.message}")
-                        Color.parseColor("#00FF00") // 默认绿色
+                        "#00FF00".toColorInt() // 默认绿色
                     }
-                } ?: Color.parseColor("#00FF00") // 默认绿色
+                } ?: "#00FF00".toColorInt() // 默认绿色
             }
             
             // 绘制已达到的圆弧

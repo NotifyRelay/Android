@@ -2,19 +2,17 @@ package github.xzynine.superislandui.floating.common
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.core.graphics.toColorInt
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import notifyrelay.core.util.DataUrlUtils
-import notifyrelay.base.util.Logger
-
 import coil.ImageLoader as CoilImageLoader
 
 /**
@@ -120,24 +118,11 @@ object SuperIslandImageUtil {
     }
 
     /**
-     * 下载图片，内部调用loadBitmapSuspend
-     */
-    suspend fun downloadBitmap(context: Context, url: String, timeoutMs: Int): Bitmap? {
-        return try {
-            val resolved = resolveReferenceUrl(context, url)
-            loadBitmapSuspend(context, resolved, timeoutMs)
-        } catch (e: Exception) {
-            Logger.w("超级岛", "超级岛: 下载图片失败: ${e.message}")
-            null
-        }
-    }
-
-    /**
      * 解析颜色字符串为颜色值
      */
     fun parseColor(colorString: String?): Int? {
         return try {
-            colorString?.let { Color.parseColor(it) }
+            colorString?.toColorInt()
         } catch (e: Exception) {
             null
         }
@@ -232,45 +217,6 @@ object SuperIslandImageUtil {
         }
         
         return builder.toAnnotatedString()
-    }
-
-    /**
-     * 安全截断文本
-     */
-    fun truncateText(text: String, maxLength: Int, suffix: String = "..."): String {
-        return if (text.length <= maxLength) {
-            text
-        } else {
-            text.substring(0, maxLength - suffix.length) + suffix
-        }
-    }
-
-    /**
-     * 格式化数字，添加千分位分隔符
-     */
-    fun formatNumber(number: Long): String {
-        return "%,d".format(number)
-    }
-
-    /**
-     * 安全解析字符串为整数
-     */
-    fun safeParseInt(value: String?, default: Int = 0): Int {
-        return value?.toIntOrNull() ?: default
-    }
-
-    /**
-     * 安全解析字符串为长整数
-     */
-    fun safeParseLong(value: String?, default: Long = 0L): Long {
-        return value?.toLongOrNull() ?: default
-    }
-
-    /**
-     * 安全解析字符串为布尔值
-     */
-    fun safeParseBoolean(value: String?, default: Boolean = false): Boolean {
-        return value?.toBooleanStrictOrNull() ?: default
     }
 
     /**

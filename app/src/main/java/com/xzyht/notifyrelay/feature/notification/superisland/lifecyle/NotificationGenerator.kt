@@ -601,15 +601,15 @@ object NotificationGenerator {
                              if (isCountDown) {
                                  // 倒计时：计算剩余时间并设置
                                  val now = System.currentTimeMillis()
-                                 val remaining = timer?.let { it.timerWhen - now }
-                                 remaining?.let {
+                                 val remaining = timer.timerWhen - now
+                                 remaining.let {
                                      if (it > 0) {
                                          // 对于倒计时，设置chronometer自动倒计时
                                          builder.setUsesChronometer(true)
                                          builder.setChronometerCountDown(true)
                                          builder.setShowWhen(true) // 确保显示时间
                                          // 设置倒计时的终点时间
-                                         timer?.let { builder.setWhen(it.timerWhen) }
+                                         timer.let { builder.setWhen(it.timerWhen) }
                                          Logger.i(TAG, "超级岛: 倒计时通知已设置chronometer，自动更新，key=$key")
                                      }
                                  }

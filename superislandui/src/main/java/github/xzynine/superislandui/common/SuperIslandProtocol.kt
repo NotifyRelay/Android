@@ -13,9 +13,6 @@ import java.security.MessageDigest
  */
 object SuperIslandProtocol {
     const val FEATURE_KEY_NAME = "si_feature_id"
-    const val TYPE_FULL = "SI_FULL"
-    const val TYPE_DELTA = "SI_DELTA"
-    const val TYPE_END = "SI_END"
     const val TERMINATE_VALUE = "__END__"
 
     data class State(

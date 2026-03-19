@@ -9,7 +9,6 @@ import android.graphics.Bitmap
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
-import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
@@ -17,14 +16,14 @@ import android.service.notification.StatusBarNotification
 import android.util.Base64
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.R
-import com.xzyht.notifyrelay.sync.MessageSender
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.backend.BackendLocalFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
+import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncReceiver
+import com.xzyht.notifyrelay.sync.MessageSender
 import github.xzynine.superislandui.common.SuperIslandManager
 import github.xzynine.superislandui.common.SuperIslandProtocol
 import kotlinx.coroutines.CoroutineScope
@@ -600,7 +599,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
             // 为通知主体添加点击事件，实现剪贴板同步功能
             val syncIntent = Intent(this, ClipboardSyncReceiver::class.java).apply {
-                action = ClipboardSyncReceiver.Companion.ACTION_MANUAL_SYNC
+                action = ClipboardSyncReceiver.ACTION_MANUAL_SYNC
             }
             val syncPendingIntent = PendingIntent.getBroadcast(
                 this, 0, syncIntent,
@@ -687,14 +686,6 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             StorageManager.getBoolean(applicationContext, key, defaultValue)
         } catch (_: Exception) {
             defaultValue
-        }
-    }
-
-    private inline fun safeSend(tag: String, crossinline block: () -> Unit) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.e(TAG, "发送消息失败", e)
         }
     }
 
