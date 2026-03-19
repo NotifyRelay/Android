@@ -71,12 +71,6 @@ class TextSplitterUnitTest {
             "過去形フィルムに縋った僕らは舵取り粘土に飲まれていつしか固まっていくようで"
         )
         
-        val outputDir = File("build/test-output/textsplitter")
-        outputDir.mkdirs()
-        
-        val resultFile = File(outputDir, "test_results.txt")
-        val resultBuilder = StringBuilder()
-        
         var testFailed = false
         
         testCases.forEachIndexed { index, text ->
@@ -89,12 +83,10 @@ class TextSplitterUnitTest {
                 
                 // 测试通过，只打印基本信息
                 val result = formatTestResult(index, text, iconText, capsuleText)
-                resultBuilder.append(result)
                 print(result)
             } catch (e: AssertionError) {
                 // 测试失败，打印详细数据值
                 val result = formatFailedTestResult(index, text, iconText, capsuleText)
-                resultBuilder.append(result)
                 print(result)
                 // 记录测试失败，但继续执行后续测试
                 testFailed = true
@@ -105,9 +97,6 @@ class TextSplitterUnitTest {
         if (testFailed) {
             throw AssertionError("部分测试用例失败，请查看详细输出")
         }
-        
-        resultFile.writeText(resultBuilder.toString(), Charsets.UTF_8)
-        println("测试结果已保存到: ${resultFile.absolutePath}")
     }
     
     /**
@@ -145,6 +134,11 @@ class TextSplitterUnitTest {
         
         // 验证胶囊文本长度不超过18个字符
         assert(capsuleText.length <= 18) { "胶囊文本长度不应超过18个字符" }
+        
+        // 验证 iconText + capsuleText 等于原始文本的截断形式
+        val combinedText = iconText + capsuleText
+        val truncatedText = TextSplitter.truncateText(text)
+        assert(combinedText == truncatedText) { "拆分后的文本组合应等于截断后的原始文本" }
     }
     
     /**
