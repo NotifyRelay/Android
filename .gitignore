@@ -29,3 +29,4 @@ local.properties
 /captures
 .qoder/
 base/build/
+app/build/

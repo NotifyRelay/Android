@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.feature.notification.superisland
-
-import com.xzyht.notifyrelay.feature.notification.superisland.common.SuperIslandProtocol
+import github.xzynine.superislandui.common.SuperIslandProtocol
 import org.json.JSONObject
 
 /**

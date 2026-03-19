@@ -7,8 +7,8 @@ import notifyrelay.data.StorageManager
 import notifyrelay.data.StorageManager.getBoolean
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.common.SuperIslandProtocol
-import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.MediaSessionData
+import github.xzynine.superislandui.common.SuperIslandProtocol
+import github.xzynine.superislandui.model.componets.MediaSessionData
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
@@ -416,8 +416,9 @@ object RemoteMediaSessionManager {
                 // 保留旧的图标
                 lastState?.pics?.let { currentPics.putAll(it) }
                 // 如果会话中有图标，使用会话中的图标
-                if (session.coverUrl != null) {
-                    currentPics["miui.focus.pic_cover"] = session.coverUrl
+                val coverUrl = session.coverUrl
+                if (coverUrl != null) {
+                    currentPics["miui.focus.pic_cover"] = coverUrl
                 }
                 val currentState = SuperIslandProtocol.State(
                     title = session.title,

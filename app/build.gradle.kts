@@ -242,6 +242,8 @@ dependencies {
     implementation(project(":base"))
     // 依赖checkupdata模块
     implementation(project(":checkupdata"))
+    // 依赖superislandui模块
+    implementation(project(":superislandui"))
 }
 
 tasks.register("printVersionName") {

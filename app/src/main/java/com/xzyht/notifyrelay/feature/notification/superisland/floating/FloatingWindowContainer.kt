@@ -24,22 +24,23 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.ActionCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.AnimTextInfoCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.BaseInfoCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.ChatInfoCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.HighlightInfoCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.HintInfoCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.MultiProgressCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.PicInfoCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.ProgressCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.TextButtonCompose
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.param.ParamIslandCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.compose.BigIslandCollapsedCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.CommonImageCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandComposeRoot
-import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.MediaSessionData
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
+import github.xzynine.superislandui.floating.BigIsland.components.ActionCompose
+import github.xzynine.superislandui.floating.BigIsland.components.AnimTextInfoCompose
+import github.xzynine.superislandui.floating.BigIsland.components.BaseInfoCompose
+import github.xzynine.superislandui.floating.BigIsland.components.ChatInfoCompose
+import github.xzynine.superislandui.floating.BigIsland.components.HighlightInfoCompose
+import github.xzynine.superislandui.floating.BigIsland.components.HintInfoCompose
+import github.xzynine.superislandui.floating.BigIsland.components.MediaIslandCompose
+import github.xzynine.superislandui.floating.BigIsland.components.MultiProgressCompose
+import github.xzynine.superislandui.floating.BigIsland.components.PicInfoCompose
+import github.xzynine.superislandui.floating.BigIsland.components.ProgressCompose
+import github.xzynine.superislandui.floating.BigIsland.components.TextButtonCompose
+import github.xzynine.superislandui.floating.SmallIsland.compose.BigIslandCollapsedCompose
+import github.xzynine.superislandui.floating.common.CommonImageCompose
+import github.xzynine.superislandui.floating.common.SuperIslandComposeRoot
+import github.xzynine.superislandui.model.componets.MediaSessionData
+import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
 
@@ -161,7 +162,7 @@ fun FloatingWindowContainer(
                                                     deviceName = entry.appName ?: ""
                                                 )
                                                 // 使用媒体类型大岛组件
-                                                com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.MediaIslandCompose(
+                                                MediaIslandCompose(
                                                     mediaSession = mediaSession,
                                                     isExpanded = entry.isExpanded,
                                                     onCollapse = {
@@ -196,13 +197,13 @@ fun FloatingWindowContainer(
 
                                             paramV2.paramIsland != null -> {
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 ParamIslandCompose")
-                                                ParamIslandCompose(paramV2.paramIsland, actions = paramV2.actions, picMap = entry.picMap)
+                                                ParamIslandCompose(paramV2.paramIsland!!, actions = paramV2.actions, picMap = entry.picMap)
                                             }
 
                                             paramV2.baseInfo != null -> {
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 BaseInfoCompose")
                                                 BaseInfoCompose(
-                                                    paramV2.baseInfo,
+                                                    paramV2.baseInfo!!,
                                                     picMap = entry.picMap
                                                 )
                                             }
@@ -215,7 +216,7 @@ fun FloatingWindowContainer(
                                             paramV2.animTextInfo != null -> {
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 AnimTextInfoCompose")
                                                 AnimTextInfoCompose(
-                                                    paramV2.animTextInfo,
+                                                    paramV2.animTextInfo!!,
                                                     picMap = entry.picMap
                                                 )
                                             }
@@ -223,7 +224,7 @@ fun FloatingWindowContainer(
                                             paramV2.highlightInfo != null -> {
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 HighlightInfoCompose")
                                                 HighlightInfoCompose(
-                                                    paramV2.highlightInfo,
+                                                    paramV2.highlightInfo!!,
                                                     picMap = entry.picMap
                                                 )
                                             }
@@ -231,7 +232,7 @@ fun FloatingWindowContainer(
                                             paramV2.picInfo != null -> {
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 PicInfoCompose")
                                                 PicInfoCompose(
-                                                    paramV2.picInfo,
+                                                    paramV2.picInfo!!,
                                                     picMap = entry.picMap
                                                 )
                                             }
@@ -239,7 +240,7 @@ fun FloatingWindowContainer(
                                             paramV2.hintInfo != null -> {
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 HintInfoCompose")
                                                 HintInfoCompose(
-                                                    paramV2.hintInfo,
+                                                    paramV2.hintInfo!!,
                                                     picMap = entry.picMap
                                                 )
                                             }
@@ -247,14 +248,14 @@ fun FloatingWindowContainer(
                                             paramV2.textButton != null -> {
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 TextButtonCompose")
                                                 TextButtonCompose(
-                                                    paramV2.textButton,
+                                                    paramV2.textButton!!,
                                                     picMap = entry.picMap
                                                 )
                                             }
 
                                             paramV2.actions?.isNotEmpty() == true -> {
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 ActionCompose")
-                                                ActionCompose(paramV2.actions, entry.picMap)
+                                                ActionCompose(paramV2.actions!!, entry.picMap)
                                             }
 
                                             else -> {

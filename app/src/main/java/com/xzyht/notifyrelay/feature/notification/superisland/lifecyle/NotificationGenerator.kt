@@ -13,25 +13,25 @@ import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
-import com.xzyht.notifyrelay.feature.notification.superisland.common.BitmapUtils
-import com.xzyht.notifyrelay.feature.notification.superisland.common.CapsuleScrollManager
-import com.xzyht.notifyrelay.feature.notification.superisland.common.TextSplitter
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AComponent
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AImageText1
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.left.AImageText5
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BComponent
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BFixedWidthDigitInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BImageText2
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BImageText3
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BImageText6
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BProgressTextInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BSameWidthDigitInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.SmallIsland.right.BTextInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.formatTimerInfo
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
+import github.xzynine.superislandui.common.BitmapUtils
+import github.xzynine.superislandui.common.CapsuleScrollManager
+import github.xzynine.superislandui.common.TextSplitter
+import github.xzynine.superislandui.floating.SmallIsland.left.AComponent
+import github.xzynine.superislandui.floating.SmallIsland.left.AImageText1
+import github.xzynine.superislandui.floating.SmallIsland.left.AImageText5
+import github.xzynine.superislandui.floating.SmallIsland.right.BComponent
+import github.xzynine.superislandui.floating.SmallIsland.right.BFixedWidthDigitInfo
+import github.xzynine.superislandui.floating.SmallIsland.right.BImageText2
+import github.xzynine.superislandui.floating.SmallIsland.right.BImageText3
+import github.xzynine.superislandui.floating.SmallIsland.right.BImageText6
+import github.xzynine.superislandui.floating.SmallIsland.right.BProgressTextInfo
+import github.xzynine.superislandui.floating.SmallIsland.right.BSameWidthDigitInfo
+import github.xzynine.superislandui.floating.SmallIsland.right.BTextInfo
+import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.floating.common.formatTimerInfo
+import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import java.util.concurrent.ConcurrentHashMap
@@ -526,40 +526,43 @@ object NotificationGenerator {
 
                 // 计时器通知的标题和内容设置
                 // 标题显示状态，内容显示应用名，时间流逝由chronometer自动处理
-                val timerTitle: String
-                val timerContent: String
+                var timerTitle: String = title ?: appName ?: "超级岛通知"
+                var timerContent: String = text ?: ""
                 if (isTimerType) {
                     val timer = bComponent.timer
-                    when (timer.timerType) {
-                        -2 -> {
-                            timerTitle = "暂停"
-                            timerContent = appName ?: "计时器"
-                        }
-                        -1 -> {
-                            timerTitle = "倒计时中"
-                            timerContent = appName ?: "计时器"
-                        }
-                        1 -> {
-                            timerTitle = "正计时中"
-                            timerContent = appName ?: "秒表"
-                        }
-                        2 -> {
-                            timerTitle = "暂停"
-                            timerContent = appName ?: "秒表"
-                        }
-                        else -> {
-                            timerTitle = title ?: appName ?: "超级岛通知"
-                            timerContent = text ?: ""
+                    timer?.let {
+                        when (it.timerType) {
+                            -2 -> {
+                                timerTitle = "暂停"
+                                timerContent = appName ?: "计时器"
+                            }
+
+                            -1 -> {
+                                timerTitle = "倒计时中"
+                                timerContent = appName ?: "计时器"
+                            }
+
+                            1 -> {
+                                timerTitle = "正计时中"
+                                timerContent = appName ?: "秒表"
+                            }
+
+                            2 -> {
+                                timerTitle = "暂停"
+                                timerContent = appName ?: "秒表"
+                            }
+
+                            else -> {
+                                timerTitle = title ?: appName ?: "超级岛通知"
+                                timerContent = text ?: ""
+                            }
                         }
                     }
-                } else {
-                    timerTitle = title ?: appName ?: "超级岛通知"
-                    timerContent = text ?: ""
                 }
 
                 // 判断是否为正在运行的计时器类型（用于chronometer）
                 val isRunningTimer = isTimerType &&
-                    (bComponent.timer.timerType == -1 || bComponent.timer.timerType == 1)
+                    (bComponent.timer!!.timerType == -1 || bComponent.timer!!.timerType == 1)
 
                 // 构建基础通知，调整属性使其更接近实际超级岛通知
                 val builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
@@ -587,7 +590,7 @@ object NotificationGenerator {
                     if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
                         // 根据timerType设置计时模式
                         val timer = bComponent.timer
-                        val timerType = timer.timerType
+                        val timerType = timer?.timerType
                         // timerType: -2倒计时暂停，-1倒计时开始，0默认，1正计时开始，2正计时暂停
 
                         // 只对正在进行中的计时器启用自动流逝
@@ -598,15 +601,17 @@ object NotificationGenerator {
                              if (isCountDown) {
                                  // 倒计时：计算剩余时间并设置
                                  val now = System.currentTimeMillis()
-                                 val remaining = timer.timerWhen - now
-                                 if (remaining > 0) {
-                                     // 对于倒计时，设置chronometer自动倒计时
-                                     builder.setUsesChronometer(true)
-                                     builder.setChronometerCountDown(true)
-                                     builder.setShowWhen(true) // 确保显示时间
-                                     // 设置倒计时的终点时间
-                                     builder.setWhen(timer.timerWhen)
-                                     Logger.i(TAG, "超级岛: 倒计时通知已设置chronometer，自动更新，key=$key")
+                                 val remaining = timer?.let { it.timerWhen - now }
+                                 remaining?.let {
+                                     if (it > 0) {
+                                         // 对于倒计时，设置chronometer自动倒计时
+                                         builder.setUsesChronometer(true)
+                                         builder.setChronometerCountDown(true)
+                                         builder.setShowWhen(true) // 确保显示时间
+                                         // 设置倒计时的终点时间
+                                         timer?.let { builder.setWhen(it.timerWhen) }
+                                         Logger.i(TAG, "超级岛: 倒计时通知已设置chronometer，自动更新，key=$key")
+                                     }
                                  }
                              } else {
                                  // 正计时：使用timerWhen作为起点
@@ -614,7 +619,7 @@ object NotificationGenerator {
                                  builder.setChronometerCountDown(false)
                                  builder.setShowWhen(true) // 确保显示时间
                                  // 设置正计时的起点时间
-                                 builder.setWhen(timer.timerWhen)
+                                 timer?.let { builder.setWhen(it.timerWhen) }
                                  Logger.i(TAG, "超级岛: 正计时通知已设置chronometer，自动更新，key=$key")
                              }
                         }
@@ -750,7 +755,7 @@ object NotificationGenerator {
                 is BSameWidthDigitInfo -> {
                     // 优先使用timer信息计算计时值
                     if (bComponent.timer != null) {
-                        formatTimerInfo(bComponent.timer)
+                        formatTimerInfo(bComponent.timer!!)
                     } else {
                         bComponent.digit
                     }
@@ -766,7 +771,7 @@ object NotificationGenerator {
                 is BSameWidthDigitInfo -> {
                     // 优先使用timer信息计算计时值
                     if (bComponent.timer != null) {
-                        formatTimerInfo(bComponent.timer)
+                        formatTimerInfo(bComponent.timer!!)
                     } else {
                         bComponent.content
                     }
@@ -810,12 +815,14 @@ object NotificationGenerator {
             // 根据计时器状态设置标题和内容
             if (isTimerType) {
                 val timer = bComponent.timer
-                val timerTitle = when (timer.timerType) {
-                    -2 -> "暂停中"
-                    -1 -> "倒计时中"
-                    1 -> "正计时中"
-                    2 -> "暂停中"
-                    else -> title ?: appName ?: "超级岛通知"
+                val timerTitle = timer?.let {
+                    when (it.timerType) {
+                        -2 -> "暂停中"
+                        -1 -> "倒计时中"
+                        1 -> "正计时中"
+                        2 -> "暂停中"
+                        else -> title ?: appName ?: "超级岛通知"
+                    }
                 }
                 val timerContent = appName ?: "超级岛通知"
 

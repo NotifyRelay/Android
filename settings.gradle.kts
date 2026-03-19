@@ -28,3 +28,5 @@ include(":data")
 include(":core")
 include(":base")
 include(":checkupdata")
+
+include(":superislandui")

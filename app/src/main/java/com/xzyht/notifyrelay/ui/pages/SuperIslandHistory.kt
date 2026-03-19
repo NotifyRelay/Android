@@ -67,7 +67,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
