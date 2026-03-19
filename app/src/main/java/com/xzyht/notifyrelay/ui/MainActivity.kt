@@ -82,7 +82,6 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
-import top.yukonga.miuix.kmp.basic.NavigationDisplayMode
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
@@ -292,7 +291,6 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
             },
             bottomBar = {
                 NavigationBar(
-                    mode = NavigationDisplayMode.IconAndText,
                     color = colorScheme.background,
                     modifier = Modifier
                         .height(75.dp)
