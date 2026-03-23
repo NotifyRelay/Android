@@ -40,6 +40,7 @@ import top.yukonga.miuix.kmp.basic.InputField
 import top.yukonga.miuix.kmp.basic.SearchBar
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.extra.BottomSheetDefaults
 import top.yukonga.miuix.kmp.extra.WindowBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -118,125 +119,123 @@ fun AppPickerDialog(
     }
 
     MiuixTheme {
-        WindowBottomSheet(
-            show = showDialog,
-            title = title,
-            onDismissRequest = { 
-                showDialog.value = false; onDismiss(); appSearchQuery = "" 
-            }
-        ) {
-            Column {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
-                ) {
-                    Switch(
-                        checked = showSystemApps,
-                        onCheckedChange = { showSystemApps = it },
-                        modifier = Modifier.padding(end = 4.dp)
-                    )
-                    Text("显示系统应用", style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurface)
-                }
-
-                var expanded by remember { mutableStateOf(false) }
-                
-                SearchBar(
-                    inputField = {
-                        InputField(
-                            query = appSearchQuery,
-                            onQueryChange = { appSearchQuery = it },
-                            onSearch = { /* 搜索操作已通过 onQueryChange 实时处理 */ },
-                            expanded = expanded,
-                            onExpandedChange = { expanded = it },
-                            label = "搜索应用/包名"
-                        )
-                    },
-                    expanded = expanded,
-                    onExpandedChange = { expanded = it }
-                ) {
-                    // SearchBar 内容区域
-                    if (isLoading || allApps.isEmpty()) {
-                        // 显示加载提示在应用列表区域
-                        Box(Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 400.dp), contentAlignment = Alignment.Center) {
-                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                                InfiniteProgressIndicator(
-                                    size = 48.dp,
-                                    color = MiuixTheme.colorScheme.primary
-                                )
-                                Spacer(modifier = Modifier.height(16.dp))
-                                Text("正在加载应用列表...", style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceSecondary)
-                            }
+        WindowBottomSheet(show = showDialog.value, modifier = Modifier, title = title, startAction = null, endAction = null, backgroundColor = BottomSheetDefaults.backgroundColor(), enableWindowDim = true, cornerRadius = BottomSheetDefaults.cornerRadius, sheetMaxWidth = BottomSheetDefaults.maxWidth, onDismissRequest = {
+                        showDialog.value = false; onDismiss(); appSearchQuery = ""
+                    }, onDismissFinished = null, outsideMargin = BottomSheetDefaults.outsideMargin, insideMargin = BottomSheetDefaults.insideMargin, defaultWindowInsetsPadding = true, dragHandleColor = BottomSheetDefaults.dragHandleColor(), allowDismiss = true, enableNestedScroll = true, content = {
+                    Column {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().padding(bottom = 4.dp)
+                        ) {
+                            Switch(
+                                checked = showSystemApps,
+                                onCheckedChange = { showSystemApps = it },
+                                modifier = Modifier.padding(end = 4.dp)
+                            )
+                            Text("显示系统应用", style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurface)
                         }
-                    } else {
-                        LazyColumn(Modifier.heightIn(max = 400.dp)) {
-                            if (filteredApps.isEmpty()) {
-                                item {
-                                    Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
-                                        Text("没有匹配的应用", style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceSecondary)
+
+                        var expanded by remember { mutableStateOf(false) }
+
+                        SearchBar(
+                            inputField = {
+                                InputField(
+                                    query = appSearchQuery,
+                                    onQueryChange = { appSearchQuery = it },
+                                    onSearch = { /* 搜索操作已通过 onQueryChange 实时处理 */ },
+                                    expanded = expanded,
+                                    onExpandedChange = { expanded = it },
+                                    label = "搜索应用/包名"
+                                )
+                            },
+                            expanded = expanded,
+                            onExpandedChange = { expanded = it }
+                        ) {
+                            // SearchBar 内容区域
+                            if (isLoading || allApps.isEmpty()) {
+                                // 显示加载提示在应用列表区域
+                                Box(Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 400.dp), contentAlignment = Alignment.Center) {
+                                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                        InfiniteProgressIndicator(
+                                            size = 48.dp,
+                                            color = MiuixTheme.colorScheme.primary
+                                        )
+                                        Spacer(modifier = Modifier.height(16.dp))
+                                        Text("正在加载应用列表...", style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceSecondary)
                                     }
                                 }
                             } else {
-                                items(filteredApps, key = { it.packageName }) { appInfo: ApplicationInfo ->
-                                    val pkg = appInfo.packageName
-                                    val label = appLabelMap[pkg] ?: pkg
-                                    var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-                                    
-                                    // 异步加载图标
-                                    LaunchedEffect(iconUpdateKey, pkg) {
-                                        val loadedIcon = AppRepository.getAppIconAsync(context, pkg)
-                                        iconBitmap = loadedIcon?.asImageBitmap()
-                                    }
-                                    Column(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .clickable {
-                                                onAppSelected(pkg)
-                                                showDialog.value = false
-                                                onDismiss()
-                                                appSearchQuery = ""
-                                            }
-                                            .padding(horizontal = 4.dp, vertical = 6.dp)
-                                    ) {
-                                        Row(verticalAlignment = Alignment.CenterVertically) {
-                                            if (iconBitmap != null) {
-                                                Image(bitmap = iconBitmap!!, contentDescription = null, modifier = Modifier.size(22.dp))
-                                            } else {
-                                                Image(bitmap = defaultAppIconBitmap, contentDescription = null, modifier = Modifier.size(22.dp))
-                                            }
-                                            Column(modifier = Modifier.padding(start = 8.dp)) {
-                                                Text(label, style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurface)
-                                                Text(pkg, style = MiuixTheme.textStyles.footnote1, color = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.padding(top = 2.dp))
+                                LazyColumn(Modifier.heightIn(max = 400.dp)) {
+                                    if (filteredApps.isEmpty()) {
+                                        item {
+                                            Box(Modifier.fillMaxWidth().height(120.dp), contentAlignment = Alignment.Center) {
+                                                Text("没有匹配的应用", style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurfaceSecondary)
                                             }
                                         }
-                                        HorizontalDivider(
-                                            modifier = Modifier.padding(top = 8.dp),
-                                            color = MiuixTheme.colorScheme.dividerLine,
-                                            thickness = 0.7.dp
-                                        )
-                                    }
-                                }
+                                    } else {
+                                        items(filteredApps, key = { it.packageName }) { appInfo: ApplicationInfo ->
+                                            val pkg = appInfo.packageName
+                                            val label = appLabelMap[pkg] ?: pkg
+                                            var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
-                                if (appSearchQuery.isNotBlank() && filteredApps.none { app: ApplicationInfo -> app.packageName == appSearchQuery } && appSearchQuery.matches(Regex("[a-zA-Z0-9_.]+"))) {
-                                    item {
-                                        Column(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .clickable {
-                                                    onAppSelected(appSearchQuery)
-                                                    showDialog.value = false
-                                                    onDismiss()
-                                                    appSearchQuery = ""
+                                            // 异步加载图标
+                                            LaunchedEffect(iconUpdateKey, pkg) {
+                                                val loadedIcon = AppRepository.getAppIconAsync(context, pkg)
+                                                iconBitmap = loadedIcon?.asImageBitmap()
+                                            }
+                                            Column(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .clickable {
+                                                        onAppSelected(pkg)
+                                                        showDialog.value = false
+                                                        onDismiss()
+                                                        appSearchQuery = ""
+                                                    }
+                                                    .padding(horizontal = 4.dp, vertical = 6.dp)
+                                            ) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    if (iconBitmap != null) {
+                                                        Image(bitmap = iconBitmap!!, contentDescription = null, modifier = Modifier.size(22.dp))
+                                                    } else {
+                                                        Image(bitmap = defaultAppIconBitmap, contentDescription = null, modifier = Modifier.size(22.dp))
+                                                    }
+                                                    Column(modifier = Modifier.padding(start = 8.dp)) {
+                                                        Text(label, style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurface)
+                                                        Text(pkg, style = MiuixTheme.textStyles.footnote1, color = MiuixTheme.colorScheme.onSurfaceSecondary, modifier = Modifier.padding(top = 2.dp))
+                                                    }
                                                 }
-                                                .padding(horizontal = 4.dp, vertical = 10.dp)
-                                        ) {
-                                            Row(verticalAlignment = Alignment.CenterVertically) {
-                                                Image(bitmap = defaultAppIconBitmap, contentDescription = null, modifier = Modifier.size(22.dp))
-                                                Text(
-                                                    "添加自定义包名：${appSearchQuery}",
-                                                    style = MiuixTheme.textStyles.body2,
-                                                    color = MiuixTheme.colorScheme.primary,
-                                                    modifier = Modifier.padding(start = 8.dp)
+                                                HorizontalDivider(
+                                                    modifier = Modifier.padding(top = 8.dp),
+                                                    color = MiuixTheme.colorScheme.dividerLine,
+                                                    thickness = 0.7.dp
                                                 )
+                                            }
+                                        }
+
+                                        if (appSearchQuery.isNotBlank() && filteredApps.none { app: ApplicationInfo -> app.packageName == appSearchQuery } && appSearchQuery.matches(Regex("[a-zA-Z0-9_.]+"))) {
+                                            item {
+                                                Column(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .clickable {
+                                                            onAppSelected(appSearchQuery)
+                                                            showDialog.value = false
+                                                            onDismiss()
+                                                            appSearchQuery = ""
+                                                        }
+                                                        .padding(horizontal = 4.dp, vertical = 10.dp)
+                                                ) {
+                                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                                        Image(bitmap = defaultAppIconBitmap, contentDescription = null, modifier = Modifier.size(22.dp))
+                                                        Text(
+                                                            "添加自定义包名：${appSearchQuery}",
+                                                            style = MiuixTheme.textStyles.body2,
+                                                            color = MiuixTheme.colorScheme.primary,
+                                                            modifier = Modifier.padding(start = 8.dp)
+                                                        )
+                                                    }
+                                                }
                                             }
                                         }
                                     }
@@ -244,8 +243,6 @@ fun AppPickerDialog(
                             }
                         }
                     }
-                }
-            }
-        }
+                })
     }
 }
