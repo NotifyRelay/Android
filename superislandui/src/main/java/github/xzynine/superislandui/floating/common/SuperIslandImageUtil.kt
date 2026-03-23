@@ -8,6 +8,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.core.graphics.toColorInt
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
@@ -59,6 +60,11 @@ object SuperIslandImageUtil {
         picMap: Map<String, String>? = null,
         iconKey: String? = null
     ): Painter? {
+        // 预览模式下返回null，由调用方处理占位符
+        if (LocalInspectionMode.current) {
+            return null
+        }
+        
         // 如果提供了iconKey，先从picMap中获取url
         val resolvedUrl = remember(url, picMap, iconKey) {
             if (!iconKey.isNullOrEmpty() && picMap != null) {

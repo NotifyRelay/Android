@@ -8,8 +8,10 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.model.componets.ActionInfo
+import github.xzynine.superislandui.common.PreviewData
 
 /**
  * 操作按钮Compose组件
@@ -33,4 +35,13 @@ fun ActionCompose(actions: List<ActionInfo>, picMap: Map<String, String>? = null
             }
         }
     }
+}
+
+@Preview(name = "操作按钮", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun ActionComposePreview() {
+    ActionCompose(
+        actions = PreviewData.sampleActions,
+        picMap = PreviewData.samplePicMap
+    )
 }

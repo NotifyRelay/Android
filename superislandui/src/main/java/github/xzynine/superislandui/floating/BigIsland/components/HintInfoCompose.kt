@@ -6,10 +6,12 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.templates.HintInfo
 import github.xzynine.superislandui.floating.common.CommonImageCompose
+import github.xzynine.superislandui.common.PreviewData
 
 
 /**
@@ -47,4 +49,22 @@ fun HintInfoCompose(hintInfo: HintInfo, picMap: Map<String, String>? = null) {
             )
         }
     }
+}
+
+@Preview(name = "提示信息类型1", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun HintInfoComposeType1Preview() {
+    HintInfoCompose(
+        hintInfo = PreviewData.sampleHintInfo,
+        picMap = PreviewData.samplePicMap
+    )
+}
+
+@Preview(name = "提示信息类型2", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun HintInfoComposeType2Preview() {
+    HintInfoCompose(
+        hintInfo = PreviewData.sampleHintInfoType2,
+        picMap = PreviewData.samplePicMap
+    )
 }

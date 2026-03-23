@@ -16,6 +16,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
@@ -78,4 +79,20 @@ fun DefaultCompose(
             )
         }
     }
+}
+
+@Preview(name = "默认状态", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun DefaultComposePreview() {
+    DefaultCompose()
+}
+
+@Preview(name = "有标题内容", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun DefaultComposeWithDataPreview() {
+    DefaultCompose(
+        title = "通知标题",
+        content = "这是通知内容的详细描述信息",
+        image = null
+    )
 }

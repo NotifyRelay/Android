@@ -9,10 +9,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.componets.TimerInfo
 import github.xzynine.superislandui.floating.common.formatTimerInfo
+import github.xzynine.superislandui.common.PreviewData
 import kotlinx.coroutines.delay
 
 /**
@@ -36,4 +38,22 @@ fun TimerInfoCompose(timerInfo: TimerInfo, picMap: Map<String, String>? = null) 
             color = Color.White
         )
     }
+}
+
+@Preview(name = "计时器正计时", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun TimerInfoComposePreview() {
+    TimerInfoCompose(
+        timerInfo = PreviewData.sampleTimerInfo,
+        picMap = PreviewData.samplePicMap
+    )
+}
+
+@Preview(name = "计时器倒计时", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun TimerInfoComposeCountdownPreview() {
+    TimerInfoCompose(
+        timerInfo = PreviewData.sampleTimerInfoCountdown,
+        picMap = PreviewData.samplePicMap
+    )
 }

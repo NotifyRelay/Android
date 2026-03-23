@@ -17,6 +17,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.templates.HighlightInfo
@@ -24,6 +25,7 @@ import github.xzynine.superislandui.model.componets.TimerInfo
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.formatTimerInfo
+import github.xzynine.superislandui.common.PreviewData
 import kotlinx.coroutines.delay
 
 /**
@@ -219,4 +221,20 @@ private fun resolveStatusText(highlightInfo: HighlightInfo): String? {
     return if (base.contains("进行")) base else base + "进行中"
 }
 
-// (deduped) end-of-file helpers retained above
+@Preview(name = "高亮信息", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun HighlightInfoComposePreview() {
+    HighlightInfoCompose(
+        highlightInfo = PreviewData.sampleHighlightInfo,
+        picMap = PreviewData.samplePicMap
+    )
+}
+
+@Preview(name = "高亮信息带计时器", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun HighlightInfoComposeWithTimerPreview() {
+    HighlightInfoCompose(
+        highlightInfo = PreviewData.sampleHighlightInfoWithTimer,
+        picMap = PreviewData.samplePicMap
+    )
+}

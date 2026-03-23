@@ -8,9 +8,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.componets.TextButton
+import github.xzynine.superislandui.common.PreviewData
 
 /**
  * 文本按钮Compose组件
@@ -35,4 +37,13 @@ fun TextButtonCompose(textButton: TextButton, picMap: Map<String, String>? = nul
             }
         }
     }
+}
+
+@Preview(name = "文本按钮", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun TextButtonComposePreview() {
+    TextButtonCompose(
+        textButton = PreviewData.sampleTextButton,
+        picMap = PreviewData.samplePicMap
+    )
 }

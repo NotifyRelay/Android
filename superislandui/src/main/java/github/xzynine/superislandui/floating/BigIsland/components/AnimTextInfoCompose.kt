@@ -17,12 +17,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.componets.AnimTextInfo
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.resolveIconUrl
+import github.xzynine.superislandui.common.PreviewData
 import kotlinx.coroutines.delay
 
 /**
@@ -126,4 +128,22 @@ fun AnimTextInfoCompose(animTextInfo: AnimTextInfo, picMap: Map<String, String>?
             }
         }
     }
+}
+
+@Preview(name = "动画文本信息", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun AnimTextInfoComposePreview() {
+    AnimTextInfoCompose(
+        animTextInfo = PreviewData.sampleAnimTextInfo,
+        picMap = PreviewData.samplePicMap
+    )
+}
+
+@Preview(name = "动画文本带计时器", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun AnimTextInfoComposeWithTimerPreview() {
+    AnimTextInfoCompose(
+        animTextInfo = PreviewData.sampleAnimTextInfoWithTimer,
+        picMap = PreviewData.samplePicMap
+    )
 }

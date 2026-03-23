@@ -18,11 +18,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.templates.BaseInfo
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.common.PreviewData
 
 /**
  * BaseInfo的Compose实现
@@ -342,4 +344,22 @@ fun BaseInfoCompose(
             }
         }
     }
+}
+
+@Preview(name = "文本组件1", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun BaseInfoComposeType1Preview() {
+    BaseInfoCompose(
+        baseInfo = PreviewData.sampleBaseInfo,
+        picMap = PreviewData.samplePicMap
+    )
+}
+
+@Preview(name = "文本组件2", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun BaseInfoComposeType2Preview() {
+    BaseInfoCompose(
+        baseInfo = PreviewData.sampleBaseInfoType2,
+        picMap = PreviewData.samplePicMap
+    )
 }

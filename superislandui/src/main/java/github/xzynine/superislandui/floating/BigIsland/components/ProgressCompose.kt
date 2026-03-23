@@ -5,9 +5,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.model.componets.ProgressInfo
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.common.PreviewData
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 
@@ -26,9 +28,27 @@ fun ProgressCompose(
         progress = progressInfo.progress.toFloat() / 100f,
         modifier = Modifier
             .fillMaxWidth()
-            .padding(top = 4.dp, start = 0.dp, end = 0.dp, bottom = 0.dp), // 与传统View保持一致的margin
+            .padding(top = 4.dp, start = 0.dp, end = 0.dp, bottom = 0.dp),
         colors = ProgressIndicatorDefaults.progressIndicatorColors(
             foregroundColor = progressColor
         )
+    )
+}
+
+@Preview(name = "进度条60%", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun ProgressComposePreview() {
+    ProgressCompose(
+        progressInfo = PreviewData.sampleProgressInfo,
+        picMap = PreviewData.samplePicMap
+    )
+}
+
+@Preview(name = "进度条25%", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun ProgressComposeLowPreview() {
+    ProgressCompose(
+        progressInfo = PreviewData.sampleProgressInfoLow,
+        picMap = PreviewData.samplePicMap
     )
 }

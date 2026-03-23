@@ -96,7 +96,7 @@ object BitmapUtils {
                 // 计算宽度：取第一行和第二行中较宽的一个
                 val firstLineWidth = linePaint.measureText(firstLineText)
                 val secondLineWidth = linePaint.measureText(secondLineText)
-                val width = (Math.max(firstLineWidth, secondLineWidth) + 10).toInt()
+                val width = (firstLineWidth.coerceAtLeast(secondLineWidth) + 10).toInt()
                 
                 // 计算高度：保持和单行高度相同
                 val singleLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -151,7 +151,7 @@ object BitmapUtils {
     fun progressToBitmap(progress: Int, colorReach: String? = null, colorUnReach: String? = null, isCCW: Boolean = false): Bitmap? {
         try {
             // 检查进度值是否有效
-            if (progress < 0 || progress > 100) {
+            if (progress !in 0..100) {
                 Logger.w(TAG, "进度值无效，progress=$progress")
                 return null
             }

@@ -10,11 +10,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.templates.PicInfo
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.common.PreviewData
 
 
 /**
@@ -48,4 +50,22 @@ fun PicInfoCompose(picInfo: PicInfo, picMap: Map<String, String>?) {
             )
         }
     }
+}
+
+@Preview(name = "图片信息类型1", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun PicInfoComposeType1Preview() {
+    PicInfoCompose(
+        picInfo = PreviewData.samplePicInfo,
+        picMap = PreviewData.samplePicMap
+    )
+}
+
+@Preview(name = "图片信息类型2", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun PicInfoComposeType2Preview() {
+    PicInfoCompose(
+        picInfo = PreviewData.samplePicInfoType2,
+        picMap = PreviewData.samplePicMap
+    )
 }

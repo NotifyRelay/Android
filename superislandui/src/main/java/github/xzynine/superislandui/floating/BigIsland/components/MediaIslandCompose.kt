@@ -22,12 +22,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoFitText
 import github.xzynine.superislandui.common.AutoScrollText
 import github.xzynine.superislandui.model.componets.MediaSessionData
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.common.PreviewData
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val COVER_SIZE = 80
@@ -168,4 +170,12 @@ private fun ExpandedMediaIsland(
             }
         }
     }
+}
+
+@Preview(name = "媒体播放器", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun MediaIslandComposePreview() {
+    MediaIslandCompose(
+        mediaSession = PreviewData.sampleMediaSessionData
+    )
 }

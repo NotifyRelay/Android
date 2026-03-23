@@ -1,6 +1,7 @@
 package github.xzynine.superislandui.floating.common
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -9,6 +10,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
@@ -16,15 +18,18 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoScrollText
 import github.xzynine.superislandui.model.componets.TimerInfo
+import github.xzynine.superislandui.common.PreviewData
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import java.util.Locale
@@ -52,6 +57,17 @@ fun CommonImageCompose(
         resolveFocusIconUrl(picMap, picKey, isDarkTheme, context)
     } else {
         resolveIconUrl(picMap, picKey, context)
+    }
+    
+    // 预览模式下：只有在有有效URL时才显示占位符
+    if (LocalInspectionMode.current) {
+        if (iconUrl.isNullOrBlank()) return
+        Box(
+            modifier = Modifier
+                .size(size)
+                .background(Color.Gray.copy(alpha = 0.3f), CircleShape)
+        )
+        return
     }
     
     val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(iconUrl, picMap)
@@ -283,4 +299,47 @@ fun SuperIslandComposeRoot(
             }
         }
     }
+}
+
+@Preview(name = "通用文本块", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun CommonTextBlockComposePreview() {
+    CommonTextBlockCompose(
+        frontTitle = "前置标题",
+        title = "主标题",
+        content = "内容描述",
+        narrow = false,
+        highlight = true,
+        monospace = false
+    )
+}
+
+@Preview(name = "圆形进度环", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun CircularProgressComposePreview() {
+    CircularProgressCompose(
+        progress = 60,
+        colorReach = Color(0xFF3482FF),
+        colorUnReach = Color(0x33333333),
+        strokeWidth = 3.dp,
+        isClockwise = true,
+        size = 48.dp
+    )
+}
+
+@Preview(name = "超级岛根布局", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun SuperIslandComposeRootPreview() {
+    SuperIslandComposeRoot(
+        content = {
+            CommonTextBlockCompose(
+                frontTitle = null,
+                title = "超级岛标题",
+                content = "超级岛内容",
+                narrow = false,
+                highlight = false,
+                monospace = false
+            )
+        }
+    )
 }

@@ -5,12 +5,14 @@ import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.floating.SmallIsland.left.AComponent
 import github.xzynine.superislandui.floating.SmallIsland.left.AImageText1
 import github.xzynine.superislandui.floating.SmallIsland.left.AImageText5
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.CommonTextBlockCompose
+import github.xzynine.superislandui.common.PreviewData
 
 /**
  * A区组件的Compose实现
@@ -79,4 +81,30 @@ fun ACompose(
             }
         }
     }
+}
+
+@Preview(name = "A区组件类型1", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun AComposeType1Preview() {
+    ACompose(
+        aComp = AImageText1(
+            title = "A区标题",
+            content = "A区内容",
+            showHighlightColor = true
+        ),
+        picMap = PreviewData.samplePicMap
+    )
+}
+
+@Preview(name = "A区组件类型5", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun AComposeType5Preview() {
+    ACompose(
+        aComp = AImageText5(
+            title = "A区标题",
+            content = "A区内容",
+            picKey = "icon_key"
+        ),
+        picMap = PreviewData.samplePicMap
+    )
 }
