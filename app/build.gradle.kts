@@ -5,9 +5,8 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose") version libs.versions.kotlinPluginCompose
-    id("kotlin-kapt")
+    id("com.google.devtools.ksp") version "2.3.6"
     id("kotlin-parcelize")
 }
 // 使用 buildSrc 的 JGit 实现计算版本信息（避免启动外部进程，兼容 configuration-cache）
@@ -187,7 +186,7 @@ dependencies {
     implementation(libs.androidx.room.runtime)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.paging)
-    kapt(libs.androidx.room.compiler)
+    annotationProcessor(libs.androidx.room.compiler)
 
     // Paging 3
     implementation(libs.bundles.paging)

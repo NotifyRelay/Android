@@ -1,8 +1,8 @@
 package com.xzyht.notifyrelay.ui.navigation
 
+import android.os.Parcel
 import android.os.Parcelable
 import androidx.navigation3.runtime.NavKey
-import kotlinx.parcelize.Parcelize
 import kotlinx.serialization.Serializable
 
 /**
@@ -14,23 +14,41 @@ sealed interface Route : NavKey, Parcelable {
      * 主页面（设备互联与增强）
      * Main page (Device connection and enhancement)
      */
-    @Parcelize
     @Serializable
-    data object Main : Route
+    data object Main : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<Main> {
+            override fun createFromParcel(parcel: Parcel): Main = Main
+            override fun newArray(size: Int): Array<Main?> = arrayOfNulls(size)
+        }
+    }
 
     /**
      * 历史页面
      * History page
      */
-    @Parcelize
     @Serializable
-    data object History : Route
+    data object History : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<History> {
+            override fun createFromParcel(parcel: Parcel): History = History
+            override fun newArray(size: Int): Array<History?> = arrayOfNulls(size)
+        }
+    }
 
     /**
      * 设置页面
      * Settings page
      */
-    @Parcelize
     @Serializable
-    data object Settings : Route
+    data object Settings : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<Settings> {
+            override fun createFromParcel(parcel: Parcel): Settings = Settings
+            override fun newArray(size: Int): Array<Settings?> = arrayOfNulls(size)
+        }
+    }
 }
