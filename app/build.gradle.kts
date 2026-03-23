@@ -30,19 +30,7 @@ plugins {
 // 例如：val versionMajor: Int = 1
 val versionMajor: Int = 1 // <-- 在此处直接修改主版本号
 
-fun gitOutput(vararg args: String): String {
-    val stdout = ByteArrayOutputStream()
-    try {
-        exec {
-            commandLine = listOf("git", *args)
-            isIgnoreExitValue = true
-            standardOutput = stdout
-        }
-    } catch (e: Exception) {
-        // 如果没有 git 或执行失败，返回空字符串
-    }
-    return stdout.toString().trim()
-}
+
 // 使用 buildSrc 中的 Versioning 实现来计算版本信息（包含对非 main 分支仅统计独有提交的修订数）
 // 支持在此文件内直接设置次版本（minor）减量（不使用 gradle.properties）：
 // - 当主版本号（versionMajor）升级后，可以在下面直接把 `versionMajorSubtract` 改为期望的值，
@@ -109,7 +97,7 @@ android {
         }
     }
 
-    val releaseSigning = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+    val releaseSigning = signingConfigs.getByName("release")
 
     buildTypes {
         getByName("debug") {

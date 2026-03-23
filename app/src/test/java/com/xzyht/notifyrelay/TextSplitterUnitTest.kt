@@ -1,6 +1,6 @@
 package com.xzyht.notifyrelay
 
-import com.xzyht.notifyrelay.feature.notification.superisland.common.TextSplitter
+import github.xzynine.superislandui.common.TextSplitter
 import org.junit.Test
 import java.io.File
 
