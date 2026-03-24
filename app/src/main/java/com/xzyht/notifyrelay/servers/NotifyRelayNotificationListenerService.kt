@@ -349,6 +349,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 
                 // 调用 FloatingReplicaManager.showFloating 生成浮窗和通知
                 // 无论播放状态如何，都保持浮窗显示，避免UI变化频繁
+                val appName = getAppName(sbn.packageName)
                 FloatingReplicaManager.showFloating(
                     context = applicationContext,
                     sourceId = sbnKey,
@@ -356,7 +357,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     text = finalText,  
                     paramV2Raw = paramV2Raw,  // 添加媒体类型的paramV2Raw
                     picMap = picMap,
-                    appName = sbn.packageName
+                    appName = appName
                 )
             } catch (e: Exception) {
                 Logger.e(TAG, "在本机内生成浮窗和通知失败", e)
