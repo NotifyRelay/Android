@@ -3,25 +3,24 @@ package com.xzyht.notifyrelay.sync
 import android.content.Context
 import android.os.Build
 import android.os.Environment
+import com.xzyht.notifyrelay.feature.device.service.AuthInfo
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
+import com.xzyht.notifyrelay.servers.MediaControlUtil
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardProcessor
-import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.ALREADY_RUNNING
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.CONFIG_ERROR
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.FAILED
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.PERMISSION_DENIED
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.PORT_IN_USE
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult.SUCCESS
-import notifyrelay.base.util.IntentUtils
-import notifyrelay.base.util.Logger
-import com.xzyht.notifyrelay.ui.GuideActivity
+import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
 import com.xzyht.notifyrelay.sync.notification.StatusProcessor
 import com.xzyht.notifyrelay.sync.notification.SuperIslandProcessor
-import com.xzyht.notifyrelay.feature.device.service.AuthInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
+import com.xzyht.notifyrelay.ui.GuideActivity
 import kotlinx.coroutines.launch
-import com.xzyht.notifyrelay.servers.MediaControlUtil
-import com.xzyht.notifyrelay.servers.NotifyRelayNotificationListenerService
+import notifyrelay.base.util.IntentUtils
+import notifyrelay.base.util.Logger
 import org.json.JSONObject
 
 /**
@@ -124,7 +123,7 @@ object ProtocolRouter {
                         val json = JSONObject(decrypted)
                         val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                         Logger.i(TAG, "收到远端媒体播放DATA_MEDIAPLAY: ${json.optString("title", "")} - ${json.optString("text", "")} (来自 ${source?.displayName ?: "未知设备"})")
-                        RemoteMediaSessionManager.onMediaMessageReceived(context, json, source!!)
+                        RemoteMediaSessionManager.onMediaMessageReceived(context, json, source)
                     } catch (e: Exception) {
                         Logger.e(TAG, "处理远端媒体播放通知DATA_MEDIAPLAY", e)
                     }
@@ -179,19 +178,10 @@ object ProtocolRouter {
                             // 媒体播放控制
                             "playPause" -> {
                                 try {
-                                    val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
-                                    val result: String
-                                    val errorMessage: String?
-                                    if (sbn != null) {
-                                        MediaControlUtil.triggerPlayPauseFromNotification(sbn)
-                                        result = "success"
-                                        errorMessage = null
-                                        Logger.i(TAG, "执行 playPause 成功")
-                                    } else {
-                                        result = "error"
-                                        errorMessage = "未找到媒体通知，无法触发本机媒体操作"
-                                        Logger.w(TAG, "playPause: $errorMessage")
-                                    }
+                                    MediaControlUtil.playPause()
+                                    val result = "success"
+                                    val errorMessage: String? = null
+                                    Logger.i(TAG, "执行 playPause 成功")
                                     // 发送响应
                                     sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "playPause", result, errorMessage)
                                 } catch (e: Exception) {
@@ -202,19 +192,10 @@ object ProtocolRouter {
                             }
                             "next" -> {
                                 try {
-                                    val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
-                                    val result: String
-                                    val errorMessage: String?
-                                    if (sbn != null) {
-                                        MediaControlUtil.triggerNextFromNotification(sbn)
-                                        result = "success"
-                                        errorMessage = null
-                                        Logger.i(TAG, "执行 next 成功")
-                                    } else {
-                                        result = "error"
-                                        errorMessage = "未找到媒体通知，无法触发本机媒体操作"
-                                        Logger.w(TAG, "next: $errorMessage")
-                                    }
+                                    MediaControlUtil.next()
+                                    val result = "success"
+                                    val errorMessage: String? = null
+                                    Logger.i(TAG, "执行 next 成功")
                                     // 发送响应
                                     sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "next", result, errorMessage)
                                 } catch (e: Exception) {
@@ -225,19 +206,10 @@ object ProtocolRouter {
                             }
                             "previous" -> {
                                 try {
-                                    val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
-                                    val result: String
-                                    val errorMessage: String?
-                                    if (sbn != null) {
-                                        MediaControlUtil.triggerPreviousFromNotification(sbn)
-                                        result = "success"
-                                        errorMessage = null
-                                        Logger.i(TAG, "执行 previous 成功")
-                                    } else {
-                                        result = "error"
-                                        errorMessage = "未找到媒体通知，无法触发本机媒体操作"
-                                        Logger.w(TAG, "previous: $errorMessage")
-                                    }
+                                    MediaControlUtil.previous()
+                                    val result = "success"
+                                    val errorMessage: String? = null
+                                    Logger.i(TAG, "执行 previous 成功")
                                     // 发送响应
                                     sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "previous", result, errorMessage)
                                 } catch (e: Exception) {

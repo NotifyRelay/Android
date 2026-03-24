@@ -317,7 +317,7 @@ object MessageSender {
                             val packageName = obj.optString("packageName", "")
                             val title = obj.optString("title", "")
                             val text = obj.optString("text", "")
-                            val coverUrl = obj.optString("coverUrl", null)
+                            val coverUrl = obj.optString("coverUrl", "")
                             
                             val deviceMap = synchronized(mediaLastStatePerDevice) {
                                 mediaLastStatePerDevice.getOrPut(task.device.uuid) { mutableMapOf() }

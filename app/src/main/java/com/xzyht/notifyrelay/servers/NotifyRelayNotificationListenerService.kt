@@ -32,7 +32,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
-import notifyrelay.core.util.DataUrlUtils
 import notifyrelay.data.StorageManager
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -46,6 +45,62 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         // 最新的媒体播放通知（用于被外部工具查询并触发其 action）
         @Volatile
         var latestMediaSbn: StatusBarNotification? = null
+        // 服务实例，用于在静态方法中访问实例方法
+        @Volatile
+        var instance: NotifyRelayNotificationListenerService? = null
+        
+        // 媒体会话数据缓存
+        private val mediaSessionDataCache = ConcurrentHashMap<String, MediaSessionData>()
+        
+        // 接收来自 MediaSessionMonitorService 的媒体会话数据
+        @JvmStatic
+        fun onMediaSessionUpdated(
+            packageName: String,
+            title: String,
+            artist: String,
+            duration: Long,
+            artBitmap: Any?
+        ) {
+            Logger.i(TAG, "Received MediaSession update: $packageName - $title")
+            
+            // 缓存媒体会话数据
+            val mediaSessionData = MediaSessionData(
+                packageName = packageName,
+                title = title,
+                artist = artist,
+                duration = duration,
+                artBitmap = artBitmap as? Bitmap,
+                timestamp = System.currentTimeMillis()
+            )
+            mediaSessionDataCache[packageName] = mediaSessionData
+            
+            // 立即处理媒体会话数据，确保歌词获取与通知获取同步
+            // 查找对应的媒体通知并处理
+            val activeNotifications = instance?.activeNotifications
+            if (activeNotifications != null) {
+                for (sbn in activeNotifications) {
+                    if (sbn.packageName == packageName && sbn.notification.category == Notification.CATEGORY_TRANSPORT) {
+                        instance?.processMediaNotification(sbn)
+                        break
+                    }
+                }
+            }
+        }
+        
+        // 获取指定包名的媒体会话数据
+    fun getMediaSessionData(packageName: String): MediaSessionData? {
+        return mediaSessionDataCache[packageName]
+    }
+        
+        // 媒体会话数据类
+        data class MediaSessionData(
+            val packageName: String,
+            val title: String,
+            val artist: String,
+            val duration: Long,
+            val artBitmap: Bitmap?,
+            val timestamp: Long
+        )
     }
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         // 只补发本应用的前台服务通知（必须channelId和id都匹配）
@@ -130,6 +185,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     }
     override fun onCreate() {
         Logger.i(TAG, "[NotifyListener] onCreate called")
+        // 初始化服务实例
+        instance = this
         // 注册缓存清理器
         NotificationRepository.registerCacheCleaner { keysToRemove ->
             if (keysToRemove.isEmpty()) {
@@ -158,9 +215,13 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             startMethod.invoke(discovery)
         } catch (_: Exception) {}
 
+        // 初始化 MediaSession 监控服务
+        mediaSessionMonitorService = MediaSessionMonitorService(this)
+        mediaSessionMonitorService.initialize()
+
         // 监听设备状态变化，更新通知
         CoroutineScope(Dispatchers.Default).launch {
-            connectionManager.devices.collect { deviceMap ->
+            connectionManager.devices.collect { _ ->
                 // 设备状态发生变化时更新通知
                 updateNotification()
             }
@@ -209,6 +270,9 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     // 媒体播放通知状态管理：使用sbn.key作为会话键，跟踪每个媒体通知的状态
     private val mediaPlayStateByKey = ConcurrentHashMap<String, MediaPlayState>()
 
+    // MediaSession 监控服务实例
+    private lateinit var mediaSessionMonitorService: MediaSessionMonitorService
+
     // 媒体播放状态数据类
     data class MediaPlayState(
         val title: String,
@@ -232,30 +296,36 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             latestMediaSbn = sbn
         } catch (_: Exception) {}
         val sbnKey = getNotificationKey(sbn)
-        val title = getNotificationTitle(sbn) ?: ""
-        val text = getNotificationText(sbn) ?: ""
+        
+        // 初始化变量
+        var finalTitle: String
+        var finalText: String
+        var finalCoverUrl: String? = null
 
-        // 初始化封面URL变量
-        var coverUrl: String? = null
-
-        // 获取音乐封面图标（无论胶囊歌词是否开启都提取）
-        try {
-            // 尝试从通知的大图中获取封面
-            val largeIcon = sbn.notification.getLargeIcon()
-            if (largeIcon != null) {
-                // 将Drawable转换为Bitmap
-                val drawable = largeIcon.loadDrawable(applicationContext)
-                if (drawable != null) {
-                    val bitmap = DataUrlUtils.drawableToBitmap(drawable)
+        // 使用 MediaSession 机制获取数据
+        val mediaSessionData = getMediaSessionData(sbn.packageName)
+        if (mediaSessionData != null) {
+            Logger.i(TAG, "Using MediaSession data for ${sbn.packageName}")
+            // 使用 MediaSession 数据
+            finalTitle = mediaSessionData.title
+            finalText = mediaSessionData.artist
+            
+            // 从 MediaSession 获取封面
+            if (mediaSessionData.artBitmap != null) {
+                try {
                     val stream = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                    mediaSessionData.artBitmap.compress(Bitmap.CompressFormat.JPEG, 80, stream)
                     val bytes = stream.toByteArray()
                     val base64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                    coverUrl = "data:image/jpeg;base64,$base64"
+                    finalCoverUrl = "data:image/jpeg;base64,$base64"
+                } catch (e: Exception) {
+                    Logger.e(TAG, "获取 MediaSession 封面失败", e)
                 }
             }
-        } catch (e: Exception) {
-            Logger.e(TAG, "获取音乐封面失败", e)
+        } else {
+            // 没有 MediaSession 数据，跳过处理
+            Logger.d(TAG, "No MediaSession data for ${sbn.packageName}, skipping media notification")
+            return
         }
 
         // 检查胶囊歌词开关状态
@@ -264,26 +334,26 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         // 如果胶囊歌词开关开启，直接在本机内生成浮窗和通知
         if (capsuleLyricsEnabled) {
             try {
-                Logger.i(TAG, "胶囊歌词开关开启，在本机内生成浮窗和通知: title='$title', text='$text'")
+                Logger.i(TAG, "胶囊歌词开关开启，在本机内生成浮窗和通知: title='$finalTitle', text='$finalText'")
                 
                 // 构建图片映射
                 val picMap = mutableMapOf<String, String>()
-                if (!coverUrl.isNullOrBlank()) {
+                if (!finalCoverUrl.isNullOrBlank()) {
                     // 添加专辑图，同时添加应用图标键以确保图片能够正确传递
-                    picMap["miui.focus.pic_cover"] = coverUrl
-                    picMap["miui.focus.pic_app_icon"] = coverUrl
+                    picMap["miui.focus.pic_cover"] = finalCoverUrl
+                    picMap["miui.focus.pic_app_icon"] = finalCoverUrl
                 }
                 
                 // 创建媒体类型的paramV2Raw，确保触发超长后使用图标文本的功能
-                val paramV2Raw = "{\"business\":\"media\",\"protocol\":1,\"scene\":\"music\",\"ticker\":\"$text\",\"content\":\"$title\",\"enableFloat\":false,\"updatable\":true,\"reopen\":\"close\",\"localTransmit\":true}"
+                val paramV2Raw = "{\"business\":\"media\",\"protocol\":1,\"scene\":\"music\",\"ticker\":\"$finalText\",\"content\":\"$finalTitle\",\"enableFloat\":false,\"updatable\":true,\"reopen\":\"close\",\"localTransmit\":true}"
                 
                 // 调用 FloatingReplicaManager.showFloating 生成浮窗和通知
                 // 无论播放状态如何，都保持浮窗显示，避免UI变化频繁
                 FloatingReplicaManager.showFloating(
                     context = applicationContext,
                     sourceId = sbnKey,
-                    title = title ,  
-                    text = text,  
+                    title = finalTitle ,  
+                    text = finalText,  
                     paramV2Raw = paramV2Raw,  // 添加媒体类型的paramV2Raw
                     picMap = picMap,
                     appName = sbn.packageName
@@ -294,7 +364,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         }
 
         // 检查状态是否变化，只在内容变化时发送
-        val currentState = MediaPlayState(title, text, sbn.packageName, sbn.postTime, coverUrl)
+        val currentState = MediaPlayState(finalTitle, finalText, sbn.packageName, sbn.postTime, finalCoverUrl)
         val lastState = mediaPlayStateByKey[sbnKey]
 
         // 发送条件：状态变化 或 距离上次发送超过15秒
@@ -316,9 +386,9 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     applicationContext,
                     sbn.packageName,
                     appName,
-                    title,
-                    text,
-                    coverUrl,
+                    finalTitle,
+                    finalText,
+                    finalCoverUrl,
                     sbn.postTime,
                     deviceManager
                 )
@@ -508,6 +578,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         if (!isEnabled) {
             Logger.w(TAG, "[NotifyListener] NotificationListenerService 未被系统启用，无法获取通知！")
         }
+        // 启动 MediaSession 监控服务
+        mediaSessionMonitorService.startMonitoring()
         // 启动时同步所有活跃通知到历史，后台处理
         val actives = activeNotifications
         if (actives != null) {
@@ -546,11 +618,22 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         }
     }
 
+    override fun onListenerDisconnected() {
+        super.onListenerDisconnected()
+        // 停止 MediaSession 监控服务
+        mediaSessionMonitorService.stopMonitoring()
+    }
+
     override fun onDestroy() {
         Logger.i(TAG, "[NotifyListener] onDestroy called")
+        // 清空服务实例引用
+        instance = null
         super.onDestroy()
         foregroundJob?.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
+        // 停止 MediaSession 监控服务
+        mediaSessionMonitorService.stopMonitoring()
+        mediaSessionMonitorService.destroy()
         // 停止设备连接
         try {
             if (this::connectionManager.isInitialized) {
@@ -595,7 +678,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
         // 检查剪贴板同步状态，为通知主体添加点击事件
         try {
-            val accessibilityEnabled = ClipboardSyncManager.isAccessibilityServiceEnabled(this)
+            ClipboardSyncManager.isAccessibilityServiceEnabled(this)
 
             // 为通知主体添加点击事件，实现剪贴板同步功能
             val syncIntent = Intent(this, ClipboardSyncReceiver::class.java).apply {
