@@ -95,35 +95,40 @@ class MainActivity : FragmentActivity() {
     internal val bannerMessage = mutableStateOf<String?>(null)
 
     private fun checkPermissionsAndStartServices() {
-        showAutoStartBanner.value = false
-        bannerMessage.value = null
+        lifecycleScope.launch(Dispatchers.Main) {
+            showAutoStartBanner.value = false
+            bannerMessage.value = null
 
-        if (!PermissionHelper.checkAllPermissions(this)) {
-            Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
-            val intent = Intent(this, GuideActivity::class.java)
-            intent.putExtra("from", "MainActivity")
-            startActivity(intent)
-            finish()
-            return
-        }
+            if (!PermissionHelper.checkAllPermissions(this@MainActivity)) {
+                Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
+                val intent = Intent(this@MainActivity, GuideActivity::class.java)
+                intent.putExtra("from", "MainActivity")
+                startActivity(intent)
+                finish()
+                return@launch
+            }
 
-        val result = ServiceManager.startAllServices(this)
-        val serviceStarted = result.first
-        val errorMessage = result.second
-        if (errorMessage != null) {
-            showAutoStartBanner.value = true
-            bannerMessage.value = errorMessage
-        }
+            val result = ServiceManager.startAllServices(this@MainActivity)
+            val serviceStarted = result.first
+            val errorMessage = result.second
+            if (errorMessage != null) {
+                showAutoStartBanner.value = true
+                bannerMessage.value = errorMessage
+            }
 
-        if (!serviceStarted) {
-            showAutoStartBanner.value = true
-            bannerMessage.value = "服务无法启动，可能因系统自启动/后台运行权限被拒绝。请前往系统设置手动允许自启动、后台运行和电池优化白名单，否则通知转发将无法正常工作。"
+            if (!serviceStarted) {
+                showAutoStartBanner.value = true
+                bannerMessage.value = "服务无法启动，可能因系统自启动/后台运行权限被拒绝。请前往系统设置手动允许自启动、后台运行和电池优化白名单，否则通知转发将无法正常工作。"
+            }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        checkPermissionsAndStartServices()
+        // 后台执行权限检查和服务启动，避免阻塞 UI 线程
+        lifecycleScope.launch(Dispatchers.Default) {
+            checkPermissionsAndStartServices()
+        }
     }
 
     private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
@@ -186,11 +191,11 @@ class MainActivity : FragmentActivity() {
             return
         }
 
-        DeviceConnectionManager.getInstance(this)
-        DeviceInfoManager.generateDeviceInfoFile(this)
-        LiveUpdatesNotificationManager.initialize(this)
-        
-        lifecycleScope.launch {
+        // 后台初始化，避免阻塞 UI 线程
+        lifecycleScope.launch(Dispatchers.Default) {
+            DeviceConnectionManager.getInstance(this@MainActivity)
+            DeviceInfoManager.generateDeviceInfoFile(this@MainActivity)
+            LiveUpdatesNotificationManager.initialize(this@MainActivity)
             NotificationRepository.init(this@MainActivity)
             AppRepository.loadApps(this@MainActivity)
             startServicesAndUpdateBanner()
