@@ -131,7 +131,6 @@ fun MainPage() {
     var audioCodec by rememberSaveable { mutableStateOf(initialSettings.audioCodec) }
     var videoCodec by rememberSaveable { mutableStateOf(initialSettings.videoCodec) }
     var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
-    var monetEnabled by remember { mutableStateOf(ThemeSettingsManager.isMonetEnabled(context)) }
     var fullscreenDebugInfoEnabled by rememberSaveable { mutableStateOf(initialSettings.fullscreenDebugInfoEnabled) }
     var showFullscreenVirtualButtons by rememberSaveable { mutableStateOf(initialSettings.showFullscreenVirtualButtons) }
     var showPreviewVirtualButtonText by rememberSaveable { mutableStateOf(initialSettings.showPreviewVirtualButtonText) }
@@ -196,18 +195,16 @@ fun MainPage() {
     var fullscreenOrientation by rememberSaveable {
         mutableIntStateOf(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
     }
-    val themeMode = resolveThemeMode(themeBaseIndex, monetEnabled)
+    val themeMode = resolveThemeMode(themeBaseIndex)
     val themeController = remember(themeMode) { ThemeController(colorSchemeMode = themeMode) }
 
     LaunchedEffect(Unit) {
         themeBaseIndex = ThemeSettingsManager.getThemeBaseIndex(context)
-        monetEnabled = ThemeSettingsManager.isMonetEnabled(context)
     }
 
     DisposableEffect(context) {
-        val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex, newMonetEnabled ->
+        val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
             themeBaseIndex = newBaseIndex
-            monetEnabled = newMonetEnabled
         }
         ThemeSettingsManager.addThemeChangeListener(context, listener)
         onDispose {

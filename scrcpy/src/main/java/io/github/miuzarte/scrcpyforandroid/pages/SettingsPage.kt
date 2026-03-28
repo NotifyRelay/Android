@@ -43,17 +43,12 @@ private val THEME_BASE_OPTIONS = listOf(
     ThemeModeOption("深色", ColorSchemeMode.Dark),
 )
 
-fun resolveThemeMode(baseIndex: Int, monetEnabled: Boolean): ColorSchemeMode {
+fun resolveThemeMode(baseIndex: Int): ColorSchemeMode {
     return when (baseIndex.coerceIn(0, 2)) {
-        0 -> if (monetEnabled) ColorSchemeMode.MonetSystem else ColorSchemeMode.System
-        1 -> if (monetEnabled) ColorSchemeMode.MonetLight else ColorSchemeMode.Light
-        else -> if (monetEnabled) ColorSchemeMode.MonetDark else ColorSchemeMode.Dark
+        0 -> ColorSchemeMode.System
+        1 -> ColorSchemeMode.Light
+        else -> ColorSchemeMode.Dark
     }
-}
-
-private fun resolveThemeLabel(baseIndex: Int, monetEnabled: Boolean): String {
-    val base = THEME_BASE_OPTIONS.getOrNull(baseIndex.coerceIn(0, 2))?.label ?: "跟随系统"
-    return if (monetEnabled) "Monet（$base）" else base
 }
 
 @Composable

@@ -27,6 +27,7 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -73,6 +74,7 @@ import kotlinx.coroutines.withContext
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.ServiceManager
 import notifyrelay.data.config.DeviceInfoManager
@@ -148,7 +150,25 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             val navigator = rememberNavigator(Route.Main)
-            val isDarkTheme = isSystemInDarkTheme()
+            val context = LocalContext.current
+            val systemDarkTheme = isSystemInDarkTheme()
+            val themeBaseIndex = remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
+            
+            val isDarkTheme = when (themeBaseIndex.intValue) {
+                ThemeSettingsManager.THEME_LIGHT -> false
+                ThemeSettingsManager.THEME_DARK -> true
+                else -> systemDarkTheme
+            }
+            
+            DisposableEffect(context) {
+                val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
+                    themeBaseIndex.intValue = newBaseIndex
+                }
+                ThemeSettingsManager.addThemeChangeListener(context, listener)
+                onDispose {
+                    ThemeSettingsManager.removeThemeChangeListener(context, listener)
+                }
+            }
             
             NotifyRelayTheme(darkTheme = isDarkTheme) {
                 val colorScheme = MiuixTheme.colorScheme
