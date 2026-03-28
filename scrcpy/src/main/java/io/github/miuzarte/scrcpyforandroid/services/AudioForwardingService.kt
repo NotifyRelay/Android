@@ -214,10 +214,12 @@ class AudioForwardingService : Service() {
         val channel = NotificationChannel(
             NOTIFICATION_CHANNEL_ID,
             "音频转发",
-            NotificationManager.IMPORTANCE_LOW
+            NotificationManager.IMPORTANCE_HIGH
         ).apply {
             description = "音频转发服务状态"
             setShowBadge(false)
+            enableLights(false)
+            enableVibration(false)
         }
 
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -240,8 +242,10 @@ class AudioForwardingService : Service() {
             .setContentText("从 $deviceName 接收音频中")
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
             .setShowWhen(false)
+            .setRequestPromotedOngoing(true)
             .addAction(
                 android.R.drawable.ic_media_pause,
                 "停止",
