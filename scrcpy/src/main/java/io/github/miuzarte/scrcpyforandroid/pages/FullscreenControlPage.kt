@@ -1,6 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.app.Activity
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -10,6 +11,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -44,10 +46,19 @@ fun FullscreenControlPage(
     onVideoSizeChanged: (width: Int, height: Int) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    // Disable predictive back handler temporarily to avoid decoding issues.
-    BackHandler(enabled = true, onBack = onDismiss)
-
     val context = LocalContext.current
+    var lastBackPressTime by remember { mutableLongStateOf(0L) }
+    
+    BackHandler(enabled = true) {
+        val currentTime = System.currentTimeMillis()
+        if (currentTime - lastBackPressTime < 2000) {
+            onDismiss()
+        } else {
+            lastBackPressTime = currentTime
+            Toast.makeText(context, "再次返回以退出", Toast.LENGTH_SHORT).show()
+        }
+    }
+
     val haptics = rememberAppHaptics()
     val activity = remember(context) { context as? Activity }
     val virtualButtonLayout = remember(virtualButtonsLayout) {

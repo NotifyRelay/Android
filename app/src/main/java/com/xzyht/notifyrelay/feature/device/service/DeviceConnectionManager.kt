@@ -542,6 +542,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 json,
                 StorageManager.PrefsType.SCRCPY
             )
+            try {
+                io.github.miuzarte.scrcpyforandroid.services.DynamicShortcutManager
+                    .updateShortcuts(context)
+            } catch (_: Exception) {}
         } catch (_: Exception) {}
     }
 
