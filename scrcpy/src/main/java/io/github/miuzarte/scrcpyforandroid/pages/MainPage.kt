@@ -47,9 +47,9 @@ import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.ui.NavDisplay
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
-import io.github.miuzarte.scrcpyforandroid.constants.AppDefaults
 import io.github.miuzarte.scrcpyforandroid.constants.UiMotion
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
+import notifyrelay.data.config.ScrcpyDefaults
 import io.github.miuzarte.scrcpyforandroid.services.MainSettings
 import io.github.miuzarte.scrcpyforandroid.services.loadDevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.loadMainSettings
@@ -282,7 +282,7 @@ fun MainPage() {
     }
 
     LaunchedEffect(adbKeyName) {
-        nativeCore.setAdbKeyName(adbKeyName.ifBlank { AppDefaults.ADB_KEY_NAME })
+        nativeCore.setAdbKeyName(adbKeyName.ifBlank { ScrcpyDefaults.ADB_KEY_NAME })
     }
 
     fun popRoot() {

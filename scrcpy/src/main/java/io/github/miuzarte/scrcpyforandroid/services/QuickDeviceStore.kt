@@ -1,16 +1,19 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
 import android.content.Context
-import androidx.core.content.edit
-import io.github.miuzarte.scrcpyforandroid.constants.AppDefaults
-import io.github.miuzarte.scrcpyforandroid.constants.AppPreferenceKeys
-import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
-import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
+import notifyrelay.data.StorageManager
+import notifyrelay.data.config.ScrcpyDefaults
+import notifyrelay.data.config.ScrcpyPreferenceKeys
+import notifyrelay.data.model.ConnectionTarget
+import notifyrelay.data.model.DeviceShortcut
 
 internal fun loadQuickDevices(context: Context): List<DeviceShortcut> {
-    val raw = context.getSharedPreferences(AppPreferenceKeys.PREFS_NAME, Context.MODE_PRIVATE)
-        .getString(AppPreferenceKeys.QUICK_DEVICES, "")
-        .orEmpty()
+    val raw = StorageManager.getString(
+        context,
+        ScrcpyPreferenceKeys.QUICK_DEVICES,
+        "",
+        StorageManager.PrefsType.SCRCPY,
+    )
 
     if (raw.isBlank()) return emptyList()
 
@@ -21,7 +24,7 @@ internal fun loadQuickDevices(context: Context): List<DeviceShortcut> {
             3 -> {
                 val name = parts[0].trim()
                 val host = parts[1].trim()
-                val port = parts[2].trim().toIntOrNull() ?: AppDefaults.ADB_PORT
+                val port = parts[2].trim().toIntOrNull() ?: ScrcpyDefaults.ADB_PORT
                 if (host.isNotBlank()) {
                     result.add(
                         DeviceShortcut(
@@ -36,11 +39,10 @@ internal fun loadQuickDevices(context: Context): List<DeviceShortcut> {
             }
 
             2 -> {
-                // Backward compatibility with old format: name|host:port
                 val name = parts[0].trim()
                 val host = parts[1].substringBefore(":").trim()
-                val port = parts[1].substringAfter(":", AppDefaults.ADB_PORT.toString()).trim()
-                    .toIntOrNull() ?: AppDefaults.ADB_PORT
+                val port = parts[1].substringAfter(":", ScrcpyDefaults.ADB_PORT.toString()).trim()
+                    .toIntOrNull() ?: ScrcpyDefaults.ADB_PORT
                 if (host.isNotBlank()) {
                     result.add(
                         DeviceShortcut(
@@ -60,10 +62,12 @@ internal fun loadQuickDevices(context: Context): List<DeviceShortcut> {
 
 internal fun saveQuickDevices(context: Context, quickDevices: List<DeviceShortcut>) {
     val raw = quickDevices.joinToString("\n") { "${it.name}|${it.host}|${it.port}" }
-    context.getSharedPreferences(AppPreferenceKeys.PREFS_NAME, Context.MODE_PRIVATE)
-        .edit {
-            putString(AppPreferenceKeys.QUICK_DEVICES, raw)
-        }
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.QUICK_DEVICES,
+        raw,
+        StorageManager.PrefsType.SCRCPY,
+    )
 }
 
 internal fun parseQuickTarget(raw: String): ConnectionTarget? {
@@ -71,8 +75,8 @@ internal fun parseQuickTarget(raw: String): ConnectionTarget? {
     if (value.isEmpty()) return null
     val host = value.substringBefore(':').trim()
     if (host.isEmpty()) return null
-    val port = value.substringAfter(':', AppDefaults.ADB_PORT.toString()).trim().toIntOrNull()
-        ?: AppDefaults.ADB_PORT
+    val port = value.substringAfter(':', ScrcpyDefaults.ADB_PORT.toString()).trim().toIntOrNull()
+        ?: ScrcpyDefaults.ADB_PORT
     return ConnectionTarget(host, port)
 }
 

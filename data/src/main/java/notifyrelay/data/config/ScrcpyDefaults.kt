@@ -1,6 +1,6 @@
-package io.github.miuzarte.scrcpyforandroid.constants
+package notifyrelay.data.config
 
-object AppDefaults {
+object ScrcpyDefaults {
     const val EVENT_LOG_LINES = 512
     const val ADB_PORT = 5555
 

@@ -15,9 +15,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.core.net.toUri
-import io.github.miuzarte.scrcpyforandroid.constants.AppDefaults
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
+import notifyrelay.data.config.ScrcpyDefaults
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlide
 import io.github.miuzarte.scrcpyforandroid.widgets.SectionSmallTitle
 import top.yukonga.miuix.kmp.basic.Card
@@ -179,7 +179,7 @@ fun SettingsScreen(
                 TextField(
                     value = serverRemotePath,
                     onValueChange = onServerRemotePathChange,
-                    label = AppDefaults.SERVER_REMOTE_PATH,
+                    label = ScrcpyDefaults.SERVER_REMOTE_PATH,
                     useLabelAsPlaceholder = true,
                     singleLine = true,
                     modifier = Modifier
@@ -201,7 +201,7 @@ fun SettingsScreen(
                 TextField(
                     value = adbKeyName,
                     onValueChange = onAdbKeyNameChange,
-                    label = AppDefaults.ADB_KEY_NAME,
+                    label = ScrcpyDefaults.ADB_KEY_NAME,
                     useLabelAsPlaceholder = true,
                     singleLine = true,
                     modifier = Modifier

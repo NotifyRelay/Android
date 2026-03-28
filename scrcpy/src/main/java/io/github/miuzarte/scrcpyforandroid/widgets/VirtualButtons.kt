@@ -30,10 +30,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
-import io.github.miuzarte.scrcpyforandroid.constants.AppDefaults
 import io.github.miuzarte.scrcpyforandroid.constants.UiAndroidKeycodes
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
+import notifyrelay.data.config.ScrcpyDefaults
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Icon
@@ -133,7 +133,7 @@ object VirtualButtonActions {
 
     fun parseStoredLayout(raw: String): List<VirtualButtonItem> {
         if (raw.isBlank())
-            return parseStoredLayout(AppDefaults.VIRTUAL_BUTTONS_LAYOUT)
+            return parseStoredLayout(ScrcpyDefaults.VIRTUAL_BUTTONS_LAYOUT)
 
         return raw.split(',').mapNotNull { item ->
             val parts = item.trim().split(':')

@@ -1,7 +1,6 @@
-package io.github.miuzarte.scrcpyforandroid.constants
+package notifyrelay.data.config
 
-object AppPreferenceKeys {
-    const val PREFS_NAME = "scrcpy_app_prefs"
+object ScrcpyPreferenceKeys {
     const val NATIVE_ADB_KEY_PREFS_NAME = "nativecore_adb_rsa"
     const val NATIVE_ADB_PRIVATE_KEY = "priv"
 

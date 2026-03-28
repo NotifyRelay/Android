@@ -29,6 +29,7 @@ object StorageManager {
             PrefsType.GENERAL -> "general_$key"
             PrefsType.DEVICE -> "device_$key"
             PrefsType.FILTER -> "filter_$key"
+            PrefsType.SCRCPY -> "scrcpy_$key"
         }
     }
 
@@ -209,6 +210,55 @@ object StorageManager {
             Thread.currentThread().interrupt()
         } catch (e: Exception) {
             Logger.w("StorageManager", "写入整数失败，键: $key", e)
+        }
+    }
+
+    /**
+     * 从Room数据库中读取浮点数（Float），带异常保护。
+     *
+     * @param context 任意 Context 实例。
+     * @param key 键名。
+     * @param default 键不存在时返回的默认值，默认为 0f。
+     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
+     * @return 存储的浮点数，若出现异常则返回 [default]。
+     */
+    fun getFloat(context: Context, key: String, default: Float = 0f, prefsType: PrefsType = PrefsType.GENERAL): Float {
+        return try {
+            val prefixedKey = getPrefixedKey(key, prefsType)
+            val repository = DatabaseRepository.Companion.getInstance(context)
+            runBlocking {
+                repository.getConfig(prefixedKey, default.toString()).toFloat()
+            }
+        } catch (e: InterruptedException) {
+            Logger.w("StorageManager", "获取浮点数时线程被中断，键: $key", e)
+            Thread.currentThread().interrupt()
+            default
+        } catch (e: Exception) {
+            Logger.w("StorageManager", "获取浮点数失败，键: $key", e)
+            default
+        }
+    }
+
+    /**
+     * 将浮点数（Float）写入Room数据库，带异常保护。
+     *
+     * @param context 任意 Context 实例。
+     * @param key 键名。
+     * @param value 要写入的浮点数值。
+     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
+     */
+    fun putFloat(context: Context, key: String, value: Float, prefsType: PrefsType = PrefsType.GENERAL) {
+        try {
+            val prefixedKey = getPrefixedKey(key, prefsType)
+            val repository = DatabaseRepository.Companion.getInstance(context)
+            runBlocking {
+                repository.setConfig(prefixedKey, value.toString())
+            }
+        } catch (e: InterruptedException) {
+            Logger.w("StorageManager", "写入浮点数时线程被中断，键: $key", e)
+            Thread.currentThread().interrupt()
+        } catch (e: Exception) {
+            Logger.w("StorageManager", "写入浮点数失败，键: $key", e)
         }
     }
 
@@ -478,6 +528,9 @@ object StorageManager {
         DEVICE,
 
         /** 过滤器相关偏好 */
-        FILTER
+        FILTER,
+
+        /** Scrcpy 模块偏好 */
+        SCRCPY
     }
 }

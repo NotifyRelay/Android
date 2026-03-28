@@ -64,12 +64,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
-import io.github.miuzarte.scrcpyforandroid.constants.AppDefaults
-import io.github.miuzarte.scrcpyforandroid.constants.ScrcpyPresets
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
-import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlide
+import notifyrelay.data.config.ScrcpyDefaults
+import notifyrelay.data.config.ScrcpyPresets
+import notifyrelay.data.model.DeviceShortcut
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -1245,7 +1245,7 @@ internal fun DeviceEditorScreen(
                 TextButton(
                     text = "保存",
                     onClick = {
-                        val p = port.toIntOrNull() ?: AppDefaults.ADB_PORT
+                        val p = port.toIntOrNull() ?: ScrcpyDefaults.ADB_PORT
                         val h = host.trim()
                         if (h.isNotBlank()) {
                             onSave(

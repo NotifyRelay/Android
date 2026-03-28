@@ -24,12 +24,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
-import io.github.miuzarte.scrcpyforandroid.constants.AppDefaults
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
-import io.github.miuzarte.scrcpyforandroid.models.ConnectionTarget
-import io.github.miuzarte.scrcpyforandroid.models.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
+import notifyrelay.data.config.ScrcpyDefaults
+import notifyrelay.data.model.ConnectionTarget
+import notifyrelay.data.model.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.services.DevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.fetchConnectedDeviceInfo
 import io.github.miuzarte.scrcpyforandroid.services.loadDevicePageSettings
@@ -238,7 +238,7 @@ fun DeviceTabScreen(
     var statusLine by rememberSaveable { mutableStateOf("未连接") }
     var adbConnected by rememberSaveable { mutableStateOf(false) }
     var currentTargetHost by rememberSaveable { mutableStateOf("") }
-    var currentTargetPort by rememberSaveable { mutableIntStateOf(AppDefaults.ADB_PORT) }
+    var currentTargetPort by rememberSaveable { mutableIntStateOf(ScrcpyDefaults.ADB_PORT) }
     var connectedDeviceLabel by rememberSaveable { mutableStateOf("未连接") }
     var sessionInfoWidth by rememberSaveable { mutableIntStateOf(0) }
     var sessionInfoHeight by rememberSaveable { mutableIntStateOf(0) }
@@ -274,7 +274,7 @@ fun DeviceTabScreen(
     var adbConnecting by rememberSaveable { mutableStateOf(false) }
 
     var connectHost by rememberSaveable { mutableStateOf("") }
-    var connectPort by rememberSaveable { mutableStateOf(AppDefaults.ADB_PORT.toString()) }
+    var connectPort by rememberSaveable { mutableStateOf(ScrcpyDefaults.ADB_PORT.toString()) }
     var quickConnectInput by rememberSaveable { mutableStateOf(initialSettings.quickConnectInput) }
     var audioForwardingSupported by rememberSaveable { mutableStateOf(true) }
     var cameraMirroringSupported by rememberSaveable { mutableStateOf(true) }
@@ -300,8 +300,8 @@ fun DeviceTabScreen(
         val timestamp = SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date())
         val line = "[$timestamp] $message"
         eventLog.add(0, line)
-        if (eventLog.size > AppDefaults.EVENT_LOG_LINES) {
-            eventLog.removeRange(AppDefaults.EVENT_LOG_LINES, eventLog.size)
+        if (eventLog.size > ScrcpyDefaults.EVENT_LOG_LINES) {
+            eventLog.removeRange(ScrcpyDefaults.EVENT_LOG_LINES, eventLog.size)
         }
         when (level) {
             Log.ERROR -> if (error != null) Log.e(LOG_TAG, message, error) else Log.e(
@@ -357,7 +357,7 @@ fun DeviceTabScreen(
         }
         adbConnected = false
         currentTargetHost = ""
-        currentTargetPort = AppDefaults.ADB_PORT
+        currentTargetPort = ScrcpyDefaults.ADB_PORT
         audioForwardingSupported = true
         cameraMirroringSupported = true
         sessionInfo = null
@@ -557,7 +557,7 @@ fun DeviceTabScreen(
 
     fun refreshEncoderLists() {
         if (!adbConnected) return
-        val remotePath = serverRemotePath.trim().ifBlank { AppDefaults.SERVER_REMOTE_PATH }
+        val remotePath = serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
         runCatching {
             nativeCore.scrcpyListEncoders(
                 customServerUri = customServerUri,
@@ -593,7 +593,7 @@ fun DeviceTabScreen(
 
     fun refreshCameraSizeLists() {
         if (!adbConnected) return
-        val remotePath = serverRemotePath.trim().ifBlank { AppDefaults.SERVER_REMOTE_PATH }
+        val remotePath = serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
         runCatching {
             nativeCore.scrcpyListCameraSizes(
                 customServerUri = customServerUri,
@@ -848,7 +848,7 @@ fun DeviceTabScreen(
             }
             val portToReplace = quickDevices.firstOrNull {
                 it.host == discoveredHost &&
-                        it.port != AppDefaults.ADB_PORT &&
+                        it.port != ScrcpyDefaults.ADB_PORT &&
                         it.port != discoveredPort
             }?.port
             if (portToReplace != null) {

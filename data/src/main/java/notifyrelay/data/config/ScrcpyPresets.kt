@@ -1,4 +1,4 @@
-package io.github.miuzarte.scrcpyforandroid.constants
+package notifyrelay.data.config
 
 object ScrcpyPresets {
     val MaxSize = listOf(0, 720, 1080, 1280, 1600, 1920, 2160, 2560, 3200, 3840)

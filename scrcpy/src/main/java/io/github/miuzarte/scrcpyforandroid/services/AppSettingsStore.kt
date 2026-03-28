@@ -1,510 +1,701 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
 import android.content.Context
-import androidx.core.content.edit
-import io.github.miuzarte.scrcpyforandroid.constants.AppDefaults
-import io.github.miuzarte.scrcpyforandroid.constants.AppPreferenceKeys
+import notifyrelay.data.StorageManager
+import notifyrelay.data.config.ScrcpyDefaults
+import notifyrelay.data.config.ScrcpyPreferenceKeys
 
 internal data class MainSettings(
-    val audioEnabled: Boolean = AppDefaults.AUDIO_ENABLED,
-    val audioCodec: String = AppDefaults.AUDIO_CODEC,
-    val videoCodec: String = AppDefaults.VIDEO_CODEC,
-    val fullscreenDebugInfoEnabled: Boolean = AppDefaults.FULLSCREEN_DEBUG_INFO,
-    val showFullscreenVirtualButtons: Boolean = AppDefaults.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
-    val showPreviewVirtualButtonText: Boolean = AppDefaults.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
-    val keepScreenOnWhenStreamingEnabled: Boolean = AppDefaults.KEEP_SCREEN_ON_WHEN_STREAMING,
-    val devicePreviewCardHeightDp: Int = AppDefaults.DEVICE_PREVIEW_CARD_HEIGHT_DP,
-    val virtualButtonsLayout: String = AppDefaults.VIRTUAL_BUTTONS_LAYOUT,
-    val customServerUri: String? = AppDefaults.CUSTOM_SERVER_URI,
-    val serverRemotePath: String = AppDefaults.SERVER_REMOTE_PATH_INPUT,
-    val adbKeyName: String = AppDefaults.ADB_KEY_NAME_INPUT,
+    val audioEnabled: Boolean = ScrcpyDefaults.AUDIO_ENABLED,
+    val audioCodec: String = ScrcpyDefaults.AUDIO_CODEC,
+    val videoCodec: String = ScrcpyDefaults.VIDEO_CODEC,
+    val fullscreenDebugInfoEnabled: Boolean = ScrcpyDefaults.FULLSCREEN_DEBUG_INFO,
+    val showFullscreenVirtualButtons: Boolean = ScrcpyDefaults.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
+    val showPreviewVirtualButtonText: Boolean = ScrcpyDefaults.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
+    val keepScreenOnWhenStreamingEnabled: Boolean = ScrcpyDefaults.KEEP_SCREEN_ON_WHEN_STREAMING,
+    val devicePreviewCardHeightDp: Int = ScrcpyDefaults.DEVICE_PREVIEW_CARD_HEIGHT_DP,
+    val virtualButtonsLayout: String = ScrcpyDefaults.VIRTUAL_BUTTONS_LAYOUT,
+    val customServerUri: String? = ScrcpyDefaults.CUSTOM_SERVER_URI,
+    val serverRemotePath: String = ScrcpyDefaults.SERVER_REMOTE_PATH_INPUT,
+    val adbKeyName: String = ScrcpyDefaults.ADB_KEY_NAME_INPUT,
     val adbPairingAutoDiscoverOnDialogOpen: Boolean =
-        AppDefaults.ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN,
-    val adbAutoReconnectPairedDevice: Boolean = AppDefaults.ADB_AUTO_RECONNECT_PAIRED_DEVICE,
-    val adbMdnsLanDiscoveryEnabled: Boolean = AppDefaults.ADB_MDNS_LAN_DISCOVERY,
+        ScrcpyDefaults.ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN,
+    val adbAutoReconnectPairedDevice: Boolean = ScrcpyDefaults.ADB_AUTO_RECONNECT_PAIRED_DEVICE,
+    val adbMdnsLanDiscoveryEnabled: Boolean = ScrcpyDefaults.ADB_MDNS_LAN_DISCOVERY,
 )
 
 internal data class DevicePageSettings(
-    val quickConnectInput: String = AppDefaults.QUICK_CONNECT_INPUT,
-    val pairHost: String = AppDefaults.PAIR_HOST,
-    val pairPort: String = AppDefaults.PAIR_PORT,
-    val pairCode: String = AppDefaults.PAIR_CODE,
-    val audioBitRateKbps: Int = AppDefaults.AUDIO_BIT_RATE_KBPS,
-    val audioBitRateInput: String = AppDefaults.AUDIO_BIT_RATE_INPUT,
-    val videoBitRateMbps: Float = AppDefaults.VIDEO_BIT_RATE_MBPS,
-    val videoBitRateInput: String = AppDefaults.VIDEO_BIT_RATE_INPUT,
-    val turnScreenOff: Boolean = AppDefaults.TURN_SCREEN_OFF,
-    val noControl: Boolean = AppDefaults.NO_CONTROL,
-    val noVideo: Boolean = AppDefaults.NO_VIDEO,
-    val videoSourcePreset: String = AppDefaults.VIDEO_SOURCE_PRESET,
-    val displayIdInput: String = AppDefaults.DISPLAY_ID,
-    val cameraIdInput: String = AppDefaults.CAMERA_ID,
-    val cameraFacingPreset: String = AppDefaults.CAMERA_FACING_PRESET,
-    val cameraSizePreset: String = AppDefaults.CAMERA_SIZE_PRESET,
-    val cameraSizeCustom: String = AppDefaults.CAMERA_SIZE_CUSTOM,
-    val cameraAr: String = AppDefaults.CAMERA_AR,
-    val cameraFps: String = AppDefaults.CAMERA_FPS,
-    val cameraHighSpeed: Boolean = AppDefaults.CAMERA_HIGH_SPEED,
-    val audioSourcePreset: String = AppDefaults.AUDIO_SOURCE_PRESET,
-    val audioSourceCustom: String = AppDefaults.AUDIO_SOURCE_CUSTOM,
-    val audioDup: Boolean = AppDefaults.AUDIO_DUP,
-    val noAudioPlayback: Boolean = AppDefaults.NO_AUDIO_PLAYBACK,
-    val requireAudio: Boolean = AppDefaults.REQUIRE_AUDIO,
-    val maxSizeInput: String = AppDefaults.MAX_SIZE_INPUT,
-    val maxFpsInput: String = AppDefaults.MAX_FPS_INPUT,
-    val videoEncoder: String = AppDefaults.VIDEO_ENCODER,
-    val videoCodecOptions: String = AppDefaults.VIDEO_CODEC_OPTION,
-    val audioEncoder: String = AppDefaults.AUDIO_ENCODER,
-    val audioCodecOptions: String = AppDefaults.AUDIO_CODEC_OPTION,
-    val newDisplayWidth: String = AppDefaults.NEW_DISPLAY_WIDTH,
-    val newDisplayHeight: String = AppDefaults.NEW_DISPLAY_HEIGHT,
-    val newDisplayDpi: String = AppDefaults.NEW_DISPLAY_DPI,
-    val cropWidth: String = AppDefaults.CROP_WIDTH,
-    val cropHeight: String = AppDefaults.CROP_HEIGHT,
-    val cropX: String = AppDefaults.CROP_X,
-    val cropY: String = AppDefaults.CROP_Y,
+    val quickConnectInput: String = ScrcpyDefaults.QUICK_CONNECT_INPUT,
+    val pairHost: String = ScrcpyDefaults.PAIR_HOST,
+    val pairPort: String = ScrcpyDefaults.PAIR_PORT,
+    val pairCode: String = ScrcpyDefaults.PAIR_CODE,
+    val audioBitRateKbps: Int = ScrcpyDefaults.AUDIO_BIT_RATE_KBPS,
+    val audioBitRateInput: String = ScrcpyDefaults.AUDIO_BIT_RATE_INPUT,
+    val videoBitRateMbps: Float = ScrcpyDefaults.VIDEO_BIT_RATE_MBPS,
+    val videoBitRateInput: String = ScrcpyDefaults.VIDEO_BIT_RATE_INPUT,
+    val turnScreenOff: Boolean = ScrcpyDefaults.TURN_SCREEN_OFF,
+    val noControl: Boolean = ScrcpyDefaults.NO_CONTROL,
+    val noVideo: Boolean = ScrcpyDefaults.NO_VIDEO,
+    val videoSourcePreset: String = ScrcpyDefaults.VIDEO_SOURCE_PRESET,
+    val displayIdInput: String = ScrcpyDefaults.DISPLAY_ID,
+    val cameraIdInput: String = ScrcpyDefaults.CAMERA_ID,
+    val cameraFacingPreset: String = ScrcpyDefaults.CAMERA_FACING_PRESET,
+    val cameraSizePreset: String = ScrcpyDefaults.CAMERA_SIZE_PRESET,
+    val cameraSizeCustom: String = ScrcpyDefaults.CAMERA_SIZE_CUSTOM,
+    val cameraAr: String = ScrcpyDefaults.CAMERA_AR,
+    val cameraFps: String = ScrcpyDefaults.CAMERA_FPS,
+    val cameraHighSpeed: Boolean = ScrcpyDefaults.CAMERA_HIGH_SPEED,
+    val audioSourcePreset: String = ScrcpyDefaults.AUDIO_SOURCE_PRESET,
+    val audioSourceCustom: String = ScrcpyDefaults.AUDIO_SOURCE_CUSTOM,
+    val audioDup: Boolean = ScrcpyDefaults.AUDIO_DUP,
+    val noAudioPlayback: Boolean = ScrcpyDefaults.NO_AUDIO_PLAYBACK,
+    val requireAudio: Boolean = ScrcpyDefaults.REQUIRE_AUDIO,
+    val maxSizeInput: String = ScrcpyDefaults.MAX_SIZE_INPUT,
+    val maxFpsInput: String = ScrcpyDefaults.MAX_FPS_INPUT,
+    val videoEncoder: String = ScrcpyDefaults.VIDEO_ENCODER,
+    val videoCodecOptions: String = ScrcpyDefaults.VIDEO_CODEC_OPTION,
+    val audioEncoder: String = ScrcpyDefaults.AUDIO_ENCODER,
+    val audioCodecOptions: String = ScrcpyDefaults.AUDIO_CODEC_OPTION,
+    val newDisplayWidth: String = ScrcpyDefaults.NEW_DISPLAY_WIDTH,
+    val newDisplayHeight: String = ScrcpyDefaults.NEW_DISPLAY_HEIGHT,
+    val newDisplayDpi: String = ScrcpyDefaults.NEW_DISPLAY_DPI,
+    val cropWidth: String = ScrcpyDefaults.CROP_WIDTH,
+    val cropHeight: String = ScrcpyDefaults.CROP_HEIGHT,
+    val cropX: String = ScrcpyDefaults.CROP_X,
+    val cropY: String = ScrcpyDefaults.CROP_Y,
 )
 
 internal fun loadMainSettings(context: Context): MainSettings {
-    val prefs = context.getSharedPreferences(
-        AppPreferenceKeys.PREFS_NAME,
-        Context.MODE_PRIVATE,
-    )
     return MainSettings(
-        audioEnabled = prefs.getBoolean(
-            AppPreferenceKeys.AUDIO_ENABLED,
-            AppDefaults.AUDIO_ENABLED,
+        audioEnabled = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.AUDIO_ENABLED,
+            ScrcpyDefaults.AUDIO_ENABLED,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        audioCodec = prefs.getString(
-            AppPreferenceKeys.AUDIO_CODEC,
-            AppDefaults.AUDIO_CODEC,
-        ).orEmpty().ifBlank { AppDefaults.AUDIO_CODEC },
-        videoCodec = prefs.getString(
-            AppPreferenceKeys.VIDEO_CODEC,
-            AppDefaults.VIDEO_CODEC,
-        ).orEmpty().ifBlank { AppDefaults.VIDEO_CODEC },
-        fullscreenDebugInfoEnabled = prefs.getBoolean(
-            AppPreferenceKeys.FULLSCREEN_DEBUG_INFO,
-            AppDefaults.FULLSCREEN_DEBUG_INFO,
+        audioCodec = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.AUDIO_CODEC,
+            ScrcpyDefaults.AUDIO_CODEC,
+            StorageManager.PrefsType.SCRCPY,
+        ).ifBlank { ScrcpyDefaults.AUDIO_CODEC },
+        videoCodec = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.VIDEO_CODEC,
+            ScrcpyDefaults.VIDEO_CODEC,
+            StorageManager.PrefsType.SCRCPY,
+        ).ifBlank { ScrcpyDefaults.VIDEO_CODEC },
+        fullscreenDebugInfoEnabled = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.FULLSCREEN_DEBUG_INFO,
+            ScrcpyDefaults.FULLSCREEN_DEBUG_INFO,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        showFullscreenVirtualButtons = prefs.getBoolean(
-            AppPreferenceKeys.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
-            AppDefaults.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
+        showFullscreenVirtualButtons = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
+            ScrcpyDefaults.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        showPreviewVirtualButtonText = prefs.getBoolean(
-            AppPreferenceKeys.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
-            AppDefaults.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
+        showPreviewVirtualButtonText = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
+            ScrcpyDefaults.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        keepScreenOnWhenStreamingEnabled = prefs.getBoolean(
-            AppPreferenceKeys.KEEP_SCREEN_ON_WHEN_STREAMING,
-            AppDefaults.KEEP_SCREEN_ON_WHEN_STREAMING,
+        keepScreenOnWhenStreamingEnabled = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.KEEP_SCREEN_ON_WHEN_STREAMING,
+            ScrcpyDefaults.KEEP_SCREEN_ON_WHEN_STREAMING,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        devicePreviewCardHeightDp = prefs.getInt(
-            AppPreferenceKeys.DEVICE_PREVIEW_CARD_HEIGHT_DP,
-            AppDefaults.DEVICE_PREVIEW_CARD_HEIGHT_DP,
+        devicePreviewCardHeightDp = StorageManager.getInt(
+            context,
+            ScrcpyPreferenceKeys.DEVICE_PREVIEW_CARD_HEIGHT_DP,
+            ScrcpyDefaults.DEVICE_PREVIEW_CARD_HEIGHT_DP,
+            StorageManager.PrefsType.SCRCPY,
         ).coerceAtLeast(120),
-        virtualButtonsLayout = prefs.getString(
-            AppPreferenceKeys.VIRTUAL_BUTTONS_LAYOUT,
-            AppDefaults.VIRTUAL_BUTTONS_LAYOUT,
-        ).orEmpty().ifBlank { AppDefaults.VIRTUAL_BUTTONS_LAYOUT },
-        customServerUri = prefs.getString(
-            AppPreferenceKeys.CUSTOM_SERVER_URI,
-            AppDefaults.CUSTOM_SERVER_URI
-        ).orEmpty().ifBlank { null },
-        serverRemotePath = prefs.getString(
-            AppPreferenceKeys.SERVER_REMOTE_PATH,
-            AppDefaults.SERVER_REMOTE_PATH_INPUT,
-        ).orEmpty(),
-        adbKeyName = prefs.getString(
-            AppPreferenceKeys.ADB_KEY_NAME,
-            AppDefaults.ADB_KEY_NAME_INPUT,
-        ).orEmpty(),
-        adbPairingAutoDiscoverOnDialogOpen = prefs.getBoolean(
-            AppPreferenceKeys.ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN,
-            AppDefaults.ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN,
+        virtualButtonsLayout = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.VIRTUAL_BUTTONS_LAYOUT,
+            ScrcpyDefaults.VIRTUAL_BUTTONS_LAYOUT,
+            StorageManager.PrefsType.SCRCPY,
+        ).ifBlank { ScrcpyDefaults.VIRTUAL_BUTTONS_LAYOUT },
+        customServerUri = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
+            ScrcpyDefaults.CUSTOM_SERVER_URI,
+            StorageManager.PrefsType.SCRCPY,
+        ).ifBlank { null },
+        serverRemotePath = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.SERVER_REMOTE_PATH,
+            ScrcpyDefaults.SERVER_REMOTE_PATH_INPUT,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        adbAutoReconnectPairedDevice = prefs.getBoolean(
-            AppPreferenceKeys.ADB_AUTO_RECONNECT_PAIRED_DEVICE,
-            AppDefaults.ADB_AUTO_RECONNECT_PAIRED_DEVICE,
+        adbKeyName = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.ADB_KEY_NAME,
+            ScrcpyDefaults.ADB_KEY_NAME_INPUT,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        adbMdnsLanDiscoveryEnabled = prefs.getBoolean(
-            AppPreferenceKeys.ADB_MDNS_LAN_DISCOVERY,
-            AppDefaults.ADB_MDNS_LAN_DISCOVERY,
+        adbPairingAutoDiscoverOnDialogOpen = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN,
+            ScrcpyDefaults.ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        adbAutoReconnectPairedDevice = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.ADB_AUTO_RECONNECT_PAIRED_DEVICE,
+            ScrcpyDefaults.ADB_AUTO_RECONNECT_PAIRED_DEVICE,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        adbMdnsLanDiscoveryEnabled = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.ADB_MDNS_LAN_DISCOVERY,
+            ScrcpyDefaults.ADB_MDNS_LAN_DISCOVERY,
+            StorageManager.PrefsType.SCRCPY,
         ),
     )
 }
 
 internal fun saveMainSettings(context: Context, settings: MainSettings) {
-    context.getSharedPreferences(
-        AppPreferenceKeys.PREFS_NAME,
-        Context.MODE_PRIVATE,
-    ).edit {
-        putBoolean(
-            AppPreferenceKeys.AUDIO_ENABLED,
-            settings.audioEnabled,
-        )
-            .putString(
-                AppPreferenceKeys.AUDIO_CODEC,
-                settings.audioCodec,
-            )
-            .putString(
-                AppPreferenceKeys.VIDEO_CODEC,
-                settings.videoCodec,
-            )
-            .putBoolean(
-                AppPreferenceKeys.FULLSCREEN_DEBUG_INFO,
-                settings.fullscreenDebugInfoEnabled,
-            )
-            .putBoolean(
-                AppPreferenceKeys.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
-                settings.showFullscreenVirtualButtons,
-            )
-            .putBoolean(
-                AppPreferenceKeys.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
-                settings.showPreviewVirtualButtonText,
-            )
-            .putBoolean(
-                AppPreferenceKeys.KEEP_SCREEN_ON_WHEN_STREAMING,
-                settings.keepScreenOnWhenStreamingEnabled,
-            )
-            .putInt(
-                AppPreferenceKeys.DEVICE_PREVIEW_CARD_HEIGHT_DP,
-                settings.devicePreviewCardHeightDp.coerceAtLeast(120),
-            )
-            .putString(
-                AppPreferenceKeys.VIRTUAL_BUTTONS_LAYOUT,
-                settings.virtualButtonsLayout,
-            )
-            .putString(
-                AppPreferenceKeys.CUSTOM_SERVER_URI,
-                settings.customServerUri,
-            )
-            .putString(
-                AppPreferenceKeys.SERVER_REMOTE_PATH,
-                settings.serverRemotePath,
-            )
-            .putString(
-                AppPreferenceKeys.ADB_KEY_NAME,
-                settings.adbKeyName,
-            )
-            .putBoolean(
-                AppPreferenceKeys.ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN,
-                settings.adbPairingAutoDiscoverOnDialogOpen,
-            )
-            .putBoolean(
-                AppPreferenceKeys.ADB_AUTO_RECONNECT_PAIRED_DEVICE,
-                settings.adbAutoReconnectPairedDevice,
-            )
-            .putBoolean(
-                AppPreferenceKeys.ADB_MDNS_LAN_DISCOVERY,
-                settings.adbMdnsLanDiscoveryEnabled,
-            )
-    }
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.AUDIO_ENABLED,
+        settings.audioEnabled,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.AUDIO_CODEC,
+        settings.audioCodec,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.VIDEO_CODEC,
+        settings.videoCodec,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.FULLSCREEN_DEBUG_INFO,
+        settings.fullscreenDebugInfoEnabled,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
+        settings.showFullscreenVirtualButtons,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
+        settings.showPreviewVirtualButtonText,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.KEEP_SCREEN_ON_WHEN_STREAMING,
+        settings.keepScreenOnWhenStreamingEnabled,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putInt(
+        context,
+        ScrcpyPreferenceKeys.DEVICE_PREVIEW_CARD_HEIGHT_DP,
+        settings.devicePreviewCardHeightDp.coerceAtLeast(120),
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.VIRTUAL_BUTTONS_LAYOUT,
+        settings.virtualButtonsLayout,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
+        settings.customServerUri ?: "",
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.SERVER_REMOTE_PATH,
+        settings.serverRemotePath,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.ADB_KEY_NAME,
+        settings.adbKeyName,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN,
+        settings.adbPairingAutoDiscoverOnDialogOpen,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.ADB_AUTO_RECONNECT_PAIRED_DEVICE,
+        settings.adbAutoReconnectPairedDevice,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.ADB_MDNS_LAN_DISCOVERY,
+        settings.adbMdnsLanDiscoveryEnabled,
+        StorageManager.PrefsType.SCRCPY,
+    )
 }
 
 internal fun loadDevicePageSettings(context: Context): DevicePageSettings {
-    val prefs = context.getSharedPreferences(
-        AppPreferenceKeys.PREFS_NAME,
-        Context.MODE_PRIVATE,
-    )
-    val audioBitRateKbps = prefs.getInt(
-        AppPreferenceKeys.AUDIO_BIT_RATE_KBPS,
-        AppDefaults.AUDIO_BIT_RATE_KBPS,
+    val audioBitRateKbps = StorageManager.getInt(
+        context,
+        ScrcpyPreferenceKeys.AUDIO_BIT_RATE_KBPS,
+        ScrcpyDefaults.AUDIO_BIT_RATE_KBPS,
+        StorageManager.PrefsType.SCRCPY,
     )
     return DevicePageSettings(
-        quickConnectInput = prefs.getString(
-            AppPreferenceKeys.QUICK_CONNECT_INPUT,
-            AppDefaults.QUICK_CONNECT_INPUT,
-        ).orEmpty(),
-        pairHost = AppDefaults.PAIR_HOST,
-        pairPort = AppDefaults.PAIR_PORT,
-        pairCode = AppDefaults.PAIR_CODE,
+        quickConnectInput = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.QUICK_CONNECT_INPUT,
+            ScrcpyDefaults.QUICK_CONNECT_INPUT,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        pairHost = ScrcpyDefaults.PAIR_HOST,
+        pairPort = ScrcpyDefaults.PAIR_PORT,
+        pairCode = ScrcpyDefaults.PAIR_CODE,
         audioBitRateKbps = audioBitRateKbps,
-        audioBitRateInput = prefs.getString(
-            AppPreferenceKeys.AUDIO_BIT_RATE_INPUT,
-            AppDefaults.AUDIO_BIT_RATE_INPUT,
-        ).orEmpty().ifBlank { audioBitRateKbps.toString() },
-        videoBitRateMbps = prefs.getFloat(
-            AppPreferenceKeys.VIDEO_BIT_RATE_MBPS,
-            AppDefaults.VIDEO_BIT_RATE_MBPS,
+        audioBitRateInput = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.AUDIO_BIT_RATE_INPUT,
+            ScrcpyDefaults.AUDIO_BIT_RATE_INPUT,
+            StorageManager.PrefsType.SCRCPY,
+        ).ifBlank { audioBitRateKbps.toString() },
+        videoBitRateMbps = StorageManager.getFloat(
+            context,
+            ScrcpyPreferenceKeys.VIDEO_BIT_RATE_MBPS,
+            ScrcpyDefaults.VIDEO_BIT_RATE_MBPS,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        videoBitRateInput = prefs.getString(
-            AppPreferenceKeys.VIDEO_BIT_RATE_INPUT,
-            AppDefaults.VIDEO_BIT_RATE_INPUT
-        ).orEmpty().ifBlank { AppDefaults.VIDEO_BIT_RATE_INPUT },
-        turnScreenOff = prefs.getBoolean(
-            AppPreferenceKeys.TURN_SCREEN_OFF,
-            AppDefaults.TURN_SCREEN_OFF,
+        videoBitRateInput = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.VIDEO_BIT_RATE_INPUT,
+            ScrcpyDefaults.VIDEO_BIT_RATE_INPUT,
+            StorageManager.PrefsType.SCRCPY,
+        ).ifBlank { ScrcpyDefaults.VIDEO_BIT_RATE_INPUT },
+        turnScreenOff = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.TURN_SCREEN_OFF,
+            ScrcpyDefaults.TURN_SCREEN_OFF,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        noControl = prefs.getBoolean(
-            AppPreferenceKeys.NO_CONTROL,
-            AppDefaults.NO_CONTROL,
+        noControl = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.NO_CONTROL,
+            ScrcpyDefaults.NO_CONTROL,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        noVideo = prefs.getBoolean(
-            AppPreferenceKeys.NO_VIDEO,
-            AppDefaults.NO_VIDEO,
+        noVideo = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.NO_VIDEO,
+            ScrcpyDefaults.NO_VIDEO,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        videoSourcePreset = prefs.getString(
-            AppPreferenceKeys.VIDEO_SOURCE_PRESET,
-            AppDefaults.VIDEO_SOURCE_PRESET,
-        ).orEmpty().ifBlank { AppDefaults.VIDEO_SOURCE_PRESET },
-        displayIdInput = prefs.getString(
-            AppPreferenceKeys.DISPLAY_ID,
-            AppDefaults.DISPLAY_ID,
-        )
-            .orEmpty(),
-        cameraIdInput = prefs.getString(
-            AppPreferenceKeys.CAMERA_ID,
-            AppDefaults.CAMERA_ID,
-        )
-            .orEmpty(),
-        cameraFacingPreset = prefs.getString(
-            AppPreferenceKeys.CAMERA_FACING_PRESET,
-            AppDefaults.CAMERA_FACING_PRESET,
-        ).orEmpty(),
-        cameraSizePreset = prefs.getString(
-            AppPreferenceKeys.CAMERA_SIZE_PRESET,
-            AppDefaults.CAMERA_SIZE_PRESET,
-        ).orEmpty(),
-        cameraSizeCustom = prefs.getString(
-            AppPreferenceKeys.CAMERA_SIZE_CUSTOM,
-            AppDefaults.CAMERA_SIZE_CUSTOM,
-        ).orEmpty(),
-        cameraAr = prefs.getString(
-            AppPreferenceKeys.CAMERA_AR,
-            AppDefaults.CAMERA_AR,
-        ).orEmpty(),
-        cameraFps = prefs.getString(
-            AppPreferenceKeys.CAMERA_FPS,
-            AppDefaults.CAMERA_FPS,
-        ).orEmpty(),
-        cameraHighSpeed = prefs.getBoolean(
-            AppPreferenceKeys.CAMERA_HIGH_SPEED,
-            AppDefaults.CAMERA_HIGH_SPEED,
+        videoSourcePreset = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.VIDEO_SOURCE_PRESET,
+            ScrcpyDefaults.VIDEO_SOURCE_PRESET,
+            StorageManager.PrefsType.SCRCPY,
+        ).ifBlank { ScrcpyDefaults.VIDEO_SOURCE_PRESET },
+        displayIdInput = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.DISPLAY_ID,
+            ScrcpyDefaults.DISPLAY_ID,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        audioSourcePreset = prefs.getString(
-            AppPreferenceKeys.AUDIO_SOURCE_PRESET,
-            AppDefaults.AUDIO_SOURCE_PRESET,
-        ).orEmpty().ifBlank { AppDefaults.AUDIO_SOURCE_PRESET },
-        audioSourceCustom = prefs.getString(
-            AppPreferenceKeys.AUDIO_SOURCE_CUSTOM,
-            AppDefaults.AUDIO_SOURCE_CUSTOM,
-        ).orEmpty(),
-        audioDup = prefs.getBoolean(
-            AppPreferenceKeys.AUDIO_DUP,
-            AppDefaults.AUDIO_DUP,
+        cameraIdInput = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.CAMERA_ID,
+            ScrcpyDefaults.CAMERA_ID,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        noAudioPlayback = prefs.getBoolean(
-            AppPreferenceKeys.NO_AUDIO_PLAYBACK,
-            AppDefaults.NO_AUDIO_PLAYBACK,
+        cameraFacingPreset = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.CAMERA_FACING_PRESET,
+            ScrcpyDefaults.CAMERA_FACING_PRESET,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        requireAudio = prefs.getBoolean(
-            AppPreferenceKeys.REQUIRE_AUDIO,
-            AppDefaults.REQUIRE_AUDIO,
+        cameraSizePreset = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.CAMERA_SIZE_PRESET,
+            ScrcpyDefaults.CAMERA_SIZE_PRESET,
+            StorageManager.PrefsType.SCRCPY,
         ),
-        maxSizeInput = prefs.getString(
-            AppPreferenceKeys.MAX_SIZE_INPUT,
-            AppDefaults.MAX_SIZE_INPUT,
-        )
-            .orEmpty(),
-        maxFpsInput = prefs.getString(
-            AppPreferenceKeys.MAX_FPS_INPUT,
-            AppDefaults.MAX_FPS_INPUT,
-        )
-            .orEmpty(),
-        videoEncoder = prefs.getString(
-            AppPreferenceKeys.VIDEO_ENCODER,
-            AppDefaults.VIDEO_ENCODER,
-        )
-            .orEmpty(),
-        videoCodecOptions = prefs.getString(
-            AppPreferenceKeys.VIDEO_CODEC_OPTION,
-            AppDefaults.VIDEO_CODEC_OPTION,
-        ).orEmpty(),
-        audioEncoder = prefs.getString(
-            AppPreferenceKeys.AUDIO_ENCODER,
-            AppDefaults.AUDIO_ENCODER,
-        ).orEmpty(),
-        audioCodecOptions = prefs.getString(
-            AppPreferenceKeys.AUDIO_CODEC_OPTION,
-            AppDefaults.AUDIO_CODEC_OPTION,
-        ).orEmpty(),
-        newDisplayWidth = prefs.getString(
-            AppPreferenceKeys.NEW_DISPLAY_WIDTH,
-            AppDefaults.NEW_DISPLAY_WIDTH,
-        ).orEmpty(),
-        newDisplayHeight = prefs.getString(
-            AppPreferenceKeys.NEW_DISPLAY_HEIGHT,
-            AppDefaults.NEW_DISPLAY_HEIGHT,
-        ).orEmpty(),
-        newDisplayDpi = prefs.getString(
-            AppPreferenceKeys.NEW_DISPLAY_DPI,
-            AppDefaults.NEW_DISPLAY_DPI,
-        ).orEmpty(),
-        cropWidth = prefs.getString(
-            AppPreferenceKeys.CROP_WIDTH,
-            AppDefaults.CROP_WIDTH,
-        ).orEmpty(),
-        cropHeight = prefs.getString(
-            AppPreferenceKeys.CROP_HEIGHT,
-            AppDefaults.CROP_HEIGHT,
-        ).orEmpty(),
-        cropX = prefs.getString(
-            AppPreferenceKeys.CROP_X,
-            AppDefaults.CROP_X,
-        ).orEmpty(),
-        cropY = prefs.getString(
-            AppPreferenceKeys.CROP_Y,
-            AppDefaults.CROP_Y,
-        ).orEmpty(),
+        cameraSizeCustom = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.CAMERA_SIZE_CUSTOM,
+            ScrcpyDefaults.CAMERA_SIZE_CUSTOM,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        cameraAr = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.CAMERA_AR,
+            ScrcpyDefaults.CAMERA_AR,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        cameraFps = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.CAMERA_FPS,
+            ScrcpyDefaults.CAMERA_FPS,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        cameraHighSpeed = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.CAMERA_HIGH_SPEED,
+            ScrcpyDefaults.CAMERA_HIGH_SPEED,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        audioSourcePreset = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.AUDIO_SOURCE_PRESET,
+            ScrcpyDefaults.AUDIO_SOURCE_PRESET,
+            StorageManager.PrefsType.SCRCPY,
+        ).ifBlank { ScrcpyDefaults.AUDIO_SOURCE_PRESET },
+        audioSourceCustom = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.AUDIO_SOURCE_CUSTOM,
+            ScrcpyDefaults.AUDIO_SOURCE_CUSTOM,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        audioDup = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.AUDIO_DUP,
+            ScrcpyDefaults.AUDIO_DUP,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        noAudioPlayback = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.NO_AUDIO_PLAYBACK,
+            ScrcpyDefaults.NO_AUDIO_PLAYBACK,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        requireAudio = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.REQUIRE_AUDIO,
+            ScrcpyDefaults.REQUIRE_AUDIO,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        maxSizeInput = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.MAX_SIZE_INPUT,
+            ScrcpyDefaults.MAX_SIZE_INPUT,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        maxFpsInput = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.MAX_FPS_INPUT,
+            ScrcpyDefaults.MAX_FPS_INPUT,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        videoEncoder = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.VIDEO_ENCODER,
+            ScrcpyDefaults.VIDEO_ENCODER,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        videoCodecOptions = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.VIDEO_CODEC_OPTION,
+            ScrcpyDefaults.VIDEO_CODEC_OPTION,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        audioEncoder = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.AUDIO_ENCODER,
+            ScrcpyDefaults.AUDIO_ENCODER,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        audioCodecOptions = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.AUDIO_CODEC_OPTION,
+            ScrcpyDefaults.AUDIO_CODEC_OPTION,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        newDisplayWidth = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.NEW_DISPLAY_WIDTH,
+            ScrcpyDefaults.NEW_DISPLAY_WIDTH,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        newDisplayHeight = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.NEW_DISPLAY_HEIGHT,
+            ScrcpyDefaults.NEW_DISPLAY_HEIGHT,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        newDisplayDpi = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.NEW_DISPLAY_DPI,
+            ScrcpyDefaults.NEW_DISPLAY_DPI,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        cropWidth = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.CROP_WIDTH,
+            ScrcpyDefaults.CROP_WIDTH,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        cropHeight = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.CROP_HEIGHT,
+            ScrcpyDefaults.CROP_HEIGHT,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        cropX = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.CROP_X,
+            ScrcpyDefaults.CROP_X,
+            StorageManager.PrefsType.SCRCPY,
+        ),
+        cropY = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.CROP_Y,
+            ScrcpyDefaults.CROP_Y,
+            StorageManager.PrefsType.SCRCPY,
+        ),
     )
 }
 
 internal fun saveDevicePageSettings(context: Context, settings: DevicePageSettings) {
-    context.getSharedPreferences(AppPreferenceKeys.PREFS_NAME, Context.MODE_PRIVATE)
-        .edit {
-            remove(AppPreferenceKeys.PAIR_HOST)
-                .remove(AppPreferenceKeys.PAIR_PORT)
-                .remove(AppPreferenceKeys.PAIR_CODE)
-                .putString(
-                    AppPreferenceKeys.QUICK_CONNECT_INPUT,
-                    settings.quickConnectInput,
-                )
-                .putInt(
-                    AppPreferenceKeys.AUDIO_BIT_RATE_KBPS,
-                    settings.audioBitRateKbps,
-                )
-                .putString(
-                    AppPreferenceKeys.AUDIO_BIT_RATE_INPUT,
-                    settings.audioBitRateInput,
-                )
-                .putFloat(
-                    AppPreferenceKeys.VIDEO_BIT_RATE_MBPS,
-                    settings.videoBitRateMbps,
-                )
-                .putString(
-                    AppPreferenceKeys.VIDEO_BIT_RATE_INPUT,
-                    settings.videoBitRateInput,
-                )
-                .putBoolean(
-                    AppPreferenceKeys.TURN_SCREEN_OFF,
-                    settings.turnScreenOff,
-                )
-                .putBoolean(
-                    AppPreferenceKeys.NO_CONTROL,
-                    settings.noControl,
-                )
-                .putBoolean(
-                    AppPreferenceKeys.NO_VIDEO,
-                    settings.noVideo,
-                )
-                .putString(
-                    AppPreferenceKeys.VIDEO_SOURCE_PRESET,
-                    settings.videoSourcePreset,
-                )
-                .putString(
-                    AppPreferenceKeys.DISPLAY_ID,
-                    settings.displayIdInput,
-                )
-                .putString(
-                    AppPreferenceKeys.CAMERA_ID,
-                    settings.cameraIdInput,
-                )
-                .putString(
-                    AppPreferenceKeys.CAMERA_FACING_PRESET,
-                    settings.cameraFacingPreset,
-                )
-                .putString(
-                    AppPreferenceKeys.CAMERA_SIZE_PRESET,
-                    settings.cameraSizePreset,
-                )
-                .putString(
-                    AppPreferenceKeys.CAMERA_SIZE_CUSTOM,
-                    settings.cameraSizeCustom,
-                )
-                .putString(
-                    AppPreferenceKeys.CAMERA_AR,
-                    settings.cameraAr,
-                )
-                .putString(
-                    AppPreferenceKeys.CAMERA_FPS,
-                    settings.cameraFps,
-                )
-                .putBoolean(
-                    AppPreferenceKeys.CAMERA_HIGH_SPEED,
-                    settings.cameraHighSpeed,
-                )
-                .putString(
-                    AppPreferenceKeys.AUDIO_SOURCE_PRESET,
-                    settings.audioSourcePreset,
-                )
-                .putString(
-                    AppPreferenceKeys.AUDIO_SOURCE_CUSTOM,
-                    settings.audioSourceCustom,
-                )
-                .putBoolean(
-                    AppPreferenceKeys.AUDIO_DUP,
-                    settings.audioDup,
-                )
-                .putBoolean(
-                    AppPreferenceKeys.NO_AUDIO_PLAYBACK,
-                    settings.noAudioPlayback,
-                )
-                .putBoolean(
-                    AppPreferenceKeys.REQUIRE_AUDIO,
-                    settings.requireAudio,
-                )
-                .putString(
-                    AppPreferenceKeys.MAX_SIZE_INPUT,
-                    settings.maxSizeInput,
-                )
-                .putString(
-                    AppPreferenceKeys.MAX_FPS_INPUT,
-                    settings.maxFpsInput,
-                )
-                .putString(
-                    AppPreferenceKeys.VIDEO_ENCODER,
-                    settings.videoEncoder,
-                )
-                .putString(
-                    AppPreferenceKeys.VIDEO_CODEC_OPTION,
-                    settings.videoCodecOptions,
-                )
-                .putString(
-                    AppPreferenceKeys.AUDIO_ENCODER,
-                    settings.audioEncoder,
-                )
-                .putString(
-                    AppPreferenceKeys.AUDIO_CODEC_OPTION,
-                    settings.audioCodecOptions,
-                )
-                .putString(
-                    AppPreferenceKeys.NEW_DISPLAY_WIDTH,
-                    settings.newDisplayWidth,
-                )
-                .putString(
-                    AppPreferenceKeys.NEW_DISPLAY_HEIGHT,
-                    settings.newDisplayHeight,
-                )
-                .putString(
-                    AppPreferenceKeys.NEW_DISPLAY_DPI,
-                    settings.newDisplayDpi,
-                )
-                .putString(
-                    AppPreferenceKeys.CROP_WIDTH,
-                    settings.cropWidth,
-                )
-                .putString(
-                    AppPreferenceKeys.CROP_HEIGHT,
-                    settings.cropHeight,
-                )
-                .putString(
-                    AppPreferenceKeys.CROP_X,
-                    settings.cropX,
-                )
-                .putString(
-                    AppPreferenceKeys.CROP_Y,
-                    settings.cropY,
-                )
-        }
+    StorageManager.remove(
+        context,
+        ScrcpyPreferenceKeys.PAIR_HOST,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.remove(
+        context,
+        ScrcpyPreferenceKeys.PAIR_PORT,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.remove(
+        context,
+        ScrcpyPreferenceKeys.PAIR_CODE,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.QUICK_CONNECT_INPUT,
+        settings.quickConnectInput,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putInt(
+        context,
+        ScrcpyPreferenceKeys.AUDIO_BIT_RATE_KBPS,
+        settings.audioBitRateKbps,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.AUDIO_BIT_RATE_INPUT,
+        settings.audioBitRateInput,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putFloat(
+        context,
+        ScrcpyPreferenceKeys.VIDEO_BIT_RATE_MBPS,
+        settings.videoBitRateMbps,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.VIDEO_BIT_RATE_INPUT,
+        settings.videoBitRateInput,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.TURN_SCREEN_OFF,
+        settings.turnScreenOff,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.NO_CONTROL,
+        settings.noControl,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.NO_VIDEO,
+        settings.noVideo,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.VIDEO_SOURCE_PRESET,
+        settings.videoSourcePreset,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.DISPLAY_ID,
+        settings.displayIdInput,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.CAMERA_ID,
+        settings.cameraIdInput,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.CAMERA_FACING_PRESET,
+        settings.cameraFacingPreset,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.CAMERA_SIZE_PRESET,
+        settings.cameraSizePreset,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.CAMERA_SIZE_CUSTOM,
+        settings.cameraSizeCustom,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.CAMERA_AR,
+        settings.cameraAr,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.CAMERA_FPS,
+        settings.cameraFps,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.CAMERA_HIGH_SPEED,
+        settings.cameraHighSpeed,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.AUDIO_SOURCE_PRESET,
+        settings.audioSourcePreset,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.AUDIO_SOURCE_CUSTOM,
+        settings.audioSourceCustom,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.AUDIO_DUP,
+        settings.audioDup,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.NO_AUDIO_PLAYBACK,
+        settings.noAudioPlayback,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.REQUIRE_AUDIO,
+        settings.requireAudio,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.MAX_SIZE_INPUT,
+        settings.maxSizeInput,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.MAX_FPS_INPUT,
+        settings.maxFpsInput,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.VIDEO_ENCODER,
+        settings.videoEncoder,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.VIDEO_CODEC_OPTION,
+        settings.videoCodecOptions,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.AUDIO_ENCODER,
+        settings.audioEncoder,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.AUDIO_CODEC_OPTION,
+        settings.audioCodecOptions,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.NEW_DISPLAY_WIDTH,
+        settings.newDisplayWidth,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.NEW_DISPLAY_HEIGHT,
+        settings.newDisplayHeight,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.NEW_DISPLAY_DPI,
+        settings.newDisplayDpi,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.CROP_WIDTH,
+        settings.cropWidth,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.CROP_HEIGHT,
+        settings.cropHeight,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.CROP_X,
+        settings.cropX,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putString(
+        context,
+        ScrcpyPreferenceKeys.CROP_Y,
+        settings.cropY,
+        StorageManager.PrefsType.SCRCPY,
+    )
 }

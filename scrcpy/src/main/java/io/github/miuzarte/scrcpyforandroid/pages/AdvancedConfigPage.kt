@@ -18,10 +18,10 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import io.github.miuzarte.scrcpyforandroid.constants.ScrcpyPresets
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlide
+import notifyrelay.data.config.ScrcpyPresets
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.ScrollBehavior

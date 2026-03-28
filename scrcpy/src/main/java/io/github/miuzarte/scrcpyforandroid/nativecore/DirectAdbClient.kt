@@ -5,8 +5,8 @@ import android.os.Build
 import android.util.Base64
 import android.util.Log
 import androidx.core.content.edit
-import io.github.miuzarte.scrcpyforandroid.constants.AppDefaults
-import io.github.miuzarte.scrcpyforandroid.constants.AppPreferenceKeys
+import notifyrelay.data.config.ScrcpyDefaults
+import notifyrelay.data.config.ScrcpyPreferenceKeys
 import java.io.BufferedInputStream
 import java.io.Closeable
 import java.io.EOFException
@@ -51,7 +51,7 @@ internal class DirectAdbTransport(private val context: Context) {
     val publicKeyX509: ByteArray get() = keys.second
 
     @Volatile
-    var keyName: String = AppDefaults.ADB_KEY_NAME
+    var keyName: String = ScrcpyDefaults.ADB_KEY_NAME
 
     fun connect(host: String, port: Int): DirectAdbConnection {
         Log.i(TAG, "connect(): opening direct adbd transport to $host:$port")
@@ -60,7 +60,7 @@ internal class DirectAdbTransport(private val context: Context) {
             port,
             privateKey,
             publicKeyX509,
-            keyName.ifBlank { AppDefaults.ADB_KEY_NAME })
+            keyName.ifBlank { ScrcpyDefaults.ADB_KEY_NAME })
         conn.handshake()
         Log.i(TAG, "connect(): handshake success for $host:$port")
         return conn
@@ -78,7 +78,7 @@ internal class DirectAdbTransport(private val context: Context) {
 
         val pairingKey = AdbPairingKey(
             privateKey = privateKey,
-            alias = keyName.ifBlank { AppDefaults.ADB_KEY_NAME },
+            alias = keyName.ifBlank { ScrcpyDefaults.ADB_KEY_NAME },
         )
         return DirectAdbPairingClient(targetHost, port, targetCode, pairingKey).use {
             it.start()
@@ -107,10 +107,10 @@ internal class DirectAdbTransport(private val context: Context) {
      */
     private fun loadOrCreate(): Pair<PrivateKey, ByteArray> {
         val prefs = context.getSharedPreferences(
-            AppPreferenceKeys.NATIVE_ADB_KEY_PREFS_NAME,
+            ScrcpyPreferenceKeys.NATIVE_ADB_KEY_PREFS_NAME,
             Context.MODE_PRIVATE
         )
-        val privB64 = prefs.getString(AppPreferenceKeys.NATIVE_ADB_PRIVATE_KEY, null)
+        val privB64 = prefs.getString(ScrcpyPreferenceKeys.NATIVE_ADB_PRIVATE_KEY, null)
         if (privB64 != null) {
             try {
                 val kf = KeyFactory.getInstance("RSA")
@@ -128,7 +128,7 @@ internal class DirectAdbTransport(private val context: Context) {
         val kp = kpg.generateKeyPair()
         prefs.edit {
             putString(
-                AppPreferenceKeys.NATIVE_ADB_PRIVATE_KEY,
+                ScrcpyPreferenceKeys.NATIVE_ADB_PRIVATE_KEY,
                 Base64.encodeToString(kp.private.encoded, Base64.NO_WRAP)
             )
         }
@@ -203,7 +203,7 @@ internal class DirectAdbConnection(
     val port: Int,
     private val privateKey: PrivateKey,
     private val publicKeyX509: ByteArray,
-    private val keyName: String = AppDefaults.ADB_KEY_NAME,
+    private val keyName: String = ScrcpyDefaults.ADB_KEY_NAME,
 ) : AutoCloseable {
 
     private val sha1DigestInfoPrefix = byteArrayOf(
