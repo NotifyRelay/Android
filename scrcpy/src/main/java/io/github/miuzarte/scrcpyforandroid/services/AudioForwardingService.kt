@@ -1,0 +1,252 @@
+package io.github.miuzarte.scrcpyforandroid.services
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.os.IBinder
+import android.util.Log
+import androidx.core.app.NotificationCompat
+import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
+import notifyrelay.data.config.ScrcpyDefaults
+import notifyrelay.data.model.ConnectionTarget
+import java.util.concurrent.Executors
+import kotlin.concurrent.Volatile
+
+class AudioForwardingService : Service() {
+    companion object {
+        private const val TAG = "AudioForwardingService"
+        private const val NOTIFICATION_CHANNEL_ID = "audio_forwarding_channel"
+        private const val NOTIFICATION_ID = 2001
+        private const val ACTION_STOP = "io.github.miuzarte.scrcpyforandroid.ACTION_STOP_AUDIO_FORWARDING"
+
+        @Volatile
+        private var isRunning: Boolean = false
+
+        @Volatile
+        private var currentSessionTarget: ConnectionTarget? = null
+
+        fun isForwarding(): Boolean = isRunning
+
+        fun getCurrentTarget(): ConnectionTarget? = currentSessionTarget
+
+        fun startAudioForwarding(context: Context, host: String, port: Int = ScrcpyDefaults.ADB_PORT, deviceName: String = host): Boolean {
+            if (isRunning) {
+                Log.w(TAG, "音频转发已在运行中: ${currentSessionTarget?.host}:${currentSessionTarget?.port}")
+                return false
+            }
+
+            if (host.isBlank()) {
+                Log.e(TAG, "目标设备 IP 为空")
+                return false
+            }
+
+            val intent = Intent(context, AudioForwardingService::class.java).apply {
+                putExtra("host", host)
+                putExtra("port", port)
+                putExtra("deviceName", deviceName)
+            }
+            context.startForegroundService(intent)
+            return true
+        }
+
+        fun stopAudioForwarding(context: Context) {
+            val intent = Intent(context, AudioForwardingService::class.java).apply {
+                action = ACTION_STOP
+            }
+            context.startService(intent)
+        }
+    }
+
+    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    private val executor = Executors.newSingleThreadExecutor { runnable ->
+        Thread(runnable, "audio-forwarding-worker").apply { isDaemon = true }
+    }
+
+    private var facade: NativeCoreFacade? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+        Log.i(TAG, "AudioForwardingService onCreate")
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        Log.i(TAG, "onStartCommand: action=${intent?.action}")
+
+        when (intent?.action) {
+            ACTION_STOP -> {
+                stopForwarding()
+                stopSelf()
+                return START_NOT_STICKY
+            }
+        }
+
+        val host = intent?.getStringExtra("host")
+        val port = intent?.getIntExtra("port", ScrcpyDefaults.ADB_PORT) ?: ScrcpyDefaults.ADB_PORT
+
+        if (host.isNullOrBlank()) {
+            Log.e(TAG, "host 为空，停止服务")
+            stopSelf()
+            return START_NOT_STICKY
+        }
+
+        val deviceName = intent?.getStringExtra("deviceName") ?: host
+
+        if (isRunning) {
+            Log.w(TAG, "音频转发已在运行中")
+            return START_NOT_STICKY
+        }
+
+        startForeground(NOTIFICATION_ID, createNotification(deviceName))
+
+        scope.launch {
+            try {
+                isRunning = true
+                currentSessionTarget = ConnectionTarget(host, port)
+
+                val success = startScrcpySession(host, port)
+
+                if (!success) {
+                    Log.e(TAG, "启动 scrcpy 会话失败")
+                    stopSelf()
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "启动音频转发失败", e)
+                stopSelf()
+            }
+        }
+
+        return START_NOT_STICKY
+    }
+
+    private fun startScrcpySession(host: String, port: Int): Boolean {
+        return try {
+            val nativeCore = NativeCoreFacade.get(applicationContext)
+            facade = nativeCore
+
+            if (nativeCore.adbIsConnected()) {
+                Log.i(TAG, "ADB 已连接，先断开现有连接")
+                nativeCore.adbDisconnect()
+            }
+
+            Log.i(TAG, "开始 ADB 连接: $host:$port")
+            val connected = nativeCore.adbConnect(host, port)
+            if (!connected) {
+                Log.e(TAG, "ADB 连接失败: $host:$port")
+                return false
+            }
+            Log.i(TAG, "ADB 连接成功: $host:$port")
+
+            val request = NativeCoreFacade.defaultStartRequest(
+                customServerUri = null,
+                maxSize = 0,
+                videoBitRate = (ScrcpyDefaults.VIDEO_BIT_RATE_MBPS * 1_000_000).toInt(),
+                remotePath = ScrcpyDefaults.SERVER_REMOTE_PATH,
+                videoCodec = ScrcpyDefaults.VIDEO_CODEC,
+                audio = true,
+                audioCodec = ScrcpyDefaults.AUDIO_CODEC,
+                audioBitRate = ScrcpyDefaults.AUDIO_BIT_RATE_KBPS * 1_000,
+                noControl = true,
+                noVideo = true,
+                audioDup = ScrcpyDefaults.AUDIO_DUP,
+                audioSource = ScrcpyDefaults.AUDIO_SOURCE_PRESET,
+            )
+
+            Log.i(TAG, "启动 scrcpy 仅音频模式")
+            val sessionInfo = nativeCore.scrcpyStart(request)
+            Log.i(TAG, "scrcpy 已启动: device=${sessionInfo.deviceName}, audioCodec=${sessionInfo.codec}")
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "启动 scrcpy 会话异常", e)
+            false
+        }
+    }
+
+    private fun stopForwarding() {
+        try {
+            executor.submit {
+                try {
+                    val nativeCore = facade
+                    if (nativeCore != null) {
+                        Log.i(TAG, "停止 scrcpy 会话")
+                        nativeCore.scrcpyStop()
+
+                        Log.i(TAG, "断开 ADB 连接")
+                        nativeCore.adbDisconnect()
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "停止音频转发失败", e)
+                } finally {
+                    isRunning = false
+                    currentSessionTarget = null
+                    facade = null
+                    Log.i(TAG, "音频转发已停止")
+                }
+            }.get()
+        } catch (e: Exception) {
+            Log.e(TAG, "停止音频转发异常", e)
+            isRunning = false
+            currentSessionTarget = null
+            facade = null
+        }
+    }
+
+    override fun onDestroy() {
+        Log.i(TAG, "AudioForwardingService onDestroy")
+        stopForwarding()
+        executor.shutdown()
+        scope.cancel()
+        super.onDestroy()
+    }
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    private fun createNotificationChannel() {
+        val channel = NotificationChannel(
+            NOTIFICATION_CHANNEL_ID,
+            "音频转发",
+            NotificationManager.IMPORTANCE_LOW
+        ).apply {
+            description = "音频转发服务状态"
+            setShowBadge(false)
+        }
+
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.createNotificationChannel(channel)
+    }
+
+    private fun createNotification(deviceName: String): Notification {
+        val stopIntent = Intent(this, AudioForwardingService::class.java).apply {
+            action = ACTION_STOP
+        }
+        val stopPendingIntent = PendingIntent.getService(
+            this,
+            0,
+            stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        return NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_ID)
+            .setContentTitle("正在接收音频")
+            .setContentText("从 $deviceName 接收音频中")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setShowWhen(false)
+            .addAction(
+                android.R.drawable.ic_media_pause,
+                "停止",
+                stopPendingIntent
+            )
+            .build()
+    }
+}

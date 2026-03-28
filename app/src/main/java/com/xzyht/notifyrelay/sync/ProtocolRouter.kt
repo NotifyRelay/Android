@@ -218,17 +218,49 @@ object ProtocolRouter {
                                     sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "previous", "error", e.message)
                                 }
                             }
-                            // 音频转发控制（仅对 PC 设备响应）
                             "audioRequest" -> {
-                                if (!isRemoteDevicePc(auth)) {
-                                    Logger.w(TAG, "音频转发请求被忽略：非 PC 设备")
-                                } else {
-                                    val response = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"accepted\"}"
+                                try {
+                                    val sourceDevice = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
+                                    val adbPort = notifyrelay.data.config.ScrcpyDefaults.ADB_PORT
+                                    
+                                    val success = io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.startAudioForwarding(
+                                        context, 
+                                        sourceDevice.ip, 
+                                        adbPort,
+                                        sourceDevice.displayName
+                                    )
+                                    
+                                    val result = if (success) "accepted" else "rejected"
+                                    val response = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"$result\"}"
+                                    ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_MEDIA_CONTROL", response)
+                                    
+                                    if (success) {
+                                        Logger.i(TAG, "音频转发已启动: ${sourceDevice.displayName}")
+                                    } else {
+                                        Logger.e(TAG, "音频转发启动失败: ${sourceDevice.displayName}")
+                                    }
+                                } catch (e: Exception) {
+                                    Logger.e(TAG, "处理音频转发请求失败", e)
+                                    val response = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"rejected\"}"
                                     ProtocolSender.sendEncrypted(deviceManager, deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333), "DATA_MEDIA_CONTROL", response)
                                 }
                             }
                             "audioResponse" -> {
-                                // 处理音频转发响应，这里可以添加相应的逻辑
+                                try {
+                                    val json = JSONObject(decrypted)
+                                    val result = json.optString("result", "rejected")
+                                    
+                                    if (result == "accepted") {
+                                        Logger.i(TAG, "音频转发请求已被接受")
+                                    } else {
+                                        Logger.w(TAG, "音频转发请求被拒绝")
+                                        deviceManager.coroutineScopeInternal.launch {
+                                            notifyrelay.base.util.ToastUtils.showShortToast(context, "音频转发请求被拒绝")
+                                        }
+                                    }
+                                } catch (e: Exception) {
+                                    Logger.e(TAG, "处理 audioResponse 失败", e)
+                                }
                             }
                         }
                     } catch (e: Exception) {
