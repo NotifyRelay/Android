@@ -498,6 +498,120 @@ internal fun ConfigPanel(
     }
 }
 
+@Composable
+internal fun SimpleConfigPanel(
+    busy: Boolean,
+    bitRateMbps: Float,
+    onBitRateSliderChange: (Float) -> Unit,
+    onBitRateInputChange: (String) -> Unit,
+    audioBitRateKbps: Int,
+    onAudioBitRateChange: (Int) -> Unit,
+    audioEnabled: Boolean,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onOpenFullscreen: () -> Unit,
+    sessionStarted: Boolean,
+) {
+    val audioBitRatePresetIndex =
+        presetIndexFromInput(audioBitRateKbps.toString(), ScrcpyPresets.AudioBitRate)
+
+    SectionSmallTitle("Scrcpy")
+    Card {
+        if (audioEnabled) {
+            SuperSlide(
+                title = "音频码率",
+                summary = "--audio-bit-rate",
+                value = audioBitRatePresetIndex.toFloat(),
+                onValueChange = { value ->
+                    val idx = value.roundToInt().coerceIn(0, ScrcpyPresets.AudioBitRate.lastIndex)
+                    onAudioBitRateChange(ScrcpyPresets.AudioBitRate[idx])
+                },
+                valueRange = 0f..ScrcpyPresets.AudioBitRate.lastIndex.toFloat(),
+                steps = (ScrcpyPresets.AudioBitRate.size - 2).coerceAtLeast(0),
+                enabled = !sessionStarted,
+                unit = "Kbps",
+                displayText = audioBitRateKbps.toString(),
+                inputInitialValue = audioBitRateKbps.toString(),
+                inputFilter = { it.filter(Char::isDigit) },
+                inputValueRange = 1f..Float.MAX_VALUE,
+                onInputConfirm = { raw ->
+                    raw.toIntOrNull()?.takeIf { it > 0 }?.let { onAudioBitRateChange(it) }
+                },
+            )
+        }
+        SuperSlide(
+            title = "视频码率",
+            summary = "--video-bit-rate",
+            value = bitRateMbps,
+            onValueChange = {
+                onBitRateSliderChange(it)
+                onBitRateInputChange(formatBitRate(it))
+            },
+            valueRange = 0.1f..40f,
+            steps = 399,
+            enabled = !sessionStarted,
+            unit = "Mbps",
+            displayFormatter = { formatBitRate(it) },
+            inputInitialValue = formatBitRate(bitRateMbps),
+            inputFilter = { text ->
+                var dotUsed = false
+                text.filter { ch ->
+                    when {
+                        ch.isDigit() -> true
+                        ch == '.' && !dotUsed -> {
+                            dotUsed = true
+                            true
+                        }
+
+                        else -> false
+                    }
+                }
+            },
+            inputValueRange = 0.1f..Float.MAX_VALUE,
+            onInputConfirm = { raw ->
+                raw.toFloatOrNull()?.let { parsed ->
+                    if (parsed >= 0.1f) {
+                        onBitRateSliderChange(parsed)
+                        onBitRateInputChange(formatBitRate(parsed))
+                    }
+                }
+            },
+        )
+        if (sessionStarted) {
+            Button(
+                onClick = onOpenFullscreen,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = UiSpacing.CardContent)
+                    .padding(top = UiSpacing.CardContent),
+            ) {
+                Icon(
+                    Icons.Rounded.Fullscreen,
+                    contentDescription = "全屏",
+                )
+                Spacer(Modifier.width(UiSpacing.SectionTitleBottom))
+                Text("全屏控制")
+            }
+        }
+        TextButton(
+            text = if (sessionStarted) "停止" else "启动",
+            onClick = {
+                if (sessionStarted) onStop() else onStart()
+            },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = UiSpacing.CardContent)
+                .padding(bottom = UiSpacing.CardContent),
+            enabled = !busy,
+            colors = if (sessionStarted) {
+                ButtonDefaults.textButtonColors()
+            } else {
+                ButtonDefaults.textButtonColorsPrimary()
+            },
+        )
+    }
+}
+
 /**
  * PairingDialog
  *
