@@ -18,4 +18,5 @@ data class OnlineDeviceInfo(
     val displayName: String,
     val ip: String,
     val port: Int,
+    val deviceType: String? = null,
 )

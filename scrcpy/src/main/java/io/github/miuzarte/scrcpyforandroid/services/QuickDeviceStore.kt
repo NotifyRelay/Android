@@ -165,6 +165,7 @@ internal fun syncFromAuthenticatedDevices(
     adbPort: Int = ScrcpyDefaults.ADB_PORT,
 ): List<OnlineDeviceInfo> {
     val onlineDevices = loadOnlineDevicesFromApp(context)
+        .filter { it.deviceType?.lowercase() != "pc" }
     if (onlineDevices.isEmpty()) return emptyList()
 
     val existingHosts = quickDevices.map { it.host }.toSet()

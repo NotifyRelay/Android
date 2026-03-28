@@ -521,14 +521,16 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         try {
             val onlineDevices = deviceMap.filter { (uuid, pair) ->
                 pair.second && (authSnapshot[uuid]?.isAccepted == true)
-            }.mapNotNull { (_, pair) ->
+            }.mapNotNull { (uuid, pair) ->
                 val info = pair.first
+                val auth = authSnapshot[uuid]
                 if (info.ip.isNotBlank() && info.ip != "0.0.0.0") {
                     notifyrelay.data.model.OnlineDeviceInfo(
                         uuid = info.uuid,
                         displayName = info.displayName,
                         ip = info.ip,
-                        port = info.port
+                        port = info.port,
+                        deviceType = auth?.deviceType
                     )
                 } else null
             }
