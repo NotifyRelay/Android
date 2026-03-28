@@ -1,11 +1,14 @@
 package io.github.miuzarte.scrcpyforandroid.services
 
 import android.content.Context
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import notifyrelay.data.StorageManager
 import notifyrelay.data.config.ScrcpyDefaults
 import notifyrelay.data.config.ScrcpyPreferenceKeys
 import notifyrelay.data.model.ConnectionTarget
 import notifyrelay.data.model.DeviceShortcut
+import notifyrelay.data.model.OnlineDeviceInfo
 
 internal fun loadQuickDevices(context: Context): List<DeviceShortcut> {
     val raw = StorageManager.getString(
@@ -138,4 +141,58 @@ internal fun replaceQuickDevicePort(
     quickDevices.clear()
     quickDevices.addAll(dedup)
     saveQuickDevices(context, quickDevices)
+}
+
+internal fun loadOnlineDevicesFromApp(context: Context): List<OnlineDeviceInfo> {
+    return try {
+        val json = StorageManager.getString(
+            context,
+            ScrcpyPreferenceKeys.ONLINE_DEVICES_CACHE,
+            "[]",
+            StorageManager.PrefsType.SCRCPY,
+        )
+        val gson = Gson()
+        val type = TypeToken.getParameterized(List::class.java, OnlineDeviceInfo::class.java).type
+        gson.fromJson(json, type) ?: emptyList()
+    } catch (_: Exception) {
+        emptyList()
+    }
+}
+
+internal fun syncFromAuthenticatedDevices(
+    context: Context,
+    quickDevices: MutableList<DeviceShortcut>,
+    adbPort: Int = ScrcpyDefaults.ADB_PORT,
+): List<OnlineDeviceInfo> {
+    val onlineDevices = loadOnlineDevicesFromApp(context)
+    if (onlineDevices.isEmpty()) return emptyList()
+
+    val existingHosts = quickDevices.map { it.host }.toSet()
+    var hasChanges = false
+
+    for (device in onlineDevices) {
+        val idx = quickDevices.indexOfFirst { it.host == device.ip }
+        if (idx >= 0) {
+            if (quickDevices[idx].name.isBlank()) {
+                quickDevices[idx] = quickDevices[idx].copy(name = device.displayName)
+                hasChanges = true
+            }
+        } else if (!existingHosts.contains(device.ip)) {
+            val newDevice = DeviceShortcut(
+                id = "${device.ip}:$adbPort",
+                name = device.displayName,
+                host = device.ip,
+                port = adbPort,
+                online = false,
+            )
+            quickDevices.add(0, newDevice)
+            hasChanges = true
+        }
+    }
+
+    if (hasChanges) {
+        saveQuickDevices(context, quickDevices)
+    }
+
+    return onlineDevices
 }

@@ -509,6 +509,38 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
         // 直接更新Flow值，UI层通过Flow订阅获取变化
         _devices.value = newMap
+
+        // 更新在线设备缓存，供 scrcpy 模块使用
+        updateOnlineDevicesCache(newMap, authSnapshot)
+    }
+
+    private fun updateOnlineDevicesCache(
+        deviceMap: Map<String, Pair<DeviceInfo, Boolean>>,
+        authSnapshot: Map<String, AuthInfo>
+    ) {
+        try {
+            val onlineDevices = deviceMap.filter { (uuid, pair) ->
+                pair.second && (authSnapshot[uuid]?.isAccepted == true)
+            }.mapNotNull { (_, pair) ->
+                val info = pair.first
+                if (info.ip.isNotBlank() && info.ip != "0.0.0.0") {
+                    notifyrelay.data.model.OnlineDeviceInfo(
+                        uuid = info.uuid,
+                        displayName = info.displayName,
+                        ip = info.ip,
+                        port = info.port
+                    )
+                } else null
+            }
+            val gson = com.google.gson.Gson()
+            val json = gson.toJson(onlineDevices)
+            StorageManager.putString(
+                context,
+                notifyrelay.data.config.ScrcpyPreferenceKeys.ONLINE_DEVICES_CACHE,
+                json,
+                StorageManager.PrefsType.SCRCPY
+            )
+        } catch (_: Exception) {}
     }
 
     private fun getDeviceInfo(uuid: String): DeviceInfo? {

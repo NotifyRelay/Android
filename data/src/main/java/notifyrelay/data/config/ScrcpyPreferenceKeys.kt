@@ -77,4 +77,6 @@ object ScrcpyPreferenceKeys {
     const val ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN = "adb_pairing_auto_discover_on_dialog_open"
     const val ADB_AUTO_RECONNECT_PAIRED_DEVICE = "adb_auto_reconnect_paired_device"
     const val ADB_MDNS_LAN_DISCOVERY = "adb_mdns_lan_discovery"
+
+    const val ONLINE_DEVICES_CACHE = "online_devices_cache"
 }

@@ -12,3 +12,10 @@ data class DeviceShortcut(
     val port: Int,
     val online: Boolean,
 )
+
+data class OnlineDeviceInfo(
+    val uuid: String,
+    val displayName: String,
+    val ip: String,
+    val port: Int,
+)

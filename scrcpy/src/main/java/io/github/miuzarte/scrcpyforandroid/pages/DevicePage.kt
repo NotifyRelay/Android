@@ -38,6 +38,7 @@ import io.github.miuzarte.scrcpyforandroid.services.parseQuickTarget
 import io.github.miuzarte.scrcpyforandroid.services.replaceQuickDevicePort
 import io.github.miuzarte.scrcpyforandroid.services.saveDevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.saveQuickDevices
+import io.github.miuzarte.scrcpyforandroid.services.syncFromAuthenticatedDevices
 import io.github.miuzarte.scrcpyforandroid.services.updateQuickDeviceNameIfEmpty
 import io.github.miuzarte.scrcpyforandroid.services.upsertQuickDevice
 import io.github.miuzarte.scrcpyforandroid.widgets.ConfigPanel
@@ -291,6 +292,7 @@ fun DeviceTabScreen(
     val quickDevices =
         rememberSaveable(saver = DeviceShortcutStateListSaver) { mutableStateListOf() }
     val sessionReconnectBlacklistHosts = remember { mutableSetOf<String>() }
+    var onlineDevicesFromApp by remember { mutableStateOf<List<notifyrelay.data.model.OnlineDeviceInfo>>(emptyList()) }
 
     LaunchedEffect(eventLog.size) {
         onCanClearLogsChange(eventLog.isNotEmpty())
@@ -731,6 +733,7 @@ fun DeviceTabScreen(
             quickDevices.clear()
             quickDevices.addAll(loadQuickDevices(context))
         }
+        onlineDevicesFromApp = syncFromAuthenticatedDevices(context, quickDevices)
     }
 
     LaunchedEffect(adbConnected, currentTargetHost, currentTargetPort, quickDevices.size) {
@@ -1078,6 +1081,7 @@ fun DeviceTabScreen(
                 input = quickConnectInput,
                 onInputChange = { quickConnectInput = it },
                 enabled = !adbConnecting,
+                onlineDevices = onlineDevicesFromApp,
                 onAddDevice = {
                     val target = parseQuickTarget(quickConnectInput) ?: return@QuickConnectCard
                     upsertQuickDevice(

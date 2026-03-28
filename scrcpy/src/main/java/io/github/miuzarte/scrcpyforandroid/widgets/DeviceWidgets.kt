@@ -1103,8 +1103,19 @@ internal fun QuickConnectCard(
     onConnect: () -> Unit,
     onAddDevice: () -> Unit,
     enabled: Boolean = true,
+    onlineDevices: List<notifyrelay.data.model.OnlineDeviceInfo> = emptyList(),
 ) {
     val focusManager = LocalFocusManager.current
+    val onlineDeviceItems = remember(onlineDevices) {
+        listOf("手动输入") + onlineDevices.map { "${it.displayName} (${it.ip})" }
+    }
+    var selectedDeviceIndex by rememberSaveable { mutableIntStateOf(0) }
+
+    LaunchedEffect(onlineDevices.isEmpty()) {
+        if (onlineDevices.isEmpty()) {
+            selectedDeviceIndex = 0
+        }
+    }
 
     Card(
         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.primaryContainer),
@@ -1131,6 +1142,24 @@ internal fun QuickConnectCard(
                 "快速连接",
                 fontWeight = FontWeight.Bold,
                 color = MiuixTheme.colorScheme.onPrimaryContainer,
+            )
+        }
+        if (onlineDevices.isNotEmpty()) {
+            SuperDropdown(
+                title = "在线设备",
+                items = onlineDeviceItems,
+                selectedIndex = selectedDeviceIndex,
+                onSelectedIndexChange = { index ->
+                    selectedDeviceIndex = index
+                    if (index > 0 && index <= onlineDevices.size) {
+                        val device = onlineDevices[index - 1]
+                        onInputChange("${device.ip}:${ScrcpyDefaults.ADB_PORT}")
+                    }
+                },
+                enabled = enabled,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = UiSpacing.CardContent),
             )
         }
         TextField(
