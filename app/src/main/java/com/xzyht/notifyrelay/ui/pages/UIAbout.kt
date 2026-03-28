@@ -37,11 +37,13 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
+import top.yukonga.miuix.kmp.extra.SuperDropdown
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Date
@@ -50,6 +52,12 @@ private const val DEFAULT_PROXY_URL = "https://gh.llkk.cc/"
 private const val PROXY_URL_KEY = "check_update_proxy_url"
 private const val TAG = "UIAbout"
 private const val SAVE_DEBOUNCE_MS = 500L
+
+private val THEME_BASE_OPTIONS = listOf(
+    "跟随系统" to 0,
+    "浅色模式" to 1,
+    "深色模式" to 2,
+)
 
 @OptIn(FlowPreview::class)
 @Composable
@@ -75,6 +83,9 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
     var proxyUrl by remember {
         mutableStateOf(StorageManager.getString(context, PROXY_URL_KEY, DEFAULT_PROXY_URL))
     }
+    
+    var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
+    var monetEnabled by remember { mutableStateOf(ThemeSettingsManager.isMonetEnabled(context)) }
     
     val checkUpdateManager = remember { CheckUpdateManager(context.applicationContext) }
     
@@ -222,6 +233,45 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
+
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = "外观设置",
+                style = textStyles.main,
+                color = colorScheme.onSurfaceSecondary,
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            )
+            
+            SuperDropdown(
+                title = "外观模式",
+                summary = THEME_BASE_OPTIONS.find { it.second == themeBaseIndex }?.first ?: "跟随系统",
+                items = THEME_BASE_OPTIONS.map { it.first },
+                selectedIndex = themeBaseIndex.coerceIn(0, THEME_BASE_OPTIONS.lastIndex),
+                onSelectedIndexChange = { newIndex ->
+                    themeBaseIndex = newIndex
+                    ThemeSettingsManager.setThemeBaseIndex(context, newIndex)
+                },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+            
+            Spacer(modifier = Modifier.height(8.dp))
+            
+            SuperSwitch(
+                title = "Monet 动态配色",
+                checked = monetEnabled,
+                summary = "开启后使用 Monet 动态配色",
+                onCheckedChange = { enabled ->
+                    monetEnabled = enabled
+                    ThemeSettingsManager.setMonetEnabled(context, enabled)
+                },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
             Spacer(modifier = Modifier.height(8.dp))
             SuperArrow(

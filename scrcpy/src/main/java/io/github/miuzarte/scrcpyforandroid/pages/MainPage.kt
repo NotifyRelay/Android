@@ -58,6 +58,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.ThemeSettingsManager
 import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -129,8 +130,8 @@ fun MainPage() {
     var audioEnabled by rememberSaveable { mutableStateOf(initialSettings.audioEnabled) }
     var audioCodec by rememberSaveable { mutableStateOf(initialSettings.audioCodec) }
     var videoCodec by rememberSaveable { mutableStateOf(initialSettings.videoCodec) }
-    var themeBaseIndex by rememberSaveable { mutableIntStateOf(initialSettings.themeBaseIndex) }
-    var monetEnabled by rememberSaveable { mutableStateOf(initialSettings.monetEnabled) }
+    var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
+    var monetEnabled by remember { mutableStateOf(ThemeSettingsManager.isMonetEnabled(context)) }
     var fullscreenDebugInfoEnabled by rememberSaveable { mutableStateOf(initialSettings.fullscreenDebugInfoEnabled) }
     var showFullscreenVirtualButtons by rememberSaveable { mutableStateOf(initialSettings.showFullscreenVirtualButtons) }
     var showPreviewVirtualButtonText by rememberSaveable { mutableStateOf(initialSettings.showPreviewVirtualButtonText) }
@@ -198,6 +199,22 @@ fun MainPage() {
     val themeMode = resolveThemeMode(themeBaseIndex, monetEnabled)
     val themeController = remember(themeMode) { ThemeController(colorSchemeMode = themeMode) }
 
+    LaunchedEffect(Unit) {
+        themeBaseIndex = ThemeSettingsManager.getThemeBaseIndex(context)
+        monetEnabled = ThemeSettingsManager.isMonetEnabled(context)
+    }
+
+    DisposableEffect(context) {
+        val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex, newMonetEnabled ->
+            themeBaseIndex = newBaseIndex
+            monetEnabled = newMonetEnabled
+        }
+        ThemeSettingsManager.addThemeChangeListener(context, listener)
+        onDispose {
+            ThemeSettingsManager.removeThemeChangeListener(context, listener)
+        }
+    }
+
     // Restore system orientation when MainPage leaves composition.
     DisposableEffect(activity) {
         onDispose {
@@ -232,8 +249,6 @@ fun MainPage() {
         audioEnabled,
         audioCodec,
         videoCodec,
-        themeBaseIndex,
-        monetEnabled,
         fullscreenDebugInfoEnabled,
         showFullscreenVirtualButtons,
         showPreviewVirtualButtonText,
@@ -253,8 +268,6 @@ fun MainPage() {
                 audioEnabled = audioEnabled,
                 audioCodec = audioCodec,
                 videoCodec = videoCodec,
-                themeBaseIndex = themeBaseIndex,
-                monetEnabled = monetEnabled,
                 fullscreenDebugInfoEnabled = fullscreenDebugInfoEnabled,
                 showFullscreenVirtualButtons = showFullscreenVirtualButtons,
                 showPreviewVirtualButtonText = showPreviewVirtualButtonText,
@@ -569,10 +582,6 @@ fun MainPage() {
                             ) { pagePadding ->
                                 SettingsScreen(
                                     contentPadding = pagePadding,
-                                    themeBaseIndex = themeBaseIndex,
-                                    onThemeBaseIndexChange = { themeBaseIndex = it },
-                                    monetEnabled = monetEnabled,
-                                    onMonetEnabledChange = { monetEnabled = it },
                                     fullscreenDebugInfoEnabled = fullscreenDebugInfoEnabled,
                                     onFullscreenDebugInfoEnabledChange = {
                                         fullscreenDebugInfoEnabled = it

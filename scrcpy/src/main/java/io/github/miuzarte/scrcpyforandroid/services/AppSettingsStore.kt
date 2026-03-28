@@ -9,8 +9,6 @@ internal data class MainSettings(
     val audioEnabled: Boolean = AppDefaults.AUDIO_ENABLED,
     val audioCodec: String = AppDefaults.AUDIO_CODEC,
     val videoCodec: String = AppDefaults.VIDEO_CODEC,
-    val themeBaseIndex: Int = AppDefaults.THEME_BASE_INDEX,
-    val monetEnabled: Boolean = AppDefaults.MONET,
     val fullscreenDebugInfoEnabled: Boolean = AppDefaults.FULLSCREEN_DEBUG_INFO,
     val showFullscreenVirtualButtons: Boolean = AppDefaults.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
     val showPreviewVirtualButtonText: Boolean = AppDefaults.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
@@ -85,14 +83,6 @@ internal fun loadMainSettings(context: Context): MainSettings {
             AppPreferenceKeys.VIDEO_CODEC,
             AppDefaults.VIDEO_CODEC,
         ).orEmpty().ifBlank { AppDefaults.VIDEO_CODEC },
-        themeBaseIndex = prefs.getInt(
-            AppPreferenceKeys.THEME_BASE_INDEX,
-            AppDefaults.THEME_BASE_INDEX,
-        ),
-        monetEnabled = prefs.getBoolean(
-            AppPreferenceKeys.MONET,
-            AppDefaults.MONET,
-        ),
         fullscreenDebugInfoEnabled = prefs.getBoolean(
             AppPreferenceKeys.FULLSCREEN_DEBUG_INFO,
             AppDefaults.FULLSCREEN_DEBUG_INFO,
@@ -160,14 +150,6 @@ internal fun saveMainSettings(context: Context, settings: MainSettings) {
             .putString(
                 AppPreferenceKeys.VIDEO_CODEC,
                 settings.videoCodec,
-            )
-            .putInt(
-                AppPreferenceKeys.THEME_BASE_INDEX,
-                settings.themeBaseIndex,
-            )
-            .putBoolean(
-                AppPreferenceKeys.MONET,
-                settings.monetEnabled,
             )
             .putBoolean(
                 AppPreferenceKeys.FULLSCREEN_DEBUG_INFO,

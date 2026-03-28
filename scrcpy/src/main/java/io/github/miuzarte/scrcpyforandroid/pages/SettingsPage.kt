@@ -59,10 +59,6 @@ private fun resolveThemeLabel(baseIndex: Int, monetEnabled: Boolean): String {
 @Composable
 fun SettingsScreen(
     contentPadding: PaddingValues,
-    themeBaseIndex: Int,
-    onThemeBaseIndexChange: (Int) -> Unit,
-    monetEnabled: Boolean,
-    onMonetEnabledChange: (Boolean) -> Unit,
     fullscreenDebugInfoEnabled: Boolean,
     onFullscreenDebugInfoEnabledChange: (Boolean) -> Unit,
     keepScreenOnWhenStreamingEnabled: Boolean,
@@ -86,7 +82,6 @@ fun SettingsScreen(
     onAdbAutoReconnectPairedDeviceChange: (Boolean) -> Unit,
     scrollBehavior: ScrollBehavior,
 ) {
-    val baseModeItems = THEME_BASE_OPTIONS.map { it.label }
     val context = LocalContext.current
 
     // 设置
@@ -95,23 +90,6 @@ fun SettingsScreen(
         scrollBehavior = scrollBehavior,
     ) {
         item {
-            SectionSmallTitle("主题")
-            Card {
-                SuperDropdown(
-                    title = "外观模式",
-                    summary = resolveThemeLabel(themeBaseIndex, monetEnabled),
-                    items = baseModeItems,
-                    selectedIndex = themeBaseIndex.coerceIn(0, baseModeItems.lastIndex),
-                    onSelectedIndexChange = onThemeBaseIndexChange,
-                )
-                SuperSwitch(
-                    title = "Monet",
-                    summary = "开启后使用 Monet 动态配色",
-                    checked = monetEnabled,
-                    onCheckedChange = onMonetEnabledChange,
-                )
-            }
-
             SectionSmallTitle("投屏")
             Card {
                 SuperSwitch(
