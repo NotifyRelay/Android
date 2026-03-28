@@ -34,9 +34,9 @@ object ScrcpyDefaults {
     const val CAMERA_FPS = ""
     const val CAMERA_HIGH_SPEED = false
 
-    const val AUDIO_SOURCE_PRESET = "output"
+    const val AUDIO_SOURCE_PRESET = "playback"
     const val AUDIO_SOURCE_CUSTOM = ""
-    const val AUDIO_DUP = false
+    const val AUDIO_DUP = true
     const val NO_AUDIO_PLAYBACK = false
     const val REQUIRE_AUDIO = false
 
