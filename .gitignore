@@ -30,3 +30,4 @@ local.properties
 .qoder/
 base/build/
 app/build/
+scrcpy/build/
