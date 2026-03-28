@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.ui.pages
 
+import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -29,6 +30,7 @@ import github.xzynine.checkupdata.CheckUpdateManager
 import github.xzynine.checkupdata.model.ReleaseInfo
 import github.xzynine.checkupdata.model.UpdateResult
 import github.xzynine.checkupdata.version.VersionRule
+import io.github.miuzarte.scrcpyforandroid.MainActivity
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
@@ -220,6 +222,17 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                     modifier = Modifier.padding(horizontal = 16.dp)
                 )
             }
+
+            Spacer(modifier = Modifier.height(8.dp))
+            SuperArrow(
+                title = "Scrcpy 投屏",
+                summary = "Android 设备投屏控制工具",
+                onClick = {
+                    val intent = Intent(context, MainActivity::class.java)
+                    context.startActivity(intent)
+                },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
 
             Spacer(modifier = Modifier.height(32.dp))
 

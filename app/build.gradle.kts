@@ -226,6 +226,8 @@ dependencies {
     implementation(project(":checkupdata"))
     // 依赖superislandui模块
     implementation(project(":superislandui"))
+    // 依赖scrcpy模块
+    implementation(project(":scrcpy"))
 }
 
 tasks.register("printVersionName") {
