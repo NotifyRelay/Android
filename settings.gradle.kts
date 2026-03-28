@@ -30,3 +30,4 @@ include(":base")
 include(":checkupdata")
 
 include(":superislandui")
+include(":scrcpy")

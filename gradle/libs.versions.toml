@@ -43,6 +43,8 @@ targetSdk = "36"
 minSdk = "29"
 semver = "2.0.0"
 paging = "3.4.2"
+activityCompose = "1.13.0"
+reorderable = "3.0.0"
 
 
 [libraries]
@@ -91,6 +93,13 @@ accompanist-pager-indicators = { group = "com.google.accompanist", name = "accom
 semver = { group = "io.github.z4kn4fein", name = "semver", version.ref = "semver" }
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
 androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
+androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 
 
 
