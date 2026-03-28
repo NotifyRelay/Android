@@ -219,11 +219,11 @@ fun MainPage() {
         }
     }
 
-    // Fullscreen route can force orientation based on stream ratio; all other routes are portrait.
+    // Fullscreen route can force orientation based on stream ratio; all other routes follow system.
     LaunchedEffect(activity, currentRootScreen, fullscreenOrientation) {
         val targetOrientation = when (currentRootScreen) {
             is RootScreen.Fullscreen -> fullscreenOrientation
-            else -> ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+            else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
         }
         activity?.requestedOrientation = targetOrientation
     }
