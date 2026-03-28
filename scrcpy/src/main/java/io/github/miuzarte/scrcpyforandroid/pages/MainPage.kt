@@ -193,7 +193,7 @@ fun MainPage() {
     var showDeviceMenu by rememberSaveable { mutableStateOf(false) }
     var lastExitBackPressAtMs by rememberSaveable { mutableLongStateOf(0L) }
     var fullscreenOrientation by rememberSaveable {
-        mutableIntStateOf(ActivityInfo.SCREEN_ORIENTATION_PORTRAIT)
+        mutableIntStateOf(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
     }
     val themeMode = resolveThemeMode(themeBaseIndex)
     val themeController = remember(themeMode) { ThemeController(colorSchemeMode = themeMode) }
@@ -546,12 +546,6 @@ fun MainPage() {
                                     },
                                     onOpenAdvancedPage = { rootBackStack.add(RootScreen.Advanced) },
                                     onOpenFullscreenPage = { session ->
-                                        fullscreenOrientation =
-                                            if (session.width >= session.height) {
-                                                ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                                            } else {
-                                                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                                            }
                                         rootBackStack.add(
                                             RootScreen.Fullscreen(
                                                 launch = FullscreenControlLaunch(
@@ -781,13 +775,7 @@ fun MainPage() {
                 virtualButtonsLayout = virtualButtonsLayout,
                 showDebugInfo = fullscreenDebugInfoEnabled,
                 showVirtualButtons = showFullscreenVirtualButtons,
-                onVideoSizeChanged = { width, height ->
-                    fullscreenOrientation = if (width >= height) {
-                        ActivityInfo.SCREEN_ORIENTATION_LANDSCAPE
-                    } else {
-                        ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-                    }
-                },
+                onVideoSizeChanged = { _, _ -> },
                 onDismiss = { popRoot() },
             )
         }
