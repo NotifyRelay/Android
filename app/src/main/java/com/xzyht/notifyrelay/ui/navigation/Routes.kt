@@ -51,4 +51,18 @@ sealed interface Route : NavKey, Parcelable {
             override fun newArray(size: Int): Array<Settings?> = arrayOfNulls(size)
         }
     }
+
+    /**
+     * Scrcpy高级设置页面
+     * Scrcpy advanced settings page
+     */
+    @Serializable
+    data object ScrcpyAdvanced : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<ScrcpyAdvanced> {
+            override fun createFromParcel(parcel: Parcel): ScrcpyAdvanced = ScrcpyAdvanced
+            override fun newArray(size: Int): Array<ScrcpyAdvanced?> = arrayOfNulls(size)
+        }
+    }
 }

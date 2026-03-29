@@ -67,6 +67,7 @@ import com.xzyht.notifyrelay.ui.screen.DeviceForwardScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreenState
 import com.xzyht.notifyrelay.ui.screen.HistoryScreen
+import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -196,6 +197,7 @@ class MainActivity : FragmentActivity() {
                                 entry<Route.Main> { MainScreen(navigator) }
                                 entry<Route.History> { HistoryScreen(navigator) }
                                 entry<Route.Settings> { SettingsScreen(navigator) }
+                                entry<Route.ScrcpyAdvanced> { ScrcpyAdvancedScreen(navigator) }
                             }
                         )
                     }

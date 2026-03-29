@@ -18,6 +18,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.ui.navigation.Navigator
+import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
 import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyDevicePage
@@ -87,9 +88,20 @@ fun DeviceForwardScreen(
                 when (page) {
                     0 -> ClipboardSyncPage()
                     1 -> MusicControlPage()
-                    2 -> ScrcpyDevicePage()
+                    2 -> ScrcpyDevicePage(
+                        onOpenAdvanced = { navigator.push(Route.ScrcpyAdvanced) }
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+fun ScrcpyAdvancedScreen(
+    navigator: Navigator
+) {
+    io.github.miuzarte.scrcpyforandroid.pages.ScrcpyAdvancedPage(
+        onBack = { navigator.pop() }
+    )
 }

@@ -1,11 +1,14 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.annotation.SuppressLint
+import android.app.Application
 import android.util.Log
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,11 +24,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
+import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.data.config.ScrcpyDefaults
 import notifyrelay.data.model.ConnectionTarget
 import notifyrelay.data.model.DeviceShortcut
@@ -60,8 +66,16 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.extra.SuperBottomSheet
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import java.net.InetSocketAddress
 import java.net.Socket
 import java.text.SimpleDateFormat
@@ -119,7 +133,6 @@ fun DeviceTabScreen() {
     val navigation = LocalScrcpyNavigation.current
     val contentPadding = LocalScrcpyPagePadding.current
     val scrollBehavior = LocalScrcpyScrollBehavior.current
-        ?: error("ScrollBehavior is not provided")
     val snack = LocalScrcpySnackbarHostState.current ?: remember { SnackbarHostState() }
     val themeBaseIndex = LocalScrcpyThemeBaseIndex.current
     val nativeCore = viewModel.nativeCore
@@ -1284,4 +1297,114 @@ private fun buildCropArg(width: String, height: String, x: String, y: String): S
     val ox = x.toIntOrNull()?.takeIf { it >= 0 } ?: return ""
     val oy = y.toIntOrNull()?.takeIf { it >= 0 } ?: return ""
     return "$w:$h:$ox:$oy"
+}
+
+@Composable
+fun ScrcpyDevicePage(
+    onOpenAdvanced: () -> Unit = {},
+) {
+    val context = LocalContext.current
+    val app = context.applicationContext as Application
+    val viewModel: ScrcpyUiViewModel = viewModel(factory = ScrcpyUiViewModel.Factory(app))
+    val snackHostState = remember { SnackbarHostState() }
+    var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
+
+    DisposableEffect(context) {
+        val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
+            themeBaseIndex = newBaseIndex
+        }
+        ThemeSettingsManager.addThemeChangeListener(context, listener)
+        onDispose {
+            ThemeSettingsManager.removeThemeChangeListener(context, listener)
+        }
+    }
+
+    val navigationActions = remember(onOpenAdvanced) {
+        ScrcpyNavigationActions(
+            openAdvancedPage = onOpenAdvanced,
+            openVirtualButtonOrder = {},
+            openFullscreenPage = { session ->
+                viewModel.fullscreenLaunch = FullscreenControlLaunch(
+                    deviceName = session.deviceName,
+                    width = session.width,
+                    height = session.height,
+                    codec = session.codec,
+                )
+            },
+            openReorderDevices = { viewModel.openReorderDevicesAction?.invoke() },
+            pickServer = {},
+        )
+    }
+    val fullscreenActions = remember {
+        ScrcpyFullscreenActions(
+            onDismiss = { viewModel.fullscreenLaunch = null },
+            onVideoSizeChanged = { _, _ -> },
+        )
+    }
+
+    ProvideScrcpyUiEnvironment(
+        viewModel = viewModel,
+        contentPadding = PaddingValues(0.dp),
+        scrollBehavior = null,
+        snackHostState = snackHostState,
+        themeBaseIndex = themeBaseIndex,
+        navigationActions = navigationActions,
+        fullscreenActions = fullscreenActions,
+    ) {
+        if (viewModel.fullscreenLaunch != null) {
+            FullscreenControlPage()
+        } else {
+            DeviceTabScreen()
+        }
+    }
+}
+
+@Composable
+fun ScrcpyAdvancedPage(
+    onBack: () -> Unit,
+) {
+    val context = LocalContext.current
+    val app = context.applicationContext as Application
+    val viewModel: ScrcpyUiViewModel = viewModel(factory = ScrcpyUiViewModel.Factory(app))
+    val snackHostState = remember { SnackbarHostState() }
+    val scrollBehavior = MiuixScrollBehavior(canScroll = { true })
+    var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
+
+    DisposableEffect(context) {
+        val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
+            themeBaseIndex = newBaseIndex
+        }
+        ThemeSettingsManager.addThemeChangeListener(context, listener)
+        onDispose {
+            ThemeSettingsManager.removeThemeChangeListener(context, listener)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = "高级参数",
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回"
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+        snackbarHost = { SnackbarHost(snackHostState) },
+    ) { pagePadding ->
+        ProvideScrcpyUiEnvironment(
+            viewModel = viewModel,
+            contentPadding = pagePadding,
+            scrollBehavior = scrollBehavior,
+            snackHostState = snackHostState,
+            themeBaseIndex = themeBaseIndex,
+        ) {
+            AdvancedConfigPage()
+        }
+    }
 }
