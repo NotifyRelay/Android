@@ -2,7 +2,6 @@ package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.annotation.SuppressLint
 import android.util.Log
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -61,7 +60,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
-import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.extra.SuperBottomSheet
 import java.net.InetSocketAddress
@@ -116,103 +114,18 @@ private val StringStateListSaver =
     )
 
 @Composable
-fun DeviceTabScreen(
-    contentPadding: PaddingValues,
-    nativeCore: NativeCoreFacade,
-    snack: SnackbarHostState,
-    scrollBehavior: ScrollBehavior,
-    virtualButtonsLayout: String,
-    showPreviewVirtualButtonText: Boolean,
-    previewCardHeightDp: Int,
-    themeBaseIndex: Int,
-    customServerUri: String?,
-    serverRemotePath: String,
-    onServerRemotePathChange: (String) -> Unit,
-    videoCodec: String,
-    onVideoCodecChange: (String) -> Unit,
-    audioEnabled: Boolean,
-    onAudioEnabledChange: (Boolean) -> Unit,
-    audioCodec: String,
-    onAudioCodecChange: (String) -> Unit,
-    noControl: Boolean,
-    onNoControlChange: (Boolean) -> Unit,
-    videoEncoder: String,
-    onVideoEncoderChange: (String) -> Unit,
-    videoCodecOptions: String,
-    onVideoCodecOptionsChange: (String) -> Unit,
-    audioEncoder: String,
-    onAudioEncoderChange: (String) -> Unit,
-    audioCodecOptions: String,
-    onAudioCodecOptionsChange: (String) -> Unit,
-    audioDup: Boolean,
-    onAudioDupChange: (Boolean) -> Unit,
-    audioSourcePreset: String,
-    onAudioSourcePresetChange: (String) -> Unit,
-    audioSourceCustom: String,
-    onAudioSourceCustomChange: (String) -> Unit,
-    videoSourcePreset: String,
-    onVideoSourcePresetChange: (String) -> Unit,
-    cameraIdInput: String,
-    onCameraIdInputChange: (String) -> Unit,
-    cameraFacingPreset: String,
-    onCameraFacingPresetChange: (String) -> Unit,
-    cameraSizePreset: String,
-    onCameraSizePresetChange: (String) -> Unit,
-    cameraSizeCustom: String,
-    onCameraSizeCustomChange: (String) -> Unit,
-    cameraArInput: String,
-    onCameraArInputChange: (String) -> Unit,
-    cameraFpsInput: String,
-    onCameraFpsInputChange: (String) -> Unit,
-    cameraHighSpeed: Boolean,
-    onCameraHighSpeedChange: (Boolean) -> Unit,
-    noAudioPlayback: Boolean,
-    onNoAudioPlaybackChange: (Boolean) -> Unit,
-    noVideo: Boolean,
-    requireAudio: Boolean,
-    onRequireAudioChange: (Boolean) -> Unit,
-    turnScreenOff: Boolean,
-    onTurnScreenOffChange: (Boolean) -> Unit,
-    maxSizeInput: String,
-    onMaxSizeInputChange: (String) -> Unit,
-    maxFpsInput: String,
-    onMaxFpsInputChange: (String) -> Unit,
-    newDisplayWidth: String,
-    onNewDisplayWidthChange: (String) -> Unit,
-    newDisplayHeight: String,
-    onNewDisplayHeightChange: (String) -> Unit,
-    newDisplayDpi: String,
-    onNewDisplayDpiChange: (String) -> Unit,
-    displayIdInput: String,
-    onDisplayIdInputChange: (String) -> Unit,
-    cropWidth: String,
-    onCropWidthChange: (String) -> Unit,
-    cropHeight: String,
-    onCropHeightChange: (String) -> Unit,
-    cropX: String,
-    onCropXChange: (String) -> Unit,
-    cropY: String,
-    onCropYChange: (String) -> Unit,
-    videoEncoderOptions: List<String>,
-    onVideoEncoderOptionsChange: (List<String>) -> Unit,
-    onVideoEncoderTypeMapChange: (Map<String, String>) -> Unit,
-    audioEncoderOptions: List<String>,
-    onAudioEncoderOptionsChange: (List<String>) -> Unit,
-    onAudioEncoderTypeMapChange: (Map<String, String>) -> Unit,
-    cameraSizeOptions: List<String>,
-    onCameraSizeOptionsChange: (List<String>) -> Unit,
-    onSessionStartedChange: (Boolean) -> Unit,
-    onRefreshEncodersActionChange: ((() -> Unit)?) -> Unit,
-    onRefreshCameraSizesActionChange: ((() -> Unit)?) -> Unit,
-    onClearLogsActionChange: ((() -> Unit)?) -> Unit,
-    onCanClearLogsChange: (Boolean) -> Unit,
-    onOpenReorderDevicesActionChange: ((() -> Unit)?) -> Unit,
-    onOpenAdvancedPage: () -> Unit,
-    onOpenFullscreenPage: (ScrcpySessionInfo) -> Unit,
-    adbPairingAutoDiscoverOnDialogOpen: Boolean,
-    adbAutoReconnectPairedDevice: Boolean,
-    adbMdnsLanDiscoveryEnabled: Boolean,
-) {
+fun DeviceTabScreen() {
+    val viewModel = LocalScrcpyUiViewModel.current
+    val navigation = LocalScrcpyNavigation.current
+    val contentPadding = LocalScrcpyPagePadding.current
+    val scrollBehavior = LocalScrcpyScrollBehavior.current
+        ?: error("ScrollBehavior is not provided")
+    val snack = LocalScrcpySnackbarHostState.current ?: remember { SnackbarHostState() }
+    val themeBaseIndex = LocalScrcpyThemeBaseIndex.current
+    val nativeCore = viewModel.nativeCore
+    val virtualButtonsLayout = viewModel.virtualButtonsLayout
+    val showPreviewVirtualButtonText = viewModel.showPreviewVirtualButtonText
+    val previewCardHeightDp = viewModel.devicePreviewCardHeightDp
     val context = LocalContext.current
     val haptics = rememberAppHaptics()
     val virtualButtonLayout = remember(virtualButtonsLayout) {
@@ -295,7 +208,7 @@ fun DeviceTabScreen(
     var onlineDevicesFromApp by remember { mutableStateOf<List<notifyrelay.data.model.OnlineDeviceInfo>>(emptyList()) }
 
     LaunchedEffect(eventLog.size) {
-        onCanClearLogsChange(eventLog.isNotEmpty())
+        viewModel.canClearLogs = eventLog.isNotEmpty()
     }
 
     fun logEvent(message: String, level: Int = Log.INFO, error: Throwable? = null) {
@@ -392,8 +305,8 @@ fun DeviceTabScreen(
     fun applyConnectedDeviceCapabilities(sdkInt: Int, release: String) {
         val audioSupported = sdkInt !in 0..<30
         audioForwardingSupported = audioSupported
-        if (!audioSupported && audioEnabled) {
-            onAudioEnabledChange(false)
+        if (!audioSupported && viewModel.audioEnabled) {
+            viewModel.audioEnabled = false
             logEvent(
                 "设备 Android ${release.ifBlank { "?" }} (SDK $sdkInt) 不支持音频转发，已自动关闭",
                 Log.WARN
@@ -401,8 +314,8 @@ fun DeviceTabScreen(
         }
         val cameraSupported = sdkInt !in 0..<31
         cameraMirroringSupported = cameraSupported
-        if (!cameraSupported && videoSourcePreset == "camera") {
-            onVideoSourcePresetChange("display")
+        if (!cameraSupported && viewModel.videoSourcePreset == "camera") {
+            viewModel.videoSourcePreset = "display"
             logEvent(
                 "设备 Android ${release.ifBlank { "?" }} (SDK $sdkInt) 不支持 camera mirroring，已切换为 display",
                 Log.WARN
@@ -559,22 +472,26 @@ fun DeviceTabScreen(
 
     fun refreshEncoderLists() {
         if (!adbConnected) return
-        val remotePath = serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
+        val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
         runCatching {
             nativeCore.scrcpyListEncoders(
-                customServerUri = customServerUri,
+                customServerUri = viewModel.customServerUri,
                 remotePath = remotePath,
             )
         }.onSuccess { lists ->
-            onVideoEncoderOptionsChange(lists.videoEncoders)
-            onAudioEncoderOptionsChange(lists.audioEncoders)
-            onVideoEncoderTypeMapChange(lists.videoEncoderTypes)
-            onAudioEncoderTypeMapChange(lists.audioEncoderTypes)
-            if (videoEncoder.isNotBlank() && videoEncoder !in videoEncoderOptions) {
-                onVideoEncoderChange("")
+            viewModel.videoEncoderOptions.clear()
+            viewModel.videoEncoderOptions.addAll(lists.videoEncoders)
+            viewModel.audioEncoderOptions.clear()
+            viewModel.audioEncoderOptions.addAll(lists.audioEncoders)
+            viewModel.videoEncoderTypeMap.clear()
+            viewModel.videoEncoderTypeMap.putAll(lists.videoEncoderTypes)
+            viewModel.audioEncoderTypeMap.clear()
+            viewModel.audioEncoderTypeMap.putAll(lists.audioEncoderTypes)
+            if (viewModel.videoEncoder.isNotBlank() && viewModel.videoEncoder !in viewModel.videoEncoderOptions) {
+                viewModel.videoEncoder = ""
             }
-            if (audioEncoder.isNotBlank() && audioEncoder !in audioEncoderOptions) {
-                onAudioEncoderChange("")
+            if (viewModel.audioEncoder.isNotBlank() && viewModel.audioEncoder !in viewModel.audioEncoderOptions) {
+                viewModel.audioEncoder = ""
             }
             logEvent("编码器列表已刷新: video=${lists.videoEncoders.size} audio=${lists.audioEncoders.size}")
             if (lists.videoEncoders.isEmpty() && lists.audioEncoders.isEmpty()) {
@@ -585,26 +502,27 @@ fun DeviceTabScreen(
                 }
             }
         }.onFailure { e ->
-            onVideoEncoderOptionsChange(emptyList())
-            onAudioEncoderOptionsChange(emptyList())
-            onVideoEncoderTypeMapChange(emptyMap())
-            onAudioEncoderTypeMapChange(emptyMap())
+            viewModel.videoEncoderOptions.clear()
+            viewModel.audioEncoderOptions.clear()
+            viewModel.videoEncoderTypeMap.clear()
+            viewModel.audioEncoderTypeMap.clear()
             logEvent("读取编码器列表失败: ${e.message ?: e.javaClass.simpleName}", Log.ERROR, e)
         }
     }
 
     fun refreshCameraSizeLists() {
         if (!adbConnected) return
-        val remotePath = serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
+        val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
         runCatching {
             nativeCore.scrcpyListCameraSizes(
-                customServerUri = customServerUri,
+                customServerUri = viewModel.customServerUri,
                 remotePath = remotePath,
             )
         }.onSuccess { lists ->
-            onCameraSizeOptionsChange(lists.sizes)
-            if (cameraSizePreset.isNotBlank() && cameraSizePreset != "custom" && cameraSizePreset !in lists.sizes) {
-                onCameraSizePresetChange("")
+            viewModel.cameraSizeOptions.clear()
+            viewModel.cameraSizeOptions.addAll(lists.sizes)
+            if (viewModel.cameraSizePreset.isNotBlank() && viewModel.cameraSizePreset != "custom" && viewModel.cameraSizePreset !in lists.sizes) {
+                viewModel.cameraSizePreset = ""
             }
             logEvent("camera sizes 已刷新: count=${lists.sizes.size}")
             if (lists.sizes.isEmpty()) {
@@ -614,7 +532,7 @@ fun DeviceTabScreen(
                 }
             }
         }.onFailure { e ->
-            onCameraSizeOptionsChange(emptyList())
+            viewModel.cameraSizeOptions.clear()
             logEvent("读取 camera sizes 失败: ${e.message ?: e.javaClass.simpleName}", Log.ERROR, e)
         }
     }
@@ -655,36 +573,36 @@ fun DeviceTabScreen(
         audioBitRateKbps,
         bitRateMbps,
         bitRateInput,
-        turnScreenOff,
-        noControl,
-        noVideo,
-        videoSourcePreset,
-        displayIdInput,
-        cameraIdInput,
-        cameraFacingPreset,
-        cameraSizePreset,
-        cameraSizeCustom,
-        cameraArInput,
-        cameraFpsInput,
-        cameraHighSpeed,
-        audioSourcePreset,
-        audioSourceCustom,
-        audioDup,
-        noAudioPlayback,
-        requireAudio,
-        maxSizeInput,
-        maxFpsInput,
-        videoEncoder,
-        videoCodecOptions,
-        audioEncoder,
-        audioCodecOptions,
-        newDisplayWidth,
-        newDisplayHeight,
-        newDisplayDpi,
-        cropWidth,
-        cropHeight,
-        cropX,
-        cropY,
+        viewModel.turnScreenOff,
+        viewModel.noControl,
+        viewModel.noVideo,
+        viewModel.videoSourcePreset,
+        viewModel.displayIdInput,
+        viewModel.cameraIdInput,
+        viewModel.cameraFacingPreset,
+        viewModel.cameraSizePreset,
+        viewModel.cameraSizeCustom,
+        viewModel.cameraArInput,
+        viewModel.cameraFpsInput,
+        viewModel.cameraHighSpeed,
+        viewModel.audioSourcePreset,
+        viewModel.audioSourceCustom,
+        viewModel.audioDup,
+        viewModel.noAudioPlayback,
+        viewModel.requireAudio,
+        viewModel.maxSizeInput,
+        viewModel.maxFpsInput,
+        viewModel.videoEncoder,
+        viewModel.videoCodecOptions,
+        viewModel.audioEncoder,
+        viewModel.audioCodecOptions,
+        viewModel.newDisplayWidth,
+        viewModel.newDisplayHeight,
+        viewModel.newDisplayDpi,
+        viewModel.cropWidth,
+        viewModel.cropHeight,
+        viewModel.cropX,
+        viewModel.cropY,
     ) {
         saveDevicePageSettings(
             context,
@@ -694,36 +612,36 @@ fun DeviceTabScreen(
                 audioBitRateInput = audioBitRateKbps.toString(),
                 videoBitRateMbps = bitRateMbps,
                 videoBitRateInput = bitRateInput,
-                turnScreenOff = turnScreenOff,
-                noControl = noControl,
-                noVideo = noVideo,
-                videoSourcePreset = videoSourcePreset,
-                displayIdInput = displayIdInput,
-                cameraIdInput = cameraIdInput,
-                cameraFacingPreset = cameraFacingPreset,
-                cameraSizePreset = cameraSizePreset,
-                cameraSizeCustom = cameraSizeCustom,
-                cameraAr = cameraArInput,
-                cameraFps = cameraFpsInput,
-                cameraHighSpeed = cameraHighSpeed,
-                audioSourcePreset = audioSourcePreset,
-                audioSourceCustom = audioSourceCustom,
-                audioDup = audioDup,
-                noAudioPlayback = noAudioPlayback,
-                requireAudio = requireAudio,
-                maxSizeInput = maxSizeInput,
-                maxFpsInput = maxFpsInput,
-                videoEncoder = videoEncoder,
-                videoCodecOptions = videoCodecOptions,
-                audioEncoder = audioEncoder,
-                audioCodecOptions = audioCodecOptions,
-                newDisplayWidth = newDisplayWidth,
-                newDisplayHeight = newDisplayHeight,
-                newDisplayDpi = newDisplayDpi,
-                cropWidth = cropWidth,
-                cropHeight = cropHeight,
-                cropX = cropX,
-                cropY = cropY,
+                turnScreenOff = viewModel.turnScreenOff,
+                noControl = viewModel.noControl,
+                noVideo = viewModel.noVideo,
+                videoSourcePreset = viewModel.videoSourcePreset,
+                displayIdInput = viewModel.displayIdInput,
+                cameraIdInput = viewModel.cameraIdInput,
+                cameraFacingPreset = viewModel.cameraFacingPreset,
+                cameraSizePreset = viewModel.cameraSizePreset,
+                cameraSizeCustom = viewModel.cameraSizeCustom,
+                cameraAr = viewModel.cameraArInput,
+                cameraFps = viewModel.cameraFpsInput,
+                cameraHighSpeed = viewModel.cameraHighSpeed,
+                audioSourcePreset = viewModel.audioSourcePreset,
+                audioSourceCustom = viewModel.audioSourceCustom,
+                audioDup = viewModel.audioDup,
+                noAudioPlayback = viewModel.noAudioPlayback,
+                requireAudio = viewModel.requireAudio,
+                maxSizeInput = viewModel.maxSizeInput,
+                maxFpsInput = viewModel.maxFpsInput,
+                videoEncoder = viewModel.videoEncoder,
+                videoCodecOptions = viewModel.videoCodecOptions,
+                audioEncoder = viewModel.audioEncoder,
+                audioCodecOptions = viewModel.audioCodecOptions,
+                newDisplayWidth = viewModel.newDisplayWidth,
+                newDisplayHeight = viewModel.newDisplayHeight,
+                newDisplayDpi = viewModel.newDisplayDpi,
+                cropWidth = viewModel.cropWidth,
+                cropHeight = viewModel.cropHeight,
+                cropX = viewModel.cropX,
+                cropY = viewModel.cropY,
             ),
         )
     }
@@ -784,14 +702,14 @@ fun DeviceTabScreen(
         }
     }
 
-    LaunchedEffect(adbConnected, adbAutoReconnectPairedDevice, adbMdnsLanDiscoveryEnabled) {
-        if (adbConnected || !adbAutoReconnectPairedDevice) return@LaunchedEffect
+    LaunchedEffect(adbConnected, viewModel.adbAutoReconnectPairedDevice, viewModel.adbMdnsLanDiscoveryEnabled) {
+        if (adbConnected || !viewModel.adbAutoReconnectPairedDevice) return@LaunchedEffect
 
         // Background auto reconnect pipeline:
         // 1) try quick list targets with reachable TCP ports
         // 2) fallback to mDNS discovery
         val quickConnectTriedOnce = mutableSetOf<String>()
-        while (!adbConnected && adbAutoReconnectPairedDevice) {
+        while (!adbConnected && viewModel.adbAutoReconnectPairedDevice) {
             if (busy || adbConnecting || sessionInfo != null) {
                 delay(ADB_AUTO_RECONNECT_RETRY_INTERVAL_MS)
                 continue
@@ -830,7 +748,7 @@ fun DeviceTabScreen(
             val discovered = withContext(Dispatchers.IO) {
                 nativeCore.adbDiscoverConnectService(
                     timeoutMs = ADB_AUTO_RECONNECT_DISCOVER_TIMEOUT_MS,
-                    includeLanDevices = adbMdnsLanDiscoveryEnabled,
+                    includeLanDevices = viewModel.adbMdnsLanDiscoveryEnabled,
                 )
             }
 
@@ -917,28 +835,28 @@ fun DeviceTabScreen(
             sessionInfoCodec = ""
             sessionInfoControlEnabled = false
         }
-        onSessionStartedChange(sessionInfo != null)
+        viewModel.sessionStarted = sessionInfo != null
     }
 
     DisposableEffect(Unit) {
-        onRefreshEncodersActionChange {
+        viewModel.refreshEncodersAction = {
             runBusy("刷新编码器") { refreshEncoderLists() }
         }
-        onRefreshCameraSizesActionChange {
+        viewModel.refreshCameraSizesAction = {
             runBusy("刷新 Camera Sizes") { refreshCameraSizeLists() }
         }
-        onClearLogsActionChange {
+        viewModel.clearLogsAction = {
             eventLog.clear()
         }
-        onOpenReorderDevicesActionChange {
+        viewModel.openReorderDevicesAction = {
             showReorderSheet = true
         }
         onDispose {
-            onRefreshEncodersActionChange(null)
-            onRefreshCameraSizesActionChange(null)
-            onClearLogsActionChange(null)
-            onCanClearLogsChange(false)
-            onOpenReorderDevicesActionChange(null)
+            viewModel.refreshEncodersAction = null
+            viewModel.refreshCameraSizesAction = null
+            viewModel.clearLogsAction = null
+            viewModel.canClearLogs = false
+            viewModel.openReorderDevicesAction = null
         }
     }
 
@@ -1118,10 +1036,10 @@ fun DeviceTabScreen(
             // "使用配对码配对设备"
             PairingCard(
                 busy = busy,
-                autoDiscoverOnDialogOpen = adbPairingAutoDiscoverOnDialogOpen,
+                autoDiscoverOnDialogOpen = viewModel.adbPairingAutoDiscoverOnDialogOpen,
                 onDiscoverTarget = {
                     nativeCore.adbDiscoverPairingService(
-                        includeLanDevices = adbMdnsLanDiscoveryEnabled,
+                        includeLanDevices = viewModel.adbMdnsLanDiscoveryEnabled,
                     )
                 },
                 onPair = { host, port, code ->
@@ -1159,90 +1077,90 @@ fun DeviceTabScreen(
                     onBitRateInputChange = { bitRateInput = it },
                     audioBitRateKbps = audioBitRateKbps,
                     onAudioBitRateChange = { audioBitRateKbps = it },
-                    videoCodec = videoCodec,
-                    onVideoCodecChange = onVideoCodecChange,
-                    audioEnabled = audioEnabled,
-                    onAudioEnabledChange = onAudioEnabledChange,
+                    videoCodec = viewModel.videoCodec,
+                    onVideoCodecChange = { viewModel.videoCodec = it },
+                    audioEnabled = viewModel.audioEnabled,
+                    onAudioEnabledChange = { viewModel.audioEnabled = it },
                     audioForwardingSupported = audioForwardingSupported,
-                    audioCodec = audioCodec,
-                    onAudioCodecChange = onAudioCodecChange,
-                    onOpenAdvanced = onOpenAdvancedPage,
+                    audioCodec = viewModel.audioCodec,
+                    onAudioCodecChange = { viewModel.audioCodec = it },
+                    onOpenAdvanced = navigation.openAdvancedPage,
                     onStartStopHaptic = { haptics.contextClick() },
                     onStart = {
                         runBusy("启动 scrcpy") {
-                            if (noVideo && !audioEnabled) {
+                            if (viewModel.noVideo && !viewModel.audioEnabled) {
                                 throw IllegalArgumentException("--no-video 需要同时启用音频")
                             }
-                            if (audioEnabled && audioSourcePreset == "custom" && audioSourceCustom.isBlank()) {
+                            if (viewModel.audioEnabled && viewModel.audioSourcePreset == "custom" && viewModel.audioSourceCustom.isBlank()) {
                                 throw IllegalArgumentException("audio-source 选择自定义时不能为空")
                             }
-                            val resolvedVideoSource = videoSourcePreset.trim().ifBlank { "display" }
+                            val resolvedVideoSource = viewModel.videoSourcePreset.trim().ifBlank { "display" }
                             if (resolvedVideoSource == "camera" && !cameraMirroringSupported) {
                                 throw IllegalArgumentException("camera mirroring 需要 Android 12+ (SDK 31+)")
                             }
-                            val resolvedCameraSize = when (cameraSizePreset) {
-                                "custom" -> cameraSizeCustom.trim()
-                                else -> cameraSizePreset.trim()
+                            val resolvedCameraSize = when (viewModel.cameraSizePreset) {
+                                "custom" -> viewModel.cameraSizeCustom.trim()
+                                else -> viewModel.cameraSizePreset.trim()
                             }
-                            if (resolvedVideoSource == "camera" && cameraSizePreset == "custom" && resolvedCameraSize.isBlank()) {
+                            if (resolvedVideoSource == "camera" && viewModel.cameraSizePreset == "custom" && resolvedCameraSize.isBlank()) {
                                 throw IllegalArgumentException("camera-size 选择自定义时不能为空")
                             }
-                            val resolvedCameraId = cameraIdInput.trim()
-                            val resolvedCameraFacing = cameraFacingPreset.trim()
+                            val resolvedCameraId = viewModel.cameraIdInput.trim()
+                            val resolvedCameraFacing = viewModel.cameraFacingPreset.trim()
                             if (resolvedVideoSource == "camera" && resolvedCameraId.isNotBlank() && resolvedCameraFacing.isNotBlank()) {
                                 throw IllegalArgumentException("camera-id 与 camera-facing 不能同时设置")
                             }
-                            val resolvedCameraAr = cameraArInput.trim()
+                            val resolvedCameraAr = viewModel.cameraArInput.trim()
                             val resolvedCameraFps =
-                                cameraFpsInput.filter(Char::isDigit).toIntOrNull() ?: 0
-                            if (resolvedVideoSource == "camera" && cameraHighSpeed && resolvedCameraFps <= 0) {
+                                viewModel.cameraFpsInput.filter(Char::isDigit).toIntOrNull() ?: 0
+                            if (resolvedVideoSource == "camera" && viewModel.cameraHighSpeed && resolvedCameraFps <= 0) {
                                 throw IllegalArgumentException("启用 --camera-high-speed 时，--camera-fps 不能为 0")
                             }
                             val maxSize =
-                                maxSizeInput.filter(Char::isDigit).toIntOrNull()?.takeIf { it > 0 }
+                                viewModel.maxSizeInput.filter(Char::isDigit).toIntOrNull()?.takeIf { it > 0 }
                                     ?: 0
                             val maxFps =
-                                maxFpsInput.filter(Char::isDigit).toIntOrNull()?.toFloat() ?: 0f
+                                viewModel.maxFpsInput.filter(Char::isDigit).toIntOrNull()?.toFloat() ?: 0f
                             if (resolvedVideoSource == "camera" && resolvedCameraSize.isNotBlank() && (maxSize > 0 || resolvedCameraAr.isNotBlank())) {
                                 throw IllegalArgumentException("显式 camera-size 时不能同时设置 --max-size 或 --camera-ar")
                             }
                             val bitRateBps = (bitRateMbps * 1_000_000).toInt()
                             val audioBitRateBps = (audioBitRateKbps.coerceAtLeast(1)) * 1_000
-                            val resolvedAudioSource = when (audioSourcePreset) {
-                                "custom" -> audioSourceCustom.trim()
-                                else -> audioSourcePreset.trim()
+                            val resolvedAudioSource = when (viewModel.audioSourcePreset) {
+                                "custom" -> viewModel.audioSourceCustom.trim()
+                                else -> viewModel.audioSourcePreset.trim()
                             }
                             val newDisplayArg = buildNewDisplayArg(
-                                newDisplayWidth.filter(Char::isDigit),
-                                newDisplayHeight.filter(Char::isDigit),
-                                newDisplayDpi.filter(Char::isDigit),
+                                viewModel.newDisplayWidth.filter(Char::isDigit),
+                                viewModel.newDisplayHeight.filter(Char::isDigit),
+                                viewModel.newDisplayDpi.filter(Char::isDigit),
                             )
-                            val displayId = displayIdInput.filter(Char::isDigit).toIntOrNull()
+                            val displayId = viewModel.displayIdInput.filter(Char::isDigit).toIntOrNull()
                                 ?.takeIf { it > 0 }
                             val crop = buildCropArg(
-                                cropWidth.filter(Char::isDigit),
-                                cropHeight.filter(Char::isDigit),
-                                cropX.filter(Char::isDigit),
-                                cropY.filter(Char::isDigit),
+                                viewModel.cropWidth.filter(Char::isDigit),
+                                viewModel.cropHeight.filter(Char::isDigit),
+                                viewModel.cropX.filter(Char::isDigit),
+                                viewModel.cropY.filter(Char::isDigit),
                             )
-                            val effectiveTurnScreenOff = turnScreenOff && !noControl
+                            val effectiveTurnScreenOff = viewModel.turnScreenOff && !viewModel.noControl
                             val session = nativeCore.scrcpyStart(
                                 NativeCoreFacade.defaultStartRequest(
-                                    customServerUri = customServerUri,
+                                    customServerUri = viewModel.customServerUri,
                                     maxSize = maxSize,
                                     maxFps = maxFps,
                                     videoBitRate = bitRateBps,
-                                    remotePath = serverRemotePath.trim(),
-                                    videoCodec = videoCodec,
-                                    audio = audioEnabled,
-                                    audioCodec = audioCodec,
+                                    remotePath = viewModel.serverRemotePath.trim(),
+                                    videoCodec = viewModel.videoCodec,
+                                    audio = viewModel.audioEnabled,
+                                    audioCodec = viewModel.audioCodec,
                                     audioBitRate = audioBitRateBps,
-                                    noControl = noControl,
-                                    videoEncoder = videoEncoder,
-                                    videoCodecOptions = videoCodecOptions,
-                                    audioEncoder = audioEncoder,
-                                    audioCodecOptions = audioCodecOptions,
-                                    audioDup = audioDup,
+                                    noControl = viewModel.noControl,
+                                    videoEncoder = viewModel.videoEncoder,
+                                    videoCodecOptions = viewModel.videoCodecOptions,
+                                    audioEncoder = viewModel.audioEncoder,
+                                    audioCodecOptions = viewModel.audioCodecOptions,
+                                    audioDup = viewModel.audioDup,
                                     audioSource = resolvedAudioSource,
                                     videoSource = resolvedVideoSource,
                                     cameraId = resolvedCameraId,
@@ -1250,10 +1168,10 @@ fun DeviceTabScreen(
                                     cameraSize = resolvedCameraSize,
                                     cameraAr = resolvedCameraAr,
                                     cameraFps = resolvedCameraFps,
-                                    cameraHighSpeed = cameraHighSpeed,
-                                    noAudioPlayback = noAudioPlayback,
-                                    noVideo = noVideo,
-                                    requireAudio = requireAudio,
+                                    cameraHighSpeed = viewModel.cameraHighSpeed,
+                                    noAudioPlayback = viewModel.noAudioPlayback,
+                                    noVideo = viewModel.noVideo,
+                                    requireAudio = viewModel.requireAudio,
                                     turnScreenOff = effectiveTurnScreenOff,
                                     newDisplay = newDisplayArg,
                                     displayId = displayId,
@@ -1263,7 +1181,7 @@ fun DeviceTabScreen(
                             sessionInfo = session
                             statusLine = "scrcpy 运行中"
                             @SuppressLint("DefaultLocale")
-                            val videoDetail = if (noVideo) {
+                            val videoDetail = if (viewModel.noVideo) {
                                 "off"
                             } else {
                                 "${session.codec} ${session.width}x${session.height} @${
@@ -1273,13 +1191,13 @@ fun DeviceTabScreen(
                                     )
                                 }Mbps"
                             }
-                            val audioDetail = if (!audioEnabled) {
+                            val audioDetail = if (!viewModel.audioEnabled) {
                                 "off"
                             } else {
-                                val playback = if (noAudioPlayback) "(no-playback)" else ""
-                                "$audioCodec ${audioBitRateKbps}kbps source=${resolvedAudioSource.ifBlank { "default" }}$playback"
+                                val playback = if (viewModel.noAudioPlayback) "(no-playback)" else ""
+                                "${viewModel.audioCodec} ${audioBitRateKbps}kbps source=${resolvedAudioSource.ifBlank { "default" }}$playback"
                             }
-                            logEvent("scrcpy 已启动: device=${session.deviceName}, video=$videoDetail, audio=$audioDetail, control=${!noControl}, turnScreenOff=$effectiveTurnScreenOff, maxSize=${if (maxSize > 0) maxSize else "auto"}, maxFps=${if (maxFps > 0f) maxFps else "auto"}")
+                            logEvent("scrcpy 已启动: device=${session.deviceName}, video=$videoDetail, audio=$audioDetail, control=${!viewModel.noControl}, turnScreenOff=$effectiveTurnScreenOff, maxSize=${if (maxSize > 0) maxSize else "auto"}, maxFps=${if (maxFps > 0f) maxFps else "auto"}")
                             scope.launch {
                                 snack.showSnackbar("scrcpy 已启动")
                             }
@@ -1320,7 +1238,7 @@ fun DeviceTabScreen(
                         },
                         onOpenFullscreen = {
                             val info = sessionInfo ?: return@PreviewCard
-                            onOpenFullscreenPage(info)
+                            navigation.openFullscreenPage(info)
                         },
                         onOpenFullscreenHaptic = { haptics.contextClick() },
                     )

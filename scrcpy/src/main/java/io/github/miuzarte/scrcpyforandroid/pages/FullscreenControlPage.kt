@@ -21,7 +21,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
 import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
 import io.github.miuzarte.scrcpyforandroid.widgets.FullscreenControlScreen
@@ -37,22 +36,21 @@ data class FullscreenControlLaunch(
 )
 
 @Composable
-fun FullscreenControlPage(
-    launch: FullscreenControlLaunch,
-    nativeCore: NativeCoreFacade,
-    virtualButtonsLayout: String,
-    showDebugInfo: Boolean,
-    showVirtualButtons: Boolean,
-    onVideoSizeChanged: (width: Int, height: Int) -> Unit,
-    onDismiss: () -> Unit,
-) {
+fun FullscreenControlPage() {
+    val viewModel = LocalScrcpyUiViewModel.current
+    val fullscreenActions = LocalScrcpyFullscreenActions.current
+    val launch = viewModel.fullscreenLaunch ?: return
+    val nativeCore = viewModel.nativeCore
+    val virtualButtonsLayout = viewModel.virtualButtonsLayout
+    val showDebugInfo = viewModel.fullscreenDebugInfoEnabled
+    val showVirtualButtons = viewModel.showFullscreenVirtualButtons
     val context = LocalContext.current
     var lastBackPressTime by remember { mutableLongStateOf(0L) }
     
     BackHandler(enabled = true) {
         val currentTime = System.currentTimeMillis()
         if (currentTime - lastBackPressTime < 2000) {
-            onDismiss()
+            fullscreenActions.onDismiss()
         } else {
             lastBackPressTime = currentTime
             Toast.makeText(context, "再次返回以退出", Toast.LENGTH_SHORT).show()
@@ -106,7 +104,7 @@ fun FullscreenControlPage(
     DisposableEffect(nativeCore) {
         val listener: (Int, Int) -> Unit = { w, h ->
             session = session.copy(width = w, height = h)
-            onVideoSizeChanged(w, h)
+            fullscreenActions.onVideoSizeChanged(w, h)
         }
         nativeCore.addVideoSizeListener(listener)
         onDispose {
@@ -138,7 +136,7 @@ fun FullscreenControlPage(
             FullscreenControlScreen(
                 session = session,
                 nativeCore = nativeCore,
-                onDismiss = onDismiss,
+                onDismiss = fullscreenActions.onDismiss,
                 showDebugInfo = showDebugInfo,
                 currentFps = currentFps,
                 enableBackHandler = false,

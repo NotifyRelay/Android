@@ -1,7 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.content.Intent
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -23,11 +22,9 @@ import io.github.miuzarte.scrcpyforandroid.widgets.SectionSmallTitle
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
-import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperDropdown
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import kotlin.math.roundToInt
@@ -52,31 +49,12 @@ fun resolveThemeMode(baseIndex: Int): ColorSchemeMode {
 }
 
 @Composable
-fun SettingsScreen(
-    contentPadding: PaddingValues,
-    fullscreenDebugInfoEnabled: Boolean,
-    onFullscreenDebugInfoEnabledChange: (Boolean) -> Unit,
-    keepScreenOnWhenStreamingEnabled: Boolean,
-    onKeepScreenOnWhenStreamingEnabledChange: (Boolean) -> Unit,
-    devicePreviewCardHeightDp: Int,
-    onDevicePreviewCardHeightDpChange: (Int) -> Unit,
-    showFullscreenVirtualButtons: Boolean,
-    onOpenReorderDevices: () -> Unit,
-    onOpenVirtualButtonOrder: () -> Unit,
-    onShowFullscreenVirtualButtonsChange: (Boolean) -> Unit,
-    customServerUri: String?,
-    onPickServer: () -> Unit,
-    onClearServer: () -> Unit,
-    serverRemotePath: String,
-    onServerRemotePathChange: (String) -> Unit,
-    adbKeyName: String,
-    onAdbKeyNameChange: (String) -> Unit,
-    adbPairingAutoDiscoverOnDialogOpen: Boolean,
-    onAdbPairingAutoDiscoverOnDialogOpenChange: (Boolean) -> Unit,
-    adbAutoReconnectPairedDevice: Boolean,
-    onAdbAutoReconnectPairedDeviceChange: (Boolean) -> Unit,
-    scrollBehavior: ScrollBehavior,
-) {
+fun SettingsScreen() {
+    val viewModel = LocalScrcpyUiViewModel.current
+    val navigation = LocalScrcpyNavigation.current
+    val contentPadding = LocalScrcpyPagePadding.current
+    val scrollBehavior = LocalScrcpyScrollBehavior.current
+        ?: error("ScrollBehavior is not provided")
     val context = LocalContext.current
 
     // 设置
@@ -90,51 +68,49 @@ fun SettingsScreen(
                 SuperSwitch(
                     title = "启用调试信息",
                     summary = "在全屏界面显示触点数量、设备分辨率和实时 FPS",
-                    checked = fullscreenDebugInfoEnabled,
-                    onCheckedChange = onFullscreenDebugInfoEnabledChange,
+                    checked = viewModel.fullscreenDebugInfoEnabled,
+                    onCheckedChange = { viewModel.fullscreenDebugInfoEnabled = it },
                 )
                 SuperSwitch(
                     title = "投屏时保持屏幕常亮",
                     summary = "Scrcpy 启动后保持本机屏幕常亮，避免锁屏导致 ADB 断开",
-                    checked = keepScreenOnWhenStreamingEnabled,
-                    onCheckedChange = onKeepScreenOnWhenStreamingEnabledChange,
+                    checked = viewModel.keepScreenOnWhenStreamingEnabled,
+                    onCheckedChange = { viewModel.keepScreenOnWhenStreamingEnabled = it },
                 )
                 SuperSlide(
                     title = "预览卡高度",
                     summary = "设备页预览卡高度",
-                    value = devicePreviewCardHeightDp.toFloat(),
+                    value = viewModel.devicePreviewCardHeightDp.toFloat(),
                     onValueChange = {
-                        onDevicePreviewCardHeightDpChange(
-                            it.roundToInt().coerceAtLeast(120)
-                        )
+                        viewModel.devicePreviewCardHeightDp = it.roundToInt().coerceAtLeast(120)
                     },
                     valueRange = 160f..600f,
                     steps = 439,
                     unit = "dp",
                     displayFormatter = { it.roundToInt().toString() },
-                    inputInitialValue = devicePreviewCardHeightDp.toString(),
+                    inputInitialValue = viewModel.devicePreviewCardHeightDp.toString(),
                     inputFilter = { it.filter(Char::isDigit) },
                     inputValueRange = 120f..Float.MAX_VALUE,
                     onInputConfirm = { raw ->
                         raw.toIntOrNull()
-                            ?.let { onDevicePreviewCardHeightDpChange(it.coerceAtLeast(120)) }
+                            ?.let { viewModel.devicePreviewCardHeightDp = it.coerceAtLeast(120) }
                     },
                 )
                 SuperArrow(
                     title = "快速设备排序",
                     summary = "手动排序设备页的快速设备",
-                    onClick = onOpenReorderDevices,
+                    onClick = navigation.openReorderDevices,
                 )
                 SuperArrow(
                     title = "虚拟按钮排序",
                     summary = "手动排序预览/全屏时的虚拟按钮，并选择哪些按钮展示在外",
-                    onClick = onOpenVirtualButtonOrder,
+                    onClick = navigation.openVirtualButtonOrder,
                 )
                 SuperSwitch(
                     title = "全屏显示虚拟按钮",
                     summary = "在全屏控制页底部显示返回键、主页键等虚拟按钮",
-                    checked = showFullscreenVirtualButtons,
-                    onCheckedChange = onShowFullscreenVirtualButtonsChange,
+                    checked = viewModel.showFullscreenVirtualButtons,
+                    onCheckedChange = { viewModel.showFullscreenVirtualButtons = it },
                 )
             }
 
@@ -149,21 +125,21 @@ fun SettingsScreen(
                     fontWeight = FontWeight.Medium,
                 )
                 TextField(
-                    value = customServerUri ?: "",
+                    value = viewModel.customServerUri ?: "",
                     onValueChange = {},
                     readOnly = true,
                     label = "scrcpy-server-v3.3.4",
-                    useLabelAsPlaceholder = customServerUri == null,
+                    useLabelAsPlaceholder = viewModel.customServerUri == null,
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = UiSpacing.CardContent)
                         .padding(bottom = UiSpacing.CardContent),
                     trailingIcon = {
                         Row(modifier = Modifier.padding(end = UiSpacing.SectionTitleLeadingGap)) {
-                            if (customServerUri != null) IconButton(onClick = onClearServer) {
+                            if (viewModel.customServerUri != null) IconButton(onClick = { viewModel.customServerUri = null }) {
                                 Icon(Icons.Rounded.Clear, contentDescription = "清空")
                             }
-                            IconButton(onClick = onPickServer) {
+                            IconButton(onClick = navigation.pickServer) {
                                 Icon(Icons.Rounded.FileOpen, contentDescription = "选择文件")
                             }
                         }
@@ -177,8 +153,8 @@ fun SettingsScreen(
                     fontWeight = FontWeight.Medium,
                 )
                 TextField(
-                    value = serverRemotePath,
-                    onValueChange = onServerRemotePathChange,
+                    value = viewModel.serverRemotePath,
+                    onValueChange = { viewModel.serverRemotePath = it },
                     label = ScrcpyDefaults.SERVER_REMOTE_PATH,
                     useLabelAsPlaceholder = true,
                     singleLine = true,
@@ -199,8 +175,8 @@ fun SettingsScreen(
                     fontWeight = FontWeight.Medium,
                 )
                 TextField(
-                    value = adbKeyName,
-                    onValueChange = onAdbKeyNameChange,
+                    value = viewModel.adbKeyName,
+                    onValueChange = { viewModel.adbKeyName = it },
                     label = ScrcpyDefaults.ADB_KEY_NAME,
                     useLabelAsPlaceholder = true,
                     singleLine = true,
@@ -212,14 +188,14 @@ fun SettingsScreen(
                 SuperSwitch(
                     title = "配对时自动启用发现服务",
                     summary = "打开配对弹窗后自动搜索可用配对端口",
-                    checked = adbPairingAutoDiscoverOnDialogOpen,
-                    onCheckedChange = onAdbPairingAutoDiscoverOnDialogOpenChange,
+                    checked = viewModel.adbPairingAutoDiscoverOnDialogOpen,
+                    onCheckedChange = { viewModel.adbPairingAutoDiscoverOnDialogOpen = it },
                 )
                 SuperSwitch(
                     title = "自动重连已配对设备",
                     summary = "自动发现开启无线调试的设备，更新快速设备的随机端口并尝试连接（效果比较随缘）",
-                    checked = adbAutoReconnectPairedDevice,
-                    onCheckedChange = onAdbAutoReconnectPairedDeviceChange,
+                    checked = viewModel.adbAutoReconnectPairedDevice,
+                    onCheckedChange = { viewModel.adbAutoReconnectPairedDevice = it },
                 )
             }
 

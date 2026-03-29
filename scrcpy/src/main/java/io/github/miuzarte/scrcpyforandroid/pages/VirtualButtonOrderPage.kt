@@ -1,6 +1,5 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -11,24 +10,23 @@ import io.github.miuzarte.scrcpyforandroid.widgets.ReorderableList
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
 import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.ScrollBehavior
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 
 @Composable
-internal fun VirtualButtonOrderPage(
-    contentPadding: PaddingValues,
-    scrollBehavior: ScrollBehavior,
-    layoutString: String,
-    onLayoutChange: (String) -> Unit,
-    showPreviewText: Boolean,
-    onShowPreviewTextChange: (Boolean) -> Unit,
-) {
+internal fun VirtualButtonOrderPage() {
+    val viewModel = LocalScrcpyUiViewModel.current
+    val contentPadding = LocalScrcpyPagePadding.current
+    val scrollBehavior = LocalScrcpyScrollBehavior.current
+        ?: error("ScrollBehavior is not provided")
+    val layoutString = viewModel.virtualButtonsLayout
+    val showPreviewText = viewModel.showPreviewVirtualButtonText
     var buttonItems by remember(layoutString) {
         mutableStateOf(VirtualButtonActions.parseStoredLayout(layoutString))
     }
 
     fun emitChanges() {
-        onLayoutChange(VirtualButtonActions.encodeStoredLayout(buttonItems))
+        viewModel.virtualButtonsLayout =
+            VirtualButtonActions.encodeStoredLayout(buttonItems)
     }
 
     AppPageLazyColumn(
@@ -42,7 +40,7 @@ internal fun VirtualButtonOrderPage(
                     title = "按钮显示文本",
                     summary = "超过3个建议关闭，只对预览卡下方的虚拟按钮生效",
                     checked = showPreviewText,
-                    onCheckedChange = onShowPreviewTextChange,
+                    onCheckedChange = { viewModel.showPreviewVirtualButtonText = it },
                 )
             }
         }

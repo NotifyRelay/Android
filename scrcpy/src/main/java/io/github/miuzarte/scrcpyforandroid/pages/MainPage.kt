@@ -1,6 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.app.Activity
+import android.app.Application
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.net.Uri
@@ -29,11 +30,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
@@ -46,19 +45,17 @@ import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.ui.NavDisplay
-import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.constants.UiMotion
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import notifyrelay.data.config.ScrcpyDefaults
 import io.github.miuzarte.scrcpyforandroid.services.MainSettings
-import io.github.miuzarte.scrcpyforandroid.services.loadDevicePageSettings
-import io.github.miuzarte.scrcpyforandroid.services.loadMainSettings
 import io.github.miuzarte.scrcpyforandroid.services.saveMainSettings
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.ThemeSettingsManager
+import androidx.lifecycle.viewmodel.compose.viewModel
 import top.yukonga.miuix.kmp.basic.DropdownImpl
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -100,9 +97,9 @@ fun MainPage() {
     val initialOrientation = remember(activity) {
         activity?.requestedOrientation ?: ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
     }
-    val nativeCore = remember(context) { NativeCoreFacade.get(context.applicationContext) }
-    val initialSettings = remember(context) { loadMainSettings(context) }
-    val initialDeviceSettings = remember(context) { loadDevicePageSettings(context) }
+    val app = context.applicationContext as Application
+    val viewModel: ScrcpyUiViewModel = viewModel(factory = ScrcpyUiViewModel.Factory(app))
+    val nativeCore = viewModel.nativeCore
     val snackHostState = remember { SnackbarHostState() }
     val tabs = remember { MainTabDestination.entries }
     val pagerState = rememberPagerState(
@@ -122,74 +119,7 @@ fun MainPage() {
             currentRootScreen is RootScreen.Advanced || currentRootScreen is RootScreen.VirtualButtonOrder
         },
     )
-    val stringListSaver = listSaver<List<String>, String>(
-        save = { value -> ArrayList(value) },
-        restore = { restored -> restored.toList() },
-    )
-
-    var audioEnabled by rememberSaveable { mutableStateOf(initialSettings.audioEnabled) }
-    var audioCodec by rememberSaveable { mutableStateOf(initialSettings.audioCodec) }
-    var videoCodec by rememberSaveable { mutableStateOf(initialSettings.videoCodec) }
     var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
-    var fullscreenDebugInfoEnabled by rememberSaveable { mutableStateOf(initialSettings.fullscreenDebugInfoEnabled) }
-    var showFullscreenVirtualButtons by rememberSaveable { mutableStateOf(initialSettings.showFullscreenVirtualButtons) }
-    var showPreviewVirtualButtonText by rememberSaveable { mutableStateOf(initialSettings.showPreviewVirtualButtonText) }
-    var keepScreenOnWhenStreamingEnabled by rememberSaveable { mutableStateOf(initialSettings.keepScreenOnWhenStreamingEnabled) }
-    var devicePreviewCardHeightDp by rememberSaveable { mutableIntStateOf(initialSettings.devicePreviewCardHeightDp) }
-    var virtualButtonsLayout by rememberSaveable { mutableStateOf(initialSettings.virtualButtonsLayout) }
-    var customServerUri by rememberSaveable { mutableStateOf(initialSettings.customServerUri) }
-    var serverRemotePath by rememberSaveable { mutableStateOf(initialSettings.serverRemotePath) }
-    var adbKeyName by rememberSaveable { mutableStateOf(initialSettings.adbKeyName) }
-    var adbPairingAutoDiscoverOnDialogOpen by rememberSaveable {
-        mutableStateOf(initialSettings.adbPairingAutoDiscoverOnDialogOpen)
-    }
-    var adbAutoReconnectPairedDevice by rememberSaveable {
-        mutableStateOf(initialSettings.adbAutoReconnectPairedDevice)
-    }
-    var adbMdnsLanDiscoveryEnabled by rememberSaveable {
-        mutableStateOf(initialSettings.adbMdnsLanDiscoveryEnabled)
-    }
-    var noControl by rememberSaveable { mutableStateOf(initialDeviceSettings.noControl) }
-    var videoEncoder by rememberSaveable { mutableStateOf(initialDeviceSettings.videoEncoder) }
-    var videoCodecOptions by rememberSaveable { mutableStateOf(initialDeviceSettings.videoCodecOptions) }
-    var audioEncoder by rememberSaveable { mutableStateOf(initialDeviceSettings.audioEncoder) }
-    var audioCodecOptions by rememberSaveable { mutableStateOf(initialDeviceSettings.audioCodecOptions) }
-    var audioDup by rememberSaveable { mutableStateOf(initialDeviceSettings.audioDup) }
-    var audioSourcePreset by rememberSaveable { mutableStateOf(initialDeviceSettings.audioSourcePreset) }
-    var audioSourceCustom by rememberSaveable { mutableStateOf(initialDeviceSettings.audioSourceCustom) }
-    var videoSourcePreset by rememberSaveable { mutableStateOf(initialDeviceSettings.videoSourcePreset) }
-    var cameraIdInput by rememberSaveable { mutableStateOf(initialDeviceSettings.cameraIdInput) }
-    var cameraFacingPreset by rememberSaveable { mutableStateOf(initialDeviceSettings.cameraFacingPreset) }
-    var cameraSizePreset by rememberSaveable { mutableStateOf(initialDeviceSettings.cameraSizePreset) }
-    var cameraSizeCustom by rememberSaveable { mutableStateOf(initialDeviceSettings.cameraSizeCustom) }
-    var cameraArInput by rememberSaveable { mutableStateOf(initialDeviceSettings.cameraAr) }
-    var cameraFpsInput by rememberSaveable { mutableStateOf(initialDeviceSettings.cameraFps) }
-    var cameraHighSpeed by rememberSaveable { mutableStateOf(initialDeviceSettings.cameraHighSpeed) }
-    var noAudioPlayback by rememberSaveable { mutableStateOf(initialDeviceSettings.noAudioPlayback) }
-    var noVideo by rememberSaveable { mutableStateOf(initialDeviceSettings.noVideo) }
-    var requireAudio by rememberSaveable { mutableStateOf(initialDeviceSettings.requireAudio) }
-    var turnScreenOff by rememberSaveable { mutableStateOf(initialDeviceSettings.turnScreenOff) }
-    var maxSizeInput by rememberSaveable { mutableStateOf(initialDeviceSettings.maxSizeInput) }
-    var maxFpsInput by rememberSaveable { mutableStateOf(initialDeviceSettings.maxFpsInput) }
-    var newDisplayWidth by rememberSaveable { mutableStateOf(initialDeviceSettings.newDisplayWidth) }
-    var newDisplayHeight by rememberSaveable { mutableStateOf(initialDeviceSettings.newDisplayHeight) }
-    var newDisplayDpi by rememberSaveable { mutableStateOf(initialDeviceSettings.newDisplayDpi) }
-    var displayIdInput by rememberSaveable { mutableStateOf(initialDeviceSettings.displayIdInput) }
-    var cropWidth by rememberSaveable { mutableStateOf(initialDeviceSettings.cropWidth) }
-    var cropHeight by rememberSaveable { mutableStateOf(initialDeviceSettings.cropHeight) }
-    var cropX by rememberSaveable { mutableStateOf(initialDeviceSettings.cropX) }
-    var cropY by rememberSaveable { mutableStateOf(initialDeviceSettings.cropY) }
-    val videoEncoderOptions = remember { mutableStateListOf<String>() }
-    val audioEncoderOptions = remember { mutableStateListOf<String>() }
-    val videoEncoderTypeMap = remember { mutableStateMapOf<String, String>() }
-    val audioEncoderTypeMap = remember { mutableStateMapOf<String, String>() }
-    val cameraSizeOptions = remember { mutableStateListOf<String>() }
-    var sessionStarted by remember { mutableStateOf(false) }
-    var refreshEncodersAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    var refreshCameraSizesAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    var clearLogsAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    var openReorderDevicesAction by remember { mutableStateOf<(() -> Unit)?>(null) }
-    var canClearLogs by remember { mutableStateOf(false) }
     var showDeviceMenu by rememberSaveable { mutableStateOf(false) }
     var lastExitBackPressAtMs by rememberSaveable { mutableLongStateOf(0L) }
     var fullscreenOrientation by rememberSaveable {
@@ -220,9 +150,9 @@ fun MainPage() {
     }
 
     // Keep-screen-on is controlled globally, so fullscreen and preview share the same behavior.
-    DisposableEffect(activity, keepScreenOnWhenStreamingEnabled, sessionStarted) {
+    DisposableEffect(activity, viewModel.keepScreenOnWhenStreamingEnabled, viewModel.sessionStarted) {
         val window = activity?.window
-        val shouldKeepScreenOn = keepScreenOnWhenStreamingEnabled && sessionStarted
+        val shouldKeepScreenOn = viewModel.keepScreenOnWhenStreamingEnabled && viewModel.sessionStarted
         if (window != null && shouldKeepScreenOn) {
             window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
@@ -243,46 +173,46 @@ fun MainPage() {
     }
 
     LaunchedEffect(
-        audioEnabled,
-        audioCodec,
-        videoCodec,
-        fullscreenDebugInfoEnabled,
-        showFullscreenVirtualButtons,
-        showPreviewVirtualButtonText,
-        keepScreenOnWhenStreamingEnabled,
-        devicePreviewCardHeightDp,
-        virtualButtonsLayout,
-        customServerUri,
-        serverRemotePath,
-        adbKeyName,
-        adbPairingAutoDiscoverOnDialogOpen,
-        adbAutoReconnectPairedDevice,
-        adbMdnsLanDiscoveryEnabled,
+        viewModel.audioEnabled,
+        viewModel.audioCodec,
+        viewModel.videoCodec,
+        viewModel.fullscreenDebugInfoEnabled,
+        viewModel.showFullscreenVirtualButtons,
+        viewModel.showPreviewVirtualButtonText,
+        viewModel.keepScreenOnWhenStreamingEnabled,
+        viewModel.devicePreviewCardHeightDp,
+        viewModel.virtualButtonsLayout,
+        viewModel.customServerUri,
+        viewModel.serverRemotePath,
+        viewModel.adbKeyName,
+        viewModel.adbPairingAutoDiscoverOnDialogOpen,
+        viewModel.adbAutoReconnectPairedDevice,
+        viewModel.adbMdnsLanDiscoveryEnabled,
     ) {
         saveMainSettings(
             context,
             MainSettings(
-                audioEnabled = audioEnabled,
-                audioCodec = audioCodec,
-                videoCodec = videoCodec,
-                fullscreenDebugInfoEnabled = fullscreenDebugInfoEnabled,
-                showFullscreenVirtualButtons = showFullscreenVirtualButtons,
-                showPreviewVirtualButtonText = showPreviewVirtualButtonText,
-                keepScreenOnWhenStreamingEnabled = keepScreenOnWhenStreamingEnabled,
-                devicePreviewCardHeightDp = devicePreviewCardHeightDp,
-                virtualButtonsLayout = virtualButtonsLayout,
-                customServerUri = customServerUri,
-                serverRemotePath = serverRemotePath,
-                adbKeyName = adbKeyName,
-                adbPairingAutoDiscoverOnDialogOpen = adbPairingAutoDiscoverOnDialogOpen,
-                adbAutoReconnectPairedDevice = adbAutoReconnectPairedDevice,
-                adbMdnsLanDiscoveryEnabled = adbMdnsLanDiscoveryEnabled,
+                audioEnabled = viewModel.audioEnabled,
+                audioCodec = viewModel.audioCodec,
+                videoCodec = viewModel.videoCodec,
+                fullscreenDebugInfoEnabled = viewModel.fullscreenDebugInfoEnabled,
+                showFullscreenVirtualButtons = viewModel.showFullscreenVirtualButtons,
+                showPreviewVirtualButtonText = viewModel.showPreviewVirtualButtonText,
+                keepScreenOnWhenStreamingEnabled = viewModel.keepScreenOnWhenStreamingEnabled,
+                devicePreviewCardHeightDp = viewModel.devicePreviewCardHeightDp,
+                virtualButtonsLayout = viewModel.virtualButtonsLayout,
+                customServerUri = viewModel.customServerUri,
+                serverRemotePath = viewModel.serverRemotePath,
+                adbKeyName = viewModel.adbKeyName,
+                adbPairingAutoDiscoverOnDialogOpen = viewModel.adbPairingAutoDiscoverOnDialogOpen,
+                adbAutoReconnectPairedDevice = viewModel.adbAutoReconnectPairedDevice,
+                adbMdnsLanDiscoveryEnabled = viewModel.adbMdnsLanDiscoveryEnabled,
             ),
         )
     }
 
-    LaunchedEffect(adbKeyName) {
-        nativeCore.setAdbKeyName(adbKeyName.ifBlank { ScrcpyDefaults.ADB_KEY_NAME })
+    LaunchedEffect(viewModel.adbKeyName) {
+        nativeCore.setAdbKeyName(viewModel.adbKeyName.ifBlank { ScrcpyDefaults.ADB_KEY_NAME })
     }
 
     fun popRoot() {
@@ -353,8 +283,52 @@ fun MainPage() {
                     Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             }
-            customServerUri = uri.toString()
+            viewModel.customServerUri = uri.toString()
         }
+
+    val navigationActions = remember(rootBackStack, viewModel, picker) {
+        ScrcpyNavigationActions(
+            openAdvancedPage = { rootBackStack.add(RootScreen.Advanced) },
+            openVirtualButtonOrder = { rootBackStack.add(RootScreen.VirtualButtonOrder) },
+            openFullscreenPage = { session ->
+                viewModel.fullscreenLaunch = FullscreenControlLaunch(
+                    deviceName = session.deviceName,
+                    width = session.width,
+                    height = session.height,
+                    codec = session.codec,
+                )
+                rootBackStack.add(
+                    RootScreen.Fullscreen(
+                        launch = FullscreenControlLaunch(
+                            deviceName = session.deviceName,
+                            width = session.width,
+                            height = session.height,
+                            codec = session.codec,
+                        ),
+                    ),
+                )
+            },
+            openReorderDevices = { viewModel.openReorderDevicesAction?.invoke() },
+            pickServer = {
+                picker.launch(
+                    arrayOf(
+                        "application/java-archive",
+                        "application/octet-stream",
+                        "*/*",
+                    )
+                )
+            },
+        )
+    }
+    val fullscreenActions = remember {
+        ScrcpyFullscreenActions(
+            onDismiss = {
+                viewModel.fullscreenLaunch = null
+                popRoot()
+            },
+            onVideoSizeChanged = { _, _ -> },
+        )
+    }
 
     val rootEntryProvider = entryProvider<NavKey> {
         entry(RootScreen.Home) {
@@ -409,10 +383,10 @@ fun MainPage() {
                                             }
                                             DeviceMenuPopup(
                                                 show = showDeviceMenu,
-                                                canClearLogs = canClearLogs,
+                                                canClearLogs = viewModel.canClearLogs,
                                                 onDismissRequest = { showDeviceMenu = false },
                                                 onReorderDevices = {
-                                                    openReorderDevicesAction?.invoke()
+                                                    viewModel.openReorderDevicesAction?.invoke()
                                                     showDeviceMenu = false
                                                 },
                                                 onOpenVirtualButtonOrder = {
@@ -420,7 +394,7 @@ fun MainPage() {
                                                     showDeviceMenu = false
                                                 },
                                                 onClearLogs = {
-                                                    clearLogsAction?.invoke()
+                                                    viewModel.clearLogsAction?.invoke()
                                                     showDeviceMenu = false
                                                 },
                                             )
@@ -429,138 +403,17 @@ fun MainPage() {
                                     )
                                 },
                             ) { pagePadding ->
-                                DeviceTabScreen(
+                                ProvideScrcpyUiEnvironment(
+                                    viewModel = viewModel,
                                     contentPadding = pagePadding,
-                                    nativeCore = nativeCore,
-                                    snack = snackHostState,
                                     scrollBehavior = deviceScrollBehavior,
-                                    virtualButtonsLayout = virtualButtonsLayout,
-                                    showPreviewVirtualButtonText = showPreviewVirtualButtonText,
-                                    previewCardHeightDp = devicePreviewCardHeightDp,
+                                    snackHostState = snackHostState,
                                     themeBaseIndex = themeBaseIndex,
-                                    customServerUri = customServerUri,
-                                    serverRemotePath = serverRemotePath,
-                                    onServerRemotePathChange = { serverRemotePath = it },
-                                    videoCodec = videoCodec,
-                                    onVideoCodecChange = { videoCodec = it },
-                                    audioEnabled = audioEnabled,
-                                    onAudioEnabledChange = { audioEnabled = it },
-                                    audioCodec = audioCodec,
-                                    onAudioCodecChange = { audioCodec = it },
-                                    noControl = noControl,
-                                    onNoControlChange = {
-                                        noControl = it
-                                        if (it) {
-                                            turnScreenOff = false
-                                        }
-                                    },
-                                    videoEncoder = videoEncoder,
-                                    onVideoEncoderChange = { videoEncoder = it },
-                                    videoCodecOptions = videoCodecOptions,
-                                    onVideoCodecOptionsChange = { videoCodecOptions = it },
-                                    audioEncoder = audioEncoder,
-                                    onAudioEncoderChange = { audioEncoder = it },
-                                    audioCodecOptions = audioCodecOptions,
-                                    onAudioCodecOptionsChange = { audioCodecOptions = it },
-                                    audioDup = audioDup,
-                                    onAudioDupChange = { audioDup = it },
-                                    audioSourcePreset = audioSourcePreset,
-                                    onAudioSourcePresetChange = { audioSourcePreset = it },
-                                    audioSourceCustom = audioSourceCustom,
-                                    onAudioSourceCustomChange = { audioSourceCustom = it },
-                                    videoSourcePreset = videoSourcePreset,
-                                    onVideoSourcePresetChange = { videoSourcePreset = it },
-                                    cameraIdInput = cameraIdInput,
-                                    onCameraIdInputChange = { cameraIdInput = it },
-                                    cameraFacingPreset = cameraFacingPreset,
-                                    onCameraFacingPresetChange = { cameraFacingPreset = it },
-                                    cameraSizePreset = cameraSizePreset,
-                                    onCameraSizePresetChange = { cameraSizePreset = it },
-                                    cameraSizeCustom = cameraSizeCustom,
-                                    onCameraSizeCustomChange = { cameraSizeCustom = it },
-                                    cameraArInput = cameraArInput,
-                                    onCameraArInputChange = { cameraArInput = it },
-                                    cameraFpsInput = cameraFpsInput,
-                                    onCameraFpsInputChange = { cameraFpsInput = it },
-                                    cameraHighSpeed = cameraHighSpeed,
-                                    onCameraHighSpeedChange = { cameraHighSpeed = it },
-                                    noAudioPlayback = noAudioPlayback,
-                                    onNoAudioPlaybackChange = { noAudioPlayback = it },
-                                    noVideo = noVideo,
-                                    requireAudio = requireAudio,
-                                    onRequireAudioChange = { requireAudio = it },
-                                    turnScreenOff = turnScreenOff,
-                                    onTurnScreenOffChange = { turnScreenOff = it },
-                                    maxSizeInput = maxSizeInput,
-                                    onMaxSizeInputChange = { maxSizeInput = it },
-                                    maxFpsInput = maxFpsInput,
-                                    onMaxFpsInputChange = { maxFpsInput = it },
-                                    newDisplayWidth = newDisplayWidth,
-                                    onNewDisplayWidthChange = { newDisplayWidth = it },
-                                    newDisplayHeight = newDisplayHeight,
-                                    onNewDisplayHeightChange = { newDisplayHeight = it },
-                                    newDisplayDpi = newDisplayDpi,
-                                    onNewDisplayDpiChange = { newDisplayDpi = it },
-                                    displayIdInput = displayIdInput,
-                                    onDisplayIdInputChange = { displayIdInput = it },
-                                    cropWidth = cropWidth,
-                                    onCropWidthChange = { cropWidth = it },
-                                    cropHeight = cropHeight,
-                                    onCropHeightChange = { cropHeight = it },
-                                    cropX = cropX,
-                                    onCropXChange = { cropX = it },
-                                    cropY = cropY,
-                                    onCropYChange = { cropY = it },
-                                    videoEncoderOptions = videoEncoderOptions,
-                                    onVideoEncoderOptionsChange = {
-                                        videoEncoderOptions.clear()
-                                        videoEncoderOptions.addAll(it)
-                                    },
-                                    onVideoEncoderTypeMapChange = {
-                                        videoEncoderTypeMap.clear()
-                                        videoEncoderTypeMap.putAll(it)
-                                    },
-                                    audioEncoderOptions = audioEncoderOptions,
-                                    onAudioEncoderOptionsChange = {
-                                        audioEncoderOptions.clear()
-                                        audioEncoderOptions.addAll(it)
-                                    },
-                                    onAudioEncoderTypeMapChange = {
-                                        audioEncoderTypeMap.clear()
-                                        audioEncoderTypeMap.putAll(it)
-                                    },
-                                    cameraSizeOptions = cameraSizeOptions,
-                                    onCameraSizeOptionsChange = {
-                                        cameraSizeOptions.clear()
-                                        cameraSizeOptions.addAll(it)
-                                    },
-                                    onSessionStartedChange = { sessionStarted = it },
-                                    onRefreshEncodersActionChange = { refreshEncodersAction = it },
-                                    onRefreshCameraSizesActionChange = {
-                                        refreshCameraSizesAction = it
-                                    },
-                                    onClearLogsActionChange = { clearLogsAction = it },
-                                    onCanClearLogsChange = { canClearLogs = it },
-                                    onOpenReorderDevicesActionChange = {
-                                        openReorderDevicesAction = it
-                                    },
-                                    onOpenAdvancedPage = { rootBackStack.add(RootScreen.Advanced) },
-                                    onOpenFullscreenPage = { session ->
-                                        rootBackStack.add(
-                                            RootScreen.Fullscreen(
-                                                launch = FullscreenControlLaunch(
-                                                    deviceName = session.deviceName,
-                                                    width = session.width,
-                                                    height = session.height,
-                                                    codec = session.codec,
-                                                ),
-                                            ),
-                                        )
-                                    },
-                                    adbPairingAutoDiscoverOnDialogOpen = adbPairingAutoDiscoverOnDialogOpen,
-                                    adbAutoReconnectPairedDevice = adbAutoReconnectPairedDevice,
-                                    adbMdnsLanDiscoveryEnabled = adbMdnsLanDiscoveryEnabled,
-                                )
+                                    navigationActions = navigationActions,
+                                    fullscreenActions = fullscreenActions,
+                                ) {
+                                    DeviceTabScreen()
+                                }
                             }
 
                             MainTabDestination.Settings -> Scaffold(
@@ -571,55 +424,16 @@ fun MainPage() {
                                     )
                                 },
                             ) { pagePadding ->
-                                SettingsScreen(
+                                ProvideScrcpyUiEnvironment(
+                                    viewModel = viewModel,
                                     contentPadding = pagePadding,
-                                    fullscreenDebugInfoEnabled = fullscreenDebugInfoEnabled,
-                                    onFullscreenDebugInfoEnabledChange = {
-                                        fullscreenDebugInfoEnabled = it
-                                    },
-                                    keepScreenOnWhenStreamingEnabled = keepScreenOnWhenStreamingEnabled,
-                                    onKeepScreenOnWhenStreamingEnabledChange = {
-                                        keepScreenOnWhenStreamingEnabled = it
-                                    },
-                                    devicePreviewCardHeightDp = devicePreviewCardHeightDp,
-                                    onDevicePreviewCardHeightDpChange = {
-                                        devicePreviewCardHeightDp = it.coerceAtLeast(120)
-                                    },
-                                    onOpenReorderDevices = {
-                                        openReorderDevicesAction?.invoke()
-                                    },
-                                    onOpenVirtualButtonOrder = {
-                                        rootBackStack.add(RootScreen.VirtualButtonOrder)
-                                    },
-                                    showFullscreenVirtualButtons = showFullscreenVirtualButtons,
-                                    onShowFullscreenVirtualButtonsChange = {
-                                        showFullscreenVirtualButtons = it
-                                    },
-                                    customServerUri = customServerUri,
-                                    onPickServer = {
-                                        picker.launch(
-                                            arrayOf(
-                                                "application/java-archive",
-                                                "application/octet-stream",
-                                                "*/*"
-                                            )
-                                        )
-                                    },
-                                    onClearServer = { customServerUri = null },
-                                    serverRemotePath = serverRemotePath,
-                                    onServerRemotePathChange = { serverRemotePath = it },
-                                    adbKeyName = adbKeyName,
-                                    onAdbKeyNameChange = { adbKeyName = it },
-                                    adbPairingAutoDiscoverOnDialogOpen = adbPairingAutoDiscoverOnDialogOpen,
-                                    onAdbPairingAutoDiscoverOnDialogOpenChange = {
-                                        adbPairingAutoDiscoverOnDialogOpen = it
-                                    },
-                                    adbAutoReconnectPairedDevice = adbAutoReconnectPairedDevice,
-                                    onAdbAutoReconnectPairedDeviceChange = {
-                                        adbAutoReconnectPairedDevice = it
-                                    },
                                     scrollBehavior = settingsScrollBehavior,
-                                )
+                                    themeBaseIndex = themeBaseIndex,
+                                    navigationActions = navigationActions,
+                                    fullscreenActions = fullscreenActions,
+                                ) {
+                                    SettingsScreen()
+                                }
                             }
                         }
                     }
@@ -628,11 +442,6 @@ fun MainPage() {
         }
 
         entry(RootScreen.Advanced) {
-            val videoEncoderDropdownItems = listOf("默认") + videoEncoderOptions
-            val audioEncoderDropdownItems = listOf("默认") + audioEncoderOptions
-            val videoEncoderIndex = (videoEncoderOptions.indexOf(videoEncoder) + 1).coerceAtLeast(0)
-            val audioEncoderIndex = (audioEncoderOptions.indexOf(audioEncoder) + 1).coerceAtLeast(0)
-
             Scaffold(
                 topBar = {
                     TopAppBar(
@@ -650,90 +459,17 @@ fun MainPage() {
                 },
                 snackbarHost = { SnackbarHost(snackHostState) },
             ) { pagePadding ->
-                AdvancedConfigPage(
+                ProvideScrcpyUiEnvironment(
+                    viewModel = viewModel,
                     contentPadding = pagePadding,
                     scrollBehavior = advancedScrollBehavior,
-                    sessionStarted = sessionStarted,
-                    snackbarHostState = snackHostState,
-                    audioEnabled = audioEnabled,
-                    noControl = noControl,
-                    onNoControlChange = {
-                        noControl = it
-                        if (it) {
-                            turnScreenOff = false
-                        }
-                    },
-                    audioDup = audioDup,
-                    onAudioDupChange = { audioDup = it },
-                    audioSourcePreset = audioSourcePreset,
-                    onAudioSourcePresetChange = { audioSourcePreset = it },
-                    audioSourceCustom = audioSourceCustom,
-                    onAudioSourceCustomChange = { audioSourceCustom = it },
-                    videoSourcePreset = videoSourcePreset,
-                    onVideoSourcePresetChange = { videoSourcePreset = it },
-                    cameraIdInput = cameraIdInput,
-                    onCameraIdInputChange = { cameraIdInput = it },
-                    cameraFacingPreset = cameraFacingPreset,
-                    onCameraFacingPresetChange = { cameraFacingPreset = it },
-                    cameraSizePreset = cameraSizePreset,
-                    onCameraSizePresetChange = { cameraSizePreset = it },
-                    cameraSizeCustom = cameraSizeCustom,
-                    onCameraSizeCustomChange = { cameraSizeCustom = it },
-                    cameraSizeDropdownItems = listOf("默认") + cameraSizeOptions + listOf("自定义"),
-                    cameraSizeIndex = when (cameraSizePreset) {
-                        "custom" -> cameraSizeOptions.size + 1
-                        in cameraSizeOptions -> cameraSizeOptions.indexOf(cameraSizePreset) + 1
-                        else -> 0
-                    },
-                    cameraArInput = cameraArInput,
-                    onCameraArInputChange = { cameraArInput = it },
-                    cameraFpsInput = cameraFpsInput,
-                    onCameraFpsInputChange = { cameraFpsInput = it },
-                    cameraHighSpeed = cameraHighSpeed,
-                    onCameraHighSpeedChange = { cameraHighSpeed = it },
-                    noAudioPlayback = noAudioPlayback,
-                    onNoAudioPlaybackChange = { noAudioPlayback = it },
-                    noVideo = noVideo,
-                    onNoVideoChange = { noVideo = it },
-                    requireAudio = requireAudio,
-                    onRequireAudioChange = { requireAudio = it },
-                    turnScreenOff = turnScreenOff,
-                    onTurnScreenOffChange = { turnScreenOff = it },
-                    maxSizeInput = maxSizeInput,
-                    onMaxSizeInputChange = { maxSizeInput = it },
-                    maxFpsInput = maxFpsInput,
-                    onMaxFpsInputChange = { maxFpsInput = it },
-                    videoEncoderDropdownItems = videoEncoderDropdownItems,
-                    videoEncoderTypeMap = videoEncoderTypeMap,
-                    videoEncoderIndex = videoEncoderIndex,
-                    onVideoEncoderChange = { videoEncoder = it },
-                    videoCodecOptions = videoCodecOptions,
-                    onVideoCodecOptionsChange = { videoCodecOptions = it },
-                    audioEncoderDropdownItems = audioEncoderDropdownItems,
-                    audioEncoderTypeMap = audioEncoderTypeMap,
-                    audioEncoderIndex = audioEncoderIndex,
-                    onAudioEncoderChange = { audioEncoder = it },
-                    audioCodecOptions = audioCodecOptions,
-                    onAudioCodecOptionsChange = { audioCodecOptions = it },
-                    onRefreshEncoders = { refreshEncodersAction?.invoke() },
-                    onRefreshCameraSizes = { refreshCameraSizesAction?.invoke() },
-                    newDisplayWidth = newDisplayWidth,
-                    onNewDisplayWidthChange = { newDisplayWidth = it },
-                    newDisplayHeight = newDisplayHeight,
-                    onNewDisplayHeightChange = { newDisplayHeight = it },
-                    newDisplayDpi = newDisplayDpi,
-                    onNewDisplayDpiChange = { newDisplayDpi = it },
-                    displayIdInput = displayIdInput,
-                    onDisplayIdInputChange = { displayIdInput = it },
-                    cropWidth = cropWidth,
-                    onCropWidthChange = { cropWidth = it },
-                    cropHeight = cropHeight,
-                    onCropHeightChange = { cropHeight = it },
-                    cropX = cropX,
-                    onCropXChange = { cropX = it },
-                    cropY = cropY,
-                    onCropYChange = { cropY = it },
-                )
+                    snackHostState = snackHostState,
+                    themeBaseIndex = themeBaseIndex,
+                    navigationActions = navigationActions,
+                    fullscreenActions = fullscreenActions,
+                ) {
+                    AdvancedConfigPage()
+                }
             }
         }
 
@@ -755,29 +491,31 @@ fun MainPage() {
                     )
                 },
             ) { pagePadding ->
-                VirtualButtonOrderPage(
+                ProvideScrcpyUiEnvironment(
+                    viewModel = viewModel,
                     contentPadding = pagePadding,
                     scrollBehavior = advancedScrollBehavior,
-                    layoutString = virtualButtonsLayout,
-                    onLayoutChange = { layout ->
-                        virtualButtonsLayout = layout
-                    },
-                    showPreviewText = showPreviewVirtualButtonText,
-                    onShowPreviewTextChange = { showPreviewVirtualButtonText = it },
-                )
+                    themeBaseIndex = themeBaseIndex,
+                    navigationActions = navigationActions,
+                    fullscreenActions = fullscreenActions,
+                ) {
+                    VirtualButtonOrderPage()
+                }
             }
         }
 
         entry<RootScreen.Fullscreen> { screen ->
-            FullscreenControlPage(
-                launch = screen.launch,
-                nativeCore = nativeCore,
-                virtualButtonsLayout = virtualButtonsLayout,
-                showDebugInfo = fullscreenDebugInfoEnabled,
-                showVirtualButtons = showFullscreenVirtualButtons,
-                onVideoSizeChanged = { _, _ -> },
-                onDismiss = { popRoot() },
-            )
+            LaunchedEffect(screen.launch) {
+                viewModel.fullscreenLaunch = screen.launch
+            }
+            ProvideScrcpyUiEnvironment(
+                viewModel = viewModel,
+                navigationActions = navigationActions,
+                fullscreenActions = fullscreenActions,
+                themeBaseIndex = themeBaseIndex,
+            ) {
+                FullscreenControlPage()
+            }
         }
     }
 
