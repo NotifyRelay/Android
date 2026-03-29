@@ -21,6 +21,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
@@ -84,14 +85,65 @@ private val DeviceShortcutStateListSaver =
 
 @Composable
 fun ScrcpyDevicePage(
-    contentPadding: PaddingValues,
-    nativeCore: NativeCoreFacade,
-    snack: SnackbarHostState,
-    scrollBehavior: ScrollBehavior,
-    onOpenFullscreenPage: (ScrcpySessionInfo) -> Unit,
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+    nativeCore: NativeCoreFacade? = null,
+    snack: SnackbarHostState? = null,
+    scrollBehavior: ScrollBehavior? = null,
+    onOpenFullscreenPage: ((ScrcpySessionInfo) -> Unit)? = null,
     adbPairingAutoDiscoverOnDialogOpen: Boolean = false,
     adbAutoReconnectPairedDevice: Boolean = false,
     adbMdnsLanDiscoveryEnabled: Boolean = true,
+) {
+    val context = LocalContext.current
+    val resolvedNativeCore = nativeCore ?: remember(context) { NativeCoreFacade.get(context.applicationContext) }
+    val resolvedSnack = snack ?: remember { SnackbarHostState() }
+    
+    var fullscreenLaunch by remember { mutableStateOf<FullscreenControlLaunch?>(null) }
+    
+    fullscreenLaunch?.let { launch ->
+        FullscreenControlPage(
+            launch = launch,
+            nativeCore = resolvedNativeCore,
+            virtualButtonsLayout = "",
+            showDebugInfo = false,
+            showVirtualButtons = false,
+            onVideoSizeChanged = { _, _ -> },
+            onDismiss = { fullscreenLaunch = null },
+        )
+        return
+    }
+    
+    val internalOnOpenFullscreenPage: (ScrcpySessionInfo) -> Unit = onOpenFullscreenPage ?: { sessionInfo ->
+        fullscreenLaunch = FullscreenControlLaunch(
+            deviceName = sessionInfo.deviceName,
+            width = sessionInfo.width,
+            height = sessionInfo.height,
+            codec = sessionInfo.codec,
+        )
+    }
+    
+    ScrcpyDevicePageImpl(
+        contentPadding = contentPadding,
+        nativeCore = resolvedNativeCore,
+        snack = resolvedSnack,
+        scrollBehavior = scrollBehavior,
+        onOpenFullscreenPage = internalOnOpenFullscreenPage,
+        adbPairingAutoDiscoverOnDialogOpen = adbPairingAutoDiscoverOnDialogOpen,
+        adbAutoReconnectPairedDevice = adbAutoReconnectPairedDevice,
+        adbMdnsLanDiscoveryEnabled = adbMdnsLanDiscoveryEnabled,
+    )
+}
+
+@Composable
+private fun ScrcpyDevicePageImpl(
+    contentPadding: PaddingValues,
+    nativeCore: NativeCoreFacade,
+    snack: SnackbarHostState,
+    scrollBehavior: ScrollBehavior?,
+    onOpenFullscreenPage: (ScrcpySessionInfo) -> Unit,
+    adbPairingAutoDiscoverOnDialogOpen: Boolean,
+    adbAutoReconnectPairedDevice: Boolean,
+    adbMdnsLanDiscoveryEnabled: Boolean,
 ) {
     val context = LocalContext.current
     val haptics = rememberAppHaptics()

@@ -22,7 +22,7 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 @Composable
 fun AppPageLazyColumn(
     contentPadding: PaddingValues,
-    scrollBehavior: ScrollBehavior,
+    scrollBehavior: ScrollBehavior?,
     modifier: Modifier = Modifier,
     state: LazyListState = rememberLazyListState(),
     itemSpacing: Dp = UiSpacing.PageItem,
@@ -40,12 +40,18 @@ fun AppPageLazyColumn(
         Modifier
     }
 
+    val nestedScrollModifier = if (scrollBehavior != null) {
+        Modifier.nestedScroll(scrollBehavior.nestedScrollConnection)
+    } else {
+        Modifier
+    }
+
     LazyColumn(
         modifier = modifier
             .fillMaxSize()
             .then(focusClearModifier)
             .overScrollVertical()
-            .nestedScroll(scrollBehavior.nestedScrollConnection)
+            .then(nestedScrollModifier)
             .padding(contentPadding),
         state = state,
         contentPadding = PaddingValues(horizontal = horizontalPadding, vertical = verticalPadding),
