@@ -12,7 +12,7 @@ import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.services.loadDevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.loadMainSettings
 
-class ScrcpyUiViewModel(private val app: Application) : ViewModel() {
+class ScrcpyUiViewModel private constructor(private val app: Application) : ViewModel() {
     val nativeCore: NativeCoreFacade = NativeCoreFacade.get(app.applicationContext)
 
     private val mainSettings = loadMainSettings(app)
@@ -89,11 +89,22 @@ class ScrcpyUiViewModel(private val app: Application) : ViewModel() {
     var clearLogsAction by mutableStateOf<(() -> Unit)?>(null)
     var openReorderDevicesAction by mutableStateOf<(() -> Unit)?>(null)
 
+    companion object {
+        @Volatile
+        private var instance: ScrcpyUiViewModel? = null
+        
+        fun getInstance(app: Application): ScrcpyUiViewModel {
+            return instance ?: synchronized(this) {
+                instance ?: ScrcpyUiViewModel(app).also { instance = it }
+            }
+        }
+    }
+    
     class Factory(private val app: Application) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(ScrcpyUiViewModel::class.java)) {
-                return ScrcpyUiViewModel(app) as T
+                return getInstance(app) as T
             }
             error("Unknown ViewModel class: ${modelClass.name}")
         }
