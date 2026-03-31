@@ -65,8 +65,6 @@ object ScrcpyPreferenceKeys {
     const val FULLSCREEN_DEBUG_INFO = "fullscreen_debug_info"
     const val SHOW_FULLSCREEN_VIRTUAL_BUTTONS = "show_fullscreen_virtual_buttons"
     const val KEEP_SCREEN_ON_WHEN_STREAMING = "keep_screen_on_when_streaming"
-    const val DEVICE_PREVIEW_CARD_HEIGHT_DP = "device_preview_card_height_dp"
-    const val PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT = "preview_virtual_button_show_text"
     const val VIRTUAL_BUTTONS_LAYOUT = "virtual_buttons_layout"
 
     const val CUSTOM_SERVER_URI = "custom_server_uri"

@@ -11,9 +11,7 @@ internal data class MainSettings(
     val videoCodec: String = ScrcpyDefaults.VIDEO_CODEC,
     val fullscreenDebugInfoEnabled: Boolean = ScrcpyDefaults.FULLSCREEN_DEBUG_INFO,
     val showFullscreenVirtualButtons: Boolean = ScrcpyDefaults.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
-    val showPreviewVirtualButtonText: Boolean = ScrcpyDefaults.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
     val keepScreenOnWhenStreamingEnabled: Boolean = ScrcpyDefaults.KEEP_SCREEN_ON_WHEN_STREAMING,
-    val devicePreviewCardHeightDp: Int = ScrcpyDefaults.DEVICE_PREVIEW_CARD_HEIGHT_DP,
     val virtualButtonsLayout: String = ScrcpyDefaults.VIRTUAL_BUTTONS_LAYOUT,
     val customServerUri: String? = ScrcpyDefaults.CUSTOM_SERVER_URI,
     val serverRemotePath: String = ScrcpyDefaults.SERVER_REMOTE_PATH_INPUT,
@@ -97,24 +95,12 @@ internal fun loadMainSettings(context: Context): MainSettings {
             ScrcpyDefaults.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
             StorageManager.PrefsType.SCRCPY,
         ),
-        showPreviewVirtualButtonText = StorageManager.getBoolean(
-            context,
-            ScrcpyPreferenceKeys.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
-            ScrcpyDefaults.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
-            StorageManager.PrefsType.SCRCPY,
-        ),
         keepScreenOnWhenStreamingEnabled = StorageManager.getBoolean(
             context,
             ScrcpyPreferenceKeys.KEEP_SCREEN_ON_WHEN_STREAMING,
             ScrcpyDefaults.KEEP_SCREEN_ON_WHEN_STREAMING,
             StorageManager.PrefsType.SCRCPY,
         ),
-        devicePreviewCardHeightDp = StorageManager.getInt(
-            context,
-            ScrcpyPreferenceKeys.DEVICE_PREVIEW_CARD_HEIGHT_DP,
-            ScrcpyDefaults.DEVICE_PREVIEW_CARD_HEIGHT_DP,
-            StorageManager.PrefsType.SCRCPY,
-        ).coerceAtLeast(120),
         virtualButtonsLayout = StorageManager.getString(
             context,
             ScrcpyPreferenceKeys.VIRTUAL_BUTTONS_LAYOUT,
@@ -193,20 +179,8 @@ internal fun saveMainSettings(context: Context, settings: MainSettings) {
     )
     StorageManager.putBoolean(
         context,
-        ScrcpyPreferenceKeys.PREVIEW_VIRTUAL_BUTTON_SHOW_TEXT,
-        settings.showPreviewVirtualButtonText,
-        StorageManager.PrefsType.SCRCPY,
-    )
-    StorageManager.putBoolean(
-        context,
         ScrcpyPreferenceKeys.KEEP_SCREEN_ON_WHEN_STREAMING,
         settings.keepScreenOnWhenStreamingEnabled,
-        StorageManager.PrefsType.SCRCPY,
-    )
-    StorageManager.putInt(
-        context,
-        ScrcpyPreferenceKeys.DEVICE_PREVIEW_CARD_HEIGHT_DP,
-        settings.devicePreviewCardHeightDp.coerceAtLeast(120),
         StorageManager.PrefsType.SCRCPY,
     )
     StorageManager.putString(

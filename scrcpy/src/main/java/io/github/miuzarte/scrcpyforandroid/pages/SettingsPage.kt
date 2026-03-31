@@ -27,7 +27,6 @@ import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
 import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.data.config.ScrcpyDefaults
-import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlide
 import io.github.miuzarte.scrcpyforandroid.widgets.SectionSmallTitle
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
@@ -37,7 +36,6 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperSwitch
-import kotlin.math.roundToInt
 
 @Composable
 fun ScrcpySettingsPage(
@@ -100,25 +98,6 @@ fun ScrcpySettingsPage(
                         summary = "Scrcpy 启动后保持本机屏幕常亮，避免锁屏导致 ADB 断开",
                         checked = viewModel.keepScreenOnWhenStreamingEnabled,
                         onCheckedChange = { viewModel.keepScreenOnWhenStreamingEnabled = it },
-                    )
-                    SuperSlide(
-                        title = "预览卡高度",
-                        summary = "设备页预览卡高度",
-                        value = viewModel.devicePreviewCardHeightDp.toFloat(),
-                        onValueChange = {
-                            viewModel.devicePreviewCardHeightDp = it.roundToInt().coerceAtLeast(120)
-                        },
-                        valueRange = 160f..600f,
-                        steps = 439,
-                        unit = "dp",
-                        displayFormatter = { it.roundToInt().toString() },
-                        inputInitialValue = viewModel.devicePreviewCardHeightDp.toString(),
-                        inputFilter = { it.filter(Char::isDigit) },
-                        inputValueRange = 120f..Float.MAX_VALUE,
-                        onInputConfirm = { raw ->
-                            raw.toIntOrNull()
-                                ?.let { viewModel.devicePreviewCardHeightDp = it.coerceAtLeast(120) }
-                        },
                     )
                     SuperArrow(
                         title = "快速设备排序",

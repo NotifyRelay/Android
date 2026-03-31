@@ -6,10 +6,8 @@ import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
 import androidx.activity.compose.BackHandler
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -47,10 +45,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalFocusManager
@@ -251,110 +247,6 @@ internal fun PairingCard(
             onPair(host, port, code)
         },
     )
-}
-
-@Composable
-internal fun PreviewCard(
-    sessionInfo: ScrcpySessionInfo?,
-    nativeCore: NativeCoreFacade,
-    previewHeightDp: Int,
-    controlsVisible: Boolean,
-    onTapped: () -> Unit,
-    onOpenFullscreenHaptic: (() -> Unit)? = null,
-    onOpenFullscreen: () -> Unit,
-) {
-    val alpha by animateFloatAsState(if (controlsVisible) 1f else 0f, label = "preview-controls")
-
-    Card {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(previewHeightDp.coerceAtLeast(120).dp)
-                .pointerInput(sessionInfo) { detectTapGestures(onTap = { onTapped() }) },
-        ) {
-            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-                val sessionAspect = if (sessionInfo == null || sessionInfo.height == 0) {
-                    16f / 9f
-                } else {
-                    sessionInfo.width.toFloat() / sessionInfo.height.toFloat()
-                }
-                val containerAspect = maxWidth.value / maxHeight.value
-                val fittedModifier = if (sessionAspect > containerAspect) {
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(sessionAspect)
-                } else {
-                    Modifier
-                        .fillMaxHeight()
-                        .aspectRatio(sessionAspect)
-                }
-
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.Center)
-                        .then(fittedModifier),
-                ) {
-                    ScrcpyVideoSurface(
-                        modifier = Modifier.fillMaxSize(),
-                        nativeCore = nativeCore,
-                        session = sessionInfo,
-                    )
-                }
-            }
-
-            if (sessionInfo != null) {
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomEnd)
-                        .padding(UiSpacing.CardContent),
-                ) {
-                    Button(
-                        onClick = {
-                            if (alpha > 0.1) {
-                                onOpenFullscreenHaptic?.invoke()
-                                onOpenFullscreen()
-                            }
-                        },
-                        modifier = Modifier.alpha(alpha),
-                    ) {
-                        Icon(
-                            Icons.Rounded.Fullscreen,
-                            contentDescription = "全屏",
-                        )
-                        Spacer(Modifier.width(UiSpacing.SectionTitleBottom))
-                        Text("全屏")
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-internal fun VirtualButtonCard(
-    busy: Boolean,
-    outsideActions: List<VirtualButtonAction>,
-    moreActions: List<VirtualButtonAction>,
-    showText: Boolean,
-    onAction: (VirtualButtonAction) -> Unit,
-) {
-    val bar = remember(outsideActions, moreActions) {
-        VirtualButtonBar(
-            outsideActions = outsideActions,
-            moreActions = moreActions,
-        )
-    }
-
-    Card {
-        bar.Preview(
-            enabled = !busy,
-            showText = showText,
-            onAction = onAction,
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(UiSpacing.CardContent),
-        )
-    }
 }
 
 @Composable
