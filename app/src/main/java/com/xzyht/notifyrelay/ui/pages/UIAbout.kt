@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.ui.pages
 
-import android.content.Intent
 import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -30,7 +29,6 @@ import github.xzynine.checkupdata.CheckUpdateManager
 import github.xzynine.checkupdata.model.ReleaseInfo
 import github.xzynine.checkupdata.model.UpdateResult
 import github.xzynine.checkupdata.version.VersionRule
-import io.github.miuzarte.scrcpyforandroid.MainActivity
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
@@ -43,8 +41,8 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.WindowDropdown
 import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.extra.WindowDropdown
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Date
 
@@ -127,7 +125,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                     }
                     lastClickTime = currentTime
                     
-                    if (clickCount >= 3 && clickCount < 5) {
+                    if (clickCount in 3..<5) {
                         Toast.makeText(context, "再点击 ${5 - clickCount} 次进入开发者模式", Toast.LENGTH_SHORT).show()
                     } else if (clickCount >= 5) {
                         Toast.makeText(context, "开发者模式已激活", Toast.LENGTH_SHORT).show()
@@ -217,12 +215,12 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                 singleLine = true
             )
 
+
+
+            if (isDeveloperModeEnabled) {
             Spacer(modifier = Modifier.height(16.dp))
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            if (isDeveloperModeEnabled) {
-                Spacer(modifier = Modifier.height(8.dp))
                 SuperArrow(
                     title = "开发者模式",
                     summary = "点击进入开发者模式设置",
@@ -258,20 +256,6 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
             Spacer(modifier = Modifier.height(16.dp))
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
-            Spacer(modifier = Modifier.height(8.dp))
-            SuperArrow(
-                title = "Scrcpy 投屏",
-                summary = "Android 设备投屏控制工具",
-                onClick = {
-                    val intent = Intent(context, MainActivity::class.java)
-                    context.startActivity(intent)
-                },
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            Spacer(modifier = Modifier.height(32.dp))
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
             Text(
                 text = "© 2026 Notify Relay",

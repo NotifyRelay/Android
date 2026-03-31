@@ -1095,11 +1095,13 @@ fun DeviceTabScreen() {
                     },
                     onOpenFullscreen = {
                         if (currentTargetHost.isNotBlank()) {
+                            val savedDeviceName = quickDevices.find { it.host == currentTargetHost && it.port == currentTargetPort }?.name?.ifBlank { null }
+                            val displayName = savedDeviceName ?: connectedDeviceLabel
                             ShortcutLaunchActivity.startFullscreenControl(
                                 context,
                                 currentTargetHost,
                                 currentTargetPort,
-                                connectedDeviceLabel,
+                                displayName,
                                 videoBitRateMbps = bitRateMbps,
                                 audioBitRateKbps = audioBitRateKbps,
                                 videoCodec = viewModel.videoCodec,

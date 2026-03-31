@@ -37,198 +37,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
 import top.yukonga.miuix.kmp.extra.SuperSwitch
-import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import kotlin.math.roundToInt
-
-private data class ThemeModeOption(
-    val label: String,
-    val mode: ColorSchemeMode,
-)
-
-private val THEME_BASE_OPTIONS = listOf(
-    ThemeModeOption("跟随系统", ColorSchemeMode.System),
-    ThemeModeOption("浅色", ColorSchemeMode.Light),
-    ThemeModeOption("深色", ColorSchemeMode.Dark),
-)
-
-fun resolveThemeMode(baseIndex: Int): ColorSchemeMode {
-    return when (baseIndex.coerceIn(0, 2)) {
-        0 -> ColorSchemeMode.System
-        1 -> ColorSchemeMode.Light
-        else -> ColorSchemeMode.Dark
-    }
-}
-
-@Composable
-internal fun SettingsScreen() {
-    val viewModel = LocalScrcpyUiViewModel.current
-    val navigation = LocalScrcpyNavigation.current
-    val contentPadding = LocalScrcpyPagePadding.current
-    val scrollBehavior = LocalScrcpyScrollBehavior.current
-    val context = LocalContext.current
-
-    // 设置
-    AppPageLazyColumn(
-        contentPadding = contentPadding,
-        scrollBehavior = scrollBehavior,
-    ) {
-        item {
-            SectionSmallTitle("投屏")
-            Card {
-                SuperSwitch(
-                    title = "启用调试信息",
-                    summary = "在全屏界面显示触点数量、设备分辨率和实时 FPS",
-                    checked = viewModel.fullscreenDebugInfoEnabled,
-                    onCheckedChange = { viewModel.fullscreenDebugInfoEnabled = it },
-                )
-                SuperSwitch(
-                    title = "投屏时保持屏幕常亮",
-                    summary = "Scrcpy 启动后保持本机屏幕常亮，避免锁屏导致 ADB 断开",
-                    checked = viewModel.keepScreenOnWhenStreamingEnabled,
-                    onCheckedChange = { viewModel.keepScreenOnWhenStreamingEnabled = it },
-                )
-                SuperSlide(
-                    title = "预览卡高度",
-                    summary = "设备页预览卡高度",
-                    value = viewModel.devicePreviewCardHeightDp.toFloat(),
-                    onValueChange = {
-                        viewModel.devicePreviewCardHeightDp = it.roundToInt().coerceAtLeast(120)
-                    },
-                    valueRange = 160f..600f,
-                    steps = 439,
-                    unit = "dp",
-                    displayFormatter = { it.roundToInt().toString() },
-                    inputInitialValue = viewModel.devicePreviewCardHeightDp.toString(),
-                    inputFilter = { it.filter(Char::isDigit) },
-                    inputValueRange = 120f..Float.MAX_VALUE,
-                    onInputConfirm = { raw ->
-                        raw.toIntOrNull()
-                            ?.let { viewModel.devicePreviewCardHeightDp = it.coerceAtLeast(120) }
-                    },
-                )
-                SuperArrow(
-                    title = "快速设备排序",
-                    summary = "手动排序设备页的快速设备",
-                    onClick = navigation.openReorderDevices,
-                )
-                SuperArrow(
-                    title = "虚拟按钮排序",
-                    summary = "手动排序预览/全屏时的虚拟按钮，并选择哪些按钮展示在外",
-                    onClick = navigation.openVirtualButtonOrder,
-                )
-                SuperSwitch(
-                    title = "全屏显示虚拟按钮",
-                    summary = "在全屏控制页底部显示返回键、主页键等虚拟按钮",
-                    checked = viewModel.showFullscreenVirtualButtons,
-                    onCheckedChange = { viewModel.showFullscreenVirtualButtons = it },
-                )
-            }
-
-            SectionSmallTitle("scrcpy-server")
-            Card {
-                Spacer(modifier = Modifier.padding(top = UiSpacing.CardContent))
-                Text(
-                    text = "自定义 binary",
-                    modifier = Modifier
-                        .padding(horizontal = UiSpacing.CardTitle)
-                        .padding(bottom = UiSpacing.FieldLabelBottom),
-                    fontWeight = FontWeight.Medium,
-                )
-                TextField(
-                    value = viewModel.customServerUri ?: "",
-                    onValueChange = {},
-                    readOnly = true,
-                    label = "scrcpy-server-v3.3.4",
-                    useLabelAsPlaceholder = viewModel.customServerUri == null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = UiSpacing.CardContent)
-                        .padding(bottom = UiSpacing.CardContent),
-                    trailingIcon = {
-                        Row(modifier = Modifier.padding(end = UiSpacing.SectionTitleLeadingGap)) {
-                            if (viewModel.customServerUri != null) IconButton(onClick = { viewModel.customServerUri = null }) {
-                                Icon(Icons.Rounded.Clear, contentDescription = "清空")
-                            }
-                            IconButton(onClick = navigation.pickServer) {
-                                Icon(Icons.Rounded.FileOpen, contentDescription = "选择文件")
-                            }
-                        }
-                    },
-                )
-                Text(
-                    text = "Remote Path",
-                    modifier = Modifier
-                        .padding(horizontal = UiSpacing.CardTitle)
-                        .padding(bottom = UiSpacing.FieldLabelBottom),
-                    fontWeight = FontWeight.Medium,
-                )
-                TextField(
-                    value = viewModel.serverRemotePath,
-                    onValueChange = { viewModel.serverRemotePath = it },
-                    label = ScrcpyDefaults.SERVER_REMOTE_PATH,
-                    useLabelAsPlaceholder = true,
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = UiSpacing.CardContent)
-                        .padding(bottom = UiSpacing.CardContent),
-                )
-            }
-
-            SectionSmallTitle("ADB")
-            Card {
-                Text(
-                    text = "自定义 ADB 密钥名",
-                    modifier = Modifier
-                        .padding(horizontal = UiSpacing.CardTitle)
-                        .padding(top = UiSpacing.CardContent, bottom = UiSpacing.FieldLabelBottom),
-                    fontWeight = FontWeight.Medium,
-                )
-                TextField(
-                    value = viewModel.adbKeyName,
-                    onValueChange = { viewModel.adbKeyName = it },
-                    label = ScrcpyDefaults.ADB_KEY_NAME,
-                    useLabelAsPlaceholder = true,
-                    singleLine = true,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = UiSpacing.CardContent)
-                        .padding(bottom = UiSpacing.CardContent),
-                )
-                SuperSwitch(
-                    title = "配对时自动启用发现服务",
-                    summary = "打开配对弹窗后自动搜索可用配对端口",
-                    checked = viewModel.adbPairingAutoDiscoverOnDialogOpen,
-                    onCheckedChange = { viewModel.adbPairingAutoDiscoverOnDialogOpen = it },
-                )
-                SuperSwitch(
-                    title = "自动重连已配对设备",
-                    summary = "自动发现开启无线调试的设备，更新快速设备的随机端口并尝试连接（效果比较随缘）",
-                    checked = viewModel.adbAutoReconnectPairedDevice,
-                    onCheckedChange = { viewModel.adbAutoReconnectPairedDevice = it },
-                )
-            }
-
-            SectionSmallTitle("关于")
-            Card {
-                SuperArrow(
-                    title = "前往仓库",
-                    summary = "github.com/Miuzarte/ScrcpyForAndroid",
-                    onClick = {
-                        val intent = Intent(
-                            Intent.ACTION_VIEW,
-                            "https://github.com/Miuzarte/ScrcpyForAndroid".toUri()
-                        )
-                        context.startActivity(intent)
-                    },
-                )
-            }
-        }
-
-        // TODO: 放进 [AppPageLazyColumn] 里
-        item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
-    }
-}
 
 @Composable
 fun ScrcpySettingsPage(
@@ -270,6 +79,167 @@ fun ScrcpySettingsPage(
         themeBaseIndex = themeBaseIndex,
         navigationActions = navigationActions,
     ) {
-        SettingsScreen()
+        val contentPadding = LocalScrcpyPagePadding.current
+        val scrollBehavior = LocalScrcpyScrollBehavior.current
+
+        AppPageLazyColumn(
+            contentPadding = contentPadding,
+            scrollBehavior = scrollBehavior,
+        ) {
+            item {
+                SectionSmallTitle("投屏")
+                Card {
+                    SuperSwitch(
+                        title = "启用调试信息",
+                        summary = "在全屏界面显示触点数量、设备分辨率和实时 FPS",
+                        checked = viewModel.fullscreenDebugInfoEnabled,
+                        onCheckedChange = { viewModel.fullscreenDebugInfoEnabled = it },
+                    )
+                    SuperSwitch(
+                        title = "投屏时保持屏幕常亮",
+                        summary = "Scrcpy 启动后保持本机屏幕常亮，避免锁屏导致 ADB 断开",
+                        checked = viewModel.keepScreenOnWhenStreamingEnabled,
+                        onCheckedChange = { viewModel.keepScreenOnWhenStreamingEnabled = it },
+                    )
+                    SuperSlide(
+                        title = "预览卡高度",
+                        summary = "设备页预览卡高度",
+                        value = viewModel.devicePreviewCardHeightDp.toFloat(),
+                        onValueChange = {
+                            viewModel.devicePreviewCardHeightDp = it.roundToInt().coerceAtLeast(120)
+                        },
+                        valueRange = 160f..600f,
+                        steps = 439,
+                        unit = "dp",
+                        displayFormatter = { it.roundToInt().toString() },
+                        inputInitialValue = viewModel.devicePreviewCardHeightDp.toString(),
+                        inputFilter = { it.filter(Char::isDigit) },
+                        inputValueRange = 120f..Float.MAX_VALUE,
+                        onInputConfirm = { raw ->
+                            raw.toIntOrNull()
+                                ?.let { viewModel.devicePreviewCardHeightDp = it.coerceAtLeast(120) }
+                        },
+                    )
+                    SuperArrow(
+                        title = "快速设备排序",
+                        summary = "手动排序设备页的快速设备",
+                        onClick = navigationActions.openReorderDevices,
+                    )
+                    SuperArrow(
+                        title = "虚拟按钮排序",
+                        summary = "手动排序预览/全屏时的虚拟按钮，并选择哪些按钮展示在外",
+                        onClick = navigationActions.openVirtualButtonOrder,
+                    )
+                    SuperSwitch(
+                        title = "全屏显示虚拟按钮",
+                        summary = "在全屏控制页底部显示返回键、主页键等虚拟按钮",
+                        checked = viewModel.showFullscreenVirtualButtons,
+                        onCheckedChange = { viewModel.showFullscreenVirtualButtons = it },
+                    )
+                }
+
+                SectionSmallTitle("scrcpy-server")
+                Card {
+                    Spacer(modifier = Modifier.padding(top = UiSpacing.CardContent))
+                    Text(
+                        text = "自定义 binary",
+                        modifier = Modifier
+                            .padding(horizontal = UiSpacing.CardTitle)
+                            .padding(bottom = UiSpacing.FieldLabelBottom),
+                        fontWeight = FontWeight.Medium,
+                    )
+                    TextField(
+                        value = viewModel.customServerUri ?: "",
+                        onValueChange = {},
+                        readOnly = true,
+                        label = "scrcpy-server-v3.3.4",
+                        useLabelAsPlaceholder = viewModel.customServerUri == null,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = UiSpacing.CardContent)
+                            .padding(bottom = UiSpacing.CardContent),
+                        trailingIcon = {
+                            Row(modifier = Modifier.padding(end = UiSpacing.SectionTitleLeadingGap)) {
+                                if (viewModel.customServerUri != null) IconButton(onClick = { viewModel.customServerUri = null }) {
+                                    Icon(Icons.Rounded.Clear, contentDescription = "清空")
+                                }
+                                IconButton(onClick = navigationActions.pickServer) {
+                                    Icon(Icons.Rounded.FileOpen, contentDescription = "选择文件")
+                                }
+                            }
+                        },
+                    )
+                    Text(
+                        text = "Remote Path",
+                        modifier = Modifier
+                            .padding(horizontal = UiSpacing.CardTitle)
+                            .padding(bottom = UiSpacing.FieldLabelBottom),
+                        fontWeight = FontWeight.Medium,
+                    )
+                    TextField(
+                        value = viewModel.serverRemotePath,
+                        onValueChange = { viewModel.serverRemotePath = it },
+                        label = ScrcpyDefaults.SERVER_REMOTE_PATH,
+                        useLabelAsPlaceholder = true,
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = UiSpacing.CardContent)
+                            .padding(bottom = UiSpacing.CardContent),
+                    )
+                }
+
+                SectionSmallTitle("ADB")
+                Card {
+                    Text(
+                        text = "自定义 ADB 密钥名",
+                        modifier = Modifier
+                            .padding(horizontal = UiSpacing.CardTitle)
+                            .padding(top = UiSpacing.CardContent, bottom = UiSpacing.FieldLabelBottom),
+                        fontWeight = FontWeight.Medium,
+                    )
+                    TextField(
+                        value = viewModel.adbKeyName,
+                        onValueChange = { viewModel.adbKeyName = it },
+                        label = ScrcpyDefaults.ADB_KEY_NAME,
+                        useLabelAsPlaceholder = true,
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = UiSpacing.CardContent)
+                            .padding(bottom = UiSpacing.CardContent),
+                    )
+                    SuperSwitch(
+                        title = "配对时自动启用发现服务",
+                        summary = "打开配对弹窗后自动搜索可用配对端口",
+                        checked = viewModel.adbPairingAutoDiscoverOnDialogOpen,
+                        onCheckedChange = { viewModel.adbPairingAutoDiscoverOnDialogOpen = it },
+                    )
+                    SuperSwitch(
+                        title = "自动重连已配对设备",
+                        summary = "自动发现开启无线调试的设备，更新快速设备的随机端口并尝试连接（效果比较随缘）",
+                        checked = viewModel.adbAutoReconnectPairedDevice,
+                        onCheckedChange = { viewModel.adbAutoReconnectPairedDevice = it },
+                    )
+                }
+
+                SectionSmallTitle("关于")
+                Card {
+                    SuperArrow(
+                        title = "前往仓库",
+                        summary = "github.com/Miuzarte/ScrcpyForAndroid",
+                        onClick = {
+                            val intent = Intent(
+                                Intent.ACTION_VIEW,
+                                "https://github.com/Miuzarte/ScrcpyForAndroid".toUri()
+                            )
+                            context.startActivity(intent)
+                        },
+                    )
+                }
+            }
+
+            item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
+        }
     }
 }

@@ -194,8 +194,13 @@ class ShortcutLaunchActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
 
         val deviceIp = intent?.getStringExtra(EXTRA_DEVICE_IP)
-        val devicePort = intent?.getIntExtra(EXTRA_DEVICE_PORT, ScrcpyDefaults.ADB_PORT) ?: ScrcpyDefaults.ADB_PORT
-        val deviceName = intent?.getStringExtra(EXTRA_DEVICE_NAME) ?: deviceIp ?: "设备"
+            ?: intent?.getStringExtra("shortcut_device_ip")
+        val devicePort = intent?.getIntExtra(EXTRA_DEVICE_PORT, ScrcpyDefaults.ADB_PORT)
+            ?: intent?.getIntExtra("shortcut_device_port", ScrcpyDefaults.ADB_PORT)
+            ?: ScrcpyDefaults.ADB_PORT
+        val deviceName = intent?.getStringExtra(EXTRA_DEVICE_NAME)
+            ?: intent?.getStringExtra("shortcut_device_name")
+            ?: deviceIp ?: "设备"
 
         if (deviceIp.isNullOrBlank()) {
             Toast.makeText(this, "无效的设备信息", Toast.LENGTH_SHORT).show()

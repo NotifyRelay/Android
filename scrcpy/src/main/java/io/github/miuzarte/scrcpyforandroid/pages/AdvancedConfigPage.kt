@@ -64,11 +64,10 @@ private val CAMERA_FACING_OPTIONS = listOf(
 private val CAMERA_FPS_PRESETS = listOf(0, 10, 15, 24, 30, 60, 120, 240, 480, 960)
 
 @Composable
-internal fun AdvancedConfigPage() {
+fun AdvancedConfigPage() {
     val viewModel = LocalScrcpyUiViewModel.current
     val contentPadding = LocalScrcpyPagePadding.current
     val scrollBehavior = LocalScrcpyScrollBehavior.current
-        ?: error("ScrollBehavior is not provided")
     val snackbarHostState = LocalScrcpySnackbarHostState.current ?: remember { SnackbarHostState() }
     val sessionStarted = viewModel.sessionStarted
     val focusManager = LocalFocusManager.current

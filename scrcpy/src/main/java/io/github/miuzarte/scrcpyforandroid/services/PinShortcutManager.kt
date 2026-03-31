@@ -12,7 +12,7 @@ import android.graphics.drawable.Icon
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathNode
 import androidx.compose.ui.graphics.vector.VectorPath
-import io.github.miuzarte.scrcpyforandroid.MainActivity
+import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import notifyrelay.data.config.ScrcpyDefaults
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.ScreenMirroring
@@ -35,7 +35,7 @@ object PinShortcutManager {
         val iconBitmap = createIconBitmapFromImageVector(MiuixIcons.ScreenMirroring)
 
         val intent = Intent(Intent.ACTION_VIEW).apply {
-            setClass(context, MainActivity::class.java)
+            setClass(context, ShortcutLaunchActivity::class.java)
             putExtra("shortcut_device_ip", deviceIp)
             putExtra("shortcut_device_port", devicePort)
             putExtra("shortcut_device_name", deviceName)

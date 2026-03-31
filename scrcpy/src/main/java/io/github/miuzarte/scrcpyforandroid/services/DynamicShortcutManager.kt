@@ -12,7 +12,7 @@ import android.graphics.drawable.Icon
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.PathNode
 import androidx.compose.ui.graphics.vector.VectorPath
-import io.github.miuzarte.scrcpyforandroid.MainActivity
+import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import notifyrelay.data.config.ScrcpyDefaults
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.ScreenMirroring
@@ -32,7 +32,7 @@ object DynamicShortcutManager {
 
         val shortcuts = onlineDevices.map { device ->
             val intent = Intent(Intent.ACTION_VIEW).apply {
-                setClass(context, MainActivity::class.java)
+                setClass(context, ShortcutLaunchActivity::class.java)
                 putExtra("shortcut_device_ip", device.ip)
                 putExtra("shortcut_device_port", ScrcpyDefaults.ADB_PORT)
                 putExtra("shortcut_device_name", device.displayName)

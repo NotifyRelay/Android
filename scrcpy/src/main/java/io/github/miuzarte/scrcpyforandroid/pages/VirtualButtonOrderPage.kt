@@ -34,77 +34,6 @@ import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 
 @Composable
-internal fun VirtualButtonOrderPage() {
-    val viewModel = LocalScrcpyUiViewModel.current
-    val contentPadding = LocalScrcpyPagePadding.current
-    val scrollBehavior = LocalScrcpyScrollBehavior.current
-    val layoutString = viewModel.virtualButtonsLayout
-    val showPreviewText = viewModel.showPreviewVirtualButtonText
-    var buttonItems by remember(layoutString) {
-        mutableStateOf(VirtualButtonActions.parseStoredLayout(layoutString))
-    }
-
-    fun emitChanges() {
-        viewModel.virtualButtonsLayout =
-            VirtualButtonActions.encodeStoredLayout(buttonItems)
-    }
-
-    AppPageLazyColumn(
-        contentPadding = contentPadding,
-        scrollBehavior = scrollBehavior,
-    ) {
-        item {
-            Card {
-                SuperSwitch(
-                    title = "按钮显示文本",
-                    summary = "超过3个建议关闭，只对预览卡下方的虚拟按钮生效",
-                    checked = showPreviewText,
-                    onCheckedChange = { viewModel.showPreviewVirtualButtonText = it },
-                )
-            }
-        }
-
-        item {
-            ReorderableList(
-                itemsProvider = {
-                    buttonItems.map { item ->
-                        val action = item.action
-                        ReorderableList.Item(
-                            id = action.id,
-                            icon = action.icon,
-                            title = if (action.keycode == null) action.title else "${action.title} (${action.keycode})",
-                            subtitle = if (item.showOutside) "显示在外部" else "显示在更多菜单内",
-                            checked = item.showOutside,
-                            checkboxEnabled = action != VirtualButtonAction.MORE,
-                        )
-                    }
-                },
-                orientation = ReorderableList.Orientation.Column,
-                onSettle = { fromIndex, toIndex ->
-                    buttonItems = buttonItems.toMutableList().apply {
-                        add(toIndex, removeAt(fromIndex))
-                    }
-                    emitChanges()
-                },
-                showCheckbox = true,
-                onCheckboxChange = { id, checked ->
-                    buttonItems = buttonItems.map { item ->
-                        if (item.action.id == id) {
-                            item.copy(showOutside = checked)
-                        } else {
-                            item
-                        }
-                    }
-                    emitChanges()
-                },
-            )()
-        }
-
-        item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
-    }
-}
-
-@Composable
 fun ScrcpyVirtualButtonOrderPage(
     onBack: () -> Unit = {},
 ) {
@@ -149,7 +78,71 @@ fun ScrcpyVirtualButtonOrderPage(
             snackHostState = snackHostState,
             themeBaseIndex = themeBaseIndex,
         ) {
-            VirtualButtonOrderPage()
+            val contentPadding = LocalScrcpyPagePadding.current
+            val layoutString = viewModel.virtualButtonsLayout
+            val showPreviewText = viewModel.showPreviewVirtualButtonText
+            var buttonItems by remember(layoutString) {
+                mutableStateOf(VirtualButtonActions.parseStoredLayout(layoutString))
+            }
+
+            fun emitChanges() {
+                viewModel.virtualButtonsLayout =
+                    VirtualButtonActions.encodeStoredLayout(buttonItems)
+            }
+
+            AppPageLazyColumn(
+                contentPadding = contentPadding,
+                scrollBehavior = scrollBehavior,
+            ) {
+                item {
+                    Card {
+                        SuperSwitch(
+                            title = "按钮显示文本",
+                            summary = "超过3个建议关闭，只对预览卡下方的虚拟按钮生效",
+                            checked = showPreviewText,
+                            onCheckedChange = { viewModel.showPreviewVirtualButtonText = it },
+                        )
+                    }
+                }
+
+                item {
+                    ReorderableList(
+                        itemsProvider = {
+                            buttonItems.map { item ->
+                                val action = item.action
+                                ReorderableList.Item(
+                                    id = action.id,
+                                    icon = action.icon,
+                                    title = if (action.keycode == null) action.title else "${action.title} (${action.keycode})",
+                                    subtitle = if (item.showOutside) "显示在外部" else "显示在更多菜单内",
+                                    checked = item.showOutside,
+                                    checkboxEnabled = action != VirtualButtonAction.MORE,
+                                )
+                            }
+                        },
+                        orientation = ReorderableList.Orientation.Column,
+                        onSettle = { fromIndex, toIndex ->
+                            buttonItems = buttonItems.toMutableList().apply {
+                                add(toIndex, removeAt(fromIndex))
+                            }
+                            emitChanges()
+                        },
+                        showCheckbox = true,
+                        onCheckboxChange = { id, checked ->
+                            buttonItems = buttonItems.map { item ->
+                                if (item.action.id == id) {
+                                    item.copy(showOutside = checked)
+                                } else {
+                                    item
+                                }
+                            }
+                            emitChanges()
+                        },
+                    )()
+                }
+
+                item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
+            }
         }
     }
 }
