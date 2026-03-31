@@ -28,6 +28,7 @@ import androidx.compose.ui.platform.LocalContext
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
 import io.github.miuzarte.scrcpyforandroid.services.DevicePageSettings
+import io.github.miuzarte.scrcpyforandroid.services.fetchConnectedDeviceInfo
 import io.github.miuzarte.scrcpyforandroid.services.loadDevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.loadMainSettings
 import io.github.miuzarte.scrcpyforandroid.widgets.FullscreenControlScreen
@@ -392,6 +393,7 @@ private fun ShortcutLaunchScreen(
     var virtualButtonsLayout by remember { mutableStateOf(settings.virtualButtonsLayout) }
     var showDebugInfo by remember { mutableStateOf(settings.fullscreenDebugInfoEnabled) }
     var showVirtualButtons by remember { mutableStateOf(settings.showFullscreenVirtualButtons) }
+    var cameraMirroringSupported by remember { mutableStateOf(true) }
 
     val virtualButtonLayout = remember(virtualButtonsLayout) {
         VirtualButtonActions.splitLayout(VirtualButtonActions.parseStoredLayout(virtualButtonsLayout))
@@ -447,7 +449,52 @@ private fun ShortcutLaunchScreen(
             return@LaunchedEffect
         }
 
+        val deviceInfo = withContext(Dispatchers.IO) {
+            fetchConnectedDeviceInfo(nativeCore, deviceIp, devicePort)
+        }
+        cameraMirroringSupported = deviceInfo.sdkInt !in 0..<31
+
         connectionState = ConnectionState.StartingScrcpy
+
+        val validationError = run {
+            if (sessionParams.noVideo && !sessionParams.audioEnabled) {
+                return@run "--no-video 需要同时启用音频"
+            }
+            if (sessionParams.audioEnabled && sessionParams.audioSourcePreset == "custom" && sessionParams.audioSourceCustom.isBlank()) {
+                return@run "audio-source 选择自定义时不能为空"
+            }
+            val resolvedVideoSource = sessionParams.videoSourcePreset.trim().ifBlank { "display" }
+            if (resolvedVideoSource == "camera" && !cameraMirroringSupported) {
+                return@run "camera mirroring 需要 Android 12+ (SDK 31+)"
+            }
+            val resolvedCameraSize = when (sessionParams.cameraSizePreset) {
+                "custom" -> sessionParams.cameraSizeCustom.trim()
+                else -> sessionParams.cameraSizePreset.trim()
+            }
+            if (resolvedVideoSource == "camera" && sessionParams.cameraSizePreset == "custom" && resolvedCameraSize.isBlank()) {
+                return@run "camera-size 选择自定义时不能为空"
+            }
+            val resolvedCameraId = sessionParams.cameraIdInput.trim()
+            val resolvedCameraFacing = sessionParams.cameraFacingPreset.trim()
+            if (resolvedVideoSource == "camera" && resolvedCameraId.isNotBlank() && resolvedCameraFacing.isNotBlank()) {
+                return@run "camera-id 与 camera-facing 不能同时设置"
+            }
+            val resolvedCameraFps = sessionParams.cameraFps.filter(Char::isDigit).toIntOrNull() ?: 0
+            if (resolvedVideoSource == "camera" && sessionParams.cameraHighSpeed && resolvedCameraFps <= 0) {
+                return@run "启用 --camera-high-speed 时，--camera-fps 不能为 0"
+            }
+            val maxSize = sessionParams.maxSizeInput.filter(Char::isDigit).toIntOrNull()?.takeIf { it > 0 } ?: 0
+            val resolvedCameraAr = sessionParams.cameraAr.trim()
+            if (resolvedVideoSource == "camera" && resolvedCameraSize.isNotBlank() && (maxSize > 0 || resolvedCameraAr.isNotBlank())) {
+                return@run "显式 camera-size 时不能同时设置 --max-size 或 --camera-ar"
+            }
+            null
+        }
+
+        if (validationError != null) {
+            connectionState = ConnectionState.ConnectionFailed("参数错误: $validationError")
+            return@LaunchedEffect
+        }
 
         val maxSize = sessionParams.maxSizeInput.filter(Char::isDigit).toIntOrNull()?.takeIf { it > 0 } ?: 0
         val maxFps = sessionParams.maxFpsInput.filter(Char::isDigit).toIntOrNull()?.toFloat() ?: 0f
