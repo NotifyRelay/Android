@@ -53,7 +53,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
                 putExtra(EXTRA_DEVICE_IP, ip)
                 putExtra(EXTRA_DEVICE_PORT, port)
                 putExtra(EXTRA_DEVICE_NAME, name)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_LAUNCH_ADJACENT)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
         }

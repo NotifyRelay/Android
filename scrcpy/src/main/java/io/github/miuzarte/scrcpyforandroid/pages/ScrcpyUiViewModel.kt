@@ -88,7 +88,6 @@ class ScrcpyUiViewModel(private val app: Application) : ViewModel() {
     var refreshCameraSizesAction by mutableStateOf<(() -> Unit)?>(null)
     var clearLogsAction by mutableStateOf<(() -> Unit)?>(null)
     var openReorderDevicesAction by mutableStateOf<(() -> Unit)?>(null)
-    var fullscreenLaunch by mutableStateOf<FullscreenControlLaunch?>(null)
 
     class Factory(private val app: Application) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")

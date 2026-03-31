@@ -1251,7 +1251,14 @@ fun DeviceTabScreen() {
                         },
                         onOpenFullscreen = {
                             val info = sessionInfo ?: return@PreviewCard
-                            navigation.openFullscreenPage(info)
+                            if (currentTargetHost.isNotBlank()) {
+                                ShortcutLaunchActivity.startFullscreenControl(
+                                    context,
+                                    currentTargetHost,
+                                    currentTargetPort,
+                                    info.deviceName
+                                )
+                            }
                         },
                         onOpenFullscreenHaptic = { haptics.contextClick() },
                     )
@@ -1323,22 +1330,9 @@ fun ScrcpyDevicePage(
         ScrcpyNavigationActions(
             openAdvancedPage = onOpenAdvanced,
             openVirtualButtonOrder = {},
-            openFullscreenPage = { session ->
-                viewModel.fullscreenLaunch = FullscreenControlLaunch(
-                    deviceName = session.deviceName,
-                    width = session.width,
-                    height = session.height,
-                    codec = session.codec,
-                )
-            },
+            openFullscreenPage = { _, _, _ -> },
             openReorderDevices = { viewModel.openReorderDevicesAction?.invoke() },
             pickServer = {},
-        )
-    }
-    val fullscreenActions = remember {
-        ScrcpyFullscreenActions(
-            onDismiss = { viewModel.fullscreenLaunch = null },
-            onVideoSizeChanged = { _, _ -> },
         )
     }
 
@@ -1349,13 +1343,8 @@ fun ScrcpyDevicePage(
         snackHostState = snackHostState,
         themeBaseIndex = themeBaseIndex,
         navigationActions = navigationActions,
-        fullscreenActions = fullscreenActions,
     ) {
-        if (viewModel.fullscreenLaunch != null) {
-            FullscreenControlPage()
-        } else {
-            DeviceTabScreen()
-        }
+        DeviceTabScreen()
     }
 }
 

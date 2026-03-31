@@ -87,7 +87,6 @@ private sealed interface RootScreen : NavKey {
     data object Home : RootScreen
     data object Advanced : RootScreen
     data object VirtualButtonOrder : RootScreen
-    data class Fullscreen(val launch: FullscreenControlLaunch) : RootScreen
 }
 
 @Composable
@@ -122,9 +121,6 @@ fun MainPage() {
     var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
     var showDeviceMenu by rememberSaveable { mutableStateOf(false) }
     var lastExitBackPressAtMs by rememberSaveable { mutableLongStateOf(0L) }
-    var fullscreenOrientation by rememberSaveable {
-        mutableIntStateOf(ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED)
-    }
     val themeMode = resolveThemeMode(themeBaseIndex)
     val themeController = remember(themeMode) { ThemeController(colorSchemeMode = themeMode) }
 
@@ -161,15 +157,6 @@ fun MainPage() {
                 window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
             }
         }
-    }
-
-    // Fullscreen route can force orientation based on stream ratio; all other routes follow system.
-    LaunchedEffect(activity, currentRootScreen, fullscreenOrientation) {
-        val targetOrientation = when (currentRootScreen) {
-            is RootScreen.Fullscreen -> fullscreenOrientation
-            else -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
-        }
-        activity?.requestedOrientation = targetOrientation
     }
 
     LaunchedEffect(
@@ -259,12 +246,12 @@ fun MainPage() {
     val canNavigateBack = rootBackStack.size > 1 ||
             pagerState.currentPage != MainTabDestination.Device.ordinal
 
-    BackHandler(enabled = currentRootScreen !is RootScreen.Fullscreen) {
+    BackHandler(enabled = true) {
         handleBackNavigation()
     }
 
     PredictiveBackHandler(
-        enabled = canNavigateBack && currentRootScreen !is RootScreen.Fullscreen
+        enabled = canNavigateBack
     ) { progress ->
         try {
             progress.collect { }
@@ -290,23 +277,8 @@ fun MainPage() {
         ScrcpyNavigationActions(
             openAdvancedPage = { rootBackStack.add(RootScreen.Advanced) },
             openVirtualButtonOrder = { rootBackStack.add(RootScreen.VirtualButtonOrder) },
-            openFullscreenPage = { session ->
-                viewModel.fullscreenLaunch = FullscreenControlLaunch(
-                    deviceName = session.deviceName,
-                    width = session.width,
-                    height = session.height,
-                    codec = session.codec,
-                )
-                rootBackStack.add(
-                    RootScreen.Fullscreen(
-                        launch = FullscreenControlLaunch(
-                            deviceName = session.deviceName,
-                            width = session.width,
-                            height = session.height,
-                            codec = session.codec,
-                        ),
-                    ),
-                )
+            openFullscreenPage = { ip, port, deviceName ->
+                ShortcutLaunchActivity.startFullscreenControl(context, ip, port, deviceName)
             },
             openReorderDevices = { viewModel.openReorderDevicesAction?.invoke() },
             pickServer = {
@@ -318,15 +290,6 @@ fun MainPage() {
                     )
                 )
             },
-        )
-    }
-    val fullscreenActions = remember {
-        ScrcpyFullscreenActions(
-            onDismiss = {
-                viewModel.fullscreenLaunch = null
-                popRoot()
-            },
-            onVideoSizeChanged = { _, _ -> },
         )
     }
 
@@ -410,7 +373,6 @@ fun MainPage() {
                                     snackHostState = snackHostState,
                                     themeBaseIndex = themeBaseIndex,
                                     navigationActions = navigationActions,
-                                    fullscreenActions = fullscreenActions,
                                 ) {
                                     DeviceTabScreen()
                                 }
@@ -430,7 +392,6 @@ fun MainPage() {
                                     scrollBehavior = settingsScrollBehavior,
                                     themeBaseIndex = themeBaseIndex,
                                     navigationActions = navigationActions,
-                                    fullscreenActions = fullscreenActions,
                                 ) {
                                     SettingsScreen()
                                 }
@@ -466,7 +427,6 @@ fun MainPage() {
                     snackHostState = snackHostState,
                     themeBaseIndex = themeBaseIndex,
                     navigationActions = navigationActions,
-                    fullscreenActions = fullscreenActions,
                 ) {
                     AdvancedConfigPage()
                 }
@@ -497,24 +457,9 @@ fun MainPage() {
                     scrollBehavior = advancedScrollBehavior,
                     themeBaseIndex = themeBaseIndex,
                     navigationActions = navigationActions,
-                    fullscreenActions = fullscreenActions,
                 ) {
                     VirtualButtonOrderPage()
                 }
-            }
-        }
-
-        entry<RootScreen.Fullscreen> { screen ->
-            LaunchedEffect(screen.launch) {
-                viewModel.fullscreenLaunch = screen.launch
-            }
-            ProvideScrcpyUiEnvironment(
-                viewModel = viewModel,
-                navigationActions = navigationActions,
-                fullscreenActions = fullscreenActions,
-                themeBaseIndex = themeBaseIndex,
-            ) {
-                FullscreenControlPage()
             }
         }
     }
