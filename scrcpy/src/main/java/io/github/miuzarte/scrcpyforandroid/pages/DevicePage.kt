@@ -51,14 +51,10 @@ import io.github.miuzarte.scrcpyforandroid.widgets.DeviceEditorScreen
 import io.github.miuzarte.scrcpyforandroid.widgets.DeviceTile
 import io.github.miuzarte.scrcpyforandroid.widgets.LogsPanel
 import io.github.miuzarte.scrcpyforandroid.widgets.PairingCard
-import io.github.miuzarte.scrcpyforandroid.widgets.PreviewCard
 import io.github.miuzarte.scrcpyforandroid.widgets.QuickConnectCard
 import io.github.miuzarte.scrcpyforandroid.widgets.ReorderableList
 import io.github.miuzarte.scrcpyforandroid.widgets.SectionSmallTitle
 import io.github.miuzarte.scrcpyforandroid.widgets.StatusCard
-import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
-import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
-import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonCard
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -136,14 +132,8 @@ fun DeviceTabScreen() {
     val snack = LocalScrcpySnackbarHostState.current ?: remember { SnackbarHostState() }
     val themeBaseIndex = LocalScrcpyThemeBaseIndex.current
     val nativeCore = viewModel.nativeCore
-    val virtualButtonsLayout = viewModel.virtualButtonsLayout
-    val showPreviewVirtualButtonText = viewModel.showPreviewVirtualButtonText
-    val previewCardHeightDp = viewModel.devicePreviewCardHeightDp
     val context = LocalContext.current
     val haptics = rememberAppHaptics()
-    val virtualButtonLayout = remember(virtualButtonsLayout) {
-        VirtualButtonActions.splitLayout(VirtualButtonActions.parseStoredLayout(virtualButtonsLayout))
-    }
     val initialSettings = remember(context) { loadDevicePageSettings(context) }
     val scope = rememberCoroutineScope()
     val adbWorkerDispatcher = remember {
@@ -194,7 +184,6 @@ fun DeviceTabScreen() {
             null
         }
     }
-    var previewControlsVisible by rememberSaveable { mutableStateOf(false) }
     var editingDeviceId by rememberSaveable { mutableStateOf<String?>(null) }
     var activeDeviceActionId by rememberSaveable { mutableStateOf<String?>(null) }
     var showReorderSheet by rememberSaveable { mutableStateOf(false) }
@@ -904,14 +893,6 @@ fun DeviceTabScreen() {
         Spacer(Modifier.height(UiSpacing.BottomSheetBottom))
     }
 
-    fun sendVirtualButtonAction(action: VirtualButtonAction) {
-        val keycode = action.keycode ?: return
-        runBusy("发送 ${action.title}") {
-            nativeCore.scrcpyInjectKeycode(0, keycode)
-            nativeCore.scrcpyInjectKeycode(1, keycode)
-        }
-    }
-
     if (editingDeviceId != null) {
         val device = quickDevices.firstOrNull { it.id == editingDeviceId }
         if (device != null) {
@@ -1098,127 +1079,8 @@ fun DeviceTabScreen() {
                     audioCodec = viewModel.audioCodec,
                     onAudioCodecChange = { viewModel.audioCodec = it },
                     onOpenAdvanced = navigation.openAdvancedPage,
-                    onStartStopHaptic = { haptics.contextClick() },
-                    onStart = {
-                        runBusy("启动 scrcpy") {
-                            if (viewModel.noVideo && !viewModel.audioEnabled) {
-                                throw IllegalArgumentException("--no-video 需要同时启用音频")
-                            }
-                            if (viewModel.audioEnabled && viewModel.audioSourcePreset == "custom" && viewModel.audioSourceCustom.isBlank()) {
-                                throw IllegalArgumentException("audio-source 选择自定义时不能为空")
-                            }
-                            val resolvedVideoSource = viewModel.videoSourcePreset.trim().ifBlank { "display" }
-                            if (resolvedVideoSource == "camera" && !cameraMirroringSupported) {
-                                throw IllegalArgumentException("camera mirroring 需要 Android 12+ (SDK 31+)")
-                            }
-                            val resolvedCameraSize = when (viewModel.cameraSizePreset) {
-                                "custom" -> viewModel.cameraSizeCustom.trim()
-                                else -> viewModel.cameraSizePreset.trim()
-                            }
-                            if (resolvedVideoSource == "camera" && viewModel.cameraSizePreset == "custom" && resolvedCameraSize.isBlank()) {
-                                throw IllegalArgumentException("camera-size 选择自定义时不能为空")
-                            }
-                            val resolvedCameraId = viewModel.cameraIdInput.trim()
-                            val resolvedCameraFacing = viewModel.cameraFacingPreset.trim()
-                            if (resolvedVideoSource == "camera" && resolvedCameraId.isNotBlank() && resolvedCameraFacing.isNotBlank()) {
-                                throw IllegalArgumentException("camera-id 与 camera-facing 不能同时设置")
-                            }
-                            val resolvedCameraAr = viewModel.cameraArInput.trim()
-                            val resolvedCameraFps =
-                                viewModel.cameraFpsInput.filter(Char::isDigit).toIntOrNull() ?: 0
-                            if (resolvedVideoSource == "camera" && viewModel.cameraHighSpeed && resolvedCameraFps <= 0) {
-                                throw IllegalArgumentException("启用 --camera-high-speed 时，--camera-fps 不能为 0")
-                            }
-                            val maxSize =
-                                viewModel.maxSizeInput.filter(Char::isDigit).toIntOrNull()?.takeIf { it > 0 }
-                                    ?: 0
-                            val maxFps =
-                                viewModel.maxFpsInput.filter(Char::isDigit).toIntOrNull()?.toFloat() ?: 0f
-                            if (resolvedVideoSource == "camera" && resolvedCameraSize.isNotBlank() && (maxSize > 0 || resolvedCameraAr.isNotBlank())) {
-                                throw IllegalArgumentException("显式 camera-size 时不能同时设置 --max-size 或 --camera-ar")
-                            }
-                            val bitRateBps = (bitRateMbps * 1_000_000).toInt()
-                            val audioBitRateBps = (audioBitRateKbps.coerceAtLeast(1)) * 1_000
-                            val resolvedAudioSource = when (viewModel.audioSourcePreset) {
-                                "custom" -> viewModel.audioSourceCustom.trim()
-                                else -> viewModel.audioSourcePreset.trim()
-                            }
-                            val newDisplayArg = buildNewDisplayArg(
-                                viewModel.newDisplayWidth.filter(Char::isDigit),
-                                viewModel.newDisplayHeight.filter(Char::isDigit),
-                                viewModel.newDisplayDpi.filter(Char::isDigit),
-                            )
-                            val displayId = viewModel.displayIdInput.filter(Char::isDigit).toIntOrNull()
-                                ?.takeIf { it > 0 }
-                            val crop = buildCropArg(
-                                viewModel.cropWidth.filter(Char::isDigit),
-                                viewModel.cropHeight.filter(Char::isDigit),
-                                viewModel.cropX.filter(Char::isDigit),
-                                viewModel.cropY.filter(Char::isDigit),
-                            )
-                            val effectiveTurnScreenOff = viewModel.turnScreenOff && !viewModel.noControl
-                            val session = nativeCore.scrcpyStart(
-                                NativeCoreFacade.defaultStartRequest(
-                                    customServerUri = viewModel.customServerUri,
-                                    maxSize = maxSize,
-                                    maxFps = maxFps,
-                                    videoBitRate = bitRateBps,
-                                    remotePath = viewModel.serverRemotePath.trim(),
-                                    videoCodec = viewModel.videoCodec,
-                                    audio = viewModel.audioEnabled,
-                                    audioCodec = viewModel.audioCodec,
-                                    audioBitRate = audioBitRateBps,
-                                    noControl = viewModel.noControl,
-                                    videoEncoder = viewModel.videoEncoder,
-                                    videoCodecOptions = viewModel.videoCodecOptions,
-                                    audioEncoder = viewModel.audioEncoder,
-                                    audioCodecOptions = viewModel.audioCodecOptions,
-                                    audioDup = viewModel.audioDup,
-                                    audioSource = resolvedAudioSource,
-                                    videoSource = resolvedVideoSource,
-                                    cameraId = resolvedCameraId,
-                                    cameraFacing = resolvedCameraFacing,
-                                    cameraSize = resolvedCameraSize,
-                                    cameraAr = resolvedCameraAr,
-                                    cameraFps = resolvedCameraFps,
-                                    cameraHighSpeed = viewModel.cameraHighSpeed,
-                                    noAudioPlayback = viewModel.noAudioPlayback,
-                                    noVideo = viewModel.noVideo,
-                                    requireAudio = viewModel.requireAudio,
-                                    turnScreenOff = effectiveTurnScreenOff,
-                                    newDisplay = newDisplayArg,
-                                    displayId = displayId,
-                                    crop = crop,
-                                ),
-                            )
-                            sessionInfo = session
-                            statusLine = "scrcpy 运行中"
-                            @SuppressLint("DefaultLocale")
-                            val videoDetail = if (viewModel.noVideo) {
-                                "off"
-                            } else {
-                                "${session.codec} ${session.width}x${session.height} @${
-                                    String.format(
-                                        "%.1f",
-                                        bitRateMbps
-                                    )
-                                }Mbps"
-                            }
-                            val audioDetail = if (!viewModel.audioEnabled) {
-                                "off"
-                            } else {
-                                val playback = if (viewModel.noAudioPlayback) "(no-playback)" else ""
-                                "${viewModel.audioCodec} ${audioBitRateKbps}kbps source=${resolvedAudioSource.ifBlank { "default" }}$playback"
-                            }
-                            logEvent("scrcpy 已启动: device=${session.deviceName}, video=$videoDetail, audio=$audioDetail, control=${!viewModel.noControl}, turnScreenOff=$effectiveTurnScreenOff, maxSize=${if (maxSize > 0) maxSize else "auto"}, maxFps=${if (maxFps > 0f) maxFps else "auto"}")
-                            scope.launch {
-                                snack.showSnackbar("scrcpy 已启动")
-                            }
-                            nativeCore.getLastScrcpyServerCommand()?.let { command ->
-                                logEvent("scrcpy-server args: $command")
-                            }
-                        }
-                    },
+                    onStopHaptic = { haptics.contextClick() },
+                    onFullscreenHaptic = { haptics.contextClick() },
                     onStop = {
                         runBusy("停止 scrcpy") {
                             nativeCore.scrcpyStop()
@@ -1231,47 +1093,55 @@ fun DeviceTabScreen() {
                             }
                         }
                     },
+                    onOpenFullscreen = {
+                        if (currentTargetHost.isNotBlank()) {
+                            ShortcutLaunchActivity.startFullscreenControl(
+                                context,
+                                currentTargetHost,
+                                currentTargetPort,
+                                connectedDeviceLabel,
+                                videoBitRateMbps = bitRateMbps,
+                                audioBitRateKbps = audioBitRateKbps,
+                                videoCodec = viewModel.videoCodec,
+                                audioCodec = viewModel.audioCodec,
+                                audioEnabled = viewModel.audioEnabled,
+                                serverRemotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH },
+                                customServerUri = viewModel.customServerUri,
+                                turnScreenOff = viewModel.turnScreenOff,
+                                noControl = viewModel.noControl,
+                                noVideo = viewModel.noVideo,
+                                videoSourcePreset = viewModel.videoSourcePreset,
+                                displayIdInput = viewModel.displayIdInput,
+                                cameraIdInput = viewModel.cameraIdInput,
+                                cameraFacingPreset = viewModel.cameraFacingPreset,
+                                cameraSizePreset = viewModel.cameraSizePreset,
+                                cameraSizeCustom = viewModel.cameraSizeCustom,
+                                cameraAr = viewModel.cameraArInput,
+                                cameraFps = viewModel.cameraFpsInput,
+                                cameraHighSpeed = viewModel.cameraHighSpeed,
+                                audioSourcePreset = viewModel.audioSourcePreset,
+                                audioSourceCustom = viewModel.audioSourceCustom,
+                                audioDup = viewModel.audioDup,
+                                noAudioPlayback = viewModel.noAudioPlayback,
+                                requireAudio = viewModel.requireAudio,
+                                maxSizeInput = viewModel.maxSizeInput,
+                                maxFpsInput = viewModel.maxFpsInput,
+                                videoEncoder = viewModel.videoEncoder,
+                                videoCodecOptions = viewModel.videoCodecOptions,
+                                audioEncoder = viewModel.audioEncoder,
+                                audioCodecOptions = viewModel.audioCodecOptions,
+                                newDisplayWidth = viewModel.newDisplayWidth,
+                                newDisplayHeight = viewModel.newDisplayHeight,
+                                newDisplayDpi = viewModel.newDisplayDpi,
+                                cropWidth = viewModel.cropWidth,
+                                cropHeight = viewModel.cropHeight,
+                                cropX = viewModel.cropX,
+                                cropY = viewModel.cropY,
+                            )
+                        }
+                    },
                     sessionStarted = sessionInfo != null,
                 )
-            }
-
-            if (
-                sessionInfo != null &&
-                sessionInfo!!.width > 0 &&
-                sessionInfo!!.height > 0
-            ) {
-                item {
-                    PreviewCard(
-                        sessionInfo = sessionInfo,
-                        nativeCore = nativeCore,
-                        previewHeightDp = previewCardHeightDp.coerceAtLeast(120),
-                        controlsVisible = previewControlsVisible,
-                        onTapped = {
-                            previewControlsVisible = !previewControlsVisible
-                        },
-                        onOpenFullscreen = {
-                            val info = sessionInfo ?: return@PreviewCard
-                            if (currentTargetHost.isNotBlank()) {
-                                ShortcutLaunchActivity.startFullscreenControl(
-                                    context,
-                                    currentTargetHost,
-                                    currentTargetPort,
-                                    info.deviceName
-                                )
-                            }
-                        },
-                        onOpenFullscreenHaptic = { haptics.contextClick() },
-                    )
-                }
-                item {
-                    VirtualButtonCard(
-                        busy = busy,
-                        outsideActions = virtualButtonLayout.first,
-                        moreActions = virtualButtonLayout.second,
-                        showText = showPreviewVirtualButtonText,
-                        onAction = ::sendVirtualButtonAction,
-                    )
-                }
             }
         }
 

@@ -373,9 +373,10 @@ internal fun ConfigPanel(
     audioCodec: String,
     onAudioCodecChange: (String) -> Unit,
     onOpenAdvanced: () -> Unit,
-    onStartStopHaptic: (() -> Unit)? = null,
-    onStart: () -> Unit,
+    onStopHaptic: (() -> Unit)? = null,
+    onFullscreenHaptic: (() -> Unit)? = null,
     onStop: () -> Unit,
+    onOpenFullscreen: () -> Unit,
     sessionStarted: Boolean,
 ) {
     val videoCodecItems = remember { VIDEO_CODEC_OPTIONS.map { it.second } }
@@ -478,23 +479,39 @@ internal fun ConfigPanel(
             onClick = onOpenAdvanced,
             enabled = !sessionStarted,
         )
-        TextButton(
-            text = if (sessionStarted) "停止" else "启动",
-            onClick = {
-                onStartStopHaptic?.invoke()
-                if (sessionStarted) onStop() else onStart()
-            },
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = UiSpacing.CardContent)
-                .padding(bottom = UiSpacing.CardContent),
-            enabled = !busy,
-            colors = if (sessionStarted) {
-                ButtonDefaults.textButtonColors()
-            } else {
-                ButtonDefaults.textButtonColorsPrimary()
-            },
-        )
+        if (sessionStarted) {
+            TextButton(
+                text = "停止",
+                onClick = {
+                    onStopHaptic?.invoke()
+                    onStop()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = UiSpacing.CardContent)
+                    .padding(bottom = UiSpacing.CardContent),
+                enabled = !busy,
+            )
+        } else {
+            Button(
+                onClick = {
+                    onFullscreenHaptic?.invoke()
+                    onOpenFullscreen()
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = UiSpacing.CardContent)
+                    .padding(bottom = UiSpacing.CardContent),
+                enabled = !busy,
+            ) {
+                Icon(
+                    Icons.Rounded.Fullscreen,
+                    contentDescription = "全屏",
+                )
+                Spacer(Modifier.width(UiSpacing.SectionTitleBottom))
+                Text("全屏启动")
+            }
+        }
     }
 }
 
