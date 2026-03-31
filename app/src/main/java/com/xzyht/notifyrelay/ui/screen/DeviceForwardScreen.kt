@@ -105,3 +105,21 @@ fun ScrcpyAdvancedScreen(
         onBack = { navigator.pop() }
     )
 }
+
+@Composable
+fun ScrcpyReorderDevicesScreen(
+    navigator: Navigator
+) {
+    io.github.miuzarte.scrcpyforandroid.pages.ScrcpyReorderDevicesPage(
+        onBack = { navigator.pop() }
+    )
+}
+
+@Composable
+fun ScrcpyVirtualButtonOrderScreen(
+    navigator: Navigator
+) {
+    io.github.miuzarte.scrcpyforandroid.pages.ScrcpyVirtualButtonOrderPage(
+        onBack = { navigator.pop() }
+    )
+}

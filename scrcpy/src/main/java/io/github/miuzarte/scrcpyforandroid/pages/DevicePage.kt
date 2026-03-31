@@ -1267,3 +1267,89 @@ fun ScrcpyAdvancedPage(
         }
     }
 }
+
+@Composable
+fun ScrcpyReorderDevicesPage(
+    onBack: () -> Unit = {},
+) {
+    val context = LocalContext.current
+    val app = context.applicationContext as Application
+    val viewModel: ScrcpyUiViewModel = viewModel(factory = ScrcpyUiViewModel.Factory(app))
+    val snackHostState = remember { SnackbarHostState() }
+    val scrollBehavior = MiuixScrollBehavior(canScroll = { true })
+    var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
+    val quickDevices = rememberSaveable(saver = DeviceShortcutStateListSaver) { mutableStateListOf<DeviceShortcut>() }
+
+    DisposableEffect(context) {
+        val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
+            themeBaseIndex = newBaseIndex
+        }
+        ThemeSettingsManager.addThemeChangeListener(context, listener)
+        onDispose {
+            ThemeSettingsManager.removeThemeChangeListener(context, listener)
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        if (quickDevices.isEmpty()) {
+            quickDevices.clear()
+            quickDevices.addAll(loadQuickDevices(context))
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = "快速设备排序",
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回"
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+        snackbarHost = { SnackbarHost(snackHostState) },
+    ) { pagePadding ->
+        ProvideScrcpyUiEnvironment(
+            viewModel = viewModel,
+            contentPadding = pagePadding,
+            scrollBehavior = scrollBehavior,
+            snackHostState = snackHostState,
+            themeBaseIndex = themeBaseIndex,
+        ) {
+            AppPageLazyColumn(
+                contentPadding = pagePadding,
+                scrollBehavior = scrollBehavior,
+            ) {
+                item {
+                    ReorderableList(
+                        itemsProvider = {
+                            quickDevices.map { device ->
+                                ReorderableList.Item(
+                                    id = device.id,
+                                    title = device.name.ifBlank { device.host },
+                                    subtitle = "${device.host}:${device.port}",
+                                )
+                            }
+                        },
+                        orientation = ReorderableList.Orientation.Column,
+                        onSettle = { fromIndex, toIndex ->
+                            if (fromIndex < 0) return@ReorderableList
+                            val to = toIndex.coerceIn(0, quickDevices.size)
+                            if (fromIndex == to) return@ReorderableList
+
+                            val moved = quickDevices.removeAt(fromIndex)
+                            quickDevices.add(to.coerceIn(0, quickDevices.size), moved)
+                            saveQuickDevices(context, quickDevices)
+                        },
+                    )()
+                }
+                item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
+            }
+        }
+    }
+}

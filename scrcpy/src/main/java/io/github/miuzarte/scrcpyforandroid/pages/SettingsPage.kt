@@ -1,6 +1,8 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
+import android.app.Application
 import android.content.Intent
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -10,18 +12,27 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Clear
 import androidx.compose.material.icons.rounded.FileOpen
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
+import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.data.config.ScrcpyDefaults
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlide
 import io.github.miuzarte.scrcpyforandroid.widgets.SectionSmallTitle
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
@@ -49,12 +60,11 @@ fun resolveThemeMode(baseIndex: Int): ColorSchemeMode {
 }
 
 @Composable
-fun SettingsScreen() {
+internal fun SettingsScreen() {
     val viewModel = LocalScrcpyUiViewModel.current
     val navigation = LocalScrcpyNavigation.current
     val contentPadding = LocalScrcpyPagePadding.current
     val scrollBehavior = LocalScrcpyScrollBehavior.current
-        ?: error("ScrollBehavior is not provided")
     val context = LocalContext.current
 
     // 设置
@@ -217,5 +227,49 @@ fun SettingsScreen() {
 
         // TODO: 放进 [AppPageLazyColumn] 里
         item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
+    }
+}
+
+@Composable
+fun ScrcpySettingsPage(
+    onOpenReorderDevices: () -> Unit = {},
+    onOpenVirtualButtonOrder: () -> Unit = {},
+    onPickServer: () -> Unit = {},
+) {
+    val context = LocalContext.current
+    val app = context.applicationContext as Application
+    val viewModel: ScrcpyUiViewModel = viewModel(factory = ScrcpyUiViewModel.Factory(app))
+    val snackHostState = remember { SnackbarHostState() }
+    var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
+
+    DisposableEffect(context) {
+        val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
+            themeBaseIndex = newBaseIndex
+        }
+        ThemeSettingsManager.addThemeChangeListener(context, listener)
+        onDispose {
+            ThemeSettingsManager.removeThemeChangeListener(context, listener)
+        }
+    }
+
+    val navigationActions = remember(onOpenReorderDevices, onOpenVirtualButtonOrder, onPickServer) {
+        ScrcpyNavigationActions(
+            openAdvancedPage = {},
+            openVirtualButtonOrder = onOpenVirtualButtonOrder,
+            openFullscreenPage = { _, _, _ -> },
+            openReorderDevices = onOpenReorderDevices,
+            pickServer = onPickServer,
+        )
+    }
+
+    ProvideScrcpyUiEnvironment(
+        viewModel = viewModel,
+        contentPadding = PaddingValues(0.dp),
+        scrollBehavior = null,
+        snackHostState = snackHostState,
+        themeBaseIndex = themeBaseIndex,
+        navigationActions = navigationActions,
+    ) {
+        SettingsScreen()
     }
 }

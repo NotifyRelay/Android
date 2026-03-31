@@ -1,15 +1,36 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
+import android.app.Application
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
 import io.github.miuzarte.scrcpyforandroid.widgets.ReorderableList
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
+import notifyrelay.base.util.ThemeSettingsManager
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SnackbarHost
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.extra.SuperSwitch
 
 @Composable
@@ -17,7 +38,6 @@ internal fun VirtualButtonOrderPage() {
     val viewModel = LocalScrcpyUiViewModel.current
     val contentPadding = LocalScrcpyPagePadding.current
     val scrollBehavior = LocalScrcpyScrollBehavior.current
-        ?: error("ScrollBehavior is not provided")
     val layoutString = viewModel.virtualButtonsLayout
     val showPreviewText = viewModel.showPreviewVirtualButtonText
     var buttonItems by remember(layoutString) {
@@ -33,7 +53,6 @@ internal fun VirtualButtonOrderPage() {
         contentPadding = contentPadding,
         scrollBehavior = scrollBehavior,
     ) {
-        // 按钮显示文本开关
         item {
             Card {
                 SuperSwitch(
@@ -79,6 +98,58 @@ internal fun VirtualButtonOrderPage() {
                     emitChanges()
                 },
             )()
+        }
+
+        item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
+    }
+}
+
+@Composable
+fun ScrcpyVirtualButtonOrderPage(
+    onBack: () -> Unit = {},
+) {
+    val context = LocalContext.current
+    val app = context.applicationContext as Application
+    val viewModel: ScrcpyUiViewModel = viewModel(factory = ScrcpyUiViewModel.Factory(app))
+    val snackHostState = remember { SnackbarHostState() }
+    val scrollBehavior = MiuixScrollBehavior(canScroll = { true })
+    var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
+
+    DisposableEffect(context) {
+        val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
+            themeBaseIndex = newBaseIndex
+        }
+        ThemeSettingsManager.addThemeChangeListener(context, listener)
+        onDispose {
+            ThemeSettingsManager.removeThemeChangeListener(context, listener)
+        }
+    }
+
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = "虚拟按钮排序",
+                navigationIcon = {
+                    IconButton(onClick = onBack) {
+                        Icon(
+                            Icons.AutoMirrored.Filled.ArrowBack,
+                            contentDescription = "返回"
+                        )
+                    }
+                },
+                scrollBehavior = scrollBehavior,
+            )
+        },
+        snackbarHost = { SnackbarHost(snackHostState) },
+    ) { pagePadding ->
+        ProvideScrcpyUiEnvironment(
+            viewModel = viewModel,
+            contentPadding = pagePadding,
+            scrollBehavior = scrollBehavior,
+            snackHostState = snackHostState,
+            themeBaseIndex = themeBaseIndex,
+        ) {
+            VirtualButtonOrderPage()
         }
     }
 }

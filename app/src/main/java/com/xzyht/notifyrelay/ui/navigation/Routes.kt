@@ -65,4 +65,32 @@ sealed interface Route : NavKey, Parcelable {
             override fun newArray(size: Int): Array<ScrcpyAdvanced?> = arrayOfNulls(size)
         }
     }
+
+    /**
+     * Scrcpy快速设备排序页面
+     * Scrcpy reorder devices page
+     */
+    @Serializable
+    data object ScrcpyReorderDevices : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<ScrcpyReorderDevices> {
+            override fun createFromParcel(parcel: Parcel): ScrcpyReorderDevices = ScrcpyReorderDevices
+            override fun newArray(size: Int): Array<ScrcpyReorderDevices?> = arrayOfNulls(size)
+        }
+    }
+
+    /**
+     * Scrcpy虚拟按钮排序页面
+     * Scrcpy virtual button order page
+     */
+    @Serializable
+    data object ScrcpyVirtualButtonOrder : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<ScrcpyVirtualButtonOrder> {
+            override fun createFromParcel(parcel: Parcel): ScrcpyVirtualButtonOrder = ScrcpyVirtualButtonOrder
+            override fun newArray(size: Int): Array<ScrcpyVirtualButtonOrder?> = arrayOfNulls(size)
+        }
+    }
 }
