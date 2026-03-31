@@ -178,6 +178,13 @@ class NativeCoreFacade(private val appContext: Context) {
     }
 
     /**
+     * Get the current ADB key name used when generating or selecting key files.
+     */
+    fun getAdbKeyName(): String {
+        return adbService.keyName
+    }
+
+    /**
      * Start a scrcpy session synchronously.
      *
      * - This method runs on the internal single-threaded [executor] via [ioCall], so

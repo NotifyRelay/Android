@@ -5,7 +5,7 @@ import android.os.Build
 import android.util.Base64
 import android.util.Log
 import androidx.core.content.edit
-import notifyrelay.data.config.ScrcpyDefaults
+import notifyrelay.base.util.DeviceUtils
 import notifyrelay.data.config.ScrcpyPreferenceKeys
 import java.io.BufferedInputStream
 import java.io.Closeable
@@ -50,8 +50,16 @@ internal class DirectAdbTransport(private val context: Context) {
     val privateKey: PrivateKey get() = keys.first
     val publicKeyX509: ByteArray get() = keys.second
 
-    @Volatile
-    var keyName: String = ScrcpyDefaults.ADB_KEY_NAME
+    private val _keyName by lazy {
+        val deviceName = DeviceUtils.getLocalDeviceName(context)
+        "$deviceName@scrcpy"
+    }
+
+    var keyName: String
+        get() = _keyName
+        set(value) {
+            // Read-only, but allow setting to maintain compatibility
+        }
 
     fun connect(host: String, port: Int): DirectAdbConnection {
         Log.i(TAG, "connect(): opening direct adbd transport to $host:$port")
@@ -60,7 +68,7 @@ internal class DirectAdbTransport(private val context: Context) {
             port,
             privateKey,
             publicKeyX509,
-            keyName.ifBlank { ScrcpyDefaults.ADB_KEY_NAME })
+            keyName)
         conn.handshake()
         Log.i(TAG, "connect(): handshake success for $host:$port")
         return conn
@@ -78,7 +86,7 @@ internal class DirectAdbTransport(private val context: Context) {
 
         val pairingKey = AdbPairingKey(
             privateKey = privateKey,
-            alias = keyName.ifBlank { ScrcpyDefaults.ADB_KEY_NAME },
+            alias = keyName,
         )
         return DirectAdbPairingClient(targetHost, port, targetCode, pairingKey).use {
             it.start()
@@ -203,7 +211,7 @@ internal class DirectAdbConnection(
     val port: Int,
     private val privateKey: PrivateKey,
     private val publicKeyX509: ByteArray,
-    private val keyName: String = ScrcpyDefaults.ADB_KEY_NAME,
+    private val keyName: String,
 ) : AutoCloseable {
 
     private val sha1DigestInfoPrefix = byteArrayOf(

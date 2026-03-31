@@ -100,14 +100,8 @@ class ScrcpyUiViewModel private constructor(private val app: Application) : View
             saveMainSettings(app, mainSettings)
         }
 
-    private val _adbKeyName = mutableStateOf(mainSettings.adbKeyName)
-    var adbKeyName: String
-        get() = _adbKeyName.value
-        set(value) {
-            _adbKeyName.value = value
-            mainSettings = mainSettings.copy(adbKeyName = value)
-            saveMainSettings(app, mainSettings)
-        }
+    val currentAdbKeyName: String
+        get() = nativeCore.getAdbKeyName()
 
     private val _adbPairingAutoDiscoverOnDialogOpen = mutableStateOf(mainSettings.adbPairingAutoDiscoverOnDialogOpen)
     var adbPairingAutoDiscoverOnDialogOpen: Boolean

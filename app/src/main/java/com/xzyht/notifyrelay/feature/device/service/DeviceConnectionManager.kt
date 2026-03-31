@@ -4,8 +4,9 @@ import android.content.pm.PackageManager
 import androidx.core.content.ContextCompat
 import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ServerLineRouter
-import notifyrelay.core.util.EncryptionManager
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.DeviceUtils
+import notifyrelay.core.util.EncryptionManager
 import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.sync.AppListSyncManager
 import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
@@ -88,44 +89,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             return DeviceConnectionManagerSingleton.getDeviceManager(context)
         }
     }
-    // 获取本地设备显示名称，优先级按要求：1. 蓝牙 -> 2. Settings.Secure(bluetooth_name) -> 3. Settings.Global(device_name) -> 4. Build.MODEL/DEVICE -> 5. 兜底
-    // 不再使用应用持久化或 SharedPreferences 中的 device_name
     internal fun getLocalDisplayName(): String {
-        try {
-            // 1. 蓝牙名称（Android 12+ 需要 BLUETOOTH_CONNECT 权限）
-            try {
-                val canReadBt = if (android.os.Build.VERSION.SDK_INT >= 31) {
-                    ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
-                } else true
-                if (canReadBt) {
-                    val bluetoothManager = context.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager
-                    val btName = bluetoothManager.adapter?.name
-                    if (!btName.isNullOrEmpty()) return sanitizeDisplayName(btName)
-                }
-            } catch (_: Exception) {}
-
-            // 2. Settings.Secure 中的 bluetooth_name（部分设备/ROM会放在这里）
-            try {
-                val s = android.provider.Settings.Secure.getString(context.contentResolver, "bluetooth_name")
-                if (!s.isNullOrEmpty()) return sanitizeDisplayName(s)
-            } catch (_: Exception) {}
-
-            // 3. Settings.Global 中的 device_name
-            try {
-                val g = android.provider.Settings.Global.getString(context.contentResolver, "device_name")
-                if (!g.isNullOrEmpty()) return sanitizeDisplayName(g)
-            } catch (_: Exception) {}
-
-            // 4. 设备型号/设备名作为兜底
-            try {
-                val model = android.os.Build.MODEL
-                if (!model.isNullOrEmpty()) return sanitizeDisplayName(model)
-                val device = android.os.Build.DEVICE
-                if (!device.isNullOrEmpty()) return sanitizeDisplayName(device)
-            } catch (_: Exception) {}
-        } catch (_: Exception) {}
-
-        return "未知设备"
+        return DeviceUtils.getLocalDeviceName(context)
     }
 
     // 将显示名称清洗为不可见字符替换、并裁剪（口径较宽）

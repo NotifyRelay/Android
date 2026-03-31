@@ -15,7 +15,6 @@ internal data class MainSettings(
     val virtualButtonsLayout: String = ScrcpyDefaults.VIRTUAL_BUTTONS_LAYOUT,
     val customServerUri: String? = ScrcpyDefaults.CUSTOM_SERVER_URI,
     val serverRemotePath: String = ScrcpyDefaults.SERVER_REMOTE_PATH_INPUT,
-    val adbKeyName: String = ScrcpyDefaults.ADB_KEY_NAME_INPUT,
     val adbPairingAutoDiscoverOnDialogOpen: Boolean =
         ScrcpyDefaults.ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN,
     val adbAutoReconnectPairedDevice: Boolean = ScrcpyDefaults.ADB_AUTO_RECONNECT_PAIRED_DEVICE,
@@ -119,12 +118,6 @@ internal fun loadMainSettings(context: Context): MainSettings {
             ScrcpyDefaults.SERVER_REMOTE_PATH_INPUT,
             StorageManager.PrefsType.SCRCPY,
         ),
-        adbKeyName = StorageManager.getString(
-            context,
-            ScrcpyPreferenceKeys.ADB_KEY_NAME,
-            ScrcpyDefaults.ADB_KEY_NAME_INPUT,
-            StorageManager.PrefsType.SCRCPY,
-        ),
         adbPairingAutoDiscoverOnDialogOpen = StorageManager.getBoolean(
             context,
             ScrcpyPreferenceKeys.ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN,
@@ -199,12 +192,6 @@ internal fun saveMainSettings(context: Context, settings: MainSettings) {
         context,
         ScrcpyPreferenceKeys.SERVER_REMOTE_PATH,
         settings.serverRemotePath,
-        StorageManager.PrefsType.SCRCPY,
-    )
-    StorageManager.putString(
-        context,
-        ScrcpyPreferenceKeys.ADB_KEY_NAME,
-        settings.adbKeyName,
         StorageManager.PrefsType.SCRCPY,
     )
     StorageManager.putBoolean(

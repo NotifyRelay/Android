@@ -71,7 +71,6 @@ object ScrcpyPreferenceKeys {
 
     const val SERVER_REMOTE_PATH = "server_remote_path"
 
-    const val ADB_KEY_NAME = "adb_key_name"
     const val ADB_PAIRING_AUTO_DISCOVER_ON_DIALOG_OPEN = "adb_pairing_auto_discover_on_dialog_open"
     const val ADB_AUTO_RECONNECT_PAIRED_DEVICE = "adb_auto_reconnect_paired_device"
     const val ADB_MDNS_LAN_DISCOVERY = "adb_mdns_lan_discovery"

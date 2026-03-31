@@ -171,16 +171,17 @@ fun ScrcpySettingsPage(
                 SectionSmallTitle("ADB")
                 Card {
                     Text(
-                        text = "自定义 ADB 密钥名",
+                        text = "当前 ADB 密钥名",
                         modifier = Modifier
                             .padding(horizontal = UiSpacing.CardTitle)
                             .padding(top = UiSpacing.CardContent, bottom = UiSpacing.FieldLabelBottom),
                         fontWeight = FontWeight.Medium,
                     )
                     TextField(
-                        value = viewModel.adbKeyName,
-                        onValueChange = { viewModel.adbKeyName = it },
-                        label = ScrcpyDefaults.ADB_KEY_NAME,
+                        value = viewModel.currentAdbKeyName,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = "设备名@scrcpy",
                         useLabelAsPlaceholder = true,
                         singleLine = true,
                         modifier = Modifier
