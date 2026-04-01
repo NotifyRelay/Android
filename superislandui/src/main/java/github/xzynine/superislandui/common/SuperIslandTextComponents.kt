@@ -158,7 +158,7 @@ fun AutoScrollText(
         )
     }
 
-    LaunchedEffect(canScroll, intrinsicWidth, actualMaxWidth, duration) {
+    LaunchedEffect(canScroll, intrinsicWidth, actualMaxWidth, duration, pauseMillis) {
         offset.snapTo(0f)
         if (!canScroll) return@LaunchedEffect
         
