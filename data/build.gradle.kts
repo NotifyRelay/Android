@@ -52,7 +52,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     // Paging 3 (DAO PagingSource)
-    implementation(libs.bundles.paging)
+    implementation(libs.androidx.paging.runtime)
     
     // Gson
     implementation(libs.gson)
