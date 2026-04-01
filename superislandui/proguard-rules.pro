@@ -19,3 +19,13 @@
 # If you keep the line number information, uncomment this to
 # hide the original source file name.
 #-renamesourcefileattribute SourceFile
+
+# Keep model classes used via JSON or reflection
+-keep class github.xzynine.superislandui.model.** {
+    *;
+}
+
+# Keep common classes used via reflection
+-keep class github.xzynine.superislandui.common.** {
+    *;
+}

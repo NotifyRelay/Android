@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    id("com.android.library")
-    id("com.google.devtools.ksp") version "2.3.6"
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -52,7 +52,7 @@ dependencies {
     ksp(libs.androidx.room.compiler)
 
     // Paging 3 (DAO PagingSource)
-    implementation(libs.bundles.paging)
+    implementation(libs.androidx.paging.runtime)
     
     // Gson
     implementation(libs.gson)

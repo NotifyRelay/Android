@@ -35,17 +35,8 @@ fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
 
         val picInfo = right.optJSONObject("picInfo")
         val picTypeOk = (picInfo?.optInt("type", 0) == 1)
-        // 图标选择优先级：
-        // 1. pic 字段（如果是 miui.focus.pic_ 前缀）
-        // 2. picFunction（来自 highlightInfo.picFunction）
-        // 3. aodPic
         val picRaw = picInfo?.optString("pic", "")?.takeIf { it.isNotBlank() }
-        val picKey: String? = when {
-            picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
-            picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
-            aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
-            else -> null
-        }
+        val picKey: String? = resolvePicKey(picRaw, picFunction, aodPic)
 
         return when (type) {
             2 -> {
@@ -176,16 +167,7 @@ fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
             val key = po.optString("pic", "").takeIf { it.isNotBlank() }
             if (typeOk) key else null
         }
-        // 图标选择优先级：
-        // 1. pic 字段（如果是 miui.focus.pic_ 前缀）
-        // 2. picFunction（来自 highlightInfo.picFunction）
-        // 3. aodPic
-        val picKey: String? = when {
-            picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
-            picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
-            aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
-            else -> picRaw
-        }
+        val picKey: String? = resolvePicKey(picRaw, picFunction, aodPic)
 
         return BProgressTextInfo(
             frontTitle = frontTitle,
@@ -209,14 +191,26 @@ fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
         // 1. pic 字段（如果是 miui.focus.pic_ 前缀）
         // 2. picFunction（来自 highlightInfo.picFunction）
         // 3. aodPic
-        val picKey: String? = when {
-            picRaw.startsWith("miui.focus.pic_") -> picRaw
-            picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
-            aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
-            else -> picRaw
-        }
+        val picKey: String? = resolvePicKey(picRaw, picFunction, aodPic, default = picRaw)
         return picKey?.let { BPicInfo(picKey = it, type = type) }
     }
 
     return BEmpty
+}
+
+/**
+ * 解析 picKey 的辅助函数
+ * 图标选择优先级：
+ * 1. picRaw 字段（如果是 miui.focus.pic_ 前缀）
+ * 2. picFunction（来自 highlightInfo.picFunction）
+ * 3. aodPic
+ * @param default 如果没有匹配的前缀，返回的默认值
+ */
+private fun resolvePicKey(picRaw: String?, picFunction: String?, aodPic: String?, default: String? = null): String? {
+    return when {
+        picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
+        picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
+        aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
+        else -> default
+    }
 }

@@ -179,11 +179,9 @@ object ProtocolRouter {
                             "playPause" -> {
                                 try {
                                     MediaControlUtil.playPause()
-                                    val result = "success"
-                                    val errorMessage: String? = null
                                     Logger.i(TAG, "执行 playPause 成功")
                                     // 发送响应
-                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "playPause", result, errorMessage)
+                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "playPause", "success", null)
                                 } catch (e: Exception) {
                                     Logger.e(TAG, "执行 playPause 失败", e)
                                     // 发送错误响应
@@ -193,11 +191,9 @@ object ProtocolRouter {
                             "next" -> {
                                 try {
                                     MediaControlUtil.next()
-                                    val result = "success"
-                                    val errorMessage: String? = null
                                     Logger.i(TAG, "执行 next 成功")
                                     // 发送响应
-                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "next", result, errorMessage)
+                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "next", "success", null)
                                 } catch (e: Exception) {
                                     Logger.e(TAG, "执行 next 失败", e)
                                     // 发送错误响应
@@ -207,11 +203,9 @@ object ProtocolRouter {
                             "previous" -> {
                                 try {
                                     MediaControlUtil.previous()
-                                    val result = "success"
-                                    val errorMessage: String? = null
                                     Logger.i(TAG, "执行 previous 成功")
                                     // 发送响应
-                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "previous", result, errorMessage)
+                                    sendMediaControlResponse(deviceManager, remoteUuid, clientIp, "previous", "success", null)
                                 } catch (e: Exception) {
                                     Logger.e(TAG, "执行 previous 失败", e)
                                     // 发送错误响应

@@ -68,6 +68,38 @@ class MediaSessionMonitorService(private val service: NotificationListenerServic
         }
     }
 
+    // 启动重试机制
+    private val startupRetryRunnable = object : Runnable {
+        override fun run() {
+            if (!isConnected) return
+            
+            try {
+                val controllers = mediaSessionManager?.getActiveSessions(componentName)
+                Logger.i(TAG, "Successfully retrieved ${controllers?.size ?: 0} active sessions")
+                updateControllers(controllers)
+            } catch (e: SecurityException) {
+                Logger.w(TAG, "Security Error on initial check: ${e.message}")
+                // 200ms 后重试一次，以防权限仍在授予中
+                handler.postDelayed(retryRunnable, 200)
+            }
+        }
+    }
+
+    // 200ms 重试机制
+    private val retryRunnable = object : Runnable {
+        override fun run() {
+            if (!isConnected) return
+            
+            try {
+                val controllers = mediaSessionManager?.getActiveSessions(componentName)
+                Logger.i(TAG, "Retry successful: ${controllers?.size ?: 0} sessions")
+                updateControllers(controllers)
+            } catch (e2: SecurityException) {
+                Logger.e(TAG, "Retry failed: ${e2.message} - Permission may need manual grant")
+            }
+        }
+    }
+
     // 初始化方法
     fun initialize() {
         instance = this
@@ -88,25 +120,7 @@ class MediaSessionMonitorService(private val service: NotificationListenerServic
         handler.postDelayed(healthCheckRunnable, 30000)
 
         // 添加延迟重试机制，以确保权限在重新绑定后完全生效
-        handler.postDelayed({
-            try {
-                val controllers = mediaSessionManager?.getActiveSessions(componentName)
-                Logger.i(TAG, "Successfully retrieved ${controllers?.size ?: 0} active sessions")
-                updateControllers(controllers)
-            } catch (e: SecurityException) {
-                Logger.w(TAG, "Security Error on initial check: ${e.message}")
-                // 200ms 后重试一次，以防权限仍在授予中
-                handler.postDelayed({
-                    try {
-                        val controllers = mediaSessionManager?.getActiveSessions(componentName)
-                        Logger.i(TAG, "Retry successful: ${controllers?.size ?: 0} sessions")
-                        updateControllers(controllers)
-                    } catch (e2: SecurityException) {
-                        Logger.e(TAG, "Retry failed: ${e2.message} - Permission may need manual grant")
-                    }
-                }, 200)
-            }
-        }, 100)
+        handler.postDelayed(startupRetryRunnable, 100)
     }
 
     // 停止监控
@@ -116,6 +130,9 @@ class MediaSessionMonitorService(private val service: NotificationListenerServic
 
         // 停止健康检查
         handler.removeCallbacks(healthCheckRunnable)
+        // 停止启动重试和重试机制
+        handler.removeCallbacks(startupRetryRunnable)
+        handler.removeCallbacks(retryRunnable)
 
         mediaSessionManager?.removeOnActiveSessionsChangedListener(sessionsChangedListener)
 
@@ -140,6 +157,8 @@ class MediaSessionMonitorService(private val service: NotificationListenerServic
     }
 
     private fun updateControllers(controllers: List<MediaController>?) {
+        // 确保服务仍在运行
+        if (!isConnected) return
 
         // 去重检查
         val currentSignatures = controllers?.joinToString("|") { "${it.packageName}@${it.hashCode()}" } ?: "null"
@@ -269,7 +288,7 @@ class MediaSessionMonitorService(private val service: NotificationListenerServic
         val primary = getPrimaryController() ?: return
 
         // 只有当这是主控制器时才处理
-        if (controller.packageName != primary.packageName) return
+        if (controller !== primary) return
 
         val artBitmap = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) 
                         ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ART)
