@@ -315,14 +315,19 @@ object MessageSender {
                         } else {
                             // 不是结束包，更新媒体状态
                             val packageName = obj.optString("packageName", "")
-                            val title = obj.optString("title", "")
-                            val text = obj.optString("text", "")
-                            val coverUrl = obj.optString("coverUrl", "")
                             
+                            // 获取当前状态，如果存在的话
                             val deviceMap = synchronized(mediaLastStatePerDevice) {
                                 mediaLastStatePerDevice.getOrPut(task.device.uuid) { mutableMapOf() }
                             }
                             val mediaSourceId = "global_media_session"
+                            val currentState = synchronized(mediaLastStatePerDevice) { deviceMap[mediaSourceId] }
+                            
+                            // 根据包类型和字段存在性更新状态
+                            val title = if (mediaType.equals("FULL", true) || obj.has("title")) obj.optString("title", "") else currentState?.title ?: ""
+                            val text = if (mediaType.equals("FULL", true) || obj.has("text")) obj.optString("text", "") else currentState?.text ?: ""
+                            val coverUrl = if (mediaType.equals("FULL", true) || obj.has("coverUrl")) obj.optString("coverUrl", "") else currentState?.coverUrl ?: ""
+                            
                             val updatedState = MediaPlayState(
                                 title = title,
                                 text = text,
