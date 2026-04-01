@@ -75,7 +75,7 @@ class TextSplitterUnitTest {
         
         testCases.forEachIndexed { index, text ->
             // 使用修复后的TextSplitter逻辑
-            val (iconText, capsuleText) = TextSplitter.splitLyricWithCharacterType(text, 6)
+            val (iconText, capsuleText) = TextSplitter.splitLyric(text, 6)
             
             try {
                 // 添加断言验证

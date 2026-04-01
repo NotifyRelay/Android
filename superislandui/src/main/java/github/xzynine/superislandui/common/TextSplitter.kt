@@ -231,14 +231,4 @@ object TextSplitter {
         
         return Pair(iconText, capsuleText)
     }
-    
-    /**
-     * 拆分歌词文本，考虑字符类型的长度计算（与splitLyric方法相同，保留为兼容性）
-     * @param lyricText 歌词文本
-     * @param threshold 拆分阈值（中文字符等价长度）
-     * @return Pair(图标文本, 胶囊文本)
-     */
-    fun splitLyricWithCharacterType(lyricText: String, threshold: Int): Pair<String, String> {
-        return splitLyric(lyricText, threshold)
-    }
 }

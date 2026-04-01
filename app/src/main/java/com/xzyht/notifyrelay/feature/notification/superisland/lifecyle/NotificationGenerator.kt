@@ -367,7 +367,7 @@ object NotificationGenerator {
                 val textLength = TextSplitter.calculateTextLength(lyricText)
                 if (textLength > threshold) {
                     // 使用TextSplitter工具类进行歌词拆分
-                    val (splitIconText, splitCapsuleText) = TextSplitter.splitLyricWithCharacterType(lyricText, threshold)
+                    val (splitIconText, splitCapsuleText) = TextSplitter.splitLyric(lyricText, threshold)
                     iconText = splitIconText
                     capsuleText = splitCapsuleText
                 }
@@ -715,7 +715,7 @@ object NotificationGenerator {
     /**
      * 构建胶囊兼容的通知，添加标准通知字段和 smallIcon 注入
      */
-    private suspend fun buildCapsuleCompatibleNotification(
+    private fun buildCapsuleCompatibleNotification(
         context: Context,
         builder: NotificationCompat.Builder,
         title: String?,
