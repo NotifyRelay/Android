@@ -1,12 +1,12 @@
 package com.xzyht.notifyrelay.ui
 
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.view.WindowManager
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -40,7 +40,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -58,7 +57,6 @@ import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
@@ -82,7 +80,6 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
-import top.yukonga.miuix.kmp.basic.NavigationDisplayMode
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
@@ -96,40 +93,42 @@ import top.yukonga.miuix.kmp.utils.MiuixPopupUtils.Companion.MiuixPopupHost
 class MainActivity : FragmentActivity() {
     internal val showAutoStartBanner = mutableStateOf(false)
     internal val bannerMessage = mutableStateOf<String?>(null)
-    
-    private var backPressedTime: Long = 0
-    private val EXIT_INTERVAL = 2000L
 
     private fun checkPermissionsAndStartServices() {
-        showAutoStartBanner.value = false
-        bannerMessage.value = null
+        lifecycleScope.launch(Dispatchers.Main) {
+            showAutoStartBanner.value = false
+            bannerMessage.value = null
 
-        if (!PermissionHelper.checkAllPermissions(this)) {
-            Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
-            val intent = Intent(this, GuideActivity::class.java)
-            intent.putExtra("from", "MainActivity")
-            startActivity(intent)
-            finish()
-            return
-        }
+            if (!PermissionHelper.checkAllPermissions(this@MainActivity)) {
+                Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
+                val intent = Intent(this@MainActivity, GuideActivity::class.java)
+                intent.putExtra("from", "MainActivity")
+                startActivity(intent)
+                finish()
+                return@launch
+            }
 
-        val result = ServiceManager.startAllServices(this)
-        val serviceStarted = result.first
-        val errorMessage = result.second as? String
-        if (errorMessage != null) {
-            showAutoStartBanner.value = true
-            bannerMessage.value = errorMessage
-        }
+            val result = ServiceManager.startAllServices(this@MainActivity)
+            val serviceStarted = result.first
+            val errorMessage = result.second
+            if (errorMessage != null) {
+                showAutoStartBanner.value = true
+                bannerMessage.value = errorMessage
+            }
 
-        if (!serviceStarted) {
-            showAutoStartBanner.value = true
-            bannerMessage.value = "服务无法启动，可能因系统自启动/后台运行权限被拒绝。请前往系统设置手动允许自启动、后台运行和电池优化白名单，否则通知转发将无法正常工作。"
+            if (!serviceStarted) {
+                showAutoStartBanner.value = true
+                bannerMessage.value = "服务无法启动，可能因系统自启动/后台运行权限被拒绝。请前往系统设置手动允许自启动、后台运行和电池优化白名单，否则通知转发将无法正常工作。"
+            }
         }
     }
 
     override fun onResume() {
         super.onResume()
-        checkPermissionsAndStartServices()
+        // 后台执行权限检查和服务启动，避免阻塞 UI 线程
+        lifecycleScope.launch(Dispatchers.Default) {
+            checkPermissionsAndStartServices()
+        }
     }
 
     private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
@@ -192,11 +191,11 @@ class MainActivity : FragmentActivity() {
             return
         }
 
-        DeviceConnectionManager.getInstance(this)
-        DeviceInfoManager.generateDeviceInfoFile(this)
-        LiveUpdatesNotificationManager.initialize(this)
-        
-        lifecycleScope.launch {
+        // 后台初始化，避免阻塞 UI 线程
+        lifecycleScope.launch(Dispatchers.Default) {
+            DeviceConnectionManager.getInstance(this@MainActivity)
+            DeviceInfoManager.generateDeviceInfoFile(this@MainActivity)
+            LiveUpdatesNotificationManager.initialize(this@MainActivity)
             NotificationRepository.init(this@MainActivity)
             AppRepository.loadApps(this@MainActivity)
             startServicesAndUpdateBanner()
@@ -292,7 +291,6 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
             },
             bottomBar = {
                 NavigationBar(
-                    mode = NavigationDisplayMode.IconAndText,
                     color = colorScheme.background,
                     modifier = Modifier
                         .height(75.dp)

@@ -24,7 +24,6 @@ import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.servers.MediaControlUtil
-import com.xzyht.notifyrelay.servers.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
 import notifyrelay.base.util.Logger
@@ -47,10 +46,8 @@ fun MusicControlPage() {
     // 响应全局设备选中状态
     val selectedDeviceObj by GlobalSelectedDeviceHolder.current()
     val selectedDevice = selectedDeviceObj
-    
-    // 监听当前设备的通知历史变化
-    val notifications by NotificationRepository.notificationHistoryFlow.collectAsState()
-    
+
+
     // 滚动状态
     val scrollState = rememberScrollState()
 
@@ -59,6 +56,8 @@ fun MusicControlPage() {
     
     // 胶囊歌词开关状态
     var capsuleLyricsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "capsule_lyrics_enabled")) }
+    
+
 
     Column(
         modifier = Modifier
@@ -172,6 +171,8 @@ fun MusicControlPage() {
             )
         }
         
+
+        
         // 媒体控制标题
         Text(
             text = "媒体控制",
@@ -196,13 +197,8 @@ fun MusicControlPage() {
                 onClick = {
                     try {
                         if (selectedDevice == null) {
-                            val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
-                            if (sbn != null) {
-                                MediaControlUtil.triggerPreviousFromNotification(sbn)
-                                ToastUtils.showShortToast(context, "已发送上一首指令到本机")
-                            } else {
-                                ToastUtils.showShortToast(context, "未找到媒体通知，请启用通知监听服务或使用 PendingIntent")
-                            }
+                            MediaControlUtil.previous()
+                            ToastUtils.showShortToast(context, "已发送上一首指令到本机")
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"previous\"}"
@@ -224,13 +220,8 @@ fun MusicControlPage() {
                 onClick = {
                     try {
                         if (selectedDevice == null) {
-                            val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
-                            if (sbn != null) {
-                                MediaControlUtil.triggerPlayPauseFromNotification(sbn)
-                                ToastUtils.showShortToast(context, "已发送播放/暂停指令到本机")
-                            } else {
-                                ToastUtils.showShortToast(context, "未找到媒体通知，请启用通知监听服务或使用 PendingIntent")
-                            }
+                            MediaControlUtil.playPause()
+                            ToastUtils.showShortToast(context, "已发送播放/暂停指令到本机")
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"playPause\"}"
@@ -252,13 +243,8 @@ fun MusicControlPage() {
                 onClick = {
                     try {
                         if (selectedDevice == null) {
-                            val sbn = NotifyRelayNotificationListenerService.latestMediaSbn
-                            if (sbn != null) {
-                                MediaControlUtil.triggerNextFromNotification(sbn)
-                                ToastUtils.showShortToast(context, "已发送下一首指令到本机")
-                            } else {
-                                ToastUtils.showShortToast(context, "未找到媒体通知，请启用通知监听服务或使用 PendingIntent")
-                            }
+                            MediaControlUtil.next()
+                            ToastUtils.showShortToast(context, "已发送下一首指令到本机")
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"next\"}"

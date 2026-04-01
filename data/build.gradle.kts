@@ -1,9 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    id("com.android.library")
-    id("org.jetbrains.kotlin.android")
-    id("kotlin-kapt")
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.ksp)
 }
 
 android {
@@ -48,9 +47,9 @@ dependencies {
     
     // Room Database
     implementation(libs.androidx.room.runtime)
-    kapt(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
     implementation(libs.androidx.room.paging)
+    ksp(libs.androidx.room.compiler)
 
     // Paging 3 (DAO PagingSource)
     implementation(libs.androidx.paging.runtime)
@@ -59,8 +58,7 @@ dependencies {
     implementation(libs.gson)
     
     // Kotlin Coroutines
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.bundles.kotlinx.coroutines)
     
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

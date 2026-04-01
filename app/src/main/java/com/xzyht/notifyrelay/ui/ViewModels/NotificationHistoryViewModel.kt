@@ -13,6 +13,7 @@ import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,6 +41,7 @@ class NotificationHistoryViewModel(
     private val refreshSignal = MutableStateFlow(0L)
     private val iconLoading = mutableSetOf<String>()
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val groupedPagingFlow: Flow<PagingData<GroupedNotifications>> = combine(
         deviceFlow,
         refreshSignal,
@@ -176,7 +178,7 @@ class NotificationHistoryViewModel(
                 }
             } finally {
                 synchronized(iconLoading) {
-                    iconLoading.removeAll(toLoad)
+                    iconLoading.removeAll(toLoad.toSet())
                 }
             }
         }
@@ -188,16 +190,13 @@ class NotificationHistoryViewModel(
 
     private suspend fun loadInstalledPackages() {
         val cached = AppRepository.getInstalledPackageNames(application)
-        installedPackages.value = if (cached.isEmpty()) {
+        installedPackages.value = cached.ifEmpty {
             AppRepository.getInstalledPackageNamesAsync(application)
-        } else {
-            cached
         }
     }
 
     private suspend fun getAppNameAndIcon(packageName: String): Pair<String, Bitmap?> {
-        var name = packageName
-        var icon: Bitmap? = null
+        var name: String
         try {
             val pm = application.packageManager
             val appInfo = pm.getApplicationInfo(packageName, 0)
@@ -205,10 +204,10 @@ class NotificationHistoryViewModel(
         } catch (_: Exception) {
             name = packageName
         }
-        try {
-            icon = AppRepository.getAppIconWithAutoRequest(application, packageName)
+        val icon: Bitmap? = try {
+            AppRepository.getAppIconWithAutoRequest(application, packageName)
         } catch (_: Exception) {
-            icon = null
+            null
         }
         return name to icon
     }

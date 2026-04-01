@@ -1,6 +1,6 @@
 package com.xzyht.notifyrelay
 
-import com.xzyht.notifyrelay.feature.notification.superisland.common.TextSplitter
+import github.xzynine.superislandui.common.TextSplitter
 import org.junit.Test
 import java.io.File
 
@@ -75,7 +75,7 @@ class TextSplitterUnitTest {
         
         testCases.forEachIndexed { index, text ->
             // 使用修复后的TextSplitter逻辑
-            val (iconText, capsuleText) = TextSplitter.splitLyricWithCharacterType(text, 6)
+            val (iconText, capsuleText) = TextSplitter.splitLyric(text, 6)
             
             try {
                 // 添加断言验证

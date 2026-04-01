@@ -13,6 +13,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslan
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -30,11 +31,11 @@ class SuperIslandHistoryViewModel(
     val uiState: StateFlow<SuperIslandHistoryUiState> = _uiState.asStateFlow()
 
     private val _appIconCache = MutableStateFlow<Map<String, Pair<String, Bitmap?>>>(emptyMap())
-    val appIconCache: StateFlow<Map<String, Pair<String, Bitmap?>>> = _appIconCache.asStateFlow()
 
     private val refreshSignal = MutableStateFlow(0L)
     private val iconLoading = mutableSetOf<String>()
 
+    @OptIn(ExperimentalCoroutinesApi::class)
     val groupedPagingFlow: Flow<PagingData<GroupedSuperIslandHistory>> = refreshSignal.flatMapLatest {
         Pager(
             config = PagingConfig(pageSize = 20, enablePlaceholders = false)
@@ -138,8 +139,8 @@ class SuperIslandHistoryViewModel(
     }
 
     private suspend fun getAppNameAndIcon(packageName: String): Pair<String, Bitmap?> {
-        var name = packageName
-        var icon: Bitmap? = null
+        var name: String
+        var icon: Bitmap?
         try {
             val pm = application.packageManager
             val appInfo = pm.getApplicationInfo(packageName, 0)

@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Looper
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.xzyht.notifyrelay.feature.notification.superisland.common.SuperIslandProtocol
+import github.xzynine.superislandui.common.SuperIslandProtocol
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers

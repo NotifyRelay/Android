@@ -4,7 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
+import github.xzynine.superislandui.model.core.ParamV2
 import java.util.concurrent.ConcurrentHashMap
 
 /**

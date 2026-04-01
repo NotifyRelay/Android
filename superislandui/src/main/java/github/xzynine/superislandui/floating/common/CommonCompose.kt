@@ -1,0 +1,345 @@
+package github.xzynine.superislandui.floating.common
+
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.Dp
+import androidx.compose.ui.unit.TextUnit
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import github.xzynine.superislandui.common.AutoScrollText
+import github.xzynine.superislandui.model.componets.TimerInfo
+import github.xzynine.superislandui.common.PreviewData
+import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
+import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
+import java.util.Locale
+
+/**
+ * 通用图片加载组件
+ * 用于A区和B区的图片渲染
+ */
+@Composable
+fun CommonImageCompose(
+    picKey: String?,
+    picMap: Map<String, String>?,
+    size: Dp = 18.dp,
+    isFocusIcon: Boolean = false,
+    contentDescription: String? = null
+) {
+    // 对于焦点图标，即使picKey为空，也尝试从picMap中获取
+    if (!isFocusIcon && picKey.isNullOrBlank()) return
+    
+    // 获取当前主题
+    val isDarkTheme = isSystemInDarkTheme()
+    
+    val context = LocalContext.current
+    val iconUrl = if (isFocusIcon) {
+        resolveFocusIconUrl(picMap, picKey, isDarkTheme, context)
+    } else {
+        resolveIconUrl(picMap, picKey, context)
+    }
+    
+    // 预览模式下：只有在有有效URL时才显示占位符
+    if (LocalInspectionMode.current) {
+        if (iconUrl.isNullOrBlank()) return
+        Box(
+            modifier = Modifier
+                .size(size)
+                .background(Color.Gray.copy(alpha = 0.3f), CircleShape)
+        )
+        return
+    }
+    
+    val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(iconUrl, picMap)
+    
+    if (painter != null) {
+        Image(
+            painter = painter,
+            contentDescription = contentDescription,
+            modifier = Modifier.size(size)
+        )
+    }
+}
+
+/**
+ * 通用占位图片组件
+ * 用于需要占位但不实际加载图片的场景
+ */
+@Composable
+fun CommonImagePlaceholder(
+    show: Boolean,
+    size: Dp = 18.dp
+) {
+    if (show) {
+        Spacer(modifier = Modifier.size(size))
+    }
+}
+
+/**
+ * 通用文本块的Compose实现
+ * 用于A区和B区的文本渲染
+ */
+@Composable
+fun CommonTextBlockCompose(
+    frontTitle: String?,
+    title: String?,
+    content: String?,
+    narrow: Boolean,
+    highlight: Boolean,
+    monospace: Boolean,
+    horizontalPadding: Dp = 6.dp,
+    frontTitleColor: Color = Color(0xCCFFFFFF),
+    frontTitleFontSize: TextUnit = 11.sp,
+    titleColor: Color = if (highlight) Color(0xFF40C4FF) else Color.White,
+    titleFontSize: TextUnit = 14.sp,
+    contentColor: Color = Color(0xCCFFFFFF),
+    contentFontSize: TextUnit = 12.sp,
+    maxWidth: Dp = 160.dp // 适当增加最大宽度，确保内容完整显示
+) {
+    // 确定字体家族
+    val fontFamily = when {
+        monospace -> FontFamily.Monospace
+        narrow -> FontFamily.SansSerif
+        else -> FontFamily.Default
+    }
+    
+    Column(
+        modifier = Modifier
+            .wrapContentWidth()
+            .padding(start = horizontalPadding)
+    ) {
+        // 前置标题
+        frontTitle?.let {
+            AutoScrollText(
+                text = it,
+                style = TextStyle(
+                    fontFamily = fontFamily,
+                    fontSize = frontTitleFontSize
+                ),
+                color = frontTitleColor,
+                baseSpeedPxPerSec = 80f,
+                pauseMillis = 800
+            )
+        }
+        
+        // 主标题
+        title?.let {
+            AutoScrollText(
+                text = it,
+                style = TextStyle(
+                    fontWeight = FontWeight.Bold,
+                    fontFamily = fontFamily,
+                    fontSize = titleFontSize
+                ),
+                color = titleColor,
+                baseSpeedPxPerSec = 100f,
+                pauseMillis = 1000
+            )
+        }
+        
+        // 内容
+        content?.let {
+            AutoScrollText(
+                text = it,
+                style = TextStyle(
+                    fontFamily = fontFamily,
+                    fontSize = contentFontSize
+                ),
+                color = contentColor,
+                baseSpeedPxPerSec = 130f,// 基础滚动速度，单位：px/秒
+                pauseMillis = 200
+            )
+        }
+    }
+}
+
+/**
+ * 圆形进度环的Compose实现
+ * 使用Miuix的CircularProgressIndicator实现
+ */
+@Composable
+fun CircularProgressCompose(
+    progress: Int,
+    colorReach: Color,
+    colorUnReach: Color,
+    strokeWidth: Dp,
+    isClockwise: Boolean,
+    size: Dp = 20.dp
+) {
+    CircularProgressIndicator(
+        progress = progress.coerceIn(0, 100).toFloat() / 100f,
+        size = size,
+        strokeWidth = strokeWidth,
+        colors = ProgressIndicatorDefaults.progressIndicatorColors(
+            foregroundColor = colorReach,
+            backgroundColor = colorUnReach
+        )
+    )
+}
+
+/**
+ * 安全解析颜色
+ */
+fun parseColorSafe(s: String?, default: Int): Int = try {
+    if (s.isNullOrBlank()) default else s.toIntOrNull(16)?.let { 0xFF000000.toInt() or it } ?: default
+} catch (_: IllegalArgumentException) {
+    default
+}
+
+/**
+ * 格式化计时器信息
+ * 修复了计时逻辑，确保暂停时显示正确进度，解决正计时快3s问题
+ */
+fun formatTimerInfo(timer: TimerInfo): String {
+    val now = System.currentTimeMillis()
+    val timerType = timer.timerType
+    val timerWhen = timer.timerWhen // 正计时：开始时间；倒计时：结束时间
+    val timerSystemCurrent = timer.timerSystemCurrent // 计时状态变更时的系统时间
+    
+    val displayValue: Long = when (timerType) {
+        -2 -> { // 倒计时暂停
+            // 暂停状态：剩余时间 = 结束时间 - 状态变更时间
+            val remaining = timerWhen - timerSystemCurrent
+            remaining.coerceAtLeast(0)
+        }
+        -1 -> { // 倒计时进行中
+            // 进行中状态：剩余时间 = 结束时间 - 当前时间
+            val remaining = timerWhen - now
+            remaining.coerceAtLeast(0)
+        }
+        2 -> { // 正计时暂停
+            // 暂停状态：已过时间 = 状态变更时间 - 开始时间
+            val elapsed = timerSystemCurrent - timerWhen
+            elapsed.coerceAtLeast(0)
+        }
+        1 -> { // 正计时进行中
+            // 进行中状态：已过时间 = 当前时间 - 开始时间
+            val elapsed = now - timerWhen
+            elapsed.coerceAtLeast(0)
+        }
+        else -> 0
+    }
+    
+    val seconds = (displayValue / 1000).toInt()
+    val minutes = seconds / 60
+    val hours = minutes / 60
+    
+    return if (hours > 0) {
+        String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes % 60, seconds % 60)
+    } else {
+        String.format(Locale.ROOT, "%02d:%02d", minutes % 60, seconds % 60)
+    }
+}
+
+/**
+ * 格式化时长
+ */
+fun formatDuration(ms: Long): String {
+    val seconds = (ms / 1000).toInt()
+    val minutes = seconds / 60
+    val hours = minutes / 60
+
+    return if (hours > 0)
+        String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes % 60, seconds % 60) else
+        String.format(Locale.ROOT, "%02d:%02d", minutes % 60, seconds % 60)
+}
+
+/**
+ * 超级岛根布局组件
+ * 提供统一的卡片样式和布局结构
+ */
+@Composable
+fun SuperIslandComposeRoot(
+    content: @Composable () -> Unit,
+    isOverlapping: Boolean = false
+) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(8.dp)
+    ) {
+        Card(
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(
+                containerColor = if (isOverlapping) {
+                    // 重叠时显示红色背景
+                    Color.Red.copy(alpha = 0.92f)
+                } else {
+                    // 正常时显示黑色背景
+                    Color.Black.copy(alpha = 0.92f)
+                }
+            ),
+            elevation = CardDefaults.cardElevation(6.dp),
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Column(
+                modifier = Modifier.padding(8.dp)
+            ) {
+                content()
+            }
+        }
+    }
+}
+
+@Preview(name = "通用文本块", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun CommonTextBlockComposePreview() {
+    CommonTextBlockCompose(
+        frontTitle = "前置标题",
+        title = "主标题",
+        content = "内容描述",
+        narrow = false,
+        highlight = true,
+        monospace = false
+    )
+}
+
+@Preview(name = "圆形进度环", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun CircularProgressComposePreview() {
+    CircularProgressCompose(
+        progress = 60,
+        colorReach = Color(0xFF3482FF),
+        colorUnReach = Color(0x33333333),
+        strokeWidth = 3.dp,
+        isClockwise = true,
+        size = 48.dp
+    )
+}
+
+@Preview(name = "超级岛根布局", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Composable
+fun SuperIslandComposeRootPreview() {
+    SuperIslandComposeRoot(
+        content = {
+            CommonTextBlockCompose(
+                frontTitle = null,
+                title = "超级岛标题",
+                content = "超级岛内容",
+                narrow = false,
+                highlight = false,
+                monospace = false
+            )
+        }
+    )
+}

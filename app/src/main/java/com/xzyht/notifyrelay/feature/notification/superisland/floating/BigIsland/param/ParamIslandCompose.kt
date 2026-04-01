@@ -19,13 +19,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import notifyrelay.base.util.Logger
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.components.ProgressInfoCompose
-import com.xzyht.notifyrelay.feature.notification.superisland.model.componets.ActionInfo
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamIsland
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.CommonImageCompose
+import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
+import github.xzynine.superislandui.floating.BigIsland.components.ProgressInfoCompose
+import github.xzynine.superislandui.floating.common.CommonImageCompose
+import github.xzynine.superislandui.model.componets.ActionInfo
+import github.xzynine.superislandui.model.core.ParamIsland
+import notifyrelay.base.util.Logger
 import top.yukonga.miuix.kmp.basic.TextButton
 
 /**

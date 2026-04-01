@@ -1,13 +1,14 @@
 [versions]
-agp = "8.13.2"
+agp = "9.1.0"
 kotlin = "2.3.10"
+ksp = "2.3.6"
 coreKtx = "1.18.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 espressoCore = "3.7.0"
 appcompat = "1.7.1"
-material = "1.12.0"
-miuix = "0.8.6"
+material = "1.13.0"
+miuix = "0.8.7"
 navigation3 = "1.1.0-beta01"
 lifecycle = "2.10.0"
 uiText = "1.10.5"
@@ -28,15 +29,15 @@ room = "2.8.4"
 navigationEventCompose = "1.0.2"
 datastorePreferences = "1.2.1"
 datastore = "1.2.1"
-gson = "2.10.1"
+gson = "2.11.0"
 okhttp = "4.12.0"
 okio = "3.7.0"
-jmdns = "3.5.7"
+jmdns = "3.6.3"
 coil = "2.4.0"
 coilCompose = "2.4.0"
 diskLruCache = "2.0.2"
 kotlinxCoroutines = "1.8.1"
-composeUi = "1.6.0"
+composeUi = "1.10.5"
 compileSdk = "36"
 targetSdk = "36"
 minSdk = "29"
@@ -105,4 +106,6 @@ paging = ["androidx-paging-runtime", "androidx-paging-compose"]
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlinPluginCompose" }
 android-library = { id = "com.android.library", version.ref = "agp" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

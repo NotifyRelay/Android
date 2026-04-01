@@ -15,10 +15,10 @@ import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.toColorInt
 import androidx.core.text.HtmlCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.FormattedSuperIslandData
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
+import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

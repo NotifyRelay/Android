@@ -2,7 +2,6 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.library)
-    alias(libs.plugins.kotlin.android)
 }
 
 android {
@@ -40,8 +39,7 @@ kotlin {
 dependencies {
     implementation(libs.okhttp)
     implementation(libs.gson)
-    implementation(libs.kotlinx.coroutines.core)
-    implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.bundles.kotlinx.coroutines)
     implementation(libs.semver)
     
     testImplementation(libs.junit)

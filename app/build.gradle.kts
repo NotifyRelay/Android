@@ -5,9 +5,8 @@ import java.util.Properties
 
 plugins {
     id("com.android.application")
-    id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose") version libs.versions.kotlinPluginCompose
-    id("kotlin-kapt")
+    id("com.google.devtools.ksp") version "2.3.6"
     id("kotlin-parcelize")
 }
 // 使用 buildSrc 的 JGit 实现计算版本信息（避免启动外部进程，兼容 configuration-cache）
@@ -30,19 +29,7 @@ plugins {
 // 例如：val versionMajor: Int = 1
 val versionMajor: Int = 1 // <-- 在此处直接修改主版本号
 
-fun gitOutput(vararg args: String): String {
-    val stdout = ByteArrayOutputStream()
-    try {
-        exec {
-            commandLine = listOf("git", *args)
-            isIgnoreExitValue = true
-            standardOutput = stdout
-        }
-    } catch (e: Exception) {
-        // 如果没有 git 或执行失败，返回空字符串
-    }
-    return stdout.toString().trim()
-}
+
 // 使用 buildSrc 中的 Versioning 实现来计算版本信息（包含对非 main 分支仅统计独有提交的修订数）
 // 支持在此文件内直接设置次版本（minor）减量（不使用 gradle.properties）：
 // - 当主版本号（versionMajor）升级后，可以在下面直接把 `versionMajorSubtract` 改为期望的值，
@@ -109,7 +96,7 @@ android {
         }
     }
 
-    val releaseSigning = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+    val releaseSigning = signingConfigs.getByName("release")
 
     buildTypes {
         getByName("debug") {
@@ -191,20 +178,18 @@ dependencies {
     implementation(libs.accompanist.pager.indicators)
 
     // AndroidX Lifecycle（提供 ViewTreeLifecycleOwner 等）
-    implementation(libs.androidx.lifecycle.runtime)
-    implementation(libs.androidx.lifecycle.runtime.ktx)
-    implementation(libs.androidx.lifecycle.runtime.android)
+    implementation(libs.bundles.lifecycle)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
 
     // Room Database
     implementation(libs.androidx.room.runtime)
-    kapt(libs.androidx.room.compiler)
     implementation(libs.androidx.room.ktx)
+    implementation(libs.androidx.room.paging)
+    annotationProcessor(libs.androidx.room.compiler)
 
     // Paging 3
-    implementation(libs.androidx.paging.runtime)
-    implementation(libs.androidx.paging.compose)
+    implementation(libs.bundles.paging)
     
     // Miuix风格ui库
     implementation(libs.miuix.android)
@@ -215,8 +200,7 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.navigation3)
     implementation(libs.androidx.navigationevent.compose)
     // DataStore 持久化（设备名、规则设置）
-    implementation(libs.androidx.datastore.preferences)
-    implementation(libs.androidx.datastore)
+    implementation(libs.bundles.datastore)
     // Gson 用于通知历史 JSON 文件读写
     implementation(libs.gson)
     // OkHttp & Okio 用于 WebSocket 和 IO
@@ -226,9 +210,7 @@ dependencies {
     implementation(libs.jmdns)
     
     // Coil: image loading (Kotlin + Coroutines friendly)
-    implementation(libs.coil)
-    // Coil Compose: Jetpack Compose integration for image loading
-    implementation(libs.coil.compose)
+    implementation(libs.bundles.coil)
     // DiskLruCache: stable disk-based LRU cache for icons
     implementation(libs.disklrucache)
     // 添加Apache FtpServer依赖用于FTP服务器实现
@@ -242,6 +224,8 @@ dependencies {
     implementation(project(":base"))
     // 依赖checkupdata模块
     implementation(project(":checkupdata"))
+    // 依赖superislandui模块
+    implementation(project(":superislandui"))
 }
 
 tasks.register("printVersionName") {

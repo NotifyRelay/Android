@@ -13,6 +13,7 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.extra.DialogDefaults
 import top.yukonga.miuix.kmp.extra.WindowDialog
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -34,62 +35,58 @@ fun HandshakeRequestDialog(
     val textStyles = MiuixTheme.textStyles
     val req = handshakeRequest
 
-    WindowDialog(
-        show = showDialog,
-        title = "新设备连接请求",
-        onDismissRequest = {
-            onReject(req)
-            onDismiss()
-        }
-    ) {
-        Column {
-            Text(
-                text = "设备名: ${req.device.displayName}",
-                style = textStyles.body2,
-                color = colorScheme.onSurfaceContainerVariant
-            )
-            Text(
-                text = "UUID: ${req.device.uuid}",
-                style = textStyles.body2,
-                color = colorScheme.onSurfaceContainerVariant
-            )
-            Text(
-                text = "IP: ${req.device.ip}  端口: ${req.device.port}",
-                style = textStyles.body2,
-                color = colorScheme.onSurfaceContainerVariant
-            )
-            if (!req.publicKey.isNullOrBlank()) {
+    WindowDialog(show = showDialog.value, modifier = Modifier, title = "新设备连接请求", titleColor = DialogDefaults.titleColor(), summary = null, summaryColor = DialogDefaults.summaryColor(), backgroundColor = DialogDefaults.backgroundColor(), enableWindowDim = true, onDismissRequest = {
+                onReject(req)
+                onDismiss()
+            }, onDismissFinished = null, outsideMargin = DialogDefaults.outsideMargin, insideMargin = DialogDefaults.insideMargin, defaultWindowInsetsPadding = true, content = {
+            Column {
                 Text(
-                    text = "公钥: ${req.publicKey}",
+                    text = "设备名: ${req.device.displayName}",
                     style = textStyles.body2,
                     color = colorScheme.onSurfaceContainerVariant
                 )
-            }
-            Text(
-                text = "是否允许该设备连接？",
-                style = textStyles.body2,
-                color = colorScheme.primary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(
-                    text = "同意",
-                    onClick = {
-                        onAccept(req)
-                        onDismiss()
-                    }
+                Text(
+                    text = "UUID: ${req.device.uuid}",
+                    style = textStyles.body2,
+                    color = colorScheme.onSurfaceContainerVariant
                 )
-                TextButton(
-                    text = "拒绝",
-                    onClick = {
-                        onReject(req)
-                        onDismiss()
-                    }
+                Text(
+                    text = "IP: ${req.device.ip}  端口: ${req.device.port}",
+                    style = textStyles.body2,
+                    color = colorScheme.onSurfaceContainerVariant
                 )
+                if (!req.publicKey.isNullOrBlank()) {
+                    Text(
+                        text = "公钥: ${req.publicKey}",
+                        style = textStyles.body2,
+                        color = colorScheme.onSurfaceContainerVariant
+                    )
+                }
+                Text(
+                    text = "是否允许该设备连接？",
+                    style = textStyles.body2,
+                    color = colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(16.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End
+                ) {
+                    TextButton(
+                        text = "同意",
+                        onClick = {
+                            onAccept(req)
+                            onDismiss()
+                        }
+                    )
+                    TextButton(
+                        text = "拒绝",
+                        onClick = {
+                            onReject(req)
+                            onDismiss()
+                        }
+                    )
+                }
             }
-        }
-    }
+        })
 }

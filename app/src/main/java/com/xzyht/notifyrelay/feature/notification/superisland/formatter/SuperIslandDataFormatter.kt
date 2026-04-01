@@ -2,8 +2,8 @@ package com.xzyht.notifyrelay.feature.notification.superisland.formatter
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.ParamV2
-import com.xzyht.notifyrelay.feature.notification.superisland.model.core.parseParamV2
+import github.xzynine.superislandui.model.core.ParamV2
+import github.xzynine.superislandui.model.core.parseParamV2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger

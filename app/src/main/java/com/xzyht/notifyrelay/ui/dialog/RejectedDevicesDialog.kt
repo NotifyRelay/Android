@@ -12,6 +12,7 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.extra.BottomSheetDefaults
 import top.yukonga.miuix.kmp.extra.WindowBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -28,37 +29,33 @@ fun RejectedDevicesDialog(
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
 
-    WindowBottomSheet(
-        show = showDialog,
-        title = "已拒绝设备",
-        onDismissRequest = onDismiss
-    ) {
-        if (rejectedDevices.isEmpty()) {
-            Text(
-                text = "暂无已拒绝设备",
-                style = textStyles.body2,
-                color = colorScheme.onSurfaceContainerVariant
-            )
-        } else {
-            Column {
-                rejectedDevices.forEach { device ->
-                    Row(
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text(
-                            text = device.displayName,
-                            style = textStyles.body2,
-                            color = colorScheme.onBackground,
-                            modifier = Modifier.weight(1f)
-                        )
-                        TextButton(
-                            text = "恢复",
-                            onClick = { onRestoreDevice(device) }
-                        )
+    WindowBottomSheet(show = showDialog.value, modifier = Modifier, title = "已拒绝设备", startAction = null, endAction = null, backgroundColor = BottomSheetDefaults.backgroundColor(), enableWindowDim = true, cornerRadius = BottomSheetDefaults.cornerRadius, sheetMaxWidth = BottomSheetDefaults.maxWidth, onDismissRequest = onDismiss, onDismissFinished = null, outsideMargin = BottomSheetDefaults.outsideMargin, insideMargin = BottomSheetDefaults.insideMargin, defaultWindowInsetsPadding = true, dragHandleColor = BottomSheetDefaults.dragHandleColor(), allowDismiss = true, enableNestedScroll = true, content = {
+            if (rejectedDevices.isEmpty()) {
+                Text(
+                    text = "暂无已拒绝设备",
+                    style = textStyles.body2,
+                    color = colorScheme.onSurfaceContainerVariant
+                )
+            } else {
+                Column {
+                    rejectedDevices.forEach { device ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                text = device.displayName,
+                                style = textStyles.body2,
+                                color = colorScheme.onBackground,
+                                modifier = Modifier.weight(1f)
+                            )
+                            TextButton(
+                                text = "恢复",
+                                onClick = { onRestoreDevice(device) }
+                            )
+                        }
                     }
                 }
             }
-        }
-    }
+        })
 }
