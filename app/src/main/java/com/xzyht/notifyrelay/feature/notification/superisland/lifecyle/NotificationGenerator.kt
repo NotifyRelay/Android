@@ -401,7 +401,18 @@ object NotificationGenerator {
                 
                 // 生成并注入动态图标
                 if (iconText.isNotEmpty()) {
-                    val iconBitmap = BitmapUtils.textToBitmap(iconText)
+                    // 尝试获取专辑图
+                    var albumBitmap: Bitmap? = null
+                    val coverKey = "miui.focus.pic_cover"
+                    if (!picMap.isNullOrEmpty() && picMap.containsKey(coverKey)) {
+                        val coverUrl = picMap[coverKey]
+                        if (!coverUrl.isNullOrBlank()) {
+                            // 同步下载专辑图
+                            albumBitmap = downloadBitmap(context, coverUrl, 5000)
+                        }
+                    }
+                    
+                    val iconBitmap = BitmapUtils.textToBitmap(iconText, albumBitmap = albumBitmap)
                     if (iconBitmap != null) {
                         injectSmallIcon(notification, iconBitmap)
                     }
@@ -980,7 +991,17 @@ object NotificationGenerator {
             Logger.d(TAG, "超级岛: 处理文本位图 - textToRender: $textToRender")
             if (!textToRender.isNullOrBlank()) {
                 Logger.d(TAG, "超级岛: 使用文本生成位图")
-                val bitmap = BitmapUtils.textToBitmap(textToRender)
+                // 尝试获取专辑图
+                var albumBitmap: Bitmap? = null
+                val coverKey = "miui.focus.pic_cover"
+                if (!picMap.isNullOrEmpty() && picMap.containsKey(coverKey)) {
+                    val coverUrl = picMap[coverKey]
+                    if (!coverUrl.isNullOrBlank()) {
+                        // 同步下载专辑图
+                        albumBitmap = downloadBitmap(context, coverUrl, 5000)
+                    }
+                }
+                val bitmap = BitmapUtils.textToBitmap(textToRender, albumBitmap = albumBitmap)
                 Logger.d(TAG, "超级岛: 文本位图生成结果: ${bitmap != null}")
                 if (bitmap != null) return bitmap
             }
