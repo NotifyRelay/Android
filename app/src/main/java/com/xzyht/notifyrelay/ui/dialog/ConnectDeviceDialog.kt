@@ -25,8 +25,6 @@ fun ConnectDeviceDialog(
 ) {
     if (device == null) return
 
-    MiuixTheme.colorScheme
-    MiuixTheme.textStyles
 
     WindowDialog(show = showDialog.value, modifier = Modifier, title = "连接设备", titleColor = DialogDefaults.titleColor(), summary = "是否连接设备：${device.displayName} \n(${device.uuid})？\n对方将收到认证请求。", summaryColor = DialogDefaults.summaryColor(), backgroundColor = DialogDefaults.backgroundColor(), enableWindowDim = true, onDismissRequest = onDismiss, onDismissFinished = null, outsideMargin = DialogDefaults.outsideMargin, insideMargin = DialogDefaults.insideMargin, defaultWindowInsetsPadding = true, content = {
             Row(
