@@ -1,8 +1,8 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    id("com.android.library")
-    id("com.google.devtools.ksp") version "2.3.6"
+    alias(libs.plugins.android.library)
+    alias(libs.plugins.ksp)
 }
 
 android {
