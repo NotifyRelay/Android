@@ -15,6 +15,7 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import androidx.core.app.NotificationCompat
+import org.json.JSONObject
 import com.xzyht.notifyrelay.R
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
@@ -345,7 +346,17 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 }
                 
                 // 创建媒体类型的paramV2Raw，确保触发超长后使用图标文本的功能
-                val paramV2Raw = "{\"business\":\"media\",\"protocol\":1,\"scene\":\"music\",\"ticker\":\"$finalText\",\"content\":\"$finalTitle\",\"enableFloat\":false,\"updatable\":true,\"reopen\":\"close\",\"localTransmit\":true}"
+                val paramV2Json = JSONObject()
+                paramV2Json.put("business", "media")
+                paramV2Json.put("protocol", 1)
+                paramV2Json.put("scene", "music")
+                paramV2Json.put("ticker", finalText)
+                paramV2Json.put("content", finalTitle)
+                paramV2Json.put("enableFloat", false)
+                paramV2Json.put("updatable", true)
+                paramV2Json.put("reopen", "close")
+                paramV2Json.put("localTransmit", true)
+                val paramV2Raw = paramV2Json.toString()
                 
                 // 调用 FloatingReplicaManager.showFloating 生成浮窗和通知
                 // 无论播放状态如何，都保持浮窗显示，避免UI变化频繁
