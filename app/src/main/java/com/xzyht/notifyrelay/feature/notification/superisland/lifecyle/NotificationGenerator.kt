@@ -961,20 +961,20 @@ object NotificationGenerator {
         // 检查是否为计时器类型，如果是，不生成文本位图，保留之前的图标
         val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
         if (!isTimerType) {
-            // 优先使用 B 区文本生成位图
-            val textToRender = when (bComponent) {
-                is BImageText2 -> bComponent.title
-                is BImageText3 -> bComponent.title
-                is BImageText6 -> bComponent.title
-                is BTextInfo -> bComponent.title
-                is BFixedWidthDigitInfo -> bComponent.digit
-                is BSameWidthDigitInfo -> bComponent.digit
-                is BProgressTextInfo -> bComponent.title ?: bComponent.content
-                else -> null
-            } ?: when (aComponent) {
+            // 优先使用 A 区（左侧）文本生成位图，然后才是 B 区（右侧）文本
+            val textToRender = when (aComponent) {
                 is AImageText1 -> aComponent.title ?: aComponent.content
                 is AImageText5 -> aComponent.title
-                else -> null
+                else -> when (bComponent) {
+                    is BImageText2 -> bComponent.title
+                    is BImageText3 -> bComponent.title
+                    is BImageText6 -> bComponent.title
+                    is BTextInfo -> bComponent.title
+                    is BFixedWidthDigitInfo -> bComponent.digit
+                    is BSameWidthDigitInfo -> bComponent.digit
+                    is BProgressTextInfo -> bComponent.title ?: bComponent.content
+                    else -> null
+                }
             }
             
             Logger.d(TAG, "超级岛: 处理文本位图 - textToRender: $textToRender")
