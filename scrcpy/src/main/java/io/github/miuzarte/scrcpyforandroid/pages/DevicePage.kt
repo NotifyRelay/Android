@@ -69,8 +69,10 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.extra.SuperBottomSheet
+import top.yukonga.miuix.kmp.basic.Text
 import androidx.compose.material.icons.Icons
+import top.yukonga.miuix.kmp.extra.WindowBottomSheet
+import top.yukonga.miuix.kmp.extra.BottomSheetDefaults
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -862,36 +864,37 @@ fun DeviceTabScreen() {
         }
     }
 
-    SuperBottomSheet(
+    WindowBottomSheet(
         show = showReorderSheet,
         title = "快速设备排序",
         onDismissRequest = { showReorderSheet = false },
-    ) {
-        val list = remember {
-            ReorderableList(
-                {
-                    quickDevices.map { device ->
-                        ReorderableList.Item(
-                            id = device.id,
-                            title = device.name.ifBlank { device.host },
-                            subtitle = "${device.host}:${device.port}",
-                        )
-                    }
-                },
-                onSettle = { fromIndex, toIndex ->
-                    if (fromIndex < 0) return@ReorderableList
-                    val to = toIndex.coerceIn(0, quickDevices.size)
-                    if (fromIndex == to) return@ReorderableList
+        content = {
+            val list = remember {
+                ReorderableList(
+                    {
+                        quickDevices.map { device ->
+                            ReorderableList.Item(
+                                id = device.id,
+                                title = device.name.ifBlank { device.host },
+                                subtitle = "${device.host}:${device.port}",
+                            )
+                        }
+                    },
+                    onSettle = { fromIndex, toIndex ->
+                        if (fromIndex < 0) return@ReorderableList
+                        val to = toIndex.coerceIn(0, quickDevices.size)
+                        if (fromIndex == to) return@ReorderableList
 
-                    val moved = quickDevices.removeAt(fromIndex)
-                    quickDevices.add(to.coerceIn(0, quickDevices.size), moved)
-                    saveQuickDevices(context, quickDevices)
-                },
-            )
+                        val moved = quickDevices.removeAt(fromIndex)
+                        quickDevices.add(to.coerceIn(0, quickDevices.size), moved)
+                        saveQuickDevices(context, quickDevices)
+                    },
+                )
+            }
+            list()
+            Spacer(Modifier.height(UiSpacing.BottomSheetBottom))
         }
-        list()
-        Spacer(Modifier.height(UiSpacing.BottomSheetBottom))
-    }
+    )
 
     if (editingDeviceId != null) {
         val device = quickDevices.firstOrNull { it.id == editingDeviceId }
@@ -1230,6 +1233,7 @@ fun ScrcpyAdvancedPage(
     val snackHostState = remember { SnackbarHostState() }
     val scrollBehavior = MiuixScrollBehavior(canScroll = { true })
     var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
+    val scope = rememberCoroutineScope()
 
     DisposableEffect(context) {
         val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
@@ -1238,6 +1242,68 @@ fun ScrcpyAdvancedPage(
         ThemeSettingsManager.addThemeChangeListener(context, listener)
         onDispose {
             ThemeSettingsManager.removeThemeChangeListener(context, listener)
+        }
+    }
+
+    // 刷新编码器列表
+    fun refreshEncoderLists() {
+        val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
+        runCatching {
+            viewModel.nativeCore.scrcpyListEncoders(
+                customServerUri = viewModel.customServerUri,
+                remotePath = remotePath,
+            )
+        }.onSuccess { lists ->
+            viewModel.videoEncoderOptions.clear()
+            viewModel.videoEncoderOptions.addAll(lists.videoEncoders)
+            viewModel.audioEncoderOptions.clear()
+            viewModel.audioEncoderOptions.addAll(lists.audioEncoders)
+            viewModel.videoEncoderTypeMap.clear()
+            viewModel.videoEncoderTypeMap.putAll(lists.videoEncoderTypes)
+            viewModel.audioEncoderTypeMap.clear()
+            viewModel.audioEncoderTypeMap.putAll(lists.audioEncoderTypes)
+            if (viewModel.videoEncoder.isNotBlank() && viewModel.videoEncoder !in viewModel.videoEncoderOptions) {
+                viewModel.videoEncoder = ""
+            }
+            if (viewModel.audioEncoder.isNotBlank() && viewModel.audioEncoder !in viewModel.audioEncoderOptions) {
+                viewModel.audioEncoder = ""
+            }
+            scope.launch {
+                snackHostState.showSnackbar("编码器列表已刷新")
+            }
+        }.onFailure { e ->
+            viewModel.videoEncoderOptions.clear()
+            viewModel.audioEncoderOptions.clear()
+            viewModel.videoEncoderTypeMap.clear()
+            viewModel.audioEncoderTypeMap.clear()
+            scope.launch {
+                snackHostState.showSnackbar("读取编码器列表失败: ${e.message ?: e.javaClass.simpleName}")
+            }
+        }
+    }
+
+    // 刷新 Camera Sizes
+    fun refreshCameraSizeLists() {
+        val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
+        runCatching {
+            viewModel.nativeCore.scrcpyListCameraSizes(
+                customServerUri = viewModel.customServerUri,
+                remotePath = remotePath,
+            )
+        }.onSuccess { lists ->
+            viewModel.cameraSizeOptions.clear()
+            viewModel.cameraSizeOptions.addAll(lists.sizes)
+            if (viewModel.cameraSizePreset.isNotBlank() && viewModel.cameraSizePreset != "custom" && viewModel.cameraSizePreset !in lists.sizes) {
+                viewModel.cameraSizePreset = ""
+            }
+            scope.launch {
+                snackHostState.showSnackbar("Camera sizes 已刷新: count=${lists.sizes.size}")
+            }
+        }.onFailure { e ->
+            viewModel.cameraSizeOptions.clear()
+            scope.launch {
+                snackHostState.showSnackbar("读取 camera sizes 失败: ${e.message ?: e.javaClass.simpleName}")
+            }
         }
     }
 
@@ -1265,7 +1331,10 @@ fun ScrcpyAdvancedPage(
             snackHostState = snackHostState,
             themeBaseIndex = themeBaseIndex,
         ) {
-            AdvancedConfigPage()
+            AdvancedConfigPage(
+                onRefreshEncoders = { refreshEncoderLists() },
+                onRefreshCameraSizes = { refreshCameraSizeLists() },
+            )
         }
     }
 }

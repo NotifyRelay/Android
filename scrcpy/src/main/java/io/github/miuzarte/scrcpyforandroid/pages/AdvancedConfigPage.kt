@@ -29,9 +29,9 @@ import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperDropdown
 import top.yukonga.miuix.kmp.extra.SuperSpinner
 import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.extra.WindowDropdown
 import kotlin.math.roundToInt
 
 private val AUDIO_SOURCE_OPTIONS = listOf(
@@ -64,7 +64,10 @@ private val CAMERA_FACING_OPTIONS = listOf(
 private val CAMERA_FPS_PRESETS = listOf(0, 10, 15, 24, 30, 60, 120, 240, 480, 960)
 
 @Composable
-fun AdvancedConfigPage() {
+fun AdvancedConfigPage(
+    onRefreshEncoders: (() -> Unit)? = null,
+    onRefreshCameraSizes: (() -> Unit)? = null,
+) {
     val viewModel = LocalScrcpyUiViewModel.current
     val contentPadding = LocalScrcpyPagePadding.current
     val scrollBehavior = LocalScrcpyScrollBehavior.current
@@ -163,7 +166,7 @@ fun AdvancedConfigPage() {
 
         item {
             Card {
-                SuperDropdown(
+                WindowDropdown(
                     title = "视频来源",
                     summary = "--video-source",
                     items = videoSourceItems,
@@ -200,10 +203,10 @@ fun AdvancedConfigPage() {
                     SuperArrow(
                         title = "重新获取 Camera Sizes",
                         summary = "--list-camera-sizes",
-                        onClick = { viewModel.refreshCameraSizesAction?.invoke() },
+                        onClick = { onRefreshCameraSizes?.invoke() },
                         enabled = !sessionStarted,
                     )
-                    SuperDropdown(
+                    WindowDropdown(
                         title = "摄像头朝向",
                         summary = "--camera-facing",
                         items = cameraFacingItems,
@@ -213,7 +216,7 @@ fun AdvancedConfigPage() {
                         },
                         enabled = !sessionStarted,
                     )
-                    SuperDropdown(
+                    WindowDropdown(
                         title = "摄像头分辨率",
                         summary = "--camera-size",
                         items = cameraSizeDropdownItems,
@@ -293,7 +296,7 @@ fun AdvancedConfigPage() {
 
         item {
             Card {
-                SuperDropdown(
+                WindowDropdown(
                     title = "音频来源",
                     summary = "--audio-source",
                     items = audioSourceItems,
@@ -403,7 +406,7 @@ fun AdvancedConfigPage() {
                 SuperArrow(
                     title = "重新获取编码器列表",
                     summary = "--list-encoders",
-                    onClick = { viewModel.refreshEncodersAction?.invoke() },
+                    onClick = { onRefreshEncoders?.invoke() },
                     enabled = !sessionStarted,
                 )
                 SuperSpinner(

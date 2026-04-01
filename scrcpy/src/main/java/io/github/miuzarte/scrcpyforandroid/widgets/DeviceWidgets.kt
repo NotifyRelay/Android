@@ -79,9 +79,10 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperDialog
-import top.yukonga.miuix.kmp.extra.SuperDropdown
 import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.extra.WindowDialog
+import top.yukonga.miuix.kmp.extra.WindowDropdown
+import top.yukonga.miuix.kmp.extra.DialogDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.isDynamicColor
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
@@ -289,7 +290,7 @@ internal fun ConfigPanel(
             onCheckedChange = onAudioEnabledChange,
             enabled = !sessionStarted && audioForwardingSupported,
         )
-        SuperDropdown(
+        WindowDropdown(
             title = "音频编码",
             summary = "--audio-codec",
             items = audioCodecItems,
@@ -319,7 +320,7 @@ internal fun ConfigPanel(
                 },
             )
         }
-        SuperDropdown(
+        WindowDropdown(
             title = "视频编码",
             summary = "--video-codec",
             items = videoCodecItems,
@@ -574,7 +575,7 @@ private fun PairingDialog(
         discoveringPort = false
     }
 
-    SuperDialog(
+    WindowDialog(
         show = showDialog,
         title = "使用配对码配对设备",
         summary = "使用六位数的配对码配对新设备",
@@ -656,7 +657,7 @@ private fun PairingDialog(
                     colors = ButtonDefaults.textButtonColorsPrimary(),
                 )
             }
-        },
+        }
     )
 }
 
@@ -1168,7 +1169,7 @@ internal fun QuickConnectCard(
             )
         }
         if (onlineDevices.isNotEmpty()) {
-            SuperDropdown(
+            WindowDropdown(
                 title = "在线设备",
                 items = onlineDeviceItems,
                 selectedIndex = selectedDeviceIndex,
