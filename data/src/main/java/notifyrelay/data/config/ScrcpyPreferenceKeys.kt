@@ -5,7 +5,6 @@ object ScrcpyPreferenceKeys {
     const val NATIVE_ADB_PRIVATE_KEY = "priv"
 
     // Devices
-    const val QUICK_DEVICES = "quick_devices"
     const val QUICK_CONNECT_INPUT = "quick_connect_input"
 
     const val PAIR_HOST = "pair_host"

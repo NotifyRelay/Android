@@ -47,7 +47,7 @@ fun DeviceForwardScreen(
     val colorScheme = MiuixTheme.colorScheme
     
     val selectedDeviceState = GlobalSelectedDeviceHolder.current()
-    selectedDeviceState.value
+    val selectedDevice = selectedDeviceState.value
 
     Column(
         modifier = Modifier
@@ -89,6 +89,12 @@ fun DeviceForwardScreen(
                     0 -> ClipboardSyncPage()
                     1 -> MusicControlPage()
                     2 -> ScrcpyDevicePage(
+                        selectedDevice = selectedDevice?.let {
+                            notifyrelay.data.model.SelectedDeviceInfo(
+                                displayName = it.displayName,
+                                ip = it.ip,
+                            )
+                        },
                         onOpenAdvanced = { navigator.push(Route.ScrcpyAdvanced) }
                     )
                 }
@@ -102,15 +108,6 @@ fun ScrcpyAdvancedScreen(
     navigator: Navigator
 ) {
     io.github.miuzarte.scrcpyforandroid.pages.ScrcpyAdvancedPage(
-        onBack = { navigator.pop() }
-    )
-}
-
-@Composable
-fun ScrcpyReorderDevicesScreen(
-    navigator: Navigator
-) {
-    io.github.miuzarte.scrcpyforandroid.pages.ScrcpyReorderDevicesPage(
         onBack = { navigator.pop() }
     )
 }

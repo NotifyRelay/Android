@@ -39,7 +39,6 @@ import top.yukonga.miuix.kmp.extra.SuperSwitch
 
 @Composable
 fun ScrcpySettingsPage(
-    onOpenReorderDevices: () -> Unit = {},
     onOpenVirtualButtonOrder: () -> Unit = {},
     onPickServer: () -> Unit = {},
 ) {
@@ -59,12 +58,11 @@ fun ScrcpySettingsPage(
         }
     }
 
-    val navigationActions = remember(onOpenReorderDevices, onOpenVirtualButtonOrder, onPickServer) {
+    val navigationActions = remember(onOpenVirtualButtonOrder, onPickServer) {
         ScrcpyNavigationActions(
             openAdvancedPage = {},
             openVirtualButtonOrder = onOpenVirtualButtonOrder,
             openFullscreenPage = { _, _, _ -> },
-            openReorderDevices = onOpenReorderDevices,
             pickServer = onPickServer,
         )
     }
@@ -98,11 +96,6 @@ fun ScrcpySettingsPage(
                         summary = "Scrcpy 启动后保持本机屏幕常亮，避免锁屏导致 ADB 断开",
                         checked = viewModel.keepScreenOnWhenStreamingEnabled,
                         onCheckedChange = { viewModel.keepScreenOnWhenStreamingEnabled = it },
-                    )
-                    SuperArrow(
-                        title = "快速设备排序",
-                        summary = "手动排序设备页的快速设备",
-                        onClick = navigationActions.openReorderDevices,
                     )
                     SuperArrow(
                         title = "虚拟按钮排序",

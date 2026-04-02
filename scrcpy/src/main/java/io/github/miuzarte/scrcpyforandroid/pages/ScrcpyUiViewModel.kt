@@ -181,7 +181,6 @@ class ScrcpyUiViewModel private constructor(private val app: Application) : View
     var refreshEncodersAction by mutableStateOf<(() -> Unit)?>(null)
     var refreshCameraSizesAction by mutableStateOf<(() -> Unit)?>(null)
     var clearLogsAction by mutableStateOf<(() -> Unit)?>(null)
-    var openReorderDevicesAction by mutableStateOf<(() -> Unit)?>(null)
 
     companion object {
         @Volatile

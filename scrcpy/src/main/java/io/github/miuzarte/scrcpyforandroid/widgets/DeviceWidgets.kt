@@ -65,7 +65,6 @@ import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlide
 import notifyrelay.data.config.ScrcpyDefaults
 import notifyrelay.data.config.ScrcpyPresets
-import notifyrelay.data.model.DeviceShortcut
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -1043,19 +1042,17 @@ private fun ScrcpyVideoSurface(
 
 @Composable
 internal fun DeviceTile(
-    device: DeviceShortcut,
+    device: notifyrelay.data.model.SelectedDeviceInfo,
     actionText: String,
     actionEnabled: Boolean,
     actionInProgress: Boolean,
-    onLongPress: () -> Unit,
     onContentClick: () -> Unit,
     onAction: () -> Unit,
 ) {
     val haptics = rememberAppHaptics()
     Card(
         colors = CardDefaults.defaultColors(
-            color = if (device.online) MiuixTheme.colorScheme.surfaceContainer
-            else MiuixTheme.colorScheme.surfaceContainer.copy(alpha = 0.6f),
+            color = MiuixTheme.colorScheme.surfaceContainer,
         ),
         pressFeedbackType = PressFeedbackType.Sink,
         onClick = haptics.contextClick,
@@ -1065,7 +1062,6 @@ internal fun DeviceTile(
                 .fillMaxWidth()
                 .combinedClickable(
                     onClick = onContentClick,
-                    onLongClick = onLongPress,
                 )
                 .padding(UiSpacing.PageItem),
             verticalAlignment = Alignment.CenterVertically,
@@ -1080,21 +1076,21 @@ internal fun DeviceTile(
                     modifier = Modifier
                         .size(8.dp)
                         .background(
-                            color = if (device.online) Color(0xFF44C74F) else MiuixTheme.colorScheme.outline,
+                            color = MiuixTheme.colorScheme.outline,
                             shape = CircleShape,
                         ),
                 )
                 Spacer(modifier = Modifier.width(UiSpacing.PageItem))
                 Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        device.name.ifBlank { device.host },
+                        device.displayName,
                         fontWeight = FontWeight.SemiBold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         color = MiuixTheme.colorScheme.onSurface,
                     )
                     Text(
-                        "${device.host}:${device.port}",
+                        device.ip,
                         fontSize = 13.sp,
                         color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
                         maxLines = 1,
@@ -1127,19 +1123,8 @@ internal fun QuickConnectCard(
     onConnect: () -> Unit,
     onAddDevice: () -> Unit,
     enabled: Boolean = true,
-    onlineDevices: List<notifyrelay.data.model.OnlineDeviceInfo> = emptyList(),
 ) {
     val focusManager = LocalFocusManager.current
-    val onlineDeviceItems = remember(onlineDevices) {
-        listOf("手动输入") + onlineDevices.map { "${it.displayName} (${it.ip})" }
-    }
-    var selectedDeviceIndex by rememberSaveable { mutableIntStateOf(0) }
-
-    LaunchedEffect(onlineDevices.isEmpty()) {
-        if (onlineDevices.isEmpty()) {
-            selectedDeviceIndex = 0
-        }
-    }
 
     Card(
         colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.primaryContainer),
@@ -1166,24 +1151,6 @@ internal fun QuickConnectCard(
                 "快速连接",
                 fontWeight = FontWeight.Bold,
                 color = MiuixTheme.colorScheme.onPrimaryContainer,
-            )
-        }
-        if (onlineDevices.isNotEmpty()) {
-            WindowDropdown(
-                title = "在线设备",
-                items = onlineDeviceItems,
-                selectedIndex = selectedDeviceIndex,
-                onSelectedIndexChange = { index ->
-                    selectedDeviceIndex = index
-                    if (index > 0 && index <= onlineDevices.size) {
-                        val device = onlineDevices[index - 1]
-                        onInputChange("${device.ip}:${ScrcpyDefaults.ADB_PORT}")
-                    }
-                },
-                enabled = enabled,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = UiSpacing.CardContent),
             )
         }
         TextField(
@@ -1222,100 +1189,6 @@ internal fun QuickConnectCard(
                 enabled = enabled,
                 colors = ButtonDefaults.textButtonColorsPrimary(),
             )
-        }
-    }
-}
-
-@Composable
-internal fun DeviceEditorScreen(
-    contentPadding: PaddingValues,
-    device: DeviceShortcut,
-    onSave: (DeviceShortcut) -> Unit,
-    onDelete: () -> Unit,
-    onBack: () -> Unit,
-) {
-    var name by rememberSaveable(device.id) { mutableStateOf(device.name) }
-    var host by rememberSaveable(device.id) { mutableStateOf(device.host) }
-    var port by rememberSaveable(device.id) { mutableStateOf(device.port.toString()) }
-
-    BackHandler(enabled = true, onBack = onBack)
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(contentPadding)
-            .padding(UiSpacing.PageHorizontal),
-    ) {
-        SectionSmallTitle("编辑设备")
-        Card {
-            TextField(
-                value = name,
-                onValueChange = { name = it },
-                label = "设备名称",
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = UiSpacing.CardContent)
-                    .padding(top = UiSpacing.CardContent),
-            )
-            TextField(
-                value = host,
-                onValueChange = { host = it },
-                label = "IP 地址",
-                singleLine = true,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = UiSpacing.CardContent)
-                    .padding(top = UiSpacing.CardContent),
-            )
-            TextField(
-                value = port,
-                onValueChange = { port = it.filter(Char::isDigit) },
-                label = "端口",
-                singleLine = true,
-                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = UiSpacing.CardContent)
-                    .padding(top = UiSpacing.CardContent),
-            )
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(UiSpacing.CardContent),
-                horizontalArrangement = Arrangement.spacedBy(UiSpacing.Medium),
-            ) {
-                TextButton(
-                    text = "返回",
-                    onClick = onBack,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(
-                    text = "删除",
-                    onClick = onDelete,
-                    modifier = Modifier.weight(1f),
-                )
-                TextButton(
-                    text = "保存",
-                    onClick = {
-                        val p = port.toIntOrNull() ?: ScrcpyDefaults.ADB_PORT
-                        val h = host.trim()
-                        if (h.isNotBlank()) {
-                            onSave(
-                                DeviceShortcut(
-                                    id = "$h:$p",
-                                    name = name.trim(),
-                                    host = h,
-                                    port = p,
-                                    online = device.online,
-                                ),
-                            )
-                        }
-                    },
-                    modifier = Modifier.weight(1f),
-                    colors = ButtonDefaults.textButtonColorsPrimary(),
-                )
-            }
         }
     }
 }

@@ -68,7 +68,6 @@ import com.xzyht.notifyrelay.ui.screen.DeviceListScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreenState
 import com.xzyht.notifyrelay.ui.screen.HistoryScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
-import com.xzyht.notifyrelay.ui.screen.ScrcpyReorderDevicesScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
 import kotlinx.coroutines.Dispatchers
@@ -200,7 +199,6 @@ class MainActivity : FragmentActivity() {
                                 entry<Route.History> { HistoryScreen(navigator) }
                                 entry<Route.Settings> { SettingsScreen(navigator) }
                                 entry<Route.ScrcpyAdvanced> { ScrcpyAdvancedScreen(navigator) }
-                                entry<Route.ScrcpyReorderDevices> { ScrcpyReorderDevicesScreen(navigator) }
                                 entry<Route.ScrcpyVirtualButtonOrder> { ScrcpyVirtualButtonOrderScreen(navigator) }
                             }
                         )

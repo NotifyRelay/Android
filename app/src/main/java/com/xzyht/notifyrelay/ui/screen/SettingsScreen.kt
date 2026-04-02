@@ -105,7 +105,6 @@ fun SettingsScreen(
                     1 -> UILocalFilter()
                     2 -> UISuperIslandSettings()
                     3 -> ScrcpySettingsPage(
-                        onOpenReorderDevices = { navigator.push(Route.ScrcpyReorderDevices) },
                         onOpenVirtualButtonOrder = { navigator.push(Route.ScrcpyVirtualButtonOrder) },
                         onPickServer = { serverPicker.launch(arrayOf("application/java-archive", "application/octet-stream", "*/*")) },
                     )

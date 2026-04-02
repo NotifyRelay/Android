@@ -21,7 +21,6 @@ data class ScrcpyNavigationActions(
     val openAdvancedPage: () -> Unit,
     val openVirtualButtonOrder: () -> Unit,
     val openFullscreenPage: (ip: String, port: Int, deviceName: String) -> Unit,
-    val openReorderDevices: () -> Unit,
     val pickServer: () -> Unit,
 )
 
@@ -30,7 +29,6 @@ val LocalScrcpyNavigation = staticCompositionLocalOf {
         openAdvancedPage = {},
         openVirtualButtonOrder = {},
         openFullscreenPage = { _, _, _ -> },
-        openReorderDevices = {},
         pickServer = {},
     )
 }

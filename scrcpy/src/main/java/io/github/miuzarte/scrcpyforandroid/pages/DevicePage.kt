@@ -6,6 +6,7 @@ import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -34,25 +35,16 @@ import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
 import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.data.config.ScrcpyDefaults
 import notifyrelay.data.model.ConnectionTarget
-import notifyrelay.data.model.DeviceShortcut
 import io.github.miuzarte.scrcpyforandroid.services.DevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.fetchConnectedDeviceInfo
 import io.github.miuzarte.scrcpyforandroid.services.loadDevicePageSettings
-import io.github.miuzarte.scrcpyforandroid.services.loadQuickDevices
 import io.github.miuzarte.scrcpyforandroid.services.parseQuickTarget
-import io.github.miuzarte.scrcpyforandroid.services.replaceQuickDevicePort
 import io.github.miuzarte.scrcpyforandroid.services.saveDevicePageSettings
-import io.github.miuzarte.scrcpyforandroid.services.saveQuickDevices
-import io.github.miuzarte.scrcpyforandroid.services.syncFromAuthenticatedDevices
-import io.github.miuzarte.scrcpyforandroid.services.updateQuickDeviceNameIfEmpty
-import io.github.miuzarte.scrcpyforandroid.services.upsertQuickDevice
 import io.github.miuzarte.scrcpyforandroid.widgets.ConfigPanel
-import io.github.miuzarte.scrcpyforandroid.widgets.DeviceEditorScreen
 import io.github.miuzarte.scrcpyforandroid.widgets.DeviceTile
 import io.github.miuzarte.scrcpyforandroid.widgets.LogsPanel
 import io.github.miuzarte.scrcpyforandroid.widgets.PairingCard
 import io.github.miuzarte.scrcpyforandroid.widgets.QuickConnectCard
-import io.github.miuzarte.scrcpyforandroid.widgets.ReorderableList
 import io.github.miuzarte.scrcpyforandroid.widgets.SectionSmallTitle
 import io.github.miuzarte.scrcpyforandroid.widgets.StatusCard
 import kotlinx.coroutines.Dispatchers
@@ -70,9 +62,8 @@ import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.TopAppBar
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.compose.material.icons.Icons
-import top.yukonga.miuix.kmp.extra.WindowBottomSheet
-import top.yukonga.miuix.kmp.extra.BottomSheetDefaults
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import java.net.InetSocketAddress
 import java.net.Socket
@@ -87,37 +78,7 @@ private const val ADB_KEEPALIVE_TIMEOUT_MS = 1_500L
 private const val ADB_AUTO_RECONNECT_DISCOVER_TIMEOUT_MS = 1_200L
 private const val ADB_AUTO_RECONNECT_RETRY_INTERVAL_MS = 1_500L
 private const val ADB_TCP_PROBE_TIMEOUT_MS = 600
-private const val DEVICE_SHORTCUT_SEPARATOR = "\u001F"
 private const val LOG_TAG = "DevicePage"
-
-private val DeviceShortcutStateListSaver =
-    listSaver<androidx.compose.runtime.snapshots.SnapshotStateList<DeviceShortcut>, String>(
-        save = { list ->
-            list.map { item ->
-                listOf(
-                    item.id,
-                    item.name,
-                    item.host,
-                    item.port.toString(),
-                    if (item.online) "1" else "0",
-                ).joinToString(DEVICE_SHORTCUT_SEPARATOR)
-            }
-        },
-        restore = { saved ->
-            saved.mapNotNull { line ->
-                val parts = line.split(DEVICE_SHORTCUT_SEPARATOR)
-                if (parts.size != 5) return@mapNotNull null
-                val port = parts[3].toIntOrNull() ?: return@mapNotNull null
-                DeviceShortcut(
-                    id = parts[0],
-                    name = parts[1],
-                    host = parts[2],
-                    port = port,
-                    online = parts[4] == "1",
-                )
-            }.toMutableStateList()
-        },
-    )
 
 private val StringStateListSaver =
     listSaver<androidx.compose.runtime.snapshots.SnapshotStateList<String>, String>(
@@ -126,7 +87,9 @@ private val StringStateListSaver =
     )
 
 @Composable
-fun DeviceTabScreen() {
+fun DeviceTabScreen(
+    selectedDevice: notifyrelay.data.model.SelectedDeviceInfo? = null,
+) {
     val viewModel = LocalScrcpyUiViewModel.current
     val navigation = LocalScrcpyNavigation.current
     val contentPadding = LocalScrcpyPagePadding.current
@@ -186,9 +149,6 @@ fun DeviceTabScreen() {
             null
         }
     }
-    var editingDeviceId by rememberSaveable { mutableStateOf<String?>(null) }
-    var activeDeviceActionId by rememberSaveable { mutableStateOf<String?>(null) }
-    var showReorderSheet by rememberSaveable { mutableStateOf(false) }
     var adbConnecting by rememberSaveable { mutableStateOf(false) }
 
     var connectHost by rememberSaveable { mutableStateOf("") }
@@ -206,10 +166,7 @@ fun DeviceTabScreen() {
     ) else null
 
     val eventLog = rememberSaveable(saver = StringStateListSaver) { mutableStateListOf() }
-    val quickDevices =
-        rememberSaveable(saver = DeviceShortcutStateListSaver) { mutableStateListOf() }
     val sessionReconnectBlacklistHosts = remember { mutableSetOf<String>() }
-    var onlineDevicesFromApp by remember { mutableStateOf<List<notifyrelay.data.model.OnlineDeviceInfo>>(emptyList()) }
 
     LaunchedEffect(eventLog.size) {
         viewModel.canClearLogs = eventLog.isNotEmpty()
@@ -253,7 +210,6 @@ fun DeviceTabScreen() {
      * - Calls `nativeCore.scrcpyStop()` and `nativeCore.adbDisconnect()` (best-effort).
      * - Resets UI-visible connection state: `adbConnected`, `currentTargetHost/Port`,
      *   `sessionInfo`, device capability flags, `statusLine`, and `connectedDeviceLabel`.
-     * - Updates the saved quick-device list via [upsertQuickDevice] when a target is provided.
      * - Logs an optional [logMessage] to the local event log.
      * - Shows an optional snackbar message asynchronously (launched on the composition scope)
      *   so callers don't get blocked by `snack.showSnackbar` (it is suspending).
@@ -265,7 +221,6 @@ fun DeviceTabScreen() {
      *   disconnected will simply reset UI fields and not throw.
      */
     suspend fun disconnectAdbConnection(
-        clearQuickOnlineForTarget: ConnectionTarget? = currentTarget,
         logMessage: String? = null,
         showSnackMessage: String? = null,
     ) {
@@ -282,11 +237,6 @@ fun DeviceTabScreen() {
         sessionInfo = null
         statusLine = "未连接"
         connectedDeviceLabel = "未连接"
-        clearQuickOnlineForTarget?.let { target ->
-            if (target.host.isNotBlank()) {
-                upsertQuickDevice(context, quickDevices, target.host, target.port, false)
-            }
-        }
         logMessage?.let { logEvent(it) }
         if (!showSnackMessage.isNullOrBlank()) {
             scope.launch {
@@ -303,7 +253,7 @@ fun DeviceTabScreen() {
 
         sessionReconnectBlacklistHosts += current.host
         logEvent("切换连接目标，先断开当前设备: ${current.host}:${current.port}")
-        disconnectAdbConnection(clearQuickOnlineForTarget = current)
+        disconnectAdbConnection()
     }
 
     fun applyConnectedDeviceCapabilities(sdkInt: Int, release: String) {
@@ -554,7 +504,6 @@ fun DeviceTabScreen() {
 
         connectedDeviceLabel = info.model
         applyConnectedDeviceCapabilities(info.sdkInt, info.androidRelease)
-        updateQuickDeviceNameIfEmpty(context, quickDevices, host, port, fullLabel)
         connectHost = host
         connectPort = port.toString()
         statusLine = "$host:$port"
@@ -650,29 +599,6 @@ fun DeviceTabScreen() {
         )
     }
 
-    LaunchedEffect(Unit) {
-        if (quickDevices.isEmpty()) {
-            quickDevices.clear()
-            quickDevices.addAll(loadQuickDevices(context))
-        }
-        onlineDevicesFromApp = syncFromAuthenticatedDevices(context, quickDevices)
-    }
-
-    LaunchedEffect(adbConnected, currentTargetHost, currentTargetPort, quickDevices.size) {
-        val activeId = if (adbConnected && currentTargetHost.isNotBlank()) {
-            "$currentTargetHost:$currentTargetPort"
-        } else {
-            null
-        }
-        for (index in quickDevices.indices) {
-            val item = quickDevices[index]
-            val shouldOnline = activeId != null && item.id == activeId
-            if (item.online != shouldOnline) {
-                quickDevices[index] = item.copy(online = shouldOnline)
-            }
-        }
-    }
-
     LaunchedEffect(adbConnected, currentTargetHost, currentTargetPort) {
         if (!adbConnected || currentTargetHost.isBlank()) return@LaunchedEffect
 
@@ -709,44 +635,11 @@ fun DeviceTabScreen() {
     LaunchedEffect(adbConnected, viewModel.adbAutoReconnectPairedDevice, viewModel.adbMdnsLanDiscoveryEnabled) {
         if (adbConnected || !viewModel.adbAutoReconnectPairedDevice) return@LaunchedEffect
 
-        // Background auto reconnect pipeline:
-        // 1) try quick list targets with reachable TCP ports
-        // 2) fallback to mDNS discovery
-        val quickConnectTriedOnce = mutableSetOf<String>()
+        // Background auto reconnect pipeline: mDNS discovery only
         while (!adbConnected && viewModel.adbAutoReconnectPairedDevice) {
             if (busy || adbConnecting || sessionInfo != null) {
                 delay(ADB_AUTO_RECONNECT_RETRY_INTERVAL_MS)
                 continue
-            }
-
-            val quickCandidates = quickDevices.toList()
-            if (quickCandidates.isNotEmpty()) {
-                for (target in quickCandidates) {
-                    if (adbConnected || adbConnecting) break
-                    if (sessionReconnectBlacklistHosts.contains(target.host)) continue
-                    val targetKey = "${target.host}:${target.port}"
-                    if (quickConnectTriedOnce.contains(targetKey)) continue
-
-                    val portReachable = probeTcpReachable(target.host, target.port)
-                    if (!portReachable) continue
-
-                    quickConnectTriedOnce += targetKey
-                    val ok = runAutoAdbConnect(target.host, target.port)
-                    adbConnected = ok
-                    upsertQuickDevice(
-                        context,
-                        quickDevices,
-                        target.host,
-                        target.port,
-                        ok
-                    )
-                    if (ok) {
-                        handleAdbConnected(target.host, target.port)
-                        logEvent("ADB 快速探测连接成功: ${target.host}:${target.port}")
-                        break
-                    }
-                }
-                if (adbConnected) break
             }
 
             val discovered = withContext(Dispatchers.IO) {
@@ -766,29 +659,6 @@ fun DeviceTabScreen() {
                 delay(ADB_AUTO_RECONNECT_RETRY_INTERVAL_MS)
                 continue
             }
-            val knownDevice = quickDevices.firstOrNull { it.host == discoveredHost }
-            if (knownDevice == null) {
-                delay(ADB_AUTO_RECONNECT_RETRY_INTERVAL_MS)
-                continue
-            }
-            val portToReplace = quickDevices.firstOrNull {
-                it.host == discoveredHost &&
-                        it.port != ScrcpyDefaults.ADB_PORT &&
-                        it.port != discoveredPort
-            }?.port
-            if (portToReplace != null) {
-                replaceQuickDevicePort(
-                    context = context,
-                    quickDevices = quickDevices,
-                    host = discoveredHost,
-                    oldPort = portToReplace,
-                    newPort = discoveredPort,
-                    online = false,
-                )
-                logEvent(
-                    "mDNS 发现新端口，已更新快速设备: $discoveredHost:$portToReplace -> $discoveredHost:$discoveredPort"
-                )
-            }
 
             if (adbConnected || adbConnecting) {
                 delay(ADB_AUTO_RECONNECT_RETRY_INTERVAL_MS)
@@ -797,13 +667,6 @@ fun DeviceTabScreen() {
 
             val ok = runAutoAdbConnect(discoveredHost, discoveredPort)
             adbConnected = ok
-            upsertQuickDevice(
-                context,
-                quickDevices,
-                discoveredHost,
-                discoveredPort,
-                ok
-            )
             if (ok) {
                 handleAdbConnected(discoveredHost, discoveredPort)
                 logEvent("ADB 自动重连成功: $discoveredHost:$discoveredPort")
@@ -852,74 +715,12 @@ fun DeviceTabScreen() {
         viewModel.clearLogsAction = {
             eventLog.clear()
         }
-        viewModel.openReorderDevicesAction = {
-            showReorderSheet = true
-        }
         onDispose {
             viewModel.refreshEncodersAction = null
             viewModel.refreshCameraSizesAction = null
             viewModel.clearLogsAction = null
             viewModel.canClearLogs = false
-            viewModel.openReorderDevicesAction = null
         }
-    }
-
-    WindowBottomSheet(
-        show = showReorderSheet,
-        title = "快速设备排序",
-        onDismissRequest = { showReorderSheet = false },
-        content = {
-            val list = remember {
-                ReorderableList(
-                    {
-                        quickDevices.map { device ->
-                            ReorderableList.Item(
-                                id = device.id,
-                                title = device.name.ifBlank { device.host },
-                                subtitle = "${device.host}:${device.port}",
-                            )
-                        }
-                    },
-                    onSettle = { fromIndex, toIndex ->
-                        if (fromIndex < 0) return@ReorderableList
-                        val to = toIndex.coerceIn(0, quickDevices.size)
-                        if (fromIndex == to) return@ReorderableList
-
-                        val moved = quickDevices.removeAt(fromIndex)
-                        quickDevices.add(to.coerceIn(0, quickDevices.size), moved)
-                        saveQuickDevices(context, quickDevices)
-                    },
-                )
-            }
-            list()
-            Spacer(Modifier.height(UiSpacing.BottomSheetBottom))
-        }
-    )
-
-    if (editingDeviceId != null) {
-        val device = quickDevices.firstOrNull { it.id == editingDeviceId }
-        if (device != null) {
-            DeviceEditorScreen(
-                contentPadding = contentPadding,
-                device = device,
-                onSave = { updated ->
-                    val idx = quickDevices.indexOfFirst { it.id == device.id }
-                    if (idx >= 0) {
-                        quickDevices[idx] = updated.copy(online = quickDevices[idx].online)
-                        saveQuickDevices(context, quickDevices)
-                    }
-                    editingDeviceId = null
-                },
-                onDelete = {
-                    quickDevices.removeAll { it.id == device.id }
-                    saveQuickDevices(context, quickDevices)
-                    editingDeviceId = null
-                },
-                onBack = { editingDeviceId = null },
-            )
-            return
-        }
-        editingDeviceId = null
     }
 
     // 设备
@@ -939,55 +740,62 @@ fun DeviceTabScreen() {
             )
         }
 
-        itemsIndexed(quickDevices, key = { _, device -> device.id }) { _, device ->
-            val host = device.host
-            val port = device.port
-            val isConnectedTarget =
-                adbConnected && currentTarget?.host == host && currentTarget.port == port
+        // 显示当前选中的设备
+        if (selectedDevice != null) {
+            item {
+                val host = selectedDevice.ip
+                val port = ScrcpyDefaults.ADB_PORT
+                val isConnectedTarget =
+                    adbConnected && currentTarget?.host == host && currentTarget.port == port
 
-            DeviceTile(
-                device = device,
-                actionText = if (isConnectedTarget) "断开" else "连接",
-                actionEnabled = !busy && !adbConnecting,
-                actionInProgress = adbConnecting && activeDeviceActionId == device.id,
-                onLongPress = { editingDeviceId = device.id },
-                onContentClick = {
-                    scope.launch {
-                        snack.showSnackbar("长按可编辑设备")
-                    }
-                },
-                onAction = {
-                    haptics.contextClick()
-                    if (isConnectedTarget) {
-                        activeDeviceActionId = device.id
-                        runAdbConnect("断开 ADB", onFinished = { activeDeviceActionId = null }) {
-                            sessionReconnectBlacklistHosts += host
-                            disconnectAdbConnection(
-                                clearQuickOnlineForTarget = ConnectionTarget(host, port),
-                                logMessage = "ADB 已断开: ${device.name}",
-                                showSnackMessage = "ADB 已断开",
-                            )
+                DeviceTile(
+                    device = selectedDevice,
+                    actionText = if (isConnectedTarget) "断开" else "连接",
+                    actionEnabled = !busy && !adbConnecting,
+                    actionInProgress = adbConnecting,
+                    onContentClick = {
+                        scope.launch {
+                            snack.showSnackbar("点击连接按钮可连接设备")
                         }
-                    } else {
-                        activeDeviceActionId = device.id
-                        runAdbConnect("连接 ADB", onFinished = { activeDeviceActionId = null }) {
-                            disconnectCurrentTargetBeforeConnecting(host, port)
-                            val ok = connectWithTimeout(host, port)
-                            adbConnected = ok
-                            upsertQuickDevice(context, quickDevices, host, port, ok)
-                            if (ok) {
-                                handleAdbConnected(host, port)
-                            } else {
-                                statusLine = "ADB 连接失败"
-                                logEvent("ADB 连接失败: $host:$port", Log.ERROR)
-                                scope.launch {
-                                    snack.showSnackbar("ADB 连接失败")
+                    },
+                    onAction = {
+                        haptics.contextClick()
+                        if (isConnectedTarget) {
+                            runAdbConnect("断开 ADB") {
+                                sessionReconnectBlacklistHosts.add(host)
+                                disconnectAdbConnection(
+                                    logMessage = "ADB 已断开: ${selectedDevice.displayName}",
+                                    showSnackMessage = "ADB 已断开",
+                                )
+                            }
+                        } else {
+                            runAdbConnect("连接 ADB") {
+                                disconnectCurrentTargetBeforeConnecting(host, port)
+                                val ok = connectWithTimeout(host, port)
+                                adbConnected = ok
+                                if (ok) {
+                                    handleAdbConnected(host, port)
+                                } else {
+                                    statusLine = "ADB 连接失败"
+                                    logEvent("ADB 连接失败: $host:$port", Log.ERROR)
+                                    scope.launch {
+                                        snack.showSnackbar("ADB 连接失败")
+                                    }
                                 }
                             }
                         }
-                    }
-                },
-            )
+                    },
+                )
+            }
+        } else {
+            item {
+                SectionSmallTitle("未选中设备")
+                Text(
+                    text = "请先在设备列表页面选择一个设备",
+                    color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                    modifier = Modifier.padding(horizontal = UiSpacing.PageHorizontal)
+                )
+            }
         }
 
         if (!adbConnected) item {
@@ -996,16 +804,8 @@ fun DeviceTabScreen() {
                 input = quickConnectInput,
                 onInputChange = { quickConnectInput = it },
                 enabled = !adbConnecting,
-                onlineDevices = onlineDevicesFromApp,
                 onAddDevice = {
                     val target = parseQuickTarget(quickConnectInput) ?: return@QuickConnectCard
-                    upsertQuickDevice(
-                        context,
-                        quickDevices,
-                        target.host,
-                        target.port,
-                        online = false
-                    )
                     scope.launch {
                         snack.showSnackbar("已添加设备: ${target.host}:${target.port}")
                     }
@@ -1016,7 +816,6 @@ fun DeviceTabScreen() {
                         disconnectCurrentTargetBeforeConnecting(target.host, target.port)
                         val ok = connectWithTimeout(target.host, target.port)
                         adbConnected = ok
-                        upsertQuickDevice(context, quickDevices, target.host, target.port, ok)
                         if (ok) {
                             handleAdbConnected(target.host, target.port)
                         } else {
@@ -1098,8 +897,7 @@ fun DeviceTabScreen() {
                     },
                     onOpenFullscreen = {
                         if (currentTargetHost.isNotBlank()) {
-                            val savedDeviceName = quickDevices.find { it.host == currentTargetHost && it.port == currentTargetPort }?.name?.ifBlank { null }
-                            val displayName = savedDeviceName ?: connectedDeviceLabel
+                            val displayName = connectedDeviceLabel
                             ShortcutLaunchActivity.startFullscreenControl(
                                 context,
                                 currentTargetHost,
@@ -1183,6 +981,7 @@ private fun buildCropArg(width: String, height: String, x: String, y: String): S
 
 @Composable
 fun ScrcpyDevicePage(
+    selectedDevice: notifyrelay.data.model.SelectedDeviceInfo? = null,
     onOpenAdvanced: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -1206,7 +1005,6 @@ fun ScrcpyDevicePage(
             openAdvancedPage = onOpenAdvanced,
             openVirtualButtonOrder = {},
             openFullscreenPage = { _, _, _ -> },
-            openReorderDevices = { viewModel.openReorderDevicesAction?.invoke() },
             pickServer = {},
         )
     }
@@ -1219,7 +1017,7 @@ fun ScrcpyDevicePage(
         themeBaseIndex = themeBaseIndex,
         navigationActions = navigationActions,
     ) {
-        DeviceTabScreen()
+        DeviceTabScreen(selectedDevice = selectedDevice)
     }
 }
 
@@ -1335,92 +1133,6 @@ fun ScrcpyAdvancedPage(
                 onRefreshEncoders = { refreshEncoderLists() },
                 onRefreshCameraSizes = { refreshCameraSizeLists() },
             )
-        }
-    }
-}
-
-@Composable
-fun ScrcpyReorderDevicesPage(
-    onBack: () -> Unit = {},
-) {
-    val context = LocalContext.current
-    val app = context.applicationContext as Application
-    val viewModel: ScrcpyUiViewModel = viewModel(factory = ScrcpyUiViewModel.Factory(app))
-    val snackHostState = remember { SnackbarHostState() }
-    val scrollBehavior = MiuixScrollBehavior(canScroll = { true })
-    var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
-    val quickDevices = rememberSaveable(saver = DeviceShortcutStateListSaver) { mutableStateListOf<DeviceShortcut>() }
-
-    DisposableEffect(context) {
-        val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
-            themeBaseIndex = newBaseIndex
-        }
-        ThemeSettingsManager.addThemeChangeListener(context, listener)
-        onDispose {
-            ThemeSettingsManager.removeThemeChangeListener(context, listener)
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        if (quickDevices.isEmpty()) {
-            quickDevices.clear()
-            quickDevices.addAll(loadQuickDevices(context))
-        }
-    }
-
-    Scaffold(
-        topBar = {
-            TopAppBar(
-                title = "快速设备排序",
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "返回"
-                        )
-                    }
-                },
-                scrollBehavior = scrollBehavior,
-            )
-        },
-        snackbarHost = { SnackbarHost(snackHostState) },
-    ) { pagePadding ->
-        ProvideScrcpyUiEnvironment(
-            viewModel = viewModel,
-            contentPadding = pagePadding,
-            scrollBehavior = scrollBehavior,
-            snackHostState = snackHostState,
-            themeBaseIndex = themeBaseIndex,
-        ) {
-            AppPageLazyColumn(
-                contentPadding = pagePadding,
-                scrollBehavior = scrollBehavior,
-            ) {
-                item {
-                    ReorderableList(
-                        itemsProvider = {
-                            quickDevices.map { device ->
-                                ReorderableList.Item(
-                                    id = device.id,
-                                    title = device.name.ifBlank { device.host },
-                                    subtitle = "${device.host}:${device.port}",
-                                )
-                            }
-                        },
-                        orientation = ReorderableList.Orientation.Column,
-                        onSettle = { fromIndex, toIndex ->
-                            if (fromIndex < 0) return@ReorderableList
-                            val to = toIndex.coerceIn(0, quickDevices.size)
-                            if (fromIndex == to) return@ReorderableList
-
-                            val moved = quickDevices.removeAt(fromIndex)
-                            quickDevices.add(to.coerceIn(0, quickDevices.size), moved)
-                            saveQuickDevices(context, quickDevices)
-                        },
-                    )()
-                }
-                item { Spacer(Modifier.height(UiSpacing.BottomContent)) }
-            }
         }
     }
 }
