@@ -7,6 +7,15 @@ import kotlin.math.min
  */
 object TextSplitter {
     
+    private val HALF_WIDTH_PUNCTUATION = setOf(
+        ',', '.', '!', '?', ';', ':', '-', '_', '(', ')', '[', ']', '{', '}', 
+        '<', '>', '"', '\'', '`', '~', '|', '\\', '/', '%', '^', '&', '*', '+', '='
+    )
+    
+    private val PUNCTUATION = setOf(
+        '，', '。', '！', '？', '；', '：', ',', '.', '!', '?', ';', ':', '、'
+    )
+    
     /**
      * 计算文本的中文字符等价长度
      * 2个英语字符视为1个中文字符
@@ -18,63 +27,66 @@ object TextSplitter {
     fun calculateTextLength(text: String): Double {
         var length = 0.0
         for (char in text) {
-            if (isChineseCharacter(char) || isKanaCharacter(char)) {
-                // 中文字符和日语片假名算1个字符
-                length += 1.0
-            } else if (isLowercaseLetter(char) || char.isDigit() || isHalfWidthPunctuation(char)) {
-                // 小写字母（英语和西里尔）、数字、半角标点算0.5个字符
-                length += 0.5
-            } else {
-                // 其他字符算1个字符
-                length += 1.0
-            }
+            length += getCharWeight(char)
         }
         return length
+    }
+    
+    /**
+     * 获取字符的等价权重
+     * @return 1.0 表示全角字符，0.5 表示半角字符
+     */
+    private fun getCharWeight(c: Char): Double {
+        return when {
+            isChineseCharacter(c) || isKanaCharacter(c) -> 1.0
+            isLowercaseLetter(c) || c.isDigit() || c in HALF_WIDTH_PUNCTUATION -> 0.5
+            else -> 1.0
+        }
     }
     
     /**
      * 判断字符是否为小写字母（包括英语和西里尔）
      */
     private fun isLowercaseLetter(c: Char): Boolean {
-        // 英语小写字母范围：a-z
-        // 小写西里尔字母范围：U+0430 到 U+044F
         return c in 'a'..'z' || c in 'а'..'я'
     }
     
     /**
      * 判断字符是否为中文字符
+     * 使用 Unicode 范围比较，比 Character.UnicodeBlock.of() 更高效
      */
     private fun isChineseCharacter(c: Char): Boolean {
-        val block = Character.UnicodeBlock.of(c)
-        return block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS ||
-            block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A ||
-            block == Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B ||
-            block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS ||
-            block == Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS_SUPPLEMENT
+        val code = c.code
+        return code in 0x4E00..0x9FFF ||
+            code in 0x3400..0x4DBF ||
+            code in 0x20000..0x2A6DF ||
+            code in 0xF900..0xFAFF ||
+            code in 0x2F800..0x2FA1F
     }
     
     /**
-     * 判断字符是否为日语片假名
+     * 判断字符是否为日语片假名/平假名
+     * 使用 Unicode 范围比较，比 Character.UnicodeBlock.of() 更高效
      */
     private fun isKanaCharacter(c: Char): Boolean {
-        val block = Character.UnicodeBlock.of(c)
-        return block == Character.UnicodeBlock.HIRAGANA ||
-            block == Character.UnicodeBlock.KATAKANA ||
-            block == Character.UnicodeBlock.KATAKANA_PHONETIC_EXTENSIONS
+        val code = c.code
+        return code in 0x3040..0x309F ||
+            code in 0x30A0..0x30FF ||
+            code in 0x31F0..0x31FF
     }
     
     /**
      * 判断字符是否为半角标点符号
      */
     private fun isHalfWidthPunctuation(char: Char): Boolean {
-        return char in setOf(',', '.', '!', '?', ';', ':', '-', '_', '(', ')', '[', ']', '{', '}', '<', '>', '"', '\'', '`', '~', '|', '\\', '/', '%', '^', '&', '*', '+', '=', '|')
+        return char in HALF_WIDTH_PUNCTUATION
     }
     
     /**
      * 判断字符是否为标点符号
      */
     private fun isPunctuation(char: Char): Boolean {
-        return char in setOf('，', '。', '！', '？', '；', '：', ',', '.', '!', '?', ';', ':', '、')
+        return char in PUNCTUATION
     }
     
     /**
@@ -83,9 +95,8 @@ object TextSplitter {
      * @return 截断后的文本
      */
     fun truncateText(text: String): String {
-        // 最长13等价字符（7+6），超长的直接截断
         val maxEquivalentLength = 13.0
-        val maxAllowedLength = 18 // 允许最多超出5个字符
+        val maxAllowedLength = 18
         
         if (text.isEmpty()) {
             return text
@@ -95,13 +106,11 @@ object TextSplitter {
             return text
         }
         
-        // 计算等价长度，找到截断点
         var currentLength = 0.0
         var truncatePoint = 0
         
         for (i in 0 until text.length) {
-            val char = text[i]
-            currentLength += if (isChineseCharacter(char) || isKanaCharacter(char)) 1.0 else if (isLowercaseLetter(char) || char.isDigit() || isHalfWidthPunctuation(char)) 0.5 else 1.0
+            currentLength += getCharWeight(text[i])
             
             if (currentLength >= maxEquivalentLength) {
                 truncatePoint = i + 1
@@ -109,18 +118,13 @@ object TextSplitter {
             }
         }
         
-        // 如果没有找到截断点（文本等价长度小于maxEquivalentLength），使用maxAllowedLength
         if (truncatePoint == 0) {
             truncatePoint = maxAllowedLength
         }
         
-        // 确保截断点不超过最大允许字符数
         truncatePoint = minOf(truncatePoint, maxAllowedLength)
-        
-        // 确保截断点至少为1
         truncatePoint = maxOf(truncatePoint, 1)
         
-        // 尝试在截断点附近寻找偏后的空格或标点符号
         var finalTruncatePoint = truncatePoint
         for (i in truncatePoint until minOf(text.length, truncatePoint + 5)) {
             if (text[i] == ' ' || isPunctuation(text[i])) {
@@ -129,10 +133,8 @@ object TextSplitter {
             }
         }
         
-        // 确保finalTruncatePoint至少为1
         finalTruncatePoint = maxOf(finalTruncatePoint, 1)
         
-        // 如果没有找到空格或标点，使用原始截断点
         return text.substring(0, finalTruncatePoint)
     }
 
@@ -143,7 +145,6 @@ object TextSplitter {
      * @return Pair(图标文本, 胶囊文本)
      */
     fun splitLyric(lyricText: String, threshold: Int): Pair<String, String> {
-        // 截断文本
         val truncatedText = truncateText(lyricText)
         
         if (truncatedText.isEmpty()) {
@@ -155,15 +156,12 @@ object TextSplitter {
             return Pair("", truncatedText)
         }
         
-        // 确保胶囊部分恰好为6等价字符的空间
         val capsuleEquivalentLength = 6.0
         var capsuleSplitPoint = truncatedText.length
         
-        // 从后往前计算，找到胶囊部分恰好6等价字符的位置
         var currentLength = 0.0
         for (i in truncatedText.length - 1 downTo 0) {
-            val char = truncatedText[i]
-            currentLength += if (isChineseCharacter(char) || isKanaCharacter(char)) 1.0 else if (isLowercaseLetter(char) || char.isDigit() || isHalfWidthPunctuation(char)) 0.5 else 1.0
+            currentLength += getCharWeight(truncatedText[i])
             
             if (currentLength >= capsuleEquivalentLength) {
                 capsuleSplitPoint = i
@@ -171,15 +169,12 @@ object TextSplitter {
             }
         }
         
-        // 确保图标文本长度至少为2个字符，且不超过7等价字符
         val maxIconEquivalentLength = 7.0
         var iconSplitPoint = min(capsuleSplitPoint, truncatedText.length)
         
-        // 从前往后计算，找到图标部分不超过7等价字符的位置
         currentLength = 0.0
         for (i in 0 until capsuleSplitPoint) {
-            val char = truncatedText[i]
-            currentLength += if (isChineseCharacter(char) || isKanaCharacter(char)) 1.0 else if (isLowercaseLetter(char) || char.isDigit() || isHalfWidthPunctuation(char)) 0.5 else 1.0
+            currentLength += getCharWeight(truncatedText[i])
             
             if (currentLength >= maxIconEquivalentLength) {
                 iconSplitPoint = i + 1
@@ -187,19 +182,15 @@ object TextSplitter {
             }
         }
         
-        // 确保图标文本长度至少为2个字符，且不超过文本长度
         val minSplitPoint = 2
         iconSplitPoint = maxOf(minSplitPoint, iconSplitPoint)
         iconSplitPoint = min(iconSplitPoint, truncatedText.length)
         
-        // 确保索引不超出范围
         val safeIconSplitPoint = min(iconSplitPoint, truncatedText.lastIndex.coerceAtLeast(0))
         
-        // 计算安全的搜索范围
         val searchStart = minSplitPoint
         val searchEnd = minOf(capsuleSplitPoint, iconSplitPoint + 3, truncatedText.length)
         
-        // 从图标拆分点开始，向左寻找最近的空格或标点符号
         var splitPoint = safeIconSplitPoint
         var foundSplitPoint = false
         if (truncatedText.isNotEmpty() && safeIconSplitPoint >= searchStart) {
@@ -212,7 +203,6 @@ object TextSplitter {
             }
         }
         
-        // 如果向左没找到空格或标点，向右寻找
         if (!foundSplitPoint && truncatedText.isNotEmpty() && safeIconSplitPoint < searchEnd) {
             for (i in safeIconSplitPoint until searchEnd) {
                 if (truncatedText[i] == ' ' || isPunctuation(truncatedText[i])) {
@@ -222,10 +212,8 @@ object TextSplitter {
             }
         }
         
-        // 确保拆分点不小于最小拆分点，且不超过胶囊拆分点
         val finalSplitPoint = maxOf(minSplitPoint, min(splitPoint, capsuleSplitPoint))
         
-        // 执行拆分
         val iconText = truncatedText.take(finalSplitPoint)
         val capsuleText = truncatedText.substring(finalSplitPoint)
         

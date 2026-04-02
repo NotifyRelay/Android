@@ -206,12 +206,12 @@ fun ScrcpySettingsPage(
                 SectionSmallTitle("关于")
                 Card {
                     SuperArrow(
-                        title = "前往仓库",
-                        summary = "github.com/Miuzarte/ScrcpyForAndroid",
+                        title = "当前基于原Miuzarte/ScrcpyForAndroid项目",
+                        summary = "的0aa83f4提交",
                         onClick = {
                             val intent = Intent(
                                 Intent.ACTION_VIEW,
-                                "https://github.com/Miuzarte/ScrcpyForAndroid".toUri()
+                                "https://github.com/Miuzarte/ScrcpyForAndroid/commit/0aa83f4a632c0e41d52670aad957831813508d60".toUri()
                             )
                             context.startActivity(intent)
                         },
