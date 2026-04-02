@@ -16,4 +16,5 @@ data class OnlineDeviceInfo(
 data class SelectedDeviceInfo(
     val displayName: String,
     val ip: String,
+    val deviceType: String? = null,
 )

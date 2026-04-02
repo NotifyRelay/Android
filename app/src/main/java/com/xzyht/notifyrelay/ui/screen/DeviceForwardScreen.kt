@@ -11,11 +11,13 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.ui.navigation.Navigator
 import com.xzyht.notifyrelay.ui.navigation.Route
@@ -46,6 +48,7 @@ fun DeviceForwardScreen(
     val selectedTabIndex = pagerState.currentPage
     val colorScheme = MiuixTheme.colorScheme
     
+    val deviceManager = remember { DeviceConnectionManagerSingleton.getDeviceManager(context) }
     val selectedDeviceState = GlobalSelectedDeviceHolder.current()
     val selectedDevice = selectedDeviceState.value
 
@@ -90,9 +93,11 @@ fun DeviceForwardScreen(
                     1 -> MusicControlPage()
                     2 -> ScrcpyDevicePage(
                         selectedDevice = selectedDevice?.let {
+                            val authInfo = deviceManager.getAuthenticatedDevices()[it.uuid]
                             notifyrelay.data.model.SelectedDeviceInfo(
                                 displayName = it.displayName,
                                 ip = it.ip,
+                                deviceType = authInfo?.deviceType
                             )
                         },
                         onOpenAdvanced = { navigator.push(Route.ScrcpyAdvanced) }

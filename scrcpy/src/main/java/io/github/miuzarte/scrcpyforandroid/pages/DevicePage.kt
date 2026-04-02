@@ -736,6 +736,7 @@ fun DeviceTabScreen(
                 sessionInfo = sessionInfo,
                 busyLabel = null,
                 connectedDeviceLabel = connectedDeviceLabel,
+                selectedDevice = selectedDevice,
                 themeBaseIndex = themeBaseIndex,
             )
         }
@@ -747,20 +748,29 @@ fun DeviceTabScreen(
                 val port = ScrcpyDefaults.ADB_PORT
                 val isConnectedTarget =
                     adbConnected && currentTarget?.host == host && currentTarget.port == port
+                val isPcDevice = selectedDevice.deviceType == "pc"
 
                 DeviceTile(
                     device = selectedDevice,
-                    actionText = if (isConnectedTarget) "断开" else "连接",
-                    actionEnabled = !busy && !adbConnecting,
+                    actionText = if (isPcDevice) "无法连接" else if (isConnectedTarget) "断开" else "连接",
+                    actionEnabled = !isPcDevice && !busy && !adbConnecting,
                     actionInProgress = adbConnecting,
                     onContentClick = {
                         scope.launch {
-                            snack.showSnackbar("点击连接按钮可连接设备")
+                            if (isPcDevice) {
+                                snack.showSnackbar("PC设备无法连接")
+                            } else {
+                                snack.showSnackbar("点击连接按钮可连接设备")
+                            }
                         }
                     },
                     onAction = {
                         haptics.contextClick()
-                        if (isConnectedTarget) {
+                        if (isPcDevice) {
+                            scope.launch {
+                                snack.showSnackbar("PC设备无法连接")
+                            }
+                        } else if (isConnectedTarget) {
                             runAdbConnect("断开 ADB") {
                                 sessionReconnectBlacklistHosts.add(host)
                                 disconnectAdbConnection(

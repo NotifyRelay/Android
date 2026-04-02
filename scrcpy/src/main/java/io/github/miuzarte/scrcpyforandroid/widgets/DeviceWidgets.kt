@@ -119,6 +119,7 @@ internal fun StatusCard(
     sessionInfo: ScrcpySessionInfo?,
     busyLabel: String?,
     connectedDeviceLabel: String,
+    selectedDevice: notifyrelay.data.model.SelectedDeviceInfo?,
     themeBaseIndex: Int,
 ) {
     val cleanStatusLine = normalizeStatusLine(statusLine)
@@ -189,10 +190,10 @@ internal fun StatusCard(
             ),
         )
 
-        else -> StatusCardSpec(
+        selectedDevice?.deviceType == "pc" -> StatusCardSpec(
             big = StatusBigCardSpec(
-                title = "ADB 未连接",
-                subtitle = "",
+                title = "PC设备无法连接",
+                subtitle = selectedDevice.ip,
                 containerColor = MiuixTheme.colorScheme.secondaryContainer,
                 titleColor = MiuixTheme.colorScheme.onSecondaryContainer,
                 subtitleColor = MiuixTheme.colorScheme.onSecondaryContainer,
@@ -201,11 +202,31 @@ internal fun StatusCard(
             ),
             firstSmall = StatusSmallCardSpec(
                 "当前设备",
-                "N/A",
+                selectedDevice.displayName,
             ),
             secondSmall = StatusSmallCardSpec(
                 "状态",
-                "N/A",
+                "无法连接",
+            ),
+        )
+
+        else -> StatusCardSpec(
+            big = StatusBigCardSpec(
+                title = "ADB 未连接",
+                subtitle = selectedDevice?.ip ?: "",
+                containerColor = MiuixTheme.colorScheme.secondaryContainer,
+                titleColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                subtitleColor = MiuixTheme.colorScheme.onSecondaryContainer,
+                icon = Icons.Rounded.LinkOff,
+                iconTint = MiuixTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.6f),
+            ),
+            firstSmall = StatusSmallCardSpec(
+                "当前设备",
+                selectedDevice?.displayName ?: "N/A",
+            ),
+            secondSmall = StatusSmallCardSpec(
+                "状态",
+                "未连接",
             ),
         )
     }
