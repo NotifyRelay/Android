@@ -1069,6 +1069,7 @@ internal fun DeviceTile(
     actionInProgress: Boolean,
     onContentClick: () -> Unit,
     onAction: () -> Unit,
+    onLongClick: (() -> Unit)? = null,
 ) {
     val haptics = rememberAppHaptics()
     Card(
@@ -1083,6 +1084,7 @@ internal fun DeviceTile(
                 .fillMaxWidth()
                 .combinedClickable(
                     onClick = onContentClick,
+                    onLongClick = onLongClick,
                 )
                 .padding(UiSpacing.PageItem),
             verticalAlignment = Alignment.CenterVertically,

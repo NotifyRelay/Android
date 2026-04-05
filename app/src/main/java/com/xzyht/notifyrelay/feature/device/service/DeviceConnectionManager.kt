@@ -89,6 +89,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             return DeviceConnectionManagerSingleton.getDeviceManager(context)
         }
     }
+    
+    // 用于比较在线设备缓存是否变化的变量
+    private var lastOnlineDevicesCacheJson: String? = null
+    
     internal fun getLocalDisplayName(): String {
         return DeviceUtils.getLocalDeviceName(context)
     }
@@ -501,16 +505,21 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
             val gson = com.google.gson.Gson()
             val json = gson.toJson(onlineDevices)
-            StorageManager.putString(
-                context,
-                notifyrelay.data.config.ScrcpyPreferenceKeys.ONLINE_DEVICES_CACHE,
-                json,
-                StorageManager.PrefsType.SCRCPY
-            )
-            try {
-                io.github.miuzarte.scrcpyforandroid.services.DynamicShortcutManager
-                    .updateShortcuts(context)
-            } catch (_: Exception) {}
+            
+            // 只有当内容实际变化时才执行存储和快捷方式更新
+            if (json != lastOnlineDevicesCacheJson) {
+                StorageManager.putString(
+                    context,
+                    notifyrelay.data.config.ScrcpyPreferenceKeys.ONLINE_DEVICES_CACHE,
+                    json,
+                    StorageManager.PrefsType.SCRCPY
+                )
+                try {
+                    io.github.miuzarte.scrcpyforandroid.services.DynamicShortcutManager
+                        .updateShortcuts(context)
+                } catch (_: Exception) {}
+                lastOnlineDevicesCacheJson = json
+            }
         } catch (_: Exception) {}
     }
 

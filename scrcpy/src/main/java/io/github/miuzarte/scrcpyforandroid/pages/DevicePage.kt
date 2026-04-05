@@ -40,6 +40,7 @@ import io.github.miuzarte.scrcpyforandroid.services.fetchConnectedDeviceInfo
 import io.github.miuzarte.scrcpyforandroid.services.loadDevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.parseQuickTarget
 import io.github.miuzarte.scrcpyforandroid.services.saveDevicePageSettings
+import io.github.miuzarte.scrcpyforandroid.services.PinShortcutManager
 import io.github.miuzarte.scrcpyforandroid.widgets.ConfigPanel
 import io.github.miuzarte.scrcpyforandroid.widgets.DeviceTile
 import io.github.miuzarte.scrcpyforandroid.widgets.LogsPanel
@@ -791,6 +792,24 @@ fun DeviceTabScreen(
                                     scope.launch {
                                         snack.showSnackbar("ADB 连接失败")
                                     }
+                                }
+                            }
+                        }
+                    },
+                    onLongClick = {
+                        if (!isPcDevice) {
+                            haptics.contextClick()
+                            val success = PinShortcutManager.createPinnedShortcut(
+                                context,
+                                deviceName = selectedDevice.displayName,
+                                deviceIp = selectedDevice.ip,
+                                devicePort = port
+                            )
+                            scope.launch {
+                                if (success) {
+                                    snack.showSnackbar("已创建桌面快捷方式: ${selectedDevice.displayName}")
+                                } else {
+                                    snack.showSnackbar("创建快捷方式失败，请检查系统设置")
                                 }
                             }
                         }
