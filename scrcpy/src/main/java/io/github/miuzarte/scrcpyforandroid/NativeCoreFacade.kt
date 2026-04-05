@@ -233,6 +233,8 @@ class NativeCoreFacade(private val appContext: Context) {
                     newDisplay = request.newDisplay,
                     displayId = request.displayId,
                     crop = request.crop,
+                    startApp = request.startApp,
+                    windowTitle = request.windowTitle,
                 ),
             )
             if (request.turnScreenOff) {
@@ -522,6 +524,8 @@ class NativeCoreFacade(private val appContext: Context) {
             newDisplay: String = "",
             displayId: Int? = null,
             crop: String = "",
+            startApp: String = "",
+            windowTitle: String = "",
         ): ScrcpyStartRequest {
             return ScrcpyStartRequest(
                 serverAsset = DEFAULT_SERVER_ASSET,
@@ -556,6 +560,8 @@ class NativeCoreFacade(private val appContext: Context) {
                 newDisplay = newDisplay,
                 displayId = displayId,
                 crop = crop,
+                startApp = startApp,
+                windowTitle = windowTitle,
             )
         }
 
@@ -795,6 +801,8 @@ data class ScrcpyStartRequest(
     val newDisplay: String = "",
     val displayId: Int? = null,
     val crop: String = "",
+    val startApp: String = "",
+    val windowTitle: String = "",
 )
 
 data class ScrcpyEncoderLists(

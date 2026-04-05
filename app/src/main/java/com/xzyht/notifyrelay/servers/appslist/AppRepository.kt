@@ -687,4 +687,56 @@ object AppRepository {
             return null
         }
     }
+
+    private val _pinnedApps = MutableStateFlow<Set<String>>(emptySet())
+    val pinnedApps: StateFlow<Set<String>> = _pinnedApps.asStateFlow()
+
+    private const val PREFS_NAME = "remote_apps_prefs"
+    private const val KEY_PINNED_APPS = "pinned_apps"
+
+    fun loadPinnedApps(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val pinnedSet = prefs.getStringSet(KEY_PINNED_APPS, emptySet()) ?: emptySet()
+        _pinnedApps.value = pinnedSet.toSet()
+    }
+
+    fun pinApp(context: Context, packageName: String) {
+        val current = _pinnedApps.value.toMutableSet()
+        current.add(packageName)
+        _pinnedApps.value = current.toSet()
+        savePinnedApps(context)
+    }
+
+    fun unpinApp(context: Context, packageName: String) {
+        val current = _pinnedApps.value.toMutableSet()
+        current.remove(packageName)
+        _pinnedApps.value = current.toSet()
+        savePinnedApps(context)
+    }
+
+    fun isAppPinned(packageName: String): Boolean {
+        return _pinnedApps.value.contains(packageName)
+    }
+
+    private fun savePinnedApps(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        prefs.edit().putStringSet(KEY_PINNED_APPS, _pinnedApps.value).apply()
+    }
+
+    suspend fun getRemoteAppsList(context: Context, deviceUuid: String): List<RemoteAppInfo> {
+        initDatabaseRepository(context)
+        val appDevices = databaseRepository?.getAppDevicesByDeviceUuid(deviceUuid)?.first() ?: emptyList()
+        val packageNames = appDevices.map { it.packageName }.distinct()
+        if (packageNames.isEmpty()) return emptyList()
+        val apps = databaseRepository?.getAppsByPackageNames(packageNames) ?: emptyList()
+        return apps.map { entity ->
+            RemoteAppInfo(
+                packageName = entity.packageName,
+                appName = entity.appName,
+                iconPath = null,
+                isPinned = isAppPinned(entity.packageName),
+                isLoading = false
+            )
+        }.sortedWith(compareByDescending<RemoteAppInfo> { it.isPinned }.thenBy { it.appName })
+    }
 }

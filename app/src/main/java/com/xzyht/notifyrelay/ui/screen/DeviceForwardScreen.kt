@@ -23,6 +23,7 @@ import com.xzyht.notifyrelay.ui.navigation.Navigator
 import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
 import com.xzyht.notifyrelay.ui.pages.MusicControlPage
+import com.xzyht.notifyrelay.ui.pages.RemoteAppsPage
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyDevicePage
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
@@ -43,7 +44,7 @@ fun DeviceForwardScreen(
         }
     }
     
-    val tabTitles = listOf("剪贴板同步", "音乐控制", "屏幕镜像")
+    val tabTitles = listOf("剪贴板同步", "音乐控制", "屏幕镜像", "应用列表")
     val pagerState = rememberPagerState(initialPage = 0) { tabTitles.size }
     val selectedTabIndex = pagerState.currentPage
     val colorScheme = MiuixTheme.colorScheme
@@ -51,6 +52,15 @@ fun DeviceForwardScreen(
     val deviceManager = remember { DeviceConnectionManagerSingleton.getDeviceManager(context) }
     val selectedDeviceState = GlobalSelectedDeviceHolder.current()
     val selectedDevice = selectedDeviceState.value
+    
+    val selectedDeviceInfo = selectedDevice?.let {
+        val authInfo = deviceManager.getAuthenticatedDevices()[it.uuid]
+        notifyrelay.data.model.SelectedDeviceInfo(
+            displayName = it.displayName,
+            ip = it.ip,
+            deviceType = authInfo?.deviceType
+        )
+    }
 
     Column(
         modifier = Modifier
@@ -92,16 +102,24 @@ fun DeviceForwardScreen(
                     0 -> ClipboardSyncPage()
                     1 -> MusicControlPage()
                     2 -> ScrcpyDevicePage(
-                        selectedDevice = selectedDevice?.let {
-                            val authInfo = deviceManager.getAuthenticatedDevices()[it.uuid]
-                            notifyrelay.data.model.SelectedDeviceInfo(
-                                displayName = it.displayName,
-                                ip = it.ip,
-                                deviceType = authInfo?.deviceType
-                            )
-                        },
+                        selectedDevice = selectedDeviceInfo,
                         onOpenAdvanced = { navigator.push(Route.ScrcpyAdvanced) }
                     )
+                    3 -> {
+                        if (selectedDevice != null && selectedDeviceInfo != null) {
+                            RemoteAppsPage(
+                                deviceUuid = selectedDevice.uuid,
+                                deviceIp = selectedDeviceInfo.ip
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier.fillMaxSize(),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                androidx.compose.material3.Text("请先选择设备")
+                            }
+                        }
+                    }
                 }
             }
         }

@@ -693,6 +693,16 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
                 value = options.listCameraSizes,
                 includeWhen = options.listCameraSizes,
             ),
+            ServerArg(
+                type = ServerArgType.STRING,
+                key = "start_app",
+                value = options.startApp.trim(),
+            ),
+            ServerArg(
+                type = ServerArgType.STRING,
+                key = "window_title",
+                value = options.windowTitle.trim(),
+            ),
             // Reserved for future args that require repeated/list values.
             // ServerArg(
             //     type = ServerArgType.LIST,
@@ -1018,6 +1028,8 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
         val crop: String = "",
         val listEncoders: Boolean = false,
         val listCameraSizes: Boolean = false,
+        val startApp: String = "",
+        val windowTitle: String = "",
     )
 
     data class EncoderLists(
