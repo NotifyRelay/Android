@@ -733,7 +733,7 @@ object AppRepository {
             RemoteAppInfo(
                 packageName = entity.packageName,
                 appName = entity.appName,
-                iconPath = null,
+                iconBytes = entity.iconBytes,
                 isPinned = isAppPinned(entity.packageName),
                 isLoading = false
             )

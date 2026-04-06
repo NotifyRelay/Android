@@ -3,10 +3,21 @@ package com.xzyht.notifyrelay.servers.appslist
 data class RemoteAppInfo(
     val packageName: String,
     val appName: String,
-    val iconPath: String? = null,
+    val iconBytes: ByteArray? = null,
     val isPinned: Boolean = false,
     var isLoading: Boolean = false,
-)
+) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (javaClass != other?.javaClass) return false
+        other as RemoteAppInfo
+        return packageName == other.packageName
+    }
+
+    override fun hashCode(): Int {
+        return packageName.hashCode()
+    }
+}
 
 data class RemoteAppsState(
     val apps: List<RemoteAppInfo> = emptyList(),

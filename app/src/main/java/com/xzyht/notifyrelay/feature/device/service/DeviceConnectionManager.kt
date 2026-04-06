@@ -1,7 +1,5 @@
 package com.xzyht.notifyrelay.feature.device.service
 
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
 import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ServerLineRouter
 import notifyrelay.base.util.Logger
@@ -582,13 +580,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     /**
      * 公开解析设备信息：优先使用缓存/认证信息，缺失IP时使用提供的回退IP。
      */
-    fun resolveDeviceInfo(uuid: String, fallbackIp: String, fallbackPort: Int = 23333): DeviceInfo {
+    fun resolveDeviceInfo(uuid: String, fallbackIp: String?, fallbackPort: Int = 23333): DeviceInfo? {
         val cached = getDeviceInfo(uuid)
         if (cached != null && cached.ip.isNotEmpty() && cached.ip != "0.0.0.0") return cached
         val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
         val name = auth?.displayName ?: DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid)
         val port = cached?.port ?: auth?.lastPort ?: fallbackPort
-        return DeviceInfo(uuid, name, fallbackIp, port)
+        return fallbackIp?.let { DeviceInfo(uuid, name, it, port) }
     }
 
     internal fun isWifiDirectNetworkInternal(): Boolean {

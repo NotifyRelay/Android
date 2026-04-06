@@ -123,7 +123,7 @@ object ProtocolRouter {
                         val json = JSONObject(decrypted)
                         val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                         Logger.i(TAG, "收到远端媒体播放DATA_MEDIAPLAY: ${json.optString("title", "")} - ${json.optString("text", "")} (来自 ${source?.displayName ?: "未知设备"})")
-                        RemoteMediaSessionManager.onMediaMessageReceived(context, json, source)
+                        source?.let { RemoteMediaSessionManager.onMediaMessageReceived(context, json, it) }
                     } catch (e: Exception) {
                         Logger.e(TAG, "处理远端媒体播放通知DATA_MEDIAPLAY", e)
                     }
@@ -135,7 +135,7 @@ object ProtocolRouter {
                     val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                     Logger.d(TAG, "source device info: $source")
                     try {
-                        IconSyncManager.handleIconRequest(decrypted, deviceManager, source, context)
+                        source?.let { IconSyncManager.handleIconRequest(decrypted, deviceManager, it, context) }
                     } catch (e: Exception) {
                         Logger.e(TAG, "调用 IconSyncManager.handleIconRequest 异常", e)
                     }
@@ -153,7 +153,7 @@ object ProtocolRouter {
                     val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                     Logger.d(TAG, "source device info: $source")
                     try {
-                        AppListSyncManager.handleAppListRequest(decrypted, deviceManager, source, context)
+                        source?.let { AppListSyncManager.handleAppListRequest(decrypted, deviceManager, it, context) }
                     } catch (e: Exception) {
                         Logger.e(TAG, "调用 AppListSyncManager.handleAppListRequest 异常", e)
                     }
@@ -217,26 +217,28 @@ object ProtocolRouter {
                                     val sourceDevice = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                                     val adbPort = notifyrelay.data.config.ScrcpyDefaults.ADB_PORT
                                     
-                                    val success = io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.startAudioForwarding(
-                                        context, 
-                                        sourceDevice.ip, 
-                                        adbPort,
-                                        sourceDevice.displayName
-                                    )
+                                    val success = sourceDevice?.let {
+                                        io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.startAudioForwarding(
+                                            context,
+                                            it.ip,
+                                            adbPort,
+                                            sourceDevice.displayName
+                                        )
+                                    }
                                     
-                                    val result = if (success) "accepted" else "rejected"
+                                    val result = if (success == true) "accepted" else "rejected"
                                     val response = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"$result\"}"
-                                    ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_MEDIA_CONTROL", response)
+                                    sourceDevice?.let { ProtocolSender.sendEncrypted(deviceManager, it, "DATA_MEDIA_CONTROL", response) }
                                     
-                                    if (success) {
+                                    if (success == true) {
                                         Logger.i(TAG, "音频转发已启动: ${sourceDevice.displayName}")
                                     } else {
-                                        Logger.e(TAG, "音频转发启动失败: ${sourceDevice.displayName}")
+                                        sourceDevice?.let { Logger.e(TAG, "音频转发启动失败: ${it.displayName}") }
                                     }
                                 } catch (e: Exception) {
                                     Logger.e(TAG, "处理音频转发请求失败", e)
                                     val response = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"rejected\"}"
-                                    ProtocolSender.sendEncrypted(deviceManager, deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333), "DATA_MEDIA_CONTROL", response)
+                                    deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)?.let { ProtocolSender.sendEncrypted(deviceManager, it, "DATA_MEDIA_CONTROL", response) }
                                 }
                             }
                             "audioResponse" -> {
@@ -295,12 +297,14 @@ object ProtocolRouter {
                                                     // 不再发送用户名和密码，PC端可以从sharedSecret独立计算
                                                 }
                                                 Logger.d(TAG, "发送 FTP 服务器信息到 PC")
-                                                ProtocolSender.sendEncrypted(
-                                                    deviceManager,
-                                                    deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
-                                                    "DATA_FTP",
-                                                    responseJson.toString()
-                                                )
+                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)?.let {
+                                                    ProtocolSender.sendEncrypted(
+                                                        deviceManager,
+                                                        it,
+                                                        "DATA_FTP",
+                                                        responseJson.toString()
+                                                    )
+                                                }
                                                 Logger.i(TAG, "FTP server started and info sent to PC (derived from sharedSecret)")
                                                 
                                                 // 检查是否需要跳转到引导页授权
@@ -326,12 +330,14 @@ object ProtocolRouter {
                                                 put("errorCode", "PERMISSION_DENIED")
                                                 put("errorMessage", errorMessage)
                                             }
-                                            ProtocolSender.sendEncrypted(
-                                                deviceManager,
-                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
-                                                "DATA_STATUS",
-                                                responseJson.toString()
-                                            )
+                                            deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)?.let {
+                                                ProtocolSender.sendEncrypted(
+                                                    deviceManager,
+                                                    it,
+                                                    "DATA_STATUS",
+                                                    responseJson.toString()
+                                                )
+                                            }
                                         }
                                         PORT_IN_USE -> {
                                             Logger.i(TAG, "ftp 服务器启动失败：端口被占用")
@@ -343,12 +349,14 @@ object ProtocolRouter {
                                                 put("errorCode", "PORT_IN_USE")
                                                 put("errorMessage", errorMessage)
                                             }
-                                            ProtocolSender.sendEncrypted(
-                                                deviceManager,
-                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
-                                                "DATA_STATUS",
-                                                responseJson.toString()
-                                            )
+                                            deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)?.let {
+                                                ProtocolSender.sendEncrypted(
+                                                    deviceManager,
+                                                    it,
+                                                    "DATA_STATUS",
+                                                    responseJson.toString()
+                                                )
+                                            }
                                         }
                                         CONFIG_ERROR -> {
                                             Logger.i(TAG, "ftp 服务器启动失败：配置错误")
@@ -360,12 +368,14 @@ object ProtocolRouter {
                                                 put("errorCode", "CONFIG_ERROR")
                                                 put("errorMessage", errorMessage)
                                             }
-                                            ProtocolSender.sendEncrypted(
-                                                deviceManager,
-                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
-                                                "DATA_STATUS",
-                                                responseJson.toString()
-                                            )
+                                            deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)?.let {
+                                                ProtocolSender.sendEncrypted(
+                                                    deviceManager,
+                                                    it,
+                                                    "DATA_STATUS",
+                                                    responseJson.toString()
+                                                )
+                                            }
                                         }
                                         FAILED -> {
                                             Logger.i(TAG, "ftp 服务器启动失败：未知错误")
@@ -377,12 +387,14 @@ object ProtocolRouter {
                                                 put("errorCode", "FAILED")
                                                 put("errorMessage", errorMessage)
                                             }
-                                            ProtocolSender.sendEncrypted(
-                                                deviceManager,
-                                                deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
-                                                "DATA_STATUS",
-                                                responseJson.toString()
-                                            )
+                                            deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)?.let {
+                                                ProtocolSender.sendEncrypted(
+                                                    deviceManager,
+                                                    it,
+                                                    "DATA_STATUS",
+                                                    responseJson.toString()
+                                                )
+                                            }
                                         }
                                     }
                                 }
@@ -393,12 +405,14 @@ object ProtocolRouter {
                                     val responseJson = JSONObject().apply {
                                         put("action", "stopped")
                                     }
-                                    ProtocolSender.sendEncrypted(
-                                        deviceManager,
-                                        deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
-                                        "DATA_FTP",
-                                        responseJson.toString()
-                                    )
+                                    deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)?.let {
+                                        ProtocolSender.sendEncrypted(
+                                            deviceManager,
+                                            it,
+                                            "DATA_FTP",
+                                            responseJson.toString()
+                                        )
+                                    }
                                     Logger.i(TAG, "FTP server stopped via command")
                                 }
                                 else -> {
@@ -476,12 +490,14 @@ object ProtocolRouter {
                     put("errorMessage", errorMessage)
                 }
             }
-            ProtocolSender.sendEncrypted(
-                deviceManager,
-                deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333),
-                "DATA_STATUS",
-                responseJson.toString()
-            )
+            deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)?.let {
+                ProtocolSender.sendEncrypted(
+                    deviceManager,
+                    it,
+                    "DATA_STATUS",
+                    responseJson.toString()
+                )
+            }
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体控制响应失败", e)
         }
