@@ -89,12 +89,14 @@ class ShortcutLaunchActivity : ComponentActivity() {
         private const val EXTRA_CROP_HEIGHT = "crop_height"
         private const val EXTRA_CROP_X = "crop_x"
         private const val EXTRA_CROP_Y = "crop_y"
+        private const val EXTRA_START_APP = "start_app"
 
-        fun startFullscreenControl(context: Context, ip: String, port: Int, name: String) {
+        fun startFullscreenControl(context: Context, ip: String, port: Int, name: String, startApp: String = "") {
             val intent = Intent(context, ShortcutLaunchActivity::class.java).apply {
                 putExtra(EXTRA_DEVICE_IP, ip)
                 putExtra(EXTRA_DEVICE_PORT, port)
                 putExtra(EXTRA_DEVICE_NAME, name)
+                putExtra(EXTRA_START_APP, startApp)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
@@ -285,6 +287,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
         val cropHeight = intent?.getStringExtra(EXTRA_CROP_HEIGHT)?.ifBlank { ScrcpyDefaults.CROP_HEIGHT } ?: ScrcpyDefaults.CROP_HEIGHT
         val cropX = intent?.getStringExtra(EXTRA_CROP_X)?.ifBlank { ScrcpyDefaults.CROP_X } ?: ScrcpyDefaults.CROP_X
         val cropY = intent?.getStringExtra(EXTRA_CROP_Y)?.ifBlank { ScrcpyDefaults.CROP_Y } ?: ScrcpyDefaults.CROP_Y
+        val startApp = intent?.getStringExtra(EXTRA_START_APP) ?: ""
 
         val sessionParams = SessionParams(
             videoBitRateMbps = videoBitRateMbps,
@@ -324,6 +327,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
             cropHeight = cropHeight,
             cropX = cropX,
             cropY = cropY,
+            startApp = startApp,
         )
 
         enableEdgeToEdge()
@@ -376,6 +380,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
         val cropHeight: String,
         val cropX: String,
         val cropY: String,
+        val startApp: String,
     )
 }
 
@@ -526,6 +531,11 @@ private fun ShortcutLaunchScreen(
             sessionParams.newDisplayHeight.filter(Char::isDigit),
             sessionParams.newDisplayDpi.filter(Char::isDigit),
         )
+        val effectiveNewDisplay = if (sessionParams.startApp.isNotBlank() && newDisplayArg.isBlank()) {
+            "1920x1080"
+        } else {
+            newDisplayArg
+        }
         val displayId = sessionParams.displayIdInput.filter(Char::isDigit).toIntOrNull()?.takeIf { it > 0 }
         val crop = buildCropArg(
             sessionParams.cropWidth.filter(Char::isDigit),
@@ -566,9 +576,10 @@ private fun ShortcutLaunchScreen(
                         noVideo = sessionParams.noVideo,
                         requireAudio = sessionParams.requireAudio,
                         turnScreenOff = effectiveTurnScreenOff,
-                        newDisplay = newDisplayArg,
+                        newDisplay = effectiveNewDisplay,
                         displayId = displayId,
                         crop = crop,
+                        startApp = sessionParams.startApp,
                     )
                 )
             }

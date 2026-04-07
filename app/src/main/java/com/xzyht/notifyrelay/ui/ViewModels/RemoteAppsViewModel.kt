@@ -9,15 +9,13 @@ import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.servers.appslist.RemoteAppInfo
 import com.xzyht.notifyrelay.servers.appslist.RemoteAppsState
 import com.xzyht.notifyrelay.sync.AppListSyncManager
-import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
-import kotlinx.coroutines.Dispatchers
+import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
 
 class RemoteAppsViewModel : ViewModel() {
@@ -156,43 +154,12 @@ class RemoteAppsViewModel : ViewModel() {
     }
 
     fun openApp(context: Context, app: RemoteAppInfo, deviceIp: String) {
-        viewModelScope.launch {
-            try {
-                val updatedApps = _state.value.apps.map { 
-                    if (it.packageName == app.packageName) it.copy(isLoading = true) else it 
-                }
-                _state.update { it.copy(apps = updatedApps) }
-
-                withContext(Dispatchers.IO) {
-                    val nativeCore = NativeCoreFacade.get(context)
-                    val port = 5555
-                    
-                    if (!nativeCore.adbIsConnected()) {
-                        nativeCore.adbConnect(deviceIp, port)
-                    }
-
-                    val request = NativeCoreFacade.defaultStartRequest(
-                        customServerUri = null,
-                        maxSize = 1920,
-                        videoBitRate = 8_000_000,
-                        remotePath = "/data/local/tmp/scrcpy-server.jar",
-                        newDisplay = "1920x1080",
-                        startApp = app.packageName,
-                        windowTitle = app.appName,
-                    )
-                    nativeCore.scrcpyStart(request)
-                }
-
-                val resetApps = _state.value.apps.map { 
-                    if (it.packageName == app.packageName) it.copy(isLoading = false) else it 
-                }
-                _state.update { it.copy(apps = resetApps) }
-            } catch (e: Exception) {
-                val resetApps = _state.value.apps.map { 
-                    if (it.packageName == app.packageName) it.copy(isLoading = false) else it 
-                }
-                _state.update { it.copy(apps = resetApps, error = e.message) }
-            }
-        }
+        ShortcutLaunchActivity.startFullscreenControl(
+            context = context,
+            ip = deviceIp,
+            port = 5555,
+            name = app.appName,
+            startApp = app.packageName,
+        )
     }
 }
