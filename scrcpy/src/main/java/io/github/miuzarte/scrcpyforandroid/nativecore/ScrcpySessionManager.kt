@@ -695,7 +695,7 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
             ),
             ServerArg(
                 type = ServerArgType.STRING,
-                key = "start_app",
+                key = "start-app",
                 value = options.startApp.trim(),
             ),
             ServerArg(

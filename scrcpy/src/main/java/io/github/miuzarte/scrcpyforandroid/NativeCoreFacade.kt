@@ -237,6 +237,7 @@ class NativeCoreFacade(private val appContext: Context) {
                     windowTitle = request.windowTitle,
                 ),
             )
+            Log.i(TAG, "scrcpyStart(): serverCmd=${sessionManager.getLastServerCommand()}")
             if (request.turnScreenOff) {
                 if (request.noControl) {
                     Log.w(TAG, "scrcpyStart(): turnScreenOff ignored because control is disabled")

@@ -35,8 +35,10 @@ import io.github.miuzarte.scrcpyforandroid.widgets.FullscreenControlScreen
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonBar
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.Logger
 import notifyrelay.data.config.ScrcpyDefaults
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
@@ -545,6 +547,8 @@ private fun ShortcutLaunchScreen(
         )
         val effectiveTurnScreenOff = sessionParams.turnScreenOff && !sessionParams.noControl
 
+        Logger.d("ShortcutLaunchActivity", "startApp=${sessionParams.startApp}, newDisplay=$effectiveNewDisplay")
+
         val session = try {
             withContext(Dispatchers.IO) {
                 nativeCore.scrcpyStart(
@@ -590,6 +594,28 @@ private fun ShortcutLaunchScreen(
 
         sessionInfo = session
         connectionState = ConnectionState.Connected(session)
+
+        if (sessionParams.startApp.isNotBlank() && effectiveNewDisplay.isNotBlank()) {
+            scope.launch(Dispatchers.IO) {
+                delay(1000)
+                try {
+                    val output = nativeCore.adbShell("dumpsys display | grep 'mDisplayId='")
+                    val regex = Regex("mDisplayId=(\\d+)")
+                    val matches = regex.findAll(output).map { it.groupValues[1].toInt() }.toList()
+                    val displayId = matches.lastOrNull { it >= 100 }
+                    Logger.d("ShortcutLaunchActivity", "dumpsys output: ${output.take(500)}, found displays: $matches, virtual: $displayId")
+                    if (displayId != null) {
+                        Logger.d("ShortcutLaunchActivity", "在虚拟显示器 $displayId 上启动应用: ${sessionParams.startApp}")
+                        nativeCore.adbShell("am start --display $displayId ${sessionParams.startApp}")
+                    } else {
+                        Logger.w("ShortcutLaunchActivity", "未找到虚拟显示器 ID，使用默认方式启动应用")
+                        nativeCore.adbShell("monkey -p ${sessionParams.startApp} -c android.intent.category.LAUNCHER 1")
+                    }
+                } catch (e: Exception) {
+                    Logger.e("ShortcutLaunchActivity", "启动应用失败", e)
+                }
+            }
+        }
     }
 
     DisposableEffect(Unit) {
