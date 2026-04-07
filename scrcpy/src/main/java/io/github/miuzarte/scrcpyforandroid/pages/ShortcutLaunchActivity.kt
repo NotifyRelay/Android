@@ -25,6 +25,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
 import io.github.miuzarte.scrcpyforandroid.services.DevicePageSettings
@@ -395,6 +396,7 @@ private fun ShortcutLaunchScreen(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val view = LocalView.current
     val nativeCore = remember(context) { NativeCoreFacade.get(context.applicationContext) }
     val settings = remember(context) { loadMainSettings(context) }
     val scope = rememberCoroutineScope()
@@ -534,7 +536,10 @@ private fun ShortcutLaunchScreen(
             sessionParams.newDisplayDpi.filter(Char::isDigit),
         )
         val effectiveNewDisplay = if (sessionParams.startApp.isNotBlank() && newDisplayArg.isBlank()) {
-            "1920x1080"
+            val windowWidth = view.width
+            val windowHeight = view.height
+            val densityDpi = context.resources.displayMetrics.densityDpi
+            if (windowWidth > 0 && windowHeight > 0) "${windowWidth}x$windowHeight/$densityDpi" else "1920x1080/$densityDpi"
         } else {
             newDisplayArg
         }
