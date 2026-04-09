@@ -560,6 +560,21 @@ private fun ShortcutLaunchScreen(
 
         Logger.d("ShortcutLaunchActivity", "startApp=${sessionParams.startApp}, newDisplay=$effectiveNewDisplay")
 
+        val existingDisplayIds = if (sessionParams.startApp.isNotBlank() && effectiveNewDisplay.isNotBlank()) {
+            try {
+                val output = nativeCore.adbShell("dumpsys display")
+                val regex = Regex("mDisplayId=(\\d+)")
+                regex.findAll(output).map { it.groupValues[1].toInt() }.toSet().also {
+                    Logger.d("ShortcutLaunchActivity", "创建前显示器列表: $it")
+                }
+            } catch (e: Exception) {
+                Logger.e("ShortcutLaunchActivity", "获取创建前显示器列表失败", e)
+                emptySet()
+            }
+        } else {
+            emptySet()
+        }
+
         val session = try {
             withContext(Dispatchers.IO) {
                 nativeCore.scrcpyStart(
@@ -610,30 +625,33 @@ private fun ShortcutLaunchScreen(
             Logger.d("ShortcutLaunchActivity", "准备在虚拟显示器上启动应用: startApp=${sessionParams.startApp}")
             
             scope.launch(Dispatchers.IO) {
-                delay(1000)
-                try {
-                    val output = nativeCore.adbShell("dumpsys display")
-                    val regex = Regex("mDisplayId=(\\d+)")
-                    val matches = regex.findAll(output).map { it.groupValues[1].toInt() }.toList()
-                    val displayId = matches.lastOrNull { it >= 100 }
+                var newDisplayId: Int? = null
+                var retryCount = 0
+                val maxRetries = 10
+                
+                while (newDisplayId == null && retryCount < maxRetries) {
+                    delay(500)
+                    retryCount++
                     
-                    Logger.d("ShortcutLaunchActivity", "找到的显示器 ID: $matches, 虚拟显示器 ID: $displayId")
-                    
-                    if (displayId != null) {
-                        val packageName = context.packageName
-                        val launchCmd = "am start --display $displayId -n $packageName/.ui.MainActivity"
-                        Logger.d("ShortcutLaunchActivity", "在虚拟显示器 $displayId 上启动本应用: $launchCmd")
-                        val result = nativeCore.adbShell(launchCmd)
-                        Logger.d("ShortcutLaunchActivity", "启动结果: $result")
+                    try {
+                        val output = nativeCore.adbShell("dumpsys display")
+                        val regex = Regex("mDisplayId=(\\d+)")
+                        val currentDisplayIds = regex.findAll(output).map { it.groupValues[1].toInt() }.toSet()
                         
-                        delay(500)
-                        ShortcutLaunchActivity.appLaunchCallback?.invoke(deviceIp, sessionParams.startApp, displayId)
-                        Logger.d("ShortcutLaunchActivity", "已发送启动目标应用请求")
-                    } else {
-                        Logger.w("ShortcutLaunchActivity", "未找到虚拟显示器 ID")
+                        val addedDisplays = currentDisplayIds - existingDisplayIds
+                        newDisplayId = addedDisplays.firstOrNull()
+                        
+                        Logger.d("ShortcutLaunchActivity", "重试 $retryCount/$maxRetries: 当前显示器: $currentDisplayIds, 新增显示器: $addedDisplays")
+                    } catch (e: Exception) {
+                        Logger.e("ShortcutLaunchActivity", "获取显示器 ID 失败", e)
                     }
-                } catch (e: Exception) {
-                    Logger.e("ShortcutLaunchActivity", "启动应用失败", e)
+                }
+                
+                if (newDisplayId != null) {
+                    ShortcutLaunchActivity.appLaunchCallback?.invoke(deviceIp, sessionParams.startApp, newDisplayId)
+                    Logger.d("ShortcutLaunchActivity", "已发送启动目标应用请求: displayId=$newDisplayId")
+                } else {
+                    Logger.w("ShortcutLaunchActivity", "未找到新增的虚拟显示器 ID，已重试 $maxRetries 次")
                 }
             }
         } else {
