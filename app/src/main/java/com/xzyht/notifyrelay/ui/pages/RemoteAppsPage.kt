@@ -45,11 +45,15 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.extra.WindowDialog
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.extended.Pin
+import top.yukonga.miuix.kmp.icon.extended.Replace
 import top.yukonga.miuix.kmp.icon.extended.ScreenMirroring
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.LocalDismissState
 
 data class DisplayInfo(
     val id: Int,
@@ -168,7 +172,7 @@ fun RemoteAppsPage(
                         )
                     } else {
                         Icon(
-                            imageVector = MiuixIcons.Settings,
+                            imageVector = MiuixIcons.Replace,
                             contentDescription = "刷新"
                         )
                     }
@@ -215,22 +219,30 @@ fun RemoteAppsPage(
     }
 
     showMenuForApp?.let { app ->
-        when (app) {
-            is RemoteAppInfo -> {
-                AppContextMenu(
-                    app = app,
-                    onDismiss = { showMenuForApp = null },
-                    onPin = { remoteViewModel.pinApp(context, app.packageName) },
-                    onUnpin = { remoteViewModel.unpinApp(context, app.packageName) }
-                )
-            }
-            is LocalAppInfo -> {
-                LocalAppContextMenu(
-                    app = app,
-                    onDismiss = { showMenuForApp = null }
-                )
-            }
-        }
+        AppContextMenu(
+            appName = when (app) {
+                is RemoteAppInfo -> app.appName
+                is LocalAppInfo -> app.appName
+                else -> ""
+            },
+            packageName = when (app) {
+                is RemoteAppInfo -> app.packageName
+                is LocalAppInfo -> app.packageName
+                else -> ""
+            },
+            isPinned = when (app) {
+                is RemoteAppInfo -> app.isPinned
+                else -> false
+            },
+            showPinButton = app is RemoteAppInfo,
+            onDismiss = { showMenuForApp = null },
+            onPin = if (app is RemoteAppInfo) {
+                { remoteViewModel.pinApp(context, app.packageName) }
+            } else null,
+            onUnpin = if (app is RemoteAppInfo) {
+                { remoteViewModel.unpinApp(context, app.packageName) }
+            } else null
+        )
     }
 }
 
@@ -653,7 +665,7 @@ private fun AppItem(
             }
             if (app.isPinned) {
                 Icon(
-                    imageVector = MiuixIcons.Settings,
+                    imageVector = MiuixIcons.Pin,
                     contentDescription = "已置顶",
                     modifier = Modifier
                         .align(Alignment.TopEnd)
@@ -682,94 +694,38 @@ private fun AppItem(
 
 @Composable
 private fun AppContextMenu(
-    app: RemoteAppInfo,
+    appName: String,
+    packageName: String,
+    isPinned: Boolean,
+    showPinButton: Boolean,
     onDismiss: () -> Unit,
-    onPin: () -> Unit,
-    onUnpin: () -> Unit
+    onPin: (() -> Unit)?,
+    onUnpin: (() -> Unit)?
 ) {
-    val colorScheme = MiuixTheme.colorScheme
-    val textStyles = MiuixTheme.textStyles
+    val dismiss = LocalDismissState.current
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.defaultColors(
-            color = colorScheme.surface
-        )
+    WindowDialog(
+        title = appName,
+        summary = packageName,
+        show = true,
+        onDismissRequest = onDismiss
     ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End
         ) {
-            Text(
-                text = app.appName,
-                style = textStyles.title3
+            top.yukonga.miuix.kmp.basic.TextButton(
+                text = "关闭",
+                onClick = { dismiss?.invoke() }
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = app.packageName,
-                style = textStyles.body2,
-                color = colorScheme.onSurfaceSecondary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                top.yukonga.miuix.kmp.basic.TextButton(
-                    text = "取消",
-                    onClick = onDismiss
-                )
+            if (showPinButton && onPin != null && onUnpin != null) {
                 Spacer(modifier = Modifier.width(8.dp))
                 top.yukonga.miuix.kmp.basic.TextButton(
-                    text = if (app.isPinned) "取消置顶" else "置顶",
+                    text = if (isPinned) "取消置顶" else "置顶",
                     onClick = {
-                        if (app.isPinned) onUnpin() else onPin()
-                        onDismiss()
+                        if (isPinned) onUnpin() else onPin()
+                        dismiss?.invoke()
                     }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun LocalAppContextMenu(
-    app: LocalAppInfo,
-    onDismiss: () -> Unit
-) {
-    val colorScheme = MiuixTheme.colorScheme
-    val textStyles = MiuixTheme.textStyles
-
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        colors = CardDefaults.defaultColors(
-            color = colorScheme.surface
-        )
-    ) {
-        Column(
-            modifier = Modifier.padding(16.dp)
-        ) {
-            Text(
-                text = app.appName,
-                style = textStyles.title3
-            )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = app.packageName,
-                style = textStyles.body2,
-                color = colorScheme.onSurfaceSecondary
-            )
-            Spacer(modifier = Modifier.height(16.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                top.yukonga.miuix.kmp.basic.TextButton(
-                    text = "关闭",
-                    onClick = onDismiss
                 )
             }
         }
