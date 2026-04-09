@@ -35,19 +35,16 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
     private val serverLogBuffer = ArrayDeque<String>()
 
     /**
-     * Start a scrcpy session.
+     * 启动 scrcpy 会话。
      *
-     * Responsibilities:
-     * - Pushes the server artifact to the device, constructs the server command,
-     *   and opens the server shell stream.
-     * - Opens the required abstract sockets (video/audio/control) with retries and
-     *   reads initial session metadata (device name, codec, resolution).
-     * - Initializes an [ActiveSession] which holds socket streams and reader threads.
+     * 职责：
+     * - 将服务器工件推送到设备，构建服务器命令，并打开服务器 shell 流。
+     * - 使用重试机制打开所需的抽象套接字（视频/音频/控制），并读取初始会话元数据（设备名称、编解码器、分辨率）。
+     * - 初始化一个 [ActiveSession]，用于保存套接字流和读取线程。
      *
-     * Threading notes:
-     * - This is synchronized to avoid concurrent starts/stops.
-     * - It may block while interacting with adb; callers should execute it off the UI
-     *   thread when appropriate. The facade uses an executor to serialize such calls.
+     * 线程说明：
+     * - 此方法是同步的，以避免并发启动/停止。
+     * - 与 adb 交互时可能会阻塞；调用方应在适当时在 UI 线程之外执行。外观模式使用执行器来序列化此类调用。
      */
     @Synchronized
     fun start(serverJarPath: Path, options: ScrcpyStartOptions): SessionInfo {
@@ -59,6 +56,15 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
         val scid = random.nextInt(Int.MAX_VALUE)
         val socketName = socketNameFor(scid)
 
+        var serverStream: AdbSocketStream? = null
+        var serverLogThread: Thread? = null
+        var firstStream: AdbSocketStream? = null
+        var videoStream: AdbSocketStream? = null
+        var videoInput: DataInputStream? = null
+        var audioStream: AdbSocketStream? = null
+        var audioInput: DataInputStream? = null
+        var controlStream: AdbSocketStream? = null
+
         try {
             adbService.push(serverJarPath, targetPath)
             val cmd = buildServerCommand(targetPath, scid, options)
@@ -67,19 +73,13 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
                 TAG,
                 "start(): socket=$socketName codec=${options.videoCodec} audio=${options.audio} audioCodec=${options.audioCodec}"
             )
-            val serverStream = adbService.openShellStream(cmd)
-            val serverLogThread = startServerLogThread(serverStream, socketName)
+            serverStream = adbService.openShellStream(cmd)
+            serverLogThread = startServerLogThread(serverStream!!, socketName)
             Thread.sleep(SERVER_BOOT_DELAY_MS)
 
             // The first socket always carries device meta (and dummy byte).
-            val firstStream = openAbstractSocketWithRetry(socketName, expectDummyByte = true)
-            val firstInput = DataInputStream(BufferedInputStream(firstStream.inputStream))
-
-            var videoStream: AdbSocketStream? = null
-            var videoInput: DataInputStream? = null
-            var audioStream: AdbSocketStream? = null
-            var audioInput: DataInputStream? = null
-            var controlStream: AdbSocketStream? = null
+            firstStream = openAbstractSocketWithRetry(socketName, expectDummyByte = true)
+            val firstInput = DataInputStream(BufferedInputStream(firstStream!!.inputStream))
 
             when {
                 options.video -> {
@@ -146,8 +146,8 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
             activeSession = ActiveSession(
                 info = sessionInfo,
                 socketName = socketName,
-                serverStream = serverStream,
-                serverLogThread = serverLogThread,
+                serverStream = serverStream!!,
+                serverLogThread = serverLogThread!!,
                 videoStream = videoStream,
                 videoInput = videoInput,
                 audioStream = audioStream,
@@ -161,19 +161,48 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
             )
             return sessionInfo
         } catch (t: Throwable) {
+            cleanupOnStartFailure(
+                serverStream = serverStream,
+                serverLogThread = serverLogThread,
+                firstStream = firstStream,
+                videoStream = videoStream,
+                audioStream = audioStream,
+                controlStream = controlStream
+            )
             val tail = snapshotServerLogs()
             val detail = if (tail.isBlank()) "" else " | server_log_tail=\n$tail"
             throw IllegalStateException("scrcpy start failed: ${t.message}$detail", t)
         }
     }
 
+    private fun cleanupOnStartFailure(
+        serverStream: AdbSocketStream?,
+        serverLogThread: Thread?,
+        firstStream: AdbSocketStream?,
+        videoStream: AdbSocketStream?,
+        audioStream: AdbSocketStream?,
+        controlStream: AdbSocketStream?
+    ) {
+        runCatching { controlStream?.close() }
+        runCatching { audioStream?.close() }
+        runCatching { videoStream?.close() }
+        if (firstStream !== videoStream && firstStream !== audioStream && firstStream !== controlStream) {
+            runCatching { firstStream?.close() }
+        }
+        runCatching { serverStream?.close() }
+        if (serverLogThread != null && Thread.currentThread() !== serverLogThread) {
+            runCatching { serverLogThread.interrupt() }
+            runCatching { serverLogThread.join(300) }
+        }
+    }
+
     /**
-     * Attach a video consumer callback.
+     * 附加视频消费者回调。
      *
-     * - Spawns a dedicated `scrcpy-video-reader` thread that reads framed Annex B
-     *   packets from the video socket and delivers `VideoPacket` instances to [consumer].
-     * - The reader thread stops when the session ends or the socket is closed.
-     * - Consumers should be resilient to occasional dropped packets or reader errors.
+     * - 启动一个专用的 `scrcpy-video-reader` 线程，从视频套接字读取分帧的 Annex B
+     *   数据包，并将 `VideoPacket` 实例传递给 [consumer]。
+     * - 当会话结束或套接字关闭时，读取线程会停止。
+     * - 消费者应能够应对偶尔的数据包丢失或读取器错误。
      */
     @Synchronized
     fun attachVideoConsumer(consumer: (VideoPacket) -> Unit) {
@@ -230,12 +259,11 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
     }
 
     /**
-     * Attach an audio consumer callback.
+     * 附加音频消费者回调。
      *
-     * - Similar to the video consumer, this starts a `scrcpy-audio-reader` thread
-     *   which reads audio packets and dispatches `AudioPacket` to the provided callback.
-     * - The function reads the audio stream header to determine whether audio is
-     *   available and exits early if disabled.
+     * - 与视频消费者类似，这会启动一个 `scrcpy-audio-reader` 线程，
+     *   该线程读取音频数据包并将 `AudioPacket` 分派给提供的回调。
+     * - 该函数读取音频流头部以确定音频是否可用，如果禁用则提前退出。
      */
     @Synchronized
     fun attachAudioConsumer(consumer: (AudioPacket) -> Unit) {
@@ -313,10 +341,10 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
     }
 
     /**
-     * Inject a keycode event to the control channel.
+     * 注入按键事件到控制通道。
      *
-     * - Requires an active control channel; throws if absent.
-     * - Synchronized to serialize control writes.
+     * - 需要活动的控制通道；如果缺少则抛出异常。
+     * - 同步以序列化控制写入。
      */
     @Synchronized
     fun injectKeycode(action: Int, keycode: Int, repeat: Int = 0, metaState: Int = 0) {
@@ -329,11 +357,10 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
     }
 
     /**
-     * Inject a touch event to the control channel.
+     * 注入触摸事件到控制通道。
      *
-     * - Coordinates are expected in device pixels and are written together with
-     *   screen dimensions so the server can interpret them correctly.
-     * - Synchronized to serialize control writes.
+     * - 坐标以设备像素为单位，并与屏幕尺寸一起写入，以确保服务器正确解释它们。
+     * - 同步以序列化控制写入。
      */
     @Synchronized
     fun injectTouch(
@@ -392,10 +419,9 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
     }
 
     /**
-     * Stop the active session and clean up reader threads and streams.
+     * 停止活动会话并清理读取线程和流。
      *
-     * - Interrupts and joins reader threads with short timeouts, closes sockets,
-     *   and clears state. It is safe to call from any thread.
+     * - 中断并等待读取线程，关闭套接字并清除状态。 安全调用。
      */
     @Synchronized
     fun stop() {
@@ -446,7 +472,7 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
             ),
         )
         Log.i(TAG, "listEncoders(): cmd=$cmd")
-        // scrcpy encoder list is printed in logs, so merge stderr into stdout.
+        // scrcpy 打印在日志中，所以合并 stderr 到 stdout。
         val output = adbService.shell("$cmd 2>&1")
         val parsed = parseEncoderLists(output)
         val preview = output.lineSequence().take(40).joinToString("\n")
@@ -795,7 +821,7 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
         AUDIO_ENCODER_REGEX.findAll(output).forEach { match ->
             audio.add(match.groupValues[1])
         }
-        // Fallback for log formats that include codec+encoder in one line.
+        // 回退日志格式，包含编码器名称。
         VIDEO_ENCODER_FALLBACK_REGEX.findAll(output).forEach { match ->
             video.add(match.groupValues[1])
         }
@@ -876,10 +902,10 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
     }
 
     /**
-     * Open an abstract adb socket with retry.
+     * 尝试打开抽象 adb 套接字。
      *
-     * - Retries a number of times with a short delay (useful during server startup).
-     * - Optionally expects a dummy byte on the stream to validate the server handshake.
+     * - 尝试打开套接字，如果失败则等待短时间后重试。
+     * - 可选地期望流中的虚拟字节，以验证服务器握手。
      */
     private fun openAbstractSocketWithRetry(
         socketName: String,
