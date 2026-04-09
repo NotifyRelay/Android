@@ -24,7 +24,9 @@ import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
 import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import com.xzyht.notifyrelay.ui.pages.RemoteAppsPage
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyAdvancedPage
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyDevicePage
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyVirtualButtonOrderPage
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
@@ -121,7 +123,7 @@ fun DeviceForwardScreen(
 fun ScrcpyAdvancedScreen(
     navigator: Navigator
 ) {
-    io.github.miuzarte.scrcpyforandroid.pages.ScrcpyAdvancedPage(
+    ScrcpyAdvancedPage(
         onBack = { navigator.pop() }
     )
 }
@@ -130,7 +132,7 @@ fun ScrcpyAdvancedScreen(
 fun ScrcpyVirtualButtonOrderScreen(
     navigator: Navigator
 ) {
-    io.github.miuzarte.scrcpyforandroid.pages.ScrcpyVirtualButtonOrderPage(
+    ScrcpyVirtualButtonOrderPage(
         onBack = { navigator.pop() }
     )
 }

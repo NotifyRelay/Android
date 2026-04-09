@@ -165,7 +165,17 @@ object AppRepository {
 
             // 批量保存应用到数据库
             if (appEntities.isNotEmpty()) {
+                // 在保存应用之前，先获取所有现有的远程设备应用关联
+                // 因为 saveApps 使用 OnConflictStrategy.REPLACE，会先删除再插入，触发外键级联删除
+                val existingRemoteAssociations = databaseRepository?.getAllAppDeviceAssociations()?.first()
+                    ?.filter { it.sourceDevice != "local" } ?: emptyList()
+                
                 databaseRepository?.saveApps(appEntities)
+                
+                // 重新保存远程设备的应用关联（本机的关联会在后面重新创建）
+                if (existingRemoteAssociations.isNotEmpty()) {
+                    databaseRepository?.saveAppDeviceAssociations(existingRemoteAssociations)
+                }
             }
 
             // 批量保存应用设备关联到数据库
@@ -688,39 +698,47 @@ object AppRepository {
         }
     }
 
-    private val _pinnedApps = MutableStateFlow<Set<String>>(emptySet())
-    val pinnedApps: StateFlow<Set<String>> = _pinnedApps.asStateFlow()
+    private val _pinnedApps = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
+    val pinnedApps: StateFlow<Map<String, Set<String>>> = _pinnedApps.asStateFlow()
 
     private const val PREFS_NAME = "remote_apps_prefs"
-    private const val KEY_PINNED_APPS = "pinned_apps"
+    private const val KEY_PINNED_APPS_PREFIX = "pinned_apps_"
 
-    fun loadPinnedApps(context: Context) {
+    fun loadPinnedApps(context: Context, deviceUuid: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        val pinnedSet = prefs.getStringSet(KEY_PINNED_APPS, emptySet()) ?: emptySet()
-        _pinnedApps.value = pinnedSet.toSet()
+        val key = KEY_PINNED_APPS_PREFIX + deviceUuid
+        val pinnedSet = prefs.getStringSet(key, emptySet()) ?: emptySet()
+        val currentMap = _pinnedApps.value.toMutableMap()
+        currentMap[deviceUuid] = pinnedSet.toSet()
+        _pinnedApps.value = currentMap
     }
 
-    fun pinApp(context: Context, packageName: String) {
-        val current = _pinnedApps.value.toMutableSet()
-        current.add(packageName)
-        _pinnedApps.value = current.toSet()
-        savePinnedApps(context)
+    fun pinApp(context: Context, deviceUuid: String, packageName: String) {
+        val currentMap = _pinnedApps.value.toMutableMap()
+        val currentSet = currentMap[deviceUuid]?.toMutableSet() ?: mutableSetOf()
+        currentSet.add(packageName)
+        currentMap[deviceUuid] = currentSet.toSet()
+        _pinnedApps.value = currentMap
+        savePinnedApps(context, deviceUuid)
     }
 
-    fun unpinApp(context: Context, packageName: String) {
-        val current = _pinnedApps.value.toMutableSet()
-        current.remove(packageName)
-        _pinnedApps.value = current.toSet()
-        savePinnedApps(context)
+    fun unpinApp(context: Context, deviceUuid: String, packageName: String) {
+        val currentMap = _pinnedApps.value.toMutableMap()
+        val currentSet = currentMap[deviceUuid]?.toMutableSet() ?: mutableSetOf()
+        currentSet.remove(packageName)
+        currentMap[deviceUuid] = currentSet.toSet()
+        _pinnedApps.value = currentMap
+        savePinnedApps(context, deviceUuid)
     }
 
-    fun isAppPinned(packageName: String): Boolean {
-        return _pinnedApps.value.contains(packageName)
+    fun isAppPinned(deviceUuid: String, packageName: String): Boolean {
+        return _pinnedApps.value[deviceUuid]?.contains(packageName) ?: false
     }
 
-    private fun savePinnedApps(context: Context) {
+    private fun savePinnedApps(context: Context, deviceUuid: String) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        prefs.edit().putStringSet(KEY_PINNED_APPS, _pinnedApps.value).apply()
+        val key = KEY_PINNED_APPS_PREFIX + deviceUuid
+        prefs.edit().putStringSet(key, _pinnedApps.value[deviceUuid] ?: emptySet()).apply()
     }
 
     suspend fun getRemoteAppsList(context: Context, deviceUuid: String): List<RemoteAppInfo> {
@@ -734,7 +752,7 @@ object AppRepository {
                 packageName = entity.packageName,
                 appName = entity.appName,
                 iconBytes = entity.iconBytes,
-                isPinned = isAppPinned(entity.packageName),
+                isPinned = isAppPinned(deviceUuid, entity.packageName),
                 isLoading = false
             )
         }.sortedWith(compareByDescending<RemoteAppInfo> { it.isPinned }.thenBy { it.appName })

@@ -22,7 +22,6 @@ import com.xzyht.notifyrelay.ui.pages.UILocalFilter
 import com.xzyht.notifyrelay.ui.pages.UIRemoteFilter
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
 import com.xzyht.notifyrelay.ui.pages.UIAbout
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpySettingsPage
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
@@ -31,6 +30,7 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpySettingsPage
 
 
 /**

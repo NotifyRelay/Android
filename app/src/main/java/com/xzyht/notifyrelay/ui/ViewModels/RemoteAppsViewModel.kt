@@ -31,7 +31,7 @@ class RemoteAppsViewModel : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                AppRepository.loadPinnedApps(context)
+                AppRepository.loadPinnedApps(context, deviceUuid)
                 val apps = AppRepository.getRemoteAppsList(context, deviceUuid)
                 val pinnedApps = apps.filter { it.isPinned }
                 _state.update { 
@@ -107,7 +107,7 @@ class RemoteAppsViewModel : ViewModel() {
                 
                 delay(2000)
                 
-                AppRepository.loadPinnedApps(context)
+                AppRepository.loadPinnedApps(context, deviceUuid)
                 val apps = AppRepository.getRemoteAppsList(context, deviceUuid)
                 val pinnedApps = apps.filter { it.isPinned }
                 _state.update { 
@@ -134,21 +134,23 @@ class RemoteAppsViewModel : ViewModel() {
     }
 
     fun pinApp(context: Context, packageName: String) {
+        val deviceUuid = currentDeviceUuid ?: return
         viewModelScope.launch {
-            AppRepository.pinApp(context, packageName)
-            updatePinnedState()
+            AppRepository.pinApp(context, deviceUuid, packageName)
+            updatePinnedState(deviceUuid)
         }
     }
 
     fun unpinApp(context: Context, packageName: String) {
+        val deviceUuid = currentDeviceUuid ?: return
         viewModelScope.launch {
-            AppRepository.unpinApp(context, packageName)
-            updatePinnedState()
+            AppRepository.unpinApp(context, deviceUuid, packageName)
+            updatePinnedState(deviceUuid)
         }
     }
 
-    private fun updatePinnedState() {
-        val pinnedSet = AppRepository.pinnedApps.value
+    private fun updatePinnedState(deviceUuid: String) {
+        val pinnedSet = AppRepository.pinnedApps.value[deviceUuid] ?: emptySet()
         val updatedApps = _state.value.apps.map { app ->
             app.copy(isPinned = pinnedSet.contains(app.packageName))
         }

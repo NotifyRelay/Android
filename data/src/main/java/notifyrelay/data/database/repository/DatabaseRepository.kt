@@ -562,6 +562,11 @@ class DatabaseRepository(private val database: AppDatabase) {
     fun getAppDevicesByDeviceUuid(deviceUuid: String) = appDeviceDao.getByDeviceUuid(deviceUuid)
 
     /**
+     * 获取所有应用设备关联
+     */
+    fun getAllAppDeviceAssociations() = appDeviceDao.getAll()
+
+    /**
      * 检查应用与设备是否存在关联
      */
     suspend fun checkAppDeviceAssociation(packageName: String, deviceUuid: String): AppDeviceEntity? {
