@@ -1,6 +1,14 @@
 package com.xzyht.notifyrelay.ui.pages
 
+import android.app.ActivityOptions
+import android.content.Context
+import android.content.Intent
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.drawable.Drawable
+import android.hardware.display.DisplayManager
+import android.os.Build
+import android.view.Display
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -15,6 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -24,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.servers.appslist.RemoteAppInfo
+import com.xzyht.notifyrelay.ui.ViewModels.LocalAppInfo
+import com.xzyht.notifyrelay.ui.ViewModels.LocalAppsViewModel
 import com.xzyht.notifyrelay.ui.ViewModels.RemoteAppsViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -35,186 +46,521 @@ import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.extended.ScreenMirroring
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+data class DisplayInfo(
+    val id: Int,
+    val name: String,
+    val isBuiltIn: Boolean = false
+)
+
 @Composable
 fun RemoteAppsPage(
-    deviceUuid: String,
-    deviceIp: String,
+    deviceUuid: String?,
+    deviceIp: String?,
     modifier: Modifier = Modifier,
-    viewModel: RemoteAppsViewModel = viewModel()
+    remoteViewModel: RemoteAppsViewModel = viewModel(),
+    localViewModel: LocalAppsViewModel = viewModel()
 ) {
     val context = LocalContext.current
-    val state by viewModel.state.collectAsState()
+    val isLocalMode = deviceUuid == null || deviceIp == null
+    
+    val remoteState by remoteViewModel.state.collectAsState()
+    val localState by localViewModel.state.collectAsState()
+    
     var searchQuery by remember { mutableStateOf("") }
-    var showMenuForApp by remember { mutableStateOf<RemoteAppInfo?>(null) }
+    var showMenuForApp by remember { mutableStateOf<Any?>(null) }
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
 
+    val displays = remember { mutableStateListOf<DisplayInfo>() }
+    var selectedDisplayId by remember { mutableIntStateOf(0) }
+    
     LaunchedEffect(deviceUuid) {
-        viewModel.loadApps(context, deviceUuid)
+        if (isLocalMode) {
+            localViewModel.loadApps(context)
+        } else {
+            remoteViewModel.loadApps(context, deviceUuid!!)
+        }
     }
 
-    Column(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(8.dp)
-    ) {
-        Row(
+    LaunchedEffect(Unit) {
+        if (isLocalMode) {
+            val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
+            fun updateDisplays() {
+                val allDisplays = displayManager.displays
+                android.util.Log.d("RemoteAppsPage", "所有显示器: ${allDisplays.map { "id=${it.displayId}, name=${it.name}, flags=${it.flags}" }}")
+                
+                val displayList = allDisplays.map { display ->
+                    DisplayInfo(
+                        id = display.displayId,
+                        name = display.name.ifEmpty { 
+                            if (display.displayId == 0) "内置显示器" else "显示器 ${display.displayId}" 
+                        },
+                        isBuiltIn = display.displayId == 0
+                    )
+                }.sortedBy { it.id }
+                
+                android.util.Log.d("RemoteAppsPage", "显示器列表: $displayList")
+                displays.clear()
+                displays.addAll(displayList)
+            }
+            updateDisplays()
+            displayManager.registerDisplayListener(object : DisplayManager.DisplayListener {
+                override fun onDisplayAdded(displayId: Int) = updateDisplays()
+                override fun onDisplayRemoved(displayId: Int) = updateDisplays()
+                override fun onDisplayChanged(displayId: Int) = updateDisplays()
+            }, null)
+        }
+    }
+
+    Box(modifier = modifier.fillMaxSize()) {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .fillMaxSize()
+                .padding(8.dp)
         ) {
-            TextField(
-                value = searchQuery,
-                onValueChange = { newValue ->
-                    searchQuery = newValue
-                    viewModel.searchApps(newValue)
-                },
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .padding(end = 8.dp),
-                label = "搜索应用",
-                singleLine = true
-            )
-            IconButton(
-                onClick = { viewModel.refreshApps(context) },
-                enabled = !state.isLoading
+                    .fillMaxWidth()
+                    .padding(bottom = 8.dp),
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                if (state.isLoading) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(24.dp),
-                        strokeWidth = 2.dp
-                    )
-                } else {
-                    Icon(
-                        imageVector = MiuixIcons.Settings,
-                        contentDescription = "刷新"
-                    )
+                TextField(
+                    value = searchQuery,
+                    onValueChange = { newValue ->
+                        searchQuery = newValue
+                        if (isLocalMode) {
+                            localViewModel.searchApps(newValue)
+                        } else {
+                            remoteViewModel.searchApps(newValue)
+                        }
+                    },
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp),
+                    label = "搜索应用",
+                    singleLine = true
+                )
+                IconButton(
+                    onClick = {
+                        if (isLocalMode) {
+                            localViewModel.loadApps(context)
+                        } else {
+                            remoteViewModel.refreshApps(context)
+                        }
+                    },
+                    enabled = if (isLocalMode) !localState.isLoading else !remoteState.isLoading
+                ) {
+                    if (if (isLocalMode) localState.isLoading else remoteState.isLoading) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(24.dp),
+                            strokeWidth = 2.dp
+                        )
+                    } else {
+                        Icon(
+                            imageVector = MiuixIcons.Settings,
+                            contentDescription = "刷新"
+                        )
+                    }
                 }
+            }
+
+            if (isLocalMode) {
+                LocalAppsContent(
+                    apps = localState.apps.filter {
+                        searchQuery.isBlank() ||
+                        it.appName.contains(searchQuery, ignoreCase = true) ||
+                        it.packageName.contains(searchQuery, ignoreCase = true)
+                    },
+                    isLoading = localState.isLoading,
+                    error = localState.error,
+                    onAppClick = { app ->
+                        openLocalApp(context, app, selectedDisplayId)
+                    },
+                    onAppLongClick = { showMenuForApp = it }
+                )
+            } else {
+                RemoteAppsContent(
+                    state = remoteState,
+                    searchQuery = searchQuery,
+                    onAppClick = { app ->
+                        remoteViewModel.openApp(context, app, deviceIp!!)
+                    },
+                    onAppLongClick = { showMenuForApp = it },
+                    onRefresh = { remoteViewModel.refreshApps(context) }
+                )
             }
         }
 
-        when {
-            state.error != null -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = MiuixIcons.Delete,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = state.error ?: "加载失败",
-                            color = colorScheme.error
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        top.yukonga.miuix.kmp.basic.Button(
-                            onClick = { viewModel.refreshApps(context) }
-                        ) {
-                            Text("重试")
-                        }
-                    }
-                }
-            }
-            state.isEmpty -> {
-                Box(
-                    modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                        Icon(
-                            imageVector = MiuixIcons.Settings,
-                            contentDescription = null,
-                            modifier = Modifier.size(48.dp),
-                            tint = colorScheme.onSurfaceSecondary
-                        )
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "暂无应用数据",
-                            color = colorScheme.onSurfaceSecondary
-                        )
-                    }
-                }
-            }
-            else -> {
-                val filteredApps = if (searchQuery.isBlank()) {
-                    state.apps
-                } else {
-                    state.apps.filter {
-                        it.appName.contains(searchQuery, ignoreCase = true) ||
-                        it.packageName.contains(searchQuery, ignoreCase = true)
-                    }
-                }
-                val pinnedApps = filteredApps.filter { it.isPinned }
-                val regularApps = filteredApps.filter { !it.isPinned }
-
-                LazyVerticalGrid(
-                    columns = GridCells.Adaptive(minSize = 80.dp),
-                    contentPadding = PaddingValues(4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    if (pinnedApps.isNotEmpty()) {
-                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                            Text(
-                                text = "置顶应用",
-                                style = textStyles.main,
-                                color = colorScheme.primary,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                        }
-                        items(pinnedApps, key = { "pinned_${it.packageName}" }) { app ->
-                            AppItem(
-                                app = app,
-                                onClick = { viewModel.openApp(context, app, deviceIp) },
-                                onLongClick = { showMenuForApp = app }
-                            )
-                        }
-                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                            HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 8.dp),
-                                color = colorScheme.dividerLine
-                            )
-                        }
-                    }
-                    if (regularApps.isNotEmpty() && pinnedApps.isNotEmpty()) {
-                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                            Text(
-                                text = "全部应用",
-                                style = textStyles.main,
-                                color = colorScheme.onSurfaceSecondary,
-                                modifier = Modifier.padding(vertical = 8.dp)
-                            )
-                        }
-                    }
-                    items(regularApps, key = { it.packageName }) { app ->
-                        AppItem(
-                            app = app,
-                            onClick = { viewModel.openApp(context, app, deviceIp) },
-                            onLongClick = { showMenuForApp = app }
-                        )
-                    }
-                }
-            }
+        if (isLocalMode && displays.size > 1) {
+            DisplayNavigationBar(
+                displays = displays,
+                selectedDisplayId = selectedDisplayId,
+                onDisplaySelected = { selectedDisplayId = it },
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 16.dp)
+            )
         }
     }
 
     showMenuForApp?.let { app ->
-        AppContextMenu(
-            app = app,
-            onDismiss = { showMenuForApp = null },
-            onPin = { viewModel.pinApp(context, app.packageName) },
-            onUnpin = { viewModel.unpinApp(context, app.packageName) }
+        when (app) {
+            is RemoteAppInfo -> {
+                AppContextMenu(
+                    app = app,
+                    onDismiss = { showMenuForApp = null },
+                    onPin = { remoteViewModel.pinApp(context, app.packageName) },
+                    onUnpin = { remoteViewModel.unpinApp(context, app.packageName) }
+                )
+            }
+            is LocalAppInfo -> {
+                LocalAppContextMenu(
+                    app = app,
+                    onDismiss = { showMenuForApp = null }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalAppsContent(
+    apps: List<LocalAppInfo>,
+    isLoading: Boolean,
+    error: String?,
+    onAppClick: (LocalAppInfo) -> Unit,
+    onAppLongClick: (LocalAppInfo) -> Unit
+) {
+    val colorScheme = MiuixTheme.colorScheme
+    val textStyles = MiuixTheme.textStyles
+
+    when {
+        error != null -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = MiuixIcons.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = error,
+                        color = colorScheme.error
+                    )
+                }
+            }
+        }
+        isLoading -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator()
+            }
+        }
+        apps.isEmpty() -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = MiuixIcons.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = colorScheme.onSurfaceSecondary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "暂无应用",
+                        color = colorScheme.onSurfaceSecondary
+                    )
+                }
+            }
+        }
+        else -> {
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 80.dp),
+                contentPadding = PaddingValues(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                items(apps, key = { it.packageName }) { app ->
+                    LocalAppItem(
+                        app = app,
+                        onClick = { onAppClick(app) },
+                        onLongClick = { onAppLongClick(app) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RemoteAppsContent(
+    state: com.xzyht.notifyrelay.servers.appslist.RemoteAppsState,
+    searchQuery: String,
+    onAppClick: (RemoteAppInfo) -> Unit,
+    onAppLongClick: (RemoteAppInfo) -> Unit,
+    onRefresh: () -> Unit
+) {
+    val colorScheme = MiuixTheme.colorScheme
+    val textStyles = MiuixTheme.textStyles
+
+    when {
+        state.error != null -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = MiuixIcons.Delete,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = state.error ?: "加载失败",
+                        color = colorScheme.error
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    top.yukonga.miuix.kmp.basic.Button(
+                        onClick = onRefresh
+                    ) {
+                        Text("重试")
+                    }
+                }
+            }
+        }
+        state.isEmpty -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(
+                        imageVector = MiuixIcons.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(48.dp),
+                        tint = colorScheme.onSurfaceSecondary
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "暂无应用数据",
+                        color = colorScheme.onSurfaceSecondary
+                    )
+                }
+            }
+        }
+        else -> {
+            val filteredApps = if (searchQuery.isBlank()) {
+                state.apps
+            } else {
+                state.apps.filter {
+                    it.appName.contains(searchQuery, ignoreCase = true) ||
+                    it.packageName.contains(searchQuery, ignoreCase = true)
+                }
+            }
+            val pinnedApps = filteredApps.filter { it.isPinned }
+            val regularApps = filteredApps.filter { !it.isPinned }
+
+            LazyVerticalGrid(
+                columns = GridCells.Adaptive(minSize = 80.dp),
+                contentPadding = PaddingValues(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                if (pinnedApps.isNotEmpty()) {
+                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            text = "置顶应用",
+                            style = textStyles.main,
+                            color = colorScheme.primary,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                    items(pinnedApps, key = { "pinned_${it.packageName}" }) { app ->
+                        AppItem(
+                            app = app,
+                            onClick = { onAppClick(app) },
+                            onLongClick = { onAppLongClick(app) }
+                        )
+                    }
+                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(vertical = 8.dp),
+                            color = colorScheme.dividerLine
+                        )
+                    }
+                }
+                if (regularApps.isNotEmpty() && pinnedApps.isNotEmpty()) {
+                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                        Text(
+                            text = "全部应用",
+                            style = textStyles.main,
+                            color = colorScheme.onSurfaceSecondary,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                }
+                items(regularApps, key = { it.packageName }) { app ->
+                    AppItem(
+                        app = app,
+                        onClick = { onAppClick(app) },
+                        onLongClick = { onAppLongClick(app) }
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DisplayNavigationBar(
+    displays: List<DisplayInfo>,
+    selectedDisplayId: Int,
+    onDisplaySelected: (Int) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val colorScheme = MiuixTheme.colorScheme
+    
+    Card(
+        modifier = modifier
+            .padding(horizontal = 16.dp),
+        colors = CardDefaults.defaultColors(
+            color = colorScheme.surface.copy(alpha = 0.95f)
+        )
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 8.dp, vertical = 8.dp),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            displays.forEach { display ->
+                val isSelected = display.id == selectedDisplayId
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .padding(horizontal = 4.dp)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(if (isSelected) colorScheme.primary.copy(alpha = 0.1f) else Color.Transparent)
+                        .clickable { onDisplaySelected(display.id) }
+                        .padding(vertical = 4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Icon(
+                        imageVector = if (display.isBuiltIn) MiuixIcons.Settings else MiuixIcons.ScreenMirroring,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                        tint = if (isSelected) colorScheme.primary else colorScheme.onSurfaceSecondary
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = display.name,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        fontSize = 12.sp,
+                        color = if (isSelected) colorScheme.primary else colorScheme.onSurface
+                    )
+                    Text(
+                        text = "#${display.id}",
+                        fontSize = 10.sp,
+                        color = if (isSelected) colorScheme.primary else colorScheme.onSurfaceSecondary
+                    )
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun LocalAppItem(
+    app: LocalAppInfo,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit
+) {
+    val colorScheme = MiuixTheme.colorScheme
+
+    Column(
+        modifier = Modifier
+            .width(72.dp)
+            .clickable(onClick = onClick),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Box(
+            modifier = Modifier.size(56.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center
+            ) {
+                if (app.icon != null) {
+                    DrawableImage(
+                        drawable = app.icon,
+                        contentDescription = app.appName,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                } else {
+                    Icon(
+                        imageVector = MiuixIcons.Settings,
+                        contentDescription = null,
+                        modifier = Modifier.size(32.dp),
+                        tint = colorScheme.onSurfaceSecondary
+                    )
+                }
+            }
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Text(
+            text = app.appName,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+            textAlign = TextAlign.Center,
+            fontSize = 11.sp,
+            color = colorScheme.onSurface,
+            modifier = Modifier.fillMaxWidth()
         )
     }
+}
+
+@Composable
+private fun DrawableImage(
+    drawable: Drawable,
+    contentDescription: String?,
+    modifier: Modifier = Modifier
+) {
+    val bitmap = remember(drawable) {
+        val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1
+        val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1
+        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+        val canvas = android.graphics.Canvas(bitmap)
+        drawable.setBounds(0, 0, width, height)
+        drawable.draw(canvas)
+        bitmap.asImageBitmap()
+    }
+    
+    Image(
+        bitmap = bitmap,
+        contentDescription = contentDescription,
+        modifier = modifier,
+        contentScale = ContentScale.Fit
+    )
 }
 
 @Composable
@@ -224,7 +570,6 @@ private fun AppItem(
     onLongClick: () -> Unit
 ) {
     val colorScheme = MiuixTheme.colorScheme
-    val textStyles = MiuixTheme.textStyles
 
     val bitmap = remember(app.iconBytes) {
         app.iconBytes?.let { bytes ->
@@ -357,5 +702,67 @@ private fun AppContextMenu(
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun LocalAppContextMenu(
+    app: LocalAppInfo,
+    onDismiss: () -> Unit
+) {
+    val colorScheme = MiuixTheme.colorScheme
+    val textStyles = MiuixTheme.textStyles
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        colors = CardDefaults.defaultColors(
+            color = colorScheme.surface
+        )
+    ) {
+        Column(
+            modifier = Modifier.padding(16.dp)
+        ) {
+            Text(
+                text = app.appName,
+                style = textStyles.title3
+            )
+            Spacer(modifier = Modifier.height(4.dp))
+            Text(
+                text = app.packageName,
+                style = textStyles.body2,
+                color = colorScheme.onSurfaceSecondary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.End
+            ) {
+                top.yukonga.miuix.kmp.basic.TextButton(
+                    text = "关闭",
+                    onClick = onDismiss
+                )
+            }
+        }
+    }
+}
+
+private fun openLocalApp(context: Context, app: LocalAppInfo, displayId: Int) {
+    try {
+        val intent = context.packageManager.getLaunchIntentForPackage(app.packageName)
+        intent?.let {
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            
+            if (displayId > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val options = ActivityOptions.makeBasic()
+                options.launchDisplayId = displayId
+                context.startActivity(intent, options.toBundle())
+            } else {
+                context.startActivity(intent)
+            }
+        }
+    } catch (e: Exception) {
+        e.printStackTrace()
     }
 }

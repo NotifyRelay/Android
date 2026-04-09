@@ -106,19 +106,10 @@ fun DeviceForwardScreen(
                         onOpenAdvanced = { navigator.push(Route.ScrcpyAdvanced) }
                     )
                     3 -> {
-                        if (selectedDevice != null && selectedDeviceInfo != null) {
-                            RemoteAppsPage(
-                                deviceUuid = selectedDevice.uuid,
-                                deviceIp = selectedDeviceInfo.ip
-                            )
-                        } else {
-                            Box(
-                                modifier = Modifier.fillMaxSize(),
-                                contentAlignment = Alignment.Center
-                            ) {
-                                androidx.compose.material3.Text("请先选择设备")
-                            }
-                        }
+                        RemoteAppsPage(
+                            deviceUuid = selectedDevice?.uuid,
+                            deviceIp = selectedDeviceInfo?.ip
+                        )
                     }
                 }
             }
