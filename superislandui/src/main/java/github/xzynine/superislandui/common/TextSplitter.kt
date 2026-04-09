@@ -268,9 +268,10 @@ object TextSplitter {
                 // 检查图标文本是否为空或只有一个字符，或者图标文本未达到上限
                 val maxIconEquivalentLength = 7.0
                 val currentIconLength = truncatedText.take(finalSplitPoint).sumOf { getCharWeight(it) }
+                val punctuationWeight = getCharWeight(truncatedText[finalSplitPoint])
                 
-                if (finalSplitPoint <= 1 || currentIconLength < maxIconEquivalentLength) {
-                    // 如果图标文本为空或只有一个字符，或者图标文本未达到上限，将标点符号移到图标区
+                if (finalSplitPoint <= 1 || currentIconLength + punctuationWeight <= maxIconEquivalentLength) {
+                    // 如果图标文本为空或只有一个字符，或者图标文本加上标点符号后未超过上限，将标点符号移到图标区
                     finalSplitPoint = min(finalSplitPoint + 1, truncatedText.length)
                 }
             }
