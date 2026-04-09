@@ -94,9 +94,9 @@ class ShortcutLaunchActivity : ComponentActivity() {
         private const val EXTRA_CROP_Y = "crop_y"
         private const val EXTRA_START_APP = "start_app"
 
-        internal var appLaunchCallback: ((deviceIp: String, packageName: String) -> Unit)? = null
+        internal var appLaunchCallback: ((deviceIp: String, packageName: String, displayId: Int) -> Unit)? = null
 
-        fun setAppLaunchCallback(callback: (deviceIp: String, packageName: String) -> Unit) {
+        fun setAppLaunchCallback(callback: (deviceIp: String, packageName: String, displayId: Int) -> Unit) {
             appLaunchCallback = callback
         }
 
@@ -627,7 +627,7 @@ private fun ShortcutLaunchScreen(
                         Logger.d("ShortcutLaunchActivity", "启动结果: $result")
                         
                         delay(500)
-                        ShortcutLaunchActivity.appLaunchCallback?.invoke(deviceIp, sessionParams.startApp)
+                        ShortcutLaunchActivity.appLaunchCallback?.invoke(deviceIp, sessionParams.startApp, displayId)
                         Logger.d("ShortcutLaunchActivity", "已发送启动目标应用请求")
                     } else {
                         Logger.w("ShortcutLaunchActivity", "未找到虚拟显示器 ID")

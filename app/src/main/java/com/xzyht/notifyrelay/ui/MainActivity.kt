@@ -144,13 +144,13 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        ShortcutLaunchActivity.setAppLaunchCallback { deviceIp, packageName ->
+        ShortcutLaunchActivity.setAppLaunchCallback { deviceIp, packageName, displayId ->
             val deviceManager = DeviceConnectionManager.getInstance(this)
             val devices = deviceManager.getAuthenticatedOnlineDevices()
             val targetDevice = devices.find { it.ip == deviceIp }
             if (targetDevice != null) {
-                Logger.d("MainActivity", "发送应用启动请求: $packageName 到 ${targetDevice.displayName}")
-                AppLaunchManager.sendAppLaunchRequest(this, deviceManager, targetDevice, packageName)
+                Logger.d("MainActivity", "发送应用启动请求: $packageName 到 ${targetDevice.displayName}, displayId: $displayId")
+                AppLaunchManager.sendAppLaunchRequest(this, deviceManager, targetDevice, packageName, displayId)
             } else {
                 Logger.w("MainActivity", "未找到目标设备: $deviceIp")
             }
