@@ -94,6 +94,12 @@ class ShortcutLaunchActivity : ComponentActivity() {
         private const val EXTRA_CROP_Y = "crop_y"
         private const val EXTRA_START_APP = "start_app"
 
+        internal var appLaunchCallback: ((deviceIp: String, packageName: String) -> Unit)? = null
+
+        fun setAppLaunchCallback(callback: (deviceIp: String, packageName: String) -> Unit) {
+            appLaunchCallback = callback
+        }
+
         fun startFullscreenControl(context: Context, ip: String, port: Int, name: String, startApp: String = "") {
             val intent = Intent(context, ShortcutLaunchActivity::class.java).apply {
                 putExtra(EXTRA_DEVICE_IP, ip)
@@ -601,25 +607,37 @@ private fun ShortcutLaunchScreen(
         connectionState = ConnectionState.Connected(session)
 
         if (sessionParams.startApp.isNotBlank() && effectiveNewDisplay.isNotBlank()) {
+            Logger.d("ShortcutLaunchActivity", "准备在虚拟显示器上启动应用: startApp=${sessionParams.startApp}")
+            
             scope.launch(Dispatchers.IO) {
                 delay(1000)
                 try {
-                    val output = nativeCore.adbShell("dumpsys display | grep 'mDisplayId='")
+                    val output = nativeCore.adbShell("dumpsys display")
                     val regex = Regex("mDisplayId=(\\d+)")
                     val matches = regex.findAll(output).map { it.groupValues[1].toInt() }.toList()
                     val displayId = matches.lastOrNull { it >= 100 }
-                    Logger.d("ShortcutLaunchActivity", "dumpsys output: ${output.take(500)}, found displays: $matches, virtual: $displayId")
+                    
+                    Logger.d("ShortcutLaunchActivity", "找到的显示器 ID: $matches, 虚拟显示器 ID: $displayId")
+                    
                     if (displayId != null) {
-                        Logger.d("ShortcutLaunchActivity", "在虚拟显示器 $displayId 上启动应用: ${sessionParams.startApp}")
-                        nativeCore.adbShell("am start --display $displayId ${sessionParams.startApp}")
+                        val packageName = context.packageName
+                        val launchCmd = "am start --display $displayId -n $packageName/.ui.MainActivity"
+                        Logger.d("ShortcutLaunchActivity", "在虚拟显示器 $displayId 上启动本应用: $launchCmd")
+                        val result = nativeCore.adbShell(launchCmd)
+                        Logger.d("ShortcutLaunchActivity", "启动结果: $result")
+                        
+                        delay(500)
+                        ShortcutLaunchActivity.appLaunchCallback?.invoke(deviceIp, sessionParams.startApp)
+                        Logger.d("ShortcutLaunchActivity", "已发送启动目标应用请求")
                     } else {
-                        Logger.w("ShortcutLaunchActivity", "未找到虚拟显示器 ID，使用默认方式启动应用")
-                        nativeCore.adbShell("monkey -p ${sessionParams.startApp} -c android.intent.category.LAUNCHER 1")
+                        Logger.w("ShortcutLaunchActivity", "未找到虚拟显示器 ID")
                     }
                 } catch (e: Exception) {
                     Logger.e("ShortcutLaunchActivity", "启动应用失败", e)
                 }
             }
+        } else {
+            Logger.d("ShortcutLaunchActivity", "跳过应用启动: startApp=${sessionParams.startApp}, newDisplay=$effectiveNewDisplay")
         }
     }
 

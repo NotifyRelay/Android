@@ -54,6 +54,7 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import com.xzyht.notifyrelay.sync.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
@@ -70,6 +71,7 @@ import com.xzyht.notifyrelay.ui.screen.HistoryScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
+import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -141,6 +143,18 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        ShortcutLaunchActivity.setAppLaunchCallback { deviceIp, packageName ->
+            val deviceManager = DeviceConnectionManager.getInstance(this)
+            val devices = deviceManager.getAuthenticatedOnlineDevices()
+            val targetDevice = devices.find { it.ip == deviceIp }
+            if (targetDevice != null) {
+                Logger.d("MainActivity", "发送应用启动请求: $packageName 到 ${targetDevice.displayName}")
+                AppLaunchManager.sendAppLaunchRequest(this, deviceManager, targetDevice, packageName)
+            } else {
+                Logger.w("MainActivity", "未找到目标设备: $deviceIp")
+            }
+        }
 
         DeveloperModeActivity.initLogConfig(this)
         DeveloperModeActivity.initDebugUiConfig(this)

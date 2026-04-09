@@ -456,6 +456,16 @@ object ProtocolRouter {
                     )
                     true
                 }
+                "DATA_APP_LAUNCH" -> {
+                    Logger.d(TAG, "接收到 DATA_APP_LAUNCH 消息: $decrypted")
+                    val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
+                    try {
+                        source?.let { AppLaunchManager.handleAppLaunchRequest(decrypted, deviceManager, it, context) }
+                    } catch (e: Exception) {
+                        Logger.e(TAG, "调用 AppLaunchManager.handleAppLaunchRequest 异常", e)
+                    }
+                    true
+                }
                 else -> {
                     // 其他未识别的 DATA_* 报文：当前版本不支持，直接忽略（方便后向兼容）
                     Logger.d(TAG, "未知DATA通道: $header")
