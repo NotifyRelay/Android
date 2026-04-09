@@ -5,7 +5,6 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.drawable.Drawable
 import android.hardware.display.DisplayManager
 import android.os.Build
 import android.view.Display
@@ -83,7 +82,7 @@ fun RemoteAppsPage(
     val displays = remember { mutableStateListOf<DisplayInfo>() }
     var selectedDisplayId by remember { mutableIntStateOf(0) }
     
-    LaunchedEffect(deviceUuid) {
+    LaunchedEffect(isLocalMode, deviceIp, deviceUuid) {
         if (isLocalMode) {
             localViewModel.loadApps(context)
         } else {
@@ -111,6 +110,14 @@ fun RemoteAppsPage(
                 android.util.Log.d("RemoteAppsPage", "显示器列表: $displayList")
                 displays.clear()
                 displays.addAll(displayList)
+                
+                val validDisplayIds = displayList.map { it.id }
+                if (selectedDisplayId !in validDisplayIds) {
+                    selectedDisplayId = displayList.find { it.id == 0 }?.id 
+                        ?: displayList.firstOrNull()?.id 
+                        ?: 0
+                    android.util.Log.d("RemoteAppsPage", "selectedDisplayId 不在有效列表中，重置为: $selectedDisplayId")
+                }
             }
             updateDisplays()
             val displayListener = object : DisplayManager.DisplayListener {
@@ -407,54 +414,76 @@ private fun RemoteAppsContent(
                     it.packageName.contains(searchQuery, ignoreCase = true)
                 }
             }
-            val pinnedApps = filteredApps.filter { it.isPinned }
-            val regularApps = filteredApps.filter { !it.isPinned }
 
-            LazyVerticalGrid(
-                columns = GridCells.Adaptive(minSize = 80.dp),
-                contentPadding = PaddingValues(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                if (pinnedApps.isNotEmpty()) {
-                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+            if (filteredApps.isEmpty()) {
+                Box(
+                    modifier = Modifier.fillMaxSize(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = MiuixIcons.Settings,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = colorScheme.onSurfaceSecondary
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            text = "置顶应用",
-                            style = textStyles.main,
-                            color = colorScheme.primary,
-                            modifier = Modifier.padding(vertical = 8.dp)
+                            text = "无匹配结果",
+                            color = colorScheme.onSurfaceSecondary
                         )
                     }
-                    items(pinnedApps, key = { "pinned_${it.packageName}" }) { app ->
+                }
+            } else {
+                val pinnedApps = filteredApps.filter { it.isPinned }
+                val regularApps = filteredApps.filter { !it.isPinned }
+
+                LazyVerticalGrid(
+                    columns = GridCells.Adaptive(minSize = 80.dp),
+                    contentPadding = PaddingValues(4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    if (pinnedApps.isNotEmpty()) {
+                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                text = "置顶应用",
+                                style = textStyles.main,
+                                color = colorScheme.primary,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                        items(pinnedApps, key = { "pinned_${it.packageName}" }) { app ->
+                            AppItem(
+                                app = app,
+                                onClick = { onAppClick(app) },
+                                onLongClick = { onAppLongClick(app) }
+                            )
+                        }
+                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                            HorizontalDivider(
+                                modifier = Modifier.padding(vertical = 8.dp),
+                                color = colorScheme.dividerLine
+                            )
+                        }
+                    }
+                    if (regularApps.isNotEmpty() && pinnedApps.isNotEmpty()) {
+                        item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
+                            Text(
+                                text = "全部应用",
+                                style = textStyles.main,
+                                color = colorScheme.onSurfaceSecondary,
+                                modifier = Modifier.padding(vertical = 8.dp)
+                            )
+                        }
+                    }
+                    items(regularApps, key = { it.packageName }) { app ->
                         AppItem(
                             app = app,
                             onClick = { onAppClick(app) },
                             onLongClick = { onAppLongClick(app) }
                         )
                     }
-                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                        HorizontalDivider(
-                            modifier = Modifier.padding(vertical = 8.dp),
-                            color = colorScheme.dividerLine
-                        )
-                    }
-                }
-                if (regularApps.isNotEmpty() && pinnedApps.isNotEmpty()) {
-                    item(span = { androidx.compose.foundation.lazy.grid.GridItemSpan(maxLineSpan) }) {
-                        Text(
-                            text = "全部应用",
-                            style = textStyles.main,
-                            color = colorScheme.onSurfaceSecondary,
-                            modifier = Modifier.padding(vertical = 8.dp)
-                        )
-                    }
-                }
-                items(regularApps, key = { it.packageName }) { app ->
-                    AppItem(
-                        app = app,
-                        onClick = { onAppClick(app) },
-                        onLongClick = { onAppLongClick(app) }
-                    )
                 }
             }
         }
@@ -527,6 +556,24 @@ private fun LocalAppItem(
     onLongClick: () -> Unit
 ) {
     val colorScheme = MiuixTheme.colorScheme
+    val context = LocalContext.current
+    val packageManager = context.packageManager
+
+    val bitmap = remember(app.packageName) {
+        try {
+            val appInfo = packageManager.getApplicationInfo(app.packageName, 0)
+            val drawable = appInfo.loadIcon(packageManager)
+            val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1
+            val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1
+            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val canvas = android.graphics.Canvas(bitmap)
+            drawable.setBounds(0, 0, width, height)
+            drawable.draw(canvas)
+            bitmap.asImageBitmap()
+        } catch (e: Exception) {
+            null
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -547,11 +594,12 @@ private fun LocalAppItem(
                     .background(colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (app.icon != null) {
-                    DrawableImage(
-                        drawable = app.icon,
+                if (bitmap != null) {
+                    Image(
+                        bitmap = bitmap,
                         contentDescription = app.appName,
-                        modifier = Modifier.fillMaxSize()
+                        modifier = Modifier.fillMaxSize(),
+                        contentScale = ContentScale.Fit
                     )
                 } else {
                     Icon(
@@ -574,30 +622,6 @@ private fun LocalAppItem(
             modifier = Modifier.fillMaxWidth()
         )
     }
-}
-
-@Composable
-private fun DrawableImage(
-    drawable: Drawable,
-    contentDescription: String?,
-    modifier: Modifier = Modifier
-) {
-    val bitmap = remember(drawable) {
-        val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1
-        val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1
-        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-        val canvas = android.graphics.Canvas(bitmap)
-        drawable.setBounds(0, 0, width, height)
-        drawable.draw(canvas)
-        bitmap.asImageBitmap()
-    }
-    
-    Image(
-        bitmap = bitmap,
-        contentDescription = contentDescription,
-        modifier = modifier,
-        contentScale = ContentScale.Fit
-    )
 }
 
 @Composable

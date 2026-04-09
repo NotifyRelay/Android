@@ -3,7 +3,6 @@ package com.xzyht.notifyrelay.ui.ViewModels
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
-import android.graphics.drawable.Drawable
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xzyht.notifyrelay.servers.appslist.RemoteAppInfo
@@ -25,7 +24,6 @@ data class LocalAppState(
 data class LocalAppInfo(
     val appName: String,
     val packageName: String,
-    val icon: Drawable?,
     val isPinned: Boolean = false
 )
 
@@ -47,8 +45,7 @@ class LocalAppsViewModel : ViewModel() {
                             if (launchIntent != null) {
                                 LocalAppInfo(
                                     appName = appInfo.loadLabel(packageManager).toString(),
-                                    packageName = appInfo.packageName,
-                                    icon = appInfo.loadIcon(packageManager)
+                                    packageName = appInfo.packageName
                                 )
                             } else null
                         }

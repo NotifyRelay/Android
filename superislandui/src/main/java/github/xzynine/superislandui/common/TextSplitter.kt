@@ -1,5 +1,6 @@
 package github.xzynine.superislandui.common
 
+import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.min
 import notifyrelay.base.util.Logger
 
@@ -36,7 +37,7 @@ object TextSplitter {
     }
     
     // 字符类型缓存
-    private val charTypeCache = mutableMapOf<Char, CharType>()
+    private val charTypeCache = ConcurrentHashMap<Char, CharType>()
     
     /**
      * 计算文本的中文字符等价长度
@@ -78,14 +79,15 @@ object TextSplitter {
     /**
      * 判断字符是否为中文字符
      * 使用 Unicode 范围比较，比 Character.UnicodeBlock.of() 更高效
+     * 注意：Kotlin Char 是 UTF-16 代码单元，只能表示 BMP 字符（0..0xFFFF）
+     * 补充平面 CJK 字符（如扩展B区 0x20000..0x2A6DF）需要代理对表示，
+     * 在此基于 Char 的实现中无法直接检测，但这些字符在歌词中极罕见。
      */
     private fun isChineseCharacter(c: Char): Boolean {
         val code = c.code
         return code in 0x4E00..0x9FFF ||
             code in 0x3400..0x4DBF ||
-            code in 0x20000..0x2A6DF ||
-            code in 0xF900..0xFAFF ||
-            code in 0x2F800..0x2FA1F
+            code in 0xF900..0xFAFF
     }
     
     /**
@@ -110,14 +112,14 @@ object TextSplitter {
      * 判断字符是否为标点符号
      */
     private fun isPunctuation(char: Char): Boolean {
-        return char in PUNCTUATION
+        return char in PUNCTUATION || char in HALF_WIDTH_PUNCTUATION
     }
     
     /**
      * 获取字符类型，使用缓存避免重复计算
      */
     private fun getCharType(c: Char): CharType {
-        return charTypeCache.getOrPut(c) {
+        return charTypeCache.computeIfAbsent(c) {
             when {
                 isChineseCharacter(c) -> CharType.CHINESE
                 isKanaCharacter(c) -> CharType.KANA

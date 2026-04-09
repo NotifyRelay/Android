@@ -35,7 +35,10 @@ import io.github.miuzarte.scrcpyforandroid.services.loadMainSettings
 import io.github.miuzarte.scrcpyforandroid.widgets.FullscreenControlScreen
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonBar
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -406,6 +409,7 @@ private fun ShortcutLaunchScreen(
     val nativeCore = remember(context) { NativeCoreFacade.get(context.applicationContext) }
     val settings = remember(context) { loadMainSettings(context) }
     val scope = rememberCoroutineScope()
+    val cleanupScope = remember { CoroutineScope(Dispatchers.IO + SupervisorJob()) }
 
     var connectionState by remember { mutableStateOf<ConnectionState>(ConnectionState.Connecting) }
     var sessionInfo by remember { mutableStateOf<ScrcpySessionInfo?>(null) }
@@ -661,9 +665,11 @@ private fun ShortcutLaunchScreen(
 
     DisposableEffect(Unit) {
         onDispose {
-            scope.launch(Dispatchers.IO) {
+            cleanupScope.launch {
                 runCatching { nativeCore.scrcpyStop() }
                 runCatching { nativeCore.adbDisconnect() }
+            }.invokeOnCompletion {
+                cleanupScope.cancel()
             }
         }
     }

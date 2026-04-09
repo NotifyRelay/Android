@@ -11,6 +11,7 @@ import java.io.InputStreamReader
 import java.nio.file.Path
 import java.security.SecureRandom
 import java.util.ArrayDeque
+import java.util.Locale
 import kotlin.concurrent.thread
 import kotlin.math.roundToInt
 
@@ -49,9 +50,7 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
     @Synchronized
     fun start(serverJarPath: Path, options: ScrcpyStartOptions): SessionInfo {
         stop()
-        synchronized(this) {
-            serverLogBuffer.clear()
-        }
+        serverLogBuffer.clear()
         val targetPath = options.serverRemotePath.ifBlank { DEFAULT_SERVER_REMOTE_PATH }
         val scid = random.nextInt(Int.MAX_VALUE)
         val socketName = socketNameFor(scid)
@@ -535,7 +534,7 @@ class ScrcpySessionManager(private val adbService: NativeAdbService) {
             ServerArg(
                 type = ServerArgType.STRING,
                 key = "scid",
-                value = String.format("%08x", scid),
+                value = String.format(Locale.US, "%08x", scid),
             ),
             ServerArg(
                 type = ServerArgType.STRING,
