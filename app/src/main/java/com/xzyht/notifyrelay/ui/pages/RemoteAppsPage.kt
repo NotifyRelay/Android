@@ -12,6 +12,7 @@ import android.view.Display
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -86,7 +87,7 @@ fun RemoteAppsPage(
         }
     }
 
-    LaunchedEffect(Unit) {
+    DisposableEffect(isLocalMode) {
         if (isLocalMode) {
             val displayManager = context.getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
             fun updateDisplays() {
@@ -108,11 +109,17 @@ fun RemoteAppsPage(
                 displays.addAll(displayList)
             }
             updateDisplays()
-            displayManager.registerDisplayListener(object : DisplayManager.DisplayListener {
+            val displayListener = object : DisplayManager.DisplayListener {
                 override fun onDisplayAdded(displayId: Int) = updateDisplays()
                 override fun onDisplayRemoved(displayId: Int) = updateDisplays()
                 override fun onDisplayChanged(displayId: Int) = updateDisplays()
-            }, null)
+            }
+            displayManager.registerDisplayListener(displayListener, null)
+            onDispose {
+                displayManager.unregisterDisplayListener(displayListener)
+            }
+        } else {
+            onDispose {}
         }
     }
 
@@ -344,6 +351,21 @@ private fun RemoteAppsContent(
                 }
             }
         }
+        state.isLoading -> {
+            Box(
+                modifier = Modifier.fillMaxSize(),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    CircularProgressIndicator()
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "加载中",
+                        color = colorScheme.onSurfaceSecondary
+                    )
+                }
+            }
+        }
         state.isEmpty -> {
             Box(
                 modifier = Modifier.fillMaxSize(),
@@ -497,7 +519,10 @@ private fun LocalAppItem(
     Column(
         modifier = Modifier
             .width(72.dp)
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(
@@ -580,7 +605,10 @@ private fun AppItem(
     Column(
         modifier = Modifier
             .width(72.dp)
-            .clickable(onClick = onClick),
+            .combinedClickable(
+                onClick = onClick,
+                onLongClick = onLongClick
+            ),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Box(

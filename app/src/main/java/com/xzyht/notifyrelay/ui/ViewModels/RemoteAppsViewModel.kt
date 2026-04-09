@@ -10,6 +10,7 @@ import com.xzyht.notifyrelay.servers.appslist.RemoteAppInfo
 import com.xzyht.notifyrelay.servers.appslist.RemoteAppsState
 import com.xzyht.notifyrelay.sync.AppListSyncManager
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,7 @@ class RemoteAppsViewModel : ViewModel() {
     val state: StateFlow<RemoteAppsState> = _state.asStateFlow()
 
     private var currentDeviceUuid: String? = null
+    private var iconUpdatesJob: Job? = null
 
     fun loadApps(context: Context, deviceUuid: String) {
         currentDeviceUuid = deviceUuid
@@ -48,7 +50,8 @@ class RemoteAppsViewModel : ViewModel() {
     }
 
     private fun observeIconUpdates(context: Context, deviceUuid: String) {
-        viewModelScope.launch {
+        iconUpdatesJob?.cancel()
+        iconUpdatesJob = viewModelScope.launch {
             AppRepository.iconUpdates.collect { update ->
                 if (update != null) {
                     val (packageName, _) = update
