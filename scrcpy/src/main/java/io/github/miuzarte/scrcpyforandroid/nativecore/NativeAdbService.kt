@@ -113,6 +113,26 @@ class NativeAdbService(appContext: Context) {
     fun isConnected(): Boolean = connection?.isAlive() == true
 
     /**
+     * 在当前连接的设备上执行 tcpip 命令，切换到指定端口
+     * 需要先建立ADB连接
+     */
+    @Synchronized
+    fun setTcpPort(port: Int): Boolean {
+        Log.i(TAG, "setTcpPort(): port=$port")
+        return try {
+            val conn = requireConnection()
+            conn.openStream("tcpip:$port").use { stream ->
+                val response = stream.inputStream.readBytes().toString(Charsets.UTF_8)
+                Log.i(TAG, "setTcpPort(): response=$response")
+                response.contains("restarted", ignoreCase = true)
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "setTcpPort(): failed", e)
+            false
+        }
+    }
+
+    /**
      * Execute a shell command on the connected device and return stdout text.
      */
     @Synchronized

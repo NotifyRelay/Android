@@ -828,35 +828,6 @@ fun DeviceTabScreen(
         }
 
         if (!adbConnected) item {
-            // "快速连接"
-            QuickConnectCard(
-                input = quickConnectInput,
-                onInputChange = { quickConnectInput = it },
-                enabled = !adbConnecting,
-                onAddDevice = {
-                    val target = parseQuickTarget(quickConnectInput) ?: return@QuickConnectCard
-                    scope.launch {
-                        snack.showSnackbar("已添加设备: ${target.host}:${target.port}")
-                    }
-                },
-                onConnect = {
-                    val target = parseQuickTarget(quickConnectInput) ?: return@QuickConnectCard
-                    runAdbConnect("连接 ADB") {
-                        disconnectCurrentTargetBeforeConnecting(target.host, target.port)
-                        val ok = connectWithTimeout(target.host, target.port)
-                        adbConnected = ok
-                        if (ok) {
-                            handleAdbConnected(target.host, target.port)
-                        } else {
-                            statusLine = "ADB 连接失败"
-                            logEvent("ADB 连接失败: ${target.host}:${target.port}", Log.ERROR)
-                            scope.launch {
-                                snack.showSnackbar("ADB 连接失败")
-                            }
-                        }
-                    }
-                },
-            )
             SectionSmallTitle("无线配对")
             // "使用配对码配对设备"
             PairingCard(
@@ -881,6 +852,51 @@ fun DeviceTabScreen(
                             if (ok) "配对成功" else "配对失败",
                             if (ok) Log.INFO else Log.ERROR
                         )
+
+                        if (ok) {
+                            try {
+                                logEvent("正在发现ADB连接端口...", Log.INFO)
+                                val connectInfo = nativeCore.adbDiscoverConnectService(
+                                    timeoutMs = 5000,
+                                    includeLanDevices = viewModel.adbMdnsLanDiscoveryEnabled,
+                                )
+
+                                if (connectInfo != null) {
+                                    val (connectHost, connectPort) = connectInfo
+                                    logEvent("发现ADB端口: $connectHost:$connectPort", Log.INFO)
+
+                                    val connected = nativeCore.adbConnect(connectHost, connectPort)
+                                    if (connected) {
+                                        logEvent("已连接到ADB端口: $connectHost:$connectPort", Log.INFO)
+
+                                        val tcpipOk = nativeCore.adbSetTcpPort(5555)
+                                        if (tcpipOk) {
+                                            logEvent("已启用 TCP/IP 模式，端口: 5555", Log.INFO)
+
+                                            nativeCore.adbDisconnect()
+
+                                            Thread.sleep(1000)
+
+                                            val reconnectOk = nativeCore.adbConnect(connectHost, 5555)
+                                            if (reconnectOk) {
+                                                logEvent("已连接到5555端口", Log.INFO)
+                                            } else {
+                                                logEvent("连接到5555端口失败", Log.WARN)
+                                            }
+                                        } else {
+                                            logEvent("启用 TCP/IP 模式失败", Log.WARN)
+                                        }
+                                    } else {
+                                        logEvent("连接到ADB端口失败: $connectHost:$connectPort", Log.WARN)
+                                    }
+                                } else {
+                                    logEvent("未发现ADB连接端口", Log.WARN)
+                                }
+                            } catch (e: Exception) {
+                                logEvent("启用 TCP/IP 模式失败: ${e.message}", Log.WARN)
+                            }
+                        }
+
                         scope.launch {
                             snack.showSnackbar(if (ok) "配对成功" else "配对失败")
                         }

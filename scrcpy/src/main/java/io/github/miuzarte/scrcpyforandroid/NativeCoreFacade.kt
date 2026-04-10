@@ -166,6 +166,11 @@ class NativeCoreFacade(private val appContext: Context) {
     fun adbIsConnected(): Boolean = ioCall { adbService.isConnected() }
 
     /**
+     * 在当前连接的设备上执行 tcpip 命令，切换到指定端口
+     */
+    fun adbSetTcpPort(port: Int): Boolean = ioCall { adbService.setTcpPort(port) }
+
+    /**
      * Execute a shell command over ADB and return its stdout as a string.
      */
     fun adbShell(command: String): String = ioCall { adbService.shell(command) }
