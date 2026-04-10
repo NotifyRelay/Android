@@ -40,9 +40,9 @@ import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperSwitch
-import top.yukonga.miuix.kmp.extra.WindowDropdown
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Date
 
@@ -113,7 +113,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                     .align(Alignment.CenterHorizontally)
             )
 
-            SuperArrow(
+            ArrowPreference(
                 title = "版本信息",
                 summary = "主版本: ${BuildConfig.VERSION_NAME}\n内部版本: ${BuildConfig.VERSION_CODE}",
                 onClick = {
@@ -139,11 +139,11 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
 
             Spacer(modifier = Modifier.height(8.dp))
 
-            SuperArrow(
+            ArrowPreference(
                 title = "检测更新",
                 summary = if (isCheckingUpdate) "检查中..." else "点击检查是否有新版本",
                 onClick = {
-                    if (isCheckingUpdate) return@SuperArrow
+                    if (isCheckingUpdate) return@ArrowPreference
                     
                     isCheckingUpdate = true
                     
@@ -189,7 +189,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
             
             Spacer(modifier = Modifier.height(8.dp))
             
-            SuperSwitch(
+            SwitchPreference(
                 title = "包含预发布版本",
                 checked = includePrerelease,
                 summary = "检测更新时包含预发布版本(极其不稳定)",
@@ -221,7 +221,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
             Spacer(modifier = Modifier.height(16.dp))
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                SuperArrow(
+                ArrowPreference(
                     title = "开发者模式",
                     summary = "点击进入开发者模式设置",
                     onClick = {
@@ -242,7 +242,7 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
             )
             
-            WindowDropdown(
+            WindowDropdownPreference(
                 title = "外观模式",
                 summary = THEME_BASE_OPTIONS.find { it.second == themeBaseIndex }?.first ?: "跟随系统",
                 items = THEME_BASE_OPTIONS.map { it.first },

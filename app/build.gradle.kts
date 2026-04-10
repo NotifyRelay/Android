@@ -192,7 +192,8 @@ dependencies {
     implementation(libs.bundles.paging)
     
     // Miuix风格ui库
-    implementation(libs.miuix.android)
+    implementation(libs.miuix.ui)
+    implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
     implementation(libs.miuix.navigation3.ui)
     // Navigation3

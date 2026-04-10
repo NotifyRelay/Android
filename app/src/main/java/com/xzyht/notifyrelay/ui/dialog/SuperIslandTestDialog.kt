@@ -20,10 +20,10 @@ import com.xzyht.notifyrelay.sync.MessageSender
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.extra.DialogDefaults
-import top.yukonga.miuix.kmp.extra.SuperSwitch
-import top.yukonga.miuix.kmp.extra.WindowDialog
+import top.yukonga.miuix.kmp.layout.DialogDefaults
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 // 全局变量，用于保存递增循环的进度值
 private var progressCounter = 0
@@ -881,7 +881,7 @@ fun SuperIslandTestDialog(
                             .padding(16.dp)
                     ) {
                         // 进度可变开关
-                        SuperSwitch(
+                        SwitchPreference(
                             title = "测试设置",
                             summary = if (isVariableProgress) "进度可变 (测试动画效果)" else "进度固定 (测试静态效果)",
                             checked = isVariableProgress,
@@ -890,7 +890,7 @@ fun SuperIslandTestDialog(
                         )
 
                         // 发送开关
-                        SuperSwitch(
+                        SwitchPreference(
                             title = "发送设置",
                             summary = if (isSendEnabled) "发送到其他设备" else "仅本地测试",
                             checked = isSendEnabled,

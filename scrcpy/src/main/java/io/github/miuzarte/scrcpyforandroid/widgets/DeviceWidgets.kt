@@ -77,14 +77,13 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperSwitch
-import top.yukonga.miuix.kmp.extra.WindowDialog
-import top.yukonga.miuix.kmp.extra.WindowDropdown
-import top.yukonga.miuix.kmp.extra.DialogDefaults
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.isDynamicColor
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
+import top.yukonga.miuix.kmp.window.WindowDialog
 import kotlin.math.roundToInt
 
 private val VIDEO_CODEC_OPTIONS = listOf(
@@ -245,7 +244,7 @@ internal fun PairingCard(
     val holdDownState = remember { mutableStateOf(false) }
 
     Card {
-        SuperArrow(
+        ArrowPreference(
             title = "使用配对码配对设备",
             onClick = {
                 showPairDialog.value = true
@@ -303,14 +302,14 @@ internal fun ConfigPanel(
 
     SectionSmallTitle("Scrcpy")
     Card {
-        SuperSwitch(
+        SwitchPreference(
             title = "音频转发",
             summary = "转发设备音频到本机 (Android 11+)",
             checked = audioEnabled,
             onCheckedChange = onAudioEnabledChange,
             enabled = !sessionStarted && audioForwardingSupported,
         )
-        WindowDropdown(
+        WindowDropdownPreference(
             title = "音频编码",
             summary = "--audio-codec",
             items = audioCodecItems,
@@ -340,7 +339,7 @@ internal fun ConfigPanel(
                 },
             )
         }
-        WindowDropdown(
+        WindowDropdownPreference(
             title = "视频编码",
             summary = "--video-codec",
             items = videoCodecItems,
@@ -386,7 +385,7 @@ internal fun ConfigPanel(
                 }
             },
         )
-        SuperArrow(
+        ArrowPreference(
             title = "高级参数",
             summary = "更多 scrcpy 启动参数",
             onClick = onOpenAdvanced,

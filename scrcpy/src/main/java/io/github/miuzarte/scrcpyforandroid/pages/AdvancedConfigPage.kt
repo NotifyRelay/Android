@@ -28,10 +28,10 @@ import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperSpinner
-import top.yukonga.miuix.kmp.extra.SuperSwitch
-import top.yukonga.miuix.kmp.extra.WindowDropdown
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.OverlaySpinnerPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import kotlin.math.roundToInt
 
 private val AUDIO_SOURCE_OPTIONS = listOf(
@@ -132,7 +132,7 @@ fun AdvancedConfigPage(
     ) {
         item {
             Card {
-                SuperSwitch(
+                SwitchPreference(
                     title = "启动后关闭屏幕",
                     summary = "--turn-screen-off",
                     checked = viewModel.turnScreenOff,
@@ -147,14 +147,14 @@ fun AdvancedConfigPage(
                     },
                     enabled = !sessionStarted && !viewModel.noControl,
                 )
-                SuperSwitch(
+                SwitchPreference(
                     title = "禁用控制",
                     summary = "--no-control",
                     checked = viewModel.noControl,
                     onCheckedChange = { viewModel.noControl = it },
                     enabled = !sessionStarted,
                 )
-                SuperSwitch(
+                SwitchPreference(
                     title = "禁用视频",
                     summary = "--no-video",
                     checked = viewModel.noVideo,
@@ -166,7 +166,7 @@ fun AdvancedConfigPage(
 
         item {
             Card {
-                WindowDropdown(
+                WindowDropdownPreference(
                     title = "视频来源",
                     summary = "--video-source",
                     items = videoSourceItems,
@@ -200,13 +200,13 @@ fun AdvancedConfigPage(
                             .padding(horizontal = UiSpacing.CardContent)
                             .padding(bottom = UiSpacing.CardContent),
                     )
-                    SuperArrow(
+                    ArrowPreference(
                         title = "重新获取 Camera Sizes",
                         summary = "--list-camera-sizes",
                         onClick = { onRefreshCameraSizes?.invoke() },
                         enabled = !sessionStarted,
                     )
-                    WindowDropdown(
+                    WindowDropdownPreference(
                         title = "摄像头朝向",
                         summary = "--camera-facing",
                         items = cameraFacingItems,
@@ -216,7 +216,7 @@ fun AdvancedConfigPage(
                         },
                         enabled = !sessionStarted,
                     )
-                    WindowDropdown(
+                    WindowDropdownPreference(
                         title = "摄像头分辨率",
                         summary = "--camera-size",
                         items = cameraSizeDropdownItems,
@@ -283,7 +283,7 @@ fun AdvancedConfigPage(
                             viewModel.cameraFpsInput = if (normalized == "0") "" else normalized
                         },
                     )
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "高帧率模式",
                         summary = "--camera-high-speed",
                         checked = viewModel.cameraHighSpeed,
@@ -296,7 +296,7 @@ fun AdvancedConfigPage(
 
         item {
             Card {
-                WindowDropdown(
+                WindowDropdownPreference(
                     title = "音频来源",
                     summary = "--audio-source",
                     items = audioSourceItems,
@@ -318,21 +318,21 @@ fun AdvancedConfigPage(
                             .padding(bottom = UiSpacing.CardContent),
                     )
                 }
-                SuperSwitch(
+                SwitchPreference(
                     title = "音频双路输出",
                     summary = "--audio-dup",
                     checked = viewModel.audioDup,
                     onCheckedChange = { viewModel.audioDup = it },
                     enabled = !sessionStarted && viewModel.audioEnabled,
                 )
-                SuperSwitch(
+                SwitchPreference(
                     title = "仅转发不播放",
                     summary = "--no-audio-playback",
                     checked = viewModel.noAudioPlayback,
                     onCheckedChange = { viewModel.noAudioPlayback = it },
                     enabled = !sessionStarted && viewModel.audioEnabled,
                 )
-                SuperSwitch(
+                SwitchPreference(
                     title = "音频失败时终止 [TODO]",
                     summary = "--require-audio",
                     checked = viewModel.requireAudio,
@@ -403,13 +403,13 @@ fun AdvancedConfigPage(
 
         item {
             Card {
-                SuperArrow(
+                ArrowPreference(
                     title = "重新获取编码器列表",
                     summary = "--list-encoders",
                     onClick = { onRefreshEncoders?.invoke() },
                     enabled = !sessionStarted,
                 )
-                SuperSpinner(
+                OverlaySpinnerPreference(
                     title = "视频编码器",
                     summary = "--video-encoder",
                     items = videoEncoderEntries,
@@ -429,7 +429,7 @@ fun AdvancedConfigPage(
                         .padding(horizontal = UiSpacing.CardContent)
                         .padding(bottom = UiSpacing.CardContent),
                 )
-                SuperSpinner(
+                OverlaySpinnerPreference(
                     title = "音频编码器",
                     summary = "--audio-encoder",
                     items = audioEncoderEntries,

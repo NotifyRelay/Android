@@ -44,7 +44,7 @@ import top.yukonga.miuix.kmp.basic.SpinnerDefaults
 import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import top.yukonga.miuix.kmp.basic.SpinnerItemImpl
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.extra.SuperListPopup
+import top.yukonga.miuix.kmp.overlay.OverlayListPopup
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 enum class VirtualButtonAction(
@@ -304,7 +304,7 @@ class VirtualButtonBar(
             }
         }
 
-        SuperListPopup(
+        OverlayListPopup(
             show = show,
             popupPositionProvider = ListPopupDefaults.ContextMenuPositionProvider,
             alignment = PopupPositionProvider.Align.TopEnd,

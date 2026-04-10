@@ -34,8 +34,8 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 
 @Composable
 fun ScrcpySettingsPage(
@@ -85,24 +85,24 @@ fun ScrcpySettingsPage(
             item {
                 SectionSmallTitle("投屏")
                 Card {
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "启用调试信息",
                         summary = "在全屏界面显示触点数量、设备分辨率和实时 FPS",
                         checked = viewModel.fullscreenDebugInfoEnabled,
                         onCheckedChange = { viewModel.fullscreenDebugInfoEnabled = it },
                     )
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "投屏时保持屏幕常亮",
                         summary = "Scrcpy 启动后保持本机屏幕常亮，避免锁屏导致 ADB 断开",
                         checked = viewModel.keepScreenOnWhenStreamingEnabled,
                         onCheckedChange = { viewModel.keepScreenOnWhenStreamingEnabled = it },
                     )
-                    SuperArrow(
+                    ArrowPreference(
                         title = "虚拟按钮排序",
                         summary = "手动排序预览/全屏时的虚拟按钮，并选择哪些按钮展示在外",
                         onClick = navigationActions.openVirtualButtonOrder,
                     )
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "全屏显示虚拟按钮",
                         summary = "在全屏控制页底部显示返回键、主页键等虚拟按钮",
                         checked = viewModel.showFullscreenVirtualButtons,
@@ -182,13 +182,13 @@ fun ScrcpySettingsPage(
                             .padding(horizontal = UiSpacing.CardContent)
                             .padding(bottom = UiSpacing.CardContent),
                     )
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "配对时自动启用发现服务",
                         summary = "打开配对弹窗后自动搜索可用配对端口",
                         checked = viewModel.adbPairingAutoDiscoverOnDialogOpen,
                         onCheckedChange = { viewModel.adbPairingAutoDiscoverOnDialogOpen = it },
                     )
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "自动重连已配对设备",
                         summary = "自动发现开启无线调试的设备，更新快速设备的随机端口并尝试连接（效果比较随缘）",
                         checked = viewModel.adbAutoReconnectPairedDevice,
@@ -198,7 +198,7 @@ fun ScrcpySettingsPage(
 
                 SectionSmallTitle("关于")
                 Card {
-                    SuperArrow(
+                    ArrowPreference(
                         title = "当前基于原Miuzarte/ScrcpyForAndroid项目",
                         summary = "的0aa83f4提交",
                         onClick = {

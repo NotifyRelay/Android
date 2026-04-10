@@ -66,7 +66,8 @@ dependencies {
     implementation(libs.bundles.coil)
     
     // Miuix 风格 UI 库
-    implementation(libs.miuix.android)
+    implementation(libs.miuix.ui)
+    implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
     
     // 依赖其他模块

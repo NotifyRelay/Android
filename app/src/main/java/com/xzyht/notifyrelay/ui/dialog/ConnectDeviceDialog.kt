@@ -8,9 +8,8 @@ import androidx.compose.runtime.MutableState
 import androidx.compose.ui.Modifier
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.extra.DialogDefaults
-import top.yukonga.miuix.kmp.extra.WindowDialog
-import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.layout.DialogDefaults
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
  * 连接设备弹窗

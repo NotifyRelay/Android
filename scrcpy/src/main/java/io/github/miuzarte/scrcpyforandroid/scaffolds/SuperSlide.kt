@@ -18,10 +18,9 @@ import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.WindowDialog
-import top.yukonga.miuix.kmp.extra.DialogDefaults
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 fun SuperSlide(
@@ -49,7 +48,7 @@ fun SuperSlide(
     var showInputDialog by remember { mutableStateOf(false) }
     var holdArrow by remember { mutableStateOf(false) }
 
-    SuperArrow(
+    ArrowPreference(
         title = title,
         summary = summary,
         onClick = {

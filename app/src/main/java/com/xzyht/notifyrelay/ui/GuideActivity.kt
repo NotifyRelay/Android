@@ -60,8 +60,8 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperSwitch
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 class GuideActivity : ComponentActivity() {
@@ -236,10 +236,10 @@ object GuideScreen {
                     color = MiuixTheme.colorScheme.onBackground
                 )
                 Spacer(modifier = Modifier.height(8.dp))
-                // 权限状态列表（使用 Miuix SuperSwitch 组件直接展示）
+                // 权限状态列表（使用 Miuix SwitchPreference 组件直接展示）
                 Column(modifier = Modifier.fillMaxWidth()) {
                     val dividerColor = MiuixTheme.colorScheme.dividerLine
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "通知访问权限",
                         summary = if (hasNotification) "已授权" else "用于读取通知内容，实现转发功能",
                         checked = hasNotification,
@@ -250,7 +250,7 @@ object GuideScreen {
                         enabled = true
                     )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "应用列表权限",
                         summary = if (canQueryApps) "已授权" else "用于发现本机已安装应用，辅助通知跳转",
                         checked = canQueryApps,
@@ -288,7 +288,7 @@ object GuideScreen {
                         enabled = true
                     )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "通知发送权限 (Android 13+)",
                         summary = if (hasPost) "已授权" else "用于发送本地通知，部分功能需开启",
                         checked = hasPost,
@@ -305,7 +305,7 @@ object GuideScreen {
                         enabled = true
                     )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "蓝牙连接权限 (可选)",
                         summary = if (hasBluetoothConnect) "已授权" else "用于优化设备发现速度，显示真实设备名",
                         summaryColor = BasicComponentColors(
@@ -326,7 +326,7 @@ object GuideScreen {
                         enabled = true
                     )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "文件管理权限",
                         summary = if (hasManageExternalStorage) "已授权" else "用于支持ftp功能，管理设备文件",
                         checked = hasManageExternalStorage,
@@ -337,7 +337,7 @@ object GuideScreen {
                         enabled = true
                     )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
-                    SuperArrow(
+                    ArrowPreference(
                         title = "后台无限制权限 (可选)",
                         summary = if (hasBackgroundUnlimited) "已设置" else "用于确保应用在后台正常运行，防止被系统杀死",
                         onClick = {
@@ -349,7 +349,7 @@ object GuideScreen {
                         enabled = true
                     )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
-                    SuperArrow(
+                    ArrowPreference(
                         title = "悬浮窗权限 (可选)",
                         summary = if (hasFloatNotification) "已授权：允许在其他应用上层显示悬浮窗" else "用于支持超级岛/悬浮岛复刻，提升通知交互体验",
                         onClick = {
@@ -369,7 +369,7 @@ object GuideScreen {
                         enabled = true
                     )
                     HorizontalDivider(color = dividerColor, thickness = 1.dp)
-                    SuperArrow(
+                    ArrowPreference(
                         title = "自启动权限",
                         summary = if (hasSelfStart) "已启用" else "必须启用，否则监听服务无法启动",
                         onClick = {
