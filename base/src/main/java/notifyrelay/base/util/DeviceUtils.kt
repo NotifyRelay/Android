@@ -1,5 +1,6 @@
 package notifyrelay.base.util
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.content.pm.PackageManager
 import android.Manifest
@@ -25,6 +26,7 @@ object DeviceUtils {
                 } else true
                 if (canReadBt) {
                     val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager
+                    @SuppressLint("MissingPermission")
                     val btName = bluetoothManager.adapter?.name
                     if (!btName.isNullOrEmpty()) return sanitizeDisplayName(btName)
                 }

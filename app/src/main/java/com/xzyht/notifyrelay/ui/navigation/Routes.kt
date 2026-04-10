@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.ui.navigation
 
+import android.annotation.SuppressLint
 import android.os.Parcel
 import android.os.Parcelable
 import androidx.navigation3.runtime.NavKey
@@ -15,6 +16,7 @@ sealed interface Route : NavKey, Parcelable {
      * Main page (Device connection and enhancement)
      */
     @Serializable
+    @SuppressLint("ParcelCreator")
     data object Main : Route {
         override fun describeContents(): Int = 0
         override fun writeToParcel(parcel: Parcel, flags: Int) {}
@@ -29,6 +31,7 @@ sealed interface Route : NavKey, Parcelable {
      * History page
      */
     @Serializable
+    @SuppressLint("ParcelCreator")
     data object History : Route {
         override fun describeContents(): Int = 0
         override fun writeToParcel(parcel: Parcel, flags: Int) {}
@@ -43,6 +46,7 @@ sealed interface Route : NavKey, Parcelable {
      * Settings page
      */
     @Serializable
+    @SuppressLint("ParcelCreator")
     data object Settings : Route {
         override fun describeContents(): Int = 0
         override fun writeToParcel(parcel: Parcel, flags: Int) {}
@@ -57,6 +61,7 @@ sealed interface Route : NavKey, Parcelable {
      * Scrcpy advanced settings page
      */
     @Serializable
+    @SuppressLint("ParcelCreator")
     data object ScrcpyAdvanced : Route {
         override fun describeContents(): Int = 0
         override fun writeToParcel(parcel: Parcel, flags: Int) {}
@@ -71,6 +76,7 @@ sealed interface Route : NavKey, Parcelable {
      * Scrcpy virtual button order page
      */
     @Serializable
+    @SuppressLint("ParcelCreator")
     data object ScrcpyVirtualButtonOrder : Route {
         override fun describeContents(): Int = 0
         override fun writeToParcel(parcel: Parcel, flags: Int) {}
