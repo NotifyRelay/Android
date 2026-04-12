@@ -167,31 +167,24 @@ class AudioForwardingService : Service() {
     }
 
     private fun stopForwarding() {
-        try {
-            executor.submit {
-                try {
-                    val nativeCore = facade
-                    if (nativeCore != null) {
-                        Log.i(TAG, "停止 scrcpy 会话")
-                        nativeCore.scrcpyStop()
+        executor.submit {
+            try {
+                val nativeCore = facade
+                if (nativeCore != null) {
+                    Log.i(TAG, "停止 scrcpy 会话")
+                    nativeCore.scrcpyStop()
 
-                        Log.i(TAG, "断开 ADB 连接")
-                        nativeCore.adbDisconnect()
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "停止音频转发失败", e)
-                } finally {
-                    isRunning = false
-                    currentSessionTarget = null
-                    facade = null
-                    Log.i(TAG, "音频转发已停止")
+                    Log.i(TAG, "断开 ADB 连接")
+                    nativeCore.adbDisconnect()
                 }
-            }.get()
-        } catch (e: Exception) {
-            Log.e(TAG, "停止音频转发异常", e)
-            isRunning = false
-            currentSessionTarget = null
-            facade = null
+            } catch (e: Exception) {
+                Log.e(TAG, "停止音频转发失败", e)
+            } finally {
+                isRunning = false
+                currentSessionTarget = null
+                facade = null
+                Log.i(TAG, "音频转发已停止")
+            }
         }
     }
 
