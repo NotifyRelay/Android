@@ -7,11 +7,6 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 
-@Composable
-fun performHaptics(type: HapticFeedbackType): Unit {
-    LocalHapticFeedback.current.performHapticFeedback(type)
-}
-
 @Immutable
 data class AppHaptics(
     val confirm: () -> Unit,

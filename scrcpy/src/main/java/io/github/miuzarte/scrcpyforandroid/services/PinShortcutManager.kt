@@ -23,24 +23,23 @@ object PinShortcutManager {
             return false
         }
 
-        val intent = Intent(Intent.ACTION_VIEW).apply {
-            setClass(context, ShortcutLaunchActivity::class.java)
-            putExtra("shortcut_device_ip", deviceIp)
-            putExtra("shortcut_device_port", devicePort)
-            putExtra("shortcut_device_name", deviceName)
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-        }
-
-        val shortcut = ShortcutInfo.Builder(context, "pinned_${deviceIp}_$devicePort")
-            .setShortLabel(deviceName)
-            .setLongLabel(deviceName)
-            .setIcon(Icon.createWithResource(context, R.drawable.ic_screen_mirroring))
-            .setIntent(intent)
-            .build()
-
         return try {
+            val intent = Intent(Intent.ACTION_VIEW).apply {
+                setClass(context, ShortcutLaunchActivity::class.java)
+                putExtra("shortcut_device_ip", deviceIp)
+                putExtra("shortcut_device_port", devicePort)
+                putExtra("shortcut_device_name", deviceName)
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            }
+
+            val shortcut = ShortcutInfo.Builder(context, "pinned_${deviceIp}_$devicePort")
+                .setShortLabel(deviceName)
+                .setLongLabel(deviceName)
+                .setIcon(Icon.createWithResource(context, R.drawable.ic_screen_mirroring))
+                .setIntent(intent)
+                .build()
+
             shortcutManager.requestPinShortcut(shortcut, null)
-            true
         } catch (_: Exception) {
             false
         }

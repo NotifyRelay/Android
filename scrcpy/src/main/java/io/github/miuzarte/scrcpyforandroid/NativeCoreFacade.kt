@@ -756,10 +756,10 @@ class NativeCoreFacade(private val appContext: Context) {
             executor.submit<T> { task() }.get()
         } catch (e: ExecutionException) {
             val cause = e.cause
-            if (cause is Exception) {
+            if (cause != null) {
                 throw cause
             }
-            throw RuntimeException(cause ?: e)
+            throw RuntimeException(e)
         }
     }
 

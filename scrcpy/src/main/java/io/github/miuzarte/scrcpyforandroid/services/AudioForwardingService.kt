@@ -49,6 +49,9 @@ class AudioForwardingService : Service() {
                 return false
             }
 
+            isRunning = true
+            currentSessionTarget = ConnectionTarget(host, port)
+
             val intent = Intent(context, AudioForwardingService::class.java).apply {
                 putExtra("host", host)
                 putExtra("port", port)
@@ -101,18 +104,10 @@ class AudioForwardingService : Service() {
 
         val deviceName = intent?.getStringExtra("deviceName") ?: host
 
-        if (isRunning) {
-            Log.w(TAG, "音频转发已在运行中")
-            return START_NOT_STICKY
-        }
-
         startForeground(NOTIFICATION_ID, createNotification(deviceName))
 
         scope.launch {
             try {
-                isRunning = true
-                currentSessionTarget = ConnectionTarget(host, port)
-
                 val success = startScrcpySession(host, port)
 
                 if (!success) {

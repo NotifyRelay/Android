@@ -973,10 +973,15 @@ object NotificationGenerator {
         val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
         if (!isTimerType) {
             // 优先使用 A 区（左侧）文本生成位图，然后才是 B 区（右侧）文本
-            val textToRender = when (aComponent) {
+            val aText = when (aComponent) {
                 is AImageText1 -> aComponent.title ?: aComponent.content
                 is AImageText5 -> aComponent.title
-                else -> when (bComponent) {
+                else -> null
+            }
+            val textToRender = if (!aText.isNullOrBlank()) {
+                aText
+            } else {
+                when (bComponent) {
                     is BImageText2 -> bComponent.title
                     is BImageText3 -> bComponent.title
                     is BImageText6 -> bComponent.title

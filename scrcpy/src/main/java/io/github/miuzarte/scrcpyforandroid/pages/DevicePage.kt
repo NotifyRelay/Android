@@ -912,8 +912,7 @@ fun DeviceTabScreen(
                     bitRateMbps = bitRateMbps,
                     onBitRateSliderChange = {
                         bitRateMbps = it
-                        @SuppressLint("DefaultLocale")
-                        bitRateInput = String.format("%.1f", it)
+                        bitRateInput = String.format(Locale.US, "%.1f", it)
                     },
                     onBitRateInputChange = { bitRateInput = it },
                     audioBitRateKbps = audioBitRateKbps,

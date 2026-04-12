@@ -674,7 +674,7 @@ private fun InputStream.readIntLE(): Int {
     val b1 = read()
     val b2 = read()
     val b3 = read()
-    if (b3 < 0) throw EOFException("readIntLE: EOF")
+    if (b0 < 0 || b1 < 0 || b2 < 0 || b3 < 0) throw EOFException("readIntLE: EOF")
     return b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24)
 }
 

@@ -7,6 +7,7 @@ import org.conscrypt.Conscrypt
 import java.io.Closeable
 import java.io.DataInputStream
 import java.io.DataOutputStream
+import java.net.InetSocketAddress
 import java.net.Socket
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -23,6 +24,9 @@ private const val MAX_PAYLOAD_SIZE = MAX_PEER_INFO_SIZE * 2
 private const val EXPORTED_KEY_LABEL = "adb-label\u0000"
 private const val EXPORTED_KEY_SIZE = 64
 private const val PAIRING_PACKET_HEADER_SIZE = 6
+
+private const val CONNECT_TIMEOUT_MS = 10_000
+private const val READ_TIMEOUT_MS = 30_000
 
 /**
  * PeerInfo container used to pack peer metadata for the pairing exchange.
@@ -175,7 +179,9 @@ internal class DirectAdbPairingClient(
     }
 
     private fun setupTlsConnection() {
-        socket = Socket(host, port)
+        socket = Socket()
+        socket.connect(InetSocketAddress(host, port), CONNECT_TIMEOUT_MS)
+        socket.soTimeout = READ_TIMEOUT_MS
         socket.tcpNoDelay = true
 
         val sslSocket = key.sslContext.socketFactory

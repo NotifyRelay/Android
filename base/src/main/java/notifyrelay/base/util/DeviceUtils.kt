@@ -28,28 +28,28 @@ object DeviceUtils {
                     val bluetoothManager = context.getSystemService(Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager
                     @SuppressLint("MissingPermission")
                     val btName = bluetoothManager.adapter?.name
-                    if (!btName.isNullOrEmpty()) return sanitizeDisplayName(btName)
+                    if (!btName.isNullOrBlank()) return sanitizeDisplayName(btName)
                 }
             } catch (_: Exception) {}
 
             // 2. Settings.Secure 中的 bluetooth_name（部分设备/ROM会放在这里）
             try {
                 val s = Settings.Secure.getString(context.contentResolver, "bluetooth_name")
-                if (!s.isNullOrEmpty()) return sanitizeDisplayName(s)
+                if (!s.isNullOrBlank()) return sanitizeDisplayName(s)
             } catch (_: Exception) {}
 
             // 3. Settings.Global 中的 device_name
             try {
                 val g = Settings.Global.getString(context.contentResolver, "device_name")
-                if (!g.isNullOrEmpty()) return sanitizeDisplayName(g)
+                if (!g.isNullOrBlank()) return sanitizeDisplayName(g)
             } catch (_: Exception) {}
 
             // 4. 设备型号/设备名作为兜底
             try {
                 val model = Build.MODEL
-                if (!model.isNullOrEmpty()) return sanitizeDisplayName(model)
+                if (!model.isNullOrBlank()) return sanitizeDisplayName(model)
                 val device = Build.DEVICE
-                if (!device.isNullOrEmpty()) return sanitizeDisplayName(device)
+                if (!device.isNullOrBlank()) return sanitizeDisplayName(device)
             } catch (_: Exception) {}
         } catch (_: Exception) {}
 

@@ -368,7 +368,7 @@ fun AdvancedConfigPage(
                     inputValueRange = 0f..Float.MAX_VALUE,
                     onInputConfirm = {
                         val normalized = it.ifBlank { "" }
-                        viewModel.maxSizeInput = normalized
+                        viewModel.maxSizeInput = if (normalized == "0") "" else normalized
                     },
                 )
                 SuperSlide(
@@ -395,7 +395,7 @@ fun AdvancedConfigPage(
                     inputValueRange = 0f..Float.MAX_VALUE,
                     onInputConfirm = {
                         val normalized = it.ifBlank { "" }
-                        viewModel.maxFpsInput = normalized
+                        viewModel.maxFpsInput = if (normalized == "0") "" else normalized
                     },
                 )
             }

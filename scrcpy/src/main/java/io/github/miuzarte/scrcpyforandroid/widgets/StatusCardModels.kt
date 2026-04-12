@@ -25,13 +25,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
-import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults.defaultColors
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.PressFeedbackType
 
 @Immutable
 internal data class StatusBigCardSpec(
@@ -67,7 +65,6 @@ internal fun StatusCardLayout(
     spec: StatusCardSpec,
     busyLabel: String?,
 ) {
-    val haptics = rememberAppHaptics()
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -80,8 +77,6 @@ internal fun StatusCardLayout(
                 .weight(1f)
                 .fillMaxHeight(),
             colors = defaultColors(color = spec.big.containerColor),
-            pressFeedbackType = PressFeedbackType.Tilt,
-            onClick = haptics.contextClick,
         ) {
             Box(modifier = Modifier.fillMaxSize()) {
                 Box(
@@ -153,12 +148,9 @@ internal fun StatusCardLayout(
 
 @Composable
 private fun StatusMetricCard(spec: StatusSmallCardSpec, modifier: Modifier) {
-    val haptics = rememberAppHaptics()
     Card(
         modifier = modifier,
         insideMargin = PaddingValues(UiSpacing.Large),
-        pressFeedbackType = PressFeedbackType.Tilt,
-        onClick = haptics.contextClick,
     ) {
         Text(
             text = spec.title,
