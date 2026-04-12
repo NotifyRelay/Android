@@ -34,10 +34,6 @@ class AudioForwardingService : Service() {
         @Volatile
         private var currentSessionTarget: ConnectionTarget? = null
 
-        fun isForwarding(): Boolean = isRunning
-
-        fun getCurrentTarget(): ConnectionTarget? = currentSessionTarget
-
         fun startAudioForwarding(context: Context, host: String, port: Int = ScrcpyDefaults.ADB_PORT, deviceName: String = host): Boolean {
             if (isRunning) {
                 Log.w(TAG, "音频转发已在运行中: ${currentSessionTarget?.host}:${currentSessionTarget?.port}")
@@ -102,7 +98,7 @@ class AudioForwardingService : Service() {
             return START_NOT_STICKY
         }
 
-        val deviceName = intent?.getStringExtra("deviceName") ?: host
+        val deviceName = intent.getStringExtra("deviceName") ?: host
 
         startForeground(NOTIFICATION_ID, createNotification(deviceName))
 
@@ -167,31 +163,24 @@ class AudioForwardingService : Service() {
     }
 
     private fun stopForwarding() {
-        try {
-            executor.submit {
-                try {
-                    val nativeCore = facade
-                    if (nativeCore != null) {
-                        Log.i(TAG, "停止 scrcpy 会话")
-                        nativeCore.scrcpyStop()
+        executor.submit {
+            try {
+                val nativeCore = facade
+                if (nativeCore != null) {
+                    Log.i(TAG, "停止 scrcpy 会话")
+                    nativeCore.scrcpyStop()
 
-                        Log.i(TAG, "断开 ADB 连接")
-                        nativeCore.adbDisconnect()
-                    }
-                } catch (e: Exception) {
-                    Log.e(TAG, "停止音频转发失败", e)
-                } finally {
-                    isRunning = false
-                    currentSessionTarget = null
-                    facade = null
-                    Log.i(TAG, "音频转发已停止")
+                    Log.i(TAG, "断开 ADB 连接")
+                    nativeCore.adbDisconnect()
                 }
-            }.get()
-        } catch (e: Exception) {
-            Log.e(TAG, "停止音频转发异常", e)
-            isRunning = false
-            currentSessionTarget = null
-            facade = null
+            } catch (e: Exception) {
+                Log.e(TAG, "停止音频转发失败", e)
+            } finally {
+                isRunning = false
+                currentSessionTarget = null
+                facade = null
+                Log.i(TAG, "音频转发已停止")
+            }
         }
     }
 
@@ -217,7 +206,7 @@ class AudioForwardingService : Service() {
             enableVibration(false)
         }
 
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.createNotificationChannel(channel)
     }
 

@@ -78,6 +78,11 @@ static jlong PairingContext_Constructor(JNIEnv* env, jclass clazz, jboolean isCl
     env->ReleaseByteArrayElements(jPassword, pswd, 0);
 
     auto ctx = reinterpret_cast<PairingContextNative*>(malloc(sizeof(PairingContextNative)));
+    if (ctx == nullptr) {
+        LOGE("Unable to allocate PairingContextNative.");
+        SPAKE2_CTX_free(spake2_ctx);
+        return 0;
+    }
     memset(ctx, 0, sizeof(PairingContextNative));
     ctx->spake2_ctx = spake2_ctx;
     memcpy(ctx->key, key, SPAKE2_MAX_MSG_SIZE);
