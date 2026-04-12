@@ -154,6 +154,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
             cropHeight: String,
             cropX: String,
             cropY: String,
+            startApp: String = "",
         ) {
             val intent = Intent(context, ShortcutLaunchActivity::class.java).apply {
                 putExtra(EXTRA_DEVICE_IP, ip)
@@ -196,6 +197,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
                 putExtra(EXTRA_CROP_HEIGHT, cropHeight)
                 putExtra(EXTRA_CROP_X, cropX)
                 putExtra(EXTRA_CROP_Y, cropY)
+                putExtra(EXTRA_START_APP, startApp)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
@@ -558,6 +560,8 @@ private fun ShortcutLaunchScreen(
             sessionParams.cropY.filter(Char::isDigit),
         )
         val effectiveTurnScreenOff = sessionParams.turnScreenOff && !sessionParams.noControl
+        val isVirtualDisplayMode = sessionParams.startApp.isNotBlank() && effectiveNewDisplay.isNotBlank()
+        val effectiveAudioDup = if (isVirtualDisplayMode) false else sessionParams.audioDup
 
         Logger.d("ShortcutLaunchActivity", "startApp=${sessionParams.startApp}, newDisplay=$effectiveNewDisplay")
 
@@ -594,7 +598,7 @@ private fun ShortcutLaunchScreen(
                         videoCodecOptions = sessionParams.videoCodecOptions,
                         audioEncoder = sessionParams.audioEncoder,
                         audioCodecOptions = sessionParams.audioCodecOptions,
-                        audioDup = sessionParams.audioDup,
+                        audioDup = effectiveAudioDup,
                         audioSource = resolvedAudioSource,
                         videoSource = resolvedVideoSource,
                         cameraId = resolvedCameraId,
