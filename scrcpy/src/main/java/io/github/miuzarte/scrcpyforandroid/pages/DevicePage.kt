@@ -426,67 +426,77 @@ fun DeviceTabScreen(
     fun refreshEncoderLists() {
         if (!adbConnected) return
         val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
-        runCatching {
-            nativeCore.scrcpyListEncoders(
-                customServerUri = viewModel.customServerUri,
-                remotePath = remotePath,
-            )
-        }.onSuccess { lists ->
-            viewModel.videoEncoderOptions.clear()
-            viewModel.videoEncoderOptions.addAll(lists.videoEncoders)
-            viewModel.audioEncoderOptions.clear()
-            viewModel.audioEncoderOptions.addAll(lists.audioEncoders)
-            viewModel.videoEncoderTypeMap.clear()
-            viewModel.videoEncoderTypeMap.putAll(lists.videoEncoderTypes)
-            viewModel.audioEncoderTypeMap.clear()
-            viewModel.audioEncoderTypeMap.putAll(lists.audioEncoderTypes)
-            if (viewModel.videoEncoder.isNotBlank() && viewModel.videoEncoder !in viewModel.videoEncoderOptions) {
-                viewModel.videoEncoder = ""
-            }
-            if (viewModel.audioEncoder.isNotBlank() && viewModel.audioEncoder !in viewModel.audioEncoderOptions) {
-                viewModel.audioEncoder = ""
-            }
-            logEvent("编码器列表已刷新: video=${lists.videoEncoders.size} audio=${lists.audioEncoders.size}")
-            if (lists.videoEncoders.isEmpty() && lists.audioEncoders.isEmpty()) {
-                logEvent("提示: 编码器为空，请检查 server 路径/版本与设备系统日志", Log.WARN)
-                val preview = lists.rawOutput.lineSequence().take(20).joinToString(" | ")
-                if (preview.isNotBlank()) {
-                    logEvent("编码器原始输出: $preview", Log.DEBUG)
+        scope.launch {
+            val result = withContext(adbWorkerDispatcher) {
+                runCatching {
+                    nativeCore.scrcpyListEncoders(
+                        customServerUri = viewModel.customServerUri,
+                        remotePath = remotePath,
+                    )
                 }
             }
-        }.onFailure { e ->
-            viewModel.videoEncoderOptions.clear()
-            viewModel.audioEncoderOptions.clear()
-            viewModel.videoEncoderTypeMap.clear()
-            viewModel.audioEncoderTypeMap.clear()
-            logEvent("读取编码器列表失败: ${e.message ?: e.javaClass.simpleName}", Log.ERROR, e)
+            result.onSuccess { lists ->
+                viewModel.videoEncoderOptions.clear()
+                viewModel.videoEncoderOptions.addAll(lists.videoEncoders)
+                viewModel.audioEncoderOptions.clear()
+                viewModel.audioEncoderOptions.addAll(lists.audioEncoders)
+                viewModel.videoEncoderTypeMap.clear()
+                viewModel.videoEncoderTypeMap.putAll(lists.videoEncoderTypes)
+                viewModel.audioEncoderTypeMap.clear()
+                viewModel.audioEncoderTypeMap.putAll(lists.audioEncoderTypes)
+                if (viewModel.videoEncoder.isNotBlank() && viewModel.videoEncoder !in viewModel.videoEncoderOptions) {
+                    viewModel.videoEncoder = ""
+                }
+                if (viewModel.audioEncoder.isNotBlank() && viewModel.audioEncoder !in viewModel.audioEncoderOptions) {
+                    viewModel.audioEncoder = ""
+                }
+                logEvent("编码器列表已刷新: video=${lists.videoEncoders.size} audio=${lists.audioEncoders.size}")
+                if (lists.videoEncoders.isEmpty() && lists.audioEncoders.isEmpty()) {
+                    logEvent("提示: 编码器为空，请检查 server 路径/版本与设备系统日志", Log.WARN)
+                    val preview = lists.rawOutput.lineSequence().take(20).joinToString(" | ")
+                    if (preview.isNotBlank()) {
+                        logEvent("编码器原始输出: $preview", Log.DEBUG)
+                    }
+                }
+            }.onFailure { e ->
+                viewModel.videoEncoderOptions.clear()
+                viewModel.audioEncoderOptions.clear()
+                viewModel.videoEncoderTypeMap.clear()
+                viewModel.audioEncoderTypeMap.clear()
+                logEvent("读取编码器列表失败: ${e.message ?: e.javaClass.simpleName}", Log.ERROR, e)
+            }
         }
     }
 
     fun refreshCameraSizeLists() {
         if (!adbConnected) return
         val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
-        runCatching {
-            nativeCore.scrcpyListCameraSizes(
-                customServerUri = viewModel.customServerUri,
-                remotePath = remotePath,
-            )
-        }.onSuccess { lists ->
-            viewModel.cameraSizeOptions.clear()
-            viewModel.cameraSizeOptions.addAll(lists.sizes)
-            if (viewModel.cameraSizePreset.isNotBlank() && viewModel.cameraSizePreset != "custom" && viewModel.cameraSizePreset !in lists.sizes) {
-                viewModel.cameraSizePreset = ""
-            }
-            logEvent("camera sizes 已刷新: count=${lists.sizes.size}")
-            if (lists.sizes.isEmpty()) {
-                val preview = lists.rawOutput.lineSequence().take(20).joinToString(" | ")
-                if (preview.isNotBlank()) {
-                    logEvent("camera sizes 原始输出: $preview", Log.DEBUG)
+        scope.launch {
+            val result = withContext(adbWorkerDispatcher) {
+                runCatching {
+                    nativeCore.scrcpyListCameraSizes(
+                        customServerUri = viewModel.customServerUri,
+                        remotePath = remotePath,
+                    )
                 }
             }
-        }.onFailure { e ->
-            viewModel.cameraSizeOptions.clear()
-            logEvent("读取 camera sizes 失败: ${e.message ?: e.javaClass.simpleName}", Log.ERROR, e)
+            result.onSuccess { lists ->
+                viewModel.cameraSizeOptions.clear()
+                viewModel.cameraSizeOptions.addAll(lists.sizes)
+                if (viewModel.cameraSizePreset.isNotBlank() && viewModel.cameraSizePreset != "custom" && viewModel.cameraSizePreset !in lists.sizes) {
+                    viewModel.cameraSizePreset = ""
+                }
+                logEvent("camera sizes 已刷新: count=${lists.sizes.size}")
+                if (lists.sizes.isEmpty()) {
+                    val preview = lists.rawOutput.lineSequence().take(20).joinToString(" | ")
+                    if (preview.isNotBlank()) {
+                        logEvent("camera sizes 原始输出: $preview", Log.DEBUG)
+                    }
+                }
+            }.onFailure { e ->
+                viewModel.cameraSizeOptions.clear()
+                logEvent("读取 camera sizes 失败: ${e.message ?: e.javaClass.simpleName}", Log.ERROR, e)
+            }
         }
     }
 
@@ -1086,35 +1096,36 @@ fun ScrcpyAdvancedPage(
     // 刷新编码器列表
     fun refreshEncoderLists() {
         val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
-        runCatching {
-            viewModel.nativeCore.scrcpyListEncoders(
-                customServerUri = viewModel.customServerUri,
-                remotePath = remotePath,
-            )
-        }.onSuccess { lists ->
-            viewModel.videoEncoderOptions.clear()
-            viewModel.videoEncoderOptions.addAll(lists.videoEncoders)
-            viewModel.audioEncoderOptions.clear()
-            viewModel.audioEncoderOptions.addAll(lists.audioEncoders)
-            viewModel.videoEncoderTypeMap.clear()
-            viewModel.videoEncoderTypeMap.putAll(lists.videoEncoderTypes)
-            viewModel.audioEncoderTypeMap.clear()
-            viewModel.audioEncoderTypeMap.putAll(lists.audioEncoderTypes)
-            if (viewModel.videoEncoder.isNotBlank() && viewModel.videoEncoder !in viewModel.videoEncoderOptions) {
-                viewModel.videoEncoder = ""
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    viewModel.nativeCore.scrcpyListEncoders(
+                        customServerUri = viewModel.customServerUri,
+                        remotePath = remotePath,
+                    )
+                }
             }
-            if (viewModel.audioEncoder.isNotBlank() && viewModel.audioEncoder !in viewModel.audioEncoderOptions) {
-                viewModel.audioEncoder = ""
-            }
-            scope.launch {
+            result.onSuccess { lists ->
+                viewModel.videoEncoderOptions.clear()
+                viewModel.videoEncoderOptions.addAll(lists.videoEncoders)
+                viewModel.audioEncoderOptions.clear()
+                viewModel.audioEncoderOptions.addAll(lists.audioEncoders)
+                viewModel.videoEncoderTypeMap.clear()
+                viewModel.videoEncoderTypeMap.putAll(lists.videoEncoderTypes)
+                viewModel.audioEncoderTypeMap.clear()
+                viewModel.audioEncoderTypeMap.putAll(lists.audioEncoderTypes)
+                if (viewModel.videoEncoder.isNotBlank() && viewModel.videoEncoder !in viewModel.videoEncoderOptions) {
+                    viewModel.videoEncoder = ""
+                }
+                if (viewModel.audioEncoder.isNotBlank() && viewModel.audioEncoder !in viewModel.audioEncoderOptions) {
+                    viewModel.audioEncoder = ""
+                }
                 snackHostState.showSnackbar("编码器列表已刷新")
-            }
-        }.onFailure { e ->
-            viewModel.videoEncoderOptions.clear()
-            viewModel.audioEncoderOptions.clear()
-            viewModel.videoEncoderTypeMap.clear()
-            viewModel.audioEncoderTypeMap.clear()
-            scope.launch {
+            }.onFailure { e ->
+                viewModel.videoEncoderOptions.clear()
+                viewModel.audioEncoderOptions.clear()
+                viewModel.videoEncoderTypeMap.clear()
+                viewModel.audioEncoderTypeMap.clear()
                 snackHostState.showSnackbar("读取编码器列表失败: ${e.message ?: e.javaClass.simpleName}")
             }
         }
@@ -1123,23 +1134,24 @@ fun ScrcpyAdvancedPage(
     // 刷新 Camera Sizes
     fun refreshCameraSizeLists() {
         val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
-        runCatching {
-            viewModel.nativeCore.scrcpyListCameraSizes(
-                customServerUri = viewModel.customServerUri,
-                remotePath = remotePath,
-            )
-        }.onSuccess { lists ->
-            viewModel.cameraSizeOptions.clear()
-            viewModel.cameraSizeOptions.addAll(lists.sizes)
-            if (viewModel.cameraSizePreset.isNotBlank() && viewModel.cameraSizePreset != "custom" && viewModel.cameraSizePreset !in lists.sizes) {
-                viewModel.cameraSizePreset = ""
+        scope.launch {
+            val result = withContext(Dispatchers.IO) {
+                runCatching {
+                    viewModel.nativeCore.scrcpyListCameraSizes(
+                        customServerUri = viewModel.customServerUri,
+                        remotePath = remotePath,
+                    )
+                }
             }
-            scope.launch {
+            result.onSuccess { lists ->
+                viewModel.cameraSizeOptions.clear()
+                viewModel.cameraSizeOptions.addAll(lists.sizes)
+                if (viewModel.cameraSizePreset.isNotBlank() && viewModel.cameraSizePreset != "custom" && viewModel.cameraSizePreset !in lists.sizes) {
+                    viewModel.cameraSizePreset = ""
+                }
                 snackHostState.showSnackbar("Camera sizes 已刷新: count=${lists.sizes.size}")
-            }
-        }.onFailure { e ->
-            viewModel.cameraSizeOptions.clear()
-            scope.launch {
+            }.onFailure { e ->
+                viewModel.cameraSizeOptions.clear()
                 snackHostState.showSnackbar("读取 camera sizes 失败: ${e.message ?: e.javaClass.simpleName}")
             }
         }
