@@ -26,6 +26,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
 import notifyrelay.base.util.ThemeSettingsManager
+import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.config.ScrcpyDefaults
 import io.github.miuzarte.scrcpyforandroid.widgets.SectionSmallTitle
 import top.yukonga.miuix.kmp.basic.Card
@@ -206,7 +207,11 @@ fun ScrcpySettingsPage(
                                 Intent.ACTION_VIEW,
                                 "https://github.com/Miuzarte/ScrcpyForAndroid/commit/0aa83f4a632c0e41d52670aad957831813508d60".toUri()
                             )
-                            context.startActivity(intent)
+                            if (intent.resolveActivity(context.packageManager) != null) {
+                                context.startActivity(intent)
+                            } else {
+                                ToastUtils.showShortToast(context, "未找到可打开链接的应用")
+                            }
                         },
                     )
                 }

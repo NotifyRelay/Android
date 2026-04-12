@@ -119,16 +119,16 @@ fun UIRemoteFilter() {
         // 过滤模式选择与黑白名单编辑
         val modes = listOf("none" to "无", "black" to "黑名单", "white" to "白名单", "peer" to "对等")
         val modeLabels = modes.map { it.second }
-        val selectedModeIndex = modes.indexOfFirst { it.first == filterMode }
+        val selectedModeIndex = modes.indexOfFirst { it.first == filterMode }.coerceIn(0, modes.lastIndex)
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
-        // 使用WindowDropdownPreference
         WindowDropdownPreference(
             title = "过滤模式",
             summary = "选择过滤模式",
             items = modeLabels,
             selectedIndex = selectedModeIndex,
-            onSelectedIndexChange = {
-                val (value, _) = modes[it]
+            onSelectedIndexChange = { idx ->
+                val safeIdx = idx.coerceIn(0, modes.lastIndex)
+                val (value, _) = modes[safeIdx]
                 RemoteFilterConfig.filterMode = value
                 RemoteFilterConfig.enablePeerMode = (value == "peer")
                 RemoteFilterConfig.save(context)

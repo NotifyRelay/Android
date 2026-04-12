@@ -13,21 +13,14 @@ data class RemoteAppInfo(
         other as RemoteAppInfo
         if (packageName != other.packageName) return false
         if (appName != other.appName) return false
-        if (iconBytes != null) {
-            if (other.iconBytes == null) return false
-            if (!iconBytes.contentEquals(other.iconBytes)) return false
-        } else if (other.iconBytes != null) return false
         if (isPinned != other.isPinned) return false
-        if (isLoading != other.isLoading) return false
         return true
     }
 
     override fun hashCode(): Int {
         var result = packageName.hashCode()
         result = 31 * result + appName.hashCode()
-        result = 31 * result + (iconBytes?.contentHashCode() ?: 0)
         result = 31 * result + isPinned.hashCode()
-        result = 31 * result + isLoading.hashCode()
         return result
     }
 }

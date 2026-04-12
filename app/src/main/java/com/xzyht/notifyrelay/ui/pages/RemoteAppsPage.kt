@@ -19,6 +19,9 @@ import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.*
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import notifyrelay.base.util.Logger
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -263,6 +266,33 @@ private fun LocalAppsContent(
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
+    val context = LocalContext.current
+    val packageManager = context.packageManager
+
+    val iconCache = remember { mutableStateMapOf<String, ImageBitmap?>() }
+
+    LaunchedEffect(apps) {
+        apps.forEach { app ->
+            if (!iconCache.containsKey(app.packageName)) {
+                iconCache[app.packageName] = withContext(Dispatchers.IO) {
+                    try {
+                        val appInfo = packageManager.getApplicationInfo(app.packageName, 0)
+                        val drawable = appInfo.loadIcon(packageManager)
+                        val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1
+                        val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1
+                        val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                        val canvas = android.graphics.Canvas(bitmap)
+                        drawable.setBounds(0, 0, width, height)
+                        drawable.draw(canvas)
+                        bitmap.asImageBitmap()
+                    } catch (e: Exception) {
+                        Logger.e("LocalAppsContent", "Failed to load icon for ${app.packageName}", e)
+                        null
+                    }
+                }
+            }
+        }
+    }
 
     when {
         error != null -> {
@@ -323,6 +353,7 @@ private fun LocalAppsContent(
                 items(apps, key = { it.packageName }) { app ->
                     LocalAppItem(
                         app = app,
+                        iconBitmap = iconCache[app.packageName],
                         onClick = { onAppClick(app) },
                         onLongClick = { onAppLongClick(app) }
                     )
@@ -342,6 +373,18 @@ private fun RemoteAppsContent(
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
+
+    val iconCache = remember { mutableStateMapOf<String, Bitmap?>() }
+
+    LaunchedEffect(state.apps) {
+        state.apps.forEach { app ->
+            if (app.iconBytes != null && !iconCache.containsKey(app.packageName)) {
+                iconCache[app.packageName] = withContext(Dispatchers.Default) {
+                    BitmapFactory.decodeByteArray(app.iconBytes, 0, app.iconBytes.size)
+                }
+            }
+        }
+    }
 
     when {
         state.error != null -> {
@@ -456,6 +499,7 @@ private fun RemoteAppsContent(
                         items(pinnedApps, key = { "pinned_${it.packageName}" }) { app ->
                             AppItem(
                                 app = app,
+                                iconBitmap = iconCache[app.packageName],
                                 onClick = { onAppClick(app) },
                                 onLongClick = { onAppLongClick(app) }
                             )
@@ -480,6 +524,7 @@ private fun RemoteAppsContent(
                     items(regularApps, key = { it.packageName }) { app ->
                         AppItem(
                             app = app,
+                            iconBitmap = iconCache[app.packageName],
                             onClick = { onAppClick(app) },
                             onLongClick = { onAppLongClick(app) }
                         )
@@ -552,28 +597,11 @@ private fun DisplayNavigationBar(
 @Composable
 private fun LocalAppItem(
     app: LocalAppInfo,
+    iconBitmap: ImageBitmap?,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
     val colorScheme = MiuixTheme.colorScheme
-    val context = LocalContext.current
-    val packageManager = context.packageManager
-
-    val bitmap = remember(app.packageName) {
-        try {
-            val appInfo = packageManager.getApplicationInfo(app.packageName, 0)
-            val drawable = appInfo.loadIcon(packageManager)
-            val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1
-            val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1
-            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = android.graphics.Canvas(bitmap)
-            drawable.setBounds(0, 0, width, height)
-            drawable.draw(canvas)
-            bitmap.asImageBitmap()
-        } catch (e: Exception) {
-            null
-        }
-    }
 
     Column(
         modifier = Modifier
@@ -594,9 +622,9 @@ private fun LocalAppItem(
                     .background(colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (bitmap != null) {
+                if (iconBitmap != null) {
                     Image(
-                        bitmap = bitmap,
+                        bitmap = iconBitmap,
                         contentDescription = app.appName,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
@@ -627,16 +655,11 @@ private fun LocalAppItem(
 @Composable
 private fun AppItem(
     app: RemoteAppInfo,
+    iconBitmap: Bitmap?,
     onClick: () -> Unit,
     onLongClick: () -> Unit
 ) {
     val colorScheme = MiuixTheme.colorScheme
-
-    val bitmap = remember(app.iconBytes) {
-        app.iconBytes?.let { bytes ->
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
-        }
-    }
 
     Column(
         modifier = Modifier
@@ -657,9 +680,9 @@ private fun AppItem(
                     .background(colorScheme.surfaceVariant),
                 contentAlignment = Alignment.Center
             ) {
-                if (bitmap != null) {
+                if (iconBitmap != null) {
                     Image(
-                        bitmap = bitmap.asImageBitmap(),
+                        bitmap = iconBitmap.asImageBitmap(),
                         contentDescription = app.appName,
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Fit
