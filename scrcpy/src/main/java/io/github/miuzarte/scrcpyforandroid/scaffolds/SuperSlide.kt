@@ -1,6 +1,7 @@
 package io.github.miuzarte.scrcpyforandroid.scaffolds
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -84,6 +85,7 @@ fun SuperSlide(
 
     if (showInputDialog) {
         var valueText by remember(inputInitialValue) { mutableStateOf(inputInitialValue) }
+        var errorMessage by remember { mutableStateOf<String?>(null) }
         val activeInputRange = inputValueRange ?: valueRange
         WindowDialog(
             show = true,
@@ -91,18 +93,32 @@ fun SuperSlide(
             onDismissRequest = {
                 showInputDialog = false
                 holdArrow = false
+                errorMessage = null
             },
             content = {
-                TextField(
-                    value = valueText,
-                    onValueChange = { valueText = inputFilter(it) },
-                    label = inputHint,
-                    singleLine = true,
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = UiSpacing.Large),
-                )
+                Column {
+                    TextField(
+                        value = valueText,
+                        onValueChange = { 
+                            valueText = inputFilter(it)
+                            errorMessage = null
+                        },
+                        label = inputHint,
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = UiSpacing.Large),
+                    )
+                    errorMessage?.let { msg ->
+                        Text(
+                            text = msg,
+                            color = MiuixTheme.colorScheme.error,
+                            fontSize = MiuixTheme.textStyles.footnote1.fontSize,
+                            modifier = Modifier.padding(top = UiSpacing.Small)
+                        )
+                    }
+                }
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -115,6 +131,7 @@ fun SuperSlide(
                         onClick = {
                             showInputDialog = false
                             holdArrow = false
+                            errorMessage = null
                         },
                     )
                     TextButton(
@@ -122,10 +139,19 @@ fun SuperSlide(
                         modifier = Modifier.weight(1f),
                         onClick = {
                             val inputValue = valueText.trim().toFloatOrNull()
-                            if (inputValue != null && inputValue >= activeInputRange.start && inputValue <= activeInputRange.endInclusive) {
-                                onInputConfirm(valueText.trim())
-                                showInputDialog = false
-                                holdArrow = false
+                            when {
+                                inputValue == null -> {
+                                    errorMessage = "请输入有效的数字"
+                                }
+                                inputValue < activeInputRange.start || inputValue > activeInputRange.endInclusive -> {
+                                    errorMessage = "数值需在 ${activeInputRange.start.toInt()} ~ ${activeInputRange.endInclusive.toInt()} 范围内"
+                                }
+                                else -> {
+                                    onInputConfirm(valueText.trim())
+                                    showInputDialog = false
+                                    holdArrow = false
+                                    errorMessage = null
+                                }
                             }
                         },
                         colors = ButtonDefaults.textButtonColorsPrimary(),

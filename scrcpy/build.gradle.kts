@@ -10,6 +10,8 @@ android {
     defaultConfig {
         minSdk = 26
 
+        consumerProguardFiles("consumer-rules.pro")
+
         externalNativeBuild {
             cmake {
                 arguments += listOf("-DANDROID_STL=none")
@@ -23,8 +25,7 @@ android {
         release {
             isMinifyEnabled = false
             proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "consumer-rules.pro"
+                getDefaultProguardFile("proguard-android-optimize.txt")
             )
         }
     }
