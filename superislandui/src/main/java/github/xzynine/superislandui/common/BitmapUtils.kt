@@ -70,6 +70,7 @@ object BitmapUtils {
                 }
                 
                 val fontSize = (forceFontSize ?: 40f) * 2f
+                val localPaint = Paint(textPaint)
 
                 // 字符权重缓存
                 val charWeightCache = mutableMapOf<Char, Float>()
@@ -85,19 +86,19 @@ object BitmapUtils {
                 }
                 
                 var currentFontSize = fontSize
-                textPaint.textSize = currentFontSize
+                localPaint.textSize = currentFontSize
                 
                 val textEquivalentLength = calculateEquivalentLength(text)
                 
                 if (textEquivalentLength > 2) {
                     val scaleFactor = 1.0f - (textEquivalentLength - 2) * 0.1f
                     currentFontSize = fontSize * scaleFactor.coerceAtLeast(0.5f)
-                    textPaint.textSize = currentFontSize
+                    localPaint.textSize = currentFontSize
                 }
                 
-                val baseline = -textPaint.ascent()
-                var textWidth = textPaint.measureText(text)
-                val height = (baseline + textPaint.descent() + 10).toInt()
+                val baseline = -localPaint.ascent()
+                var textWidth = localPaint.measureText(text)
+                val height = (baseline + localPaint.descent() + 10).toInt()
                 
                 val maxSize = 500
                 val maxTextLengthForAlbum = 6 // 最多6个字符时才添加专辑图
@@ -139,12 +140,9 @@ object BitmapUtils {
                 // 如果文本宽度超过可用宽度，水平缩放文字（变为窄体）
                 if (textWidth > availableTextWidth) {
                     val scaleFactor = availableTextWidth / textWidth
-                    textPaint.textScaleX = scaleFactor.coerceAtLeast(0.5f) // 最小缩放0.5，避免文字过于压缩
+                    localPaint.textScaleX = scaleFactor.coerceAtLeast(0.5f) // 最小缩放0.5，避免文字过于压缩
                     // 重新计算缩放后的文本宽度
-                    textWidth = textPaint.measureText(text)
-                } else {
-                    // 重置文本缩放为1.0
-                    textPaint.textScaleX = 1.0f
+                    textWidth = localPaint.measureText(text)
                 }
                 
                 val image = getOrCreateBitmap(finalWidth, finalHeight)
@@ -160,15 +158,17 @@ object BitmapUtils {
                         albumBitmap, 
                         scaledWidth, 
                         albumHeight, 
-                        false // 关闭filtering，提高性能
+                        false
                     )
-                    canvas.drawBitmap(scaledAlbumBitmap, 5f, 5f, null)
-                    textX = scaledWidth + 15f
+                    try {
+                        canvas.drawBitmap(scaledAlbumBitmap, 5f, 5f, null)
+                        textX = scaledWidth + 15f
+                    } finally {
+                        scaledAlbumBitmap.recycle()
+                    }
                 }
                 
-                canvas.drawText(text, textX, baseline + 5f, textPaint)
-                // 重置文本缩放为1.0，确保不影响后续绘制
-                textPaint.textScaleX = 1.0f
+                canvas.drawText(text, textX, baseline + 5f, localPaint)
                 Logger.d(TAG, "生成文本位图成功，尺寸: ${finalWidth}x${finalHeight}")
                 return@measureTime image
             } catch (e: Exception) {
@@ -202,7 +202,8 @@ object BitmapUtils {
                 val sweepAngle = (progress / 100f) * 360f
                 val startAngle = if (isCCW) 90f else -90f
                 
-                progressPaintUnReach.color = colorUnReach?.let { 
+                val localPaintUnReach = Paint(progressPaintUnReach)
+                localPaintUnReach.color = colorUnReach?.let { 
                     try {
                         it.toColorInt()
                     } catch (e: Exception) {
@@ -213,15 +214,16 @@ object BitmapUtils {
                 
                 val centerX = size / 2f
                 val centerY = size / 2f
-                val radius = (size - progressPaintUnReach.strokeWidth) / 2f
+                val radius = (size - localPaintUnReach.strokeWidth) / 2f
                 
                 canvas.drawArc(
                     centerX - radius, centerY - radius,
                     centerX + radius, centerY + radius,
-                    startAngle, 360f, false, progressPaintUnReach
+                    startAngle, 360f, false, localPaintUnReach
                 )
                 
-                progressPaintReach.color = colorReach?.let { 
+                val localPaintReach = Paint(progressPaintReach)
+                localPaintReach.color = colorReach?.let { 
                     try {
                         it.toColorInt()
                     } catch (e: Exception) {
@@ -233,7 +235,7 @@ object BitmapUtils {
                 canvas.drawArc(
                     centerX - radius, centerY - radius,
                     centerX + radius, centerY + radius,
-                    startAngle, sweepAngle, false, progressPaintReach
+                    startAngle, sweepAngle, false, localPaintReach
                 )
                 
                 Logger.d(TAG, "生成进度位图成功，进度: $progress%")

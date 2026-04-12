@@ -1,7 +1,6 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.annotation.SuppressLint
-import android.app.Application
 import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Spacer
@@ -26,7 +25,6 @@ import androidx.compose.runtime.toMutableStateList
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
@@ -1027,10 +1025,9 @@ private fun buildCropArg(width: String, height: String, x: String, y: String): S
 fun ScrcpyDevicePage(
     selectedDevice: notifyrelay.data.model.SelectedDeviceInfo? = null,
     onOpenAdvanced: () -> Unit = {},
+    viewModel: ScrcpyUiViewModel,
 ) {
     val context = LocalContext.current
-    val app = context.applicationContext as Application
-    val viewModel: ScrcpyUiViewModel = viewModel(factory = ScrcpyUiViewModel.Factory(app))
     val snackHostState = remember { SnackbarHostState() }
     var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
 
@@ -1068,10 +1065,9 @@ fun ScrcpyDevicePage(
 @Composable
 fun ScrcpyAdvancedPage(
     onBack: () -> Unit,
+    viewModel: ScrcpyUiViewModel,
 ) {
     val context = LocalContext.current
-    val app = context.applicationContext as Application
-    val viewModel: ScrcpyUiViewModel = viewModel(factory = ScrcpyUiViewModel.Factory(app))
     val snackHostState = remember { SnackbarHostState() }
     val scrollBehavior = MiuixScrollBehavior(canScroll = { true })
     var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }

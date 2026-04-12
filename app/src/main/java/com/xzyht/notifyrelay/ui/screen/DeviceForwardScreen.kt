@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.ui.screen
 
+import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,6 +27,7 @@ import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import com.xzyht.notifyrelay.ui.pages.RemoteAppsPage
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyAdvancedPage
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyDevicePage
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyVirtualButtonOrderPage
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
@@ -37,7 +39,9 @@ fun DeviceForwardScreen(
     navigator: Navigator
 ) {
     val context = LocalContext.current
+    val app = context.applicationContext as Application
     val coroutineScope = rememberCoroutineScope()
+    val scrcpyViewModel = remember { ScrcpyUiViewModel.getInstance(app) }
     
     LaunchedEffect(Unit) {
         if (!RemoteFilterConfig.isLoaded) {
@@ -105,7 +109,8 @@ fun DeviceForwardScreen(
                     1 -> MusicControlPage()
                     2 -> ScrcpyDevicePage(
                         selectedDevice = selectedDeviceInfo,
-                        onOpenAdvanced = { navigator.push(Route.ScrcpyAdvanced) }
+                        onOpenAdvanced = { navigator.push(Route.ScrcpyAdvanced) },
+                        viewModel = scrcpyViewModel
                     )
                     3 -> {
                         RemoteAppsPage(
@@ -123,8 +128,12 @@ fun DeviceForwardScreen(
 fun ScrcpyAdvancedScreen(
     navigator: Navigator
 ) {
+    val context = LocalContext.current
+    val app = context.applicationContext as Application
+    val scrcpyViewModel = remember { ScrcpyUiViewModel.getInstance(app) }
     ScrcpyAdvancedPage(
-        onBack = { navigator.pop() }
+        onBack = { navigator.pop() },
+        viewModel = scrcpyViewModel
     )
 }
 

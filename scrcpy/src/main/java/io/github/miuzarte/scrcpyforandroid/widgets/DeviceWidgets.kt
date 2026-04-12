@@ -84,6 +84,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.MiuixTheme.isDynamicColor
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import top.yukonga.miuix.kmp.window.WindowDialog
+import java.util.Locale
 import kotlin.math.roundToInt
 
 private val VIDEO_CODEC_OPTIONS = listOf(
@@ -378,10 +379,9 @@ internal fun ConfigPanel(
             inputValueRange = 0.1f..Float.MAX_VALUE,
             onInputConfirm = { raw ->
                 raw.toFloatOrNull()?.let { parsed ->
-                    if (parsed >= 0.1f) {
-                        onBitRateSliderChange(parsed)
-                        onBitRateInputChange(formatBitRate(parsed))
-                    }
+                    val coerced = parsed.coerceIn(0.1f, 40f)
+                    onBitRateSliderChange(coerced)
+                    onBitRateInputChange(formatBitRate(coerced))
                 }
             },
         )
@@ -499,10 +499,9 @@ internal fun SimpleConfigPanel(
             inputValueRange = 0.1f..Float.MAX_VALUE,
             onInputConfirm = { raw ->
                 raw.toFloatOrNull()?.let { parsed ->
-                    if (parsed >= 0.1f) {
-                        onBitRateSliderChange(parsed)
-                        onBitRateInputChange(formatBitRate(parsed))
-                    }
+                    val coerced = parsed.coerceIn(0.1f, 40f)
+                    onBitRateSliderChange(coerced)
+                    onBitRateInputChange(formatBitRate(coerced))
                 }
             },
         )
@@ -689,8 +688,7 @@ private fun presetIndexFromInput(raw: String, presets: List<Int>): Int {
     return nearest?.index ?: 0
 }
 
-@SuppressLint("DefaultLocale")
-private fun formatBitRate(value: Float): String = String.format("%.1f", value)
+private fun formatBitRate(value: Float): String = String.format(Locale.ROOT, "%.1f", value)
 
 @Composable
 internal fun LogsPanel(lines: List<String>) {
@@ -951,9 +949,8 @@ fun FullscreenControlScreen(
                         fontSize = 13.sp,
                         fontWeight = FontWeight.SemiBold,
                     )
-                    @SuppressLint("DefaultLocale")
                     Text(
-                        text = "FPS: ${String.format("%.1f", currentFps.coerceAtLeast(0f))}",
+                        text = "FPS: ${String.format(Locale.ROOT, "%.1f", currentFps.coerceAtLeast(0f))}",
                         color = Color.White,
                         fontSize = 13.sp,
                     )
