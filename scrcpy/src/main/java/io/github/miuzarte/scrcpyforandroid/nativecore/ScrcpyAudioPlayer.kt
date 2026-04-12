@@ -20,57 +20,64 @@ import java.nio.ByteOrder
  */
 class ScrcpyAudioPlayer(private val codecId: Int) {
 
+    private val audioStateLock = Any()
     private var mediaCodec: MediaCodec? = null
     private var audioTrack: AudioTrack? = null
     private val bufferInfo = MediaCodec.BufferInfo()
 
-    @Volatile
     private var prepared = false
-
-    @Volatile
     private var released = false
     private var packetCount = 0L
 
     fun feedPacket(data: ByteArray, ptsUs: Long, isConfig: Boolean) {
-        if (released) return
+        synchronized(audioStateLock) {
+            if (released) return
 
-        if (isConfig) {
-            Log.i(
-                TAG,
-                "feedPacket(): config packet size=${data.size} codec=0x${
-                    codecId.toUInt().toString(16)
-                }"
-            )
-            when (codecId) {
-                AUDIO_CODEC_OPUS -> prepareOpus(data)
-                AUDIO_CODEC_AAC -> prepareAac(data)
-                AUDIO_CODEC_FLAC -> prepareFlac(data)
-                // RAW has no config packet
+            if (isConfig) {
+                Log.i(
+                    TAG,
+                    "feedPacket(): config packet size=${data.size} codec=0x${
+                        codecId.toUInt().toString(16)
+                    }"
+                )
+                when (codecId) {
+                    AUDIO_CODEC_OPUS -> prepareOpus(data)
+                    AUDIO_CODEC_AAC -> prepareAac(data)
+                    AUDIO_CODEC_FLAC -> prepareFlac(data)
+                }
+                return
             }
-            return
-        }
 
-        packetCount += 1
-        if (packetCount == 1L || packetCount % 120L == 0L) {
-            Log.i(TAG, "feedPacket(): packets=$packetCount prepared=$prepared size=${data.size}")
-        }
+            packetCount += 1
+            if (packetCount == 1L || packetCount % 120L == 0L) {
+                Log.i(TAG, "feedPacket(): packets=$packetCount prepared=$prepared size=${data.size}")
+            }
 
-        if (codecId == AUDIO_CODEC_RAW) {
-            ensureRawAudioTrack()?.write(data, 0, data.size, AudioTrack.WRITE_NON_BLOCKING)
-            return
-        }
+            if (codecId == AUDIO_CODEC_RAW) {
+                val track = ensureRawAudioTrack()
+                if (track != null) {
+                    writeAudioTrackBlocking(track, data)
+                }
+                return
+            }
 
-        if (!prepared) return
-        val codec = mediaCodec ?: return
+            if (!prepared) return
+            val codec = mediaCodec ?: return
 
-        val inputIdx = codec.dequeueInputBuffer(CODEC_TIMEOUT_US)
-        if (inputIdx >= 0) {
-            val buf = codec.getInputBuffer(inputIdx) ?: return
-            buf.clear()
-            buf.put(data)
-            codec.queueInputBuffer(inputIdx, 0, data.size, ptsUs, 0)
+            val inputIdx = codec.dequeueInputBuffer(CODEC_TIMEOUT_US)
+            if (inputIdx >= 0) {
+                val buf = codec.getInputBuffer(inputIdx) ?: return
+                buf.clear()
+                if (data.size > buf.remaining()) {
+                    Log.w(TAG, "Input buffer too small: data=${data.size} remaining=${buf.remaining()}, dropping frame")
+                    codec.queueInputBuffer(inputIdx, 0, 0, 0, 0)
+                    return
+                }
+                buf.put(data)
+                codec.queueInputBuffer(inputIdx, 0, data.size, ptsUs, 0)
+            }
+            drainOutput(codec)
         }
-        drainOutput(codec)
     }
 
     // OpusHead bytes (already extracted by server's fixOpusConfigPacket)
@@ -170,6 +177,30 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
         )
     }
 
+    private fun writeAudioTrackBlocking(track: AudioTrack, data: ByteArray) {
+        var offset = 0
+        val size = data.size
+        var retryCount = 0
+        val maxRetries = 100
+        while (offset < size && retryCount < maxRetries) {
+            if (released) return
+            val written = track.write(data, offset, size - offset, AudioTrack.WRITE_NON_BLOCKING)
+            if (written > 0) {
+                offset += written
+                retryCount = 0
+            } else if (written == 0) {
+                retryCount++
+                Thread.sleep(5)
+            } else {
+                Log.w(TAG, "AudioTrack write error: $written")
+                break
+            }
+        }
+        if (offset < size) {
+            Log.w(TAG, "AudioTrack write incomplete: $offset/$size bytes")
+        }
+    }
+
     /**
      * Drain decoder output and write PCM frames to the AudioTrack.
      *
@@ -185,7 +216,7 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
                 val pcm = ByteArray(size)
                 outBuf.position(bufferInfo.offset)
                 outBuf.get(pcm)
-                track.write(pcm, 0, size, AudioTrack.WRITE_NON_BLOCKING)
+                writeAudioTrackBlocking(track, pcm)
             }
             codec.releaseOutputBuffer(idx, false)
             idx = codec.dequeueOutputBuffer(bufferInfo, 0L)
@@ -196,15 +227,17 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
      * Release media and audio resources. Safe to call from any thread.
      */
     fun release() {
-        if (released) return
-        released = true
-        prepared = false
-        runCatching { mediaCodec?.stop() }
-        runCatching { mediaCodec?.release() }
-        runCatching { audioTrack?.stop() }
-        runCatching { audioTrack?.release() }
-        mediaCodec = null
-        audioTrack = null
+        synchronized(audioStateLock) {
+            if (released) return
+            released = true
+            prepared = false
+            runCatching { mediaCodec?.stop() }
+            runCatching { mediaCodec?.release() }
+            runCatching { audioTrack?.stop() }
+            runCatching { audioTrack?.release() }
+            mediaCodec = null
+            audioTrack = null
+        }
     }
 
     private fun longBuffer(value: Long): ByteBuffer =

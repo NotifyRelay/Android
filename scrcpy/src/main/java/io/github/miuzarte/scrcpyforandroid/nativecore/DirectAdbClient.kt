@@ -160,41 +160,6 @@ internal class DirectAdbTransport(private val context: Context) {
         return digest.joinToString(":") { b -> "%02x".format(b) }
     }
 
-    private fun encodeAdbPublicKey(modulus: BigInteger, exponent: Int): ByteArray {
-        val words = 64
-        val bytes = 256
-        val two32 = BigInteger.ONE.shiftLeft(32)
-        val mask32 = two32.subtract(BigInteger.ONE)
-
-        fun toBigEndianPadded(n: BigInteger): ByteArray {
-            val raw = n.toByteArray()
-            val arr = ByteArray(bytes)
-            val src = if (raw[0] == 0.toByte()) raw.copyOfRange(1, raw.size) else raw
-            src.copyInto(arr, destinationOffset = bytes - src.size)
-            return arr
-        }
-
-        val modBE = toBigEndianPadded(modulus)
-        val n0 = modulus.and(mask32)
-        val n0inv = n0.modInverse(two32).negate().mod(two32).toInt()
-        val r = BigInteger.ONE.shiftLeft(bytes * 8)
-        val rrBE = toBigEndianPadded(r.multiply(r).mod(modulus))
-
-        val buf = ByteBuffer.allocate(4 + 4 + bytes + bytes + 4).order(ByteOrder.LITTLE_ENDIAN)
-        buf.putInt(words)
-        buf.putInt(n0inv)
-        for (i in words - 1 downTo 0) {
-            val o = i * 4
-            buf.put(modBE[o + 3]); buf.put(modBE[o + 2]); buf.put(modBE[o + 1]); buf.put(modBE[o])
-        }
-        for (i in words - 1 downTo 0) {
-            val o = i * 4
-            buf.put(rrBE[o + 3]); buf.put(rrBE[o + 2]); buf.put(rrBE[o + 1]); buf.put(rrBE[o])
-        }
-        buf.putInt(exponent)
-        return buf.array()
-    }
-
     companion object {
         private const val TAG = "DirectAdbTransport"
     }
@@ -514,42 +479,6 @@ internal class DirectAdbConnection(
         return "${Base64.encodeToString(adbKeyBytes, Base64.NO_WRAP)} $keyName\u0000"
             .toByteArray(Charsets.UTF_8)
     }
-
-    private fun encodeAdbPublicKey(modulus: BigInteger, exponent: Int): ByteArray {
-        val words = 64
-        val bytes = 256
-        val two32 = BigInteger.ONE.shiftLeft(32)
-        val mask32 = two32.subtract(BigInteger.ONE)
-
-        fun toBigEndianPadded(n: BigInteger): ByteArray {
-            val raw = n.toByteArray()
-            val arr = ByteArray(bytes)
-            val src = if (raw[0] == 0.toByte()) raw.copyOfRange(1, raw.size) else raw
-            src.copyInto(arr, destinationOffset = bytes - src.size)
-            return arr
-        }
-
-        val modBE = toBigEndianPadded(modulus)
-        // n0 is the least-significant 32 bits of modulus; for RSA modulus this must be odd.
-        val n0 = modulus.and(mask32)
-        val n0inv = n0.modInverse(two32).negate().mod(two32).toInt()
-        val r = BigInteger.ONE.shiftLeft(bytes * 8)
-        val rrBE = toBigEndianPadded(r.multiply(r).mod(modulus))
-
-        val buf = ByteBuffer.allocate(4 + 4 + bytes + bytes + 4).order(ByteOrder.LITTLE_ENDIAN)
-        buf.putInt(words)
-        buf.putInt(n0inv)
-        for (i in words - 1 downTo 0) {
-            val o = i * 4
-            buf.put(modBE[o + 3]); buf.put(modBE[o + 2]); buf.put(modBE[o + 1]); buf.put(modBE[o])
-        }
-        for (i in words - 1 downTo 0) {
-            val o = i * 4
-            buf.put(rrBE[o + 3]); buf.put(rrBE[o + 2]); buf.put(rrBE[o + 1]); buf.put(rrBE[o])
-        }
-        buf.putInt(exponent)
-        return buf.array()
-    }
 }
 
 /**
@@ -683,4 +612,39 @@ private fun OutputStream.writeIntLE(v: Int) {
     write(v shr 8 and 0xFF)
     write(v shr 16 and 0xFF)
     write(v shr 24 and 0xFF)
+}
+
+private fun encodeAdbPublicKey(modulus: BigInteger, exponent: Int): ByteArray {
+    val words = 64
+    val bytes = 256
+    val two32 = BigInteger.ONE.shiftLeft(32)
+    val mask32 = two32.subtract(BigInteger.ONE)
+
+    fun toBigEndianPadded(n: BigInteger): ByteArray {
+        val raw = n.toByteArray()
+        val arr = ByteArray(bytes)
+        val src = if (raw[0] == 0.toByte()) raw.copyOfRange(1, raw.size) else raw
+        src.copyInto(arr, destinationOffset = bytes - src.size)
+        return arr
+    }
+
+    val modBE = toBigEndianPadded(modulus)
+    val n0 = modulus.and(mask32)
+    val n0inv = n0.modInverse(two32).negate().mod(two32).toInt()
+    val r = BigInteger.ONE.shiftLeft(bytes * 8)
+    val rrBE = toBigEndianPadded(r.multiply(r).mod(modulus))
+
+    val buf = ByteBuffer.allocate(4 + 4 + bytes + bytes + 4).order(ByteOrder.LITTLE_ENDIAN)
+    buf.putInt(words)
+    buf.putInt(n0inv)
+    for (i in words - 1 downTo 0) {
+        val o = i * 4
+        buf.put(modBE[o + 3]); buf.put(modBE[o + 2]); buf.put(modBE[o + 1]); buf.put(modBE[o])
+    }
+    for (i in words - 1 downTo 0) {
+        val o = i * 4
+        buf.put(rrBE[o + 3]); buf.put(rrBE[o + 2]); buf.put(rrBE[o + 1]); buf.put(rrBE[o])
+    }
+    buf.putInt(exponent)
+    return buf.array()
 }
