@@ -1,9 +1,11 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
+import android.app.ActivityManager
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.widget.Toast
+import io.github.miuzarte.scrcpyforandroid.R
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
@@ -221,6 +223,13 @@ class ShortcutLaunchActivity : ComponentActivity() {
             finish()
             return
         }
+
+        setTaskDescription(
+            ActivityManager.TaskDescription.Builder()
+                .setLabel(deviceName)
+                .setIcon(R.drawable.ic_screen_mirroring)
+                .build()
+        )
 
         val hasExtendedParams = intent?.hasExtra(EXTRA_VIDEO_BIT_RATE_MBPS) == true
 

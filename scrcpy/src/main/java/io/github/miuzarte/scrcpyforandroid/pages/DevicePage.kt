@@ -949,7 +949,7 @@ fun DeviceTabScreen(
                     },
                     onOpenFullscreen = {
                         if (currentTargetHost.isNotBlank()) {
-                            val displayName = connectedDeviceLabel
+                            val displayName = selectedDevice?.displayName?.takeIf { it.isNotBlank() } ?: connectedDeviceLabel
                             ShortcutLaunchActivity.startFullscreenControl(
                                 context,
                                 currentTargetHost,

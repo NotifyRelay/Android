@@ -15,6 +15,7 @@
             android:configChanges="keyboardHidden|orientation|screenSize|smallestScreenSize"
             android:exported="false"
             android:resizeableActivity="true"
+            android:taskAffinity="io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity"
             android:theme="@style/Theme.ScrcpyForAndroid" />
 
         <service
