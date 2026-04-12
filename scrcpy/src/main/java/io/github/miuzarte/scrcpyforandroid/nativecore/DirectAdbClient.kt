@@ -69,7 +69,12 @@ internal class DirectAdbTransport(private val context: Context) {
             privateKey,
             publicKeyX509,
             keyName)
-        conn.handshake()
+        try {
+            conn.handshake()
+        } catch (e: Exception) {
+            conn.close()
+            throw e
+        }
         Log.i(TAG, "connect(): handshake success for $host:$port")
         return conn
     }
@@ -390,6 +395,9 @@ internal class DirectAdbConnection(
             if (!closed) {
                 closed = true
                 streams.values.forEach { runCatching { it.forceClose() } }
+                streams.clear()
+                runCatching { tlsSocket?.close() }
+                runCatching { socket.close() }
             }
         }
     }

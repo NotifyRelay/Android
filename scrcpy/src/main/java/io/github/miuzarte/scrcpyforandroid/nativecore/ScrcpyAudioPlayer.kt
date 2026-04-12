@@ -26,10 +26,15 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
     private val bufferInfo = MediaCodec.BufferInfo()
 
     private var prepared = false
+    @Volatile
     private var released = false
     private var packetCount = 0L
 
     fun feedPacket(data: ByteArray, ptsUs: Long, isConfig: Boolean) {
+        var trackForRawWrite: AudioTrack? = null
+        var codecForDrain: MediaCodec? = null
+        var trackForDrain: AudioTrack? = null
+
         synchronized(audioStateLock) {
             if (released) return
 
@@ -54,29 +59,34 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
             }
 
             if (codecId == AUDIO_CODEC_RAW) {
-                val track = ensureRawAudioTrack()
-                if (track != null) {
-                    writeAudioTrackBlocking(track, data)
-                }
-                return
-            }
+                trackForRawWrite = ensureRawAudioTrack()
+            } else {
+                if (!prepared) return
+                codecForDrain = mediaCodec ?: return
+                trackForDrain = audioTrack
 
-            if (!prepared) return
-            val codec = mediaCodec ?: return
-
-            val inputIdx = codec.dequeueInputBuffer(CODEC_TIMEOUT_US)
-            if (inputIdx >= 0) {
-                val buf = codec.getInputBuffer(inputIdx) ?: return
-                buf.clear()
-                if (data.size > buf.remaining()) {
-                    Log.w(TAG, "Input buffer too small: data=${data.size} remaining=${buf.remaining()}, dropping frame")
-                    codec.queueInputBuffer(inputIdx, 0, 0, 0, 0)
-                    return
+                val inputIdx = codecForDrain!!.dequeueInputBuffer(CODEC_TIMEOUT_US)
+                if (inputIdx >= 0) {
+                    val buf = codecForDrain!!.getInputBuffer(inputIdx) ?: return
+                    buf.clear()
+                    if (data.size > buf.remaining()) {
+                        Log.w(TAG, "Input buffer too small: data=${data.size} remaining=${buf.remaining()}, dropping frame")
+                        codecForDrain!!.queueInputBuffer(inputIdx, 0, 0, 0, 0)
+                        return
+                    }
+                    buf.put(data)
+                    codecForDrain!!.queueInputBuffer(inputIdx, 0, data.size, ptsUs, 0)
                 }
-                buf.put(data)
-                codec.queueInputBuffer(inputIdx, 0, data.size, ptsUs, 0)
             }
-            drainOutput(codec)
+        }
+
+        if (trackForRawWrite != null) {
+            writeAudioTrackBlocking(trackForRawWrite!!, data)
+            return
+        }
+
+        if (codecForDrain != null && trackForDrain != null) {
+            drainOutput(codecForDrain!!, trackForDrain!!)
         }
     }
 
@@ -206,8 +216,7 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
      *
      * - Non-blocking writes are used so audio does not stall the decoder thread.
      */
-    private fun drainOutput(codec: MediaCodec) {
-        val track = audioTrack ?: return
+    private fun drainOutput(codec: MediaCodec, track: AudioTrack) {
         var idx = codec.dequeueOutputBuffer(bufferInfo, 0L)
         while (idx >= 0) {
             val outBuf = codec.getOutputBuffer(idx) ?: break

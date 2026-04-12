@@ -19,6 +19,8 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.CopyOnWriteArraySet
 import java.util.concurrent.ExecutionException
 import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
+import java.util.concurrent.TimeoutException
 
 /**
  * Facade that centralizes ADB and scrcpy native operations.
@@ -154,9 +156,10 @@ class NativeCoreFacade(private val appContext: Context) {
 
     /**
      * Disconnect current ADB connection. Always returns true.
+     * Uses a 5-second timeout to prevent indefinite blocking.
      */
     fun adbDisconnect(): Boolean {
-        ioCall { adbService.disconnect() }
+        runCatching { ioCall(5000) { adbService.disconnect() } }
         return true
     }
 
@@ -304,20 +307,23 @@ class NativeCoreFacade(private val appContext: Context) {
      * - Executes on the internal executor to keep scrcpy/session-manager operations
      *   serialized with other IO operations.
      * - Releases decoders and audio players and resets session state.
+     * - Uses a 10-second timeout to prevent indefinite blocking.
      */
     fun scrcpyStop(): Boolean {
-        ioCall {
-            releaseAllDecoders()
-            synchronized(bootstrapLock) {
-                bootstrapPackets.clear()
-                latestConfigPacket = null
+        runCatching {
+            ioCall(10000) {
+                releaseAllDecoders()
+                synchronized(bootstrapLock) {
+                    bootstrapPackets.clear()
+                    latestConfigPacket = null
+                }
+                currentSessionInfo = null
+                sessionManager.clearVideoConsumer()
+                sessionManager.clearAudioConsumer()
+                sessionManager.stop()
+                audioPlayer?.release()
+                audioPlayer = null
             }
-            currentSessionInfo = null
-            sessionManager.clearVideoConsumer()
-            sessionManager.clearAudioConsumer()
-            sessionManager.stop()
-            audioPlayer?.release()
-            audioPlayer = null
         }
         return true
     }
@@ -754,6 +760,29 @@ class NativeCoreFacade(private val appContext: Context) {
     private fun <T> ioCall(task: () -> T): T {
         return try {
             executor.submit<T> { task() }.get()
+        } catch (e: ExecutionException) {
+            val cause = e.cause
+            if (cause != null) {
+                throw cause
+            }
+            throw RuntimeException(e)
+        }
+    }
+
+    /**
+     * Execute a blocking IO task with a timeout.
+     *
+     * - If the task times out, the Future is cancelled with interrupt and a
+     *   [TimeoutException] is thrown.
+     * - Use this for cleanup operations that should not block indefinitely.
+     */
+    private fun <T> ioCall(timeoutMs: Long, task: () -> T): T {
+        val future = executor.submit<T> { task() }
+        return try {
+            future.get(timeoutMs, TimeUnit.MILLISECONDS)
+        } catch (e: TimeoutException) {
+            future.cancel(true)
+            throw e
         } catch (e: ExecutionException) {
             val cause = e.cause
             if (cause != null) {

@@ -401,17 +401,7 @@ object NotificationGenerator {
                 
                 // 生成并注入动态图标
                 if (iconText.isNotEmpty()) {
-                    // 尝试获取专辑图
-                    var albumBitmap: Bitmap? = null
-                    val coverKey = "miui.focus.pic_cover"
-                    if (!picMap.isNullOrEmpty() && picMap.containsKey(coverKey)) {
-                        val coverUrl = picMap[coverKey]
-                        if (!coverUrl.isNullOrBlank()) {
-                            // 同步下载专辑图
-                            albumBitmap = downloadBitmap(context, coverUrl, 5000)
-                        }
-                    }
-                    
+                    val albumBitmap = loadAlbumBitmapOrNull(context, picMap, iconText.length)
                     val iconBitmap = BitmapUtils.textToBitmap(iconText, albumBitmap = albumBitmap)
                     if (iconBitmap != null) {
                         injectSmallIcon(notification, iconBitmap)
@@ -996,16 +986,7 @@ object NotificationGenerator {
             Logger.d(TAG, "超级岛: 处理文本位图 - textToRender: $textToRender")
             if (!textToRender.isNullOrBlank()) {
                 Logger.d(TAG, "超级岛: 使用文本生成位图")
-                // 尝试获取专辑图
-                var albumBitmap: Bitmap? = null
-                val coverKey = "miui.focus.pic_cover"
-                if (!picMap.isNullOrEmpty() && picMap.containsKey(coverKey)) {
-                    val coverUrl = picMap[coverKey]
-                    if (!coverUrl.isNullOrBlank()) {
-                        // 同步下载专辑图
-                        albumBitmap = downloadBitmap(context, coverUrl, 5000)
-                    }
-                }
+                val albumBitmap = loadAlbumBitmapOrNull(context, picMap, textToRender.length)
                 val bitmap = BitmapUtils.textToBitmap(textToRender, albumBitmap = albumBitmap)
                 Logger.d(TAG, "超级岛: 文本位图生成结果: ${bitmap != null}")
                 if (bitmap != null) return bitmap
@@ -1112,6 +1093,22 @@ object NotificationGenerator {
             Logger.w(TAG, "超级岛: 下载图片失败: ${e.message}")
             null
         }
+    }
+
+    /**
+     * 加载专辑图位图，仅在文本长度 <= 6 且 coverUrl 存在时执行下载
+     */
+    private suspend fun loadAlbumBitmapOrNull(
+        context: Context,
+        picMap: Map<String, String>?,
+        textLength: Int
+    ): Bitmap? {
+        if (textLength > 6) return null
+        val coverKey = "miui.focus.pic_cover"
+        if (picMap.isNullOrEmpty() || !picMap.containsKey(coverKey)) return null
+        val coverUrl = picMap[coverKey] ?: return null
+        if (coverUrl.isBlank()) return null
+        return downloadBitmap(context, coverUrl, 5000)
     }
 
     /**

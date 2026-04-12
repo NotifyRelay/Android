@@ -785,7 +785,7 @@ private fun openLocalApp(context: Context, app: LocalAppInfo, displayId: Int) {
         intent?.let {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             
-            if (displayId > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                 val options = ActivityOptions.makeBasic()
                 options.launchDisplayId = displayId
                 context.startActivity(intent, options.toBundle())
