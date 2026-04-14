@@ -181,7 +181,7 @@ data class ServerParams(
             // By default, control is true
             cmd.add("control=false")
         }
-        if (displayId >= 0) {
+        if (displayId > 0) {
             cmd.add("display_id=$displayId")
         }
         if (cameraId.isNotBlank()) {

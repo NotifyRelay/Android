@@ -331,7 +331,7 @@ data class ClientOptions(
                 }
             }
 
-            if (cameraHighSpeed && cameraFps > 0u) {
+            if (cameraHighSpeed && cameraFps.toInt() == 0) {
                 throw IllegalArgumentException(
                     "--camera-high-speed requires an explicit --camera-fps value"
                 )

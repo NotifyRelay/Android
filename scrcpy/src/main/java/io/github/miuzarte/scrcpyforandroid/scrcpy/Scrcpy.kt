@@ -111,7 +111,8 @@ class Scrcpy(
         Log.i(TAG, "Initializing scrcpy session")
 
         try {
-            // Validate options
+            // Fix and validate options
+            options.fix()
             options.validate()
 
             // Generate session ID
