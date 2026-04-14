@@ -8,13 +8,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
-import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
+import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.services.loadDevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.loadMainSettings
 import io.github.miuzarte.scrcpyforandroid.services.saveMainSettings
 
 class ScrcpyUiViewModel private constructor(private val app: Application) : ViewModel() {
-    val nativeCore: NativeCoreFacade = NativeCoreFacade.get(app.applicationContext)
 
     private var mainSettings = loadMainSettings(app)
     private val deviceSettings = loadDevicePageSettings(app)
@@ -101,7 +100,7 @@ class ScrcpyUiViewModel private constructor(private val app: Application) : View
         }
 
     val currentAdbKeyName: String
-        get() = nativeCore.getAdbKeyName()
+        get() = NativeAdbService.keyName
 
     private val _adbPairingAutoDiscoverOnDialogOpen = mutableStateOf(mainSettings.adbPairingAutoDiscoverOnDialogOpen)
     var adbPairingAutoDiscoverOnDialogOpen: Boolean

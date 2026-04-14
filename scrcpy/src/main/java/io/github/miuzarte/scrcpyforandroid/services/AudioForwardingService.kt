@@ -10,7 +10,12 @@ import android.content.Intent
 import android.os.IBinder
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
+import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
+import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.AudioSource
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.VideoSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -65,17 +70,16 @@ class AudioForwardingService : Service() {
         }
     }
 
-    private val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
-    private val executor = Executors.newSingleThreadExecutor { runnable ->
-        Thread(runnable, "audio-forwarding-worker").apply { isDaemon = true }
-    }
+    private val executor = Executors.newSingleThreadExecutor()
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
-    private var facade: NativeCoreFacade? = null
+    @Volatile
+    private var scrcpy: Scrcpy? = null
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
-        Log.i(TAG, "AudioForwardingService onCreate")
+        NativeAdbService.init(applicationContext)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -119,42 +123,41 @@ class AudioForwardingService : Service() {
         return START_NOT_STICKY
     }
 
-    private fun startScrcpySession(host: String, port: Int): Boolean {
+    private suspend fun startScrcpySession(host: String, port: Int): Boolean {
         return try {
-            val nativeCore = NativeCoreFacade.get(applicationContext)
-            facade = nativeCore
-
-            if (nativeCore.adbIsConnected()) {
+            if (NativeAdbService.isConnectedSync()) {
                 Log.i(TAG, "ADB 已连接，先断开现有连接")
-                nativeCore.adbDisconnect()
+                NativeAdbService.disconnect()
             }
 
             Log.i(TAG, "开始 ADB 连接: $host:$port")
-            val connected = nativeCore.adbConnect(host, port)
-            if (!connected) {
-                Log.e(TAG, "ADB 连接失败: $host:$port")
+            runCatching {
+                NativeAdbService.connect(host, port)
+            }.onFailure { e ->
+                Log.e(TAG, "ADB 连接失败: $host:$port", e)
                 return false
             }
             Log.i(TAG, "ADB 连接成功: $host:$port")
 
-            val request = NativeCoreFacade.defaultStartRequest(
-                customServerUri = null,
-                maxSize = 0,
-                videoBitRate = (ScrcpyDefaults.VIDEO_BIT_RATE_MBPS * 1_000_000).toInt(),
-                remotePath = ScrcpyDefaults.SERVER_REMOTE_PATH,
-                videoCodec = ScrcpyDefaults.VIDEO_CODEC,
-                audio = true,
-                audioCodec = ScrcpyDefaults.AUDIO_CODEC,
-                audioBitRate = ScrcpyDefaults.AUDIO_BIT_RATE_KBPS * 1_000,
-                noControl = true,
-                noVideo = true,
-                audioDup = ScrcpyDefaults.AUDIO_DUP,
-                audioSource = ScrcpyDefaults.AUDIO_SOURCE_PRESET,
+            val scrcpyInstance = Scrcpy(
+                appContext = applicationContext,
+                serverRemotePath = ScrcpyDefaults.SERVER_REMOTE_PATH,
             )
+            scrcpy = scrcpyInstance
+
+            val options = ClientOptions().apply {
+                video = false
+                audio = true
+                audioCodec = Codec.fromString(ScrcpyDefaults.AUDIO_CODEC, Codec.Type.AUDIO)
+                audioBitRate = ScrcpyDefaults.AUDIO_BIT_RATE_KBPS * 1000
+                control = false
+                audioDup = ScrcpyDefaults.AUDIO_DUP
+                audioSource = AudioSource.fromString(ScrcpyDefaults.AUDIO_SOURCE_PRESET)
+            }
 
             Log.i(TAG, "启动 scrcpy 仅音频模式")
-            val sessionInfo = nativeCore.scrcpyStart(request)
-            Log.i(TAG, "scrcpy 已启动: device=${sessionInfo.deviceName}, audioCodec=${sessionInfo.codec}")
+            val sessionInfo = scrcpyInstance.start(options)
+            Log.i(TAG, "scrcpy 已启动: device=${sessionInfo.deviceName}, audioCodecId=${sessionInfo.audioCodecId}")
             true
         } catch (e: Exception) {
             Log.e(TAG, "启动 scrcpy 会话异常", e)
@@ -163,22 +166,22 @@ class AudioForwardingService : Service() {
     }
 
     private fun stopForwarding() {
-        executor.submit {
+        scope.launch {
             try {
-                val nativeCore = facade
-                if (nativeCore != null) {
+                val instance = scrcpy
+                if (instance != null) {
                     Log.i(TAG, "停止 scrcpy 会话")
-                    nativeCore.scrcpyStop()
+                    runCatching { instance.stop() }
 
                     Log.i(TAG, "断开 ADB 连接")
-                    nativeCore.adbDisconnect()
+                    runCatching { NativeAdbService.disconnect() }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "停止音频转发失败", e)
             } finally {
                 isRunning = false
                 currentSessionTarget = null
-                facade = null
+                scrcpy = null
                 Log.i(TAG, "音频转发已停止")
             }
         }

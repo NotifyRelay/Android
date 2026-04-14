@@ -4,8 +4,8 @@ import android.content.Context
 import android.os.Build
 import android.util.Base64
 import android.util.Log
-import androidx.core.content.edit
-import notifyrelay.base.util.DeviceUtils
+import io.github.miuzarte.scrcpyforandroid.nativecore.DirectAdbTransport.init
+import kotlinx.coroutines.runBlocking
 import notifyrelay.data.config.ScrcpyPreferenceKeys
 import java.io.BufferedInputStream
 import java.io.Closeable
@@ -36,30 +36,29 @@ import java.util.concurrent.atomic.AtomicInteger
 import javax.net.ssl.SSLSocket
 import kotlin.concurrent.thread
 
-/**
- * Low-level transport helper that manages local RSA keys and creates
- * `DirectAdbConnection` instances for direct TCP/TLS ADB connections.
- *
- * This type is responsible for persisting the private key and performing
- * pairing/connect discovery helpers.
- */
-internal class DirectAdbTransport(private val context: Context) {
+private const val DEFAULT_ADB_KEY_NAME = "scrcpy"
 
-    private val keys: Pair<PrivateKey, ByteArray> by lazy { loadOrCreate() }
+internal object DirectAdbTransport {
+
+    private lateinit var appContext: Context
+    private val prefs by lazy {
+        appContext.getSharedPreferences(
+            ScrcpyPreferenceKeys.NATIVE_ADB_KEY_PREFS_NAME,
+            Context.MODE_PRIVATE
+        )
+    }
+
+    private val keys: Pair<PrivateKey, ByteArray> by lazy { runBlocking { loadOrCreate() } }
 
     val privateKey: PrivateKey get() = keys.first
     val publicKeyX509: ByteArray get() = keys.second
 
-    private val _keyName by lazy {
-        val deviceName = DeviceUtils.getLocalDeviceName(context)
-        "$deviceName@scrcpy"
-    }
+    @Volatile
+    var keyName: String = DEFAULT_ADB_KEY_NAME
 
-    var keyName: String
-        get() = _keyName
-        set(value) {
-            // Read-only, but allow setting to maintain compatibility
-        }
+    fun init(context: Context) {
+        appContext = context.applicationContext
+    }
 
     fun connect(host: String, port: Int): DirectAdbConnection {
         Log.i(TAG, "connect(): opening direct adbd transport to $host:$port")
@@ -68,13 +67,8 @@ internal class DirectAdbTransport(private val context: Context) {
             port,
             privateKey,
             publicKeyX509,
-            keyName)
-        try {
-            conn.handshake()
-        } catch (e: Exception) {
-            conn.close()
-            throw e
-        }
+            keyName.ifBlank { DEFAULT_ADB_KEY_NAME })
+        conn.handshake()
         Log.i(TAG, "connect(): handshake success for $host:$port")
         return conn
     }
@@ -91,7 +85,7 @@ internal class DirectAdbTransport(private val context: Context) {
 
         val pairingKey = AdbPairingKey(
             privateKey = privateKey,
-            alias = keyName,
+            alias = keyName.ifBlank { DEFAULT_ADB_KEY_NAME },
         )
         return DirectAdbPairingClient(targetHost, port, targetCode, pairingKey).use {
             it.start()
@@ -100,54 +94,56 @@ internal class DirectAdbTransport(private val context: Context) {
 
     fun discoverPairingService(
         timeoutMs: Long = 12_000,
-        includeLanDevices: Boolean = true
-    ): Pair<String, Int>? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
-        return AdbMdnsDiscoverer(context).discoverPairingService(timeoutMs, includeLanDevices)
-    }
+        includeLanDevices: Boolean = true,
+    ): Pair<String, Int>? =
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) null
+        else AdbMdnsDiscoverer.discoverPairingService(timeoutMs, includeLanDevices)
 
     fun discoverConnectService(
         timeoutMs: Long = 12_000,
-        includeLanDevices: Boolean = true
-    ): Pair<String, Int>? {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return null
-        return AdbMdnsDiscoverer(context).discoverConnectService(timeoutMs, includeLanDevices)
-    }
+        includeLanDevices: Boolean = true,
+    ): Pair<String, Int>? =
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) null
+        else AdbMdnsDiscoverer.discoverConnectService(timeoutMs, includeLanDevices)
 
-    /**
-     * Load persisted RSA keypair from shared preferences, or generate a new one.
-     * Returns (privateKey, publicX509Bytes).
-     */
-    private fun loadOrCreate(): Pair<PrivateKey, ByteArray> {
-        val prefs = context.getSharedPreferences(
-            ScrcpyPreferenceKeys.NATIVE_ADB_KEY_PREFS_NAME,
-            Context.MODE_PRIVATE
-        )
-        val privB64 = prefs.getString(ScrcpyPreferenceKeys.NATIVE_ADB_PRIVATE_KEY, null)
-        if (privB64 != null) {
+    private suspend fun loadOrCreate(
+        forceNew: Boolean = false,
+    ): Pair<PrivateKey, ByteArray> {
+        val privB64 = prefs.getString(ScrcpyPreferenceKeys.NATIVE_ADB_PRIVATE_KEY, null) ?: ""
+
+        if (privB64.isNotBlank() && !forceNew) {
             try {
                 val kf = KeyFactory.getInstance("RSA")
-                val priv =
-                    kf.generatePrivate(PKCS8EncodedKeySpec(Base64.decode(privB64, Base64.DEFAULT)))
+                val priv = kf.generatePrivate(
+                    PKCS8EncodedKeySpec(
+                        Base64.decode(privB64, Base64.DEFAULT)
+                    )
+                )
                 val pub = derivePublicX509(priv)
-                Log.i(TAG, "loadOrCreate(): loaded persisted RSA key pair, fp=${fingerprint(pub)}")
+                Log.i(
+                    TAG,
+                    "loadOrCreate(): loaded persisted RSA key pair from prefs, " +
+                            "fp=${fingerprint(pub)}"
+                )
                 return Pair(priv, pub)
             } catch (e: Exception) {
-                Log.w(TAG, "loadOrCreate(): failed to load persisted key, regenerating", e)
+                Log.w(
+                    TAG,
+                    "loadOrCreate(): failed to load persisted key from prefs, regenerating",
+                    e
+                )
             }
         }
         val kpg = KeyPairGenerator.getInstance("RSA")
         kpg.initialize(2048)
         val kp = kpg.generateKeyPair()
-        prefs.edit {
-            putString(
-                ScrcpyPreferenceKeys.NATIVE_ADB_PRIVATE_KEY,
-                Base64.encodeToString(kp.private.encoded, Base64.NO_WRAP)
-            )
-        }
+
+        val privateKeyB64 = Base64.encodeToString(kp.private.encoded, Base64.NO_WRAP)
+        prefs.edit().putString(ScrcpyPreferenceKeys.NATIVE_ADB_PRIVATE_KEY, privateKeyB64).apply()
+
         Log.i(
             TAG,
-            "loadOrCreate(): generated new RSA key pair, fp=${fingerprint(kp.public.encoded)}"
+            "loadOrCreate(): generated new RSA key pair and saved to prefs, fp=${fingerprint(kp.public.encoded)}"
         )
         return Pair(kp.private, kp.public.encoded)
     }
@@ -165,23 +161,50 @@ internal class DirectAdbTransport(private val context: Context) {
         return digest.joinToString(":") { b -> "%02x".format(b) }
     }
 
-    companion object {
-        private const val TAG = "DirectAdbTransport"
+    private fun encodeAdbPublicKey(modulus: BigInteger, exponent: Int): ByteArray {
+        val words = 64
+        val bytes = 256
+        val two32 = BigInteger.ONE.shiftLeft(32)
+        val mask32 = two32.subtract(BigInteger.ONE)
+
+        fun toBigEndianPadded(n: BigInteger): ByteArray {
+            val raw = n.toByteArray()
+            val arr = ByteArray(bytes)
+            val src = if (raw[0] == 0.toByte()) raw.copyOfRange(1, raw.size) else raw
+            src.copyInto(arr, destinationOffset = bytes - src.size)
+            return arr
+        }
+
+        val modBE = toBigEndianPadded(modulus)
+        val n0 = modulus.and(mask32)
+        val n0inv = n0.modInverse(two32).negate().mod(two32).toInt()
+        val r = BigInteger.ONE.shiftLeft(bytes * 8)
+        val rrBE = toBigEndianPadded(r.multiply(r).mod(modulus))
+
+        val buf = ByteBuffer.allocate(4 + 4 + bytes + bytes + 4).order(ByteOrder.LITTLE_ENDIAN)
+        buf.putInt(words)
+        buf.putInt(n0inv)
+        for (i in words - 1 downTo 0) {
+            val o = i * 4
+            buf.put(modBE[o + 3]); buf.put(modBE[o + 2]); buf.put(modBE[o + 1]); buf.put(modBE[o])
+        }
+        for (i in words - 1 downTo 0) {
+            val o = i * 4
+            buf.put(rrBE[o + 3]); buf.put(rrBE[o + 2]); buf.put(rrBE[o + 1]); buf.put(rrBE[o])
+        }
+        buf.putInt(exponent)
+        return buf.array()
     }
+
+    private const val TAG = "DirectAdbTransport"
 }
 
-/**
- * Represents a single direct ADB connection over TCP (optionally upgraded to TLS).
- *
- * Exposes framed ADB streams via `openStream` and handles the protocol handshake,
- * reader thread and stream routing.
- */
 internal class DirectAdbConnection(
     val host: String,
     val port: Int,
     private val privateKey: PrivateKey,
     private val publicKeyX509: ByteArray,
-    private val keyName: String,
+    private val keyName: String = DEFAULT_ADB_KEY_NAME,
 ) : AutoCloseable {
 
     private val sha1DigestInfoPrefix = byteArrayOf(
@@ -301,7 +324,9 @@ internal class DirectAdbConnection(
      */
     fun openStream(service: String): AdbSocketStream {
         val localId = nextLocalId.getAndIncrement()
-        val stream = AdbSocketStream(localId) { cmd, a0, a1, d -> sendMsg(cmd, a0, a1, d) }
+        val stream = AdbSocketStream(localId) { command, arg0, arg1, data ->
+            sendMsg(command, arg0, arg1, data)
+        }
         streams[localId] = stream
         sendMsg(A_OPEN, localId, 0, (service + "\u0000").toByteArray(Charsets.UTF_8))
         try {
@@ -314,7 +339,8 @@ internal class DirectAdbConnection(
     }
 
     fun shell(command: String): String =
-        openStream("shell:$command").use { it.inputStream.readBytes().toString(Charsets.UTF_8) }
+        openStream("shell:$command")
+            .use { it.inputStream.readBytes().toString(Charsets.UTF_8) }
 
     /**
      * Push raw bytes to a remote path using the minimal ADB "sync" protocol.
@@ -322,43 +348,49 @@ internal class DirectAdbConnection(
      * - Implements SEND/DATA/DONE/OKAY sequence and throws IOException on failure.
      */
     fun push(data: ByteArray, remotePath: String, unixMode: Int = 420) {
-        openStream("sync:").use { stream ->
-            val out = stream.outputStream
-            val inp = stream.inputStream
-            val pathMode = "$remotePath,$unixMode".toByteArray(Charsets.UTF_8)
+        openStream("sync:")
+            .use { stream ->
+                val out = stream.outputStream
+                val inp = stream.inputStream
+                val pathMode = "$remotePath,$unixMode".toByteArray(Charsets.UTF_8)
 
-            out.write("SEND".toByteArray(Charsets.US_ASCII))
-            out.writeIntLE(pathMode.size)
-            out.write(pathMode)
+                out.write("SEND".toByteArray(Charsets.US_ASCII))
+                out.writeIntLE(pathMode.size)
+                out.write(pathMode)
 
-            val chunkBuf = ByteArray(64 * 1024)
-            var offset = 0
-            while (offset < data.size) {
-                val len = minOf(chunkBuf.size, data.size - offset)
-                out.write("DATA".toByteArray(Charsets.US_ASCII))
-                out.writeIntLE(len)
-                out.write(data, offset, len)
-                offset += len
+                val chunkBuf = ByteArray(64 * 1024)
+                var offset = 0
+                while (offset < data.size) {
+                    val len = minOf(chunkBuf.size, data.size - offset)
+                    out.write("DATA".toByteArray(Charsets.US_ASCII))
+                    out.writeIntLE(len)
+                    out.write(data, offset, len)
+                    offset += len
+                }
+
+                out.write("DONE".toByteArray(Charsets.US_ASCII))
+                out.writeIntLE((System.currentTimeMillis() / 1000).toInt())
+                out.flush()
+
+                val idBuf = ByteArray(4).also { inp.readExact(it) }
+                val msgLen = inp.readIntLE()
+                val id = String(idBuf, Charsets.US_ASCII)
+                if (id != "OKAY") {
+                    val msg = if (msgLen > 0) ByteArray(msgLen).also { inp.readExact(it) }
+                        .toString(Charsets.UTF_8) else id
+                    throw IOException("ADB push failed: $msg")
+                } else if (msgLen > 0) {
+                    inp.skip(msgLen.toLong())
+                }
             }
-
-            out.write("DONE".toByteArray(Charsets.US_ASCII))
-            out.writeIntLE((System.currentTimeMillis() / 1000).toInt())
-            out.flush()
-
-            val idBuf = ByteArray(4).also { inp.readExact(it) }
-            val msgLen = inp.readIntLE()
-            val id = String(idBuf, Charsets.US_ASCII)
-            if (id != "OKAY") {
-                val msg = if (msgLen > 0) ByteArray(msgLen).also { inp.readExact(it) }
-                    .toString(Charsets.UTF_8) else id
-                throw IOException("ADB push failed: $msg")
-            } else if (msgLen > 0) {
-                inp.skip(msgLen.toLong())
-            }
-        }
     }
 
-    fun isAlive(): Boolean = !closed && !socket.isClosed && socket.isConnected
+    fun isAlive(): Boolean {
+        val isClosed = socket.isClosed
+        val isConnected = socket.isConnected
+        Log.d(TAG, "isClose: $isClosed, isConnected: $isConnected")
+        return !closed && !isClosed && isConnected
+    }
 
     override fun close() {
         if (!closed) {
@@ -395,9 +427,6 @@ internal class DirectAdbConnection(
             if (!closed) {
                 closed = true
                 streams.values.forEach { runCatching { it.forceClose() } }
-                streams.clear()
-                runCatching { tlsSocket?.close() }
-                runCatching { socket.close() }
             }
         }
     }
@@ -487,15 +516,51 @@ internal class DirectAdbConnection(
         return "${Base64.encodeToString(adbKeyBytes, Base64.NO_WRAP)} $keyName\u0000"
             .toByteArray(Charsets.UTF_8)
     }
+
+    private fun encodeAdbPublicKey(modulus: BigInteger, exponent: Int): ByteArray {
+        val words = 64
+        val bytes = 256
+        val two32 = BigInteger.ONE.shiftLeft(32)
+        val mask32 = two32.subtract(BigInteger.ONE)
+
+        fun toBigEndianPadded(n: BigInteger): ByteArray {
+            val raw = n.toByteArray()
+            val arr = ByteArray(bytes)
+            val src = if (raw[0] == 0.toByte()) raw.copyOfRange(1, raw.size) else raw
+            src.copyInto(arr, destinationOffset = bytes - src.size)
+            return arr
+        }
+
+        val modBE = toBigEndianPadded(modulus)
+        // n0 is the least-significant 32 bits of modulus; for RSA modulus this must be odd.
+        val n0 = modulus.and(mask32)
+        val n0inv = n0.modInverse(two32).negate().mod(two32).toInt()
+        val r = BigInteger.ONE.shiftLeft(bytes * 8)
+        val rrBE = toBigEndianPadded(r.multiply(r).mod(modulus))
+
+        val buf = ByteBuffer.allocate(4 + 4 + bytes + bytes + 4).order(ByteOrder.LITTLE_ENDIAN)
+        buf.putInt(words)
+        buf.putInt(n0inv)
+        for (i in words - 1 downTo 0) {
+            val o = i * 4
+            buf.put(modBE[o + 3]); buf.put(modBE[o + 2]); buf.put(modBE[o + 1]); buf.put(modBE[o])
+        }
+        for (i in words - 1 downTo 0) {
+            val o = i * 4
+            buf.put(rrBE[o + 3]); buf.put(rrBE[o + 2]); buf.put(rrBE[o + 1]); buf.put(rrBE[o])
+        }
+        buf.putInt(exponent)
+        return buf.array()
+    }
 }
 
 /**
  * Logical ADB stream abstraction mapped to a local id. Provides blocking
  * `InputStream`/`OutputStream` implementations and lifecycle helpers used by callers.
  */
-internal class AdbSocketStream(
+class AdbSocketStream(
     val localId: Int,
-    private val sender: (cmd: Int, arg0: Int, arg1: Int, data: ByteArray) -> Unit,
+    private val sender: (cmd: Int, arg0: Int, arg1: Int, `data`: ByteArray) -> Unit,
 ) : Closeable {
 
     companion object {
@@ -546,12 +611,13 @@ internal class AdbSocketStream(
     }
 
     override fun close() {
-        if (!closed) {
-            closed = true
-            val r = remoteId
-            if (r != 0) runCatching { sender(A_CLSE, localId, r, ByteArray(0)) }
-            queue.offer(EndOfStreamMarker)
+        if (closed) return
+
+        closed = true
+        if (remoteId != 0) runCatching {
+            sender(A_CLSE, localId, remoteId, ByteArray(0))
         }
+        queue.offer(EndOfStreamMarker)
     }
 
     private inner class InStream : InputStream() {
@@ -611,7 +677,7 @@ private fun InputStream.readIntLE(): Int {
     val b1 = read()
     val b2 = read()
     val b3 = read()
-    if (b0 < 0 || b1 < 0 || b2 < 0 || b3 < 0) throw EOFException("readIntLE: EOF")
+    if (b3 < 0) throw EOFException("readIntLE: EOF")
     return b0 or (b1 shl 8) or (b2 shl 16) or (b3 shl 24)
 }
 
@@ -620,39 +686,4 @@ private fun OutputStream.writeIntLE(v: Int) {
     write(v shr 8 and 0xFF)
     write(v shr 16 and 0xFF)
     write(v shr 24 and 0xFF)
-}
-
-private fun encodeAdbPublicKey(modulus: BigInteger, exponent: Int): ByteArray {
-    val words = 64
-    val bytes = 256
-    val two32 = BigInteger.ONE.shiftLeft(32)
-    val mask32 = two32.subtract(BigInteger.ONE)
-
-    fun toBigEndianPadded(n: BigInteger): ByteArray {
-        val raw = n.toByteArray()
-        val arr = ByteArray(bytes)
-        val src = if (raw[0] == 0.toByte()) raw.copyOfRange(1, raw.size) else raw
-        src.copyInto(arr, destinationOffset = bytes - src.size)
-        return arr
-    }
-
-    val modBE = toBigEndianPadded(modulus)
-    val n0 = modulus.and(mask32)
-    val n0inv = n0.modInverse(two32).negate().mod(two32).toInt()
-    val r = BigInteger.ONE.shiftLeft(bytes * 8)
-    val rrBE = toBigEndianPadded(r.multiply(r).mod(modulus))
-
-    val buf = ByteBuffer.allocate(4 + 4 + bytes + bytes + 4).order(ByteOrder.LITTLE_ENDIAN)
-    buf.putInt(words)
-    buf.putInt(n0inv)
-    for (i in words - 1 downTo 0) {
-        val o = i * 4
-        buf.put(modBE[o + 3]); buf.put(modBE[o + 2]); buf.put(modBE[o + 1]); buf.put(modBE[o])
-    }
-    for (i in words - 1 downTo 0) {
-        val o = i * 4
-        buf.put(rrBE[o + 3]); buf.put(rrBE[o + 2]); buf.put(rrBE[o + 1]); buf.put(rrBE[o])
-    }
-    buf.putInt(exponent)
-    return buf.array()
 }

@@ -30,6 +30,12 @@ import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
 import io.github.miuzarte.scrcpyforandroid.scaffolds.AppPageLazyColumn
+import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
+import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.AudioSource
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.VideoSource
 import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.data.config.ScrcpyDefaults
 import notifyrelay.data.model.ConnectionTarget
@@ -95,7 +101,6 @@ fun DeviceTabScreen(
     val scrollBehavior = LocalScrcpyScrollBehavior.current
     val snack = LocalScrcpySnackbarHostState.current ?: remember { SnackbarHostState() }
     val themeBaseIndex = LocalScrcpyThemeBaseIndex.current
-    val nativeCore = viewModel.nativeCore
     val context = LocalContext.current
     val haptics = rememberAppHaptics()
     val initialSettings = remember(context) { loadDevicePageSettings(context) }
@@ -115,40 +120,22 @@ fun DeviceTabScreen(
         }
     }
 
+    LaunchedEffect(Unit) {
+        NativeAdbService.init(context.applicationContext)
+    }
+
     var busy by rememberSaveable { mutableStateOf(false) }
     var statusLine by rememberSaveable { mutableStateOf("未连接") }
     var adbConnected by rememberSaveable { mutableStateOf(false) }
     var currentTargetHost by rememberSaveable { mutableStateOf("") }
     var currentTargetPort by rememberSaveable { mutableIntStateOf(ScrcpyDefaults.ADB_PORT) }
     var connectedDeviceLabel by rememberSaveable { mutableStateOf("未连接") }
-    var sessionInfoWidth by rememberSaveable { mutableIntStateOf(0) }
-    var sessionInfoHeight by rememberSaveable { mutableIntStateOf(0) }
-    var sessionInfoDeviceName by rememberSaveable { mutableStateOf("") }
-    var sessionInfoCodec by rememberSaveable { mutableStateOf("") }
-    var sessionInfoControlEnabled by rememberSaveable { mutableStateOf(false) }
     var sessionInfo by remember {
         mutableStateOf<ScrcpySessionInfo?>(null)
     }
-    LaunchedEffect(
-        sessionInfoWidth,
-        sessionInfoHeight,
-        sessionInfoDeviceName,
-        sessionInfoCodec,
-        sessionInfoControlEnabled
-    ) {
-        sessionInfo = if (sessionInfoDeviceName.isNotBlank()) {
-            ScrcpySessionInfo(
-                width = sessionInfoWidth,
-                height = sessionInfoHeight,
-                deviceName = sessionInfoDeviceName,
-                codec = sessionInfoCodec,
-                controlEnabled = sessionInfoControlEnabled,
-            )
-        } else {
-            null
-        }
-    }
     var adbConnecting by rememberSaveable { mutableStateOf(false) }
+
+    var scrcpyInstance by remember { mutableStateOf<Scrcpy?>(null) }
 
     var connectHost by rememberSaveable { mutableStateOf("") }
     var connectPort by rememberSaveable { mutableStateOf(ScrcpyDefaults.ADB_PORT.toString()) }
@@ -224,10 +211,10 @@ fun DeviceTabScreen(
         showSnackMessage: String? = null,
     ) {
         withContext(adbWorkerDispatcher) {
-            // Also stops scrcpy.
-            runCatching { nativeCore.scrcpyStop() }
-            runCatching { nativeCore.adbDisconnect() }
+            runCatching { scrcpyInstance?.stop() }
+            runCatching { NativeAdbService.disconnect() }
         }
+        scrcpyInstance = null
         adbConnected = false
         currentTargetHost = ""
         currentTargetPort = ScrcpyDefaults.ADB_PORT
@@ -290,9 +277,12 @@ fun DeviceTabScreen(
      */
     suspend fun connectWithTimeout(host: String, port: Int): Boolean {
         return withContext(adbWorkerDispatcher) {
-            withTimeout(ADB_CONNECT_TIMEOUT_MS) {
-                nativeCore.adbConnect(host, port)
-            }
+            runCatching {
+                withTimeout(ADB_CONNECT_TIMEOUT_MS) {
+                    NativeAdbService.connect(host, port)
+                }
+                true
+            }.getOrElse { false }
         }
     }
 
@@ -312,14 +302,15 @@ fun DeviceTabScreen(
     suspend fun keepAliveCheck(host: String, port: Int): Boolean {
         return withContext(adbWorkerDispatcher) {
             withTimeout(ADB_KEEPALIVE_TIMEOUT_MS) {
-                val connected = nativeCore.adbIsConnected()
+                val connected = NativeAdbService.isConnected()
                 if (!connected) {
-                    return@withTimeout false
+                    false
+                } else {
+                    runCatching {
+                        NativeAdbService.shell("echo -n 1")
+                        true
+                    }.getOrElse { false }
                 }
-                runCatching {
-                    nativeCore.adbShell("echo -n 1")
-                    true
-                }.getOrElse { false }
             }
         }
     }
@@ -425,86 +416,27 @@ fun DeviceTabScreen(
 
     fun refreshEncoderLists() {
         if (!adbConnected) return
-        val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
-        scope.launch {
-            val result = withContext(adbWorkerDispatcher) {
-                runCatching {
-                    nativeCore.scrcpyListEncoders(
-                        customServerUri = viewModel.customServerUri,
-                        remotePath = remotePath,
-                    )
-                }
-            }
-            result.onSuccess { lists ->
-                viewModel.videoEncoderOptions.clear()
-                viewModel.videoEncoderOptions.addAll(lists.videoEncoders)
-                viewModel.audioEncoderOptions.clear()
-                viewModel.audioEncoderOptions.addAll(lists.audioEncoders)
-                viewModel.videoEncoderTypeMap.clear()
-                viewModel.videoEncoderTypeMap.putAll(lists.videoEncoderTypes)
-                viewModel.audioEncoderTypeMap.clear()
-                viewModel.audioEncoderTypeMap.putAll(lists.audioEncoderTypes)
-                if (viewModel.videoEncoder.isNotBlank() && viewModel.videoEncoder !in viewModel.videoEncoderOptions) {
-                    viewModel.videoEncoder = ""
-                }
-                if (viewModel.audioEncoder.isNotBlank() && viewModel.audioEncoder !in viewModel.audioEncoderOptions) {
-                    viewModel.audioEncoder = ""
-                }
-                logEvent("编码器列表已刷新: video=${lists.videoEncoders.size} audio=${lists.audioEncoders.size}")
-                if (lists.videoEncoders.isEmpty() && lists.audioEncoders.isEmpty()) {
-                    logEvent("提示: 编码器为空，请检查 server 路径/版本与设备系统日志", Log.WARN)
-                    val preview = lists.rawOutput.lineSequence().take(20).joinToString(" | ")
-                    if (preview.isNotBlank()) {
-                        logEvent("编码器原始输出: $preview", Log.DEBUG)
-                    }
-                }
-            }.onFailure { e ->
-                viewModel.videoEncoderOptions.clear()
-                viewModel.audioEncoderOptions.clear()
-                viewModel.videoEncoderTypeMap.clear()
-                viewModel.audioEncoderTypeMap.clear()
-                logEvent("读取编码器列表失败: ${e.message ?: e.javaClass.simpleName}", Log.ERROR, e)
-            }
-        }
+        logEvent("编码器列表刷新功能暂未实现", Log.WARN)
     }
 
     fun refreshCameraSizeLists() {
         if (!adbConnected) return
-        val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
-        scope.launch {
-            val result = withContext(adbWorkerDispatcher) {
-                runCatching {
-                    nativeCore.scrcpyListCameraSizes(
-                        customServerUri = viewModel.customServerUri,
-                        remotePath = remotePath,
-                    )
-                }
-            }
-            result.onSuccess { lists ->
-                viewModel.cameraSizeOptions.clear()
-                viewModel.cameraSizeOptions.addAll(lists.sizes)
-                if (viewModel.cameraSizePreset.isNotBlank() && viewModel.cameraSizePreset != "custom" && viewModel.cameraSizePreset !in lists.sizes) {
-                    viewModel.cameraSizePreset = ""
-                }
-                logEvent("camera sizes 已刷新: count=${lists.sizes.size}")
-                if (lists.sizes.isEmpty()) {
-                    val preview = lists.rawOutput.lineSequence().take(20).joinToString(" | ")
-                    if (preview.isNotBlank()) {
-                        logEvent("camera sizes 原始输出: $preview", Log.DEBUG)
-                    }
-                }
-            }.onFailure { e ->
-                viewModel.cameraSizeOptions.clear()
-                logEvent("读取 camera sizes 失败: ${e.message ?: e.javaClass.simpleName}", Log.ERROR, e)
-            }
-        }
+        logEvent("camera sizes 刷新功能暂未实现", Log.WARN)
     }
 
-    fun handleAdbConnected(host: String, port: Int) {
+    suspend fun handleAdbConnected(host: String, port: Int) {
         currentTargetHost = host
         currentTargetPort = port
 
-        val info = fetchConnectedDeviceInfo(nativeCore, host, port)
+        if (scrcpyInstance == null) {
+            scrcpyInstance = Scrcpy(
+                appContext = context.applicationContext,
+                serverRemotePath = viewModel.serverRemotePath,
+                customServerUri = viewModel.customServerUri,
+            )
+        }
+
+        val info = fetchConnectedDeviceInfo(host, port)
         val fullLabel = if (info.serial.isNotBlank()) {
             "${info.model} (${info.serial})"
         } else {
@@ -652,7 +584,7 @@ fun DeviceTabScreen(
             }
 
             val discovered = withContext(Dispatchers.IO) {
-                nativeCore.adbDiscoverConnectService(
+                NativeAdbService.discoverConnectService(
                     timeoutMs = ADB_AUTO_RECONNECT_DISCOVER_TIMEOUT_MS,
                     includeLanDevices = viewModel.adbMdnsLanDiscoveryEnabled,
                 )
@@ -687,30 +619,17 @@ fun DeviceTabScreen(
         }
     }
 
-    DisposableEffect(nativeCore) {
+    DisposableEffect(Unit) {
         val listener: (Int, Int) -> Unit = { width, height ->
             sessionInfo = sessionInfo?.copy(width = width, height = height)
         }
-        nativeCore.addVideoSizeListener(listener)
+        NativeCoreFacade.addVideoSizeListener(listener)
         onDispose {
-            nativeCore.removeVideoSizeListener(listener)
+            NativeCoreFacade.removeVideoSizeListener(listener)
         }
     }
 
     LaunchedEffect(sessionInfo) {
-        if (sessionInfo != null) {
-            sessionInfoWidth = sessionInfo?.width ?: 0
-            sessionInfoHeight = sessionInfo?.height ?: 0
-            sessionInfoDeviceName = sessionInfo?.deviceName.orEmpty()
-            sessionInfoCodec = sessionInfo?.codec.orEmpty()
-            sessionInfoControlEnabled = sessionInfo?.controlEnabled == true
-        } else {
-            sessionInfoWidth = 0
-            sessionInfoHeight = 0
-            sessionInfoDeviceName = ""
-            sessionInfoCodec = ""
-            sessionInfoControlEnabled = false
-        }
         viewModel.sessionStarted = sessionInfo != null
     }
 
@@ -842,7 +761,7 @@ fun DeviceTabScreen(
                 busy = busy,
                 autoDiscoverOnDialogOpen = viewModel.adbPairingAutoDiscoverOnDialogOpen,
                 onDiscoverTarget = {
-                    nativeCore.adbDiscoverPairingService(
+                    NativeAdbService.discoverPairingService(
                         includeLanDevices = viewModel.adbMdnsLanDiscoveryEnabled,
                     )
                 },
@@ -851,7 +770,7 @@ fun DeviceTabScreen(
                         val resolvedHost = host.trim()
                         val resolvedPort = port.toIntOrNull() ?: return@runBusy
                         val resolvedCode = code.trim()
-                        val ok = nativeCore.adbPair(
+                        val ok = NativeAdbService.pair(
                             resolvedHost,
                             resolvedPort,
                             resolvedCode,
@@ -864,7 +783,7 @@ fun DeviceTabScreen(
                         if (ok) {
                             try {
                                 logEvent("正在发现ADB连接端口...", Log.INFO)
-                                val connectInfo = nativeCore.adbDiscoverConnectService(
+                                val connectInfo = NativeAdbService.discoverConnectService(
                                     timeoutMs = 5000,
                                     includeLanDevices = viewModel.adbMdnsLanDiscoveryEnabled,
                                 )
@@ -873,19 +792,19 @@ fun DeviceTabScreen(
                                     val (connectHost, connectPort) = connectInfo
                                     logEvent("发现ADB端口: $connectHost:$connectPort", Log.INFO)
 
-                                    val connected = nativeCore.adbConnect(connectHost, connectPort)
+                                    val connected = runCatching { NativeAdbService.connect(connectHost, connectPort) }.isSuccess
                                     if (connected) {
                                         logEvent("已连接到ADB端口: $connectHost:$connectPort", Log.INFO)
 
-                                        val tcpipOk = nativeCore.adbSetTcpPort(5555)
+                                        val tcpipOk = NativeAdbService.setTcpPort(5555)
                                         if (tcpipOk) {
                                             logEvent("已启用 TCP/IP 模式，端口: 5555", Log.INFO)
 
-                                            nativeCore.adbDisconnect()
+                                            NativeAdbService.disconnect()
 
                                             Thread.sleep(1000)
 
-                                            val reconnectOk = nativeCore.adbConnect(connectHost, 5555)
+                                            val reconnectOk = runCatching { NativeAdbService.connect(connectHost, 5555) }.isSuccess
                                             if (reconnectOk) {
                                                 logEvent("已连接到5555端口", Log.INFO)
                                             } else {
@@ -937,7 +856,7 @@ fun DeviceTabScreen(
                     onFullscreenHaptic = { haptics.contextClick() },
                     onStop = {
                         runBusy("停止 scrcpy") {
-                            nativeCore.scrcpyStop()
+                            scrcpyInstance?.stop()
                             sessionInfo = null
                             statusLine =
                                 currentTarget?.let { "${it.host}:${it.port}" } ?: "ADB 已连接"
@@ -1083,6 +1002,14 @@ fun ScrcpyAdvancedPage(
     var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
     val scope = rememberCoroutineScope()
 
+    val scrcpyInstance = remember {
+        Scrcpy(
+            appContext = context.applicationContext,
+            customServerUri = viewModel.customServerUri,
+            serverRemotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH },
+        )
+    }
+
     DisposableEffect(context) {
         val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
             themeBaseIndex = newBaseIndex
@@ -1093,15 +1020,16 @@ fun ScrcpyAdvancedPage(
         }
     }
 
-    // 刷新编码器列表
     fun refreshEncoderLists() {
-        val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    viewModel.nativeCore.scrcpyListEncoders(
-                        customServerUri = viewModel.customServerUri,
-                        remotePath = remotePath,
+                    val (videoEncoders, audioEncoders) = scrcpyInstance.listings.getEncoders(forceRefresh = true)
+                    Scrcpy.ListResult.Encoders(
+                        videoEncoders = videoEncoders.map { it.id },
+                        audioEncoders = audioEncoders.map { it.id },
+                        videoEncoderTypes = videoEncoders.associate { it.id to it.type.s },
+                        audioEncoderTypes = audioEncoders.associate { it.id to it.type.s },
                     )
                 }
             }
@@ -1131,16 +1059,12 @@ fun ScrcpyAdvancedPage(
         }
     }
 
-    // 刷新 Camera Sizes
     fun refreshCameraSizeLists() {
-        val remotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
         scope.launch {
             val result = withContext(Dispatchers.IO) {
                 runCatching {
-                    viewModel.nativeCore.scrcpyListCameraSizes(
-                        customServerUri = viewModel.customServerUri,
-                        remotePath = remotePath,
-                    )
+                    val sizes = scrcpyInstance.listings.getCameraSizes(forceRefresh = true)
+                    Scrcpy.ListResult.CameraSizes(sizes = sizes)
                 }
             }
             result.onSuccess { lists ->

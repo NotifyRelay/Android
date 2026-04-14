@@ -17,19 +17,14 @@ import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicReference
 
 @RequiresApi(Build.VERSION_CODES.R)
-/**
- * Performs mDNS discovery for ADB TLS pairing/connect services on the local network.
- *
- * Uses Android's `NsdManager` to resolve services and returns a host:port pair
- * when a suitable service is found within the provided timeout.
- */
-internal class AdbMdnsDiscoverer(context: Context) {
+internal object AdbMdnsDiscoverer {
 
-    private val nsdManager = context.getSystemService(NsdManager::class.java)
+    private lateinit var nsdManager: NsdManager
 
-    /**
-     * Discover a device that advertises the ADB connect service via mDNS.
-     */
+    fun init(context: Context) {
+        nsdManager = context.getSystemService(NsdManager::class.java)
+    }
+
     fun discoverConnectService(timeoutMs: Long, includeLanDevices: Boolean): Pair<String, Int>? {
         return discoverService(TLS_CONNECT, timeoutMs, includeLanDevices)
     }
@@ -131,9 +126,7 @@ internal class AdbMdnsDiscoverer(context: Context) {
         true
     }
 
-    companion object {
-        private const val TAG = "AdbMdnsDiscoverer"
-        private const val TLS_CONNECT = "_adb-tls-connect._tcp"
-        private const val TLS_PAIRING = "_adb-tls-pairing._tcp"
-    }
+    private const val TAG = "AdbMdnsDiscoverer"
+    private const val TLS_CONNECT = "_adb-tls-connect._tcp"
+    private const val TLS_PAIRING = "_adb-tls-pairing._tcp"
 }

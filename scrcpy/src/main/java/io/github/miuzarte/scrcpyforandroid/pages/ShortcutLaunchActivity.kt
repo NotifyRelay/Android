@@ -30,6 +30,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
+import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
+import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.AudioSource
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.CameraFacing
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.VideoSource
 import io.github.miuzarte.scrcpyforandroid.services.DevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.fetchConnectedDeviceInfo
 import io.github.miuzarte.scrcpyforandroid.services.loadDevicePageSettings
@@ -53,6 +60,7 @@ import top.yukonga.miuix.kmp.theme.ThemeController
 class ShortcutLaunchActivity : ComponentActivity() {
 
     companion object {
+        private const val TAG = "ShortcutLaunchActivity"
         private const val EXTRA_DEVICE_IP = "device_ip"
         private const val EXTRA_DEVICE_PORT = "device_port"
         private const val EXTRA_DEVICE_NAME = "device_name"
@@ -415,7 +423,6 @@ private fun ShortcutLaunchScreen(
 ) {
     val context = LocalContext.current
     val view = LocalView.current
-    val nativeCore = remember(context) { NativeCoreFacade.get(context.applicationContext) }
     val settings = remember(context) { loadMainSettings(context) }
     val scope = rememberCoroutineScope()
 
@@ -426,6 +433,8 @@ private fun ShortcutLaunchScreen(
     var showDebugInfo by remember { mutableStateOf(settings.fullscreenDebugInfoEnabled) }
     var showVirtualButtons by remember { mutableStateOf(settings.showFullscreenVirtualButtons) }
     var cameraMirroringSupported by remember { mutableStateOf(true) }
+
+    var scrcpyInstance by remember { mutableStateOf<Scrcpy?>(null) }
 
     val virtualButtonLayout = remember(virtualButtonsLayout) {
         VirtualButtonActions.splitLayout(VirtualButtonActions.parseStoredLayout(virtualButtonsLayout))
@@ -451,30 +460,35 @@ private fun ShortcutLaunchScreen(
         }
     }
 
-    DisposableEffect(nativeCore) {
+    DisposableEffect(Unit) {
         val listener: (Int, Int) -> Unit = { w, h ->
             sessionInfo?.let { sessionInfo = it.copy(width = w, height = h) }
         }
-        nativeCore.addVideoSizeListener(listener)
+        NativeCoreFacade.addVideoSizeListener(listener)
         onDispose {
-            nativeCore.removeVideoSizeListener(listener)
+            NativeCoreFacade.removeVideoSizeListener(listener)
         }
     }
 
-    DisposableEffect(nativeCore) {
+    DisposableEffect(Unit) {
         val listener: (Float) -> Unit = { fps -> currentFps = fps }
-        nativeCore.addVideoFpsListener(listener)
+        NativeCoreFacade.addVideoFpsListener(listener)
         onDispose {
-            nativeCore.removeVideoFpsListener(listener)
+            NativeCoreFacade.removeVideoFpsListener(listener)
         }
     }
 
     LaunchedEffect(deviceIp, devicePort) {
         connectionState = ConnectionState.Connecting
 
-        val connected = withContext(Dispatchers.IO) {
-            nativeCore.adbConnect(deviceIp, devicePort)
-        }
+        NativeAdbService.init(context.applicationContext)
+
+        val connected = runCatching {
+            withContext(Dispatchers.IO) {
+                NativeAdbService.connect(deviceIp, devicePort)
+            }
+            true
+        }.getOrElse { false }
 
         if (!connected) {
             connectionState = ConnectionState.ConnectionFailed("ADB 连接失败")
@@ -482,7 +496,7 @@ private fun ShortcutLaunchScreen(
         }
 
         val deviceInfo = withContext(Dispatchers.IO) {
-            fetchConnectedDeviceInfo(nativeCore, deviceIp, devicePort)
+            fetchConnectedDeviceInfo(deviceIp, devicePort)
         }
         cameraMirroringSupported = deviceInfo.sdkInt !in 0..<31
 
@@ -576,7 +590,7 @@ private fun ShortcutLaunchScreen(
 
         val existingDisplayIds = if (sessionParams.startApp.isNotBlank() && effectiveNewDisplay.isNotBlank()) {
             try {
-                val output = nativeCore.adbShell("dumpsys display")
+                val output = NativeAdbService.shell("dumpsys display")
                 val regex = Regex("mDisplayId=(\\d+)")
                 regex.findAll(output).map { it.groupValues[1].toInt() }.toSet().also {
                     Logger.d("ShortcutLaunchActivity", "创建前显示器列表: $it")
@@ -589,43 +603,50 @@ private fun ShortcutLaunchScreen(
             emptySet()
         }
 
+        val instance = Scrcpy(
+            appContext = context.applicationContext,
+            serverRemotePath = sessionParams.serverRemotePath.trim(),
+            customServerUri = sessionParams.customServerUri,
+        )
+        scrcpyInstance = instance
+
+        val options = ClientOptions().apply {
+            video = !sessionParams.noVideo
+            audio = sessionParams.audioEnabled
+            control = !sessionParams.noControl
+            videoCodec = Codec.fromString(sessionParams.videoCodec, Codec.Type.VIDEO)
+            audioCodec = Codec.fromString(sessionParams.audioCodec, Codec.Type.AUDIO)
+            videoBitRate = bitRateBps
+            audioBitRate = audioBitRateBps
+            this.maxSize = maxSize.toUShort()
+            this.maxFps = maxFps.toString()
+            videoSource = VideoSource.fromString(resolvedVideoSource)
+            if (resolvedVideoSource == "camera") {
+                cameraId = resolvedCameraId
+                cameraFacing = CameraFacing.fromString(resolvedCameraFacing)
+                cameraSize = resolvedCameraSize
+                cameraAr = resolvedCameraAr
+                this.cameraFps = resolvedCameraFps.toUShort()
+                cameraHighSpeed = sessionParams.cameraHighSpeed
+            }
+            audioSource = AudioSource.fromString(resolvedAudioSource)
+            audioDup = effectiveAudioDup
+            audioPlayback = !sessionParams.noAudioPlayback
+            requireAudio = sessionParams.requireAudio
+            this.displayId = displayId ?: -1
+            this.newDisplay = effectiveNewDisplay
+            this.crop = crop
+            this.videoEncoder = sessionParams.videoEncoder
+            this.audioEncoder = sessionParams.audioEncoder
+            this.videoCodecOptions = sessionParams.videoCodecOptions
+            this.audioCodecOptions = sessionParams.audioCodecOptions
+            turnScreenOff = effectiveTurnScreenOff
+            this.startApp = sessionParams.startApp
+        }
+
         val session = try {
             withContext(Dispatchers.IO) {
-                nativeCore.scrcpyStart(
-                    NativeCoreFacade.defaultStartRequest(
-                        customServerUri = sessionParams.customServerUri,
-                        maxSize = maxSize,
-                        maxFps = maxFps,
-                        videoBitRate = bitRateBps,
-                        remotePath = sessionParams.serverRemotePath.trim(),
-                        videoCodec = sessionParams.videoCodec,
-                        audio = sessionParams.audioEnabled,
-                        audioCodec = sessionParams.audioCodec,
-                        audioBitRate = audioBitRateBps,
-                        noControl = sessionParams.noControl,
-                        videoEncoder = sessionParams.videoEncoder,
-                        videoCodecOptions = sessionParams.videoCodecOptions,
-                        audioEncoder = sessionParams.audioEncoder,
-                        audioCodecOptions = sessionParams.audioCodecOptions,
-                        audioDup = effectiveAudioDup,
-                        audioSource = resolvedAudioSource,
-                        videoSource = resolvedVideoSource,
-                        cameraId = resolvedCameraId,
-                        cameraFacing = resolvedCameraFacing,
-                        cameraSize = resolvedCameraSize,
-                        cameraAr = resolvedCameraAr,
-                        cameraFps = resolvedCameraFps,
-                        cameraHighSpeed = sessionParams.cameraHighSpeed,
-                        noAudioPlayback = sessionParams.noAudioPlayback,
-                        noVideo = sessionParams.noVideo,
-                        requireAudio = sessionParams.requireAudio,
-                        turnScreenOff = effectiveTurnScreenOff,
-                        newDisplay = effectiveNewDisplay,
-                        displayId = displayId,
-                        crop = crop,
-                        startApp = sessionParams.startApp,
-                    )
-                )
+                instance.start(options)
             }
         } catch (e: Exception) {
             connectionState = ConnectionState.ConnectionFailed("scrcpy 启动失败: ${e.message}")
@@ -648,7 +669,7 @@ private fun ShortcutLaunchScreen(
                     retryCount++
                     
                     try {
-                        val output = nativeCore.adbShell("dumpsys display")
+                        val output = NativeAdbService.shell("dumpsys display")
                         val regex = Regex("mDisplayId=(\\d+)")
                         val currentDisplayIds = regex.findAll(output).map { it.groupValues[1].toInt() }.toSet()
                         
@@ -677,8 +698,8 @@ private fun ShortcutLaunchScreen(
         onDispose {
             runBlocking {
                 withContext(Dispatchers.IO) {
-                    runCatching { nativeCore.scrcpyStop() }
-                    runCatching { nativeCore.adbDisconnect() }
+                    runCatching { scrcpyInstance?.stop() }
+                    runCatching { NativeAdbService.disconnect() }
                 }
             }
         }
@@ -711,23 +732,25 @@ private fun ShortcutLaunchScreen(
                         val session = state.session
                         FullscreenControlScreen(
                             session = session,
-                            nativeCore = nativeCore,
+                            scrcpySession = null,
                             onDismiss = onDismiss,
                             showDebugInfo = showDebugInfo,
                             currentFps = currentFps,
                             enableBackHandler = false,
                             onInjectTouch = { action, pointerId, x, y, pressure, buttons ->
-                                nativeCore.scrcpyInjectTouch(
-                                    action = action,
-                                    pointerId = pointerId,
-                                    x = x,
-                                    y = y,
-                                    screenWidth = session.width,
-                                    screenHeight = session.height,
-                                    pressure = pressure,
-                                    actionButton = 0,
-                                    buttons = buttons,
-                                )
+                                scope.launch(Dispatchers.IO) {
+                                    scrcpyInstance?.injectTouch(
+                                        action = action,
+                                        pointerId = pointerId,
+                                        x = x,
+                                        y = y,
+                                        screenWidth = session.width,
+                                        screenHeight = session.height,
+                                        pressure = pressure,
+                                        actionButton = 0,
+                                        buttons = buttons,
+                                    )
+                                }
                             },
                         )
 
@@ -736,8 +759,10 @@ private fun ShortcutLaunchScreen(
                                 modifier = Modifier.align(Alignment.BottomCenter),
                                 onAction = { action ->
                                     action.keycode?.let { keycode ->
-                                        nativeCore.scrcpyInjectKeycode(0, keycode)
-                                        nativeCore.scrcpyInjectKeycode(1, keycode)
+                                        scope.launch(Dispatchers.IO) {
+                                            scrcpyInstance?.injectKeycode(0, keycode)
+                                            scrcpyInstance?.injectKeycode(1, keycode)
+                                        }
                                     }
                                 },
                             )

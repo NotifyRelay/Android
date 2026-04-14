@@ -67,6 +67,8 @@ dependencies {
     implementation(libs.miuix.navigation3.ui)
     implementation(libs.reorderable)
     implementation(libs.gson)
+    implementation(libs.kotlinx.coroutines.core)
+    implementation(libs.kotlinx.coroutines.android)
     implementation("io.github.vvb2060.ndk:boringssl:20250114")
     implementation("org.lsposed.libcxx:libcxx:27.0.12077973")
     implementation("org.bouncycastle:bcpkix-jdk18on:1.80")

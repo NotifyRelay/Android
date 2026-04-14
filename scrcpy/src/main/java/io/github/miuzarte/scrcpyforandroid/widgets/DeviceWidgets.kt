@@ -63,6 +63,7 @@ import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.haptics.rememberAppHaptics
 import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlide
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import notifyrelay.data.config.ScrcpyDefaults
 import notifyrelay.data.config.ScrcpyPresets
 import kotlinx.coroutines.Dispatchers
@@ -165,7 +166,7 @@ internal fun StatusCard(
                 ),
                 secondSmall = StatusSmallCardSpec(
                     "编解码器",
-                    sessionInfo.codec,
+                    sessionInfo.codec?.string ?: "未知",
                 ),
             )
         }
@@ -238,7 +239,7 @@ internal fun StatusCard(
 internal fun PairingCard(
     busy: Boolean,
     autoDiscoverOnDialogOpen: Boolean,
-    onDiscoverTarget: (() -> Pair<String, Int>?)? = null,
+    onDiscoverTarget: (suspend () -> Pair<String, Int>?)? = null,
     onPair: (host: String, port: String, code: String) -> Unit,
 ) {
     val showPairDialog = remember { mutableStateOf(false) }
@@ -558,7 +559,7 @@ private fun PairingDialog(
     showDialog: Boolean,
     enabled: Boolean,
     autoDiscoverOnDialogOpen: Boolean,
-    onDiscoverTarget: (() -> Pair<String, Int>?)?,
+    onDiscoverTarget: (suspend () -> Pair<String, Int>?)?,
     onDismissRequest: () -> Unit,
     onDismissFinished: () -> Unit,
     onConfirm: (host: String, port: String, code: String) -> Unit,
@@ -572,7 +573,7 @@ private fun PairingDialog(
     suspend fun doDiscover() {
         if (onDiscoverTarget == null || discoveringPort || !enabled) return
         discoveringPort = true
-        val found = withContext(Dispatchers.IO) { onDiscoverTarget.invoke() }
+        val found = onDiscoverTarget.invoke()
         if (found != null) {
             host = found.first
             port = found.second.toString()
@@ -721,7 +722,7 @@ internal fun LogsPanel(lines: List<String>) {
 @Composable
 fun FullscreenControlScreen(
     session: ScrcpySessionInfo,
-    nativeCore: NativeCoreFacade,
+    scrcpySession: Scrcpy.Session?,
     onDismiss: () -> Unit,
     showDebugInfo: Boolean,
     currentFps: Float,
@@ -929,7 +930,6 @@ fun FullscreenControlScreen(
         ) {
             ScrcpyVideoSurface(
                 modifier = Modifier.fillMaxSize(),
-                nativeCore = nativeCore,
                 session = session,
             )
         }
@@ -993,28 +993,24 @@ fun FullscreenControlScreen(
 @Composable
 private fun ScrcpyVideoSurface(
     modifier: Modifier,
-    nativeCore: NativeCoreFacade,
     session: ScrcpySessionInfo?,
 ) {
-    val surfaceTag = "video-main"
     var currentSurface by remember { mutableStateOf<Surface?>(null) }
 
     LaunchedEffect(session, currentSurface) {
         if (session != null && currentSurface != null) {
-            nativeCore.registerVideoSurface(surfaceTag, currentSurface!!)
+            NativeCoreFacade.attachVideoSurface(currentSurface!!)
         }
-        // Unregistration is handled directly in onSurfaceTextureDestroyed and DisposableEffect
     }
 
     DisposableEffect(Unit) {
         onDispose {
             val released = currentSurface
             if (released != null) {
-                nativeCore.unregisterVideoSurface(surfaceTag, released)
+                NativeCoreFacade.detachVideoSurface(released, releaseDecoder = true)
                 released.release()
                 currentSurface = null
             }
-            // If currentSurface is null, onSurfaceTextureDestroyed already handled cleanup
         }
     }
 
@@ -1028,7 +1024,7 @@ private fun ScrcpyVideoSurface(
                         width: Int,
                         height: Int
                     ) {
-                        currentSurface?.release() // Release stale surface if any
+                        currentSurface?.release()
                         @SuppressLint("Recycle")
                         currentSurface = Surface(surfaceTexture)
                     }
@@ -1043,7 +1039,7 @@ private fun ScrcpyVideoSurface(
                         val released = currentSurface
                         currentSurface = null
                         if (released != null) {
-                            nativeCore.unregisterVideoSurface(surfaceTag, released)
+                            NativeCoreFacade.detachVideoSurface(released, releaseDecoder = true)
                             released.release()
                         }
                         return true
