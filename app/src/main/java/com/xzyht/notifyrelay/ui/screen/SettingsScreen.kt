@@ -17,6 +17,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.DeveloperModeActivity
 import com.xzyht.notifyrelay.ui.navigation.Navigator
+import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.pages.UILocalFilter
 import com.xzyht.notifyrelay.ui.pages.UIRemoteFilter
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
@@ -25,10 +26,15 @@ import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.net.Uri
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpySettingsPage
+
 
 /**
  * 设置页面屏幕
- * 纯 Compose 实现
  */
 @Composable
 fun SettingsScreen(
@@ -36,16 +42,27 @@ fun SettingsScreen(
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
+    val activity = context as? Activity
 
     val handleDeveloperModeTriggered = {
         val intent = Intent(context, DeveloperModeActivity::class.java)
         context.startActivity(intent)
     }
 
-    val tabTitles = listOf("远程过滤", "本地过滤", "超级岛", "关于")
+    val tabTitles = listOf("远程过滤", "本地过滤", "超级岛", "屏幕镜像", "关于")
     val pagerState = rememberPagerState(initialPage = 0) { tabTitles.size }
     val selectedTabIndex = pagerState.currentPage
     val colorScheme = MiuixTheme.colorScheme
+
+    val serverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+        if (uri == null) return@rememberLauncherForActivityResult
+        runCatching {
+            context.contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION
+            )
+        }
+    }
 
     Column(
         modifier = Modifier
@@ -68,7 +85,7 @@ fun SettingsScreen(
                 selectedBackgroundColor = colorScheme.primary,
                 selectedContentColor = colorScheme.onPrimary
             ),
-            minWidth = 100.dp,
+            minWidth = 80.dp,
             height = 48.dp,
             cornerRadius = 16.dp
         )
@@ -87,7 +104,11 @@ fun SettingsScreen(
                     0 -> UIRemoteFilter()
                     1 -> UILocalFilter()
                     2 -> UISuperIslandSettings()
-                    3 -> UIAbout(onDeveloperModeTriggered = handleDeveloperModeTriggered)
+                    3 -> ScrcpySettingsPage(
+                        onOpenVirtualButtonOrder = { navigator.push(Route.ScrcpyVirtualButtonOrder) },
+                        onPickServer = { serverPicker.launch(arrayOf("application/java-archive", "application/octet-stream", "*/*")) },
+                    )
+                    4 -> UIAbout(onDeveloperModeTriggered = handleDeveloperModeTriggered)
                 }
             }
         }

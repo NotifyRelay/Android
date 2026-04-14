@@ -25,8 +25,8 @@ import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
-import top.yukonga.miuix.kmp.extra.SuperSwitch
-import top.yukonga.miuix.kmp.extra.WindowDropdown
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 class DeveloperModeActivity : AppCompatActivity() {
@@ -119,7 +119,7 @@ class DeveloperModeActivity : AppCompatActivity() {
             ) {
                 var debugUiEnabled by DEBUG_UI_ENABLED
 
-                SuperSwitch(
+                SwitchPreference(
                     title = "调试UI显示",
                     summary = "显示调试信息、测试按钮等开发调试元素",
                     checked = debugUiEnabled,
@@ -129,7 +129,7 @@ class DeveloperModeActivity : AppCompatActivity() {
                     }
                 )
 
-                WindowDropdown(
+                WindowDropdownPreference(
                     title = "日志级别",
                     summary = "当前级别: ${logLevelOptions[selectedLevelIndex.intValue].first}",
                     items = logLevelOptions.map { it.first },

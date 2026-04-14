@@ -28,7 +28,7 @@ import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.extra.WindowDropdown
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 enum class ClipboardSyncMode(val displayName: String) {
@@ -110,8 +110,8 @@ fun ClipboardSyncPage() {
             }
         )
         Spacer(modifier = Modifier.height(16.dp))
-        
-        WindowDropdown(
+
+        WindowDropdownPreference(
             title = "同步模式",
             summary = if (accessibilityEnabled) "无障碍服务 - 已启用"
             else if (selectedMode == ClipboardSyncMode.ACCESSIBILITY.ordinal) "无障碍服务 - 点击前往设置"

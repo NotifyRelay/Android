@@ -1,11 +1,10 @@
 package com.xzyht.notifyrelay.feature.device.service
 
-import android.content.pm.PackageManager
-import androidx.core.content.ContextCompat
 import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ServerLineRouter
-import notifyrelay.core.util.EncryptionManager
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.DeviceUtils
+import notifyrelay.core.util.EncryptionManager
 import notifyrelay.data.StorageManager
 import com.xzyht.notifyrelay.sync.AppListSyncManager
 import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
@@ -88,44 +87,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             return DeviceConnectionManagerSingleton.getDeviceManager(context)
         }
     }
-    // 获取本地设备显示名称，优先级按要求：1. 蓝牙 -> 2. Settings.Secure(bluetooth_name) -> 3. Settings.Global(device_name) -> 4. Build.MODEL/DEVICE -> 5. 兜底
-    // 不再使用应用持久化或 SharedPreferences 中的 device_name
+    
+    // 用于比较在线设备缓存是否变化的变量
+    private var lastOnlineDevicesCacheJson: String? = null
+    
     internal fun getLocalDisplayName(): String {
-        try {
-            // 1. 蓝牙名称（Android 12+ 需要 BLUETOOTH_CONNECT 权限）
-            try {
-                val canReadBt = if (android.os.Build.VERSION.SDK_INT >= 31) {
-                    ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
-                } else true
-                if (canReadBt) {
-                    val bluetoothManager = context.getSystemService(android.content.Context.BLUETOOTH_SERVICE) as android.bluetooth.BluetoothManager
-                    val btName = bluetoothManager.adapter?.name
-                    if (!btName.isNullOrEmpty()) return sanitizeDisplayName(btName)
-                }
-            } catch (_: Exception) {}
-
-            // 2. Settings.Secure 中的 bluetooth_name（部分设备/ROM会放在这里）
-            try {
-                val s = android.provider.Settings.Secure.getString(context.contentResolver, "bluetooth_name")
-                if (!s.isNullOrEmpty()) return sanitizeDisplayName(s)
-            } catch (_: Exception) {}
-
-            // 3. Settings.Global 中的 device_name
-            try {
-                val g = android.provider.Settings.Global.getString(context.contentResolver, "device_name")
-                if (!g.isNullOrEmpty()) return sanitizeDisplayName(g)
-            } catch (_: Exception) {}
-
-            // 4. 设备型号/设备名作为兜底
-            try {
-                val model = android.os.Build.MODEL
-                if (!model.isNullOrEmpty()) return sanitizeDisplayName(model)
-                val device = android.os.Build.DEVICE
-                if (!device.isNullOrEmpty()) return sanitizeDisplayName(device)
-            } catch (_: Exception) {}
-        } catch (_: Exception) {}
-
-        return "未知设备"
+        return DeviceUtils.getLocalDeviceName(context)
     }
 
     // 将显示名称清洗为不可见字符替换、并裁剪（口径较宽）
@@ -509,6 +476,49 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
         // 直接更新Flow值，UI层通过Flow订阅获取变化
         _devices.value = newMap
+
+        // 更新在线设备缓存，供 scrcpy 模块使用
+        updateOnlineDevicesCache(newMap, authSnapshot)
+    }
+
+    private fun updateOnlineDevicesCache(
+        deviceMap: Map<String, Pair<DeviceInfo, Boolean>>,
+        authSnapshot: Map<String, AuthInfo>
+    ) {
+        try {
+            val onlineDevices = deviceMap.filter { (uuid, pair) ->
+                pair.second && (authSnapshot[uuid]?.isAccepted == true)
+            }.mapNotNull { (uuid, pair) ->
+                val info = pair.first
+                val auth = authSnapshot[uuid]
+                if (info.ip.isNotBlank() && info.ip != "0.0.0.0") {
+                    notifyrelay.data.model.OnlineDeviceInfo(
+                        uuid = info.uuid,
+                        displayName = info.displayName,
+                        ip = info.ip,
+                        port = info.port,
+                        deviceType = auth?.deviceType
+                    )
+                } else null
+            }
+            val gson = com.google.gson.Gson()
+            val json = gson.toJson(onlineDevices)
+            
+            // 只有当内容实际变化时才执行存储和快捷方式更新
+            if (json != lastOnlineDevicesCacheJson) {
+                StorageManager.putString(
+                    context,
+                    notifyrelay.data.config.ScrcpyPreferenceKeys.ONLINE_DEVICES_CACHE,
+                    json,
+                    StorageManager.PrefsType.SCRCPY
+                )
+                try {
+                    io.github.miuzarte.scrcpyforandroid.services.DynamicShortcutManager
+                        .updateShortcuts(context)
+                } catch (_: Exception) {}
+                lastOnlineDevicesCacheJson = json
+            }
+        } catch (_: Exception) {}
     }
 
     private fun getDeviceInfo(uuid: String): DeviceInfo? {
@@ -570,13 +580,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     /**
      * 公开解析设备信息：优先使用缓存/认证信息，缺失IP时使用提供的回退IP。
      */
-    fun resolveDeviceInfo(uuid: String, fallbackIp: String, fallbackPort: Int = 23333): DeviceInfo {
+    fun resolveDeviceInfo(uuid: String, fallbackIp: String?, fallbackPort: Int = 23333): DeviceInfo? {
         val cached = getDeviceInfo(uuid)
         if (cached != null && cached.ip.isNotEmpty() && cached.ip != "0.0.0.0") return cached
         val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
         val name = auth?.displayName ?: DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid)
         val port = cached?.port ?: auth?.lastPort ?: fallbackPort
-        return DeviceInfo(uuid, name, fallbackIp, port)
+        return fallbackIp?.let { DeviceInfo(uuid, name, it, port) }
     }
 
     internal fun isWifiDirectNetworkInternal(): Boolean {

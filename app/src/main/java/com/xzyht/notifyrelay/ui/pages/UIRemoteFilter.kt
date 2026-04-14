@@ -32,10 +32,10 @@ import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperCheckbox
-import top.yukonga.miuix.kmp.extra.SuperSwitch
-import top.yukonga.miuix.kmp.extra.WindowDropdown
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.CheckboxPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -92,7 +92,7 @@ fun UIRemoteFilter() {
                 .padding(top = 12.dp)
         ) {
                 // 延迟去重
-        SuperSwitch(
+        SwitchPreference(
             title = "智能去重",
             checked = enableDedup,
             summary = "智能去重，避免重复通知",
@@ -105,7 +105,7 @@ fun UIRemoteFilter() {
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
         
         // 锁屏通知过滤
-        SuperSwitch(
+        SwitchPreference(
             title = "仅复刻锁屏通知到通知栏",
             checked = enableLockScreenOnly,
             summary = "仅复刻锁屏状态的通知到通知栏",
@@ -119,16 +119,16 @@ fun UIRemoteFilter() {
         // 过滤模式选择与黑白名单编辑
         val modes = listOf("none" to "无", "black" to "黑名单", "white" to "白名单", "peer" to "对等")
         val modeLabels = modes.map { it.second }
-        val selectedModeIndex = modes.indexOfFirst { it.first == filterMode }
+        val selectedModeIndex = modes.indexOfFirst { it.first == filterMode }.coerceIn(0, modes.lastIndex)
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
-        // 使用WindowDropdown
-        WindowDropdown(
+        WindowDropdownPreference(
             title = "过滤模式",
             summary = "选择过滤模式",
             items = modeLabels,
             selectedIndex = selectedModeIndex,
-            onSelectedIndexChange = {
-                val (value, _) = modes[it]
+            onSelectedIndexChange = { idx ->
+                val safeIdx = idx.coerceIn(0, modes.lastIndex)
+                val (value, _) = modes[safeIdx]
                 RemoteFilterConfig.filterMode = value
                 RemoteFilterConfig.enablePeerMode = (value == "peer")
                 RemoteFilterConfig.save(context)
@@ -205,7 +205,7 @@ fun UIRemoteFilter() {
             }
         }
         // 包名等价功能总开关
-        SuperSwitch(
+        SwitchPreference(
             title = "启用包名等价映射",
             checked = enablePackageGroupMapping,
             summary = "启用包名等价映射功能",
@@ -224,14 +224,14 @@ fun UIRemoteFilter() {
                 val groupName = if (idx < RemoteFilterConfig.defaultPackageGroups.size) "默认组${idx+1}" else "自定义组${idx+1-RemoteFilterConfig.defaultPackageGroups.size}"
                 
                 Column(modifier = Modifier.fillMaxWidth()) {
-                    // 将SuperCheckbox和操作按钮放在同一行
+                    // 将CheckboxPreference和操作按钮放在同一行
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        // SuperCheckbox占据大部分空间
-                        SuperCheckbox(
+                        // CheckboxPreference占据大部分空间
+                        CheckboxPreference(
                             title = groupName,
                             checked = allGroupEnabled[idx],
                             onCheckedChange = { v ->
@@ -331,7 +331,7 @@ fun UIRemoteFilter() {
         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
         
         // 添加新组按钮
-        SuperArrow(
+        ArrowPreference(
             title = "添加新组",
             onClick = {
                 val newGroups = allGroups.toMutableList().apply { add(mutableListOf()) }

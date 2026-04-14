@@ -35,7 +35,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * 音乐控制功能页面，从DeviceInterconnect中提取
+ * 音乐控制功能页面
  */
 @Composable
 fun MusicControlPage() {
@@ -87,31 +87,94 @@ fun MusicControlPage() {
             color = colorScheme.onSurface
         )
         
-        // 音频转发按钮
+        // 音频转发标题
+        Text(
+            text = "音频转发",
+            style = textStyles.title2,
+            color = colorScheme.onSurface
+        )
+        
+        // 音频转发说明
+        Text(
+            text = "与选中设备进行音频转发",
+            style = textStyles.body2,
+            color = colorScheme.onSurfaceSecondary
+        )
+        
+        // 音频转发按钮组
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            // 接收对端音频按钮
+            Button(
+                onClick = {
+                    if (selectedDevice == null) {
+                        ToastUtils.showShortToast(context, "当前选中的是本机，无法接收本机音频")
+                        return@Button
+                    }
+                    
+                    try {
+                        val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                        val success = deviceManager.requestAudioForwarding(selectedDevice)
+                        
+                        if (success) {
+                            ToastUtils.showShortToast(context, "已请求${selectedDevice.displayName}转发音频")
+                        } else {
+                            ToastUtils.showShortToast(context, "请求发送失败")
+                        }
+                    } catch (e: Exception) {
+                        Logger.e("NotifyRelay", "请求音频转发异常", e)
+                        ToastUtils.showShortToast(context, "请求发送异常: ${e.message}")
+                    }
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("发送本端音频到对端")
+            }
+            
+            // 播放对端音频按钮
+            Button(
+                onClick = {
+                    if (selectedDevice == null) {
+                        ToastUtils.showShortToast(context, "当前选中的是本机，无法播放本机音频")
+                        return@Button
+                    }
+                    
+                    try {
+                        val adbPort = notifyrelay.data.config.ScrcpyDefaults.ADB_PORT
+                        val success = io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.startAudioForwarding(
+                            context,
+                            selectedDevice.ip,
+                            adbPort,
+                            selectedDevice.displayName
+                        )
+                        
+                        if (success) {
+                            ToastUtils.showShortToast(context, "正在连接${selectedDevice.displayName}...")
+                        } else {
+                            ToastUtils.showShortToast(context, "启动失败，可能已有转发在进行中")
+                        }
+                    } catch (e: Exception) {
+                        Logger.e("NotifyRelay", "播放对端音频异常", e)
+                        ToastUtils.showShortToast(context, "启动异常: ${e.message}")
+                    }
+                },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("播放对端音频")
+            }
+        }
+        
+        // 停止音频转发按钮
         Button(
             onClick = {
-                if (selectedDevice == null) {
-                    ToastUtils.showShortToast(context, "当前选中的是本机，无法转发音频到本机")
-                    return@Button
-                }
-                
-                try {
-                    val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                    val success = deviceManager.requestAudioForwarding(selectedDevice)
-                    
-                    if (success) {
-                        ToastUtils.showShortToast(context, "音频转发请求已发送")
-                    } else {
-                        ToastUtils.showShortToast(context, "音频转发请求发送失败")
-                    }
-                } catch (e: Exception) {
-                    Logger.e("NotifyRelay", "音频转发请求发送异常", e)
-                    ToastUtils.showShortToast(context, "音频转发请求发送异常: ${e.message}")
-                }
+                io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.stopAudioForwarding(context)
+                ToastUtils.showShortToast(context, "已停止音频转发")
             },
             modifier = Modifier.fillMaxWidth()
         ) {
-            Text("开始音频转发")
+            Text("停止音频转发")
         }
         
         // 远端媒体超级岛显示开关
@@ -271,8 +334,8 @@ fun MusicControlPage() {
         
         Text(
             text = "1. 请确保目标设备已连接且在线\n" +
-                    "2. 音频转发功能需要目标设备支持\n" +
-                    "3. 目标设备暂时只能是pc,且需要adb调试开启,因为转发利用的是scrcpy\n" +
+                    "2. 音频转发功能需要目标设备开启 ADB 调试\n" +
+                    "3. 目标设备需要先完成 ADB 配对\n" +
                     "4. 媒体控制功能支持播放/暂停、上一首、下一首操作\n",
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary

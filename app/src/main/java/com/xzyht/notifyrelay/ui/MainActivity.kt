@@ -27,6 +27,7 @@ import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -53,6 +54,7 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import com.xzyht.notifyrelay.sync.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
@@ -66,13 +68,17 @@ import com.xzyht.notifyrelay.ui.screen.DeviceForwardScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreenState
 import com.xzyht.notifyrelay.ui.screen.HistoryScreen
+import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
+import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
+import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.ServiceManager
 import notifyrelay.data.config.DeviceInfoManager
@@ -138,6 +144,18 @@ class MainActivity : FragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
+        ShortcutLaunchActivity.setAppLaunchCallback { deviceIp, packageName, displayId ->
+            val deviceManager = DeviceConnectionManager.getInstance(this)
+            val devices = deviceManager.getAuthenticatedOnlineDevices()
+            val targetDevice = devices.find { it.ip == deviceIp }
+            if (targetDevice != null) {
+                Logger.d("MainActivity", "发送应用启动请求: $packageName 到 ${targetDevice.displayName}, displayId: $displayId")
+                AppLaunchManager.sendAppLaunchRequest(this, deviceManager, targetDevice, packageName, displayId)
+            } else {
+                Logger.w("MainActivity", "未找到目标设备: $deviceIp")
+            }
+        }
+
         DeveloperModeActivity.initLogConfig(this)
         DeveloperModeActivity.initDebugUiConfig(this)
 
@@ -148,7 +166,25 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             val navigator = rememberNavigator(Route.Main)
-            val isDarkTheme = isSystemInDarkTheme()
+            val context = LocalContext.current
+            val systemDarkTheme = isSystemInDarkTheme()
+            val themeBaseIndex = remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
+            
+            val isDarkTheme = when (themeBaseIndex.intValue) {
+                ThemeSettingsManager.THEME_LIGHT -> false
+                ThemeSettingsManager.THEME_DARK -> true
+                else -> systemDarkTheme
+            }
+            
+            DisposableEffect(context) {
+                val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
+                    themeBaseIndex.intValue = newBaseIndex
+                }
+                ThemeSettingsManager.addThemeChangeListener(context, listener)
+                onDispose {
+                    ThemeSettingsManager.removeThemeChangeListener(context, listener)
+                }
+            }
             
             NotifyRelayTheme(darkTheme = isDarkTheme) {
                 val colorScheme = MiuixTheme.colorScheme
@@ -176,6 +212,8 @@ class MainActivity : FragmentActivity() {
                                 entry<Route.Main> { MainScreen(navigator) }
                                 entry<Route.History> { HistoryScreen(navigator) }
                                 entry<Route.Settings> { SettingsScreen(navigator) }
+                                entry<Route.ScrcpyAdvanced> { ScrcpyAdvancedScreen(navigator) }
+                                entry<Route.ScrcpyVirtualButtonOrder> { ScrcpyVirtualButtonOrderScreen(navigator) }
                             }
                         )
                     }

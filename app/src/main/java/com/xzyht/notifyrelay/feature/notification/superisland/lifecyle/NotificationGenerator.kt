@@ -401,7 +401,8 @@ object NotificationGenerator {
                 
                 // 生成并注入动态图标
                 if (iconText.isNotEmpty()) {
-                    val iconBitmap = BitmapUtils.textToBitmap(iconText)
+                    val albumBitmap = loadAlbumBitmapOrNull(context, picMap, iconText.length)
+                    val iconBitmap = BitmapUtils.textToBitmap(iconText, albumBitmap = albumBitmap)
                     if (iconBitmap != null) {
                         injectSmallIcon(notification, iconBitmap)
                     }
@@ -961,26 +962,32 @@ object NotificationGenerator {
         // 检查是否为计时器类型，如果是，不生成文本位图，保留之前的图标
         val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
         if (!isTimerType) {
-            // 优先使用 B 区文本生成位图
-            val textToRender = when (bComponent) {
-                is BImageText2 -> bComponent.title
-                is BImageText3 -> bComponent.title
-                is BImageText6 -> bComponent.title
-                is BTextInfo -> bComponent.title
-                is BFixedWidthDigitInfo -> bComponent.digit
-                is BSameWidthDigitInfo -> bComponent.digit
-                is BProgressTextInfo -> bComponent.title ?: bComponent.content
-                else -> null
-            } ?: when (aComponent) {
+            // 优先使用 A 区（左侧）文本生成位图，然后才是 B 区（右侧）文本
+            val aText = when (aComponent) {
                 is AImageText1 -> aComponent.title ?: aComponent.content
                 is AImageText5 -> aComponent.title
                 else -> null
+            }
+            val textToRender = if (!aText.isNullOrBlank()) {
+                aText
+            } else {
+                when (bComponent) {
+                    is BImageText2 -> bComponent.title
+                    is BImageText3 -> bComponent.title
+                    is BImageText6 -> bComponent.title
+                    is BTextInfo -> bComponent.title
+                    is BFixedWidthDigitInfo -> bComponent.digit
+                    is BSameWidthDigitInfo -> bComponent.digit
+                    is BProgressTextInfo -> bComponent.title ?: bComponent.content
+                    else -> null
+                }
             }
             
             Logger.d(TAG, "超级岛: 处理文本位图 - textToRender: $textToRender")
             if (!textToRender.isNullOrBlank()) {
                 Logger.d(TAG, "超级岛: 使用文本生成位图")
-                val bitmap = BitmapUtils.textToBitmap(textToRender)
+                val albumBitmap = loadAlbumBitmapOrNull(context, picMap, textToRender.length)
+                val bitmap = BitmapUtils.textToBitmap(textToRender, albumBitmap = albumBitmap)
                 Logger.d(TAG, "超级岛: 文本位图生成结果: ${bitmap != null}")
                 if (bitmap != null) return bitmap
             }
@@ -1086,6 +1093,22 @@ object NotificationGenerator {
             Logger.w(TAG, "超级岛: 下载图片失败: ${e.message}")
             null
         }
+    }
+
+    /**
+     * 加载专辑图位图，仅在文本长度 <= 6 且 coverUrl 存在时执行下载
+     */
+    private suspend fun loadAlbumBitmapOrNull(
+        context: Context,
+        picMap: Map<String, String>?,
+        textLength: Int
+    ): Bitmap? {
+        if (textLength > 6) return null
+        val coverKey = "miui.focus.pic_cover"
+        if (picMap.isNullOrEmpty() || !picMap.containsKey(coverKey)) return null
+        val coverUrl = picMap[coverKey] ?: return null
+        if (coverUrl.isBlank()) return null
+        return downloadBitmap(context, coverUrl, 5000)
     }
 
     /**

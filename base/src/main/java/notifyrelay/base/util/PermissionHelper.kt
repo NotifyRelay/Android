@@ -1,6 +1,7 @@
 package notifyrelay.base.util
 
 import android.Manifest
+import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -9,6 +10,7 @@ import android.os.Build
 import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.base.util.IntentUtils
@@ -31,6 +33,7 @@ object PermissionHelper {
      * @param context 用于访问 PackageManager、Settings 及系统服务的上下文（通常传入 Activity 或 Application 的 Context）。
      * @return 如果所有必要权限均已授予则返回 true，否则返回 false。
      */
+    @SuppressLint("QueryPermissionsNeeded")
     fun checkAllPermissions(context: Context): Boolean {
         val enabledListeners = Settings.Secure.getString(
             context.contentResolver,
@@ -155,16 +158,9 @@ object PermissionHelper {
      * @param context 用于获取 AppOpsManager 服务的上下文。
      * @return 如果 AppOps 管理器允许 `android:get_usage_stats` 则返回 true，否则返回 false。
      */
-    @Suppress("DEPRECATION")
     fun isUsageStatsEnabled(context: Context): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
-        val mode = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // API 29+ 使用 unsafeCheckOpNoThrow
-            appOps.unsafeCheckOpNoThrow("android:get_usage_stats", android.os.Process.myUid(), context.packageName)
-        } else {
-            // API 29- 使用兼容的 checkOpNoThrow
-            appOps.checkOpNoThrow("android:get_usage_stats", android.os.Process.myUid(), context.packageName)
-        }
+        val mode = appOps.unsafeCheckOpNoThrow("android:get_usage_stats", android.os.Process.myUid(), context.packageName)
         return mode == android.app.AppOpsManager.MODE_ALLOWED
     }
 
@@ -216,7 +212,7 @@ object PermissionHelper {
      */
     fun requestOverlayPermission(activity: Activity) {
         val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-        intent.data = android.net.Uri.parse("package:${activity.packageName}")
+        intent.data = "package:${activity.packageName}".toUri()
         activity.startActivity(intent)
     }
 
@@ -280,7 +276,7 @@ object PermissionHelper {
     fun requestManageExternalStoragePermission(context: Context) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             val intent = Intent(Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION)
-            intent.data = android.net.Uri.parse("package:${context.packageName}")
+            intent.data = "package:${context.packageName}".toUri()
             IntentUtils.startActivity(context, intent, context !is Activity)
         }
     }

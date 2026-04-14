@@ -37,16 +37,11 @@ object HapticFeedbackUtils {
             val vibrator = obtainVibrator(context) ?: return
             if (!vibrator.hasVibrator()) return
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val effect = VibrationEffect.createOneShot(
-                    durationMs,
-                    VibrationEffect.DEFAULT_AMPLITUDE
-                )
-                vibrator.vibrate(effect)
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(durationMs)
-            }
+            val effect = VibrationEffect.createOneShot(
+                durationMs,
+                VibrationEffect.DEFAULT_AMPLITUDE
+            )
+            vibrator.vibrate(effect)
         } catch (_: Exception) {
         }
     }
@@ -64,15 +59,8 @@ object HapticFeedbackUtils {
             val vibrator = obtainVibrator(context) ?: return
             if (!vibrator.hasVibrator()) return
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                // VibrationEffect 不直接支持 repeat 索引，但可通过外层逻辑控制；
-                // 这里优先保证一次性模式，保持简单安全。
-                val effect = VibrationEffect.createWaveform(pattern, repeat)
-                vibrator.vibrate(effect)
-            } else {
-                @Suppress("DEPRECATION")
-                vibrator.vibrate(pattern, repeat)
-            }
+            val effect = VibrationEffect.createWaveform(pattern, repeat)
+            vibrator.vibrate(effect)
         } catch (_: Exception) {
         }
     }

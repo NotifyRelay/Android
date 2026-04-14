@@ -21,9 +21,9 @@ import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
-import top.yukonga.miuix.kmp.extra.SuperArrow
-import top.yukonga.miuix.kmp.extra.SuperSwitch
-import top.yukonga.miuix.kmp.extra.WindowDropdown
+import top.yukonga.miuix.kmp.preference.ArrowPreference
+import top.yukonga.miuix.kmp.preference.SwitchPreference
+import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val SUPER_ISLAND_KEY = "superisland_enabled"
@@ -123,7 +123,7 @@ fun UISuperIslandSettings() {
                         .verticalScroll(remember { androidx.compose.foundation.ScrollState(0) }),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "超级岛读取",
                         summary = "控制是否尝试从本机通知中读取小米超级岛数据并转发",
                         checked = enabled,
@@ -133,7 +133,7 @@ fun UISuperIslandSettings() {
                         }
                     )
 
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "超级岛显示",
                         summary = "控制是否显示来自远端的超级岛",
                         checked = showSuperIsland,
@@ -144,7 +144,7 @@ fun UISuperIslandSettings() {
                         }
                     )
 
-                    SuperSwitch(
+                    SwitchPreference(
                         title = "浮窗兼容",
                         summary = floatingWindowSummary,
                         checked = floatingWindowEnabled,
@@ -154,7 +154,7 @@ fun UISuperIslandSettings() {
                         }
                     )
 
-                    WindowDropdown(
+                    WindowDropdownPreference(
                         title = "规范信息注入方式",
                         summary = "控制通知中注入的规范信息类型",
                         items = specInjectionOptions.map { it.first },
@@ -167,7 +167,7 @@ fun UISuperIslandSettings() {
                         }
                     )
 
-                    SuperArrow(
+                    ArrowPreference(
                         title = "测试超级岛分支",
                         onClick = {
                             showTestDialog.value = true

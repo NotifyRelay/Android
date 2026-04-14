@@ -147,6 +147,10 @@ object AppListSyncManager {
                     )
                 }
                 databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
+                
+                // 请求缺失的图标
+                val sourceDevice = deviceManager.resolveDeviceInfo(deviceUuid, null, 23333)
+                sourceDevice?.let { checkAndRequestMissingIcons(context, packageNames, deviceManager, it) }
             }
         } catch (e: Exception) {
             Logger.e(TAG, "处理应用列表响应失败", e)

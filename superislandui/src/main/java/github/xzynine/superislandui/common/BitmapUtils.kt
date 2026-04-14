@@ -9,7 +9,6 @@ import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
 import notifyrelay.base.util.Logger
 
-
 /**
  * 位图工具类，用于处理文本到位图的转换等操作
  */
@@ -17,126 +16,166 @@ object BitmapUtils {
     private const val TAG = "BitmapUtils"
     
     /**
+     * 性能监控工具
+     */
+    private inline fun <T> measureTime(operation: String, block: () -> T): T {
+        val start = System.currentTimeMillis()
+        val result = block()
+        val duration = System.currentTimeMillis() - start
+        if (duration > 16) { // 超过一帧时间
+            Logger.w(TAG, "$operation 耗时 ${duration}ms")
+        }
+        return result
+    }
+    
+    private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.WHITE
+        textAlign = Paint.Align.LEFT
+        typeface = Typeface.DEFAULT_BOLD
+    }
+    
+    private val progressPaintUnReach = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 10f
+        color = "#888888".toColorInt()
+    }
+    
+    private val progressPaintReach = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = 10f
+        color = "#00FF00".toColorInt()
+    }
+    
+    private var reusableBitmap: Bitmap? = null
+    private var reusableBitmapWidth = 0
+    private var reusableBitmapHeight = 0
+    
+    // Bitmap缓存池，支持不同尺寸的bitmap复用
+    private val bitmapCache = mutableMapOf<Int, MutableList<Bitmap>>()
+    private const val MAX_CACHE_SIZE = 10 // 最大缓存数量
+    
+    /**
      * 将文本转换为位图
      * @param text 要转换的文本
      * @param forceFontSize 强制字体大小，null 表示使用默认大小
+     * @param albumBitmap 专辑图 bitmap，可为 null
      * @return 生成的位图，失败返回 null
      */
-    fun textToBitmap(text: String, forceFontSize: Float? = null): Bitmap? {
-        try {
-            // 检查文本是否为空
-            if (text.isBlank()) {
-                Logger.w(TAG, "文本为空，无法生成位图")
-                return null
-            }
-            
-            val fontSize = forceFontSize ?: 40f
+    fun textToBitmap(text: String, forceFontSize: Float? = null, albumBitmap: Bitmap? = null): Bitmap? {
+        return measureTime("textToBitmap") {
+            try {
+                if (text.isBlank()) {
+                    Logger.w(TAG, "文本为空，无法生成位图")
+                    return@measureTime null
+                }
+                
+                val fontSize = (forceFontSize ?: 40f) * 2f
+                val localPaint = Paint(textPaint)
 
-            // 查找第一行的分割点（等价字符长度不超过7）
-            fun findSplitPoint(text: String): Int {
-                var equivalentLength = 0f
-                for (i in text.indices) {
-                    val char = text[i]
-                    val charLength = if (char in 'a'..'z') 0.5f else 1f
-                    if (equivalentLength + charLength > 7) {
-                        return i
+                // 字符权重缓存
+                val charWeightCache = mutableMapOf<Char, Float>()
+                
+                fun calculateEquivalentLength(text: String): Float {
+                    var length = 0f
+                    for (char in text) {
+                        length += charWeightCache.getOrPut(char) {
+                            if (char in 'a'..'z') 0.5f else 1f
+                        }
                     }
-                    equivalentLength += charLength
-                }
-                return text.length
-            }
-            
-            val splitPoint = findSplitPoint(text)
-            val firstLineText = text.substring(0, splitPoint)
-            val secondLineText = text.substring(splitPoint)
-            
-            // 处理单行或多行逻辑
-            if (secondLineText.isBlank()) {
-                // 单行文本
-                val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    textSize = fontSize
-                    color = Color.WHITE
-                    textAlign = Paint.Align.LEFT
-                    typeface = Typeface.DEFAULT_BOLD
+                    return length
                 }
                 
-                val baseline = -paint.ascent() // ascent() 为负值
-                // 为紧凑裁剪中的宽字符添加更多缓冲区
-                val width = (paint.measureText(firstLineText) + 10).toInt() 
-                val height = (baseline + paint.descent() + 5).toInt()
+                var currentFontSize = fontSize
+                localPaint.textSize = currentFontSize
                 
-                // 空或无效尺寸的安全检查
-                if (width <= 0 || height <= 0) {
-                    Logger.w(TAG, "文本位图尺寸无效，width=$width, height=$height")
-                    return null
+                val textEquivalentLength = calculateEquivalentLength(text)
+                
+                if (textEquivalentLength > 2) {
+                    val scaleFactor = 1.0f - (textEquivalentLength - 2) * 0.1f
+                    currentFontSize = fontSize * scaleFactor.coerceAtLeast(0.5f)
+                    localPaint.textSize = currentFontSize
                 }
-
-                // 确保尺寸在合理范围内
+                
+                val baseline = -localPaint.ascent()
+                var textWidth = localPaint.measureText(text)
+                val height = (baseline + localPaint.descent() + 10).toInt()
+                
                 val maxSize = 500
-                val finalWidth = width.coerceAtMost(maxSize)
+                val maxTextLengthForAlbum = 6 // 最多6个字符时才添加专辑图
+                
+                // 计算真实的专辑图宽度
+                var scaledAlbumWidth = 0
+                if (albumBitmap != null) {
+                    val albumHeight = height - 10
+                    if (albumHeight > 0 && albumBitmap.height > 0) {
+                        val scaleFactor = albumHeight.toFloat() / albumBitmap.height
+                        scaledAlbumWidth = (albumBitmap.width * scaleFactor).toInt()
+                    }
+                }
+                
+                val widthWithAlbum = (textWidth + scaledAlbumWidth + 20).toInt()
+                val widthWithoutAlbum = (textWidth + 10).toInt()
+                
+                if (widthWithoutAlbum <= 0 || height <= 0) {
+                    Logger.w(TAG, "文本位图尺寸无效，width=$widthWithoutAlbum, height=$height")
+                    return@measureTime null
+                }
+                
+                val shouldAddAlbum = albumBitmap != null && 
+                                    scaledAlbumWidth > 0 &&
+                                    widthWithAlbum <= maxSize && 
+                                    text.length <= maxTextLengthForAlbum
+                
+                var finalWidth = if (shouldAddAlbum) widthWithAlbum else widthWithoutAlbum
+                finalWidth = finalWidth.coerceAtMost(maxSize)
                 val finalHeight = height.coerceAtMost(maxSize)
                 
-                val image = createBitmap(finalWidth, finalHeight)
-                val canvas = Canvas(image)
-                // 绘制时添加小的左内边距
-                canvas.drawText(firstLineText, 5f, baseline, paint)
-                Logger.d(TAG, "生成文本位图成功，尺寸: ${finalWidth}x${finalHeight}")
-                return image
-            } else {
-                // 多行文本：两行字体大小相同，总高度与单行相同
-                val lineFontSize = fontSize * 0.6f // 调整字体大小以适应两行
-                
-                val linePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    textSize = lineFontSize
-                    color = Color.WHITE
-                    textAlign = Paint.Align.LEFT
-                    typeface = Typeface.DEFAULT_BOLD
+                // 确保文本能完全显示在finalWidth内
+                val availableTextWidth = if (shouldAddAlbum) {
+                    finalWidth - scaledAlbumWidth - 20f // 20 = 5 (left padding) + 15 (spacing)
+                } else {
+                    finalWidth - 10f // 10 = left padding
                 }
-
-                // 计算宽度：取第一行和第二行中较宽的一个
-                val firstLineWidth = linePaint.measureText(firstLineText)
-                val secondLineWidth = linePaint.measureText(secondLineText)
-                val width = (firstLineWidth.coerceAtLeast(secondLineWidth) + 10).toInt()
                 
-                // 计算高度：保持和单行高度相同
-                val singleLinePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                    textSize = fontSize
-                    typeface = Typeface.DEFAULT_BOLD
+                // 如果文本宽度超过可用宽度，水平缩放文字（变为窄体）
+                if (textWidth > availableTextWidth) {
+                    val scaleFactor = availableTextWidth / textWidth
+                    localPaint.textScaleX = scaleFactor.coerceAtLeast(0.5f) // 最小缩放0.5，避免文字过于压缩
+                    // 重新计算缩放后的文本宽度
+                    textWidth = localPaint.measureText(text)
                 }
-                val height = (-singleLinePaint.ascent() + singleLinePaint.descent() + 5).toInt()
                 
-                // 空或无效尺寸的安全检查
-                if (width <= 0 || height <= 0) {
-                    Logger.w(TAG, "文本位图尺寸无效，width=$width, height=$height")
-                    return null
-                }
-
-                // 确保尺寸在合理范围内
-                val maxSize = 500
-                val finalWidth = width.coerceAtMost(maxSize)
-                val finalHeight = height.coerceAtMost(maxSize)
-                
-                val image = createBitmap(finalWidth, finalHeight)
+                val image = getOrCreateBitmap(finalWidth, finalHeight)
                 val canvas = Canvas(image)
                 
-                // 计算两行的垂直位置，确保完整显示
-                val lineHeight = height * 0.5f
-                val firstLineY = lineHeight * 0.8f // 第一行垂直居中
-                val secondLineY = lineHeight + (lineHeight * 0.8f) // 第二行垂直居中
+                var textX = 10f
+                if (shouldAddAlbum) {
+                    val albumHeight = height - 10
+                    val scaleFactor = albumHeight.toFloat() / albumBitmap!!.height
+                    val scaledWidth = (albumBitmap.width * scaleFactor).toInt()
+                    
+                    val scaledAlbumBitmap = Bitmap.createScaledBitmap(
+                        albumBitmap, 
+                        scaledWidth, 
+                        albumHeight, 
+                        false
+                    )
+                    try {
+                        canvas.drawBitmap(scaledAlbumBitmap, 5f, 5f, null)
+                        textX = scaledWidth + 15f
+                    } finally {
+                        scaledAlbumBitmap.recycle()
+                    }
+                }
                 
-                // 绘制第一行
-                canvas.drawText(firstLineText, 5f, firstLineY, linePaint)
-                
-                // 绘制第二行
-                canvas.drawText(secondLineText, 5f, secondLineY, linePaint)
-                
+                canvas.drawText(text, textX, baseline + 5f, localPaint)
                 Logger.d(TAG, "生成文本位图成功，尺寸: ${finalWidth}x${finalHeight}")
-                return image
+                return@measureTime image
+            } catch (e: Exception) {
+                Logger.w(TAG, "生成文本位图失败: ${e.message}")
+                e.printStackTrace()
+                return@measureTime null
             }
-        } catch (e: Exception) {
-            Logger.w(TAG, "生成文本位图失败: ${e.message}")
-            e.printStackTrace()
-            return null
         }
     }
     
@@ -149,76 +188,115 @@ object BitmapUtils {
      * @return 生成的位图，失败返回 null
      */
     fun progressToBitmap(progress: Int, colorReach: String? = null, colorUnReach: String? = null, isCCW: Boolean = false): Bitmap? {
-        try {
-            // 检查进度值是否有效
-            if (progress !in 0..100) {
-                Logger.w(TAG, "进度值无效，progress=$progress")
-                return null
-            }
-            
-            val size = 100 // 位图大小
-            val bitmap = createBitmap(size, size)
-            val canvas = Canvas(bitmap)
-            
-            // 背景透明
-            canvas.drawColor(Color.TRANSPARENT)
-            
-            // 计算进度角度
-            val sweepAngle = (progress / 100f) * 360f
-            val startAngle = if (isCCW) 90f else -90f
-            
-            // 绘制未达到的部分
-            val paintUnReach = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                strokeWidth = 10f
-                color = colorUnReach?.let { 
+        return measureTime("progressToBitmap") {
+            try {
+                if (progress !in 0..100) {
+                    Logger.w(TAG, "进度值无效，progress=$progress")
+                    return@measureTime null
+                }
+                
+                val size = 100
+                val bitmap = getOrCreateBitmap(size, size)
+                val canvas = Canvas(bitmap)
+                
+                val sweepAngle = (progress / 100f) * 360f
+                val startAngle = if (isCCW) 90f else -90f
+                
+                val localPaintUnReach = Paint(progressPaintUnReach)
+                localPaintUnReach.color = colorUnReach?.let { 
                     try {
                         it.toColorInt()
                     } catch (e: Exception) {
                         Logger.w(TAG, "解析未达到部分颜色失败: ${e.message}")
-                        "#888888".toColorInt() // 默认灰色
+                        "#888888".toColorInt()
                     }
-                } ?: "#888888".toColorInt() // 默认灰色
-            }
-            
-            val centerX = size / 2f
-            val centerY = size / 2f
-            val radius = (size - paintUnReach.strokeWidth) / 2f
-            
-            // 绘制未达到的圆环
-            canvas.drawArc(
-                centerX - radius, centerY - radius,
-                centerX + radius, centerY + radius,
-                startAngle, 360f, false, paintUnReach
-            )
-            
-            // 绘制已达到的部分
-            val paintReach = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                style = Paint.Style.STROKE
-                strokeWidth = 10f
-                color = colorReach?.let { 
+                } ?: "#888888".toColorInt()
+                
+                val centerX = size / 2f
+                val centerY = size / 2f
+                val radius = (size - localPaintUnReach.strokeWidth) / 2f
+                
+                canvas.drawArc(
+                    centerX - radius, centerY - radius,
+                    centerX + radius, centerY + radius,
+                    startAngle, 360f, false, localPaintUnReach
+                )
+                
+                val localPaintReach = Paint(progressPaintReach)
+                localPaintReach.color = colorReach?.let { 
                     try {
                         it.toColorInt()
                     } catch (e: Exception) {
                         Logger.w(TAG, "解析已达到部分颜色失败: ${e.message}")
-                        "#00FF00".toColorInt() // 默认绿色
+                        "#00FF00".toColorInt()
                     }
-                } ?: "#00FF00".toColorInt() // 默认绿色
+                } ?: "#00FF00".toColorInt()
+                
+                canvas.drawArc(
+                    centerX - radius, centerY - radius,
+                    centerX + radius, centerY + radius,
+                    startAngle, sweepAngle, false, localPaintReach
+                )
+                
+                Logger.d(TAG, "生成进度位图成功，进度: $progress%")
+                return@measureTime bitmap
+            } catch (e: Exception) {
+                Logger.w(TAG, "生成进度位图失败: ${e.message}")
+                e.printStackTrace()
+                return@measureTime null
             }
-            
-            // 绘制已达到的圆弧
-            canvas.drawArc(
-                centerX - radius, centerY - radius,
-                centerX + radius, centerY + radius,
-                startAngle, sweepAngle, false, paintReach
-            )
-            
-            Logger.d(TAG, "生成进度位图成功，进度: $progress%")
-            return bitmap
-        } catch (e: Exception) {
-            Logger.w(TAG, "生成进度位图失败: ${e.message}")
-            e.printStackTrace()
-            return null
         }
+    }
+    
+    private fun getOrCreateBitmap(width: Int, height: Int): Bitmap {
+        val key = width * 10000 + height // 简单的尺寸键值
+        
+        // 从缓存池中查找合适尺寸的bitmap
+        bitmapCache[key]?.let {
+            val iterator = it.iterator()
+            while (iterator.hasNext()) {
+                val bitmap = iterator.next()
+                if (!bitmap.isRecycled) {
+                    iterator.remove()
+                    bitmap.eraseColor(Color.TRANSPARENT)
+                    return bitmap
+                }
+            }
+        }
+        
+        // 创建新bitmap
+        val newBitmap = createBitmap(width, height)
+        
+        // 管理缓存大小
+        bitmapCache.getOrPut(key) { mutableListOf() }.apply {
+            add(newBitmap)
+            // 限制缓存数量
+            if (size > MAX_CACHE_SIZE) {
+                val oldest = removeAt(0)
+                if (!oldest.isRecycled) {
+                    oldest.recycle()
+                }
+            }
+        }
+        
+        return newBitmap
+    }
+    
+    fun releaseResources() {
+        reusableBitmap?.recycle()
+        reusableBitmap = null
+        reusableBitmapWidth = 0
+        reusableBitmapHeight = 0
+        
+        // 清理缓存池
+        for (bitmaps in bitmapCache.values) {
+            for (bitmap in bitmaps) {
+                if (!bitmap.isRecycled) {
+                    bitmap.recycle()
+                }
+            }
+            bitmaps.clear()
+        }
+        bitmapCache.clear()
     }
 }

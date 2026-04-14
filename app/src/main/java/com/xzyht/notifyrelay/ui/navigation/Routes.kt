@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.ui.navigation
 
+import android.annotation.SuppressLint
 import android.os.Parcel
 import android.os.Parcelable
 import androidx.navigation3.runtime.NavKey
@@ -15,6 +16,7 @@ sealed interface Route : NavKey, Parcelable {
      * Main page (Device connection and enhancement)
      */
     @Serializable
+    @SuppressLint("ParcelCreator")
     data object Main : Route {
         override fun describeContents(): Int = 0
         override fun writeToParcel(parcel: Parcel, flags: Int) {}
@@ -29,6 +31,7 @@ sealed interface Route : NavKey, Parcelable {
      * History page
      */
     @Serializable
+    @SuppressLint("ParcelCreator")
     data object History : Route {
         override fun describeContents(): Int = 0
         override fun writeToParcel(parcel: Parcel, flags: Int) {}
@@ -43,12 +46,43 @@ sealed interface Route : NavKey, Parcelable {
      * Settings page
      */
     @Serializable
+    @SuppressLint("ParcelCreator")
     data object Settings : Route {
         override fun describeContents(): Int = 0
         override fun writeToParcel(parcel: Parcel, flags: Int) {}
         object CREATOR : Parcelable.Creator<Settings> {
             override fun createFromParcel(parcel: Parcel): Settings = Settings
             override fun newArray(size: Int): Array<Settings?> = arrayOfNulls(size)
+        }
+    }
+
+    /**
+     * Scrcpy高级设置页面
+     * Scrcpy advanced settings page
+     */
+    @Serializable
+    @SuppressLint("ParcelCreator")
+    data object ScrcpyAdvanced : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<ScrcpyAdvanced> {
+            override fun createFromParcel(parcel: Parcel): ScrcpyAdvanced = ScrcpyAdvanced
+            override fun newArray(size: Int): Array<ScrcpyAdvanced?> = arrayOfNulls(size)
+        }
+    }
+
+    /**
+     * Scrcpy虚拟按钮排序页面
+     * Scrcpy virtual button order page
+     */
+    @Serializable
+    @SuppressLint("ParcelCreator")
+    data object ScrcpyVirtualButtonOrder : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<ScrcpyVirtualButtonOrder> {
+            override fun createFromParcel(parcel: Parcel): ScrcpyVirtualButtonOrder = ScrcpyVirtualButtonOrder
+            override fun newArray(size: Int): Array<ScrcpyVirtualButtonOrder?> = arrayOfNulls(size)
         }
     }
 }
