@@ -9,6 +9,7 @@ import android.graphics.Rect
 import android.os.Bundle
 import android.os.Build
 import android.util.Rational
+import android.view.View
 import android.widget.Toast
 import io.github.miuzarte.scrcpyforandroid.R
 import androidx.activity.ComponentActivity
@@ -37,10 +38,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
+import androidx.core.graphics.Insets
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
 import io.github.miuzarte.scrcpyforandroid.constants.UiAndroidKeycodes
@@ -490,12 +495,45 @@ private fun ShortcutLaunchScreen(
     onRequestPip: (session: ScrcpySessionInfo, sourceRect: Rect?) -> Unit,
 ) {
     val context = LocalContext.current
+    val configuration = LocalConfiguration.current
     val view = LocalView.current
     val settings = remember(context) { loadMainSettings(context) }
     val scope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
     val imeFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
+
+    val autoNewDisplaySize = remember(
+        configuration.screenWidthDp,
+        configuration.screenHeightDp,
+        configuration.densityDpi,
+        view,
+        sessionParams.startApp,
+        sessionParams.newDisplayWidth,
+        sessionParams.newDisplayHeight,
+        sessionParams.newDisplayDpi,
+    ) {
+        val newDisplayArg = buildNewDisplayArg(
+            sessionParams.newDisplayWidth.filter(Char::isDigit),
+            sessionParams.newDisplayHeight.filter(Char::isDigit),
+            sessionParams.newDisplayDpi.filter(Char::isDigit),
+        )
+        if (sessionParams.startApp.isBlank() || newDisplayArg.isNotBlank()) {
+            ""
+        } else {
+            val densityScale = context.resources.displayMetrics.density
+            val widthPx = (configuration.screenWidthDp * densityScale).toInt()
+            val heightPx = (configuration.screenHeightDp * densityScale).toInt()
+            val systemBars = getSystemBarInsets(view)
+            val availableWidth = (widthPx - systemBars.left - systemBars.right).coerceAtLeast(0)
+            val availableHeight = (heightPx - systemBars.top - systemBars.bottom).coerceAtLeast(0)
+            if (availableWidth > 0 && availableHeight > 0) {
+                "${availableWidth}x${availableHeight}/${configuration.densityDpi}"
+            } else {
+                ""
+            }
+        }
+    }
 
     var connectionState by remember { mutableStateOf<ConnectionState>(ConnectionState.Connecting) }
     var sessionInfo by remember { mutableStateOf<ScrcpySessionInfo?>(null) }
@@ -561,7 +599,7 @@ private fun ShortcutLaunchScreen(
         }
     }
 
-    LaunchedEffect(deviceIp, devicePort) {
+    LaunchedEffect(deviceIp, devicePort, autoNewDisplaySize) {
         connectionState = ConnectionState.Connecting
 
         NativeAdbService.init(context.applicationContext)
@@ -651,10 +689,14 @@ private fun ShortcutLaunchScreen(
             sessionParams.newDisplayDpi.filter(Char::isDigit),
         )
         val effectiveNewDisplay = if (sessionParams.startApp.isNotBlank() && newDisplayArg.isBlank()) {
-            val windowWidth = view.width
-            val windowHeight = view.height
-            val densityDpi = context.resources.displayMetrics.densityDpi
-            if (windowWidth > 0 && windowHeight > 0) "${windowWidth}x$windowHeight/$densityDpi" else "1920x1080/$densityDpi"
+            autoNewDisplaySize.ifBlank {
+                val systemBars = getSystemBarInsets(view)
+                val windowWidth = (view.width - systemBars.left - systemBars.right).coerceAtLeast(0)
+                val windowHeight =
+                    (view.height - systemBars.top - systemBars.bottom).coerceAtLeast(0)
+                val densityDpi = context.resources.displayMetrics.densityDpi
+                if (windowWidth > 0 && windowHeight > 0) "${windowWidth}x${windowHeight}/$densityDpi" else "1920x1080/$densityDpi"
+            }
         } else {
             newDisplayArg
         }
@@ -969,6 +1011,12 @@ private fun buildCropArg(width: String, height: String, x: String, y: String): S
     val ox = x.toIntOrNull()?.takeIf { it >= 0 } ?: return ""
     val oy = y.toIntOrNull()?.takeIf { it >= 0 } ?: return ""
     return "$w:$h:$ox:$oy"
+}
+
+private fun getSystemBarInsets(view: View): Insets {
+    return ViewCompat.getRootWindowInsets(view)
+        ?.getInsets(WindowInsetsCompat.Type.systemBars())
+        ?: Insets.NONE
 }
 
 private sealed class ConnectionState {

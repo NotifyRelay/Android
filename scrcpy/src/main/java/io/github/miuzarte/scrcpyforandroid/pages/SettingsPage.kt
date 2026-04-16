@@ -207,11 +207,11 @@ fun ScrcpySettingsPage(
                 Card {
                     ArrowPreference(
                         title = "当前基于原Miuzarte/ScrcpyForAndroid项目",
-                        summary = "的0aa83f4提交",
+                        summary = "的47d140提交",
                         onClick = {
                             val intent = Intent(
                                 Intent.ACTION_VIEW,
-                                "https://github.com/Miuzarte/ScrcpyForAndroid/commit/0aa83f4a632c0e41d52670aad957831813508d60".toUri()
+                                "https://github.com/Miuzarte/ScrcpyForAndroid/commit/47d140a5c7d539b4596dc74910a85369345edfd4".toUri()
                             )
                             if (intent.resolveActivity(context.packageManager) != null) {
                                 context.startActivity(intent)
