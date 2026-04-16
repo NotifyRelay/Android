@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Screenshot
 import androidx.compose.runtime.Composable
@@ -119,6 +120,12 @@ enum class VirtualButtonAction(
         Icons.Rounded.Screenshot,
         UiAndroidKeycodes.SYSRQ
     ),
+    PIP(
+        "pip",
+        "画中画",
+        Icons.Rounded.PictureInPictureAlt,
+        null
+    ),
 }
 
 data class VirtualButtonItem(
@@ -132,16 +139,24 @@ object VirtualButtonActions {
     private val byId = all.associateBy { it.id }
 
     fun parseStoredLayout(raw: String): List<VirtualButtonItem> {
-        if (raw.isBlank())
+        if (raw.isBlank()) {
             return parseStoredLayout(ScrcpyDefaults.VIRTUAL_BUTTONS_LAYOUT)
+        }
 
-        return raw.split(',').mapNotNull { item ->
+        val items = raw.split(',').mapNotNull { item ->
             val parts = item.trim().split(':')
             if (parts.size != 2) return@mapNotNull null
             val id = parts[0]
             val showOutside = parts[1] == "1"
             val action = byId[id] ?: return@mapNotNull null
             VirtualButtonItem(action, showOutside)
+        }
+        val existing = items.map { it.action }.toSet()
+        val missing = all.filter { it !in existing }
+        return if (missing.isEmpty()) {
+            items
+        } else {
+            items + missing.map { VirtualButtonItem(it, showOutside = false) }
         }
     }
 

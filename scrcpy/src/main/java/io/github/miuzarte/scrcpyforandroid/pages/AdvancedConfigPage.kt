@@ -29,9 +29,9 @@ import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.OverlaySpinnerPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
 import kotlin.math.roundToInt
 
 private val AUDIO_SOURCE_OPTIONS = listOf(
@@ -409,7 +409,7 @@ fun AdvancedConfigPage(
                     onClick = { onRefreshEncoders?.invoke() },
                     enabled = !sessionStarted,
                 )
-                OverlaySpinnerPreference(
+                WindowSpinnerPreference(
                     title = "视频编码器",
                     summary = "--video-encoder",
                     items = videoEncoderEntries,
@@ -429,7 +429,7 @@ fun AdvancedConfigPage(
                         .padding(horizontal = UiSpacing.CardContent)
                         .padding(bottom = UiSpacing.CardContent),
                 )
-                OverlaySpinnerPreference(
+                WindowSpinnerPreference(
                     title = "音频编码器",
                     summary = "--audio-encoder",
                     items = audioEncoderEntries,

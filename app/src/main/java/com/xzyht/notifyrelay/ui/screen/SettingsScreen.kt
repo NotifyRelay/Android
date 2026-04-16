@@ -16,8 +16,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.DeveloperModeActivity
-import com.xzyht.notifyrelay.ui.navigation.Navigator
-import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.pages.UILocalFilter
 import com.xzyht.notifyrelay.ui.pages.UIRemoteFilter
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
@@ -30,16 +28,15 @@ import android.app.Activity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.net.Uri
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpySettingsPage
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
 
 
 /**
  * 设置页面屏幕
  */
 @Composable
-fun SettingsScreen(
-    navigator: Navigator
-) {
+fun SettingsScreen() {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val activity = context as? Activity
@@ -104,8 +101,8 @@ fun SettingsScreen(
                     0 -> UIRemoteFilter()
                     1 -> UILocalFilter()
                     2 -> UISuperIslandSettings()
-                    3 -> ScrcpySettingsPage(
-                        onOpenVirtualButtonOrder = { navigator.push(Route.ScrcpyVirtualButtonOrder) },
+                    3 -> ScrcpyScreenHost(
+                        startScreen = ScrcpyRootScreen.Settings,
                         onPickServer = { serverPicker.launch(arrayOf("application/java-archive", "application/octet-stream", "*/*")) },
                     )
                     4 -> UIAbout(onDeveloperModeTriggered = handleDeveloperModeTriggered)

@@ -257,7 +257,7 @@ class ScrcpyAudioPlayer(
                 )
             }
             codec.releaseOutputBuffer(idx, false)
-            idx = codec.dequeueOutputBuffer(idx, 0L)
+            idx = codec.dequeueOutputBuffer(bufferInfo, 0L)
         }
     }
 

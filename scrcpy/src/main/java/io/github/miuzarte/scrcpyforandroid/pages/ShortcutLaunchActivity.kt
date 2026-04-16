@@ -1,9 +1,14 @@
 package io.github.miuzarte.scrcpyforandroid.pages
 
 import android.app.ActivityManager
+import android.app.PictureInPictureParams
 import android.content.Context
 import android.content.Intent
+import android.content.res.Configuration
+import android.graphics.Rect
 import android.os.Bundle
+import android.os.Build
+import android.util.Rational
 import android.widget.Toast
 import io.github.miuzarte.scrcpyforandroid.R
 import androidx.activity.ComponentActivity
@@ -42,6 +47,7 @@ import io.github.miuzarte.scrcpyforandroid.services.fetchConnectedDeviceInfo
 import io.github.miuzarte.scrcpyforandroid.services.loadDevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.loadMainSettings
 import io.github.miuzarte.scrcpyforandroid.widgets.FullscreenControlScreen
+import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonBar
 import kotlinx.coroutines.Dispatchers
@@ -58,6 +64,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
 
 class ShortcutLaunchActivity : ComponentActivity() {
+
+    private val pipModeState = mutableStateOf(false)
 
     companion object {
         private const val TAG = "ShortcutLaunchActivity"
@@ -361,14 +369,46 @@ class ShortcutLaunchActivity : ComponentActivity() {
 
         enableEdgeToEdge()
         setContent {
+            val isInPip by pipModeState
             ShortcutLaunchScreen(
                 deviceIp = deviceIp,
                 devicePort = devicePort,
                 deviceName = deviceName,
                 sessionParams = sessionParams,
-                onDismiss = { finish() }
+                onDismiss = { finish() },
+                isInPip = isInPip,
+                onRequestPip = { session, sourceRect ->
+                    enterPictureInPicture(session, sourceRect)
+                },
             )
         }
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration
+    ) {
+        newConfig?.let { super.onPictureInPictureModeChanged(isInPictureInPictureMode, it) }
+        pipModeState.value = isInPictureInPictureMode
+    }
+
+    private fun enterPictureInPicture(session: ScrcpySessionInfo?, sourceRect: Rect?) {
+        val targetSession = session ?: return
+        val ratio = Rational(
+            targetSession.width.coerceAtLeast(1),
+            targetSession.height.coerceAtLeast(1),
+        )
+        val builder = PictureInPictureParams.Builder()
+            .setAspectRatio(ratio)
+            .apply {
+                if (sourceRect != null) {
+                    setSourceRectHint(sourceRect)
+                }
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    setSeamlessResizeEnabled(true)
+                }
+            }
+        enterPictureInPictureMode(builder.build())
     }
 
     internal data class SessionParams(
@@ -419,7 +459,9 @@ private fun ShortcutLaunchScreen(
     devicePort: Int,
     deviceName: String,
     sessionParams: ShortcutLaunchActivity.SessionParams,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    isInPip: Boolean,
+    onRequestPip: (session: ScrcpySessionInfo, sourceRect: Rect?) -> Unit,
 ) {
     val context = LocalContext.current
     val view = LocalView.current
@@ -603,6 +645,7 @@ private fun ShortcutLaunchScreen(
             emptySet()
         }
 
+        val mainSettings = loadMainSettings(context)
         val instance = Scrcpy(
             appContext = context.applicationContext,
             serverRemotePath = sessionParams.serverRemotePath.trim(),
@@ -759,6 +802,13 @@ private fun ShortcutLaunchScreen(
                             bar.Fullscreen(
                                 modifier = Modifier.align(Alignment.BottomCenter),
                                 onAction = { action ->
+                                    if (action == VirtualButtonAction.PIP) {
+                                        if (!isInPip) {
+                                            val sourceRect = Rect().takeIf { view.getGlobalVisibleRect(it) }
+                                            onRequestPip(session, sourceRect)
+                                        }
+                                        return@Fullscreen
+                                    }
                                     action.keycode?.let { keycode ->
                                         scope.launch(Dispatchers.IO) {
                                             scrcpyInstance?.injectKeycode(0, keycode)

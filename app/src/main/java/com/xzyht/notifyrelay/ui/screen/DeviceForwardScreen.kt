@@ -20,13 +20,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
+import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
 import com.xzyht.notifyrelay.ui.navigation.Navigator
 import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
 import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import com.xzyht.notifyrelay.ui.pages.RemoteAppsPage
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyAdvancedPage
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyDevicePage
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyVirtualButtonOrderPage
 import kotlinx.coroutines.launch
@@ -35,13 +37,10 @@ import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-fun DeviceForwardScreen(
-    navigator: Navigator
-) {
+fun DeviceForwardScreen() {
     val context = LocalContext.current
-    val app = context.applicationContext as Application
+    val navigator = LocalNavigator.current
     val coroutineScope = rememberCoroutineScope()
-    val scrcpyViewModel = remember { ScrcpyUiViewModel.getInstance(app) }
     
     LaunchedEffect(Unit) {
         if (!RemoteFilterConfig.isLoaded) {
@@ -107,10 +106,10 @@ fun DeviceForwardScreen(
                 when (page) {
                     0 -> ClipboardSyncPage()
                     1 -> MusicControlPage()
-                    2 -> ScrcpyDevicePage(
+                    2 -> ScrcpyScreenHost(
+                        startScreen = ScrcpyRootScreen.Device,
                         selectedDevice = selectedDeviceInfo,
                         onOpenAdvanced = { navigator.push(Route.ScrcpyAdvanced) },
-                        viewModel = scrcpyViewModel
                     )
                     3 -> {
                         RemoteAppsPage(
