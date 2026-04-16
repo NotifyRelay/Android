@@ -12,5 +12,6 @@ internal object UiAndroidKeycodes {
     const val NOTIFICATION = 83
     const val SYSRQ = 120 // System Request / Print Screen
     const val APP_SWITCH = 187
+    const val DEL = 67
 }
 // TODO: customizable virtual keys with any keycode

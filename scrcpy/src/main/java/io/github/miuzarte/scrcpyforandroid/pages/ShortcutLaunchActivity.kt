@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -36,11 +37,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
+import io.github.miuzarte.scrcpyforandroid.constants.UiAndroidKeycodes
 import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
@@ -66,6 +69,7 @@ import notifyrelay.data.config.ScrcpyDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -491,6 +495,7 @@ private fun ShortcutLaunchScreen(
     val scope = rememberCoroutineScope()
     val keyboardController = LocalSoftwareKeyboardController.current
     val imeFocusRequester = remember { FocusRequester() }
+    val focusManager = LocalFocusManager.current
 
     var connectionState by remember { mutableStateOf<ConnectionState>(ConnectionState.Connecting) }
     var sessionInfo by remember { mutableStateOf<ScrcpySessionInfo?>(null) }
@@ -542,6 +547,9 @@ private fun ShortcutLaunchScreen(
         if (showImeInput) {
             imeFocusRequester.requestFocus()
             keyboardController?.show()
+        } else {
+            focusManager.clearFocus()
+            keyboardController?.hide()
         }
     }
 
@@ -868,7 +876,6 @@ private fun ShortcutLaunchScreen(
                                         showImeInput = !showImeInput
                                         if (!showImeInput) {
                                             imeBuffer = ""
-                                            keyboardController?.hide()
                                         }
                                         return@Fullscreen
                                     }
@@ -888,26 +895,50 @@ private fun ShortcutLaunchScreen(
                                     TextField(
                                         value = imeBuffer,
                                         onValueChange = { newValue ->
-                                            val previous = imeBuffer
-                                            imeBuffer = newValue
-                                            val delta = if (newValue.startsWith(previous)) {
-                                                newValue.removePrefix(previous)
-                                            } else {
-                                                newValue
-                                            }
-                                            if (delta.isNotBlank()) {
+                                            val oldValue = imeBuffer
+                                            val commonPrefix = oldValue.commonPrefixWith(newValue)
+                                            val removedCount = oldValue.length - commonPrefix.length
+                                            val addedText = newValue.substring(commonPrefix.length)
+
+                                            if (removedCount > 0) {
                                                 scope.launch(Dispatchers.IO) {
-                                                    scrcpyInstance?.injectText(delta)
+                                                    repeat(removedCount) {
+                                                        scrcpyInstance?.injectKeycode(0, UiAndroidKeycodes.DEL)
+                                                        scrcpyInstance?.injectKeycode(1, UiAndroidKeycodes.DEL)
+                                                    }
                                                 }
-                                                imeBuffer = ""
                                             }
+                                            if (addedText.isNotEmpty()) {
+                                                scope.launch(Dispatchers.IO) {
+                                                    addedText.forEach { ch ->
+                                                        scrcpyInstance?.injectText(ch.toString())
+                                                    }
+                                                }
+                                            }
+                                            imeBuffer = newValue
                                         },
-                                        label = "输入并转发",
+                                        label = "输入（暂不支持中文等组合）",
                                         keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                        keyboardActions = KeyboardActions(onDone = {
+                                            showImeInput = false
+                                            imeBuffer = ""
+                                        }),
                                         modifier = Modifier
                                             .padding(UiSpacing.Medium)
                                             .focusRequester(imeFocusRequester)
                                             .focusable(),
+                                    )
+                                    TextButton(
+                                        text = "关闭输入",
+                                        onClick = {
+                                            showImeInput = false
+                                            imeBuffer = ""
+                                        },
+                                        modifier = Modifier.padding(
+                                            start = UiSpacing.Medium,
+                                            end = UiSpacing.Medium,
+                                            bottom = UiSpacing.Medium,
+                                        ),
                                     )
                                 }
                             }
