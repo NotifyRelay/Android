@@ -15,7 +15,6 @@ import io.github.miuzarte.scrcpyforandroid.R
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
@@ -45,6 +44,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.input.ImeAction
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
@@ -397,7 +397,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
             useScrcpyStartApp = useScrcpyStartApp,
         )
 
-        enableEdgeToEdge()
+        WindowCompat.setDecorFitsSystemWindows(window, true)
         setContent {
             val isInPip by pipModeState
             ShortcutLaunchScreen(
