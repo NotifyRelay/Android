@@ -158,13 +158,19 @@ class RemoteAppsViewModel : ViewModel() {
         _state.update { it.copy(apps = updatedApps, pinnedApps = pinnedApps) }
     }
 
-    fun openApp(context: Context, app: RemoteAppInfo, deviceIp: String) {
+    fun openApp(
+        context: Context,
+        app: RemoteAppInfo,
+        deviceIp: String,
+        useScrcpyStartApp: Boolean = false,
+    ) {
         ShortcutLaunchActivity.startFullscreenControl(
             context = context,
             ip = deviceIp,
             port = 5555,
             name = app.appName,
             startApp = app.packageName,
+            useScrcpyStartApp = useScrcpyStartApp,
         )
     }
 }

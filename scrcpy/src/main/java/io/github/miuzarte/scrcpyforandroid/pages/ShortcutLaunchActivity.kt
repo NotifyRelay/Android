@@ -112,6 +112,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
         private const val EXTRA_CROP_X = "crop_x"
         private const val EXTRA_CROP_Y = "crop_y"
         private const val EXTRA_START_APP = "start_app"
+        private const val EXTRA_USE_SCRCPY_START_APP = "use_scrcpy_start_app"
 
         internal var appLaunchCallback: ((deviceIp: String, packageName: String, displayId: Int) -> Unit)? = null
 
@@ -119,12 +120,20 @@ class ShortcutLaunchActivity : ComponentActivity() {
             appLaunchCallback = callback
         }
 
-        fun startFullscreenControl(context: Context, ip: String, port: Int, name: String, startApp: String = "") {
+        fun startFullscreenControl(
+            context: Context,
+            ip: String,
+            port: Int,
+            name: String,
+            startApp: String = "",
+            useScrcpyStartApp: Boolean = false,
+        ) {
             val intent = Intent(context, ShortcutLaunchActivity::class.java).apply {
                 putExtra(EXTRA_DEVICE_IP, ip)
                 putExtra(EXTRA_DEVICE_PORT, port)
                 putExtra(EXTRA_DEVICE_NAME, name)
                 putExtra(EXTRA_START_APP, startApp)
+                putExtra(EXTRA_USE_SCRCPY_START_APP, useScrcpyStartApp)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
@@ -173,6 +182,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
             cropX: String,
             cropY: String,
             startApp: String = "",
+            useScrcpyStartApp: Boolean = false,
         ) {
             val intent = Intent(context, ShortcutLaunchActivity::class.java).apply {
                 putExtra(EXTRA_DEVICE_IP, ip)
@@ -216,6 +226,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
                 putExtra(EXTRA_CROP_X, cropX)
                 putExtra(EXTRA_CROP_Y, cropY)
                 putExtra(EXTRA_START_APP, startApp)
+                putExtra(EXTRA_USE_SCRCPY_START_APP, useScrcpyStartApp)
                 addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             }
             context.startActivity(intent)
@@ -325,6 +336,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
         val cropX = intent?.getStringExtra(EXTRA_CROP_X)?.ifBlank { ScrcpyDefaults.CROP_X } ?: ScrcpyDefaults.CROP_X
         val cropY = intent?.getStringExtra(EXTRA_CROP_Y)?.ifBlank { ScrcpyDefaults.CROP_Y } ?: ScrcpyDefaults.CROP_Y
         val startApp = intent?.getStringExtra(EXTRA_START_APP) ?: ""
+        val useScrcpyStartApp = intent?.getBooleanExtra(EXTRA_USE_SCRCPY_START_APP, false) ?: false
 
         val sessionParams = SessionParams(
             videoBitRateMbps = videoBitRateMbps,
@@ -365,6 +377,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
             cropX = cropX,
             cropY = cropY,
             startApp = startApp,
+            useScrcpyStartApp = useScrcpyStartApp,
         )
 
         enableEdgeToEdge()
@@ -450,6 +463,7 @@ class ShortcutLaunchActivity : ComponentActivity() {
         val cropX: String,
         val cropY: String,
         val startApp: String,
+        val useScrcpyStartApp: Boolean,
     )
 }
 
@@ -627,10 +641,14 @@ private fun ShortcutLaunchScreen(
         val effectiveTurnScreenOff = sessionParams.turnScreenOff && !sessionParams.noControl
         val isVirtualDisplayMode = sessionParams.startApp.isNotBlank() && effectiveNewDisplay.isNotBlank()
         val effectiveAudioDup = if (isVirtualDisplayMode) false else sessionParams.audioDup
+        val shouldUseScrcpyStartApp = sessionParams.useScrcpyStartApp && sessionParams.startApp.isNotBlank()
 
         Logger.d("ShortcutLaunchActivity", "startApp=${sessionParams.startApp}, newDisplay=$effectiveNewDisplay")
 
-        val existingDisplayIds = if (sessionParams.startApp.isNotBlank() && effectiveNewDisplay.isNotBlank()) {
+        val existingDisplayIds = if (!shouldUseScrcpyStartApp
+            && sessionParams.startApp.isNotBlank()
+            && effectiveNewDisplay.isNotBlank()
+        ) {
             try {
                 val output = NativeAdbService.shell("dumpsys display")
                 val regex = Regex("mDisplayId=(\\d+)")
@@ -700,7 +718,21 @@ private fun ShortcutLaunchScreen(
         sessionInfo = session
         connectionState = ConnectionState.Connected(session)
 
-        if (sessionParams.startApp.isNotBlank() && effectiveNewDisplay.isNotBlank()) {
+        if (shouldUseScrcpyStartApp) {
+            if (!options.control) {
+                Logger.w("ShortcutLaunchActivity", "控制通道不可用，无法通过 scrcpy 启动应用")
+            } else {
+                scope.launch(Dispatchers.IO) {
+                    runCatching { instance.startApp(sessionParams.startApp) }
+                        .onSuccess {
+                            Logger.d("ShortcutLaunchActivity", "已通过 scrcpy 启动应用: ${sessionParams.startApp}")
+                        }
+                        .onFailure { error ->
+                            Logger.w("ShortcutLaunchActivity", "scrcpy 启动应用失败: ${error.message}", error)
+                        }
+                }
+            }
+        } else if (sessionParams.startApp.isNotBlank() && effectiveNewDisplay.isNotBlank()) {
             Logger.d("ShortcutLaunchActivity", "准备在虚拟显示器上启动应用: startApp=${sessionParams.startApp}")
             
             scope.launch(Dispatchers.IO) {

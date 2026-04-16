@@ -217,6 +217,8 @@ class Scrcpy(
 
     fun getCurrentSession(): Session.SessionInfo? = currentSessionState.value
 
+    suspend fun startApp(name: String) = session.startApp(name)
+
     suspend fun injectKeycode(
         action: Int,
         keycode: Int,
@@ -1000,6 +1002,15 @@ class Scrcpy(
 
         suspend fun clearAudioConsumer() = mutex.withLock { audioConsumer = null }
 
+        suspend fun startApp(name: String) = mutex.withLock {
+            try {
+                requireControlWriter().startApp(name)
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "startApp(): control channel not available", e)
+                throw e
+            }
+        }
+
         suspend fun injectKeycode(
             action: Int,
             keycode: Int,
@@ -1352,6 +1363,18 @@ class Scrcpy(
                 output.flush()
             }
 
+            @Synchronized
+            fun startApp(name: String) {
+                val normalized = name.trim()
+                val bytes = normalized.toByteArray(Charsets.UTF_8)
+                require(normalized.isNotBlank()) { "start app name is blank" }
+                require(bytes.size <= 255) { "start app name is too long" }
+                output.writeByte(TYPE_START_APP)
+                output.writeByte(bytes.size)
+                output.write(bytes)
+                output.flush()
+            }
+
             private fun writePosition(x: Int, y: Int, screenWidth: Int, screenHeight: Int) {
                 output.writeInt(x)
                 output.writeInt(y)
@@ -1399,6 +1422,7 @@ class Scrcpy(
             private const val TYPE_INJECT_SCROLL_EVENT = 3
             private const val TYPE_BACK_OR_SCREEN_ON = 4
             private const val TYPE_SET_DISPLAY_POWER = 10
+            private const val TYPE_START_APP = 16
 
             private fun socketNameFor(scid: Int): String {
                 return "scrcpy_%08x".format(scid)
