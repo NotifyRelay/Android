@@ -2,15 +2,19 @@ package io.github.miuzarte.scrcpyforandroid.nativecore
 
 // Go reader note: Audio output helper for scrcpy stream: decodes/plays PCM or codec audio frames.
 
+import android.content.Context
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioManager
 import android.media.AudioTrack
 import android.media.MediaCodec
 import android.media.MediaFormat
+import android.os.Build
 import android.util.Log
+import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import kotlin.math.max
 
 /**
  * Decodes and plays scrcpy audio stream (OPUS / AAC / FLAC / RAW PCM).
@@ -18,76 +22,75 @@ import java.nio.ByteOrder
  * All [feedPacket] calls are expected from a single background thread.
  * [release] may be called from any thread.
  */
-class ScrcpyAudioPlayer(private val codecId: Int) {
+class ScrcpyAudioPlayer(
+    context: Context,
+    private val codecId: Int,
+    private val lowLatency: Boolean,
+) {
 
-    private val audioStateLock = Any()
     private var mediaCodec: MediaCodec? = null
     private var audioTrack: AudioTrack? = null
     private val bufferInfo = MediaCodec.BufferInfo()
+    private val audioManager = context.applicationContext
+        .getSystemService(Context.AUDIO_SERVICE) as? AudioManager
+    private var reusablePcmBuffer = ByteArray(0)
 
+    @Volatile
+    private var audioThreadPriorityApplied = false
+
+    @Volatile
     private var prepared = false
+
     @Volatile
     private var released = false
     private var packetCount = 0L
 
     fun feedPacket(data: ByteArray, ptsUs: Long, isConfig: Boolean) {
-        var trackForRawWrite: AudioTrack? = null
-        var codecForDrain: MediaCodec? = null
-        var trackForDrain: AudioTrack? = null
+        if (released) return
+        applyAudioThreadPriorityIfNeeded()
 
-        synchronized(audioStateLock) {
-            if (released) return
-
-            if (isConfig) {
-                Log.i(
-                    TAG,
-                    "feedPacket(): config packet size=${data.size} codec=0x${
-                        codecId.toUInt().toString(16)
-                    }"
-                )
-                when (codecId) {
-                    AUDIO_CODEC_OPUS -> prepareOpus(data)
-                    AUDIO_CODEC_AAC -> prepareAac(data)
-                    AUDIO_CODEC_FLAC -> prepareFlac(data)
-                }
-                return
+        if (isConfig) {
+            Log.i(
+                TAG,
+                "feedPacket(): config packet size=${data.size} codec=0x${
+                    codecId.toUInt().toString(16)
+                }"
+            )
+            when (codecId) {
+                Codec.OPUS.id -> prepareOpus(data)
+                Codec.AAC.id -> prepareAac(data)
+                Codec.FLAC.id -> prepareFlac(data)
             }
-
-            packetCount += 1
-            if (packetCount == 1L || packetCount % 120L == 0L) {
-                Log.i(TAG, "feedPacket(): packets=$packetCount prepared=$prepared size=${data.size}")
-            }
-
-            if (codecId == AUDIO_CODEC_RAW) {
-                trackForRawWrite = ensureRawAudioTrack()
-            } else {
-                if (!prepared) return
-                codecForDrain = mediaCodec ?: return
-                trackForDrain = audioTrack
-
-                val inputIdx = codecForDrain!!.dequeueInputBuffer(CODEC_TIMEOUT_US)
-                if (inputIdx >= 0) {
-                    val buf = codecForDrain!!.getInputBuffer(inputIdx) ?: return
-                    buf.clear()
-                    if (data.size > buf.remaining()) {
-                        Log.w(TAG, "Input buffer too small: data=${data.size} remaining=${buf.remaining()}, dropping frame")
-                        codecForDrain!!.queueInputBuffer(inputIdx, 0, 0, 0, 0)
-                        return
-                    }
-                    buf.put(data)
-                    codecForDrain!!.queueInputBuffer(inputIdx, 0, data.size, ptsUs, 0)
-                }
-            }
-        }
-
-        if (trackForRawWrite != null) {
-            writeAudioTrackBlocking(trackForRawWrite!!, data)
             return
         }
 
-        if (codecForDrain != null && trackForDrain != null) {
-            drainOutput(codecForDrain!!, trackForDrain!!)
+        packetCount += 1
+        if (packetCount == 1L || packetCount % 120L == 0L) {
+            Log.i(TAG, "feedPacket(): packets=$packetCount prepared=$prepared size=${data.size}")
         }
+
+        if (codecId == Codec.RAW.id) {
+            val track = ensureRawAudioTrack() ?: return
+            track.write(
+                data,
+                0,
+                data.size,
+                AudioTrack.WRITE_NON_BLOCKING,
+            )
+            return
+        }
+
+        if (!prepared) return
+        val codec = mediaCodec ?: return
+
+        val inputIdx = codec.dequeueInputBuffer(CODEC_TIMEOUT_US)
+        if (inputIdx >= 0) {
+            val buf = codec.getInputBuffer(inputIdx) ?: return
+            buf.clear()
+            buf.put(data)
+            codec.queueInputBuffer(inputIdx, 0, data.size, ptsUs, 0)
+        }
+        drainOutput(codec)
     }
 
     // OpusHead bytes (already extracted by server's fixOpusConfigPacket)
@@ -171,44 +174,64 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
         val minBuf = AudioTrack.getMinBufferSize(
             SAMPLE_RATE, AudioFormat.CHANNEL_OUT_STEREO, AudioFormat.ENCODING_PCM_16BIT,
         ).coerceAtLeast(1)
-        return AudioTrack(
-            AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_MEDIA)
-                .setContentType(AudioAttributes.CONTENT_TYPE_MOVIE)
-                .build(),
-            AudioFormat.Builder()
-                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                .setSampleRate(SAMPLE_RATE)
-                .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
-                .build(),
-            (minBuf * 4).coerceAtLeast(65536),
-            AudioTrack.MODE_STREAM,
-            AudioManager.AUDIO_SESSION_ID_GENERATE,
-        )
-    }
+        val framesPerBurst = audioManager
+            ?.getProperty(AudioManager.PROPERTY_OUTPUT_FRAMES_PER_BUFFER)
+            ?.toIntOrNull()
+            ?.takeIf { it > 0 }
+            ?: DEFAULT_FRAMES_PER_BURST
+        val nativeSampleRate = audioManager
+            ?.getProperty(AudioManager.PROPERTY_OUTPUT_SAMPLE_RATE)
+            ?.toIntOrNull()
+            ?.takeIf { it > 0 }
+            ?: SAMPLE_RATE
 
-    private fun writeAudioTrackBlocking(track: AudioTrack, data: ByteArray) {
-        var offset = 0
-        val size = data.size
-        var retryCount = 0
-        val maxRetries = 100
-        while (offset < size && retryCount < maxRetries) {
-            if (released) return
-            val written = track.write(data, offset, size - offset, AudioTrack.WRITE_NON_BLOCKING)
-            if (written > 0) {
-                offset += written
-                retryCount = 0
-            } else if (written == 0) {
-                retryCount++
-                Thread.sleep(5)
-            } else {
-                Log.w(TAG, "AudioTrack write error: $written")
-                break
+        val bufferSize = if (lowLatency) {
+            val targetBuffer = framesPerBurst * 2 * BYTES_PER_FRAME_PCM16_STEREO
+            max(minBuf, targetBuffer)
+        } else {
+            (minBuf * 4).coerceAtLeast(DEFAULT_BUFFER_SIZE_BYTES)
+        }
+
+        val attributesBuilder = AudioAttributes.Builder()
+            .setUsage(
+                if (lowLatency) AudioAttributes.USAGE_GAME
+                else AudioAttributes.USAGE_MEDIA
+            )
+            .setContentType(
+                if (lowLatency) AudioAttributes.CONTENT_TYPE_SONIFICATION
+                else AudioAttributes.CONTENT_TYPE_MOVIE
+            )
+        if (lowLatency) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                attributesBuilder.setAllowedCapturePolicy(AudioAttributes.ALLOW_CAPTURE_BY_NONE)
             }
         }
-        if (offset < size) {
-            Log.w(TAG, "AudioTrack write incomplete: $offset/$size bytes")
+
+        val trackBuilder = AudioTrack.Builder()
+            .setAudioAttributes(attributesBuilder.build())
+            .setAudioFormat(
+                AudioFormat.Builder()
+                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                    .setSampleRate(SAMPLE_RATE)
+                    .setChannelMask(AudioFormat.CHANNEL_OUT_STEREO)
+                    .build()
+            )
+            .setBufferSizeInBytes(bufferSize)
+            .setTransferMode(AudioTrack.MODE_STREAM)
+            .setSessionId(AudioManager.AUDIO_SESSION_ID_GENERATE)
+        if (lowLatency)
+            trackBuilder.setPerformanceMode(AudioTrack.PERFORMANCE_MODE_LOW_LATENCY)
+
+        val track = trackBuilder.build()
+
+        if (lowLatency) {
+            Log.i(
+                TAG,
+                "low-latency audio requested: nativeSampleRate=$nativeSampleRate streamSampleRate=$SAMPLE_RATE " +
+                        "framesPerBurst=$framesPerBurst bufferSize=$bufferSize performanceMode=${track.performanceMode}"
+            )
         }
+        return track
     }
 
     /**
@@ -216,19 +239,25 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
      *
      * - Non-blocking writes are used so audio does not stall the decoder thread.
      */
-    private fun drainOutput(codec: MediaCodec, track: AudioTrack) {
+    private fun drainOutput(codec: MediaCodec) {
+        val track = audioTrack ?: return
         var idx = codec.dequeueOutputBuffer(bufferInfo, 0L)
         while (idx >= 0) {
             val outBuf = codec.getOutputBuffer(idx) ?: break
             val size = bufferInfo.size
             if (size > 0) {
-                val pcm = ByteArray(size)
+                ensurePcmBufferCapacity(size)
                 outBuf.position(bufferInfo.offset)
-                outBuf.get(pcm)
-                writeAudioTrackBlocking(track, pcm)
+                outBuf.get(reusablePcmBuffer, 0, size)
+                track.write(
+                    reusablePcmBuffer,
+                    0,
+                    size,
+                    AudioTrack.WRITE_NON_BLOCKING,
+                )
             }
             codec.releaseOutputBuffer(idx, false)
-            idx = codec.dequeueOutputBuffer(bufferInfo, 0L)
+            idx = codec.dequeueOutputBuffer(idx, 0L)
         }
     }
 
@@ -236,31 +265,42 @@ class ScrcpyAudioPlayer(private val codecId: Int) {
      * Release media and audio resources. Safe to call from any thread.
      */
     fun release() {
-        synchronized(audioStateLock) {
-            if (released) return
-            released = true
-            prepared = false
-            runCatching { mediaCodec?.stop() }
-            runCatching { mediaCodec?.release() }
-            runCatching { audioTrack?.stop() }
-            runCatching { audioTrack?.release() }
-            mediaCodec = null
-            audioTrack = null
-        }
+        if (released) return
+        released = true
+        prepared = false
+        runCatching { mediaCodec?.stop() }
+        runCatching { mediaCodec?.release() }
+        runCatching { audioTrack?.stop() }
+        runCatching { audioTrack?.release() }
+        mediaCodec = null
+        audioTrack = null
     }
 
     private fun longBuffer(value: Long): ByteBuffer =
         ByteBuffer.allocate(8).order(ByteOrder.nativeOrder()).apply { putLong(value); flip() }
 
+    private fun ensurePcmBufferCapacity(size: Int) {
+        if (reusablePcmBuffer.size < size) {
+            reusablePcmBuffer = ByteArray(size)
+        }
+    }
+
+    private fun applyAudioThreadPriorityIfNeeded() {
+        if (!lowLatency || audioThreadPriorityApplied) return
+        audioThreadPriorityApplied = true
+        runCatching {
+            android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
+        }
+    }
+
     companion object {
         private const val TAG = "ScrcpyAudioPlayer"
-        const val AUDIO_CODEC_OPUS = 0x6f707573
-        const val AUDIO_CODEC_AAC = 0x00616163
-        const val AUDIO_CODEC_FLAC = 0x666c6163
-        const val AUDIO_CODEC_RAW = 0x00726177
-        private const val SAMPLE_RATE = 48000
-        private const val CHANNELS = 2
         private const val CODEC_TIMEOUT_US = 10_000L
-        private const val OPUS_SEEK_PREROLL_NS = 80_000_000L // 80 ms
+        private const val SAMPLE_RATE = 48_000
+        private const val CHANNELS = 2
+        private const val OPUS_SEEK_PREROLL_NS = 80_000_000L
+        private const val DEFAULT_FRAMES_PER_BURST = 192
+        private const val DEFAULT_BUFFER_SIZE_BYTES = 65_536
+        private const val BYTES_PER_FRAME_PCM16_STEREO = 4
     }
 }

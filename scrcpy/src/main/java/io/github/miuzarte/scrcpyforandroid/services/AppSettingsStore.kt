@@ -12,6 +12,7 @@ internal data class MainSettings(
     val fullscreenDebugInfoEnabled: Boolean = ScrcpyDefaults.FULLSCREEN_DEBUG_INFO,
     val showFullscreenVirtualButtons: Boolean = ScrcpyDefaults.SHOW_FULLSCREEN_VIRTUAL_BUTTONS,
     val keepScreenOnWhenStreamingEnabled: Boolean = ScrcpyDefaults.KEEP_SCREEN_ON_WHEN_STREAMING,
+    val lowLatency: Boolean = ScrcpyDefaults.LOW_LATENCY,
     val virtualButtonsLayout: String = ScrcpyDefaults.VIRTUAL_BUTTONS_LAYOUT,
     val customServerUri: String? = ScrcpyDefaults.CUSTOM_SERVER_URI,
     val serverRemotePath: String = ScrcpyDefaults.SERVER_REMOTE_PATH_INPUT,
@@ -100,6 +101,12 @@ internal fun loadMainSettings(context: Context): MainSettings {
             ScrcpyDefaults.KEEP_SCREEN_ON_WHEN_STREAMING,
             StorageManager.PrefsType.SCRCPY,
         ),
+        lowLatency = StorageManager.getBoolean(
+            context,
+            ScrcpyPreferenceKeys.LOW_LATENCY,
+            ScrcpyDefaults.LOW_LATENCY,
+            StorageManager.PrefsType.SCRCPY,
+        ),
         virtualButtonsLayout = StorageManager.getString(
             context,
             ScrcpyPreferenceKeys.VIRTUAL_BUTTONS_LAYOUT,
@@ -174,6 +181,12 @@ internal fun saveMainSettings(context: Context, settings: MainSettings) {
         context,
         ScrcpyPreferenceKeys.KEEP_SCREEN_ON_WHEN_STREAMING,
         settings.keepScreenOnWhenStreamingEnabled,
+        StorageManager.PrefsType.SCRCPY,
+    )
+    StorageManager.putBoolean(
+        context,
+        ScrcpyPreferenceKeys.LOW_LATENCY,
+        settings.lowLatency,
         StorageManager.PrefsType.SCRCPY,
     )
     StorageManager.putString(

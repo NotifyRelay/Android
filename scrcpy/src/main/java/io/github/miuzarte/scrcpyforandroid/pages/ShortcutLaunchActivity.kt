@@ -607,6 +607,7 @@ private fun ShortcutLaunchScreen(
             appContext = context.applicationContext,
             serverRemotePath = sessionParams.serverRemotePath.trim(),
             customServerUri = sessionParams.customServerUri,
+            lowLatency = mainSettings.lowLatency,
         )
         scrcpyInstance = instance
 

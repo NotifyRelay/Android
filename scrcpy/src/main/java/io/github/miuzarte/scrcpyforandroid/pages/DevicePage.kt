@@ -433,6 +433,7 @@ fun DeviceTabScreen(
                 appContext = context.applicationContext,
                 serverRemotePath = viewModel.serverRemotePath,
                 customServerUri = viewModel.customServerUri,
+                lowLatency = viewModel.lowLatency,
             )
         }
 
@@ -1007,6 +1008,7 @@ fun ScrcpyAdvancedPage(
             appContext = context.applicationContext,
             customServerUri = viewModel.customServerUri,
             serverRemotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH },
+            lowLatency = viewModel.lowLatency,
         )
     }
 

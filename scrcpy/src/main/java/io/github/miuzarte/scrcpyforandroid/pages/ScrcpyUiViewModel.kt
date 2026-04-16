@@ -72,6 +72,15 @@ class ScrcpyUiViewModel private constructor(private val app: Application) : View
             saveMainSettings(app, mainSettings)
         }
 
+    private val _lowLatency = mutableStateOf(mainSettings.lowLatency)
+    var lowLatency: Boolean
+        get() = _lowLatency.value
+        set(value) {
+            _lowLatency.value = value
+            mainSettings = mainSettings.copy(lowLatency = value)
+            saveMainSettings(app, mainSettings)
+        }
+
     private val _virtualButtonsLayout = mutableStateOf(mainSettings.virtualButtonsLayout)
     var virtualButtonsLayout: String
         get() = _virtualButtonsLayout.value

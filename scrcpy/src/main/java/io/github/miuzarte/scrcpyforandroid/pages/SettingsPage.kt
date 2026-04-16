@@ -98,6 +98,12 @@ fun ScrcpySettingsPage(
                         checked = viewModel.keepScreenOnWhenStreamingEnabled,
                         onCheckedChange = { viewModel.keepScreenOnWhenStreamingEnabled = it },
                     )
+                    SwitchPreference(
+                        title = "低延迟音频",
+                        summary = "启用低延迟音频路径（可能增加功耗）",
+                        checked = viewModel.lowLatency,
+                        onCheckedChange = { viewModel.lowLatency = it },
+                    )
                     ArrowPreference(
                         title = "虚拟按钮排序",
                         summary = "手动排序预览/全屏时的虚拟按钮，并选择哪些按钮展示在外",
