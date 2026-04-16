@@ -15,10 +15,12 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -31,10 +33,15 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.input.ImeAction
 import io.github.miuzarte.scrcpyforandroid.NativeCoreFacade
 import io.github.miuzarte.scrcpyforandroid.ScrcpySessionInfo
+import io.github.miuzarte.scrcpyforandroid.constants.UiSpacing
 import io.github.miuzarte.scrcpyforandroid.nativecore.NativeAdbService
 import io.github.miuzarte.scrcpyforandroid.scrcpy.ClientOptions
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
@@ -42,7 +49,6 @@ import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.AudioSource
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.CameraFacing
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.Codec
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Shared.VideoSource
-import io.github.miuzarte.scrcpyforandroid.services.DevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.fetchConnectedDeviceInfo
 import io.github.miuzarte.scrcpyforandroid.services.loadDevicePageSettings
 import io.github.miuzarte.scrcpyforandroid.services.loadMainSettings
@@ -57,8 +63,10 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
 import notifyrelay.data.config.ScrcpyDefaults
+import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
@@ -481,6 +489,8 @@ private fun ShortcutLaunchScreen(
     val view = LocalView.current
     val settings = remember(context) { loadMainSettings(context) }
     val scope = rememberCoroutineScope()
+    val keyboardController = LocalSoftwareKeyboardController.current
+    val imeFocusRequester = remember { FocusRequester() }
 
     var connectionState by remember { mutableStateOf<ConnectionState>(ConnectionState.Connecting) }
     var sessionInfo by remember { mutableStateOf<ScrcpySessionInfo?>(null) }
@@ -489,6 +499,8 @@ private fun ShortcutLaunchScreen(
     var showDebugInfo by remember { mutableStateOf(settings.fullscreenDebugInfoEnabled) }
     var showVirtualButtons by remember { mutableStateOf(settings.showFullscreenVirtualButtons) }
     var cameraMirroringSupported by remember { mutableStateOf(true) }
+    var showImeInput by remember { mutableStateOf(false) }
+    var imeBuffer by remember { mutableStateOf("") }
 
     var scrcpyInstance by remember { mutableStateOf<Scrcpy?>(null) }
 
@@ -523,6 +535,13 @@ private fun ShortcutLaunchScreen(
         NativeCoreFacade.addVideoSizeListener(listener)
         onDispose {
             NativeCoreFacade.removeVideoSizeListener(listener)
+        }
+    }
+
+    LaunchedEffect(showImeInput) {
+        if (showImeInput) {
+            imeFocusRequester.requestFocus()
+            keyboardController?.show()
         }
     }
 
@@ -841,6 +860,18 @@ private fun ShortcutLaunchScreen(
                                         }
                                         return@Fullscreen
                                     }
+                                    if (action == VirtualButtonAction.IME) {
+                                        if (sessionParams.noControl) {
+                                            Toast.makeText(context, "控制通道不可用，无法转发输入", Toast.LENGTH_SHORT).show()
+                                            return@Fullscreen
+                                        }
+                                        showImeInput = !showImeInput
+                                        if (!showImeInput) {
+                                            imeBuffer = ""
+                                            keyboardController?.hide()
+                                        }
+                                        return@Fullscreen
+                                    }
                                     action.keycode?.let { keycode ->
                                         scope.launch(Dispatchers.IO) {
                                             scrcpyInstance?.injectKeycode(0, keycode)
@@ -849,6 +880,37 @@ private fun ShortcutLaunchScreen(
                                     }
                                 },
                             )
+                        }
+
+                        if (showImeInput) {
+                            Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                                Card {
+                                    TextField(
+                                        value = imeBuffer,
+                                        onValueChange = { newValue ->
+                                            val previous = imeBuffer
+                                            imeBuffer = newValue
+                                            val delta = if (newValue.startsWith(previous)) {
+                                                newValue.removePrefix(previous)
+                                            } else {
+                                                newValue
+                                            }
+                                            if (delta.isNotBlank()) {
+                                                scope.launch(Dispatchers.IO) {
+                                                    scrcpyInstance?.injectText(delta)
+                                                }
+                                                imeBuffer = ""
+                                            }
+                                        },
+                                        label = "输入并转发",
+                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                                        modifier = Modifier
+                                            .padding(UiSpacing.Medium)
+                                            .focusRequester(imeFocusRequester)
+                                            .focusable(),
+                                    )
+                                }
+                            }
                         }
                     }
                 }

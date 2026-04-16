@@ -19,6 +19,7 @@ import androidx.compose.material.icons.rounded.Home
 import androidx.compose.material.icons.rounded.Menu
 import androidx.compose.material.icons.rounded.MoreVert
 import androidx.compose.material.icons.rounded.Notifications
+import androidx.compose.material.icons.rounded.Keyboard
 import androidx.compose.material.icons.rounded.PictureInPictureAlt
 import androidx.compose.material.icons.rounded.PowerSettingsNew
 import androidx.compose.material.icons.rounded.Screenshot
@@ -119,6 +120,12 @@ enum class VirtualButtonAction(
         "截图",
         Icons.Rounded.Screenshot,
         UiAndroidKeycodes.SYSRQ
+    ),
+    IME(
+        "ime",
+        "输入法",
+        Icons.Rounded.Keyboard,
+        null
     ),
     PIP(
         "pip",
