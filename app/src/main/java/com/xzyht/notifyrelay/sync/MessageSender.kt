@@ -803,14 +803,6 @@ object MessageSender {
 
             // 将超级岛发送任务加入独立队列（不去重，实时性优先）
             authenticatedDevices.forEach { deviceInfo ->
-                // 检查设备类型，不向PC类型设备发送超级岛数据
-                val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[deviceInfo.uuid] }
-                val deviceType = auth?.deviceType
-                if (deviceType?.lowercase() == "pc") {
-                    Logger.i("超级岛", "跳过向PC类型设备发送超级岛数据：${deviceInfo.displayName}")
-                    return@forEach
-                }
-                
                 // 读取该设备下该feature的上次状态
                 val deviceMap = synchronized(siLastStatePerDevice) {
                     siLastStatePerDevice.getOrPut(deviceInfo.uuid) { mutableMapOf() }
@@ -883,18 +875,6 @@ object MessageSender {
                 superPkg, appName, time, isLocked, featureId
             ).toString()
             authenticatedDevices.forEach { deviceInfo ->
-                // 检查设备类型，不向PC类型设备发送超级岛结束数据
-                val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[deviceInfo.uuid] }
-                val deviceType = auth?.deviceType
-                if (deviceType?.lowercase() == "pc") {
-                    Logger.i("超级岛", "跳过向PC类型设备发送超级岛结束数据：${deviceInfo.displayName}")
-                    // 仍然清理该设备的lastState，确保状态一致性
-                    synchronized(siLastStatePerDevice) {
-                        siLastStatePerDevice[deviceInfo.uuid]?.remove(featureId)
-                    }
-                    return@forEach
-                }
-                
                 // 清理该设备的lastState
                 synchronized(siLastStatePerDevice) {
                     siLastStatePerDevice[deviceInfo.uuid]?.remove(featureId)
