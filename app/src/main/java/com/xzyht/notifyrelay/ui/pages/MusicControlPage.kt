@@ -11,7 +11,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
+import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.feature.notification.superisland.MediaMessageReceiveMode
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.servers.MediaControlUtil
 import com.xzyht.notifyrelay.sync.ProtocolSender
@@ -32,6 +33,7 @@ import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -51,8 +53,9 @@ fun MusicControlPage() {
     // 滚动状态
     val scrollState = rememberScrollState()
 
-    // 移除媒体会话相关状态
-    var islandEnabled by remember { mutableStateOf(RemoteMediaSessionManager.isEnabled(context)) }
+    var mediaMessageReceiveMode by remember {
+        mutableStateOf(RemoteMediaSessionManager.getReceiveMode(context))
+    }
     
     // 胶囊歌词开关状态
     var capsuleLyricsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "capsule_lyrics_enabled")) }
@@ -177,35 +180,29 @@ fun MusicControlPage() {
             Text("停止音频转发")
         }
         
-        // 远端媒体超级岛显示开关
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "启用远端媒体超级岛显示",
-                    style = textStyles.body1,
-                    color = colorScheme.onSurface
-                )
-                Text(
-                    text = "接收远端设备媒体播放信息并以超级岛形式显示",
-                    style = textStyles.body2,
-                    color = colorScheme.onSurfaceSecondary
-                )
-            }
-            Switch(
-                checked = islandEnabled,
-                onCheckedChange = { enabled ->
-                    islandEnabled = enabled
-                    RemoteMediaSessionManager.setEnabled(context, enabled)
-                    if (!enabled) {
-                        RemoteMediaSessionManager.clearSession()
-                    }
+        WindowSpinnerPreference(
+            title = "接收媒体消息",
+            summary = "接收远端设备媒体播放信息并以超级岛形式显示",
+            items = listOf(
+                SpinnerEntry(title = "开"),
+                SpinnerEntry(title = "关"),
+                SpinnerEntry(title = "仅音频时开"),
+            ),
+            selectedIndex = when (mediaMessageReceiveMode) {
+                MediaMessageReceiveMode.On -> 0
+                MediaMessageReceiveMode.Off -> 1
+                MediaMessageReceiveMode.AudioOnly -> 2
+            },
+            onSelectedIndexChange = { index ->
+                val mode = when (index) {
+                    1 -> MediaMessageReceiveMode.Off
+                    2 -> MediaMessageReceiveMode.AudioOnly
+                    else -> MediaMessageReceiveMode.On
                 }
-            )
-        }
+                mediaMessageReceiveMode = mode
+                RemoteMediaSessionManager.setReceiveMode(context, mode)
+            }
+        )
         
         // 胶囊歌词开关
         Row(

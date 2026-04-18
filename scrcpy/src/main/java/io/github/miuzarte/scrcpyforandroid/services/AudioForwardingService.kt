@@ -39,6 +39,10 @@ class AudioForwardingService : Service() {
         @Volatile
         private var currentSessionTarget: ConnectionTarget? = null
 
+        fun isAudioForwardingRunning(): Boolean {
+            return isRunning
+        }
+
         fun startAudioForwarding(context: Context, host: String, port: Int = ScrcpyDefaults.ADB_PORT, deviceName: String = host): Boolean {
             if (isRunning) {
                 Log.w(TAG, "音频转发已在运行中: ${currentSessionTarget?.host}:${currentSessionTarget?.port}")
