@@ -171,7 +171,8 @@ object RemoteMediaSessionManager {
         device: DeviceInfo
     ) {
         if (!shouldReceiveMediaMessage(context)) {
-            Logger.d("RemoteMediaSessionManager", "远端媒体消息未接收或未满足音频条件，忽略消息")
+            Logger.d("RemoteMediaSessionManager", "远端媒体消息未接收或未满足音频条件，伪造结束以关闭浮窗")
+            closeSessionForDevice(device, "接收条件不满足")
             return
         }
 
@@ -186,27 +187,7 @@ object RemoteMediaSessionManager {
             if (isEndPackage) {
                 // 处理结束包
                 Logger.i("RemoteMediaSessionManager", "收到媒体会话结束包，关闭浮窗: ${device.displayName}")
-                
-                // 取消复传任务
-                cancelResendTask(device.uuid)
-                
-                // 从Store中移除状态
-                SuperIslandRemoteStore.removeExact(sourceKey)
-                
-                // 关闭浮窗
-                com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.dismissBySource(sourceKey)
-                
-                // 清理各种缓存
-                mediaFeatureIdCache.remove(device.uuid)
-                mediaLastUpdateTime.remove(device.uuid)
-                mediaSessionCache.remove(device.uuid)
-                
-                // 如果是当前会话，清除当前会话
-                if (currentDevice?.uuid == device.uuid) {
-                    currentSession = null
-                    currentDevice = null
-                }
-                
+                closeSessionForDevice(device, "收到结束包")
                 return
             }
             
@@ -354,6 +335,25 @@ object RemoteMediaSessionManager {
         currentSession = null
         currentDevice = null
         Logger.i("RemoteMediaSessionManager", "已清除所有远端媒体会话")
+    }
+
+    private fun closeSessionForDevice(device: DeviceInfo, reason: String) {
+        val sourceKey = SOURCE_KEY_PREFIX + "_" + device.uuid
+        try {
+            cancelResendTask(device.uuid)
+            SuperIslandRemoteStore.removeExact(sourceKey)
+            com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.dismissBySource(sourceKey)
+            mediaFeatureIdCache.remove(device.uuid)
+            mediaLastUpdateTime.remove(device.uuid)
+            mediaSessionCache.remove(device.uuid)
+            if (currentDevice?.uuid == device.uuid) {
+                currentSession = null
+                currentDevice = null
+            }
+            Logger.i("RemoteMediaSessionManager", "已关闭设备媒体超级岛浮窗: ${device.displayName}, reason=$reason")
+        } catch (e: Exception) {
+            Logger.e("RemoteMediaSessionManager", "关闭媒体超级岛浮窗失败: $sourceKey", e)
+        }
     }
 
     fun getCurrentSession(): MediaSessionData? = currentSession

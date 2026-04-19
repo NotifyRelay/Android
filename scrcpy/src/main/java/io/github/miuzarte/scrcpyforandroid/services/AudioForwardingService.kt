@@ -80,6 +80,9 @@ class AudioForwardingService : Service() {
     @Volatile
     private var scrcpy: Scrcpy? = null
 
+    @Volatile
+    private var stopping: Boolean = false
+
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
@@ -91,8 +94,8 @@ class AudioForwardingService : Service() {
 
         when (intent?.action) {
             ACTION_STOP -> {
-                stopForwarding()
-                stopSelf()
+                stopForeground(STOP_FOREGROUND_REMOVE)
+                stopForwardingAsync(stopService = true)
                 return START_NOT_STICKY
             }
         }
@@ -171,31 +174,44 @@ class AudioForwardingService : Service() {
         }
     }
 
-    private fun stopForwarding() {
-        scope.launch {
-            try {
-                val instance = scrcpy
-                if (instance != null) {
-                    Log.i(TAG, "停止 scrcpy 会话")
-                    runCatching { instance.stop() }
-
-                    Log.i(TAG, "断开 ADB 连接")
-                    runCatching { NativeAdbService.disconnect() }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "停止音频转发失败", e)
-            } finally {
-                isRunning = false
-                currentSessionTarget = null
-                scrcpy = null
-                Log.i(TAG, "音频转发已停止")
+    private fun stopForwardingAsync(stopService: Boolean = false) {
+        CoroutineScope(SupervisorJob() + Dispatchers.IO).launch {
+            stopForwardingInternal()
+            if (stopService) {
+                stopSelf()
             }
+        }
+    }
+
+    private suspend fun stopForwardingInternal() {
+        if (stopping) {
+            return
+        }
+
+        stopping = true
+        try {
+            val instance = scrcpy
+            if (instance != null) {
+                Log.i(TAG, "停止 scrcpy 会话")
+                runCatching { instance.stop() }
+
+                Log.i(TAG, "断开 ADB 连接")
+                runCatching { NativeAdbService.disconnect() }
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "停止音频转发失败", e)
+        } finally {
+            isRunning = false
+            currentSessionTarget = null
+            scrcpy = null
+            stopping = false
+            Log.i(TAG, "音频转发已停止")
         }
     }
 
     override fun onDestroy() {
         Log.i(TAG, "AudioForwardingService onDestroy")
-        stopForwarding()
+        stopForwardingAsync()
         executor.shutdown()
         scope.cancel()
         super.onDestroy()
