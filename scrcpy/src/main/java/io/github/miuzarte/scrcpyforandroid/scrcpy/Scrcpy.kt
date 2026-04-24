@@ -72,6 +72,8 @@ class Scrcpy(
     @Volatile
     private var audioPlayer: ScrcpyAudioPlayer? = null
 
+    private val lifecycleMutex = Mutex()
+
     val listings = Listings()
 
     companion object {
@@ -105,111 +107,126 @@ class Scrcpy(
     }
 
     suspend fun start(options: ClientOptions): Session.SessionInfo = withContext(Dispatchers.IO) {
-        if (isRunning) {
-            throw IllegalStateException("Scrcpy session is already running")
-        }
-
-        Log.i(TAG, "Initializing scrcpy session")
-
-        try {
-            // Fix and validate options
-            options.fix()
-            options.validate()
-
-            // Generate session ID
-            val scid = generateScid()
-            Log.d(TAG, "scid=0x${scid.toString(16)}")
-
-            val serverJar = if (customServerUri.isNullOrBlank()) {
-                extractAssetToCache(serverAsset)
-            } else {
-                extractUriToCache(customServerUri.toUri())
+        lifecycleMutex.withLock {
+            if (isRunning) {
+                throw IllegalStateException("Scrcpy session is already running")
             }
 
-            // Execute server
-            val info = executeServer(
-                serverJar = serverJar,
-                options = options,
-                scid = scid,
-            )
+            Log.i(TAG, "Initializing scrcpy session")
 
-            // Turn screen off if requested
-            if (options.turnScreenOff) {
-                if (!options.control) {
-                    Log.w(TAG, "start(): turnScreenOff ignored because control is disabled")
+            try {
+                // Fix and validate options
+                options.fix()
+                options.validate()
+
+                // Generate session ID
+                val scid = generateScid()
+                Log.d(TAG, "scid=0x${scid.toString(16)}")
+
+                val serverJar = if (customServerUri.isNullOrBlank()) {
+                    extractAssetToCache(serverAsset)
                 } else {
-                    runCatching { session.setDisplayPower(on = false) }
-                        .onFailure { e -> Log.w(TAG, "start(): set display power failed", e) }
+                    extractUriToCache(customServerUri.toUri())
                 }
-            }
 
-            // Create session info
-            _currentSessionState.value = info
-            isRunning = true
-
-            // Setup video consumer (notify NativeCoreFacade to setup decoders)
-            if (options.video) {
-                NativeCoreFacade.onScrcpySessionStarted(info, session)
-            }
-
-            // Setup audio player
-            audioPlayer?.release()
-            audioPlayer = null
-            if (info.audioCodecId != 0 && options.audioPlayback) {
-                Log.i(
-                    TAG,
-                    "start(): create audio player codecId=0x${
-                        info.audioCodecId.toUInt().toString(16)
-                    }"
+                // Execute server
+                val info = executeServer(
+                    serverJar = serverJar,
+                    options = options,
+                    scid = scid,
                 )
-                val player = ScrcpyAudioPlayer(appContext, info.audioCodecId, lowLatency)
-                audioPlayer = player
-                session.attachAudioConsumer { packet ->
-                    player.feedPacket(packet.data, packet.ptsUs, packet.isConfig)
+
+                // Turn screen off if requested
+                if (options.turnScreenOff) {
+                    if (!options.control) {
+                        Log.w(TAG, "start(): turnScreenOff ignored because control is disabled")
+                    } else {
+                        runCatching { session.setDisplayPower(on = false) }
+                            .onFailure { e -> Log.w(TAG, "start(): set display power failed", e) }
+                    }
                 }
-            } else {
-                Log.i(TAG, "start(): audio playback disabled for this session")
+
+                // Create session info
+                _currentSessionState.value = info
+                isRunning = true
+
+                // Setup video consumer (notify NativeCoreFacade to setup decoders)
+                if (options.video) {
+                    NativeCoreFacade.onScrcpySessionStarted(info, session)
+                }
+
+                // Setup audio player
+                audioPlayer?.release()
+                audioPlayer = null
+                if (info.audioCodecId != 0 && options.audioPlayback) {
+                    Log.i(
+                        TAG,
+                        "start(): create audio player codecId=0x${
+                            info.audioCodecId.toUInt().toString(16)
+                        }"
+                    )
+                    val player = ScrcpyAudioPlayer(appContext, info.audioCodecId, lowLatency)
+                    audioPlayer = player
+                    session.attachAudioConsumer { packet ->
+                        player.feedPacket(packet.data, packet.ptsUs, packet.isConfig)
+                    }
+                } else {
+                    Log.i(TAG, "start(): audio playback disabled for this session")
+                }
+
+                Log.i(
+                    TAG, "start(): Session started successfully - device=${info.deviceName}, " +
+                            "video=${if (options.video) "${info.codec?.string ?: "null"} ${info.width}x${info.height}" else "off"}, " +
+                            "audio=${if (options.audio) options.audioCodec.string else "off"}, " +
+                            "control=${options.control}"
+                )
+
+                return@withLock info
+
+            } catch (e: Exception) {
+                Log.e(TAG, "start(): Failed to start scrcpy session", e)
+                // Clean up resources to avoid leaks
+                runCatching {
+                    NativeCoreFacade.onScrcpySessionStopped()
+                    session.clearVideoConsumer()
+                    session.clearAudioConsumer()
+                    session.stop()
+                    audioPlayer?.release()
+                    audioPlayer = null
+                }.onFailure { cleanupError ->
+                    Log.w(TAG, "start(): Cleanup failed during error handling", cleanupError)
+                }
+                isRunning = false
+                _currentSessionState.value = null
+                throw e
             }
-
-            Log.i(
-                TAG, "start(): Session started successfully - device=${info.deviceName}, " +
-                        "video=${if (options.video) "${info.codec?.string ?: "null"} ${info.width}x${info.height}" else "off"}, " +
-                        "audio=${if (options.audio) options.audioCodec.string else "off"}, " +
-                        "control=${options.control}"
-            )
-
-            return@withContext info
-
-        } catch (e: Exception) {
-            Log.e(TAG, "start(): Failed to start scrcpy session", e)
-            isRunning = false
-            _currentSessionState.value = null
-            throw e
         }
     }
 
     suspend fun stop(): Boolean = withContext(Dispatchers.IO) {
-        if (!isRunning) {
-            Log.w(TAG, "stop(): No active session to stop")
-            return@withContext false
-        }
+        lifecycleMutex.withLock {
+            if (!isRunning) {
+                Log.w(TAG, "stop(): No active session to stop")
+                return@withLock false
+            }
 
-        Log.i(TAG, "stop(): Stopping scrcpy session")
+            Log.i(TAG, "stop(): Stopping scrcpy session")
 
-        return@withContext try {
-            NativeCoreFacade.onScrcpySessionStopped()
-            session.clearVideoConsumer()
-            session.clearAudioConsumer()
-            session.stop()
-            audioPlayer?.release()
-            audioPlayer = null
-            isRunning = false
-            _currentSessionState.value = null
-            Log.i(TAG, "stop(): Session stopped successfully")
-            true
-        } catch (e: Exception) {
-            Log.e(TAG, "stop(): Failed to stop session", e)
-            false
+            return@withLock try {
+                NativeCoreFacade.onScrcpySessionStopped()
+                session.clearVideoConsumer()
+                session.clearAudioConsumer()
+                session.stop()
+                audioPlayer?.release()
+                audioPlayer = null
+                isRunning = false
+                _currentSessionState.value = null
+                Log.i(TAG, "stop(): Session stopped successfully")
+                true
+            } catch (e: Exception) {
+                Log.e(TAG, "stop(): Failed to stop session", e)
+                false
+            }
         }
     }
 
@@ -499,9 +516,8 @@ class Scrcpy(
                     _refreshVersion.update { it + 1 }
                 }
             } finally {
-                val remaining = (_refreshCounter.value - 1).coerceAtLeast(0)
-                _refreshCounter.value = remaining
-                _refreshBusy.value = remaining > 0
+                _refreshCounter.update { (it - 1).coerceAtLeast(0) }
+                _refreshBusy.value = _refreshCounter.value > 0
             }
         }
     }
@@ -770,19 +786,24 @@ class Scrcpy(
             serverLogBuffer.clear()
             val socketName = socketNameFor(scid.toInt())
 
+            var serverStream: AdbSocketStream? = null
+            var serverLogThread: Thread? = null
+            var firstStream: AdbSocketStream? = null
+            var videoStream: AdbSocketStream? = null
+            var videoInput: DataInputStream? = null
+            var audioStream: AdbSocketStream? = null
+            var audioInput: DataInputStream? = null
+            var controlStream: AdbSocketStream? = null
+            var controlWriter: ControlWriter? = null
+            var newSession: ActiveSession? = null
+
             try {
-                val serverStream = NativeAdbService.openShellStream(serverCommand)
-                val serverLogThread = startServerLogThread(serverStream, socketName)
+                serverStream = NativeAdbService.openShellStream(serverCommand)
+                serverLogThread = startServerLogThread(serverStream, socketName)
                 Thread.sleep(SERVER_BOOT_DELAY_MS)
 
-                val firstStream = openAbstractSocketWithRetry(socketName, expectDummyByte = true)
+                firstStream = openAbstractSocketWithRetry(socketName, expectDummyByte = true)
                 val firstInput = DataInputStream(BufferedInputStream(firstStream.inputStream))
-
-                var videoStream: AdbSocketStream? = null
-                var videoInput: DataInputStream? = null
-                var audioStream: AdbSocketStream? = null
-                var audioInput: DataInputStream? = null
-                var controlStream: AdbSocketStream? = null
 
                 when {
                     options.video -> {
@@ -879,11 +900,11 @@ class Scrcpy(
                     controlEnabled = controlStream != null,
                 )
 
-                val controlWriter = controlStream?.let { stream ->
+                controlWriter = controlStream?.let { stream ->
                     ControlWriter(DataOutputStream(stream.outputStream))
                 }
 
-                val newSession = ActiveSession(
+                newSession = ActiveSession(
                     info = sessionInfo,
                     socketName = socketName,
                     serverStream = serverStream,
@@ -901,6 +922,42 @@ class Scrcpy(
                 val tail = snapshotServerLogs()
                 val detail = if (tail.isBlank()) "" else " | server_log_tail=\n$tail"
                 throw IllegalStateException("scrcpy start failed: ${t.message}$detail", t)
+            } finally {
+                if (activeSession == null) {
+                    // Clean up resources if session setup failed
+                    try {
+                        controlWriter?.close()
+                    } catch (_: Exception) {}
+
+                    try {
+                        videoInput?.close()
+                    } catch (_: Exception) {}
+
+                    try {
+                        audioInput?.close()
+                    } catch (_: Exception) {}
+
+                    try {
+                        videoStream?.close()
+                    } catch (_: Exception) {}
+
+                    try {
+                        audioStream?.close()
+                    } catch (_: Exception) {}
+
+                    try {
+                        controlStream?.close()
+                    } catch (_: Exception) {}
+
+                    try {
+                        serverLogThread?.interrupt()
+                        serverLogThread?.join(1000)
+                    } catch (_: Exception) {}
+
+                    try {
+                        serverStream?.close()
+                    } catch (_: Exception) {}
+                }
             }
         }
 
@@ -950,6 +1007,18 @@ class Scrcpy(
                         }
                     }
                 } finally {
+                    teardownSessionIfActive(session)
+                }
+            }
+        }
+
+        private fun teardownSessionIfActive(sessionToCheck: ActiveSession) {
+            kotlinx.coroutines.runBlocking {
+                mutex.withLock {
+                    if (activeSession === sessionToCheck) {
+                        Log.i(TAG, "Session teardown triggered by reader thread")
+                        stopInternal()
+                    }
                 }
             }
         }
@@ -996,6 +1065,7 @@ class Scrcpy(
                         }
                     }
                 } finally {
+                    teardownSessionIfActive(session)
                 }
             }
         }
@@ -1290,6 +1360,11 @@ class Scrcpy(
         )
 
         private class ControlWriter(private val output: DataOutputStream) {
+            @Synchronized
+            fun close() {
+                output.close()
+            }
+
             @Synchronized
             fun injectKeycode(action: Int, keycode: Int, repeat: Int, metaState: Int) {
                 output.writeByte(TYPE_INJECT_KEYCODE)

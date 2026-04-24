@@ -90,6 +90,10 @@ data class ServerParams(
     var vdSystemDecorations: Boolean,
 
     var list: ListOptions,
+
+    var turnScreenOff: Boolean,
+    var requireAudio: Boolean,
+    var startApp: String,
 ) {
     companion object {
         const val SEPARATOR: String = " "
@@ -279,6 +283,16 @@ data class ServerParams(
         }
         if (list has ListOptions.APPS) {
             cmd.add("list_apps=true")
+        }
+        if (turnScreenOff) {
+            cmd.add("turn_screen_off=true")
+        }
+        if (requireAudio) {
+            cmd.add("require_audio=true")
+        }
+        if (startApp.isNotBlank()) {
+            validate(startApp)
+            cmd.add("start_app=${startApp.trim()}")
         }
         return cmd
     }

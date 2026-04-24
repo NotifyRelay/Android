@@ -569,6 +569,9 @@ data class ClientOptions(
             vdDestroyContent = vdDestroyContent,
             vdSystemDecorations = vdSystemDecorations,
             list = list,
+            turnScreenOff = turnScreenOff,
+            requireAudio = requireAudio,
+            startApp = startApp,
         )
     }
 }

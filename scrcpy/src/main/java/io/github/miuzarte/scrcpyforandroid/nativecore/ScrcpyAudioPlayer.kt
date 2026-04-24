@@ -27,6 +27,7 @@ class ScrcpyAudioPlayer(
     private val codecId: Int,
     private val lowLatency: Boolean,
 ) {
+    private val lock = Any()
 
     private var mediaCodec: MediaCodec? = null
     private var audioTrack: AudioTrack? = null
@@ -46,51 +47,53 @@ class ScrcpyAudioPlayer(
     private var packetCount = 0L
 
     fun feedPacket(data: ByteArray, ptsUs: Long, isConfig: Boolean) {
-        if (released) return
-        applyAudioThreadPriorityIfNeeded()
+        synchronized(lock) {
+            if (released) return@synchronized
+            applyAudioThreadPriorityIfNeeded()
 
-        if (isConfig) {
-            Log.i(
-                TAG,
-                "feedPacket(): config packet size=${data.size} codec=0x${
-                    codecId.toUInt().toString(16)
-                }"
-            )
-            when (codecId) {
-                Codec.OPUS.id -> prepareOpus(data)
-                Codec.AAC.id -> prepareAac(data)
-                Codec.FLAC.id -> prepareFlac(data)
+            if (isConfig) {
+                Log.i(
+                    TAG,
+                    "feedPacket(): config packet size=${data.size} codec=0x${
+                        codecId.toUInt().toString(16)
+                    }"
+                )
+                when (codecId) {
+                    Codec.OPUS.id -> prepareOpus(data)
+                    Codec.AAC.id -> prepareAac(data)
+                    Codec.FLAC.id -> prepareFlac(data)
+                }
+                return@synchronized
             }
-            return
-        }
 
-        packetCount += 1
-        if (packetCount == 1L || packetCount % 120L == 0L) {
-            Log.i(TAG, "feedPacket(): packets=$packetCount prepared=$prepared size=${data.size}")
-        }
+            packetCount += 1
+            if (packetCount == 1L || packetCount % 120L == 0L) {
+                Log.i(TAG, "feedPacket(): packets=$packetCount prepared=$prepared size=${data.size}")
+            }
 
-        if (codecId == Codec.RAW.id) {
-            val track = ensureRawAudioTrack() ?: return
-            track.write(
-                data,
-                0,
-                data.size,
-                AudioTrack.WRITE_NON_BLOCKING,
-            )
-            return
-        }
+            if (codecId == Codec.RAW.id) {
+                val track = ensureRawAudioTrack() ?: return@synchronized
+                track.write(
+                    data,
+                    0,
+                    data.size,
+                    AudioTrack.WRITE_NON_BLOCKING,
+                )
+                return@synchronized
+            }
 
-        if (!prepared) return
-        val codec = mediaCodec ?: return
+            if (!prepared) return@synchronized
+            val codec = mediaCodec ?: return@synchronized
 
-        val inputIdx = codec.dequeueInputBuffer(CODEC_TIMEOUT_US)
-        if (inputIdx >= 0) {
-            val buf = codec.getInputBuffer(inputIdx) ?: return
-            buf.clear()
-            buf.put(data)
-            codec.queueInputBuffer(inputIdx, 0, data.size, ptsUs, 0)
+            val inputIdx = codec.dequeueInputBuffer(CODEC_TIMEOUT_US)
+            if (inputIdx >= 0) {
+                val buf = codec.getInputBuffer(inputIdx) ?: return@synchronized
+                buf.clear()
+                buf.put(data)
+                codec.queueInputBuffer(inputIdx, 0, data.size, ptsUs, 0)
+            }
+            drainOutput(codec)
         }
-        drainOutput(codec)
     }
 
     // OpusHead bytes (already extracted by server's fixOpusConfigPacket)
@@ -265,15 +268,17 @@ class ScrcpyAudioPlayer(
      * Release media and audio resources. Safe to call from any thread.
      */
     fun release() {
-        if (released) return
-        released = true
-        prepared = false
-        runCatching { mediaCodec?.stop() }
-        runCatching { mediaCodec?.release() }
-        runCatching { audioTrack?.stop() }
-        runCatching { audioTrack?.release() }
-        mediaCodec = null
-        audioTrack = null
+        synchronized(lock) {
+            if (released) return@synchronized
+            released = true
+            prepared = false
+            runCatching { mediaCodec?.stop() }
+            runCatching { mediaCodec?.release() }
+            runCatching { audioTrack?.stop() }
+            runCatching { audioTrack?.release() }
+            mediaCodec = null
+            audioTrack = null
+        }
     }
 
     private fun longBuffer(value: Long): ByteBuffer =

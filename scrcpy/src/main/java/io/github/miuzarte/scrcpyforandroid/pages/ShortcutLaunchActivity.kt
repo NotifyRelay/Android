@@ -64,11 +64,14 @@ import io.github.miuzarte.scrcpyforandroid.widgets.FullscreenControlScreen
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonAction
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonActions
 import io.github.miuzarte.scrcpyforandroid.widgets.VirtualButtonBar
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
+import java.util.concurrent.Executors
 import notifyrelay.base.util.Logger
 import notifyrelay.data.config.ScrcpyDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -499,6 +502,10 @@ private fun ShortcutLaunchScreen(
     val view = LocalView.current
     val settings = remember(context) { loadMainSettings(context) }
     val scope = rememberCoroutineScope()
+    val inputDispatcher = remember<CoroutineDispatcher> {
+        val executor = Executors.newSingleThreadExecutor()
+        executor.asCoroutineDispatcher()
+    }
     val keyboardController = LocalSoftwareKeyboardController.current
     val imeFocusRequester = remember { FocusRequester() }
     val focusManager = LocalFocusManager.current
@@ -596,6 +603,12 @@ private fun ShortcutLaunchScreen(
         NativeCoreFacade.addVideoFpsListener(listener)
         onDispose {
             NativeCoreFacade.removeVideoFpsListener(listener)
+        }
+    }
+
+    DisposableEffect(inputDispatcher) {
+        onDispose {
+            (inputDispatcher as? kotlinx.coroutines.ExecutorCoroutineDispatcher)?.close()
         }
     }
 
@@ -883,7 +896,7 @@ private fun ShortcutLaunchScreen(
                             currentFps = currentFps,
                             enableBackHandler = false,
                             onInjectTouch = { action, pointerId, x, y, pressure, buttons ->
-                                scope.launch(Dispatchers.IO) {
+                                scope.launch(inputDispatcher) {
                                     scrcpyInstance?.injectTouch(
                                         action = action,
                                         pointerId = pointerId,
@@ -922,7 +935,7 @@ private fun ShortcutLaunchScreen(
                                         return@Fullscreen
                                     }
                                     action.keycode?.let { keycode ->
-                                        scope.launch(Dispatchers.IO) {
+                                        scope.launch(inputDispatcher) {
                                             scrcpyInstance?.injectKeycode(0, keycode)
                                             scrcpyInstance?.injectKeycode(1, keycode)
                                         }
@@ -943,7 +956,7 @@ private fun ShortcutLaunchScreen(
                                             val addedText = newValue.substring(commonPrefix.length)
 
                                             if (removedCount > 0) {
-                                                scope.launch(Dispatchers.IO) {
+                                                scope.launch(inputDispatcher) {
                                                     repeat(removedCount) {
                                                         scrcpyInstance?.injectKeycode(0, UiAndroidKeycodes.DEL)
                                                         scrcpyInstance?.injectKeycode(1, UiAndroidKeycodes.DEL)
@@ -951,7 +964,7 @@ private fun ShortcutLaunchScreen(
                                                 }
                                             }
                                             if (addedText.isNotEmpty()) {
-                                                scope.launch(Dispatchers.IO) {
+                                                scope.launch(inputDispatcher) {
                                                     addedText.forEach { ch ->
                                                         scrcpyInstance?.injectText(ch.toString())
                                                     }

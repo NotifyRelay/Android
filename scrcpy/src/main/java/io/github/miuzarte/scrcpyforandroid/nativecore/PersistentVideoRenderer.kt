@@ -66,10 +66,10 @@ class PersistentVideoRenderer {
     fun attachDisplaySurface(surface: Surface) {
         ensureInitialized()
         val newId = System.identityHashCode(surface)
-        if (displaySurfaceId == newId) return
         Log.i(tag, "attachDisplaySurface(): request surfaceId=$newId old=${displaySurfaceId}")
         handler.post {
             if (released || !surface.isValid) return@post
+            if (displaySurfaceId == newId) return@post
             releaseDisplaySurfaceLocked()
             displaySurface = surface
             displaySurfaceId = newId

@@ -121,15 +121,19 @@ object NativeCoreFacade {
                     "videoFeed(): packets=$packetCount key=${packet.isKeyFrame} cfg=${packet.isConfig} decoder=${decoder != null}"
                 )
             }
-            val currentDecoder = decoder ?: return@attachVideoConsumer
-            if (activeSurfaceId == null) return@attachVideoConsumer
-            runCatching {
-                currentDecoder.feedAnnexB(
-                    packet.data,
-                    packet.ptsUs,
-                    packet.isKeyFrame,
-                    packet.isConfig
-                )
+            kotlinx.coroutines.runBlocking {
+                sessionLifecycleMutex.withLock {
+                    val currentDecoder = decoder ?: return@withLock
+                    if (activeSurfaceId == null) return@withLock
+                    runCatching {
+                        currentDecoder.feedAnnexB(
+                            packet.data,
+                            packet.ptsUs,
+                            packet.isKeyFrame,
+                            packet.isConfig
+                        )
+                    }
+                }
             }
         }
     }

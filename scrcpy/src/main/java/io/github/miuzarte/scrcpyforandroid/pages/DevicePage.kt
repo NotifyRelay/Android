@@ -137,6 +137,15 @@ fun DeviceTabScreen(
 
     var scrcpyInstance by remember { mutableStateOf<Scrcpy?>(null) }
 
+    // Reset scrcpyInstance when config values change
+    LaunchedEffect(
+        viewModel.serverRemotePath,
+        viewModel.customServerUri,
+        viewModel.lowLatency
+    ) {
+        scrcpyInstance = null
+    }
+
     var connectHost by rememberSaveable { mutableStateOf("") }
     var connectPort by rememberSaveable { mutableStateOf(ScrcpyDefaults.ADB_PORT.toString()) }
     var quickConnectInput by rememberSaveable { mutableStateOf(initialSettings.quickConnectInput) }
@@ -429,9 +438,10 @@ fun DeviceTabScreen(
         currentTargetPort = port
 
         if (scrcpyInstance == null) {
+            val trimmedServerRemotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
             scrcpyInstance = Scrcpy(
                 appContext = context.applicationContext,
-                serverRemotePath = viewModel.serverRemotePath,
+                serverRemotePath = trimmedServerRemotePath,
                 customServerUri = viewModel.customServerUri,
                 lowLatency = viewModel.lowLatency,
             )
@@ -1003,11 +1013,12 @@ fun ScrcpyAdvancedPage(
     var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
     val scope = rememberCoroutineScope()
 
-    val scrcpyInstance = remember {
+    val scrcpyInstance = remember(viewModel.customServerUri, viewModel.serverRemotePath, viewModel.lowLatency) {
+        val trimmedServerRemotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH }
         Scrcpy(
             appContext = context.applicationContext,
             customServerUri = viewModel.customServerUri,
-            serverRemotePath = viewModel.serverRemotePath.trim().ifBlank { ScrcpyDefaults.SERVER_REMOTE_PATH },
+            serverRemotePath = trimmedServerRemotePath,
             lowLatency = viewModel.lowLatency,
         )
     }

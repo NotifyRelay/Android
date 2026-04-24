@@ -19,24 +19,33 @@ import java.util.concurrent.atomic.AtomicReference
 @RequiresApi(Build.VERSION_CODES.R)
 internal object AdbMdnsDiscoverer {
 
-    private lateinit var nsdManager: NsdManager
+    private var nsdManager: NsdManager? = null
 
     fun init(context: Context) {
         nsdManager = context.getSystemService(NsdManager::class.java)
     }
 
     fun discoverConnectService(timeoutMs: Long, includeLanDevices: Boolean): Pair<String, Int>? {
-        return discoverService(TLS_CONNECT, timeoutMs, includeLanDevices)
+        val manager = nsdManager ?: run {
+            Log.e(TAG, "NsdManager not initialized. Call init(context) first.")
+            return null
+        }
+        return discoverService(manager, TLS_CONNECT, timeoutMs, includeLanDevices)
     }
 
     /**
      * Discover a device that advertises the ADB pairing service via mDNS.
      */
     fun discoverPairingService(timeoutMs: Long, includeLanDevices: Boolean): Pair<String, Int>? {
-        return discoverService(TLS_PAIRING, timeoutMs, includeLanDevices)
+        val manager = nsdManager ?: run {
+            Log.e(TAG, "NsdManager not initialized. Call init(context) first.")
+            return null
+        }
+        return discoverService(manager, TLS_PAIRING, timeoutMs, includeLanDevices)
     }
 
     private fun discoverService(
+        manager: NsdManager,
         serviceType: String,
         timeoutMs: Long,
         includeLanDevices: Boolean,
@@ -97,7 +106,7 @@ internal object AdbMdnsDiscoverer {
                     }
                 }
                 runCatching {
-                    nsdManager.resolveService(serviceInfo, resolveListener)
+                    manager.resolveService(serviceInfo, resolveListener)
                 }.onFailure { e ->
                     Log.w(TAG, "resolveService failed for ${serviceInfo.serviceName}", e)
                 }
@@ -108,9 +117,9 @@ internal object AdbMdnsDiscoverer {
             }
         }
 
-        nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
+        manager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryListener)
         latch.await(timeoutMs, TimeUnit.MILLISECONDS)
-        runCatching { nsdManager.stopServiceDiscovery(discoveryListener) }
+        runCatching { manager.stopServiceDiscovery(discoveryListener) }
 
         val port = resultPort.get()
         val host = resultHost.get()
