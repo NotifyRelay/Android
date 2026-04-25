@@ -234,6 +234,18 @@ data class ClientOptions(
         }
     }
 
+    enum class KeyInjectMode(val string: String) {
+        MIXED("mixed"),
+        PREFER_TEXT("prefer_text"),
+        RAW("raw");
+
+        companion object {
+            fun fromString(value: String) =
+                entries.find { it.string.equals(value, ignoreCase = true) }
+                    ?: MIXED
+        }
+    }
+
     fun fix(): ClientOptions {
         when (videoSource) {
             VideoSource.DISPLAY -> {

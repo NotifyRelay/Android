@@ -8,6 +8,7 @@ import android.content.res.Configuration
 import android.graphics.Rect
 import android.os.Bundle
 import android.os.Build
+import android.util.Log
 import android.util.Rational
 import android.view.View
 import android.widget.Toast
@@ -15,18 +16,16 @@ import io.github.miuzarte.scrcpyforandroid.R
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardActions
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,14 +33,9 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalFocusManager
-import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.text.input.ImeAction
 import androidx.core.graphics.Insets
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
@@ -74,11 +68,8 @@ import kotlinx.coroutines.withContext
 import java.util.concurrent.Executors
 import notifyrelay.base.util.Logger
 import notifyrelay.data.config.ScrcpyDefaults
-import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.ColorSchemeMode
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.ThemeController
@@ -506,9 +497,6 @@ private fun ShortcutLaunchScreen(
         val executor = Executors.newSingleThreadExecutor()
         executor.asCoroutineDispatcher()
     }
-    val keyboardController = LocalSoftwareKeyboardController.current
-    val imeFocusRequester = remember { FocusRequester() }
-    val focusManager = LocalFocusManager.current
 
     val autoNewDisplaySize = remember(
         configuration.screenWidthDp,
@@ -549,8 +537,7 @@ private fun ShortcutLaunchScreen(
     var showDebugInfo by remember { mutableStateOf(settings.fullscreenDebugInfoEnabled) }
     var showVirtualButtons by remember { mutableStateOf(settings.showFullscreenVirtualButtons) }
     var cameraMirroringSupported by remember { mutableStateOf(true) }
-    var showImeInput by remember { mutableStateOf(false) }
-    var imeBuffer by remember { mutableStateOf("") }
+    var imeRequestToken by remember { mutableIntStateOf(0) }
 
     var scrcpyInstance by remember { mutableStateOf<Scrcpy?>(null) }
 
@@ -585,16 +572,6 @@ private fun ShortcutLaunchScreen(
         NativeCoreFacade.addVideoSizeListener(listener)
         onDispose {
             NativeCoreFacade.removeVideoSizeListener(listener)
-        }
-    }
-
-    LaunchedEffect(showImeInput) {
-        if (showImeInput) {
-            imeFocusRequester.requestFocus()
-            keyboardController?.show()
-        } else {
-            focusManager.clearFocus()
-            keyboardController?.hide()
         }
     }
 
@@ -910,6 +887,36 @@ private fun ShortcutLaunchScreen(
                                     )
                                 }
                             },
+                            imeRequestToken = imeRequestToken,
+                            onImeCommitText = { text ->
+                                val scrcpy = scrcpyInstance ?: return@FullscreenControlScreen
+                                submitImeText(
+                                    scrcpy = scrcpy,
+                                    text = text,
+                                    keyInjectMode = sessionInfo?.keyInjectMode
+                                        ?: ClientOptions.KeyInjectMode.MIXED,
+                                ) { error, _ ->
+                                    Log.w("ShortcutLaunchActivity", "输入法文本提交失败", error)
+                                }
+                            },
+                            onImeDeleteSurroundingText = { beforeLength, _ ->
+                                val scrcpy = scrcpyInstance ?: return@FullscreenControlScreen
+                                submitImeDeleteSurroundingText(
+                                    scrcpy = scrcpy,
+                                    beforeLength = beforeLength,
+                                    afterLength = 0,
+                                )
+                            },
+                            onImeKeyEvent = { event ->
+                                val scrcpy = scrcpyInstance ?: return@FullscreenControlScreen false
+                                submitImeKeyEvent(
+                                    scrcpy = scrcpy,
+                                    event = event,
+                                    keyInjectMode = sessionInfo?.keyInjectMode
+                                        ?: ClientOptions.KeyInjectMode.MIXED,
+                                    forwardKeyRepeat = sessionInfo?.forwardKeyRepeat ?: true,
+                                )
+                            },
                         )
 
                         if (showVirtualButtons) {
@@ -928,10 +935,7 @@ private fun ShortcutLaunchScreen(
                                             Toast.makeText(context, "控制通道不可用，无法转发输入", Toast.LENGTH_SHORT).show()
                                             return@Fullscreen
                                         }
-                                        showImeInput = !showImeInput
-                                        if (!showImeInput) {
-                                            imeBuffer = ""
-                                        }
+                                        imeRequestToken = if (imeRequestToken == 0) 1 else 0
                                         return@Fullscreen
                                     }
                                     action.keycode?.let { keycode ->
@@ -942,61 +946,6 @@ private fun ShortcutLaunchScreen(
                                     }
                                 },
                             )
-                        }
-
-                        if (showImeInput) {
-                            Box(modifier = Modifier.align(Alignment.BottomCenter)) {
-                                Card {
-                                    TextField(
-                                        value = imeBuffer,
-                                        onValueChange = { newValue ->
-                                            val oldValue = imeBuffer
-                                            val commonPrefix = oldValue.commonPrefixWith(newValue)
-                                            val removedCount = oldValue.length - commonPrefix.length
-                                            val addedText = newValue.substring(commonPrefix.length)
-
-                                            if (removedCount > 0) {
-                                                scope.launch(inputDispatcher) {
-                                                    repeat(removedCount) {
-                                                        scrcpyInstance?.injectKeycode(0, UiAndroidKeycodes.DEL)
-                                                        scrcpyInstance?.injectKeycode(1, UiAndroidKeycodes.DEL)
-                                                    }
-                                                }
-                                            }
-                                            if (addedText.isNotEmpty()) {
-                                                scope.launch(inputDispatcher) {
-                                                    addedText.forEach { ch ->
-                                                        scrcpyInstance?.injectText(ch.toString())
-                                                    }
-                                                }
-                                            }
-                                            imeBuffer = newValue
-                                        },
-                                        label = "输入（暂不支持中文等组合）",
-                                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                                        keyboardActions = KeyboardActions(onDone = {
-                                            showImeInput = false
-                                            imeBuffer = ""
-                                        }),
-                                        modifier = Modifier
-                                            .padding(UiSpacing.Medium)
-                                            .focusRequester(imeFocusRequester)
-                                            .focusable(),
-                                    )
-                                    TextButton(
-                                        text = "关闭输入",
-                                        onClick = {
-                                            showImeInput = false
-                                            imeBuffer = ""
-                                        },
-                                        modifier = Modifier.padding(
-                                            start = UiSpacing.Medium,
-                                            end = UiSpacing.Medium,
-                                            bottom = UiSpacing.Medium,
-                                        ),
-                                    )
-                                }
-                            }
                         }
                     }
                 }

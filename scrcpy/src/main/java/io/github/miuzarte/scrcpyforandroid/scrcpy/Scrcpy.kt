@@ -250,6 +250,8 @@ class Scrcpy(
 
     suspend fun injectText(text: String) = session.injectText(text)
 
+    suspend fun setClipboard(text: String, paste: Boolean) = session.setClipboard(text, paste)
+
     suspend fun injectTouch(
         action: Int,
         pointerId: Long,
@@ -1102,6 +1104,14 @@ class Scrcpy(
             }
         }
 
+        suspend fun setClipboard(text: String, paste: Boolean) = mutex.withLock {
+            try {
+                requireControlWriter().setClipboard(text, paste)
+            } catch (e: IllegalStateException) {
+                Log.w(TAG, "setClipboard(): control channel not available", e)
+            }
+        }
+
         suspend fun injectTouch(
             action: Int,
             pointerId: Long,
@@ -1292,7 +1302,15 @@ class Scrcpy(
             val width: Int,
             val height: Int,
             val audioCodecId: Int = 0,
+            val audioCodec: Codec? = null,
             val controlEnabled: Boolean,
+            val legacyPaste: Boolean = false,
+            val mouseHover: Boolean = true,
+            val killAdbOnClose: Boolean = false,
+            val videoPlayback: Boolean = true,
+            val audioPlayback: Boolean = true,
+            val keyInjectMode: ClientOptions.KeyInjectMode = ClientOptions.KeyInjectMode.MIXED,
+            val forwardKeyRepeat: Boolean = true,
             val host: String = "",
             val port: Int = Defaults.ADB_PORT,
         )
@@ -1379,6 +1397,17 @@ class Scrcpy(
             fun injectText(text: String) {
                 val bytes = text.toByteArray(Charsets.UTF_8)
                 output.writeByte(TYPE_INJECT_TEXT)
+                output.writeInt(bytes.size)
+                output.write(bytes)
+                output.flush()
+            }
+
+            @Synchronized
+            fun setClipboard(text: String, paste: Boolean) {
+                val bytes = text.toByteArray(Charsets.UTF_8)
+                output.writeByte(TYPE_SET_CLIPBOARD)
+                output.writeLong(CLIPBOARD_SEQUENCE_INVALID)
+                output.writeByte(if (paste) 1 else 0)
                 output.writeInt(bytes.size)
                 output.write(bytes)
                 output.flush()
@@ -1496,8 +1525,10 @@ class Scrcpy(
             private const val TYPE_INJECT_TOUCH_EVENT = 2
             private const val TYPE_INJECT_SCROLL_EVENT = 3
             private const val TYPE_BACK_OR_SCREEN_ON = 4
+            private const val TYPE_SET_CLIPBOARD = 9
             private const val TYPE_SET_DISPLAY_POWER = 10
             private const val TYPE_START_APP = 16
+            private const val CLIPBOARD_SEQUENCE_INVALID = 0L
 
             private fun socketNameFor(scid: Int): String {
                 return "scrcpy_%08x".format(scid)

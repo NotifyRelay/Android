@@ -5,6 +5,7 @@ import android.opengl.EGL14
 import android.opengl.EGLConfig
 import android.opengl.EGLContext
 import android.opengl.EGLDisplay
+import android.opengl.EGLExt
 import android.opengl.EGLSurface
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
@@ -37,6 +38,12 @@ class PersistentVideoRenderer {
     private var displayEglSurface: EGLSurface = EGL14.EGL_NO_SURFACE
     private var displaySurface: Surface? = null
     private var displaySurfaceId: Int? = null
+    private var recordEglSurface: EGLSurface = EGL14.EGL_NO_SURFACE
+    private var recordSurface: Surface? = null
+    private var recordSurfaceId: Int? = null
+    private var recordWidth: Int = 0
+    private var recordHeight: Int = 0
+    private var onRecordFrameRendered: ((Long) -> Unit)? = null
 
     private var oesTextureId = 0
     private var decoderSurfaceTexture: SurfaceTexture? = null
@@ -101,11 +108,64 @@ class PersistentVideoRenderer {
         }
     }
 
+    fun attachRecordSurface(
+        surface: Surface,
+        width: Int,
+        height: Int,
+        onFrameRendered: ((Long) -> Unit)? = null,
+    ) {
+        ensureInitialized()
+        val newId = System.identityHashCode(surface)
+        if (recordSurfaceId == newId &&
+            recordWidth == width &&
+            recordHeight == height
+        ) {
+            onRecordFrameRendered = onFrameRendered
+            return
+        }
+        Log.i(tag, "attachRecordSurface(): request surfaceId=$newId size=${width}x$height")
+        handler.post {
+            if (released || !surface.isValid) return@post
+            releaseRecordSurfaceLocked()
+            recordSurface = surface
+            recordSurfaceId = newId
+            recordWidth = width.coerceAtLeast(1)
+            recordHeight = height.coerceAtLeast(1)
+            onRecordFrameRendered = onFrameRendered
+            recordEglSurface = EGL14.eglCreateWindowSurface(
+                eglDisplay,
+                eglConfig,
+                surface,
+                intArrayOf(EGL14.EGL_NONE),
+                0
+            )
+            Log.i(tag, "attachRecordSurface(): attached surfaceId=$newId")
+            drawFrame()
+        }
+    }
+
+    fun detachRecordSurface(surface: Surface? = null, releaseSurface: Boolean = false) {
+        val requestId = surface?.let { System.identityHashCode(it) }
+        Log.i(
+            tag,
+            "detachRecordSurface(): request surfaceId=$requestId releaseSurface=$releaseSurface current=$recordSurfaceId"
+        )
+        handler.post {
+            if (released) return@post
+            if (requestId != null && requestId != recordSurfaceId) return@post
+            releaseRecordSurfaceLocked()
+            if (releaseSurface) {
+                runCatching { surface?.release() }
+            }
+        }
+    }
+
     fun release() {
         handler.post {
             if (released) return@post
             released = true
             releaseDisplaySurfaceLocked()
+            releaseRecordSurfaceLocked()
             runCatching { decoderSurface?.release() }
             decoderSurface = null
             runCatching { decoderSurfaceTexture?.release() }
@@ -236,6 +296,17 @@ class PersistentVideoRenderer {
             }
             .onFailure { Log.w(tag, "updateTexImage failed", it) }
         surfaceTexture.getTransformMatrix(stMatrix)
+        val frameTimestampNs = surfaceTexture.timestamp
+
+        if (recordEglSurface != EGL14.EGL_NO_SURFACE) {
+            renderToSurface(
+                eglSurface = recordEglSurface,
+                width = recordWidth,
+                height = recordHeight,
+                presentationTimeNs = frameTimestampNs,
+            )
+            onRecordFrameRendered?.invoke(frameTimestampNs)
+        }
 
         if (displayEglSurface == EGL14.EGL_NO_SURFACE) {
             return
@@ -245,26 +316,11 @@ class PersistentVideoRenderer {
         val height = IntArray(1)
         EGL14.eglQuerySurface(eglDisplay, displayEglSurface, EGL14.EGL_WIDTH, width, 0)
         EGL14.eglQuerySurface(eglDisplay, displayEglSurface, EGL14.EGL_HEIGHT, height, 0)
-        EGL14.eglMakeCurrent(eglDisplay, displayEglSurface, displayEglSurface, eglContext)
-        GLES20.glViewport(0, 0, width[0].coerceAtLeast(1), height[0].coerceAtLeast(1))
-        GLES20.glClearColor(0f, 0f, 0f, 1f)
-        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
-        GLES20.glUseProgram(program)
-        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
-        GLES20.glUniformMatrix4fv(stMatrixHandle, 1, false, stMatrix, 0)
-        GLES20.glUniform1i(samplerHandle, 0)
-
-        VERTICES.position(0)
-        GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 16, VERTICES)
-        GLES20.glEnableVertexAttribArray(positionHandle)
-        VERTICES.position(2)
-        GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 16, VERTICES)
-        GLES20.glEnableVertexAttribArray(texCoordHandle)
-
-        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
-        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
-        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
-        EGL14.eglSwapBuffers(eglDisplay, displayEglSurface)
+        renderToSurface(
+            eglSurface = displayEglSurface,
+            width = width[0].coerceAtLeast(1),
+            height = height[0].coerceAtLeast(1),
+        )
         val rendered = frameRenderedCount.incrementAndGet()
         if (rendered == 1L || rendered % 120L == 0L) {
             Log.i(
@@ -284,6 +340,50 @@ class PersistentVideoRenderer {
         }
         displaySurface = null
         displaySurfaceId = null
+    }
+
+    private fun releaseRecordSurfaceLocked() {
+        if (recordEglSurface != EGL14.EGL_NO_SURFACE) {
+            EGL14.eglDestroySurface(eglDisplay, recordEglSurface)
+            recordEglSurface = EGL14.EGL_NO_SURFACE
+        }
+        if (recordSurfaceId != null) {
+            Log.i(tag, "releaseRecordSurfaceLocked(): surfaceId=$recordSurfaceId")
+        }
+        recordSurface = null
+        recordSurfaceId = null
+        recordWidth = 0
+        recordHeight = 0
+        onRecordFrameRendered = null
+    }
+
+    private fun renderToSurface(
+        eglSurface: EGLSurface,
+        width: Int,
+        height: Int,
+        presentationTimeNs: Long? = null,
+    ) {
+        EGL14.eglMakeCurrent(eglDisplay, eglSurface, eglSurface, eglContext)
+        GLES20.glViewport(0, 0, width.coerceAtLeast(1), height.coerceAtLeast(1))
+        GLES20.glClearColor(0f, 0f, 0f, 1f)
+        GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        GLES20.glUseProgram(program)
+        GLES20.glUniformMatrix4fv(mvpMatrixHandle, 1, false, mvpMatrix, 0)
+        GLES20.glUniformMatrix4fv(stMatrixHandle, 1, false, stMatrix, 0)
+        GLES20.glUniform1i(samplerHandle, 0)
+
+        VERTICES.position(0)
+        GLES20.glVertexAttribPointer(positionHandle, 2, GLES20.GL_FLOAT, false, 16, VERTICES)
+        GLES20.glEnableVertexAttribArray(positionHandle)
+        VERTICES.position(2)
+        GLES20.glVertexAttribPointer(texCoordHandle, 2, GLES20.GL_FLOAT, false, 16, VERTICES)
+        GLES20.glEnableVertexAttribArray(texCoordHandle)
+
+        GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, oesTextureId)
+        GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
+        presentationTimeNs?.let { EGLExt.eglPresentationTimeANDROID(eglDisplay, eglSurface, it) }
+        EGL14.eglSwapBuffers(eglDisplay, eglSurface)
     }
 
     private fun createExternalTexture(): Int {

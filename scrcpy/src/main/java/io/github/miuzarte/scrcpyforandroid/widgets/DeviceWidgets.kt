@@ -2,9 +2,11 @@ package io.github.miuzarte.scrcpyforandroid.widgets
 
 import android.annotation.SuppressLint
 import android.graphics.SurfaceTexture
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.Surface
 import android.view.TextureView
+import android.view.View
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -66,7 +68,9 @@ import io.github.miuzarte.scrcpyforandroid.scaffolds.SuperSlide
 import io.github.miuzarte.scrcpyforandroid.scrcpy.Scrcpy
 import notifyrelay.data.config.ScrcpyDefaults
 import notifyrelay.data.config.ScrcpyPresets
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Button
@@ -728,6 +732,10 @@ fun FullscreenControlScreen(
     currentFps: Float,
     enableBackHandler: Boolean = true,
     onInjectTouch: (action: Int, pointerId: Long, x: Int, y: Int, pressure: Float, buttons: Int) -> Unit,
+    imeRequestToken: Int = 0,
+    onImeCommitText: (suspend (String) -> Unit)? = null,
+    onImeDeleteSurroundingText: (suspend (beforeLength: Int, afterLength: Int) -> Unit)? = null,
+    onImeKeyEvent: (suspend (KeyEvent) -> Boolean)? = null,
 ) {
     var touchAreaSize by remember { mutableStateOf(IntSize.Zero) }
     val activePointerIds = remember { linkedSetOf<Int>() }
@@ -931,6 +939,10 @@ fun FullscreenControlScreen(
             ScrcpyVideoSurface(
                 modifier = Modifier.fillMaxSize(),
                 session = session,
+                imeRequestToken = imeRequestToken,
+                onImeCommitText = onImeCommitText,
+                onImeDeleteSurroundingText = onImeDeleteSurroundingText,
+                onImeKeyEvent = onImeKeyEvent,
             )
         }
 
@@ -974,16 +986,15 @@ fun FullscreenControlScreen(
  * ScrcpyVideoSurface
  *
  * Purpose:
- * - Hosts a `TextureView` and bridges its `Surface` to `nativeCore` for video rendering.
- * - Ensures only a single `Surface` instance is registered at any time under the
- *   stable `surfaceTag` ("video-main"). This reduces surface recreation bugs seen
- *   when preview/fullscreen used separate tags.
+ * - Hosts a `ScrcpyInputSurfaceView` and bridges its `Surface` to `nativeCore` for video rendering.
+ * - Supports IME input through `ScrcpyInputSurfaceView.InputCallbacks`.
+ * - Ensures only a single `Surface` instance is registered at any time.
  *
  * Concurrency / lifecycle:
- * - `currentSurface` is only mutated on the UI thread via TextureView callbacks.
+ * - `currentSurface` is only mutated on the UI thread via SurfaceHolder callbacks.
  * - Registration to `nativeCore` is triggered from a [LaunchedEffect] when both
  *   `session` and `currentSurface` are available. Unregistration happens in
- *   `onSurfaceTextureDestroyed` and `DisposableEffect.onDispose` to guarantee
+ *   `surfaceDestroyed` and `DisposableEffect.onDispose` to guarantee
  *   cleanup even if the composable leaves composition.
  *
  * Reliability notes:
@@ -994,8 +1005,15 @@ fun FullscreenControlScreen(
 private fun ScrcpyVideoSurface(
     modifier: Modifier,
     session: ScrcpySessionInfo?,
+    imeRequestToken: Int = 0,
+    onImeCommitText: (suspend (String) -> Unit)? = null,
+    onImeDeleteSurroundingText: (suspend (beforeLength: Int, afterLength: Int) -> Unit)? = null,
+    onImeKeyEvent: (suspend (KeyEvent) -> Boolean)? = null,
 ) {
     var currentSurface by remember { mutableStateOf<Surface?>(null) }
+    var currentSurfaceView by remember { mutableStateOf<ScrcpyInputSurfaceView?>(null) }
+    val scope = rememberCoroutineScope()
+    val ioScope = remember { CoroutineScope(SupervisorJob() + Dispatchers.IO) }
 
     LaunchedEffect(session, currentSurface) {
         if (session != null && currentSurface != null) {
@@ -1003,13 +1021,26 @@ private fun ScrcpyVideoSurface(
         }
     }
 
+    LaunchedEffect(session?.width, session?.height, currentSurfaceView) {
+        val surfaceView = currentSurfaceView ?: return@LaunchedEffect
+        val currentSession = session ?: return@LaunchedEffect
+        if (currentSession.width > 0 && currentSession.height > 0) {
+            surfaceView.holder.setFixedSize(currentSession.width, currentSession.height)
+        }
+    }
+
+    LaunchedEffect(imeRequestToken, currentSurfaceView) {
+        if (imeRequestToken == 0) return@LaunchedEffect
+        val surfaceView = currentSurfaceView ?: return@LaunchedEffect
+        surfaceView.setCommitTextEnabled(true)
+        io.github.miuzarte.scrcpyforandroid.services.LocalInputService.showSoftKeyboard(surfaceView)
+    }
+
     DisposableEffect(Unit) {
         onDispose {
-            val released = currentSurface
-            if (released != null) {
-                NativeCoreFacade.detachVideoSurface(released, releaseDecoder = true)
-                released.release()
-                currentSurface = null
+            val surface = currentSurface
+            if (surface != null) {
+                NativeCoreFacade.detachVideoSurface(surface, releaseDecoder = true)
             }
         }
     }
@@ -1017,39 +1048,72 @@ private fun ScrcpyVideoSurface(
     AndroidView(
         modifier = modifier,
         factory = { context ->
-            TextureView(context).apply {
-                surfaceTextureListener = object : TextureView.SurfaceTextureListener {
-                    override fun onSurfaceTextureAvailable(
-                        surfaceTexture: SurfaceTexture,
-                        width: Int,
-                        height: Int
-                    ) {
-                        currentSurface?.release()
-                        @SuppressLint("Recycle")
-                        currentSurface = Surface(surfaceTexture)
-                    }
-
-                    override fun onSurfaceTextureSizeChanged(
-                        surfaceTexture: SurfaceTexture,
-                        width: Int,
-                        height: Int
-                    ) = Unit
-
-                    override fun onSurfaceTextureDestroyed(surfaceTexture: SurfaceTexture): Boolean {
-                        val released = currentSurface
-                        currentSurface = null
-                        if (released != null) {
-                            NativeCoreFacade.detachVideoSurface(released, releaseDecoder = true)
-                            released.release()
+            ScrcpyInputSurfaceView(context).apply {
+                currentSurfaceView = this
+                inputCallbacks = object : ScrcpyInputSurfaceView.InputCallbacks {
+                    override fun handleKeyEvent(event: KeyEvent): Boolean {
+                        val handler = onImeKeyEvent ?: return false
+                        ioScope.launch {
+                            handler(event)
                         }
                         return true
                     }
 
-                    override fun onSurfaceTextureUpdated(surfaceTexture: SurfaceTexture) = Unit
+                    override fun handleCommitText(text: CharSequence): Boolean {
+                        val handler = onImeCommitText ?: return false
+                        ioScope.launch {
+                            handler(text.toString())
+                        }
+                        return true
+                    }
+
+                    override fun handleDeleteSurroundingText(
+                        beforeLength: Int,
+                        afterLength: Int
+                    ): Boolean {
+                        val handler = onImeDeleteSurroundingText ?: return false
+                        ioScope.launch {
+                            handler(beforeLength, afterLength)
+                        }
+                        return true
+                    }
                 }
+                holder.addCallback(object : android.view.SurfaceHolder.Callback {
+                    override fun surfaceCreated(holder: android.view.SurfaceHolder) {
+                        val newSurface = holder.surface
+                        if (!newSurface.isValid) return
+                        currentSurface = newSurface
+                        if (session != null) {
+                            scope.launch {
+                                NativeCoreFacade.attachVideoSurface(newSurface)
+                            }
+                        }
+                    }
+
+                    override fun surfaceChanged(
+                        holder: android.view.SurfaceHolder,
+                        format: Int,
+                        width: Int,
+                        height: Int
+                    ) = Unit
+
+                    override fun surfaceDestroyed(holder: android.view.SurfaceHolder) {
+                        val surface = currentSurface
+                        currentSurface = null
+                        if (surface != null) {
+                            scope.launch {
+                                NativeCoreFacade.detachVideoSurface(surface, releaseDecoder = true)
+                            }
+                        }
+                    }
+                })
             }
         },
-        update = {},
+        update = { view ->
+            if (imeRequestToken == 0) {
+                view.setCommitTextEnabled(false)
+            }
+        },
     )
 }
 

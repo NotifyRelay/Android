@@ -25,6 +25,9 @@ object NativeCoreFacade {
     private val bootstrapPackets = ArrayDeque<CachedPacket>()
 
     @Volatile
+    private var recordingSurfaceAttached = false
+
+    @Volatile
     private var latestConfigPacket: CachedPacket? = null
     private var packetCount: Long = 0
 
@@ -92,6 +95,36 @@ object NativeCoreFacade {
         }
     }
 
+    suspend fun attachRecordingSurface(
+        surface: Surface,
+        width: Int,
+        height: Int,
+        onFrameRendered: ((Long) -> Unit)? = null,
+    ) {
+        sessionLifecycleMutex.withLock {
+            recordingSurfaceAttached = true
+            renderer.attachRecordSurface(surface, width, height, onFrameRendered)
+            val session = currentSessionInfo
+            if (session != null && decoder == null) {
+                createOrReplaceDecoder(session)
+            }
+        }
+    }
+
+    suspend fun detachRecordingSurface(
+        surface: Surface? = null,
+        releaseSurface: Boolean = false,
+    ) {
+        sessionLifecycleMutex.withLock {
+            recordingSurfaceAttached = false
+            renderer.detachRecordSurface(surface, releaseSurface)
+            if (activeSurfaceId == null) {
+                decoder?.release()
+                decoder = null
+            }
+        }
+    }
+
     fun addVideoSizeListener(listener: (Int, Int) -> Unit) = videoSizeListeners.add(listener)
     fun removeVideoSizeListener(listener: (Int, Int) -> Unit) = videoSizeListeners.remove(listener)
     fun addVideoFpsListener(listener: (Float) -> Unit) = videoFpsListeners.add(listener)
@@ -107,7 +140,7 @@ object NativeCoreFacade {
             bootstrapPackets.clear()
             latestConfigPacket = null
         }
-        if (activeSurfaceId != null) {
+        if (activeSurfaceId != null || recordingSurfaceAttached) {
             Log.i(TAG, "onScrcpySessionStarted(): bind decoder to persistent surface")
             createOrReplaceDecoder(session)
         }
@@ -145,6 +178,7 @@ object NativeCoreFacade {
             latestConfigPacket = null
         }
         currentSessionInfo = null
+        recordingSurfaceAttached = false
     }
 
     private const val TAG = "NativeCoreFacade"
