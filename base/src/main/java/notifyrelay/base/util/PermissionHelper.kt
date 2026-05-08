@@ -361,6 +361,21 @@ object PermissionHelper {
     }
 
     /**
+     * 检查设备是否处于锁屏状态。
+     *
+     * @param context 用于获取 KeyguardManager 服务的上下文。
+     * @return 如果设备处于锁屏状态返回 true，否则返回 false。
+     */
+    fun isDeviceLocked(context: Context): Boolean {
+        return try {
+            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+            keyguardManager.isKeyguardLocked
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    /**
      * 检查指定的无障碍服务是否已启用。
      *
      * @param context 用于访问 Settings.Secure 的上下文。

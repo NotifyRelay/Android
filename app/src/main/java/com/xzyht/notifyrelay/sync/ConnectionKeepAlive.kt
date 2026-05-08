@@ -6,6 +6,7 @@ import android.widget.Toast
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import notifyrelay.core.util.EncryptionManager
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
@@ -43,11 +44,13 @@ class ConnectionKeepAlive(
     private val heartbeatJobs get() = deviceManager.heartbeatJobsInternal
     private val heartbeatedDevices get() = deviceManager.heartbeatedDevicesInternal
     private val authenticatedDevices get() = deviceManager.authenticatedDevices
+    private var lastUsedTcpHeartbeat = false
 
     /**
      * 启动某个设备的心跳任务。
      * - 每 4 秒发送一次心跳
      * - 连续失败 5 次后触发 handleHeartbeatFailure
+     * - 锁屏时或WLAN直连模式下使用TCP心跳，否则使用UDP广播
      */
     fun startHeartbeatToDevice(uuid: String, initialIp: String, initialPort: Int, sharedSecret: String) {
         heartbeatJobs[uuid]?.cancel()
@@ -60,7 +63,28 @@ class ConnectionKeepAlive(
             while (true) {
                 var success = false
                 try {
-                    success = DiscoveryBroadcaster.sendBroadcast(deviceManager)
+                    val info = deviceManager.getDeviceInfoInternal(uuid)
+                    val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[uuid] }
+                    val targetIp = info?.ip ?: auth?.lastIp ?: initialIp
+                    val targetPort = info?.port ?: auth?.lastPort ?: initialPort
+
+                    // 判断是否需要使用TCP心跳：锁屏时或WLAN直连模式下使用TCP
+                    val useTcpHeartbeat = shouldUseTcpHeartbeat()
+
+                    if (useTcpHeartbeat && targetIp.isNotEmpty() && targetIp != "0.0.0.0") {
+                        // TCP心跳：向对方主动建立TCP连接发送心跳
+                        success = HeartbeatSender.sendTcpHeartbeat(
+                            deviceManager,
+                            DeviceInfo(uuid, info?.displayName ?: auth?.displayName ?: "已认证设备", targetIp, targetPort)
+                        )
+                    } else {
+                        // UDP广播心跳
+                        success = try {
+                            DiscoveryBroadcaster.sendBroadcast(deviceManager)
+                        } catch (e: Exception) {
+                            false
+                        }
+                    }
                 } catch (e: Exception) {
                     //Logger.d("死神-NotifyRelay", "[KeepAlive] 心跳发送失败: $uuid, ${e.message}")
                 }
@@ -78,6 +102,26 @@ class ConnectionKeepAlive(
             }
         }
         heartbeatJobs[uuid] = job
+    }
+
+    /**
+     * 判断是否应该使用TCP心跳而非UDP广播
+     * 条件：本机锁屏时 或 WLAN直连模式
+     */
+    private fun shouldUseTcpHeartbeat(): Boolean {
+        val useTcp = deviceManager.isWifiDirectNetworkInternal() ||
+                     PermissionHelper.isDeviceLocked(deviceManager.contextInternal)
+
+        if (useTcp != lastUsedTcpHeartbeat) {
+            lastUsedTcpHeartbeat = useTcp
+            if (useTcp) {
+                Logger.d("KeepAlive", "切换到TCP心跳")
+            } else {
+                Logger.d("KeepAlive", "切换到UDP广播心跳")
+            }
+        }
+
+        return useTcp
     }
 
     /**

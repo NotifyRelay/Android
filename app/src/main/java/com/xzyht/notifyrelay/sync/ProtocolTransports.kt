@@ -89,7 +89,37 @@ object HandshakeSender {
 object HeartbeatSender {
 
     private const val TAG = "HeartbeatSender"
-    
+
+    /**
+     * 通过TCP发送心跳（用于锁屏时UDP广播被限制的情况）
+     * 格式：HEARTBEAT_TCP:<uuid>:<displayName>:<port>:<+/-><batteryLevel>:<deviceType>
+     */
+    fun sendTcpHeartbeat(
+        manager: DeviceConnectionManager,
+        target: DeviceInfo,
+        timeoutMs: Int = 3000
+    ): Boolean {
+        return try {
+            val socket = Socket()
+            socket.connect(InetSocketAddress(target.ip, target.port), timeoutMs)
+            val writer = OutputStreamWriter(socket.getOutputStream())
+
+            val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
+            val isCharging = BatteryUtils.isCharging(manager.contextInternal)
+            val chargeSign = if (isCharging) "+" else "-"
+            val displayName = manager.encodeDisplayNameForTransportInternal(manager.localDisplayNameInternal())
+            val port = manager.listenPort
+            val payload = "HEARTBEAT_TCP:${manager.uuid}:${displayName}:${port}:${chargeSign}${batteryLevel}:android\n"
+
+            writer.write(payload)
+            writer.flush()
+            try { writer.close() } catch (_: Exception) {}
+            try { socket.close() } catch (_: Exception) {}
+            true
+        } catch (e: Exception) {
+            false
+        }
+    }
 }
 
 /** 统一广播发送器（用于发现和心跳广播） */

@@ -123,116 +123,12 @@ class ConnectionDiscoveryManager(
                         socket.receive(packet)
                         val msg = String(packet.data, 0, packet.length)
                         val ip = packet.address.hostAddress
-                        // 解析新格式的心跳消息：<uuid>:<displayName>:<port>:<+/-><batteryLevel>:<deviceType>
-                        val parts = msg.split(":")
-                        if (parts.size >= 5) {
-                            val uuid = parts[0]
-                            val rawDisplay = parts[1]
-                            val portStr = parts[2]
-                            val batteryStr = parts[3]
-                            val deviceType = parts[4]
-                            
-                            if (!uuid.isNullOrEmpty() && uuid != deviceManager.uuid && !ip.isNullOrEmpty()) {
-                                // 解析端口
-                                val port = portStr.toIntOrNull() ?: deviceManager.listenPort
-                                
-                                // 解析设备名称
-                                val displayName = try {
-                                    deviceManager.decodeDisplayNameFromTransportInternal(rawDisplay)
-                                } catch (_: Exception) {
-                                    rawDisplay
-                                }
-                                
-                                // 解析充电状态和电量
-                                var batteryLevel = 0
-                                var isCharging: Boolean = false
-                                
-                                try {
-                                    if (batteryStr.isNotEmpty()) {
-                                        val chargeSign = batteryStr[0]
-                                        isCharging = chargeSign == '+'
-                                        val batteryPart = batteryStr.substring(1)
-                                        batteryLevel = batteryPart.toInt().coerceIn(0, 100)
-                                    }
-                                } catch (e: Exception) {
-                                    // 解析失败时使用默认值
-                                }
-                                
-                                // 创建设备信息
-                                val device = DeviceInfo(uuid, displayName, ip, port, batteryLevel, if (isCharging) '1' else '0')
-                                
-                                // 检查是否为已认证设备
-                                val isAuthed = synchronized(deviceManager.authenticatedDevices) {
-                                    deviceManager.authenticatedDevices.containsKey(uuid)
-                                }
-                                
-                                // 仅已在认证表中的设备才更新心跳状态
-                                if (isAuthed) {
-                                    // 合并已认证设备的更新逻辑，减少冗余操作
-                                    var needSave = false
-                                    
-                                    synchronized(deviceManager.authenticatedDevices) {
-                                        val auth = deviceManager.authenticatedDevices[uuid]
-                                        if (auth != null) {
-                                            // 检查是否需要更新认证信息
-                                            val needsUpdate = auth.displayName != device.displayName ||
-                                                    auth.lastIp != ip ||
-                                                    auth.deviceType != deviceType
-                                            
-                                            if (needsUpdate) {
-                                                deviceManager.authenticatedDevices[uuid] = auth.copy(
-                                                    displayName = device.displayName,
-                                                    lastIp = ip,
-                                                    deviceType = deviceType
-                                                )
-                                                needSave = true
-                                            }
-                                        }
-                                    }
-                                    
-                                    // 用心跳驱动在线状态：刷新 lastSeen + 标记已建立心跳
-                                    deviceManager.deviceLastSeenInternal[uuid] = System.currentTimeMillis()
-                                    synchronized(deviceManager.heartbeatedDevicesInternal) {
-                                        deviceManager.heartbeatedDevicesInternal.add(uuid)
-                                    }
-                                    
-                                    // 只调用一次 saveAuthedDevicesInternal
-                                    if (needSave) {
-                                        deviceManager.saveAuthedDevicesInternal()
-                                    }
-                                    
-                                    // 只更新一次设备信息缓存（不触发额外的 updateDeviceListInternal）
-                                    synchronized(deviceManager.deviceInfoCacheInternal) {
-                                        deviceManager.deviceInfoCacheInternal[uuid] = device
-                                    }
-                                    DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, displayName)
-                                    
-                                    // 只调用一次 updateDeviceListInternal
-                                    deviceManager.coroutineScopeInternal.launch { 
-                                        deviceManager.updateDeviceListInternal() 
-                                    }
-                                    
-                                    // 连接到已认证设备（避免双重连接尝试）
-                                    val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
-                                        deviceManager.heartbeatedDevicesInternal.contains(uuid)
-                                    }
-                                    if (!isHeartbeated) {
-                                        deviceManager.connectToDevice(device)
-                                    } else if (!deviceManager.heartbeatJobsInternal.containsKey(uuid)) {
-                                        // 若本端尚未给对方发心跳，则自动反向 connectToDevice
-                                        val info = deviceManager.getDeviceInfoInternal(uuid)
-                                        if (info != null && info.ip.isNotEmpty() && info.ip != "0.0.0.0") {
-                                            deviceManager.connectToDevice(info)
-                                        }
-                                    }
-                                } else {
-                                    // 非认证设备更新设备信息缓存
-                                    updateDeviceInfoCache(device)
-                                }
-                            }
+
+                        val heartbeatInfo = HeartbeatProcessor.parseHeartbeatPayload(msg, ip, deviceManager.listenPort)
+                        if (heartbeatInfo != null && heartbeatInfo.uuid != deviceManager.uuid) {
+                            HeartbeatProcessor.processHeartbeat(heartbeatInfo, deviceManager)
                         }
                     } catch (e: SocketTimeoutException) {
-                        // 超时异常，继续循环检查条件
                         continue
                     }
                 }

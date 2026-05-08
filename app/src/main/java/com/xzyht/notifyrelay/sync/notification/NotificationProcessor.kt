@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.sync.notification
 
-import android.app.KeyguardManager
 import android.content.Context
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
@@ -15,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import org.json.JSONObject
 
 /**
@@ -100,8 +100,7 @@ object NotificationProcessor {
         val result = remoteNotificationFilter(decrypted, context)
 
         if (result.shouldShow) {
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val localIsLocked = keyguardManager.isKeyguardLocked
+            val localIsLocked = PermissionHelper.isDeviceLocked(context)
 
             if (result.needsDelay && localIsLocked) {
                 handleLockedScreenDelayed(context, scope, result)

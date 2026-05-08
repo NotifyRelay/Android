@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.sync
 
-import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,6 +9,7 @@ import android.net.Uri
 import android.os.Handler
 import android.util.Base64
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
@@ -497,8 +497,7 @@ object MessageSender {
             }
 
             // 获取锁屏状态
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val isLocked = keyguardManager.isKeyguardLocked
+            val isLocked = PermissionHelper.isDeviceLocked(context)
             
             // 创建当前媒体播放状态
             val currentState = MediaPlayState(
@@ -606,8 +605,7 @@ object MessageSender {
             }
 
             // 获取锁屏状态
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val isLocked = keyguardManager.isKeyguardLocked
+            val isLocked = PermissionHelper.isDeviceLocked(context)
             
             // 构建结束包
             val payload = buildMediaPlayEndPayload(
@@ -679,8 +677,7 @@ object MessageSender {
             }
 
             // 获取锁屏状态
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val isLocked = keyguardManager.isKeyguardLocked
+            val isLocked = PermissionHelper.isDeviceLocked(context)
 
             // 构建标准 JSON 格式的通知数据
             val json = JSONObject().apply {
@@ -746,8 +743,7 @@ object MessageSender {
                 return
             }
 
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val isLocked = keyguardManager.isKeyguardLocked
+            val isLocked = PermissionHelper.isDeviceLocked(context)
 
             // 处理图片：若 picMap 中是本地 URI/file 路径则读取并编码为 base64 data URI，http(s) 地址或其他字符串保持不变
             val processedPics = mutableMapOf<String, String>()
@@ -866,8 +862,7 @@ object MessageSender {
         try {
             val authenticatedDevices = getAuthenticatedDevices(deviceManager)
             if (authenticatedDevices.isEmpty()) return
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val isLocked = keyguardManager.isKeyguardLocked
+            val isLocked = PermissionHelper.isDeviceLocked(context)
             val featureId = featureIdOverride ?: SuperIslandProtocol.computeFeatureId(
                 superPkg, paramV2Raw, title, text
             )
