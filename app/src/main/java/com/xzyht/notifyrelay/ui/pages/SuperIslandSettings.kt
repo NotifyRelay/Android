@@ -42,38 +42,12 @@ val specInjectionOptions = listOf(
 fun UISuperIslandSettings() {
     val context = LocalContext.current
     
-    // 版本比较函数
-    fun isVersionGreaterThan(version: String?, target: String?): Boolean {
-        if (version == null || target == null) return false
-        
-        try {
-            // 去除OS前缀
-            val versionNum = version.replace("OS", "")
-            val targetNum = target.replace("OS", "")
-            
-            // 分割版本号
-            val versionParts = versionNum.split(".").mapNotNull { it.toIntOrNull() }
-            val targetParts = targetNum.split(".").mapNotNull { it.toIntOrNull() }
-            
-            // 比较版本号
-            for (i in 0 until Math.max(versionParts.size, targetParts.size)) {
-                val versionPart = versionParts.getOrElse(i) { 0 }
-                val targetPart = targetParts.getOrElse(i) { 0 }
-                
-                if (versionPart > targetPart) return true
-                if (versionPart < targetPart) return false
-            }
-            
-            return false // 版本相同
-        } catch (e: Exception) {
-            return false
-        }
-    }
+    
     
     // 计算浮窗兼容的默认值
     val defaultFloatingWindowEnabled = run {
         val detailedOsVersion = PermissionHelper.getDetailedOsVersion()
-        val isGreater = isVersionGreaterThan(detailedOsVersion, "OS3.0.300")
+        val isGreater = PermissionHelper.isVersionGreaterThan(detailedOsVersion, "OS3.0.300")
         // 版本高于OS3.0.300时默认关闭
         !isGreater
     }
@@ -99,7 +73,7 @@ fun UISuperIslandSettings() {
         // 获取当前详细OS版本
         val currentOsVersion = PermissionHelper.getDetailedOsVersion() ?: "未知"
         // 版本比较结果
-        val versionComparisonResult = isVersionGreaterThan(currentOsVersion, "OS3.0.300")
+        val versionComparisonResult = PermissionHelper.isVersionGreaterThan(currentOsVersion, "OS3.0.300")
         // 在debug构建下显示预设默认值和当前版本及比较结果
         if (DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
             "$baseSummary (当前版本: $currentOsVersion, 版本比较: ${if (versionComparisonResult) "高于" else "低于或等于"} OS3.0.300, 有用户设置: ${if (hasFloatingWindowSetting) "是" else "否"}, 预设默认值: ${if (defaultFloatingWindowEnabled) "开启" else "关闭"})"

@@ -13,6 +13,7 @@ import github.xzynine.superislandui.common.SuperIslandProtocol
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import org.json.JSONObject
 
 object SuperIslandProcessor {
@@ -151,7 +152,12 @@ object SuperIslandProcessor {
             val mText = try { json.optString("text", text.orEmpty()) } catch (_: Exception) { text.orEmpty() }
 
             if (isLocked) {
-                if (superIslandDeduplicationCache.get(dedupKey) != null) {
+                val osVersion = PermissionHelper.getDetailedOsVersion()
+                val shouldSkipDedup = PermissionHelper.isVersionGreaterThan(osVersion, "OS3.0.200")
+                
+                if (shouldSkipDedup) {
+                    Logger.i("超级岛", "澎湃系统版本高于OS3.0.200，跳过锁屏去重: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
+                } else if (superIslandDeduplicationCache.get(dedupKey) != null) {
                     Logger.i("超级岛", "锁屏重复通知去重: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
                     return true
                 } else {
