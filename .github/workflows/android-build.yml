@@ -65,7 +65,7 @@ jobs:
       - name: Build debug APK
         run: ./gradlew assembleDebug
         env:
-          KEYSTORE_PATH: keystore.jks
+          KEYSTORE_PATH: app/keystore.jks
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
@@ -79,7 +79,7 @@ jobs:
       - name: Build release APKs (split by ABI)
         run: ./gradlew assembleRelease
         env:
-          KEYSTORE_PATH: keystore.jks
+          KEYSTORE_PATH: app/keystore.jks
           KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
           STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
           KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
