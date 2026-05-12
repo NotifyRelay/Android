@@ -88,7 +88,7 @@ android {
 
         if (!resolvedKeystore.isNullOrBlank() && !resolvedStorePassword.isNullOrBlank() && !resolvedKeyPassword.isNullOrBlank() && !resolvedKeyAlias.isNullOrBlank()) {
             create("release") {
-                storeFile = file(resolvedKeystore)
+                storeFile = rootProject.file(resolvedKeystore)
                 storePassword = resolvedStorePassword
                 keyAlias = resolvedKeyAlias
                 keyPassword = resolvedKeyPassword
