@@ -48,6 +48,11 @@ jobs:
           # -q silences extra Gradle output, leaving only the printed version on stdout.
           VERSION=$(./gradlew -q :app:printVersionName)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+        env:
+          KEYSTORE_PATH: app/keystore.jks
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
 
       - name: Validate version output
         run: |
