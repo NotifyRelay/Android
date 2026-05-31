@@ -14,6 +14,16 @@ import androidx.core.content.ContextCompat
 object DeviceUtils {
 
     /**
+     * 判断当前设备是否为平板
+     * 根据设备最小宽度 >= 600dp 判断
+     * @param context 上下文
+     * @return 如果是平板返回 true，否则返回 false
+     */
+    fun isTablet(context: Context): Boolean {
+        return context.resources.configuration.smallestScreenWidthDp >= 600
+    }
+
+    /**
      * 获取本地设备显示名称
      * 优先级：1. 蓝牙名称 -> 2. Settings.Secure(bluetooth_name) -> 3. Settings.Global(device_name) -> 4. Build.MODEL/DEVICE -> 5. 兜底
      */

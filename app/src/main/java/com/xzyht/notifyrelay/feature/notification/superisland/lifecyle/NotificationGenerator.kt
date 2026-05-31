@@ -32,6 +32,7 @@ import github.xzynine.superislandui.floating.SmallIsland.right.BTextInfo
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.model.core.ParamV2
+import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import java.util.concurrent.ConcurrentHashMap
@@ -135,7 +136,8 @@ object NotificationGenerator {
         context: Context,
         notificationId: Int,
         originalBuilder: NotificationCompat.Builder,
-        notificationManager: NotificationManager
+        notificationManager: NotificationManager,
+        maxScrollWeight: Int = CapsuleScrollManager.DEFAULT_MAX_DISPLAY_WEIGHT
     ) {
         // 移除旧的滚动Runnable
         scrollRunnable.remove(key)?.let {
@@ -151,7 +153,7 @@ object NotificationGenerator {
                 }
                 
                 // 获取当前应该显示的文本
-                val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText)
+                val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText, maxScrollWeight)
                 
                 // 构建原始通知以获取其属性
                 val originalNotification = originalBuilder.build()
@@ -359,28 +361,47 @@ object NotificationGenerator {
                 var capsuleText = lyricText
                 var iconText = ""
                 
-                // 检查是否为本地传递
-
-                // 当歌词超过阈值时，拆分为图标文本和胶囊文本
-                // 远端和本地都保持6字符开始分割
-                val threshold = 6
-                val textLength = TextSplitter.calculateTextLength(lyricText)
-                if (textLength > threshold) {
-                    // 使用TextSplitter工具类进行歌词拆分
-                    val (splitIconText, splitCapsuleText) = TextSplitter.splitLyric(lyricText, threshold)
-                    iconText = splitIconText
-                    capsuleText = splitCapsuleText
+                // 检查歌词分割模式设置
+                // 0=默认（平板不分割，手机分割），1=分割，2=不分割
+                val lyricsSplitMode = StorageManager.getInt(context, "lyrics_split_mode", 0)
+                val shouldSplit = when (lyricsSplitMode) {
+                    1 -> true
+                    2 -> false
+                    else -> !DeviceUtils.isTablet(context)
+                }
+                
+                if (shouldSplit) {
+                    // 当歌词超过阈值时，拆分为图标文本和胶囊文本
+                    // 远端和本地都保持6字符开始分割
+                    val threshold = 6
+                    val textLength = TextSplitter.calculateTextLength(lyricText)
+                    if (textLength > threshold) {
+                        // 使用TextSplitter工具类进行歌词拆分
+                        val (splitIconText, splitCapsuleText) = TextSplitter.splitLyric(lyricText, threshold)
+                        iconText = splitIconText
+                        capsuleText = splitCapsuleText
+                    }
+                } else {
+                    // 不分割时，不进行任何截断和拆分，完整显示所有文本
+                    capsuleText = lyricText
+                    iconText = ""
+                }
+                
+                val scrollMaxWeight = if (shouldSplit) {
+                    CapsuleScrollManager.DEFAULT_MAX_DISPLAY_WEIGHT
+                } else {
+                    19
                 }
                 
                 // 使用CapsuleScrollManager处理胶囊文本滚动
                 val scrollKey = "${key}_scroll"
-                val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText)
+                val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText, scrollMaxWeight)
                 
                 // 设置胶囊文本
                 builder.setShortCriticalText(displayText)
                 
                 // 设置滚动更新机制
-                setupScrollUpdate(key, scrollKey, capsuleText, context, notificationId, originalBuilder = builder, notificationManager
+                setupScrollUpdate(key, scrollKey, capsuleText, context, notificationId, originalBuilder = builder, notificationManager, scrollMaxWeight
                 )
                 
                 // picMap 已在调用方通过 SuperIslandDataFormatter 解析，直接使用

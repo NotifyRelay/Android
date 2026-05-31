@@ -137,10 +137,28 @@ object TextSplitter {
      * @return 截断后的文本
      */
     fun truncateText(text: String): String {
+        return truncateTextInternal(text, 13.0, 18)
+    }
+
+    /**
+     * 截断文本（放宽限制），最长26等价字符，允许最多超出5个字符
+     * 用于不分割歌词时，胶囊文本区显示更多内容
+     * @param text 原始文本
+     * @return 截断后的文本
+     */
+    fun truncateTextExtended(text: String): String {
+        return truncateTextInternal(text, 26.0, 36)
+    }
+
+    /**
+     * 截断文本内部实现
+     * @param text 原始文本
+     * @param maxEquivalentLength 最大等价字符长度
+     * @param maxAllowedLength 最大字符数
+     * @return 截断后的文本
+     */
+    private fun truncateTextInternal(text: String, maxEquivalentLength: Double, maxAllowedLength: Int): String {
         return measureTime("truncateText") {
-            val maxEquivalentLength = 13.0
-            val maxAllowedLength = 18
-            
             if (text.isEmpty()) {
                 return@measureTime text
             }
@@ -206,7 +224,7 @@ object TextSplitter {
                 return@measureTime Pair("", truncatedText)
             }
             
-            val capsuleEquivalentLength = 6.0
+            val capsuleEquivalentLength = 7.0
             var capsuleSplitPoint = truncatedText.length
             
             var currentLength = 0.0

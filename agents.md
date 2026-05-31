@@ -35,7 +35,7 @@ minSdk = 29 (Android 10)，不兼容 API 29 以下版本，请勿使用相应的
 
 **基础模块 (`:base`)**：
 
-- `base/src/main/java/notifyrelay/base/util` (基础工具类：DeviceUtils、HapticFeedbackUtils、IntentUtils、Logger、PermissionHelper、ThemeSettingsManager、ToastUtils)
+- `base/src/main/java/notifyrelay/base/util` (基础工具类：DeviceUtils（含isTablet平板判断）、HapticFeedbackUtils、IntentUtils、Logger、PermissionHelper、ThemeSettingsManager、ToastUtils)
 
 **核心模块 (`:core`)**：
 
