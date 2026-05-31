@@ -68,6 +68,10 @@ object HeartbeatProcessor {
             deviceManager.authenticatedDevices.containsKey(uuid)
         }
 
+        deviceManager.deviceLastSeenInternal[uuid] = System.currentTimeMillis()
+
+        val device = DeviceInfo(uuid, info.displayName, info.ip, info.port, info.batteryLevel, if (info.isCharging) '1' else '0')
+
         if (isAuthed) {
             var needSave = false
 
@@ -89,7 +93,6 @@ object HeartbeatProcessor {
                 }
             }
 
-            deviceManager.deviceLastSeenInternal[uuid] = System.currentTimeMillis()
             synchronized(deviceManager.heartbeatedDevicesInternal) {
                 deviceManager.heartbeatedDevicesInternal.add(uuid)
             }
@@ -98,7 +101,15 @@ object HeartbeatProcessor {
                 deviceManager.saveAuthedDevicesInternal()
             }
 
-            val device = DeviceInfo(uuid, info.displayName, info.ip, info.port, info.batteryLevel, if (info.isCharging) '1' else '0')
+            synchronized(deviceManager.deviceInfoCacheInternal) {
+                deviceManager.deviceInfoCacheInternal[uuid] = device
+            }
+            DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
+
+            deviceManager.coroutineScopeInternal.launch {
+                deviceManager.updateDeviceListInternal()
+            }
+        } else {
             synchronized(deviceManager.deviceInfoCacheInternal) {
                 deviceManager.deviceInfoCacheInternal[uuid] = device
             }
