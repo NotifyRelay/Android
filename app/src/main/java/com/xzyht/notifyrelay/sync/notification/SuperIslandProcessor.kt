@@ -175,9 +175,29 @@ object SuperIslandProcessor {
                 try { manager.sendSuperIslandAckInternal(remoteUuid, sharedSecret, recvHash, featureId, mappedPkg) } catch (_: Exception) {}
             }
 
-            val finalTitle = merged?.title ?: mTitle
-            val finalText = merged?.text ?: mText
             val mParam2 = merged?.paramV2Raw ?: paramV2Raw
+            
+            // 解析 title/text 的优先级：merged > 顶层包字段 > paramV2Raw.iconTextInfo
+            val finalTitle = merged?.title?.takeIf { it.isNotBlank() }
+                ?: mTitle.takeIf { it.isNotBlank() }
+                ?: if (!mParam2.isNullOrBlank()) {
+                    try {
+                        val paramJson = JSONObject(mParam2)
+                        paramJson.optJSONObject("iconTextInfo")
+                            ?.optString("title", "")?.takeIf { it.isNotBlank() }
+                    } catch (e: Exception) { null }
+                } else null
+            
+            val finalText = merged?.text?.takeIf { it.isNotBlank() }
+                ?: mText.takeIf { it.isNotBlank() }
+                ?: if (!mParam2.isNullOrBlank()) {
+                    try {
+                        val paramJson = JSONObject(mParam2)
+                        paramJson.optJSONObject("iconTextInfo")
+                            ?.optString("content", "")?.takeIf { it.isNotBlank() }
+                    } catch (e: Exception) { null }
+                } else null
+            
             val rawPics = merged?.pics ?: emptyMap()
             val mPics = if (rawPics.isEmpty()) rawPics else rawPics.filterKeys { it != "miui.focus.pics" }
             

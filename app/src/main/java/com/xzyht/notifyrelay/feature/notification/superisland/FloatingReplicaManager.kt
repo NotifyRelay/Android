@@ -314,6 +314,15 @@ object FloatingReplicaManager {
                     // 使用统一的格式化服务解析数据
                     val formattedData = SuperIslandDataFormatter.formatForDisplay(context, paramV2Raw, internedPicMap)
                     val paramV2 = formattedData.paramV2
+
+                    // 如果传入的title/text为空，尝试从已解析的paramV2中提取
+                    val displayTitle = title?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.highlightInfo?.title?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.baseInfo?.title?.takeIf { it.isNotBlank() }
+
+                    val displayText = text?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
                     
                     // 生成唯一的entryKey，确保包含sourceId，以便后续能正确移除
                     val entryKey = sourceId
@@ -331,7 +340,7 @@ object FloatingReplicaManager {
                             LiveUpdatesNotificationManager.initialize(context)
                             // 发送复合通知（使用预格式化数据重载）
                             LiveUpdatesNotificationManager.showLiveUpdate(
-                                sourceId, title, text, appName, formattedData
+                                sourceId, displayTitle, displayText, appName, formattedData
                             )
                             // Live Updates通知的ID计算方式与传统通知不同，需要手动计算并添加映射
                             val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
@@ -340,7 +349,7 @@ object FloatingReplicaManager {
                         }
                     } else {
                         // 非进度类型或Live Updates未启用时，发送传统复刻通知
-                        val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
+                        val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, displayTitle, displayText, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, floatingWindowManager, entryKeyToNotificationId)
                         // 添加到 sourceId 到 notificationId 的直接映射
                         addSourceIdMapping(sourceId, entryKey, notificationId)
                         Logger.i(TAG, "浮窗功能关闭时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
@@ -436,6 +445,15 @@ object FloatingReplicaManager {
                     // 对于同一通知的不同时间更新，应该使用相同的key，所以不能包含时间戳
                     val entryKey = sourceId
 
+                    // 如果传入的title/text为空，尝试从已解析的paramV2中提取
+                    val displayTitle = title?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.highlightInfo?.title?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.baseInfo?.title?.takeIf { it.isNotBlank() }
+
+                    val displayText = text?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
+
                     // 更新Compose浮窗管理器的条目
                     // 锁屏状态下不自动展开，非锁屏状态保持原有逻辑
                     floatingWindowManager.addOrUpdateEntry(
@@ -446,8 +464,8 @@ object FloatingReplicaManager {
                         isExpanded = if (isLocked) false else !summaryOnly,
                         summaryOnly = summaryOnly,
                         business = paramV2?.business,
-                        title = title,
-                        text = text,
+                        title = displayTitle,
+                        text = displayText,
                         appName = appName
                     )
 
