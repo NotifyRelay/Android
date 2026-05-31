@@ -22,6 +22,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.backend.BackendLocalFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+import com.xzyht.notifyrelay.feature.notification.superisland.LocalSuperIslandTracker
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.sync.MessageSender
@@ -160,6 +161,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     if (pair != null) {
                         val deviceManager = this.deviceManager
                         val (superPkg, featureId) = pair
+                        LocalSuperIslandTracker.markInactive(superPkg)
                         MessageSender.sendSuperIslandEnd(
                             applicationContext,
                             superPkg,
@@ -454,6 +456,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 val superData = SuperIslandManager.extractSuperIslandData(sbn, applicationContext)
                 if (superData != null) {
                     Logger.i(TAG, "超级岛: 检测到超级岛数据，准备转发，pkg=${superData.sourcePackage}, title=${superData.title}")
+                    superData.sourcePackage?.let { LocalSuperIslandTracker.markActive(it) }
 
                     // 过滤本应用的超级岛通知，不进行转发
                     if (sbn.packageName != applicationContext.packageName) {

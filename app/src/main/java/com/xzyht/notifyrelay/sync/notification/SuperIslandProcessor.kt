@@ -7,18 +7,30 @@ import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+import com.xzyht.notifyrelay.feature.notification.superisland.LocalSuperIslandTracker
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.SuperIslandRemoteStore
 import github.xzynine.superislandui.common.SuperIslandProtocol
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.data.StorageManager
+import notifyrelay.data.database.repository.DatabaseRepository
 import org.json.JSONObject
 
 object SuperIslandProcessor {
     private const val TAG = "SuperIslandProcessor"
     private const val DEDUP_CACHE_MAX_SIZE = 1024
+
+    private val DEFAULT_MIRROR_PACKAGES = listOf(
+        "com.xiaomi.midrop",
+        "com.xiaomi.mirror",
+        "com.xiaomi.bluetooth",
+        "com.miui.mishare.connectivity"
+    )
     
 
     private val superIslandDeduplicationCache = object : LruCache<String, Boolean>(DEDUP_CACHE_MAX_SIZE) {
@@ -47,6 +59,20 @@ object SuperIslandProcessor {
 
             val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
             val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
+
+            val mirrorFilterEnabled = StorageManager.getBoolean(context, "super_island_mirror_filter_enabled", true)
+            if (mirrorFilterEnabled) {
+                val disabledDefaults = StorageManager.getString(context, "super_island_mirror_filter_disabled_defaults", "")
+                val disabledSet = disabledDefaults.split(",").filter { it.isNotBlank() }.toSet()
+                val isDefaultEnabled = DEFAULT_MIRROR_PACKAGES.contains(mappedPkg) && !disabledSet.contains(mappedPkg)
+                val isCustomEnabled = runBlocking(Dispatchers.IO) {
+                    DatabaseRepository.getInstance(context).getEnabledMirrorFilterPackages().contains(mappedPkg)
+                }
+                if ((isDefaultEnabled || isCustomEnabled) && LocalSuperIslandTracker.isActive(mappedPkg)) {
+                    Logger.i("超级岛", "镜像应用过滤(对称)：跳过远程复刻, pkg=$mappedPkg, remoteUuid=$remoteUuid")
+                    return true
+                }
+            }
 
             val siType = try { json.optString("type", "") } catch (_: Exception) { "" }
 

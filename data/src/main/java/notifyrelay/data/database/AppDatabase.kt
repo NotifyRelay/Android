@@ -14,6 +14,7 @@ import notifyrelay.data.database.dao.DeviceDao
 import notifyrelay.data.database.dao.NotificationRecordDao
 import notifyrelay.data.database.dao.SuperIslandHistoryDao
 import notifyrelay.data.database.dao.SuperIslandImageDao
+import notifyrelay.data.database.dao.SuperIslandMirrorFilterDao
 import notifyrelay.data.database.entity.AppConfigEntity
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
@@ -22,6 +23,7 @@ import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
 import notifyrelay.data.database.entity.SuperIslandImageEntity
+import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -40,9 +42,10 @@ import notifyrelay.data.database.migration.MigrationHelper
         NotificationRecordEntity::class,
         SuperIslandHistoryEntity::class,
         SuperIslandImageEntity::class,
-        SuperIslandImageBindingEntity::class
+        SuperIslandImageBindingEntity::class,
+        SuperIslandMirrorFilterEntity::class
     ],
-    version = 6,
+    version = 7,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -54,6 +57,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun notificationRecordDao(): NotificationRecordDao
     abstract fun superIslandHistoryDao(): SuperIslandHistoryDao
     abstract fun superIslandImageDao(): SuperIslandImageDao
+    abstract fun superIslandMirrorFilterDao(): SuperIslandMirrorFilterDao
     
     companion object {
         // 数据库名称
@@ -85,7 +89,7 @@ abstract class AppDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
                 .build().also { INSTANCE = it }
             }
         }
@@ -234,6 +238,22 @@ abstract class AppDatabase : RoomDatabase() {
             }
         }
         
+        /**
+         * 数据库迁移：从版本6到版本7
+         * 添加超级岛镜像过滤包名表
+         */
+        private val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS super_island_mirror_filters (
+                        packageName TEXT PRIMARY KEY NOT NULL,
+                        enabled INTEGER NOT NULL DEFAULT 1,
+                        lastUpdated INTEGER NOT NULL
+                    )
+                """.trimIndent())
+            }
+        }
+
         /**
          * 从旧存储迁移数据到Room数据库
          */
