@@ -160,8 +160,21 @@ object PermissionHelper {
      */
     fun isUsageStatsEnabled(context: Context): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
-        val mode = appOps.unsafeCheckOpNoThrow("android:get_usage_stats", android.os.Process.myUid(), context.packageName)
-        return mode == android.app.AppOpsManager.MODE_ALLOWED
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            @Suppress("DEPRECATION")
+            appOps.unsafeCheckOpNoThrow(
+                android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+                android.os.Process.myUid(),
+                context.packageName
+            ) == android.app.AppOpsManager.MODE_ALLOWED
+        } else {
+            @Suppress("DEPRECATION")
+            appOps.unsafeCheckOpNoThrow(
+                "android:get_usage_stats",
+                android.os.Process.myUid(),
+                context.packageName
+            ) == android.app.AppOpsManager.MODE_ALLOWED
+        }
     }
 
     /**
