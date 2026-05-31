@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland
 
 import android.content.Context
 import com.xzyht.notifyrelay.sync.ProtocolSender
+import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import notifyrelay.data.StorageManager.getBoolean
@@ -12,9 +13,19 @@ import github.xzynine.superislandui.model.componets.MediaSessionData
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
+enum class MediaMessageReceiveMode {
+    On,
+    Off,
+    AudioOnly
+}
+
 object RemoteMediaSessionManager {
     private const val KEY_ENABLED = "remote_media_island_enabled"
     private const val DEFAULT_ENABLED = true
+    private const val KEY_RECEIVE_MODE = "remote_media_message_receive_mode"
+    private const val MODE_ON = 0
+    private const val MODE_OFF = 1
+    private const val MODE_AUDIO_ONLY = 2
 
     // 会话和设备信息，需要线程安全访问
     @Volatile
@@ -86,12 +97,9 @@ object RemoteMediaSessionManager {
         // 保存应用上下文
         applicationContext = context.applicationContext
         
-        isEnabled = try {
-            getBoolean(context, KEY_ENABLED, DEFAULT_ENABLED)
-        } catch (_: Exception) {
-            DEFAULT_ENABLED
-        }
-        Logger.i("RemoteMediaSessionManager", "远端媒体超级岛功能已${if (isEnabled) "启用" else "禁用"}")
+        val mode = getReceiveMode(context)
+        isEnabled = mode != MediaMessageReceiveMode.Off
+        Logger.i("RemoteMediaSessionManager", "远端媒体超级岛接收模式: $mode")
         
         // 初始化定期检查任务
         initCleanupRunnable()
@@ -100,23 +108,60 @@ object RemoteMediaSessionManager {
     }
 
     fun isEnabled(context: Context): Boolean {
-        return try {
-            getBoolean(context, KEY_ENABLED, DEFAULT_ENABLED)
-        } catch (_: Exception) {
-            DEFAULT_ENABLED
-        }
+        return getReceiveMode(context) != MediaMessageReceiveMode.Off
     }
 
     fun setEnabled(context: Context, enabled: Boolean) {
+        setReceiveMode(context, if (enabled) MediaMessageReceiveMode.On else MediaMessageReceiveMode.Off)
+    }
+
+    fun getReceiveMode(context: Context): MediaMessageReceiveMode {
+        val stored = try {
+            StorageManager.getInt(context, KEY_RECEIVE_MODE, -1)
+        } catch (_: Exception) {
+            -1
+        }
+
+        if (stored == -1) {
+            val enabled = try {
+                getBoolean(context, KEY_ENABLED, DEFAULT_ENABLED)
+            } catch (_: Exception) {
+                DEFAULT_ENABLED
+            }
+            return if (enabled) MediaMessageReceiveMode.On else MediaMessageReceiveMode.Off
+        }
+
+        return when (stored) {
+            MODE_OFF -> MediaMessageReceiveMode.Off
+            MODE_AUDIO_ONLY -> MediaMessageReceiveMode.AudioOnly
+            else -> MediaMessageReceiveMode.On
+        }
+    }
+
+    fun setReceiveMode(context: Context, mode: MediaMessageReceiveMode) {
         try {
-            StorageManager.putBoolean(context, KEY_ENABLED, enabled)
-            isEnabled = enabled
-            if (!enabled) {
+            val value = when (mode) {
+                MediaMessageReceiveMode.On -> MODE_ON
+                MediaMessageReceiveMode.Off -> MODE_OFF
+                MediaMessageReceiveMode.AudioOnly -> MODE_AUDIO_ONLY
+            }
+            StorageManager.putInt(context, KEY_RECEIVE_MODE, value)
+            StorageManager.putBoolean(context, KEY_ENABLED, mode != MediaMessageReceiveMode.Off)
+            isEnabled = mode != MediaMessageReceiveMode.Off
+            if (mode == MediaMessageReceiveMode.Off) {
                 clearSession()
             }
-            Logger.i("RemoteMediaSessionManager", "远端媒体超级岛功能已${if (enabled) "启用" else "禁用"}")
+            Logger.i("RemoteMediaSessionManager", "远端媒体超级岛接收模式已设置为: $mode")
         } catch (e: Exception) {
-            Logger.e("RemoteMediaSessionManager", "设置远端媒体超级岛开关失败", e)
+            Logger.e("RemoteMediaSessionManager", "设置远端媒体超级岛接收模式失败", e)
+        }
+    }
+
+    private fun shouldReceiveMediaMessage(context: Context): Boolean {
+        return when (getReceiveMode(context)) {
+            MediaMessageReceiveMode.On -> true
+            MediaMessageReceiveMode.Off -> false
+            MediaMessageReceiveMode.AudioOnly -> AudioForwardingService.isAudioForwardingRunning()
         }
     }
 
@@ -125,8 +170,9 @@ object RemoteMediaSessionManager {
         json: JSONObject,
         device: DeviceInfo
     ) {
-        if (!isEnabled(context)) {
-            Logger.d("RemoteMediaSessionManager", "远端媒体超级岛功能未启用，忽略消息")
+        if (!shouldReceiveMediaMessage(context)) {
+            Logger.d("RemoteMediaSessionManager", "远端媒体消息未接收或未满足音频条件，伪造结束以关闭浮窗")
+            closeSessionForDevice(device, "接收条件不满足")
             return
         }
 
@@ -141,27 +187,7 @@ object RemoteMediaSessionManager {
             if (isEndPackage) {
                 // 处理结束包
                 Logger.i("RemoteMediaSessionManager", "收到媒体会话结束包，关闭浮窗: ${device.displayName}")
-                
-                // 取消复传任务
-                cancelResendTask(device.uuid)
-                
-                // 从Store中移除状态
-                SuperIslandRemoteStore.removeExact(sourceKey)
-                
-                // 关闭浮窗
-                com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.dismissBySource(sourceKey)
-                
-                // 清理各种缓存
-                mediaFeatureIdCache.remove(device.uuid)
-                mediaLastUpdateTime.remove(device.uuid)
-                mediaSessionCache.remove(device.uuid)
-                
-                // 如果是当前会话，清除当前会话
-                if (currentDevice?.uuid == device.uuid) {
-                    currentSession = null
-                    currentDevice = null
-                }
-                
+                closeSessionForDevice(device, "收到结束包")
                 return
             }
             
@@ -309,6 +335,25 @@ object RemoteMediaSessionManager {
         currentSession = null
         currentDevice = null
         Logger.i("RemoteMediaSessionManager", "已清除所有远端媒体会话")
+    }
+
+    private fun closeSessionForDevice(device: DeviceInfo, reason: String) {
+        val sourceKey = SOURCE_KEY_PREFIX + "_" + device.uuid
+        try {
+            cancelResendTask(device.uuid)
+            SuperIslandRemoteStore.removeExact(sourceKey)
+            com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.dismissBySource(sourceKey)
+            mediaFeatureIdCache.remove(device.uuid)
+            mediaLastUpdateTime.remove(device.uuid)
+            mediaSessionCache.remove(device.uuid)
+            if (currentDevice?.uuid == device.uuid) {
+                currentSession = null
+                currentDevice = null
+            }
+            Logger.i("RemoteMediaSessionManager", "已关闭设备媒体超级岛浮窗: ${device.displayName}, reason=$reason")
+        } catch (e: Exception) {
+            Logger.e("RemoteMediaSessionManager", "关闭媒体超级岛浮窗失败: $sourceKey", e)
+        }
     }
 
     fun getCurrentSession(): MediaSessionData? = currentSession

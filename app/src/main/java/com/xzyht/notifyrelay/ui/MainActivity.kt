@@ -211,7 +211,7 @@ class MainActivity : FragmentActivity() {
                             entryProvider = entryProvider {
                                 entry<Route.Main> { MainScreen(navigator) }
                                 entry<Route.History> { HistoryScreen(navigator) }
-                                entry<Route.Settings> { SettingsScreen(navigator) }
+                                entry<Route.Settings> { SettingsScreen() }
                                 entry<Route.ScrcpyAdvanced> { ScrcpyAdvancedScreen(navigator) }
                                 entry<Route.ScrcpyVirtualButtonOrder> { ScrcpyVirtualButtonOrderScreen(navigator) }
                             }
@@ -395,8 +395,8 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
                     ) { page ->
                         when (page) {
                             0 -> HistoryScreen(navigator)
-                            1 -> DeviceForwardScreen(navigator)
-                            2 -> SettingsScreen(navigator)
+                            1 -> DeviceForwardScreen()
+                            2 -> SettingsScreen()
                         }
                     }
                 }
@@ -417,8 +417,8 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
                     ) { page ->
                         when (page) {
                             0 -> HistoryScreen(navigator)
-                            1 -> DeviceForwardScreen(navigator)
-                            2 -> SettingsScreen(navigator)
+                            1 -> DeviceForwardScreen()
+                            2 -> SettingsScreen()
                         }
                     }
                 }

@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.sync
 
-import android.app.KeyguardManager
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -10,6 +9,7 @@ import android.net.Uri
 import android.os.Handler
 import android.util.Base64
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
@@ -497,8 +497,7 @@ object MessageSender {
             }
 
             // 获取锁屏状态
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val isLocked = keyguardManager.isKeyguardLocked
+            val isLocked = PermissionHelper.isDeviceLocked(context)
             
             // 创建当前媒体播放状态
             val currentState = MediaPlayState(
@@ -606,8 +605,7 @@ object MessageSender {
             }
 
             // 获取锁屏状态
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val isLocked = keyguardManager.isKeyguardLocked
+            val isLocked = PermissionHelper.isDeviceLocked(context)
             
             // 构建结束包
             val payload = buildMediaPlayEndPayload(
@@ -679,8 +677,7 @@ object MessageSender {
             }
 
             // 获取锁屏状态
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val isLocked = keyguardManager.isKeyguardLocked
+            val isLocked = PermissionHelper.isDeviceLocked(context)
 
             // 构建标准 JSON 格式的通知数据
             val json = JSONObject().apply {
@@ -746,8 +743,7 @@ object MessageSender {
                 return
             }
 
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val isLocked = keyguardManager.isKeyguardLocked
+            val isLocked = PermissionHelper.isDeviceLocked(context)
 
             // 处理图片：若 picMap 中是本地 URI/file 路径则读取并编码为 base64 data URI，http(s) 地址或其他字符串保持不变
             val processedPics = mutableMapOf<String, String>()
@@ -803,14 +799,6 @@ object MessageSender {
 
             // 将超级岛发送任务加入独立队列（不去重，实时性优先）
             authenticatedDevices.forEach { deviceInfo ->
-                // 检查设备类型，不向PC类型设备发送超级岛数据
-                val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[deviceInfo.uuid] }
-                val deviceType = auth?.deviceType
-                if (deviceType?.lowercase() == "pc") {
-                    Logger.i("超级岛", "跳过向PC类型设备发送超级岛数据：${deviceInfo.displayName}")
-                    return@forEach
-                }
-                
                 // 读取该设备下该feature的上次状态
                 val deviceMap = synchronized(siLastStatePerDevice) {
                     siLastStatePerDevice.getOrPut(deviceInfo.uuid) { mutableMapOf() }
@@ -874,8 +862,7 @@ object MessageSender {
         try {
             val authenticatedDevices = getAuthenticatedDevices(deviceManager)
             if (authenticatedDevices.isEmpty()) return
-            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-            val isLocked = keyguardManager.isKeyguardLocked
+            val isLocked = PermissionHelper.isDeviceLocked(context)
             val featureId = featureIdOverride ?: SuperIslandProtocol.computeFeatureId(
                 superPkg, paramV2Raw, title, text
             )
@@ -883,18 +870,6 @@ object MessageSender {
                 superPkg, appName, time, isLocked, featureId
             ).toString()
             authenticatedDevices.forEach { deviceInfo ->
-                // 检查设备类型，不向PC类型设备发送超级岛结束数据
-                val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[deviceInfo.uuid] }
-                val deviceType = auth?.deviceType
-                if (deviceType?.lowercase() == "pc") {
-                    Logger.i("超级岛", "跳过向PC类型设备发送超级岛结束数据：${deviceInfo.displayName}")
-                    // 仍然清理该设备的lastState，确保状态一致性
-                    synchronized(siLastStatePerDevice) {
-                        siLastStatePerDevice[deviceInfo.uuid]?.remove(featureId)
-                    }
-                    return@forEach
-                }
-                
                 // 清理该设备的lastState
                 synchronized(siLastStatePerDevice) {
                     siLastStatePerDevice[deviceInfo.uuid]?.remove(featureId)

@@ -235,6 +235,7 @@ object ServerLineRouter {
      * - 当前 only 用于处理手动发现 NOTIFYRELAY_DISCOVER_MANUAL（加密文本）
      * - 尝试用每个已认证设备的 sharedSecret 解密首行
      * - 匹配成功后更新 deviceInfoCache / authenticatedDevices 的 IP / 端口等信息
+     * - HEARTBEAT_TCP：处理TCP心跳包，更新设备在线状态
      */
     private fun handleOther(
         line: String,
@@ -278,6 +279,13 @@ object ServerLineRouter {
                             // 解密失败，继续尝试下一个密钥
                         }
                     }
+                }
+            } else if (line.startsWith("HEARTBEAT_TCP:")) {
+                val payload = line.substringAfter("HEARTBEAT_TCP:")
+                val clientIp = client.inetAddress.hostAddress.orEmpty()
+                val heartbeatInfo = HeartbeatProcessor.parseHeartbeatPayload(payload, clientIp, deviceManager.listenPort)
+                if (heartbeatInfo != null && heartbeatInfo.uuid != deviceManager.uuid) {
+                    HeartbeatProcessor.processHeartbeat(heartbeatInfo, deviceManager)
                 }
             }
         } catch (_: Exception) {

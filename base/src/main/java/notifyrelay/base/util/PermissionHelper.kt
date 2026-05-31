@@ -314,6 +314,40 @@ object PermissionHelper {
     }
 
     /**
+     * 比较两个版本号，判断当前版本是否大于目标版本。
+     *
+     * @param version 当前版本号，例如 "OS3.0.300"
+     * @param target 目标版本号，例如 "OS3.0.200"
+     * @return 如果当前版本大于目标版本返回 true，否则返回 false
+     */
+    fun isVersionGreaterThan(version: String?, target: String?): Boolean {
+        if (version == null || target == null) return false
+        
+        try {
+            // 去除OS前缀
+            val versionNum = version.replace("OS", "")
+            val targetNum = target.replace("OS", "")
+            
+            // 分割版本号
+            val versionParts = versionNum.split(".").mapNotNull { it.toIntOrNull() }
+            val targetParts = targetNum.split(".").mapNotNull { it.toIntOrNull() }
+            
+            // 比较版本号
+            for (i in 0 until Math.max(versionParts.size, targetParts.size)) {
+                val versionPart = versionParts.getOrElse(i) { 0 }
+                val targetPart = targetParts.getOrElse(i) { 0 }
+                
+                if (versionPart > targetPart) return true
+                if (versionPart < targetPart) return false
+            }
+            
+            return false // 版本相同
+        } catch (e: Exception) {
+            return false
+        }
+    }
+
+    /**
      * 私有工具：检测设备是否为 MIUI/澎湃（基于厂商名或系统权限信息判断）。
      *
      * @param context 用于访问 PackageManager 的上下文。
@@ -324,6 +358,21 @@ object PermissionHelper {
         return kotlin.runCatching {
             context.packageManager.getPermissionInfo("com.android.permission.GET_INSTALLED_APPS", 0).packageName == "com.lbe.security.miui"
         }.getOrElse { false }
+    }
+
+    /**
+     * 检查设备是否处于锁屏状态。
+     *
+     * @param context 用于获取 KeyguardManager 服务的上下文。
+     * @return 如果设备处于锁屏状态返回 true，否则返回 false。
+     */
+    fun isDeviceLocked(context: Context): Boolean {
+        return try {
+            val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
+            keyguardManager.isKeyguardLocked
+        } catch (_: Exception) {
+            false
+        }
     }
 
     /**
