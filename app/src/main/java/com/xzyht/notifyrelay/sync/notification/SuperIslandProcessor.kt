@@ -26,10 +26,9 @@ object SuperIslandProcessor {
     private const val DEDUP_CACHE_MAX_SIZE = 1024
 
     private val DEFAULT_MIRROR_PACKAGES = listOf(
-        "com.xiaomi.midrop",
-        "com.xiaomi.mirror",
         "com.xiaomi.bluetooth",
-        "com.miui.mishare.connectivity"
+        "com.miui.mishare.connectivity",
+        "com.xiaomi.mirror"
     )
     
 

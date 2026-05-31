@@ -58,10 +58,9 @@ private const val SPEC_INJECTION_MODE_KEY = "spec_injection_mode"
 private const val MIRROR_FILTER_ENABLED_KEY = "super_island_mirror_filter_enabled"
 
 private val DEFAULT_MIRROR_PACKAGES = listOf(
-    "com.xiaomi.midrop",
-    "com.xiaomi.mirror",
     "com.xiaomi.bluetooth",
-    "com.miui.mishare.connectivity"
+    "com.miui.mishare.connectivity",
+    "com.xiaomi.mirror"
 )
 
 // 注入方式选项
@@ -318,55 +317,6 @@ fun UISuperIslandSettings() {
                             onClick = { showAppPicker = true }
                         ) {
                             Text("选择应用")
-                        }
-                        Button(
-                            onClick = { showCustomPkgInput = true }
-                        ) {
-                            Text("输入包名")
-                        }
-                    }
-
-                    if (showCustomPkgInput) {
-                        TextField(
-                            value = customPkgText,
-                            onValueChange = { customPkgText = it },
-                            label = "输入包名，如 com.example.app",
-                            singleLine = true,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.End
-                        ) {
-                            Button(
-                                onClick = {
-                                    customPkgText = ""
-                                    showCustomPkgInput = false
-                                }
-                            ) {
-                                Text("取消")
-                            }
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Button(
-                                onClick = {
-                                    val pkg = customPkgText.trim()
-                                    if (pkg.isNotBlank()) {
-                                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                                            DatabaseRepository.getInstance(context).upsertMirrorFilterPackage(
-                                                SuperIslandMirrorFilterEntity(pkg, enabled = true)
-                                            )
-                                            withContext(Dispatchers.Main) {
-                                                loadCustomPackages()
-                                                customPkgText = ""
-                                                showCustomPkgInput = false
-                                            }
-                                        }
-                                    }
-                                },
-                                enabled = customPkgText.isNotBlank()
-                            ) {
-                                Text("确定")
-                            }
                         }
                     }
                 }
