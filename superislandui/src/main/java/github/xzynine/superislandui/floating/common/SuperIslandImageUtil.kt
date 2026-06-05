@@ -3,6 +3,7 @@ package github.xzynine.superislandui.floating.common
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
+import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.painter.Painter
@@ -40,7 +41,7 @@ object SuperIslandImageUtil {
                 if (result is SuccessResult) {
                     val drawable = result.drawable
                     if (drawable is BitmapDrawable) return drawable.bitmap
-                    DataUrlUtils.drawableToBitmap(drawable)
+                    drawable.toBitmap()
                 } else null
             }
         } catch (_: Exception) {

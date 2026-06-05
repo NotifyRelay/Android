@@ -3,10 +3,10 @@ package notifyrelay.core.util
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.util.Base64
+import androidx.core.graphics.drawable.toBitmap
 import coil.Coil
 import coil.request.ErrorResult
 import coil.request.ImageRequest
@@ -101,7 +101,7 @@ object DataUrlUtils {
                 if (result is SuccessResult) {
                     val drawable = result.drawable
                     if (drawable is BitmapDrawable) return@withContext drawable.bitmap
-                    drawableToBitmap(drawable)
+                    drawable.toBitmap()
                 } else {
                     val error = (result as? ErrorResult)?.throwable
                     if (error != null) Logger.e(TAG, "loadBitmapWithCoil 失败: ${error.message}", error)
@@ -113,17 +113,6 @@ object DataUrlUtils {
                 null
             }
         }
-    }
-
-    fun drawableToBitmap(drawable: Drawable): Bitmap {
-        if (drawable is BitmapDrawable) return drawable.bitmap
-        val w = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 1
-        val h = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 1
-        val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-        val canvas = Canvas(bmp)
-        drawable.setBounds(0, 0, canvas.width, canvas.height)
-        drawable.draw(canvas)
-        return bmp
     }
 
     fun bitmapToDataUri(bitmap: Bitmap): String {
