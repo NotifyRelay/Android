@@ -1,13 +1,9 @@
 package notifyrelay.base.util
 
 import android.util.Log
-/**
- * 日志工具类
- * 用于统一管理日志输出，支持按级别控制是否输出到控制台
- * 支持i/d/w/e的级别控制
- */
+import timber.log.Timber
+
 object Logger {
-    // 日志级别枚举
     enum class Level {
         VERBOSE,
         DEBUG,
@@ -17,98 +13,51 @@ object Logger {
         NONE
     }
 
-    // 当前日志级别，可根据需求调整
     var CURRENT_LEVEL = Level.INFO
 
-    /**
-     * 详细日志（最低级别）
-     */
-    fun v(tag: String, message: String) {
-        if (CURRENT_LEVEL <= Level.VERBOSE) {
-            Log.v(tag, message)
+    init {
+        try {
+            Timber.plant(object : Timber.DebugTree() {
+                override fun isLoggable(tag: String?, priority: Int): Boolean {
+                    val level = when (priority) {
+                        Log.VERBOSE -> Level.VERBOSE
+                        Log.DEBUG -> Level.DEBUG
+                        Log.INFO -> Level.INFO
+                        Log.WARN -> Level.WARN
+                        Log.ERROR -> Level.ERROR
+                        else -> return true
+                    }
+                    return when (CURRENT_LEVEL) {
+                        Level.NONE -> false
+                        else -> level.ordinal >= CURRENT_LEVEL.ordinal
+                    }
+                }
+            })
+        } catch (_: IllegalStateException) {
         }
     }
 
-    /**
-     * 详细日志带异常
-     */
-    fun v(tag: String, message: String, throwable: Throwable) {
-        if (CURRENT_LEVEL <= Level.VERBOSE) {
-            Log.v(tag, message, throwable)
-        }
+    fun plant(tree: Timber.Tree) {
+        Timber.plant(tree)
     }
 
-    /**
-     * 调试日志
-     */
-    fun d(tag: String, message: String) {
-        if (CURRENT_LEVEL <= Level.DEBUG) {
-            Log.d(tag, message)
-        }
-    }
+    fun v(tag: String, message: String) = Timber.tag(tag).v(message)
 
-    /**
-     * 调试日志带异常
-     */
-    fun d(tag: String, message: String, throwable: Throwable) {
-        if (CURRENT_LEVEL <= Level.DEBUG) {
-            Log.d(tag, message, throwable)
-        }
-    }
+    fun v(tag: String, message: String, throwable: Throwable) = Timber.tag(tag).v(throwable, message)
 
-    /**
-     * 信息日志
-     */
-    fun i(tag: String, message: String) {
-        if (CURRENT_LEVEL <= Level.INFO) {
-            Log.i(tag, message)
-        }
-    }
+    fun d(tag: String, message: String) = Timber.tag(tag).d(message)
 
-    /**
-     * 信息日志带异常
-     */
-    fun i(tag: String, message: String, throwable: Throwable) {
-        if (CURRENT_LEVEL <= Level.INFO) {
-            Log.i(tag, message, throwable)
-        }
-    }
+    fun d(tag: String, message: String, throwable: Throwable) = Timber.tag(tag).d(throwable, message)
 
-    /**
-     * 警告日志
-     */
-    fun w(tag: String, message: String) {
-        if (CURRENT_LEVEL <= Level.WARN) {
-            Log.w(tag, message)
-        }
-    }
+    fun i(tag: String, message: String) = Timber.tag(tag).i(message)
 
-    /**
-     * 警告日志带异常
-     */
-    fun w(tag: String, message: String, throwable: Throwable) {
-        if (CURRENT_LEVEL <= Level.WARN) {
-            Log.w(tag, message, throwable)
-        }
-    }
+    fun i(tag: String, message: String, throwable: Throwable) = Timber.tag(tag).i(throwable, message)
 
-    /**
-     * 错误日志
-     */
-    fun e(tag: String, message: String) {
-        if (CURRENT_LEVEL <= Level.ERROR) {
-            Log.e(tag, message)
-        }
-    }
+    fun w(tag: String, message: String) = Timber.tag(tag).w(message)
 
-    /**
-     * 错误日志带异常
-     */
-    fun e(tag: String, message: String, throwable: Throwable) {
-        if (CURRENT_LEVEL <= Level.ERROR) {
-            Log.e(tag, message, throwable)
-        }
-    }
+    fun w(tag: String, message: String, throwable: Throwable) = Timber.tag(tag).w(throwable, message)
 
+    fun e(tag: String, message: String) = Timber.tag(tag).e(message)
 
+    fun e(tag: String, message: String, throwable: Throwable) = Timber.tag(tag).e(throwable, message)
 }
