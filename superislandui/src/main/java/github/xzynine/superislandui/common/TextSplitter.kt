@@ -2,25 +2,14 @@ package github.xzynine.superislandui.common
 
 import kotlin.math.min
 import notifyrelay.base.util.Logger
-
-/**
- * 性能监控工具
- */
-private inline fun <T> measureTime(operation: String, block: () -> T): T {
-    val start = System.currentTimeMillis()
-    val result = block()
-    val duration = System.currentTimeMillis() - start
-    if (duration > 16) { // 超过一帧时间
-        Logger.w("TextSplitter", "$operation 耗时 ${duration}ms")
-    }
-    return result
-}
+import notifyrelay.base.util.measureTime
 
 /**
  * 文本拆分工具类，用于处理歌词等文本的拆分
  * 权重体系复用 CapsuleScrollManager（CJK=2，西文=1，空白=0）
  */
 object TextSplitter {
+    private const val TAG = "TextSplitter"
 
     private val HALF_WIDTH_PUNCTUATION = setOf(
         ',', '.', '!', '?', ';', ':', '-', '_', '(', ')', '[', ']', '{', '}', 
@@ -72,7 +61,7 @@ object TextSplitter {
      * @return 截断后的文本
      */
     private fun truncateTextInternal(text: String, maxWeight: Int, maxAllowedLength: Int): String {
-        return measureTime("truncateText") {
+        return measureTime(TAG, "truncateText") {
             if (text.isEmpty()) {
                 return@measureTime text
             }
@@ -122,7 +111,7 @@ object TextSplitter {
      * @return Pair(图标文本, 胶囊文本)
      */
     fun splitLyric(lyricText: String, threshold: Int): Pair<String, String> {
-        return measureTime("splitLyric") {
+        return measureTime(TAG, "splitLyric") {
             val truncatedText = truncateText(lyricText)
 
             if (truncatedText.isEmpty()) {

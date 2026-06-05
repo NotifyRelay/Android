@@ -8,25 +8,13 @@ import android.graphics.Typeface
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.measureTime
 
 /**
  * 位图工具类，用于处理文本到位图的转换等操作
  */
 object BitmapUtils {
     private const val TAG = "BitmapUtils"
-    
-    /**
-     * 性能监控工具
-     */
-    private inline fun <T> measureTime(operation: String, block: () -> T): T {
-        val start = System.currentTimeMillis()
-        val result = block()
-        val duration = System.currentTimeMillis() - start
-        if (duration > 16) { // 超过一帧时间
-            Logger.w(TAG, "$operation 耗时 ${duration}ms")
-        }
-        return result
-    }
     
     private val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = Color.WHITE
@@ -62,7 +50,7 @@ object BitmapUtils {
      * @return 生成的位图，失败返回 null
      */
     fun textToBitmap(text: String, forceFontSize: Float? = null, albumBitmap: Bitmap? = null): Bitmap? {
-        return measureTime("textToBitmap") {
+        return measureTime(TAG, "textToBitmap") {
             try {
                 if (text.isBlank()) {
                     Logger.w(TAG, "文本为空，无法生成位图")
@@ -188,7 +176,7 @@ object BitmapUtils {
      * @return 生成的位图，失败返回 null
      */
     fun progressToBitmap(progress: Int, colorReach: String? = null, colorUnReach: String? = null, isCCW: Boolean = false): Bitmap? {
-        return measureTime("progressToBitmap") {
+        return measureTime(TAG, "progressToBitmap") {
             try {
                 if (progress !in 0..100) {
                     Logger.w(TAG, "进度值无效，progress=$progress")
