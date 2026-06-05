@@ -750,7 +750,7 @@ private fun SuperIslandHistoryImage(imageKey: String, data: String, modifier: Mo
                 } catch (_: Exception) { data }
 
                 val decoded = when {
-                    DataUrlUtils.isDataUrl(resolved) -> DataUrlUtils.decodeDataUrlToBitmap(resolved)
+                    DataUrlUtils.isDataUrl(resolved) -> DataUrlUtils.decodeDataUrlToBitmap(context, resolved)
                     resolved.startsWith("http", ignoreCase = true) -> downloadBitmap(context, resolved)
                     else -> null
                 }

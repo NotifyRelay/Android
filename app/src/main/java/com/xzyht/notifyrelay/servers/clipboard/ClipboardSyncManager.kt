@@ -299,18 +299,16 @@ object ClipboardSyncManager {
                         Logger.d(TAG, "已更新本地剪贴板为文本内容")
                     }
                     CLIPBOARD_TYPE_IMAGE -> {
-                        // 构建完整的data URI
                         val dataUrl = "data:image/png;base64,$content"
-                        val bitmap = DataUrlUtils.decodeDataUrlToBitmap(dataUrl)
-                        if (bitmap != null) {
-                            // 将Bitmap转换为文本，因为直接存储Bitmap在剪贴板中需要特殊处理
-                            // 这里我们将图片转换为Base64字符串存储，其他应用可以解析
-                            val clipItem = ClipData.Item(dataUrl)
-                            // 使用文本类型，因为ClipData.Item没有直接接受Bitmap的构造函数
-                            val mimeTypes = arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)
-                            val clip = ClipData("synced_image", mimeTypes, clipItem)
-                            cm.setPrimaryClip(clip)
-                            Logger.d(TAG, "已更新剪贴板，包含图片数据URL")
+                        CoroutineScope(Dispatchers.IO).launch {
+                            val bitmap = DataUrlUtils.decodeDataUrlToBitmap(context, dataUrl)
+                            if (bitmap != null) {
+                                val clipItem = ClipData.Item(dataUrl)
+                                val mimeTypes = arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)
+                                val clip = ClipData("synced_image", mimeTypes, clipItem)
+                                cm.setPrimaryClip(clip)
+                                Logger.d(TAG, "已更新剪贴板，包含图片数据URL")
+                            }
                         }
                     }
                 }

@@ -5,16 +5,14 @@ import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.core.graphics.toColorInt
+import coil.Coil
 import coil.compose.rememberAsyncImagePainter
 import coil.request.ImageRequest
 import coil.request.SuccessResult
 import notifyrelay.core.util.DataUrlUtils
-import coil.ImageLoader as CoilImageLoader
 
 /**
  * 超级岛图片加载和处理工具类
@@ -31,9 +29,9 @@ object SuperIslandImageUtil {
             val finalUrl = resolveReferenceUrl(context, urlOrData)
             
             if (finalUrl.startsWith("data:", ignoreCase = true)) {
-                DataUrlUtils.decodeDataUrlToBitmap(finalUrl)
+                DataUrlUtils.decodeDataUrlToBitmap(context, finalUrl)
             } else {
-                val loader = CoilImageLoader(context)
+                val loader = Coil.imageLoader(context)
                 val request = ImageRequest.Builder(context)
                     .data(finalUrl)
                     .allowHardware(false)
@@ -42,7 +40,6 @@ object SuperIslandImageUtil {
                 if (result is SuccessResult) {
                     val drawable = result.drawable
                     if (drawable is BitmapDrawable) return drawable.bitmap
-                    // 将 drawable 转换为 bitmap
                     DataUrlUtils.drawableToBitmap(drawable)
                 } else null
             }
@@ -65,7 +62,6 @@ object SuperIslandImageUtil {
             return null
         }
         
-        // 如果提供了iconKey，先从picMap中获取url
         val resolvedUrl = remember(url, picMap, iconKey) {
             if (!iconKey.isNullOrEmpty() && picMap != null) {
                 picMap[iconKey]
@@ -83,16 +79,6 @@ object SuperIslandImageUtil {
             }
         }
 
-        // 对于data: URL，使用DataUrlUtils解码
-        if (!processedUrl.isNullOrEmpty() && processedUrl.startsWith("data:", ignoreCase = true)) {
-            // 同步解码data: URL
-            val bitmap = DataUrlUtils.decodeDataUrlToBitmap(processedUrl)
-            if (bitmap != null) {
-                return BitmapPainter(bitmap.asImageBitmap())
-            }
-        }
-
-        // 对于其他URL，使用Coil
         return if (!processedUrl.isNullOrEmpty()) {
             rememberAsyncImagePainter(model = processedUrl)
         } else {
