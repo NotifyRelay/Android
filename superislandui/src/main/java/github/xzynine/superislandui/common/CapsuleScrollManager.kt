@@ -26,12 +26,11 @@ object CapsuleScrollManager {
     private val scrollDataMap = mutableMapOf<String, ScrollData>()
 
     // 基于视觉权重的滚动（CJK=2，西文=1）
-    const val DEFAULT_MAX_DISPLAY_WEIGHT = 17  // 默认视觉容量：约10个CJK字符或约20个西文字符
-    private const val compensationThreshold = 20  // 如果剩余权重小于此值则停止滚动（保持胶囊稳定）
+    private const val maxDisplayWeight = 17  // 视觉容量：约10个CJK字符或约20个西文字符
+    private const val compensationThreshold = 7  // 如果剩余权重小于此值则停止滚动（保持胶囊稳定）
 
-    private const val initialPauseDuration = 400L  // 新歌词开始前的初始暂停
-    private const val finalPauseDuration = 300L    // 滚动到末尾后的最终暂停
-    private const val SCROLL_STEP_DELAY = 1200L    // 滚动步长延迟
+    private const val finalPauseDuration = 500L     // 下一句文本前的0.5秒
+    private const val SCROLL_STEP_DELAY = 1800L     // 滚动步长延迟
 
     // 自适应滚动速度跟踪
     private data class AdaptiveData(
@@ -44,10 +43,9 @@ object CapsuleScrollManager {
     private val adaptiveDataMap = mutableMapOf<String, AdaptiveData>()
     
     /**
-     * 计算字符的视觉权重（CJK=2，西文=1，空白=0）
+     * 计算字符的视觉权重（CJK=2，西文=1）
      */
-    private fun charWeight(c: Char): Int {
-        if (c.isWhitespace()) return 0
+    fun charWeight(c: Char): Int {
         return when (Character.UnicodeBlock.of(c)) {
             Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS,
             Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A,
@@ -98,32 +96,46 @@ object CapsuleScrollManager {
     }
     
     /**
-     * 计算智能移动权重
-     * CJK: 每次移动1个字符（2权重），日语更平滑
-     * 西文: 每次移动2权重
+     * 计算智能移动权重（CJK: 2-3字符=4-6权重，西文: 3-4字符=3-4权重）
      */
     private fun calculateSmartShiftWeight(text: String, currentOffset: Int): Int {
-        val segment = extractByWeight(text, currentOffset, 10)
-        if (segment.isEmpty()) return 2
+        // 提取从当前偏移量开始的片段
+        val segment = extractByWeight(text, currentOffset, 10)  // 向前查看10个权重
+        if (segment.isEmpty()) return 4  // 默认值
         
-        val nonWhitespaceChars = segment.count { !it.isWhitespace() }
-        val cjkCount = segment.count { !it.isWhitespace() && charWeight(it) == 2 }
-        val isCJK = nonWhitespaceChars > 0 && cjkCount > nonWhitespaceChars / 2
+        // 检测主要是CJK还是西文
+        val cjkCount = segment.count { charWeight(it) == 2 }
+        val totalChars = segment.length
+        
+        val isCJK = cjkCount > totalChars / 2
         
         return if (isCJK) {
-            if (segment.isNotEmpty()) charWeight(segment[0]) else 2
+            // CJK: 移动2-3个字符（4-6权重），优先2个字符
+            if (segment.length >= 2) {
+                charWeight(segment[0]) + charWeight(segment[1])  // 2个字符
+            } else {
+                4  // 回退值
+            }
         } else {
-            2
+            // 西文: 移动3-4个字符（3-4权重）
+            // 尝试找到单词边界（空格）
+            val spaceIndex = segment.indexOf(' ', 2)  // 查找2个字符后的空格
+            if (spaceIndex in 2..4) {
+                // 移动到空格
+                calculateWeight(segment.take(spaceIndex + 1))
+            } else if (segment.length >= 3) {
+                // 移动3个字符
+                calculateWeight(segment.take(3))
+            } else {
+                3  // 回退值
+            }
         }
     }
 
     /**
      * 获取当前应该显示的文本片段
-     * @param key 滚动状态键
-     * @param text 完整文本
-     * @param maxWeight 单段最大显示权重（CJK=2，西文=1），默认使用 DEFAULT_MAX_DISPLAY_WEIGHT
      */
-    fun getCurrentDisplayText(key: String, text: String, maxWeight: Int = DEFAULT_MAX_DISPLAY_WEIGHT): String {
+    fun getCurrentDisplayText(key: String, text: String): String {
         val scrollData = scrollDataMap.getOrPut(key) { ScrollData() }
         
         // 如果文本更改，重置滚动偏移量
@@ -136,11 +148,8 @@ object CapsuleScrollManager {
         
         val totalWeight = calculateWeight(text)
         
-        // 根据当前maxWeight等比缩放补偿阈值
-        val scaledCompensationThreshold = compensationThreshold * maxWeight / DEFAULT_MAX_DISPLAY_WEIGHT
-        
         // 短文本：无需滚动
-        if (totalWeight <= maxWeight) {
+        if (totalWeight <= maxDisplayWeight) {
             scrollData.scrollState = ScrollState.DONE
             return text
         }
@@ -148,32 +157,25 @@ object CapsuleScrollManager {
         // 滚动时序的状态机
         return when (scrollData.scrollState) {
             ScrollState.SCROLLING -> {
-                // 初始暂停：让第一段内容显示足够长时间再开始滚动
-                if (scrollData.scrollOffset == 0) {
-                    val initialPauseElapsed = System.currentTimeMillis() - scrollData.initialPauseStartTime
-                    if (initialPauseElapsed < initialPauseDuration) {
-                        return extractByWeight(text, 0, maxWeight)
-                    }
-                }
                 // 计算剩余内容
                 val remainingWeight = totalWeight - scrollData.scrollOffset
                 
                 // 补偿算法：如果剩余权重较小则停止滚动以保持胶囊稳定
-                if (remainingWeight <= scaledCompensationThreshold) {
+                if (remainingWeight <= compensationThreshold) {
                     // 显示所有剩余内容（即使>最大显示权重）
                     scrollData.scrollState = ScrollState.FINAL_PAUSE
                     scrollData.initialPauseStartTime = System.currentTimeMillis()
                     extractByWeight(text, scrollData.scrollOffset, remainingWeight)
-                } else if (remainingWeight <= maxWeight) {
+                } else if (remainingWeight <= maxDisplayWeight) {
                     // 最后完整片段：切换到FINAL_PAUSE
                     scrollData.scrollState = ScrollState.FINAL_PAUSE
                     scrollData.initialPauseStartTime = System.currentTimeMillis()
-                    extractByWeight(text, scrollData.scrollOffset, maxWeight)
+                    extractByWeight(text, scrollData.scrollOffset, maxDisplayWeight)
                 } else {
                     // 主动滚动
-                    val displayText = extractByWeight(text, scrollData.scrollOffset, maxWeight)
+                    val displayText = extractByWeight(text, scrollData.scrollOffset, maxDisplayWeight)
                     
-                    // 按智能步长增加滚动偏移量（CJK:1字符=2权重，西文:2权重）
+                    // 按智能步长增加滚动偏移量（2-3个CJK或3-4个西文字符）
                     scrollData.scrollOffset += calculateSmartShiftWeight(text, scrollData.scrollOffset)
                     
                     displayText
@@ -183,7 +185,7 @@ object CapsuleScrollManager {
             ScrollState.FINAL_PAUSE -> {
                 // 显示最终片段（由于补偿可能>最大显示权重）
                 val remainingWeight = totalWeight - scrollData.scrollOffset
-                val displayText = extractByWeight(text, scrollData.scrollOffset, maxOf(remainingWeight, maxWeight))
+                val displayText = extractByWeight(text, scrollData.scrollOffset, maxOf(remainingWeight, maxDisplayWeight))
                 
                 val pauseElapsed = System.currentTimeMillis() - scrollData.initialPauseStartTime
                 if (pauseElapsed >= finalPauseDuration) {
@@ -196,7 +198,7 @@ object CapsuleScrollManager {
             ScrollState.DONE -> {
                 // 保持显示最终片段
                 val remainingWeight = totalWeight - scrollData.scrollOffset
-                extractByWeight(text, scrollData.scrollOffset, maxOf(remainingWeight, maxWeight))
+                extractByWeight(text, scrollData.scrollOffset, maxOf(remainingWeight, maxDisplayWeight))
             }
         }
     }

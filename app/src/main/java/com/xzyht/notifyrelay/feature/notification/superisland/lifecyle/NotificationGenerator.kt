@@ -136,8 +136,7 @@ object NotificationGenerator {
         context: Context,
         notificationId: Int,
         originalBuilder: NotificationCompat.Builder,
-        notificationManager: NotificationManager,
-        maxScrollWeight: Int = CapsuleScrollManager.DEFAULT_MAX_DISPLAY_WEIGHT
+        notificationManager: NotificationManager
     ) {
         // 移除旧的滚动Runnable
         scrollRunnable.remove(key)?.let {
@@ -153,7 +152,7 @@ object NotificationGenerator {
                 }
                 
                 // 获取当前应该显示的文本
-                val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText, maxScrollWeight)
+                val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText)
                 
                 // 构建原始通知以获取其属性
                 val originalNotification = originalBuilder.build()
@@ -373,7 +372,7 @@ object NotificationGenerator {
                 if (shouldSplit) {
                     // 当歌词超过阈值时，拆分为图标文本和胶囊文本
                     // 远端和本地都保持6字符开始分割
-                    val threshold = 6
+                    val threshold = 12
                     val textLength = TextSplitter.calculateTextLength(lyricText)
                     if (textLength > threshold) {
                         // 使用TextSplitter工具类进行歌词拆分
@@ -387,21 +386,15 @@ object NotificationGenerator {
                     iconText = ""
                 }
                 
-                val scrollMaxWeight = if (shouldSplit) {
-                    CapsuleScrollManager.DEFAULT_MAX_DISPLAY_WEIGHT
-                } else {
-                    19
-                }
-                
                 // 使用CapsuleScrollManager处理胶囊文本滚动
                 val scrollKey = "${key}_scroll"
-                val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText, scrollMaxWeight)
+                val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText)
                 
                 // 设置胶囊文本
                 builder.setShortCriticalText(displayText)
                 
                 // 设置滚动更新机制
-                setupScrollUpdate(key, scrollKey, capsuleText, context, notificationId, originalBuilder = builder, notificationManager, scrollMaxWeight
+                setupScrollUpdate(key, scrollKey, capsuleText, context, notificationId, originalBuilder = builder, notificationManager
                 )
                 
                 // picMap 已在调用方通过 SuperIslandDataFormatter 解析，直接使用
