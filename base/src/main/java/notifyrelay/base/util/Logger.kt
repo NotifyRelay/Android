@@ -14,6 +14,9 @@ object Logger {
     }
 
     var CURRENT_LEVEL = Level.INFO
+    
+    // 过滤通知日志开关（默认开启）
+    var ENABLE_FILTERED_NOTIFICATION_LOG = true
 
     init {
         try {

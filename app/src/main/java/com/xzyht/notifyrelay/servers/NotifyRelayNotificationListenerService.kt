@@ -514,7 +514,9 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         }
 
         if (!BackendLocalFilter.shouldForward(sbn, applicationContext, checkProcessed)) {
-            logSbnDetail("法鸡-黑影 被过滤", sbn)
+            if (Logger.ENABLE_FILTERED_NOTIFICATION_LOG) {
+                logSbnDetail("法鸡-黑影 被过滤", sbn)
+            }
             return
         }
         val notificationKey = sbn.key ?: (sbn.id.toString() + sbn.packageName)

@@ -35,8 +35,10 @@ class DeveloperModeActivity : AppCompatActivity() {
         private const val KEY_LOG_ENABLED = "log_enabled"
         private const val KEY_LOG_LEVEL = "log_level"
         private const val KEY_DEBUG_UI_ENABLED = "debug_ui_enabled"
+        private const val KEY_FILTERED_NOTIFICATION_LOG_ENABLED = "filtered_notification_log_enabled"
 
         val DEBUG_UI_ENABLED: MutableState<Boolean> = mutableStateOf(false)
+        val FILTERED_NOTIFICATION_LOG_ENABLED: MutableState<Boolean> = mutableStateOf(true)
 
         fun initLogConfig(context: Context) {
             val logLevelOrdinal = StorageManager.getInt(context, KEY_LOG_LEVEL, Logger.Level.INFO.ordinal)
@@ -45,6 +47,8 @@ class DeveloperModeActivity : AppCompatActivity() {
 
         fun initDebugUiConfig(context: Context) {
             DEBUG_UI_ENABLED.value = StorageManager.getBoolean(context, KEY_DEBUG_UI_ENABLED, false)
+            FILTERED_NOTIFICATION_LOG_ENABLED.value = StorageManager.getBoolean(context, KEY_FILTERED_NOTIFICATION_LOG_ENABLED, true)
+            Logger.ENABLE_FILTERED_NOTIFICATION_LOG = FILTERED_NOTIFICATION_LOG_ENABLED.value
         }
     }
 
@@ -118,6 +122,7 @@ class DeveloperModeActivity : AppCompatActivity() {
                     .fillMaxSize()
             ) {
                 var debugUiEnabled by DEBUG_UI_ENABLED
+                var filteredNotificationLogEnabled by FILTERED_NOTIFICATION_LOG_ENABLED
 
                 SwitchPreference(
                     title = "调试UI显示",
@@ -126,6 +131,17 @@ class DeveloperModeActivity : AppCompatActivity() {
                     onCheckedChange = {
                         debugUiEnabled = it
                         StorageManager.putBoolean(context, KEY_DEBUG_UI_ENABLED, it)
+                    }
+                )
+
+                SwitchPreference(
+                    title = "过滤通知日志",
+                    summary = "显示被过滤通知的详细日志",
+                    checked = filteredNotificationLogEnabled,
+                    onCheckedChange = {
+                        filteredNotificationLogEnabled = it
+                        Logger.ENABLE_FILTERED_NOTIFICATION_LOG = it
+                        StorageManager.putBoolean(context, KEY_FILTERED_NOTIFICATION_LOG_ENABLED, it)
                     }
                 )
 
