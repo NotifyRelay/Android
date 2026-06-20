@@ -324,16 +324,18 @@ object NotificationRepository {
             NotifyRelayStoreProvider.getInstance(context)
             // 主动加载本地历史到内存，保证判重有效
             val store2 = NotifyRelayStoreProvider.getInstance(context)
-            val localList = store2.readAll("本机").map {
-                NotificationRecord(
-                    key = it.key,
-                    packageName = it.packageName,
-                    appName = it.appName,
-                    title = it.title,
-                    text = it.text,
-                    time = it.time,
-                    device = it.device
-                )
+            val localList = runBlocking {
+                store2.readAll("本机").map {
+                    NotificationRecord(
+                        key = it.key,
+                        packageName = it.packageName,
+                        appName = it.appName,
+                        title = it.title,
+                        text = it.text,
+                        time = it.time,
+                        device = it.device
+                    )
+                }
             }
             notifications.clear()
             notifications.addAll(localList)

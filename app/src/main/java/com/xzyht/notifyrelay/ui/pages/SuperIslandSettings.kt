@@ -106,9 +106,9 @@ fun UISuperIslandSettings() {
         }
     }
 
-    fun loadCustomPackages() {
+    suspend fun loadCustomPackages() {
         val repo = DatabaseRepository.getInstance(context)
-        customPackages = runBlockingWithContext(Dispatchers.IO) {
+        customPackages = withContext(Dispatchers.IO) {
             repo.getAllMirrorFilterPackages()
         }
     }
@@ -343,6 +343,3 @@ fun UISuperIslandSettings() {
     }
 }
 
-private fun <T> runBlockingWithContext(context: kotlin.coroutines.CoroutineContext, block: suspend () -> T): T {
-    return kotlinx.coroutines.runBlocking(context) { block() }
-}
