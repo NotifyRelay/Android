@@ -108,6 +108,7 @@ object ImageUtils {
                 val request = ImageRequest.Builder(context)
                     .data(uri)
                     .allowHardware(false)
+                    .timeoutMs(timeoutMs)
                     .build()
                 val result = loader.execute(request)
                 if (result is SuccessResult) {
