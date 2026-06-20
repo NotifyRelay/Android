@@ -1,4 +1,4 @@
-﻿package github.xzynine.superislandui.floating.BigIsland.components
+package github.xzynine.superislandui.floating.BigIsland.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -42,7 +42,7 @@ fun BaseInfoCompose(
             .padding(8.dp)
             .wrapContentHeight()
     ) {
-        val hasSecondary = baseInfo.content != null || baseInfo.subContent != null
+        val hasSecondary = baseInfo.content != null || baseInfo.subContent != null || baseInfo.picFunction != null
         val hasMain = baseInfo.title != null || baseInfo.subTitle != null || baseInfo.extraTitle != null || baseInfo.specialTitle != null
 
         if (baseInfo.type == 1) {
