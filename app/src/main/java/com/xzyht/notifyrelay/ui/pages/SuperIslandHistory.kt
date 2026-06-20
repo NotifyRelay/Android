@@ -870,9 +870,9 @@ private fun SuperIslandAppIcon(
     }
 }
 
-private suspend fun downloadBitmap(context: Context, urlString: String, timeoutMs: Int = 5_000): Bitmap? {
+private suspend fun downloadBitmap(context: Context, urlString: String): Bitmap? {
     return try {
-        ImageUtils.loadBitmap(context, urlString, timeoutMs)
+        ImageUtils.loadBitmap(context, urlString)
     } catch (_: Exception) { null }
 }
 
