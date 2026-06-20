@@ -1,4 +1,4 @@
-﻿package com.xzyht.notifyrelay.ui.pages
+package com.xzyht.notifyrelay.ui.pages
 
 import android.app.Activity
 import android.content.ClipData
