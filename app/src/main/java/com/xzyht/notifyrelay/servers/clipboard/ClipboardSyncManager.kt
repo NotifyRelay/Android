@@ -1,4 +1,4 @@
-﻿package com.xzyht.notifyrelay.servers.clipboard
+package com.xzyht.notifyrelay.servers.clipboard
 
 import android.content.ClipData
 import android.content.ClipDescription
@@ -301,13 +301,18 @@ object ClipboardSyncManager {
                     CLIPBOARD_TYPE_IMAGE -> {
                         val dataUrl = "data:image/png;base64,$content"
                         CoroutineScope(Dispatchers.IO).launch {
-                            val bitmap = ImageUtils.decodeDataUrlToBitmap(context, dataUrl)
-                            if (bitmap != null) {
-                                val clipItem = ClipData.Item(dataUrl)
-                                val mimeTypes = arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)
-                                val clip = ClipData("synced_image", mimeTypes, clipItem)
-                                cm.setPrimaryClip(clip)
-                                Logger.d(TAG, "已更新剪贴板，包含图片数据URL")
+                            try {
+                                val bitmap = ImageUtils.decodeDataUrlToBitmap(context, dataUrl)
+                                if (bitmap != null) {
+                                    val clipItem = ClipData.Item(dataUrl)
+                                    val mimeTypes = arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)
+                                    val clip = ClipData("synced_image", mimeTypes, clipItem)
+                                    cm.setPrimaryClip(clip)
+                                    Logger.d(TAG, "已更新剪贴板，包含图片数据URL")
+                                }
+                            } finally {
+                                delay(500)
+                                isInternalUpdate = false
                             }
                         }
                     }
@@ -318,10 +323,12 @@ object ClipboardSyncManager {
         } catch (e: Exception) {
             Logger.e(TAG, "更新剪贴板失败", e)
         } finally {
-            // 延迟重置内部更新标志，确保剪贴板变化监听器有足够时间触发
-            CoroutineScope(Dispatchers.IO).launch {
-                delay(500)
-                isInternalUpdate = false
+            // 文本类型在此重置标志，图片类型在协程内部重置
+            if (type == CLIPBOARD_TYPE_TEXT) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    delay(500)
+                    isInternalUpdate = false
+                }
             }
         }
     }
