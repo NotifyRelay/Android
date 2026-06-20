@@ -1,4 +1,4 @@
-﻿package github.xzynine.superislandui.floating.common
+package github.xzynine.superislandui.floating.common
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -7,6 +7,8 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
@@ -47,7 +49,7 @@ object SuperIslandImageUtil {
         if (ImageUtils.isDataUrl(resolvedUrl)) {
             val context = LocalContext.current
             val bitmap by produceState<Bitmap?>(initialValue = null, key1 = resolvedUrl) {
-                value = ImageUtils.loadBitmap(context, resolvedUrl)
+                value = withContext(Dispatchers.IO) { ImageUtils.loadBitmap(context, resolvedUrl) }
             }
             return bitmap?.let { BitmapPainter(it.asImageBitmap()) }
         }
