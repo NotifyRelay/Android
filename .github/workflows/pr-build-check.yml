@@ -32,16 +32,17 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
-      - name: Decode keystore into app module
+      - name: Create temporary keystore for build verification
         run: |
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
-        env:
-          KEYSTORE_BASE64: ${{ secrets.KEYSTORE_BASE64 }}
+          keytool -genkey -v -keystore app/keystore.jks -alias pr \
+            -keyalg RSA -keysize 2048 -validity 1 \
+            -storepass prpass -keypass prpass \
+            -dname "CN=PR, OU=PR, O=NotifyRelay, L=Unknown, ST=Unknown, C=CN"
 
       - name: Build verification
         run: ./gradlew assembleDebug
         env:
           KEYSTORE_PATH: app/keystore.jks
-          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
-          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
-          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+          KEY_ALIAS: pr
+          STORE_PASSWORD: prpass
+          KEY_PASSWORD: prpass
