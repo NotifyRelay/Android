@@ -495,7 +495,12 @@ object NotificationGenerator {
                     .setSmallIcon(android.R.drawable.stat_notify_more) // 使用系统默认图标
                     // 调整为与实际超级岛通知一致的属性
                     .setOngoing(true) // 实际通知通常是持续的
-                    .setPriority(NotificationCompat.PRIORITY_MAX) // 提高优先级到最高，与原始通知一致                   .setShowWhen(isRunningTimer) // 计时器需要显示时间以支持chronometer自动流�?                    .setUsesChronometer(isRunningTimer) // 计时器需要使用chronometer功能
+                    // 提高优先级到最高，与原始通知一致
+                    .setPriority(NotificationCompat.PRIORITY_MAX)
+                    // 计时器需要显示时间以支持chronometer自动流更新
+                    .setShowWhen(isRunningTimer)
+                    // 计时器需要使用chronometer功能
+                    .setUsesChronometer(isRunningTimer)
                     .setWhen(System.currentTimeMillis()) // 设置时间
                     .setOnlyAlertOnce(true) // 只提示一次
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 公开可见
@@ -919,7 +924,8 @@ object NotificationGenerator {
             if (notificationId != null) {
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 notificationManager.cancel(notificationId)
-                // 停止对应的滚动更新                stopScrollUpdate(key)
+                // 停止对应的滚动更新
+                stopScrollUpdate(key)
                 Logger.i(TAG, "超级岛 取消复刻通知成功，key=$key, notificationId=$notificationId")
             }
         } catch (e: Exception) {
@@ -938,14 +944,16 @@ object NotificationGenerator {
                 // 取消所有映射中的通知
                 entryKeyToNotificationId.forEach { (key, notificationId) ->
                     notificationManager.cancel(notificationId)
-                    // 停止对应的滚动更新                    stopScrollUpdate(key)
+                    // 停止对应的滚动更新
+                    stopScrollUpdate(key)
                     Logger.i(TAG, "超级岛 取消复刻通知成功，key=$key, notificationId=$notificationId")
                 }
             }
             
             // 清空映射
             entryKeyToNotificationId.clear()
-            // 清空所有滚动更新            clearAllScrollUpdates()
+            // 清空所有滚动更新
+            clearAllScrollUpdates()
             Logger.i(TAG, "超级岛 清除所有复刻通知成功")
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛 清除所有复刻通知失败: ${e.message}")
