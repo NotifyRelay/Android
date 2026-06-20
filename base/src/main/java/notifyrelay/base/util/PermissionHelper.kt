@@ -421,9 +421,10 @@ object PermissionHelper {
      * 应用前后台检测器
      */
     object AppForegroundDetector {
+        @Volatile
         private var isForeground = false
         private var isInitialized = false
-        private val listeners = mutableListOf<(Boolean) -> Unit>()
+        private val listeners = java.util.concurrent.CopyOnWriteArrayList<(Boolean) -> Unit>()
 
         @Synchronized
         fun initialize(context: Context) {
