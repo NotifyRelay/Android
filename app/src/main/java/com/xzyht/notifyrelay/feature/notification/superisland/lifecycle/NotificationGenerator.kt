@@ -867,7 +867,8 @@ object NotificationGenerator {
                 Logger.d(TAG, "超级岛 成功生成小图标")
             }
             
-            // 注入小图标            injectSmallIcon(notification, smallIconBitmap)
+            // 注入小图标            
+            injectSmallIcon(notification, smallIconBitmap)
             
             // 返回注入图标后的通知对象
             return notification

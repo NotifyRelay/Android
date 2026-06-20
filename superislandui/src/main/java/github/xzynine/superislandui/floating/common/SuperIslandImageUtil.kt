@@ -4,8 +4,13 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import coil.compose.rememberAsyncImagePainter
 import notifyrelay.core.util.image.ImageUtils
@@ -26,10 +31,8 @@ object SuperIslandImageUtil {
         iconKey: String? = null
     ): Painter? {
         // 预览模式下返回null，由调用方处理占位符
-        if (LocalInspectionMode.current) {
-            return null
-        }
-        
+        if (LocalInspectionMode.current) return null
+
         val resolvedUrl = remember(url, picMap, iconKey) {
             if (!iconKey.isNullOrEmpty() && picMap != null) {
                 picMap[iconKey]
@@ -38,12 +41,19 @@ object SuperIslandImageUtil {
             }
         }
 
-        // 直接使用 resolvedUrl（原 resolveReferenceUrl 为空壳方法直接返回输入）
-        return if (!resolvedUrl.isNullOrEmpty()) {
-            rememberAsyncImagePainter(model = resolvedUrl)
-        } else {
-            null
+        if (resolvedUrl.isNullOrEmpty()) return null
+
+        // data URL 使用 ImageUtils.loadBitmap（走 decodeDataUrlToBitmap），与通知路径一致
+        if (ImageUtils.isDataUrl(resolvedUrl)) {
+            val context = LocalContext.current
+            val bitmap by produceState<Bitmap?>(initialValue = null, key1 = resolvedUrl) {
+                value = ImageUtils.loadBitmap(context, resolvedUrl)
+            }
+            return bitmap?.let { BitmapPainter(it.asImageBitmap()) }
         }
+
+        // 非 data URL 仍然使用 Coil
+        return rememberAsyncImagePainter(model = resolvedUrl)
     }
 
     /**
