@@ -5,7 +5,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.content.Intent
 import android.view.accessibility.AccessibilityEvent
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardDetection
-import com.xzyht.notifyrelay.ui.ClipboardSyncActivity
+import com.xzyht.notifyrelay.ui.activity.ClipboardSyncActivity
 import notifyrelay.base.util.Logger
 
 /**

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.ViewModels
+package com.xzyht.notifyrelay.ui.viewmodel
 
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 

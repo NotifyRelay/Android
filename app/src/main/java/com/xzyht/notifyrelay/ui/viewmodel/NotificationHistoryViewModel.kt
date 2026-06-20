@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.ViewModels
+package com.xzyht.notifyrelay.ui.viewmodel
 
 import android.app.Application
 import android.graphics.Bitmap
@@ -9,8 +9,8 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStore
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
+import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
+import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -18,33 +18,64 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import notifyrelay.data.database.repository.DatabaseRepository
 
-class SuperIslandHistoryViewModel(
+class NotificationHistoryViewModel(
     private val application: Application,
     private val repository: DatabaseRepository
 ) : ViewModel() {
-    private val _uiState = MutableStateFlow(SuperIslandHistoryUiState())
-    val uiState: StateFlow<SuperIslandHistoryUiState> = _uiState.asStateFlow()
+    private val _uiState = MutableStateFlow(NotificationHistoryUiState())
+    val uiState: StateFlow<NotificationHistoryUiState> = _uiState.asStateFlow()
 
     private val _appIconCache = MutableStateFlow<Map<String, Pair<String, Bitmap?>>>(emptyMap())
+    val appIconCache: StateFlow<Map<String, Pair<String, Bitmap?>>> = _appIconCache.asStateFlow()
 
+    private val installedPackages = MutableStateFlow<Set<String>>(emptySet())
+    val installedPackagesState: StateFlow<Set<String>> = installedPackages.asStateFlow()
+
+    private val deviceFlow = MutableStateFlow("本机")
     private val refreshSignal = MutableStateFlow(0L)
     private val iconLoading = mutableSetOf<String>()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val groupedPagingFlow: Flow<PagingData<GroupedSuperIslandHistory>> = refreshSignal.flatMapLatest {
+    val groupedPagingFlow: Flow<PagingData<GroupedNotifications>> = combine(
+        deviceFlow,
+        refreshSignal,
+        installedPackages
+    ) { device, _, packages ->
+        device to packages
+    }.flatMapLatest { (device, packages) ->
         Pager(
             config = PagingConfig(pageSize = 20, enablePlaceholders = false)
         ) {
-            SuperIslandPagingSource(repository, application)
+            NotificationPagingSource(
+                repository = repository,
+                deviceUuid = device,
+                installedPackages = packages
+            )
         }.flow
     }.cachedIn(viewModelScope)
 
     init {
+        viewModelScope.launch(Dispatchers.IO) {
+            if (!RemoteFilterConfig.isLoaded) {
+                RemoteFilterConfig.load(application)
+            }
+            NotificationRepository.init(application)
+            NotificationRepository.scanDeviceList(application)
+            _uiState.update { state ->
+                state.copy(deviceList = NotificationRepository.deviceList)
+            }
+        }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            loadInstalledPackages()
+        }
+
         viewModelScope.launch {
             AppRepository.iconUpdates.collect { update ->
                 update?.let { (packageName, _) ->
@@ -54,6 +85,24 @@ class SuperIslandHistoryViewModel(
                     preloadAppIcons(listOf(packageName))
                 }
             }
+        }
+    }
+
+    fun loadNotifications(device: String) {
+        if (deviceFlow.value == device) {
+            return
+        }
+        deviceFlow.value = device
+        _uiState.update { it.copy(selectedDevice = device, isLoading = true, error = null) }
+
+        viewModelScope.launch(Dispatchers.IO) {
+            NotificationRepository.currentDevice = device
+            NotificationRepository.notifyHistoryChanged(device, application)
+            NotificationRepository.scanDeviceList(application)
+            _uiState.update { state ->
+                state.copy(deviceList = NotificationRepository.deviceList, isLoading = false)
+            }
+            refreshPaging()
         }
     }
 
@@ -67,17 +116,20 @@ class SuperIslandHistoryViewModel(
         }
     }
 
-    fun deleteEntry(id: Long) {
+    fun deleteNotification(key: String) {
+        val device = _uiState.value.selectedDevice
         viewModelScope.launch(Dispatchers.IO) {
-            repository.deleteSuperIslandHistoryById(id)
+            NotificationRepository.currentDevice = device
+            NotificationRepository.removeNotification(key, application)
             refreshPaging()
         }
     }
 
     fun deleteGroup(packageName: String) {
+        val device = _uiState.value.selectedDevice
         viewModelScope.launch(Dispatchers.IO) {
-            val actualPackageName = if (packageName == "(未知应用)") null else packageName
-            repository.deleteSuperIslandHistoryByPackage(actualPackageName)
+            NotificationRepository.currentDevice = device
+            NotificationRepository.removeNotificationsByPackage(packageName, application)
             _uiState.update { state ->
                 state.copy(expandedGroups = state.expandedGroups - packageName)
             }
@@ -86,8 +138,10 @@ class SuperIslandHistoryViewModel(
     }
 
     fun clearHistory() {
+        val device = _uiState.value.selectedDevice
         viewModelScope.launch(Dispatchers.IO) {
-            repository.clearSuperIslandHistory()
+            NotificationRepository.currentDevice = device
+            NotificationRepository.clearDeviceHistory(device, application)
             _appIconCache.value = emptyMap()
             _uiState.update { state ->
                 state.copy(expandedGroups = emptySet())
@@ -96,12 +150,8 @@ class SuperIslandHistoryViewModel(
         }
     }
 
-    suspend fun loadEntryDetail(id: Long): SuperIslandHistoryStoreEntry? {
-        return SuperIslandHistoryStore.loadEntryDetail(application, id)
-    }
-
     fun preloadAppIcons(packageNames: List<String>) {
-        val targets = packageNames.filter { it.isNotBlank() && it != "(未知应用)" }
+        val targets = packageNames.filter { it.isNotBlank() }
         if (targets.isEmpty()) return
 
         val toLoad = synchronized(iconLoading) {
@@ -128,7 +178,7 @@ class SuperIslandHistoryViewModel(
                 }
             } finally {
                 synchronized(iconLoading) {
-                    iconLoading.removeAll(toLoad)
+                    iconLoading.removeAll(toLoad.toSet())
                 }
             }
         }
@@ -138,9 +188,15 @@ class SuperIslandHistoryViewModel(
         refreshSignal.value = System.currentTimeMillis()
     }
 
+    private suspend fun loadInstalledPackages() {
+        val cached = AppRepository.getInstalledPackageNames(application)
+        installedPackages.value = cached.ifEmpty {
+            AppRepository.getInstalledPackageNamesAsync(application)
+        }
+    }
+
     private suspend fun getAppNameAndIcon(packageName: String): Pair<String, Bitmap?> {
         var name: String
-        var icon: Bitmap?
         try {
             val pm = application.packageManager
             val appInfo = pm.getApplicationInfo(packageName, 0)
@@ -148,20 +204,20 @@ class SuperIslandHistoryViewModel(
         } catch (_: Exception) {
             name = packageName
         }
-        try {
-            icon = AppRepository.getAppIconWithAutoRequest(application, packageName)
+        val icon: Bitmap? = try {
+            AppRepository.getAppIconWithAutoRequest(application, packageName)
         } catch (_: Exception) {
-            icon = null
+            null
         }
         return name to icon
     }
 
     class Factory(private val application: Application) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            if (modelClass.isAssignableFrom(SuperIslandHistoryViewModel::class.java)) {
+            if (modelClass.isAssignableFrom(NotificationHistoryViewModel::class.java)) {
                 val repository = DatabaseRepository.getInstance(application)
                 @Suppress("UNCHECKED_CAST")
-                return SuperIslandHistoryViewModel(application, repository) as T
+                return NotificationHistoryViewModel(application, repository) as T
             }
             throw IllegalArgumentException("Unknown ViewModel class")
         }

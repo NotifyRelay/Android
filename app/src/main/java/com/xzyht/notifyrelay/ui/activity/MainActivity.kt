@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui
+package com.xzyht.notifyrelay.ui.activity
 
 import android.content.Intent
 import android.content.res.Configuration

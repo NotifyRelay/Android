@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.ViewModels
+package com.xzyht.notifyrelay.ui.viewmodel
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState

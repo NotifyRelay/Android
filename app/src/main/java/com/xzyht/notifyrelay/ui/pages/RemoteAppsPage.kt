@@ -36,9 +36,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.servers.appslist.RemoteAppInfo
-import com.xzyht.notifyrelay.ui.ViewModels.LocalAppInfo
-import com.xzyht.notifyrelay.ui.ViewModels.LocalAppsViewModel
-import com.xzyht.notifyrelay.ui.ViewModels.RemoteAppsViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.LocalAppInfo
+import com.xzyht.notifyrelay.ui.viewmodel.LocalAppsViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.RemoteAppsViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator

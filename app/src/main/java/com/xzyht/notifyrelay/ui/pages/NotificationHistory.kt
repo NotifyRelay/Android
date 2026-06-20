@@ -52,10 +52,10 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
-import com.xzyht.notifyrelay.ui.DeveloperModeActivity
-import com.xzyht.notifyrelay.ui.GuideActivity
-import com.xzyht.notifyrelay.ui.ViewModels.GroupedNotifications
-import com.xzyht.notifyrelay.ui.ViewModels.NotificationHistoryViewModel
+import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
+import com.xzyht.notifyrelay.ui.activity.GuideActivity
+import com.xzyht.notifyrelay.ui.viewmodel.GroupedNotifications
+import com.xzyht.notifyrelay.ui.viewmodel.NotificationHistoryViewModel
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
 import kotlinx.coroutines.launch

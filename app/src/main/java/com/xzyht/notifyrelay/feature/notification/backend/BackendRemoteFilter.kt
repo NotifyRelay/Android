@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.backend
 
 import android.content.Context
-import com.xzyht.notifyrelay.ui.DeveloperModeActivity
+import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import notifyrelay.base.util.Logger

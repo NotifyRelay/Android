@@ -4,7 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.util.Properties
 
 plugins {
-    id("com.android.application")
+    alias(libs.plugins.android.application)
     id("org.jetbrains.kotlin.plugin.compose") version libs.versions.kotlinPluginCompose
     id("com.google.devtools.ksp") version "2.3.6"
     id("kotlin-parcelize")

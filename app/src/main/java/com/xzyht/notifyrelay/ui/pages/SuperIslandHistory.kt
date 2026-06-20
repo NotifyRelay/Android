@@ -70,8 +70,8 @@ import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaMan
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
-import com.xzyht.notifyrelay.ui.ViewModels.GroupedSuperIslandHistory
-import com.xzyht.notifyrelay.ui.ViewModels.SuperIslandHistoryViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.GroupedSuperIslandHistory
+import com.xzyht.notifyrelay.ui.viewmodel.SuperIslandHistoryViewModel
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

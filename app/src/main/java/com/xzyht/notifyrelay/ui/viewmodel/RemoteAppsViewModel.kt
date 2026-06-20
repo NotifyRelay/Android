@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.ViewModels
+package com.xzyht.notifyrelay.ui.viewmodel
 
 import android.content.Context
 import androidx.lifecycle.ViewModel

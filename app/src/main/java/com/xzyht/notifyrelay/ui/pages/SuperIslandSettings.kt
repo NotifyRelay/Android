@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils.SpecInjectionMode
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
-import com.xzyht.notifyrelay.ui.DeveloperModeActivity
+import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import com.xzyht.notifyrelay.ui.dialog.SuperIslandTestDialog
 import kotlinx.coroutines.Dispatchers

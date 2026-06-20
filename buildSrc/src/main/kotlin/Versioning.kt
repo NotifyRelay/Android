@@ -39,21 +39,21 @@ object Versioning {
         return try {
             val includeId: ObjectId? = repository.resolve(includeRef)
             if (includeId == null) return 0
-            val revWalk = RevWalk(repository)
-            val includeCommit = revWalk.parseCommit(includeId)
-            revWalk.markStart(includeCommit)
-            if (!excludeRef.isNullOrBlank()) {
-                val excludeId = repository.resolve(excludeRef)
-                if (excludeId != null) {
-                    val excludeCommit = revWalk.parseCommit(excludeId)
-                    revWalk.markUninteresting(excludeCommit)
+            RevWalk(repository).use { revWalk ->
+                val includeCommit = revWalk.parseCommit(includeId)
+                revWalk.markStart(includeCommit)
+                if (!excludeRef.isNullOrBlank()) {
+                    val excludeId = repository.resolve(excludeRef)
+                    if (excludeId != null) {
+                        val excludeCommit = revWalk.parseCommit(excludeId)
+                        revWalk.markUninteresting(excludeCommit)
+                    }
                 }
-            }
 
-            var cnt = 0
-            for (c in revWalk) cnt++
-            revWalk.close()
-            cnt
+                var cnt = 0
+                for (c in revWalk) cnt++
+                cnt
+            }
         } catch (e: Exception) {
             0
         }
@@ -122,8 +122,8 @@ object Versioning {
         // 最大值估算：200*1,000,000 + 100,000*1,000 + 12312359 = 312,312,359 < 2,147,483,647
         val versionCode = (majorOverride * 1_000_000L + mainCountAdjusted * 1_000L + dateTime.toLong()).coerceAtMost(Int.MAX_VALUE.toLong())
 
-        // Close repository resources
-        try { git?.repository?.close() } catch (_: Exception) {}
+        // Close repository and git resources
+        try { git?.close() } catch (_: Exception) {}
 
         return VersionInfo(versionName, versionCode.toInt())
     }
