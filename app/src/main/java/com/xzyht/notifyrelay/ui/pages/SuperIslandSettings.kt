@@ -202,7 +202,7 @@ fun UISuperIslandSettings() {
                         modifier = Modifier.padding(horizontal = 4.dp)
                     )
 
-                    installedPkgs@ val installedPkgs = remember { AppRepository.getInstalledPackageNamesSync(context) }
+                    val installedPkgs = remember { AppRepository.getInstalledPackageNamesSync(context) }
 
                     DEFAULT_MIRROR_PACKAGES.forEach { pkg ->
                         val isInstalled = installedPkgs.contains(pkg)
