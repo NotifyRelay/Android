@@ -90,6 +90,7 @@ object SuperIslandImageUtil {
         
         // 简单的HTML解析，只处理font标签的color属性
         var index = 0
+        var fontStyleDepth = 0  // 追踪font标签pushStyle的嵌套深度
         while (index < unescapedHtml.length) {
             val tagStart = unescapedHtml.indexOf('<', index)
             if (tagStart == -1) {
@@ -111,8 +112,9 @@ object SuperIslandImageUtil {
             
             if (tag.startsWith("/")) {
                 val endTagName = tag.substring(1).trim()
-                if (endTagName.equals("font", ignoreCase = true)) {
+                if (endTagName.equals("font", ignoreCase = true) && fontStyleDepth > 0) {
                     builder.pop()
+                    fontStyleDepth--
                 }
                 index = tagEnd + 1
             } else {
@@ -122,6 +124,7 @@ object SuperIslandImageUtil {
                         val colorValue = matchResult.groupValues[1]
                         val colorInt = ImageUtils.parseColor(colorValue) ?: 0xFFFFFFFF.toInt()
                         builder.pushStyle(androidx.compose.ui.text.SpanStyle(color = androidx.compose.ui.graphics.Color(colorInt)))
+                        fontStyleDepth++
                     }
                 }
                 
