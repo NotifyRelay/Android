@@ -23,7 +23,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingl
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import github.xzynine.superislandui.floating.BigIsland.components.ProgressInfoCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
-import github.xzynine.superislandui.model.componets.ActionInfo
+import github.xzynine.superislandui.model.components.ActionInfo
 import github.xzynine.superislandui.model.core.ParamIsland
 import notifyrelay.base.util.Logger
 import top.yukonga.miuix.kmp.basic.TextButton

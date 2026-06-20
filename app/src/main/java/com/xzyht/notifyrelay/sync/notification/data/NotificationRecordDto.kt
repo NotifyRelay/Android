@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.sync.notification.data
 
 // 数据库存储实体
-data class NotificationRecordEntity(
+data class NotificationRecordDto(
     val key: String,
     val packageName: String,
     val appName: String? = null, // 新增字段

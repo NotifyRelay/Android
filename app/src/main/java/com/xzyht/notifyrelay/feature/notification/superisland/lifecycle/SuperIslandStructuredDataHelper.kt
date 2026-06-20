@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.lifecyle
+package com.xzyht.notifyrelay.feature.notification.superisland.lifecycle
 
 import android.content.Context
 import android.os.Bundle
@@ -7,17 +7,17 @@ import notifyrelay.base.util.Logger
 import org.json.JSONObject
 
 /**
- * 超级岛结构化数据注入工具类
- * 负责为通知添加符合小米官方规范的超级岛结构化数据
+ * 超级岛结构化数据注入工具�?
+ * 负责为通知添加符合小米官方规范的超级岛结构化数�?
  */
 object SuperIslandStructuredDataHelper {
     private const val TAG = "SuperIslandStructuredDataHelper"
 
     /**
      * 添加超级岛相关的结构化数据到通知
-     * @param builder 通知构建器
-     * @param context 上下文
-     * @param paramV2Raw ParamV2原始JSON字符串
+     * @param builder 通知构建�?
+     * @param context 上下�?
+     * @param paramV2Raw ParamV2原始JSON字符�?
      * @param picMap 图片映射
      * @param title 通知标题
      * @param text 通知内容
@@ -72,7 +72,7 @@ object SuperIslandStructuredDataHelper {
                     } catch (e: Exception) {
                         // 如果构建完整结构失败，回退到直接使用原始数据
                         extras.putString("miui.focus.param", rawData)
-                        Logger.w(TAG, "构建完整焦点通知参数结构失败，回退到原始数据: ${e.message}")
+                        Logger.w(TAG, "构建完整焦点通知参数结构失败，回退到原始数据 ${e.message}")
                     }
                 }
 
@@ -342,7 +342,7 @@ object SuperIslandStructuredDataHelper {
 
             Logger.i(TAG, "添加非媒体类型超级岛结构化数据成功")
         } catch (e: Exception) {
-            Logger.w(TAG, "添加非媒体类型超级岛结构化数据失败: ${e.message}")
+            Logger.w(TAG, "添加非媒体类型超级岛结构化数据失败 ${e.message}")
             e.printStackTrace()
         }
     }

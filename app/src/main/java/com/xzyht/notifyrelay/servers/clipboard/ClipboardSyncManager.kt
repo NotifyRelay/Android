@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.servers.clipboard
+﻿package com.xzyht.notifyrelay.servers.clipboard
 
 import android.content.ClipData
 import android.content.ClipDescription
@@ -8,7 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.servers.ClipboardAccessiblityService
+import com.xzyht.notifyrelay.servers.ClipboardAccessibilityService
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.core.util.DataUrlUtils
+import notifyrelay.core.util.image.ImageUtils
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -25,7 +25,7 @@ object ClipboardSyncManager {
     private const val CLIPBOARD_TYPE_TEXT = "text"
     private const val CLIPBOARD_TYPE_IMAGE = "image"
     private const val DATA_HEADER = "DATA_CLIPBOARD"
-    private const val ACCESSIBILITY_SERVICE_NAME = "com.xzyht.notifyrelay/com.xzyht.notifyrelay.servers.ClipboardAccessiblityService"
+    private const val ACCESSIBILITY_SERVICE_NAME = "com.xzyht.notifyrelay/com.xzyht.notifyrelay.servers.ClipboardAccessibilityService"
     
     private var clipboardManager: ClipboardManager? = null
     private var lastClipboardContent: String = ""
@@ -72,7 +72,7 @@ object ClipboardSyncManager {
 
     fun suppressClipboardMonitoring(durationMs: Long = 2000) {
         Logger.d(TAG, "抑制所有剪贴板监听 $durationMs ms")
-        ClipboardAccessiblityService.pauseDetectionTemporary(durationMs)
+        ClipboardAccessibilityService.pauseDetectionTemporary(durationMs)
     }
 
     /**
@@ -261,7 +261,7 @@ object ClipboardSyncManager {
                                 }
                             }
                             if (imageBitmap != null) {
-                                val dataUrl = DataUrlUtils.bitmapToDataUri(imageBitmap)
+                                val dataUrl = ImageUtils.bitmapToDataUri(imageBitmap)
                                 // 从data URI中提取纯base64部分
                                 val commaIndex = dataUrl.indexOf(',')
                                 if (commaIndex > 0) {
@@ -301,7 +301,7 @@ object ClipboardSyncManager {
                     CLIPBOARD_TYPE_IMAGE -> {
                         val dataUrl = "data:image/png;base64,$content"
                         CoroutineScope(Dispatchers.IO).launch {
-                            val bitmap = DataUrlUtils.decodeDataUrlToBitmap(context, dataUrl)
+                            val bitmap = ImageUtils.decodeDataUrlToBitmap(context, dataUrl)
                             if (bitmap != null) {
                                 val clipItem = ClipData.Item(dataUrl)
                                 val mimeTypes = arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)

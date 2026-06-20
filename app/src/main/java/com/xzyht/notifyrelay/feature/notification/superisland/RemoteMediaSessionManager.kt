@@ -9,7 +9,7 @@ import notifyrelay.data.StorageManager.getBoolean
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import github.xzynine.superislandui.common.SuperIslandProtocol
-import github.xzynine.superislandui.model.componets.MediaSessionData
+import github.xzynine.superislandui.model.components.MediaSessionData
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 

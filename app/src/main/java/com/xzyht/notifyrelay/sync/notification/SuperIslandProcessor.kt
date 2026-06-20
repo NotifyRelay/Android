@@ -8,11 +8,11 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.LocalSuperIslandTracker
-import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.SuperIslandRemoteStore
 import github.xzynine.superislandui.common.SuperIslandProtocol
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
+import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStore
+import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
@@ -252,7 +252,7 @@ object SuperIslandProcessor {
 
             // 检查是否为测试数据，如果是则跳过保存到历史记录
             if (!pkg.startsWith("test_")) {
-                val historyEntry = SuperIslandHistoryEntry(
+                val historyEntry = SuperIslandHistoryStoreEntry(
                     id = System.currentTimeMillis(),
                     sourceDeviceUuid = remoteUuid,
                     originalPackage = pkg,
@@ -267,11 +267,11 @@ object SuperIslandProcessor {
                 )
 
                 try {
-                    SuperIslandHistory.append(context, historyEntry)
+                    SuperIslandHistoryStore.append(context, historyEntry)
                 } catch (_: Exception) {
-                    SuperIslandHistory.append(
+                    SuperIslandHistoryStore.append(
                         context,
-                        SuperIslandHistoryEntry(
+                        SuperIslandHistoryStoreEntry(
                             id = System.currentTimeMillis(),
                             sourceDeviceUuid = remoteUuid,
                             originalPackage = pkg,

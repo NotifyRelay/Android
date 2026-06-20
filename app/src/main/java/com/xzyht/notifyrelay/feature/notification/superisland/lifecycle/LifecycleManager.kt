@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.lifecyle
+package com.xzyht.notifyrelay.feature.notification.superisland.lifecycle
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -8,7 +8,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingW
 
 
 /**
- * 浮窗生命周期管理器
+ * 浮窗生命周期管理类
  */
 class LifecycleManager {
 
@@ -50,6 +50,8 @@ class LifecycleManager {
 
 /**
  * 提供生命周期所有者的组合局部
+ * @param lifecycleManager 生命周期管理器
+ * @param content 内容函数
  */
 @Composable
 fun ProvideLifecycleOwner(

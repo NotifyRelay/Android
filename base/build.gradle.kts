@@ -1,11 +1,11 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+﻿import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     id("com.android.library")
 }
 
 android {
-    namespace = "notifyrelay.base.util"
+    namespace = "notifyrelay.base"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {

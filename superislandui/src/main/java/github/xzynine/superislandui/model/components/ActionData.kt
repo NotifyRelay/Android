@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.model.componets
+package github.xzynine.superislandui.model.components
 
 import org.json.JSONObject
 
@@ -10,16 +10,16 @@ data class ActionInfo(
     val actionTitle: String? = null, // 按钮文本
     val actionTitleColor: String? = null, // 按钮文本颜色
     val actionTitleColorDark: String? = null, // 深色模式按钮文本颜色
-    val actionBgColor: String? = null, // 按钮背景色
-    val actionBgColorDark: String? = null, // 深色模式按钮背景色
-    val actionIntentType: Int? = null, // 跳转类型：1 activity, 2 broadcast, 3 service
+    val actionBgColor: String? = null, // 按钮背景�?
+    val actionBgColorDark: String? = null, // 深色模式按钮背景�?
+    val actionIntentType: Int? = null, // 跳转类型�? activity, 2 broadcast, 3 service
     val actionIntent: String? = null, // 跳转URI
     val clickWithCollapse: Boolean? = null, // 点击是否收起面板
-    val type: Int? = null, // 按钮类型：0普通，1进度，2文字
-    val progressInfo: ProgressInfo? = null // 进度按钮的进度信息
+    val type: Int? = null, // 按钮类型�?普通，1进度�?文字
+    val progressInfo: ProgressInfo? = null // 进度按钮的进度信�?
 )
 
-// 解析操作信息组件（按钮等）
+// 解析操作信息组件（按钮等�?
 fun parseActionInfo(json: JSONObject): ActionInfo {
     return ActionInfo(
         action = json.optString("action", "").takeIf { it.isNotEmpty() },

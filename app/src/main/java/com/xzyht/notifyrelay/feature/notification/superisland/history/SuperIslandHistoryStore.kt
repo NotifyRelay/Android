@@ -10,7 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
-data class SuperIslandHistoryEntry(
+data class SuperIslandHistoryStoreEntry(
     val id: Long,
     val sourceDeviceUuid: String? = null,
     val originalPackage: String? = null,
@@ -24,12 +24,12 @@ data class SuperIslandHistoryEntry(
     val featureId: String? = null
 )
 
-object SuperIslandHistory {
+object SuperIslandHistoryStore {
     private const val MAX_ENTRIES = 600
     private val gson = Gson()
     private val stringStringMapType = object : TypeToken<Map<String, String>>() {}.type
 
-    suspend fun loadEntryDetail(context: Context, id: Long): SuperIslandHistoryEntry? {
+    suspend fun loadEntryDetail(context: Context, id: Long): SuperIslandHistoryStoreEntry? {
         val repo = DatabaseRepository.getInstance(context)
         val entity = try {
             repo.getSuperIslandHistoryById(id)
@@ -47,7 +47,7 @@ object SuperIslandHistory {
             } catch (_: Exception) {
                 rawPicMap
             }
-            SuperIslandHistoryEntry(
+            SuperIslandHistoryStoreEntry(
                 id = e.id,
                 sourceDeviceUuid = e.sourceDeviceUuid,
                 originalPackage = e.originalPackage,
@@ -63,7 +63,7 @@ object SuperIslandHistory {
         }
     }
 
-    fun append(context: Context, entry: SuperIslandHistoryEntry) {
+    fun append(context: Context, entry: SuperIslandHistoryStoreEntry) {
         val packageName = resolvePackageName(entry)
 
         CoroutineScope(Dispatchers.IO).launch {
@@ -106,7 +106,7 @@ object SuperIslandHistory {
         } catch (_: Exception) {}
     }
 
-    private fun resolvePackageName(entry: SuperIslandHistoryEntry): String? {
+    private fun resolvePackageName(entry: SuperIslandHistoryStoreEntry): String? {
         val mapped = entry.mappedPackage?.takeIf { it.isNotBlank() }
         if (!mapped.isNullOrBlank()) return mapped
         val original = entry.originalPackage?.takeIf { it.isNotBlank() }

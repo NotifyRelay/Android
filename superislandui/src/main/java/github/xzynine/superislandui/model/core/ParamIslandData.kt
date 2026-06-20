@@ -2,13 +2,13 @@ package github.xzynine.superislandui.model.core
 
 import github.xzynine.superislandui.floating.SmallIsland.core.BigIslandArea
 import github.xzynine.superislandui.floating.SmallIsland.core.parseBigIslandArea
-import github.xzynine.superislandui.model.componets.ProgressInfo
-import github.xzynine.superislandui.model.componets.parseProgressInfo
+import github.xzynine.superislandui.model.components.ProgressInfo
+import github.xzynine.superislandui.model.components.parseProgressInfo
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * 解析 param_island 节点，提取小岛/大岛摘要所需的基础文本与图标信息。
+ * 解析 param_island 节点，提取小�?大岛摘要所需的基础文本与图标信息�?
  */
 data class ParamIsland(
     val smallIslandArea: SmallIslandArea? = null,

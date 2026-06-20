@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.floating.BigIsland.components
+﻿package github.xzynine.superislandui.floating.BigIsland.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
@@ -21,9 +21,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.templates.HighlightInfo
-import github.xzynine.superislandui.model.componets.TimerInfo
+import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import notifyrelay.core.util.image.ImageUtils
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.common.PreviewData
 import kotlinx.coroutines.delay
@@ -80,8 +81,8 @@ fun HighlightInfoCompose(
                 ?: timerLabel
                 ?: if (highlightInfo.iconOnly) null else "高亮信息"
             primaryTextRaw?.let {
-                val primaryColor = SuperIslandImageUtil.parseColor(highlightInfo.colorTitle)
-                    ?: SuperIslandImageUtil.parseColor(highlightInfo.colorContent)
+                val primaryColor = ImageUtils.parseColor(highlightInfo.colorTitle)
+                    ?: ImageUtils.parseColor(highlightInfo.colorContent)
                     ?: 0xFFFFFFFF.toInt()
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
@@ -97,8 +98,8 @@ fun HighlightInfoCompose(
                 ?.takeIf { it.isNotBlank() && it != primaryTextRaw }
                 ?: timerLabel?.takeIf { it.isNotBlank() && it != primaryTextRaw }
             statusText?.let { status ->
-                val statusColor = SuperIslandImageUtil.parseColor(highlightInfo.colorSubContent)
-                    ?: SuperIslandImageUtil.parseColor(highlightInfo.colorContent)
+                val statusColor = ImageUtils.parseColor(highlightInfo.colorSubContent)
+                    ?: ImageUtils.parseColor(highlightInfo.colorContent)
                     ?: 0xFFDDDDDD.toInt()
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(status),
@@ -113,7 +114,7 @@ fun HighlightInfoCompose(
                 ?.let { content ->
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(content),
-                        color = Color(SuperIslandImageUtil.parseColor(highlightInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
+                        color = Color(ImageUtils.parseColor(highlightInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
@@ -125,7 +126,7 @@ fun HighlightInfoCompose(
                 ?.let { sub ->
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(sub),
-                        color = Color(SuperIslandImageUtil.parseColor(highlightInfo.colorSubContent) ?: 0xFF9EA3FF.toInt()),
+                        color = Color(ImageUtils.parseColor(highlightInfo.colorSubContent) ?: 0xFF9EA3FF.toInt()),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(bottom = 4.dp)
                     )
@@ -135,7 +136,7 @@ fun HighlightInfoCompose(
             highlightInfo.timerInfo
                 ?.takeIf { !highlightInfo.iconOnly }
                 ?.let { timerInfo ->
-                    val timerColor = SuperIslandImageUtil.parseColor(highlightInfo.colorTitle) ?: 0xFFFFFFFF.toInt()
+                    val timerColor = ImageUtils.parseColor(highlightInfo.colorTitle) ?: 0xFFFFFFFF.toInt()
                     TimerText(timerInfo, timerColor)
                 }
         }

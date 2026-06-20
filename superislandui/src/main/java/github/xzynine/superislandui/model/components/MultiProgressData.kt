@@ -1,15 +1,15 @@
-package github.xzynine.superislandui.model.componets
+package github.xzynine.superislandui.model.components
 
 import org.json.JSONObject
 
-// 多进度信息：多段进度条组件
+// 多进度信息：多段进度条组�?
 data class MultiProgressInfo(
     val title: String, // 进度描述文本
-    val progress: Int, // 当前进度百分比
-    val color: String? = null, // 进度条颜色
-    val points: Int? = null, // 节点数量（0-4）
-    val picForward: String? = null, // 进度指示点
-    val picForwardWait: String? = null, // 目标指示点
+    val progress: Int, // 当前进度百分�?
+    val color: String? = null, // 进度条颜�?
+    val points: Int? = null, // 节点数量�?-4�?
+    val picForward: String? = null, // 进度指示�?
+    val picForwardWait: String? = null, // 目标指示�?
     val picForwardBox: String? = null, // 进度条背景块
     val picMiddle: String? = null, // 激活的中间节点
     val picMiddleUnselected: String? = null, // 未激活的中间节点
@@ -17,7 +17,7 @@ data class MultiProgressInfo(
     val picEndUnselected: String? = null // 未激活的末尾节点
 )
 
-// 解析多进度信息组件
+// 解析多进度信息组�?
 fun parseMultiProgressInfo(json: JSONObject): MultiProgressInfo {
     val middleUnselected = sequenceOf(
         json.optString("picMiddleUnselected", ""),

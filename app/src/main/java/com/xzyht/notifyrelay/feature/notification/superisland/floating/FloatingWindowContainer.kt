@@ -39,7 +39,7 @@ import github.xzynine.superislandui.floating.BigIsland.components.TextButtonComp
 import github.xzynine.superislandui.floating.SmallIsland.compose.BigIslandCollapsedCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandComposeRoot
-import github.xzynine.superislandui.model.componets.MediaSessionData
+import github.xzynine.superislandui.model.components.MediaSessionData
 import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.util.Logger
 import org.json.JSONObject

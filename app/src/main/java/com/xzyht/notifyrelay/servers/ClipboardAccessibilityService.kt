@@ -12,9 +12,7 @@ import notifyrelay.base.util.Logger
  * 剪贴板无障碍服务
  * 用于智能检测复制操作并触发同步
  */
-class ClipboardAccessiblityService : AccessibilityService() {
-
-    private val TAG = "ClipboardAccessibility"
+class ClipboardAccessibilityService : AccessibilityService() {
 
     // 剪贴板检测实例
     private lateinit var clipboardDetector: ClipboardDetection
@@ -89,12 +87,12 @@ class ClipboardAccessiblityService : AccessibilityService() {
                 startTransparentActivity()
             }
         } catch (e: Exception) {
-            Logger.e(TAG, "无障碍服务错误", e)
+            Logger.e(TAG, "无障碍服务错误: ${e.message}", e)
         }
     }
 
     /**
-     * 启动透明Activity获取剪贴板
+     * 启动透明Activity获取剪贴板内容
      */
     private fun startTransparentActivity() {
         try {
@@ -117,6 +115,8 @@ class ClipboardAccessiblityService : AccessibilityService() {
     }
 
     companion object {
+        private const val TAG = "ClipboardAccessibility"
+
         // 暂停截止时间
         @Volatile
         private var pausedUntilTime: Long = 0
@@ -127,7 +127,7 @@ class ClipboardAccessiblityService : AccessibilityService() {
          */
         fun pauseDetectionTemporary(durationMs: Long) {
             pausedUntilTime = System.currentTimeMillis() + durationMs
-            Logger.d("ClipboardAccessibility", "无障碍服务检测已暂停 $durationMs ms")
+            Logger.i(TAG, "无障碍服务检测已暂停 $durationMs ms")
         }
 
         // 监听的事件类型

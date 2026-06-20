@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.floating.BigIsland.components
+﻿package github.xzynine.superislandui.floating.BigIsland.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.core.ParamV2
 import github.xzynine.superislandui.floating.common.CircularProgressCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import notifyrelay.core.util.image.ImageUtils
 import github.xzynine.superislandui.common.PreviewData
 
 /**
@@ -61,8 +62,8 @@ fun ChatInfoCompose(paramV2: ParamV2, picMap: Map<String, String>?) {
             Spacer(modifier = Modifier.width(8.dp))
 
             // 创建圆形进度条 - 使用common目录下的通用组件
-            val progressColor = SuperIslandImageUtil.parseColor(progressInfo.colorProgress) ?: 0xFF3482FF.toInt()
-            val trackColor = SuperIslandImageUtil.parseColor(progressInfo.colorProgressEnd)
+            val progressColor = ImageUtils.parseColor(progressInfo.colorProgress) ?: 0xFF3482FF.toInt()
+            val trackColor = ImageUtils.parseColor(progressInfo.colorProgressEnd)
                 ?: ((progressColor and 0x00FFFFFF) or (0x33 shl 24))
 
             // 使用通用的CircularProgressCompose组件（内部已处理动画）
@@ -81,7 +82,7 @@ fun ChatInfoCompose(paramV2: ParamV2, picMap: Map<String, String>?) {
             chatInfo.title?.let {
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                    color = Color(SuperIslandImageUtil.parseColor(chatInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
+                    color = Color(ImageUtils.parseColor(chatInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Normal,
                     modifier = Modifier.padding(start = 8.dp)
@@ -91,7 +92,7 @@ fun ChatInfoCompose(paramV2: ParamV2, picMap: Map<String, String>?) {
             chatInfo.content?.let {
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                    color = Color(SuperIslandImageUtil.parseColor(chatInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
+                    color = Color(ImageUtils.parseColor(chatInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(start = 8.dp)
                 )

@@ -1,8 +1,8 @@
-package github.xzynine.superislandui.model.componets
+package github.xzynine.superislandui.model.components
 
 import org.json.JSONObject
 
-// 动画文本组件：animTextInfo（独立于 HighlightInfo）
+// 动画文本组件：animTextInfo（独立于 HighlightInfo�?
 data class AnimIconInfo(
     val src: String,
     val srcDark: String? = null
@@ -10,7 +10,7 @@ data class AnimIconInfo(
 
 data class AnimTextInfo(
     val icon: AnimIconInfo,
-    val title: String? = null,        // 主要文本（与 timerInfo 至少二选一）
+    val title: String? = null,        // 主要文本（与 timerInfo 至少二选一�?
     val content: String? = null,      // 次要文本
     val timerInfo: TimerInfo? = null, // 计时信息
     val colorTitle: String? = null,

@@ -24,7 +24,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.NotificationGenerator.SpecInjectionMode
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils.SpecInjectionMode
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.ui.DeveloperModeActivity
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
@@ -84,6 +84,8 @@ fun UISuperIslandSettings() {
     var specInjectionMode by remember { mutableStateOf(savedInjectionMode) }
 
     val hasFloatingWindowSetting = StorageManager.getString(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, "") != ""
+
+    val defaultFloatingWindowEnabled = FloatingReplicaManager.getDefaultFloatingWindowEnabled()
 
     val showTestDialog = remember { mutableStateOf(false) }
 

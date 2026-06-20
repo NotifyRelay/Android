@@ -1,53 +1,20 @@
-package github.xzynine.superislandui.floating.common
+﻿package github.xzynine.superislandui.floating.common
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
-import androidx.core.graphics.drawable.toBitmap
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalInspectionMode
-import androidx.core.graphics.toColorInt
-import coil.Coil
 import coil.compose.rememberAsyncImagePainter
-import coil.request.ImageRequest
-import coil.request.SuccessResult
-import notifyrelay.core.util.DataUrlUtils
+import notifyrelay.core.util.image.ImageUtils
 
 /**
  * 超级岛图片加载和处理工具类
  * 整合了图片加载、Compose 图片加载和辅助工具函数
  */
 object SuperIslandImageUtil {
-    /**
-     * 使用 Coil 进行 HTTP/URI 加载，并将 data: 协议 URI 委托给 DataUrlUtils 处理。
-     * 用于展开态与摘要态中组件级图标加载，避免在渲染器中写网络细节。
-     */
-    suspend fun loadBitmapSuspend(context: Context, urlOrData: String, timeoutMs: Int = 5000): Bitmap? {
-        return try {
-            // 若为数据库绑定ID则先解析为真实值
-            val finalUrl = resolveReferenceUrl(context, urlOrData)
-            
-            if (finalUrl.startsWith("data:", ignoreCase = true)) {
-                DataUrlUtils.decodeDataUrlToBitmap(context, finalUrl)
-            } else {
-                val loader = Coil.imageLoader(context)
-                val request = ImageRequest.Builder(context)
-                    .data(finalUrl)
-                    .allowHardware(false)
-                    .build()
-                val result = loader.execute(request)
-                if (result is SuccessResult) {
-                    val drawable = result.drawable
-                    if (drawable is BitmapDrawable) return drawable.bitmap
-                    drawable.toBitmap()
-                } else null
-            }
-        } catch (_: Exception) {
-            null
-        }
-    }
 
     /**
      * 统一的Compose图片加载工具，封装了现有ImageLoader和DataUrlUtils的功能
@@ -71,17 +38,9 @@ object SuperIslandImageUtil {
             }
         }
 
-        // 处理数据库绑定ID
-        val processedUrl = remember(resolvedUrl) {
-            if (!resolvedUrl.isNullOrEmpty()) {
-                resolveReferenceUrl(null, resolvedUrl)
-            } else {
-                resolvedUrl
-            }
-        }
-
-        return if (!processedUrl.isNullOrEmpty()) {
-            rememberAsyncImagePainter(model = processedUrl)
+        // 直接使用 resolvedUrl（原 resolveReferenceUrl 为空壳方法直接返回输入）
+        return if (!resolvedUrl.isNullOrEmpty()) {
+            rememberAsyncImagePainter(model = resolvedUrl)
         } else {
             null
         }
@@ -102,7 +61,7 @@ object SuperIslandImageUtil {
         if (secondKey != null) {
             var url = picMap[secondKey]
             if (!url.isNullOrEmpty()) {
-                url = resolveReferenceUrl(null, url)
+                // 原 resolveReferenceUrl 为空壳方法直接返回输入，此处直接使用 url
             }
             return url
         }
@@ -111,59 +70,27 @@ object SuperIslandImageUtil {
     }
 
     /**
-     * 解析颜色字符串为颜色值
-     */
-    fun parseColor(colorString: String?): Int? {
-        return try {
-            colorString?.toColorInt()
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    /**
-     * 解码HTML转义字符
-     */
-    fun unescapeHtml(input: String): String {
-        return input
-            .replace("\\u003c", "<")
-            .replace("\\u003e", ">")
-            .replace("\\u0027", "'")
-            .replace("\\u0022", "\"")
-            .replace("\\u0026", "&")
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", "\"")
-            .replace("&apos;", "'")
-            .replace("&amp;", "&")
-    }
-
-    /**
      * 解析简单HTML标签，将其转换为AnnotatedString
      */
     fun parseSimpleHtmlToAnnotatedString(html: String): androidx.compose.ui.text.AnnotatedString {
         val builder = androidx.compose.ui.text.AnnotatedString.Builder()
-        val unescapedHtml = unescapeHtml(html)
+        val unescapedHtml = ImageUtils.unescapeHtml(html)
         
         // 简单的HTML解析，只处理font标签的color属性
         var index = 0
         while (index < unescapedHtml.length) {
             val tagStart = unescapedHtml.indexOf('<', index)
             if (tagStart == -1) {
-                // 没有更多标签，添加剩余文本
                 builder.append(unescapedHtml.substring(index))
                 break
             }
             
-            // 添加标签前的文本
             if (tagStart > index) {
                 builder.append(unescapedHtml.substring(index, tagStart))
             }
             
-            // 查找标签结束位置
             val tagEnd = unescapedHtml.indexOf('>', tagStart)
             if (tagEnd == -1) {
-                // 标签未结束，将整个标签作为文本处理
                 builder.append(unescapedHtml.substring(tagStart))
                 break
             }
@@ -171,38 +98,28 @@ object SuperIslandImageUtil {
             val tag = unescapedHtml.substring(tagStart + 1, tagEnd)
             
             if (tag.startsWith("/")) {
-                // 结束标签，移除当前样式
                 val endTagName = tag.substring(1).trim()
                 if (endTagName.equals("font", ignoreCase = true)) {
-                    // 结束font标签，重置颜色
                     builder.pop()
                 }
-                // 移动到标签结束位置之后
                 index = tagEnd + 1
             } else {
-                // 开始标签，处理样式
                 if (tag.startsWith("font", ignoreCase = true)) {
-                    // 处理font标签的color属性
                     val colorMatch = Regex("color=['\"](#[0-9A-Fa-f]{6}|#[0-9A-Fa-f]{3})['\"]").find(tag)
                     colorMatch?.let { matchResult ->
                         val colorValue = matchResult.groupValues[1]
-                        val colorInt = parseColor(colorValue) ?: 0xFFFFFFFF.toInt()
+                        val colorInt = ImageUtils.parseColor(colorValue) ?: 0xFFFFFFFF.toInt()
                         builder.pushStyle(androidx.compose.ui.text.SpanStyle(color = androidx.compose.ui.graphics.Color(colorInt)))
                     }
                 }
                 
-                // 移动到标签结束位置之后
                 index = tagEnd + 1
                 
-                // 查找下一个标签（可能是结束标签）
                 val nextTagStart = unescapedHtml.indexOf('<', index)
                 if (nextTagStart != -1) {
-                    // 添加开始标签和结束标签之间的文本
                     builder.append(unescapedHtml.substring(index, nextTagStart))
-                    // 移动到下一个标签开始位置
                     index = nextTagStart
                 } else {
-                    // 没有更多标签，添加剩余文本
                     builder.append(unescapedHtml.substring(index))
                     break
                 }
@@ -210,12 +127,5 @@ object SuperIslandImageUtil {
         }
         
         return builder.toAnnotatedString()
-    }
-
-    /**
-     * 解析图片标识，直接返回原始URL
-     */
-    private fun resolveReferenceUrl(context: Context?, urlOrRef: String): String {
-        return urlOrRef
     }
 }

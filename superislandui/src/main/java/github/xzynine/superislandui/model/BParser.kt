@@ -10,7 +10,7 @@ import github.xzynine.superislandui.floating.SmallIsland.right.BPicInfo
 import github.xzynine.superislandui.floating.SmallIsland.right.BProgressTextInfo
 import github.xzynine.superislandui.floating.SmallIsland.right.BSameWidthDigitInfo
 import github.xzynine.superislandui.floating.SmallIsland.right.BTextInfo
-import github.xzynine.superislandui.model.componets.TimerInfo
+import github.xzynine.superislandui.model.components.TimerInfo
 import org.json.JSONObject
 
 /**

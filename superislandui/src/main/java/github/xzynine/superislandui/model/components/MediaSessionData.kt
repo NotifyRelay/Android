@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.model.componets
+package github.xzynine.superislandui.model.components
 
 data class MediaSessionData(
     val packageName: String,

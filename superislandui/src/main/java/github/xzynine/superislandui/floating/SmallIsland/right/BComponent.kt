@@ -1,6 +1,6 @@
 package github.xzynine.superislandui.floating.SmallIsland.right
 
-import github.xzynine.superislandui.model.componets.TimerInfo
+import github.xzynine.superislandui.model.components.TimerInfo
 
 /**
  * B区（右侧 imageTextInfoRight + 其它文本/图片/进度组件）模型。

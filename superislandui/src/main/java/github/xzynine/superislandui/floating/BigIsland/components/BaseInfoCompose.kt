@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.floating.BigIsland.components
+﻿package github.xzynine.superislandui.floating.BigIsland.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.templates.BaseInfo
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import notifyrelay.core.util.image.ImageUtils
 import github.xzynine.superislandui.common.PreviewData
 
 /**
@@ -56,7 +57,7 @@ fun BaseInfoCompose(
                 baseInfo.content?.let {
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                         fontSize = 12.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -71,7 +72,7 @@ fun BaseInfoCompose(
                     }
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorSubContent) ?: 0xFFDDDDDD.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorSubContent) ?: 0xFFDDDDDD.toInt()),
                         fontSize = 12.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -120,7 +121,7 @@ fun BaseInfoCompose(
                 baseInfo.title?.let {
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Normal,
                         maxLines = 1,
@@ -145,7 +146,7 @@ fun BaseInfoCompose(
                 baseInfo.subTitle?.let {
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorSubTitle) ?: 0xFFFFFFFF.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorSubTitle) ?: 0xFFFFFFFF.toInt()),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Normal,
                         maxLines = 1,
@@ -161,7 +162,7 @@ fun BaseInfoCompose(
                     }
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorExtraTitle) ?: 0xFFFFFFFF.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorExtraTitle) ?: 0xFFFFFFFF.toInt()),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Normal,
                         maxLines = 1,
@@ -177,7 +178,7 @@ fun BaseInfoCompose(
                     }
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorSpecialTitle) ?: 0xFFFFFFFF.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorSpecialTitle) ?: 0xFFFFFFFF.toInt()),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Normal,
                         maxLines = 1,
@@ -185,7 +186,7 @@ fun BaseInfoCompose(
                         modifier = Modifier
                             .wrapContentWidth()
                             .background(
-                                color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorSpecialBg) ?: 0xFFDDDDDD.toInt()),
+                                color = Color(ImageUtils.parseColor(baseInfo.colorSpecialBg) ?: 0xFFDDDDDD.toInt()),
                                 shape = RoundedCornerShape(4.dp)
                             )
                             .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -206,7 +207,7 @@ fun BaseInfoCompose(
                 baseInfo.title?.let {
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Normal,
                         maxLines = 1,
@@ -231,7 +232,7 @@ fun BaseInfoCompose(
                 baseInfo.subTitle?.let {
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorSubTitle) ?: 0xFFFFFFFF.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorSubTitle) ?: 0xFFFFFFFF.toInt()),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Normal,
                         maxLines = 1,
@@ -247,7 +248,7 @@ fun BaseInfoCompose(
                     }
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorExtraTitle) ?: 0xFFFFFFFF.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorExtraTitle) ?: 0xFFFFFFFF.toInt()),
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Normal,
                         maxLines = 1,
@@ -263,7 +264,7 @@ fun BaseInfoCompose(
                     }
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorSpecialTitle) ?: 0xFFFFFFFF.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorSpecialTitle) ?: 0xFFFFFFFF.toInt()),
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Normal,
                         maxLines = 1,
@@ -271,7 +272,7 @@ fun BaseInfoCompose(
                         modifier = Modifier
                             .wrapContentWidth()
                             .background(
-                                color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorSpecialBg) ?: 0xFFDDDDDD.toInt()),
+                                color = Color(ImageUtils.parseColor(baseInfo.colorSpecialBg) ?: 0xFFDDDDDD.toInt()),
                                 shape = RoundedCornerShape(4.dp)
                             )
                             .padding(horizontal = 6.dp, vertical = 2.dp)
@@ -305,7 +306,7 @@ fun BaseInfoCompose(
                 baseInfo.content?.let {
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                         fontSize = 12.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -320,7 +321,7 @@ fun BaseInfoCompose(
                     }
                     Text(
                         text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                        color = Color(SuperIslandImageUtil.parseColor(baseInfo.colorSubContent) ?: 0xFFDDDDDD.toInt()),
+                        color = Color(ImageUtils.parseColor(baseInfo.colorSubContent) ?: 0xFFDDDDDD.toInt()),
                         fontSize = 12.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,

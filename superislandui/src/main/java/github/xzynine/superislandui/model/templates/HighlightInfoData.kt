@@ -1,7 +1,7 @@
 package github.xzynine.superislandui.model.templates
 
-import github.xzynine.superislandui.model.componets.TimerInfo
-import github.xzynine.superislandui.model.componets.parseTimerInfo
+import github.xzynine.superislandui.model.components.TimerInfo
+import github.xzynine.superislandui.model.components.parseTimerInfo
 import org.json.JSONObject
 
 // 高亮信息模板：强调图文组件，强调显示数据或内容

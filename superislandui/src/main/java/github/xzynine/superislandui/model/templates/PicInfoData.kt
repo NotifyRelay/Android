@@ -1,7 +1,7 @@
 package github.xzynine.superislandui.model.templates
 
-import github.xzynine.superislandui.model.componets.ActionInfo
-import github.xzynine.superislandui.model.componets.parseActionInfo
+import github.xzynine.superislandui.model.components.ActionInfo
+import github.xzynine.superislandui.model.components.parseActionInfo
 import org.json.JSONObject
 
 // 图片信息模板：识别图形组件，显示应用图标或自定义图片

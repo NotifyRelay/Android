@@ -9,8 +9,8 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
+import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStore
+import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -96,8 +96,8 @@ class SuperIslandHistoryViewModel(
         }
     }
 
-    suspend fun loadEntryDetail(id: Long): SuperIslandHistoryEntry? {
-        return SuperIslandHistory.loadEntryDetail(application, id)
+    suspend fun loadEntryDetail(id: Long): SuperIslandHistoryStoreEntry? {
+        return SuperIslandHistoryStore.loadEntryDetail(application, id)
     }
 
     fun preloadAppIcons(packageNames: List<String>) {

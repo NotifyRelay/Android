@@ -28,7 +28,7 @@
     <!-- Android 14+ 特殊前台服务权限声明 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
-    <!-- Android 14+ 数据同步前台服务权限声明（解决 FGS type dataSync 崩溃） -->
+    <!-- Android 14+ 数据同步前台服务权限声明（解决 FGS type dataSync 崩溃问题）-->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <!-- 文件管理权限 -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ProtectedPermissions" />
@@ -67,7 +67,7 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
-        <!-- 注册通知点击广播接收器 -->
+        <!-- 注册通知点击广播接收�?-->
         <receiver
             android:name=".feature.device.receiver.RemoteNotificationClickReceiver"
             android:exported="false" />
@@ -92,7 +92,7 @@
             </intent-filter>
         </receiver>
         
-        <!-- 剪贴板监控服务 -->
+        <!-- 剪贴板监控服�?-->
         <service
             android:name=".servers.ClipboardMonitorService"
             android:exported="false"
@@ -117,7 +117,7 @@
             
         <!-- 剪贴板无障碍服务 -->
         <service
-            android:name=".servers.ClipboardAccessiblityService"
+            android:name=".servers.ClipboardAccessibilityService"
             android:label="NotifyRelay 设备互联"
             android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
             android:exported="false">

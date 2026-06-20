@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.floating.BigIsland.components
+﻿package github.xzynine.superislandui.floating.BigIsland.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -7,8 +7,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.xzynine.superislandui.model.componets.ProgressInfo
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.model.components.ProgressInfo
+import notifyrelay.core.util.image.ImageUtils
 import github.xzynine.superislandui.common.PreviewData
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
@@ -22,7 +22,7 @@ fun ProgressCompose(
     picMap: Map<String, String>?
 ) {
     // 与传统View保持一致，只设置进度条颜色，不设置轨道颜色
-    val progressColor = Color(SuperIslandImageUtil.parseColor(progressInfo.colorProgress) ?: 0xFF00FF00.toInt())
+    val progressColor = Color(ImageUtils.parseColor(progressInfo.colorProgress) ?: 0xFF00FF00.toInt())
     
     LinearProgressIndicator(
         progress = progressInfo.progress.toFloat() / 100f,

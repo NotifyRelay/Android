@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.lifecyle
+package com.xzyht.notifyrelay.feature.notification.superisland.lifecycle
 
 import android.app.NotificationChannel
 import android.app.NotificationManager
@@ -14,9 +14,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.toColorInt
 import androidx.core.text.HtmlCompat
-import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import notifyrelay.core.util.image.ImageUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.FormattedSuperIslandData
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import github.xzynine.superislandui.model.core.ParamV2
@@ -25,98 +24,35 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
 
 object LiveUpdatesNotificationManager {
-    private const val TAG = "超级岛-进度类型"
+    private const val TAG = "超级岛进度类型"
     const val CHANNEL_ID = "live_updates_channel"
     private const val CHANNEL_NAME = "超级岛Live Updates"
     private const val NOTIFICATION_BASE_ID = 10000
     private const val ICON_CACHE_SIZE = 10 // 最大缓存10个图标
-    private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
-    // 规范信息注入模式键
-    private const val SPEC_INJECTION_MODE_KEY = "spec_injection_mode"
-    
-    // 注入方式枚举
-    enum class SpecInjectionMode {
-        SUPER_ISLAND,      // 仅超级岛规范信息注入
-        LIVE_UPDATES,      // 仅Live Updates规范信息注入
-        BOTH,              // 两者都注入
-        NONE               // 都不注入（不应该使用，但为了完整性保留）
-    }
     
     /**
-     * 检查浮窗功能是否开启
-     */
-    private fun isFloatingWindowEnabled(context: Context): Boolean {
-        return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, FloatingReplicaManager.getDefaultFloatingWindowEnabled())
-    }
-
-    /**
-     * 获取规范信息注入模式
-     */
-    private fun getSpecInjectionMode(context: Context): SpecInjectionMode {
-        val modeOrdinal = StorageManager.getInt(context, SPEC_INJECTION_MODE_KEY, SpecInjectionMode.BOTH.ordinal)
-        return SpecInjectionMode.entries.toTypedArray().getOrElse(modeOrdinal) { SpecInjectionMode.BOTH }
-    }
-
-    /**
-     * 检查超级岛规范信息注入是否开启
-     */
-    private fun isSuperIslandSpecInjectionEnabled(context: Context): Boolean {
-        val mode = getSpecInjectionMode(context)
-        return mode == SpecInjectionMode.SUPER_ISLAND || mode == SpecInjectionMode.BOTH
-    }
-
-    /**
-     * 检查Live Updates规范信息注入是否开启
-     */
-    private fun isLiveUpdatesSpecInjectionEnabled(context: Context): Boolean {
-        val mode = getSpecInjectionMode(context)
-        return mode == SpecInjectionMode.LIVE_UPDATES || mode == SpecInjectionMode.BOTH
-    }
-
-    /**
-     * 检查是否至少有一种规范信息注入开启
-     * @return true 如果至少有一种注入开启，false 如果都关闭
-     */
-    private fun isAnySpecInjectionEnabled(context: Context): Boolean {
-        return isSuperIslandSpecInjectionEnabled(context) || isLiveUpdatesSpecInjectionEnabled(context)
-    }
-
-    /**
-     * 验证规范信息注入开关状态，确保至少有一种开启
-     * 如果都关闭，则默认开启两者都注入
-     */
-    private fun validateSpecInjectionSwitches(context: Context) {
-        if (!isAnySpecInjectionEnabled(context)) {
-            // 如果都关闭，默认开启两者都注入
-            StorageManager.putInt(context, SPEC_INJECTION_MODE_KEY, SpecInjectionMode.BOTH.ordinal)
-            Logger.w(TAG, "规范信息注入模式无效，已默认设置为两者都注入")
-        }
-    }
-    
-    /**
-     * 耦合逻辑说明：
-     * 1. 浮窗功能与通知点击事件的耦合：
+     * 耦合逻辑说明
+     * 1. 浮窗功能与通知点击事件的耦合
      *    - 当浮窗功能开启时，为通知设置点击意图和删除意图
-     *    - 点击意图的 action 为 com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING
-     *    - 删除意图的 action 为 com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION
+     *    - 点击意图.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING
+     *    - 删除意图.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION
      *    - 这些意图会触发 NotificationBroadcastReceiver 中的相应处理逻辑
      * 
-     * 2. 通知与浮窗的去耦合：
+     * 2. 通知与浮窗的去耦合
      *    - 通过 SUPER_ISLAND_FLOATING_WINDOW_KEY 开关控制浮窗功能
-     *    - 浮窗功能关闭时，不设置与浮窗关联的通知点击和关闭广播/意图
+     *    - 浮窗功能关闭时，不设置与浮窗关联的通知点击和关闭意图
      *    - 浮窗功能关闭时，仅创建基础通知，不添加与浮窗相关的功能
      */
 
     private lateinit var notificationManager: NotificationManager
     private lateinit var appContext: Context
 
-    // 图标缓存，避免重复加载
+    // 图标缓存，避免重复加载图标
     private val iconCache = object : LruCache<String, Bitmap>(ICON_CACHE_SIZE) {
         override fun sizeOf(key: String, value: Bitmap): Int {
-            // 返回1，表示每个图标计数为1，这样maxSize就表示图标数量
+            // 返回1，表示每个图标计数为1，这样maxSize就表示图标数
             return 1
         }
     }
@@ -153,7 +89,7 @@ object LiveUpdatesNotificationManager {
         }
 
         // 验证规范信息注入开关状态，确保至少有一种开启
-        validateSpecInjectionSwitches(appContext)
+        SuperIslandConfigUtils.validateSpecInjectionSwitches(appContext)
 
         // 检查是否可以使用Live Updates，但即使不可用也继续尝试发送通知
         if (!canUseLiveUpdates()) {
@@ -167,19 +103,19 @@ object LiveUpdatesNotificationManager {
 
             // 调试picMap内容
             if (formattedData.resolvedPicMap.isNotEmpty()) {
-                Logger.d(TAG, "收到picMap，包含 ${formattedData.resolvedPicMap.size} 个图标资源: ${formattedData.resolvedPicMap.keys}")
+                Logger.d(TAG, "收到picMap，包含 ${formattedData.resolvedPicMap.size} 个图标资源 ${formattedData.resolvedPicMap.keys}")
             } else {
                 Logger.d(TAG, "picMap为空或null")
             }
 
             // 仅处理进度类型通知
             if (!SuperIslandDataFormatter.isProgressType(paramV2)) {
-                Logger.i(TAG, "非进度类型通知，跳过处理: $sourceId")
+                Logger.i(TAG, "非进度类型通知，跳过处理 $sourceId")
                 return
             }
 
             // 检查浮窗功能是否开启
-            val floatingWindowEnabled = isFloatingWindowEnabled(appContext)
+            val floatingWindowEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(appContext)
             
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
             val deleteIntent = if (floatingWindowEnabled) {
@@ -195,7 +131,7 @@ object LiveUpdatesNotificationManager {
                 null
             }
 
-            // 创建点击意图，用于处理用户点击通知时切换浮窗显示/隐藏
+            // 创建点击意图，用于处理用户点击通知时切换浮窗显示隐藏
             val contentIntent = if (floatingWindowEnabled) {
                 PendingIntent.getBroadcast(
                     appContext,
@@ -253,7 +189,7 @@ object LiveUpdatesNotificationManager {
                 }
             }
 
-            // 直接设置状态栏关键文本，不再使用反射
+            // 直接设置状态栏关键文本，不再使用反解析后的标题和内容
             // 使用处理后的标题和内容
             val processedTitle = paramV2?.baseInfo?.title?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
             val processedContent = paramV2?.baseInfo?.content?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
@@ -285,7 +221,8 @@ object LiveUpdatesNotificationManager {
                 }
             }
 
-            // 构建最终通知 - 仅处理进度类型
+            // 构建最终通知 - 仅处理进度类通知
+            // 其他类型的通知（如聊天、系统等）将直接使用基础通知
             val finalBuilder =
                 paramV2?.let { buildProgressStyleNotification(notificationBuilder, it, formattedData.resolvedPicMap) }
 
@@ -305,7 +242,7 @@ object LiveUpdatesNotificationManager {
                     }
                 }
             } catch (e: Exception) {
-                Logger.w(TAG, "检查通知可提升特性失败: ${e.message}")
+                Logger.w(TAG, "检查通知可提升特性失败 ${e.message}")
             }
 
             // 发送通知
@@ -329,7 +266,7 @@ object LiveUpdatesNotificationManager {
         paramV2: ParamV2?,
         picMap: Map<String, String>?
     ) {
-        // 只在有图标资源时才异步加载
+        // 只在有图标资源时才异步加载图标
         if (picMap.isNullOrEmpty() || paramV2 == null) return
 
         // 异步加载图标
@@ -361,7 +298,7 @@ object LiveUpdatesNotificationManager {
             return
         }
 
-        // 获取当前进度值
+        // 获取当前进度�?
         val currentProgress = progressInfo?.progress ?: multiProgressInfo?.progress ?: 0
 
         // 调试日志：打印picMap内容，确认图标资源是否存在
@@ -403,9 +340,9 @@ object LiveUpdatesNotificationManager {
         paramV2.picInfo?.pic?.let { picKey ->
             val appIconUrl = picMap[picKey]
             if (appIconUrl != null) {
-                val bitmap = SuperIslandImageUtil.loadBitmapSuspend(
+                val bitmap = ImageUtils.loadBitmap(
                     context = appContext,
-                    urlOrData = appIconUrl,
+                    uri = appIconUrl,
                     timeoutMs = 5000
                 )
 
@@ -427,9 +364,9 @@ object LiveUpdatesNotificationManager {
                 if (iconUrl != null) {
                     Logger.d(TAG, "加载前进图标URL: $iconUrl")
 
-                    val bitmap = SuperIslandImageUtil.loadBitmapSuspend(
+                    val bitmap = ImageUtils.loadBitmap(
                         context = appContext,
-                        urlOrData = iconUrl,
+                        uri = iconUrl,
                         timeoutMs = 5000
                     )
 
@@ -443,7 +380,7 @@ object LiveUpdatesNotificationManager {
                     }
                 }
             } ?: run {
-                Logger.w(TAG, "未找到有效的前进图标键")
+                Logger.w(TAG, "未找到有效的前进图标")
             }
         }
 
@@ -510,7 +447,7 @@ object LiveUpdatesNotificationManager {
             updatedBuilder.setShortCriticalText(shortText)
 
             // 检查浮窗功能是否开启
-            val floatingWindowEnabled = isFloatingWindowEnabled(appContext)
+            val floatingWindowEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(appContext)
             
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
             val deleteIntent = if (floatingWindowEnabled) {
@@ -526,7 +463,7 @@ object LiveUpdatesNotificationManager {
                 null
             }
 
-            // 创建点击意图，用于处理用户点击通知时切换浮窗显示/隐藏
+            // 创建点击意图，用于处理用户点击通知时切换浮窗显示隐藏
             val contentIntent = if (floatingWindowEnabled) {
                 PendingIntent.getBroadcast(
                     appContext,
@@ -614,7 +551,7 @@ object LiveUpdatesNotificationManager {
                 Logger.d(TAG, "处理后标题: $processedTitle")
                 Logger.d(TAG, "处理后内容: $processedContent")
 
-                // 参考 NotificationGenerator.kt 的逻辑设置文本
+                // 参�?NotificationGenerator.kt 的逻辑设置文本
                 builder
                     .setContentTitle(processedTitle)
                     .setContentText(processedContent)
@@ -624,7 +561,7 @@ object LiveUpdatesNotificationManager {
             val progressColor = progressInfo?.colorProgress ?: multiProgressInfo?.color
             val progressEndColor = progressInfo?.colorProgressEnd ?: multiProgressInfo?.color
 
-            // 解析颜色值
+            // 解析颜色配置
             val pointColor = progressColor?.toColorInt() ?: Color.BLUE
             val segmentColor = progressEndColor?.toColorInt() ?: Color.CYAN
 
@@ -635,11 +572,11 @@ object LiveUpdatesNotificationManager {
             var progressPointsCount = 0
             var progressSegmentsCount = 0
 
-            // 只有当 multiProgressInfo 存在时才生成节点和分段
+            // 只有multiProgressInfo 存在时才生成节点和分段
             if (multiProgressInfo != null) {
                 // 根据 multiProgressInfo.points 生成进度点和分段
                 val nodeCount = multiProgressInfo.points ?: 4
-                val validNodeCount = maxOf(2, nodeCount) // 最少需要2个节点来创建分段
+                val validNodeCount = maxOf(2, nodeCount) // 最少需2个节点来创建分段
                 val segmentCount = validNodeCount - 1
                 val segmentSize = 100 / segmentCount
 
@@ -668,7 +605,7 @@ object LiveUpdatesNotificationManager {
                 progressPointsCount = progressPoints.size
                 progressSegmentsCount = progressSegments.size
 
-                Logger.d(TAG, "为 multiProgressInfo 生成了 $progressPointsCount 个节点，分别在位置: $nodePositions")
+                Logger.d(TAG, "multiProgressInfo 生成 $progressPointsCount 个节点，分别在位置 $nodePositions")
             }
 
             // 尝试直接设置进度跟踪器图标，避免闪烁
@@ -708,7 +645,7 @@ object LiveUpdatesNotificationManager {
             // 最后设置进度，按照官方示例顺序
             progressStyle.setProgress(currentProgress)
 
-            Logger.d(TAG, "设置了 ${progressPointsCount} 个进度点和 ${progressSegmentsCount} 个进度段，与官方示例保持一致")
+            Logger.d(TAG, "设置 ${progressPointsCount} 个进度点 ${progressSegmentsCount} 个进度段，与官方示例保持一致")
 
             // 直接调用builder.setStyle方法，符合官方示例的API使用
             return builder.setStyle(progressStyle)
@@ -755,14 +692,14 @@ object LiveUpdatesNotificationManager {
         val progressColor = progressInfo?.colorProgress ?: multiProgressInfo?.color
         val progressEndColor = progressInfo?.colorProgressEnd ?: multiProgressInfo?.color
 
-        // 解析颜色值
+        // 解析颜色配置
         val pointColor = progressColor?.toColorInt() ?: Color.BLUE
         val segmentColor = progressEndColor?.toColorInt() ?: Color.CYAN
 
         // 直接创建ProgressStyle实例
         val progressStyle = NotificationCompat.ProgressStyle()
 
-        // 只有当 multiProgressInfo 存在时才生成节点和分段
+        // 只有 multiProgressInfo 存在时才生成节点和分段
         if (multiProgressInfo != null) {
             // 根据 multiProgressInfo.points 生成进度点和分段
             val nodeCount = multiProgressInfo.points ?: 4
@@ -774,7 +711,7 @@ object LiveUpdatesNotificationManager {
             val progressPoints = mutableListOf<NotificationCompat.ProgressStyle.Point>()
             for (i in 0 until validNodeCount) {
                 var position = (i * 100) / (validNodeCount - 1)
-                // 调整位置，避免使用0和100，因为原生通知可能不支持
+                // 调整位置，避免使用0和100%，因为原生通知可能不支持这两个值
                 if (position == 0) {
                     position = 5 // 使用5%代替0%
                 } else if (position == 100) {
@@ -801,10 +738,10 @@ object LiveUpdatesNotificationManager {
         val builder = NotificationCompat.Builder(appContext, CHANNEL_ID)
             .setOngoing(true)
             .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            // 添加Live Updates所需的属性，参照参考实现
+            // 添加Live Updates所需的属性，参照参考文档
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            // 直接调用setRequestPromotedOngoing，不再使用反射
+            // 直接调用setRequestPromotedOngoing，不再使用回调
             .setRequestPromotedOngoing(true)
 
         return builder
@@ -865,7 +802,7 @@ object LiveUpdatesNotificationManager {
             Logger.i(TAG, "canUseLiveUpdates: canPostPromotedNotifications返回 $result")
             return result
         } catch (e: NoSuchMethodException) {
-            Logger.w(TAG, "canUseLiveUpdates: 未找到canPostPromotedNotifications方法 - 设备可能不支持")
+            Logger.w(TAG, "canUseLiveUpdates: 未找到canPostPromotedNotifications方法 - 设备可能不支持Live Updates")
             // 方法不存在，可能设备不支持，返回false
             return false
         } catch (e: SecurityException) {
@@ -903,7 +840,7 @@ object LiveUpdatesNotificationManager {
             picMap = picMap,
             title = paramV2?.baseInfo?.title,
             text = paramV2?.baseInfo?.content,
-            isSuperIslandSpecInjectionEnabled = isSuperIslandSpecInjectionEnabled(appContext)
+            isSuperIslandSpecInjectionEnabled = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(appContext)
         )
     }
 }
