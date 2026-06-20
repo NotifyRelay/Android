@@ -207,8 +207,11 @@ fun UISuperIslandSettings() {
                     DEFAULT_MIRROR_PACKAGES.forEach { pkg ->
                         val isInstalled = installedPkgs.contains(pkg)
                         var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-                        val currentDisabledDefaults = StorageManager.getString(context, "super_island_mirror_filter_disabled_defaults", "")
-                        val isEnabled = !currentDisabledDefaults.split(",").contains(pkg)
+                        var disabledDefaultsPkgs by remember { mutableStateOf(
+                            StorageManager.getString(context, "super_island_mirror_filter_disabled_defaults", "")
+                                .split(",").filter { it.isNotBlank() }.toSet()
+                        ) }
+                        val isEnabled = !disabledDefaultsPkgs.contains(pkg)
 
                         LaunchedEffect(pkg) {
                             if (iconBitmap == null) {
@@ -240,7 +243,9 @@ fun UISuperIslandSettings() {
                                     val current = StorageManager.getString(context, "super_island_mirror_filter_disabled_defaults", "")
                                     val disabledSet = current.split(",").filter { it.isNotBlank() }.toMutableSet()
                                     if (v) disabledSet.remove(pkg) else disabledSet.add(pkg)
-                                    StorageManager.putString(context, "super_island_mirror_filter_disabled_defaults", disabledSet.joinToString(","))
+                                    val newValue = disabledSet.joinToString(",")
+                                    StorageManager.putString(context, "super_island_mirror_filter_disabled_defaults", newValue)
+                                    disabledDefaultsPkgs = disabledSet
                                 }
                             )
                         }
