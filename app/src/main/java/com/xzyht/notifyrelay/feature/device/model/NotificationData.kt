@@ -8,8 +8,10 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecordDto
 import notifyrelay.base.util.Logger
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import notifyrelay.data.database.repository.DatabaseRepository
 
 class NotificationRecordStore(private val context: Context) {
@@ -42,16 +44,16 @@ class NotificationRecordStore(private val context: Context) {
         )
     }
     
-    internal fun readAll(device: String): MutableList<NotificationRecordDto> {
+    internal suspend fun readAll(device: String): MutableList<NotificationRecordDto> {
         val deviceUuid = if (device == "local") "本机" else device
-        return runBlocking {
+        return withContext(Dispatchers.IO) {
             repository.getNotificationsByDevice(deviceUuid)
         }.map { convertFromRoomEntity(it) }.toMutableList()
     }
 
-    internal fun writeAll(list: List<NotificationRecordDto>, device: String) {
+    internal suspend fun writeAll(list: List<NotificationRecordDto>, device: String) {
         val deviceUuid = if (device == "local") "本机" else device
-        runBlocking {
+        withContext(Dispatchers.IO) {
             val roomEntities = list.map { convertToRoomEntity(it, deviceUuid) }
             repository.saveNotifications(roomEntities)
         }
@@ -166,8 +168,8 @@ object NotificationRepository {
                 time = time,
                 device = fileKey
             ))
-            // writeAll是同步的，不需要runBlocking
-            store.writeAll(oldList, fileKey)
+            // writeAll是suspend函数，需要runBlocking
+            runBlocking { store.writeAll(oldList, fileKey) }
             Logger.i("秩序之光 狂鼠 NotifyRelay", "写入远端历史 device=$device, size=${oldList.size}")
             
             // 限制每个包名的通知数量为80
@@ -465,8 +467,8 @@ object NotificationRepository {
                 )
             }
             val fileKey = if (currentDevice == "本机") "local" else currentDevice
-            // 移除不必要的runBlocking，writeAll已经是同步的
-            store.writeAll(entities, fileKey)
+            // writeAll是suspend函数，需要runBlocking
+            runBlocking { store.writeAll(entities, fileKey) }
             Logger.i("回声 NotifyRelay", "写入本地历史 device=$currentDevice, fileKey=$fileKey, size=${entities.size}")
             scanDeviceList(context)
         } catch (e: Exception) {
