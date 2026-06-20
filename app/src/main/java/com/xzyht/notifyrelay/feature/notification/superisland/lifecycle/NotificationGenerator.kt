@@ -360,7 +360,7 @@ object NotificationGenerator {
                         val coverUrl = picMap[coverKey]
                         if (!coverUrl.isNullOrBlank()) {
                             // 同步下载专辑图
-                            val bitmap = downloadBitmap(context, coverUrl, 5000)
+                            val bitmap = downloadBitmap(context, coverUrl)
                             if (bitmap != null) {
                                 injectSmallIcon(notification, bitmap)
                             }
@@ -407,7 +407,7 @@ object NotificationGenerator {
                             val appIconUrl = picMap[appIconKey]
                             if (!appIconUrl.isNullOrBlank()) {
                                 // 异步下载应用图标
-                                val bitmap = downloadBitmap(context, appIconUrl, 5000)
+                                val bitmap = downloadBitmap(context, appIconUrl)
                                 if (bitmap != null) {
                                     smallIconBitmap = bitmap
                                 }
@@ -581,7 +581,7 @@ object NotificationGenerator {
                         val picUrl = picMap[picKeyToUse]
                         if (!picUrl.isNullOrBlank()) {
                             // 异步下载图标
-                            val bitmap = downloadBitmap(context, picUrl, 5000)
+                            val bitmap = downloadBitmap(context, picUrl)
                             if (bitmap != null) {
                                 smallIconBitmap = bitmap
                             }
@@ -595,7 +595,7 @@ object NotificationGenerator {
                             val appIconUrl = picMap[appIconKey]
                             if (!appIconUrl.isNullOrBlank()) {
                                 // 同步下载应用图标
-                                val bitmap = downloadBitmap(context, appIconUrl, 5000)
+                                val bitmap = downloadBitmap(context, appIconUrl)
                                 if (bitmap != null) {
                                     smallIconBitmap = bitmap
                                 }
@@ -810,7 +810,7 @@ object NotificationGenerator {
             if (!picUrl.isNullOrBlank()) {
                 // 异步下载图标
                 Logger.d(TAG, "超级岛 使用 A 区图标或B区图标作为小图标")
-                val bitmap = downloadBitmap(context, picUrl, 5000)
+                val bitmap = downloadBitmap(context, picUrl)
                 if (bitmap != null) {
                     Logger.d(TAG, "超级岛 A 区图标或B区图标加载成功")
                     return bitmap
@@ -828,7 +828,7 @@ object NotificationGenerator {
             if (!appIconUrl.isNullOrBlank()) {
                 // 异步下载应用图标
                 Logger.d(TAG, "超级岛 使用应用图标作为小图标")
-                val bitmap = downloadBitmap(context, appIconUrl, 5000)
+                val bitmap = downloadBitmap(context, appIconUrl)
                 if (bitmap != null) {
                     Logger.d(TAG, "超级岛 应用图标加载成功")
                     return bitmap
@@ -890,9 +890,9 @@ object NotificationGenerator {
     /**
      * 下载位图
      */
-    private suspend fun downloadBitmap(context: Context, url: String, timeoutMs: Int): Bitmap? {
+    private suspend fun downloadBitmap(context: Context, url: String): Bitmap? {
         return try {
-            ImageUtils.loadBitmap(context, url, timeoutMs)
+            ImageUtils.loadBitmap(context, url)
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛 下载图片失败: ${e.message}")
             null
@@ -912,7 +912,7 @@ object NotificationGenerator {
         if (picMap.isNullOrEmpty() || !picMap.containsKey(coverKey)) return null
         val coverUrl = picMap[coverKey] ?: return null
         if (coverUrl.isBlank()) return null
-        return downloadBitmap(context, coverUrl, 5000)
+        return downloadBitmap(context, coverUrl)
     }
 
     /**

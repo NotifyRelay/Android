@@ -336,8 +336,7 @@ object LiveUpdatesNotificationManager {
             if (appIconUrl != null) {
                 val bitmap = ImageUtils.loadBitmap(
                     context = appContext,
-                    uri = appIconUrl,
-                    timeoutMs = 5000
+                    uri = appIconUrl
                 )
 
                 if (bitmap != null) {
@@ -360,8 +359,7 @@ object LiveUpdatesNotificationManager {
 
                     val bitmap = ImageUtils.loadBitmap(
                         context = appContext,
-                        uri = iconUrl,
-                        timeoutMs = 5000
+                        uri = iconUrl
                     )
 
                     if (bitmap != null) {

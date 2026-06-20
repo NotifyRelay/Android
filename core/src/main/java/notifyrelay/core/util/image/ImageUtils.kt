@@ -98,7 +98,7 @@ object ImageUtils {
 
     // ==================== 统一图片加载 ====================
 
-    suspend fun loadBitmap(context: Context, uri: Any, timeoutMs: Int = 5000): Bitmap? {
+    suspend fun loadBitmap(context: Context, uri: Any): Bitmap? {
         if (uri is String && uri.trim().startsWith(DATA_PREFIX, ignoreCase = true)) {
             return decodeDataUrlToBitmap(context, uri)
         }
@@ -108,7 +108,6 @@ object ImageUtils {
                 val request = ImageRequest.Builder(context)
                     .data(uri)
                     .allowHardware(false)
-                    .timeoutMs(timeoutMs)
                     .build()
                 val result = loader.execute(request)
                 if (result is SuccessResult) {
