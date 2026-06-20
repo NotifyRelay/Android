@@ -45,7 +45,7 @@ object CapsuleScrollManager {
     /**
      * 计算字符的视觉权重（CJK=2，西文=1）
      */
-    private fun charWeight(c: Char): Int {
+    fun charWeight(c: Char): Int {
         return when (Character.UnicodeBlock.of(c)) {
             Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS,
             Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A,

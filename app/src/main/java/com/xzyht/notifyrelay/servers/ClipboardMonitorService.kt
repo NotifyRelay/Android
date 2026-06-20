@@ -6,7 +6,7 @@ import android.content.Intent
 import android.os.IBinder
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.ui.ClipboardSyncActivity
+import com.xzyht.notifyrelay.ui.activity.ClipboardSyncActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import notifyrelay.base.util.Logger

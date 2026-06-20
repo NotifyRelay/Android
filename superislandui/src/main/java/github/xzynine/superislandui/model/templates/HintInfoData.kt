@@ -1,9 +1,9 @@
 package github.xzynine.superislandui.model.templates
 
-import github.xzynine.superislandui.model.componets.ActionInfo
-import github.xzynine.superislandui.model.componets.TimerInfo
-import github.xzynine.superislandui.model.componets.parseActionInfo
-import github.xzynine.superislandui.model.componets.parseTimerInfo
+import github.xzynine.superislandui.model.components.ActionInfo
+import github.xzynine.superislandui.model.components.TimerInfo
+import github.xzynine.superislandui.model.components.parseActionInfo
+import github.xzynine.superislandui.model.components.parseTimerInfo
 import org.json.JSONObject
 
 // 提示信息模板：按钮组件2和3，包含文本和按钮

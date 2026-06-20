@@ -1,6 +1,7 @@
 package github.xzynine.superislandui.floating.SmallIsland.right
 
-import github.xzynine.superislandui.model.componets.TimerInfo
+import github.xzynine.superislandui.model.components.TimerInfo
+import github.xzynine.superislandui.floating.common.formatTimerInfo
 
 /**
  * B区（右侧 imageTextInfoRight + 其它文本/图片/进度组件）模型。
@@ -127,3 +128,75 @@ data class BPicInfo(
 
 // 空
 object BEmpty : BComponent { override val kind: String = "empty" }
+
+// --- 扩展属性（可空接收者），消除外部重复的 when 表达式 ---
+val BComponent?.bPicKey: String?
+    get() = when (this) {
+        is BImageText2 -> picKey
+        is BImageText3 -> picKey
+        is BImageText6 -> picKey
+        is BProgressTextInfo -> picKey
+        is BPicInfo -> picKey
+        else -> null
+    }
+
+val BComponent?.bTitle: String?
+    get() = when (this) {
+        is BImageText2 -> title
+        is BImageText3 -> title
+        is BImageText6 -> title
+        is BTextInfo -> title
+        is BFixedWidthDigitInfo -> digit
+        is BSameWidthDigitInfo -> if (timer != null) formatTimerInfo(timer) else digit
+        is BProgressTextInfo -> title
+        else -> null
+    }
+
+val BComponent?.bContent: String?
+    get() = when (this) {
+        is BImageText2 -> content
+        is BTextInfo -> content
+        is BFixedWidthDigitInfo -> content
+        is BSameWidthDigitInfo -> if (timer != null) formatTimerInfo(timer) else content
+        is BProgressTextInfo -> content
+        else -> null
+    }
+
+val BComponent?.textToRender: String?
+    get() = when (this) {
+        is BImageText2 -> title
+        is BImageText3 -> title
+        is BImageText6 -> title
+        is BTextInfo -> title
+        is BFixedWidthDigitInfo -> digit
+        is BSameWidthDigitInfo -> digit
+        is BProgressTextInfo -> title ?: content
+        else -> null
+    }
+
+val BComponent?.bProgress: Int?
+    get() = when (this) {
+        is BProgressTextInfo -> progress
+        else -> null
+    }
+
+val BComponent?.bProgressColorReach: String?
+    get() = when (this) {
+        is BProgressTextInfo -> colorReach
+        else -> null
+    }
+
+val BComponent?.bProgressColorUnReach: String?
+    get() = when (this) {
+        is BProgressTextInfo -> colorUnReach
+        else -> null
+    }
+
+val BComponent?.bProgressIsCCW: Boolean
+    get() = when (this) {
+        is BProgressTextInfo -> isCCW
+        else -> false
+    }
+
+val BComponent?.isTimerType: Boolean
+    get() = this is BSameWidthDigitInfo && timer != null

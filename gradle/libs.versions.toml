@@ -1,5 +1,5 @@
 [versions]
-agp = "9.1.0"
+agp = "9.2.1"
 kotlin = "2.3.20"
 ksp = "2.3.6"
 coreKtx = "1.18.0"
@@ -45,6 +45,7 @@ semver = "3.0.0"
 paging = "3.4.2"
 activityCompose = "1.13.0"
 reorderable = "3.0.0"
+timber = "5.0.1"
 
 
 [libraries]
@@ -101,6 +102,8 @@ androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
+timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycle" }
 
 
 

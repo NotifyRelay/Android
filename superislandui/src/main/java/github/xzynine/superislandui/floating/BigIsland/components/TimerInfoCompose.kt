@@ -12,7 +12,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.model.componets.TimerInfo
+import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.common.PreviewData
 import kotlinx.coroutines.delay

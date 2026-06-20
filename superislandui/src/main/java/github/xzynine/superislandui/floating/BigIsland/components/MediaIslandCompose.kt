@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoFitText
 import github.xzynine.superislandui.common.AutoScrollText
-import github.xzynine.superislandui.model.componets.MediaSessionData
+import github.xzynine.superislandui.model.components.MediaSessionData
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.common.PreviewData
 import top.yukonga.miuix.kmp.theme.MiuixTheme

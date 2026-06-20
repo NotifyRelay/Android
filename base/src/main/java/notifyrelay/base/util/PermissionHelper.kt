@@ -11,9 +11,10 @@ import android.provider.Settings
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
-import notifyrelay.base.util.Logger
-import notifyrelay.base.util.ToastUtils
-import notifyrelay.base.util.IntentUtils
+import androidx.lifecycle.DefaultLifecycleObserver
+import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ProcessLifecycleOwner
+
 
 /**
  * 权限辅助工具类
@@ -160,8 +161,21 @@ object PermissionHelper {
      */
     fun isUsageStatsEnabled(context: Context): Boolean {
         val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
-        val mode = appOps.unsafeCheckOpNoThrow("android:get_usage_stats", android.os.Process.myUid(), context.packageName)
-        return mode == android.app.AppOpsManager.MODE_ALLOWED
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            @Suppress("DEPRECATION")
+            appOps.unsafeCheckOpNoThrow(
+                android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
+                android.os.Process.myUid(),
+                context.packageName
+            ) == android.app.AppOpsManager.MODE_ALLOWED
+        } else {
+            @Suppress("DEPRECATION")
+            appOps.unsafeCheckOpNoThrow(
+                "android:get_usage_stats",
+                android.os.Process.myUid(),
+                context.packageName
+            ) == android.app.AppOpsManager.MODE_ALLOWED
+        }
     }
 
     /**
@@ -291,7 +305,7 @@ object PermissionHelper {
         return try {
             // 直接搜索包含 "OS" 开头的版本部分
             // 例如：OS3.0.300.4.WNACNXM
-            val osPattern = Regex("OS\\d+(\\.\\d+)*[\\w\\.]*")
+            val osPattern = Regex("OS\\d+(\\.\\d+)*[\\w.]*")
             val matchResult = osPattern.find(fingerprint)
             
             if (matchResult != null) {
@@ -403,66 +417,47 @@ object PermissionHelper {
     fun isAppInForeground(context: Context): Boolean {
         return AppForegroundDetector.isForeground()
     }
-    
     /**
      * 应用前后台检测器
-     * 使用 ActivityLifecycleCallbacks 计数法，实时准确，无需权限
      */
     object AppForegroundDetector {
-        private var activityStartCount = 0
+        @Volatile
         private var isForeground = false
         private var isInitialized = false
-        private val listeners = mutableListOf<(Boolean) -> Unit>()
-        
+        private val listeners = java.util.concurrent.CopyOnWriteArrayList<(Boolean) -> Unit>()
+
         @Synchronized
         fun initialize(context: Context) {
             if (isInitialized) return
             isInitialized = true
-            
+
             try {
-                val application = context.applicationContext as? android.app.Application
-                application?.registerActivityLifecycleCallbacks(object : android.app.Application.ActivityLifecycleCallbacks {
-                    override fun onActivityCreated(activity: android.app.Activity, savedInstanceState: android.os.Bundle?) {}
-                    override fun onActivityStarted(activity: android.app.Activity) {
-                        if (activityStartCount == 0) {
-                            // 从后台进入前台
-                            isForeground = true
-                            notifyListeners(true)
-                        }
-                        activityStartCount++
+                ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
+                    override fun onStart(owner: LifecycleOwner) {
+                        isForeground = true
+                        notifyListeners(true)
                     }
-                    
-                    override fun onActivityResumed(activity: android.app.Activity) {}
-                    override fun onActivityPaused(activity: android.app.Activity) {}
-                    override fun onActivityStopped(activity: android.app.Activity) {
-                        activityStartCount--
-                        if (activityStartCount == 0) {
-                            // 进入后台
-                            isForeground = false
-                            notifyListeners(false)
-                        }
+
+                    override fun onStop(owner: LifecycleOwner) {
+                        isForeground = false
+                        notifyListeners(false)
                     }
-                    
-                    override fun onActivitySaveInstanceState(activity: android.app.Activity, outState: android.os.Bundle) {}
-                    override fun onActivityDestroyed(activity: android.app.Activity) {}
                 })
             } catch (e: Exception) {
                 Logger.e("AppForegroundDetector", "初始化失败", e)
             }
         }
-        
-        fun isForeground(): Boolean {
-            return isForeground
-        }
-        
+
+        fun isForeground(): Boolean = isForeground
+
         fun addListener(listener: (Boolean) -> Unit) {
             listeners.add(listener)
         }
-        
+
         fun removeListener(listener: (Boolean) -> Unit) {
             listeners.remove(listener)
         }
-        
+
         private fun notifyListeners(foreground: Boolean) {
             listeners.forEach { it(foreground) }
         }

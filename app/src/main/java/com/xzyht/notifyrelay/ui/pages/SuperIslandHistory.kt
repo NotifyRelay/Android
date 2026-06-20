@@ -67,18 +67,18 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
+import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
-import com.xzyht.notifyrelay.ui.ViewModels.GroupedSuperIslandHistory
-import com.xzyht.notifyrelay.ui.ViewModels.SuperIslandHistoryViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.GroupedSuperIslandHistory
+import com.xzyht.notifyrelay.ui.viewmodel.SuperIslandHistoryViewModel
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
-import notifyrelay.core.util.DataUrlUtils
+import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import notifyrelay.core.util.image.ImageUtils
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
@@ -252,7 +252,7 @@ private fun SuperIslandHistoryListBlock(
     onToggleGroup: (String) -> Unit,
     onDeleteGroup: (String) -> Unit,
     onDeleteEntry: (Long) -> Unit,
-    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryStoreEntry?,
     deleteWidthPx: Float,
     deleteWidth: Dp
 ) {
@@ -343,7 +343,7 @@ private fun SuperIslandHistoryGroupCard(
     includeImageDataOnCopy: Boolean,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
-    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryStoreEntry?,
     deleteWidthPx: Float,
     deleteWidth: Dp,
     onDeleteEntry: (Long) -> Unit
@@ -458,7 +458,7 @@ private fun SuperIslandHistoryGroupCard(
                                 )
                                 .offset { IntOffset(entryOffset.roundToInt(), 0) }
                         ) {
-                            SuperIslandHistoryEntryCard(
+                            SuperIslandHistoryStoreEntryCard(
                                 entry = entry,
                                 includeImageDataOnCopy = includeImageDataOnCopy,
                                 appIconBitmap = appIconBitmap,
@@ -517,11 +517,11 @@ private fun SuperIslandHistoryGroupCard(
 
 @Composable
 private fun SuperIslandHistorySummaryRow(
-    entry: SuperIslandHistoryEntry,
+    entry: SuperIslandHistoryStoreEntry,
     includeImageDataOnCopy: Boolean,
     appIconBitmap: ImageBitmap?,
     iconPackage: String?,
-    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryStoreEntry?
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
@@ -597,12 +597,12 @@ private fun SuperIslandHistorySummaryRow(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SuperIslandHistoryEntryCard(
-    entry: SuperIslandHistoryEntry,
+private fun SuperIslandHistoryStoreEntryCard(
+    entry: SuperIslandHistoryStoreEntry,
     includeImageDataOnCopy: Boolean,
     appIconBitmap: ImageBitmap?,
     iconPackage: String?,
-    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryStoreEntry?
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
@@ -701,7 +701,7 @@ private fun SuperIslandHistoryEntryCard(
             Text(it, style = textStyles.body2, color = colorScheme.onSurfaceVariantSummary)
         }
 
-        var loadedDetail by remember { mutableStateOf<SuperIslandHistoryEntry?>(null) }
+        var loadedDetail by remember { mutableStateOf<SuperIslandHistoryStoreEntry?>(null) }
         val displayPayload = remember(loadedDetail, sanitizedPayload, includeImageDataOnCopy) {
             loadedDetail?.rawPayload?.takeIf { it.isNotBlank() }?.let {
                 if (includeImageDataOnCopy) it else sanitizeImageContent(it, false)
@@ -750,7 +750,7 @@ private fun SuperIslandHistoryImage(imageKey: String, data: String, modifier: Mo
                 } catch (_: Exception) { data }
 
                 val decoded = when {
-                    DataUrlUtils.isDataUrl(resolved) -> DataUrlUtils.decodeDataUrlToBitmap(resolved)
+                    ImageUtils.isDataUrl(resolved) -> ImageUtils.decodeDataUrlToBitmap(context, resolved)
                     resolved.startsWith("http", ignoreCase = true) -> downloadBitmap(context, resolved)
                     else -> null
                 }
@@ -872,7 +872,7 @@ private fun SuperIslandAppIcon(
 
 private suspend fun downloadBitmap(context: Context, urlString: String, timeoutMs: Int = 5_000): Bitmap? {
     return try {
-        SuperIslandImageUtil.loadBitmapSuspend(context, urlString, timeoutMs)
+        ImageUtils.loadBitmap(context, urlString, timeoutMs)
     } catch (_: Exception) { null }
 }
 
@@ -936,7 +936,7 @@ private fun formatTimestamp(timestamp: Long): String {
 }
 
 private fun buildEntryCopyText(
-    entry: SuperIslandHistoryEntry,
+    entry: SuperIslandHistoryStoreEntry,
     includeImageDataOnCopy: Boolean
 ): String {
     return buildString {
@@ -993,7 +993,7 @@ private fun copyEntryToClipboard(context: Context, content: String) {
     }
 }
 
-private fun triggerFloatingReplica(context: Context, entry: SuperIslandHistoryEntry) {
+private fun triggerFloatingReplica(context: Context, entry: SuperIslandHistoryStoreEntry) {
     val sourceId = entry.mappedPackage?.takeIf { it.isNotBlank() }
         ?: entry.originalPackage?.takeIf { it.isNotBlank() }
         ?: entry.appName?.takeIf { it.isNotBlank() }

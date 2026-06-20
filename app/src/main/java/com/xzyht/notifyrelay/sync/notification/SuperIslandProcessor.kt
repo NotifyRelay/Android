@@ -7,19 +7,37 @@ import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.notification.superisland.LocalSuperIslandTracker
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.SuperIslandRemoteStore
 import github.xzynine.superislandui.common.SuperIslandProtocol
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistory
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryEntry
+import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStore
+import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.data.StorageManager
+import notifyrelay.data.database.repository.DatabaseRepository
 import org.json.JSONObject
 
 object SuperIslandProcessor {
     private const val TAG = "SuperIslandProcessor"
     private const val DEDUP_CACHE_MAX_SIZE = 1024
+
+    private val DEFAULT_MIRROR_PACKAGES = listOf(
+        "com.xiaomi.bluetooth",
+        "com.miui.mishare.connectivity",
+        "com.xiaomi.mirror"
+    )
     
+
+    private fun dismissBySourceId(sourceId: String) {
+        FloatingReplicaManager.dismissBySource(sourceId)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
+        }
+    }
 
     private val superIslandDeduplicationCache = object : LruCache<String, Boolean>(DEDUP_CACHE_MAX_SIZE) {
         override fun entryRemoved(evicted: Boolean, key: String?, oldValue: Boolean?, newValue: Boolean?) {
@@ -49,6 +67,22 @@ object SuperIslandProcessor {
             val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
 
             val siType = try { json.optString("type", "") } catch (_: Exception) { "" }
+            val termVal = try { json.optString("terminateValue", "") } catch (_: Exception) { "" }
+            val isEnd = (termVal == SuperIslandProtocol.TERMINATE_VALUE)
+
+            val mirrorFilterEnabled = StorageManager.getBoolean(context, "super_island_mirror_filter_enabled", true)
+            if (mirrorFilterEnabled) {
+                val disabledDefaults = StorageManager.getString(context, "super_island_mirror_filter_disabled_defaults", "")
+                val disabledSet = disabledDefaults.split(",").filter { it.isNotBlank() }.toSet()
+                val isDefaultEnabled = DEFAULT_MIRROR_PACKAGES.contains(mappedPkg) && !disabledSet.contains(mappedPkg)
+                val isCustomEnabled = runBlocking(Dispatchers.IO) {
+                    DatabaseRepository.getInstance(context).getEnabledMirrorFilterPackages().contains(mappedPkg)
+                }
+                if ((isDefaultEnabled || isCustomEnabled) && LocalSuperIslandTracker.isActive(mappedPkg) && !isEnd) {
+                    Logger.i("超级岛", "镜像应用过滤(对称)：跳过远程复刻, pkg=$mappedPkg, remoteUuid=$remoteUuid")
+                    return true
+                }
+            }
 
             // SI_ACK 属于超级岛协议的确认包，仅用于可靠性确认，不应进入通知/聊天管线
             if (siType == "SI_ACK") {
@@ -73,9 +107,7 @@ object SuperIslandProcessor {
             val dedupKey = "${remoteUuid}|${mappedPkg}|${featureId}"
 
             // 结束包判断：存在 terminateValue 或者显式 featureKeyValue 且 terminateValue 标记
-            val termVal = try { json.optString("terminateValue", "") } catch (_: Exception) { "" }
             val explicitFeatureKey = try { json.optString("featureKeyValue", "") } catch (_: Exception) { "" }
-            val isEnd = (termVal == SuperIslandProtocol.TERMINATE_VALUE)
             if (isEnd) {
                 try {
                     // 优先用显式的 featureKeyValue 进行 dismiss（若有）
@@ -83,11 +115,7 @@ object SuperIslandProcessor {
                         try {
                             // 如果显式值看起来像完整的 sourceId（包含分隔符），直接移除
                             if (explicitFeatureKey.contains("|")) {
-                                FloatingReplicaManager.dismissBySource(explicitFeatureKey)
-                                // 同时关闭对应的 Live Updates 通知
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(explicitFeatureKey)
-                                }
+                                dismissBySourceId(explicitFeatureKey)
                                 SuperIslandRemoteStore.removeExact(explicitFeatureKey)
                                 superIslandDeduplicationCache.remove(dedupKey)
                                 Logger.i("超级岛", "收到终止通知(显式完整 sourceId)，移除去重缓存: $dedupKey -> source=$explicitFeatureKey")
@@ -99,11 +127,7 @@ object SuperIslandProcessor {
                             if (matched.isNotEmpty()) {
                                 matched.forEach { rid ->
                                     try { 
-                                        FloatingReplicaManager.dismissBySource(rid) 
-                                        // 同时关闭对应的 Live Updates 通知
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                                            LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
-                                        }
+                                        dismissBySourceId(rid)
                                     } catch (_: Exception) {}
                                     superIslandDeduplicationCache.remove("${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
                                     Logger.i("超级岛", "收到终止通知(显式 featureKey 匹配)，移除并关闭通知: $rid -> featureKey=$explicitFeatureKey")
@@ -119,11 +143,7 @@ object SuperIslandProcessor {
                     if (removedKeys.isNotEmpty()) {
                         removedKeys.forEach { rid ->
                             try { 
-                                FloatingReplicaManager.dismissBySource(rid) 
-                                // 同时关闭对应的 Live Updates 通知
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
-                                }
+                                dismissBySourceId(rid)
                             } catch (_: Exception) {}
                             // 同步移除去重缓存（若存在）
                             superIslandDeduplicationCache.remove("${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
@@ -134,11 +154,7 @@ object SuperIslandProcessor {
 
                     // 最后兜底：按照当前计算的 sourceKey 进行移除（可能无对应），以防漏掉
                     try { 
-                        FloatingReplicaManager.dismissBySource(sourceKey) 
-                        // 同时关闭对应的 Live Updates 通知
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                                LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceKey)
-                            }
+                        dismissBySourceId(sourceKey)
                     } catch (_: Exception) {}
                     superIslandDeduplicationCache.remove(dedupKey)
                     Logger.i("超级岛", "收到终止通知(兜底)，尝试移除: $sourceKey")
@@ -175,9 +191,29 @@ object SuperIslandProcessor {
                 try { manager.sendSuperIslandAckInternal(remoteUuid, sharedSecret, recvHash, featureId, mappedPkg) } catch (_: Exception) {}
             }
 
-            val finalTitle = merged?.title ?: mTitle
-            val finalText = merged?.text ?: mText
             val mParam2 = merged?.paramV2Raw ?: paramV2Raw
+            
+            // 解析 title/text 的优先级：merged > 顶层包字段 > paramV2Raw.iconTextInfo
+            val finalTitle = merged?.title?.takeIf { it.isNotBlank() }
+                ?: mTitle.takeIf { it.isNotBlank() }
+                ?: if (!mParam2.isNullOrBlank()) {
+                    try {
+                        val paramJson = JSONObject(mParam2)
+                        paramJson.optJSONObject("iconTextInfo")
+                            ?.optString("title", "")?.takeIf { it.isNotBlank() }
+                    } catch (e: Exception) { null }
+                } else null
+            
+            val finalText = merged?.text?.takeIf { it.isNotBlank() }
+                ?: mText.takeIf { it.isNotBlank() }
+                ?: if (!mParam2.isNullOrBlank()) {
+                    try {
+                        val paramJson = JSONObject(mParam2)
+                        paramJson.optJSONObject("iconTextInfo")
+                            ?.optString("content", "")?.takeIf { it.isNotBlank() }
+                    } catch (e: Exception) { null }
+                } else null
+            
             val rawPics = merged?.pics ?: emptyMap()
             val mPics = if (rawPics.isEmpty()) rawPics else rawPics.filterKeys { it != "miui.focus.pics" }
             
@@ -207,7 +243,7 @@ object SuperIslandProcessor {
 
             // 检查是否为测试数据，如果是则跳过保存到历史记录
             if (!pkg.startsWith("test_")) {
-                val historyEntry = SuperIslandHistoryEntry(
+                val historyEntry = SuperIslandHistoryStoreEntry(
                     id = System.currentTimeMillis(),
                     sourceDeviceUuid = remoteUuid,
                     originalPackage = pkg,
@@ -222,11 +258,11 @@ object SuperIslandProcessor {
                 )
 
                 try {
-                    SuperIslandHistory.append(context, historyEntry)
+                    SuperIslandHistoryStore.append(context, historyEntry)
                 } catch (_: Exception) {
-                    SuperIslandHistory.append(
+                    SuperIslandHistoryStore.append(
                         context,
-                        SuperIslandHistoryEntry(
+                        SuperIslandHistoryStoreEntry(
                             id = System.currentTimeMillis(),
                             sourceDeviceUuid = remoteUuid,
                             originalPackage = pkg,

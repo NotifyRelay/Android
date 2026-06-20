@@ -17,7 +17,7 @@ import com.xzyht.notifyrelay.sync.ftpServer.StartResult.SUCCESS
 import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
 import com.xzyht.notifyrelay.sync.notification.StatusProcessor
 import com.xzyht.notifyrelay.sync.notification.SuperIslandProcessor
-import com.xzyht.notifyrelay.ui.GuideActivity
+import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger

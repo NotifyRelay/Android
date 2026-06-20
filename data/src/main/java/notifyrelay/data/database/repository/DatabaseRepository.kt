@@ -13,6 +13,7 @@ import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.entity.SuperIslandHistorySummary
 import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
 import notifyrelay.data.database.entity.SuperIslandImageEntity
+import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
 
 /**
  * 数据库仓库类
@@ -33,6 +34,8 @@ class DatabaseRepository(private val database: AppDatabase) {
     private val superIslandHistoryDao = database.superIslandHistoryDao()
     // 超级岛图片去重相关
     private val superIslandImageDao = database.superIslandImageDao()
+    // 超级岛镜像过滤相关
+    private val superIslandMirrorFilterDao = database.superIslandMirrorFilterDao()
     
     /**
      * 获取应用配置值
@@ -460,6 +463,28 @@ class DatabaseRepository(private val database: AppDatabase) {
     suspend fun clearSuperIslandImages() {
         superIslandImageDao.clearAllBindings()
         superIslandImageDao.clearAllImages()
+    }
+
+    // 超级岛镜像过滤相关方法
+
+    suspend fun getEnabledMirrorFilterPackages(): List<String> {
+        return superIslandMirrorFilterDao.getEnabledPackages().map { it.packageName }
+    }
+
+    suspend fun getAllMirrorFilterPackages(): List<SuperIslandMirrorFilterEntity> {
+        return superIslandMirrorFilterDao.getAllPackages()
+    }
+
+    suspend fun upsertMirrorFilterPackage(pkg: SuperIslandMirrorFilterEntity) {
+        superIslandMirrorFilterDao.upsert(pkg)
+    }
+
+    suspend fun setMirrorFilterEnabled(packageName: String, enabled: Boolean) {
+        superIslandMirrorFilterDao.setEnabled(packageName, enabled)
+    }
+
+    suspend fun deleteMirrorFilterPackage(packageName: String) {
+        superIslandMirrorFilterDao.delete(packageName)
     }
 
     // 应用相关方法

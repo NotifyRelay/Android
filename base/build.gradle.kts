@@ -1,11 +1,11 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+﻿import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    id("com.android.library")
+    alias(libs.plugins.android.library)
 }
 
 android {
-    namespace = "notifyrelay.base.util"
+    namespace = "notifyrelay.base"
     compileSdk = libs.versions.compileSdk.get().toInt()
 
     defaultConfig {
@@ -40,6 +40,8 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
+    implementation(libs.timber)
+    implementation(libs.androidx.lifecycle.process)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

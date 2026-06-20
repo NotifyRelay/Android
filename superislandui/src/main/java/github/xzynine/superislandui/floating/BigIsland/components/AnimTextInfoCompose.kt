@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.floating.BigIsland.components
+﻿package github.xzynine.superislandui.floating.BigIsland.components
 
 
 import android.content.res.Configuration
@@ -20,12 +20,13 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.model.componets.AnimTextInfo
+import github.xzynine.superislandui.model.components.AnimTextInfo
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.common.PreviewData
 import kotlinx.coroutines.delay
+import notifyrelay.core.util.image.ImageUtils
 
 /**
  * 动画文本信息Compose组件
@@ -97,8 +98,8 @@ fun AnimTextInfoCompose(animTextInfo: AnimTextInfo, picMap: Map<String, String>?
 
             val majorText = animTextInfo.title ?: timerState.value
             val majorColor = when {
-                preferDark -> SuperIslandImageUtil.parseColor(animTextInfo.colorTitleDark)
-                else -> SuperIslandImageUtil.parseColor(animTextInfo.colorTitle)
+                preferDark -> ImageUtils.parseColor(animTextInfo.colorTitleDark)
+                else -> ImageUtils.parseColor(animTextInfo.colorTitle)
             } ?: 0xFFFFFFFF.toInt()
             majorText?.let { text ->
                 val isTimeLike = text.matches(Regex("[0-9: ]{2,}"))
@@ -115,8 +116,8 @@ fun AnimTextInfoCompose(animTextInfo: AnimTextInfo, picMap: Map<String, String>?
                 if (!animTextInfo.title.isNullOrBlank() && timerState.value != null) timerState.value else null
             }
             val secondaryColor = when {
-                preferDark -> SuperIslandImageUtil.parseColor(animTextInfo.colorContentDark)
-                else -> SuperIslandImageUtil.parseColor(animTextInfo.colorContent)
+                preferDark -> ImageUtils.parseColor(animTextInfo.colorContentDark)
+                else -> ImageUtils.parseColor(animTextInfo.colorContent)
             } ?: 0xFFDDDDDD.toInt()
             secondaryText?.let { text ->
                 Text(

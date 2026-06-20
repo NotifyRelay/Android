@@ -1,8 +1,9 @@
-package github.xzynine.superislandui.common
+﻿package github.xzynine.superislandui.common
 
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
+import androidx.core.graphics.drawable.toBitmap
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Bundle
@@ -11,7 +12,7 @@ import android.service.notification.StatusBarNotification
 import android.util.Base64
 import github.xzynine.superislandui.model.core.SuperIslandData
 import notifyrelay.base.util.Logger
-import notifyrelay.core.util.DataUrlUtils
+import notifyrelay.core.util.image.ImageUtils
 import notifyrelay.data.StorageManager
 import org.json.JSONObject
 
@@ -31,21 +32,6 @@ object SuperIslandManager {
      */
     private fun isEnabled(context: Context): Boolean {
         return try { StorageManager.getBoolean(context, STORAGE_KEY, true) } catch (_: Exception) { true }
-    }
-
-    /**
-     * 判断系统属性是否支持岛功能（反射 SystemProperties.getBoolean）
-     */
-    fun isSupportIsland(defaultValue: Boolean = false): Boolean {
-        return try {
-            val clazz = Class.forName("android.os.SystemProperties")
-            val method = clazz.getDeclaredMethod("getBoolean", String::class.java, Boolean::class.javaPrimitiveType)
-            val res = method.invoke(null, "persist.sys.feature.island", defaultValue) as? Boolean
-            res ?: defaultValue
-        } catch (e: Exception) {
-            Logger.w("超级岛", "超级岛: 系统支持性检查失败: ${e.message}")
-            defaultValue
-        }
     }
 
     /**
@@ -178,13 +164,13 @@ object SuperIslandManager {
                                 @Suppress("DEPRECATION")
                                 val obj = picsBundle.get(bk)
                                 if (obj is Bitmap) {
-                                    picMap[bk] = DataUrlUtils.bitmapToDataUri(obj)
+                                    picMap[bk] = ImageUtils.bitmapToDataUri(obj)
                                     continue
                                 }
                                 if (obj is Drawable) {
                                     try {
-                                        val bmp = DataUrlUtils.drawableToBitmap(obj)
-                                        picMap[bk] = DataUrlUtils.bitmapToDataUri(bmp)
+                                        val bmp = obj.toBitmap()
+                                        picMap[bk] = ImageUtils.bitmapToDataUri(bmp)
                                         continue
                                     } catch (_: Exception) {}
                                 }
@@ -192,8 +178,8 @@ object SuperIslandManager {
                                     try {
                                         val drawable = obj.loadDrawable(context)
                                         if (drawable != null) {
-                                            val bmp = DataUrlUtils.drawableToBitmap(drawable)
-                                            picMap[bk] = DataUrlUtils.bitmapToDataUri(bmp)
+                                            val bmp = drawable.toBitmap()
+                                            picMap[bk] = ImageUtils.bitmapToDataUri(bmp)
                                             continue
                                         }
                                     } catch (_: Exception) {}
@@ -236,12 +222,12 @@ object SuperIslandManager {
                         @Suppress("DEPRECATION")
                         val p = try { extras.get(k) } catch (_: Exception) { null }
                         if (p is Bitmap) {
-                            picMap[k] = DataUrlUtils.bitmapToDataUri(p)
+                            picMap[k] = ImageUtils.bitmapToDataUri(p)
                             continue
                         }
                         if (p is Drawable) {
                             try {
-                                picMap[k] = DataUrlUtils.bitmapToDataUri(DataUrlUtils.drawableToBitmap(p))
+                                picMap[k] = ImageUtils.bitmapToDataUri(p.toBitmap())
                                 continue
                             } catch (_: Exception) {}
                         }
@@ -249,7 +235,7 @@ object SuperIslandManager {
                             try {
                                 val drawable = p.loadDrawable(context)
                                 if (drawable != null) {
-                                    picMap[k] = DataUrlUtils.bitmapToDataUri(DataUrlUtils.drawableToBitmap(drawable))
+                                    picMap[k] = ImageUtils.bitmapToDataUri(drawable.toBitmap())
                                     continue
                                 }
                             } catch (_: Exception) {}
@@ -278,8 +264,8 @@ object SuperIslandManager {
                 if (!picMap.containsKey(appIconKey)) {
                     val pm = context.packageManager
                     val appIconDrawable = pm.getApplicationIcon(pkg)
-                    val appIconBitmap = DataUrlUtils.drawableToBitmap(appIconDrawable)
-                    val dataUrl = DataUrlUtils.bitmapToDataUri(appIconBitmap)
+                    val appIconBitmap = appIconDrawable.toBitmap()
+                    val dataUrl = ImageUtils.bitmapToDataUri(appIconBitmap)
                     picMap[appIconKey] = dataUrl
                     //Logger.d("超级岛", "超级岛: 注入应用图标到 picMap => $appIconKey")
                 }

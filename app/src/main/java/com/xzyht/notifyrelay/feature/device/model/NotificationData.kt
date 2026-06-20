@@ -6,18 +6,20 @@ import android.service.notification.StatusBarNotification
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
-import com.xzyht.notifyrelay.sync.notification.data.NotificationRecordEntity
+import com.xzyht.notifyrelay.sync.notification.data.NotificationRecordDto
 import notifyrelay.base.util.Logger
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import notifyrelay.data.database.repository.DatabaseRepository
 
 class NotificationRecordStore(private val context: Context) {
     // 数据库仓库实例
     private val repository = DatabaseRepository.getInstance(context)
     
-    // 转换方法：将旧的NotificationRecordEntity转换为新的Room实体
-    private fun convertToRoomEntity(old: NotificationRecordEntity, deviceUuid: String): notifyrelay.data.database.entity.NotificationRecordEntity {
+    // 转换方法：将旧的NotificationRecordDto转换为新的Room实体
+    private fun convertToRoomEntity(old: NotificationRecordDto, deviceUuid: String): notifyrelay.data.database.entity.NotificationRecordEntity {
         return notifyrelay.data.database.entity.NotificationRecordEntity(
             key = old.key,
             deviceUuid = deviceUuid,
@@ -30,8 +32,8 @@ class NotificationRecordStore(private val context: Context) {
     }
     
     // 转换方法：将新的Room实体转换为旧的NotificationRecordEntity
-    private fun convertFromRoomEntity(new: notifyrelay.data.database.entity.NotificationRecordEntity): NotificationRecordEntity {
-        return NotificationRecordEntity(
+    private fun convertFromRoomEntity(new: notifyrelay.data.database.entity.NotificationRecordEntity): NotificationRecordDto {
+        return NotificationRecordDto(
             key = new.key,
             packageName = new.packageName,
             appName = new.appName,
@@ -42,28 +44,28 @@ class NotificationRecordStore(private val context: Context) {
         )
     }
     
-    internal fun readAll(device: String): MutableList<NotificationRecordEntity> {
+    internal suspend fun readAll(device: String): MutableList<NotificationRecordDto> {
         val deviceUuid = if (device == "local") "本机" else device
-        return runBlocking {
+        return withContext(Dispatchers.IO) {
             repository.getNotificationsByDevice(deviceUuid)
         }.map { convertFromRoomEntity(it) }.toMutableList()
     }
 
-    internal fun writeAll(list: List<NotificationRecordEntity>, device: String) {
+    internal suspend fun writeAll(list: List<NotificationRecordDto>, device: String) {
         val deviceUuid = if (device == "local") "本机" else device
-        runBlocking {
+        withContext(Dispatchers.IO) {
             val roomEntities = list.map { convertToRoomEntity(it, deviceUuid) }
             repository.saveNotifications(roomEntities)
         }
     }
 
-    suspend fun insert(record: NotificationRecordEntity) {
+    suspend fun insert(record: NotificationRecordDto) {
         val deviceUuid = if (record.device == "local") "本机" else record.device
         val roomEntity = convertToRoomEntity(record, deviceUuid)
         repository.saveNotification(roomEntity)
     }
 
-    suspend fun getAll(device: String): List<NotificationRecordEntity> {
+    suspend fun getAll(device: String): List<NotificationRecordDto> {
         val deviceUuid = if (device == "local") "本机" else device
         return repository.getNotificationsByDevice(deviceUuid)
             .map { convertFromRoomEntity(it) }
@@ -157,7 +159,7 @@ object NotificationRepository {
             val oldList = runBlocking { store.getAll(fileKey) }.toMutableList()
             oldList.removeAll { it.key == key }
             // device 字段严格等于 fileKey，保证UI读取时一致
-            oldList.add(0, NotificationRecordEntity(
+            oldList.add(0, NotificationRecordDto(
                 key = key,
                 packageName = packageName,
                 appName = appName,
@@ -166,8 +168,8 @@ object NotificationRepository {
                 time = time,
                 device = fileKey
             ))
-            // writeAll是同步的，不需要runBlocking
-            store.writeAll(oldList, fileKey)
+            // writeAll是suspend函数，需要runBlocking
+            runBlocking { store.writeAll(oldList, fileKey) }
             Logger.i("秩序之光 狂鼠 NotifyRelay", "写入远端历史 device=$device, size=${oldList.size}")
             
             // 限制每个包名的通知数量为80
@@ -322,16 +324,18 @@ object NotificationRepository {
             NotifyRelayStoreProvider.getInstance(context)
             // 主动加载本地历史到内存，保证判重有效
             val store2 = NotifyRelayStoreProvider.getInstance(context)
-            val localList = store2.readAll("本机").map {
-                NotificationRecord(
-                    key = it.key,
-                    packageName = it.packageName,
-                    appName = it.appName,
-                    title = it.title,
-                    text = it.text,
-                    time = it.time,
-                    device = it.device
-                )
+            val localList = runBlocking {
+                store2.readAll("本机").map {
+                    NotificationRecord(
+                        key = it.key,
+                        packageName = it.packageName,
+                        appName = it.appName,
+                        title = it.title,
+                        text = it.text,
+                        time = it.time,
+                        device = it.device
+                    )
+                }
             }
             notifications.clear()
             notifications.addAll(localList)
@@ -454,7 +458,7 @@ object NotificationRepository {
             // 只同步当前设备的通知，避免影响其他设备
             val currentDeviceNotifications = notifications.filter { it.device == currentDevice }
             val entities = currentDeviceNotifications.map {
-                NotificationRecordEntity(
+                NotificationRecordDto(
                     key = it.key,
                     packageName = it.packageName,
                     appName = it.appName,
@@ -465,8 +469,8 @@ object NotificationRepository {
                 )
             }
             val fileKey = if (currentDevice == "本机") "local" else currentDevice
-            // 移除不必要的runBlocking，writeAll已经是同步的
-            store.writeAll(entities, fileKey)
+            // writeAll是suspend函数，需要runBlocking
+            runBlocking { store.writeAll(entities, fileKey) }
             Logger.i("回声 NotifyRelay", "写入本地历史 device=$currentDevice, fileKey=$fileKey, size=${entities.size}")
             scanDeviceList(context)
         } catch (e: Exception) {

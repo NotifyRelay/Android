@@ -8,7 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.servers.ClipboardAccessiblityService
+import com.xzyht.notifyrelay.servers.ClipboardAccessibilityService
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.core.util.DataUrlUtils
+import notifyrelay.core.util.image.ImageUtils
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
 
@@ -25,7 +25,7 @@ object ClipboardSyncManager {
     private const val CLIPBOARD_TYPE_TEXT = "text"
     private const val CLIPBOARD_TYPE_IMAGE = "image"
     private const val DATA_HEADER = "DATA_CLIPBOARD"
-    private const val ACCESSIBILITY_SERVICE_NAME = "com.xzyht.notifyrelay/com.xzyht.notifyrelay.servers.ClipboardAccessiblityService"
+    private const val ACCESSIBILITY_SERVICE_NAME = "com.xzyht.notifyrelay/com.xzyht.notifyrelay.servers.ClipboardAccessibilityService"
     
     private var clipboardManager: ClipboardManager? = null
     private var lastClipboardContent: String = ""
@@ -72,7 +72,7 @@ object ClipboardSyncManager {
 
     fun suppressClipboardMonitoring(durationMs: Long = 2000) {
         Logger.d(TAG, "抑制所有剪贴板监听 $durationMs ms")
-        ClipboardAccessiblityService.pauseDetectionTemporary(durationMs)
+        ClipboardAccessibilityService.pauseDetectionTemporary(durationMs)
     }
 
     /**
@@ -261,7 +261,7 @@ object ClipboardSyncManager {
                                 }
                             }
                             if (imageBitmap != null) {
-                                val dataUrl = DataUrlUtils.bitmapToDataUri(imageBitmap)
+                                val dataUrl = ImageUtils.bitmapToDataUri(imageBitmap)
                                 // 从data URI中提取纯base64部分
                                 val commaIndex = dataUrl.indexOf(',')
                                 if (commaIndex > 0) {
@@ -299,18 +299,21 @@ object ClipboardSyncManager {
                         Logger.d(TAG, "已更新本地剪贴板为文本内容")
                     }
                     CLIPBOARD_TYPE_IMAGE -> {
-                        // 构建完整的data URI
                         val dataUrl = "data:image/png;base64,$content"
-                        val bitmap = DataUrlUtils.decodeDataUrlToBitmap(dataUrl)
-                        if (bitmap != null) {
-                            // 将Bitmap转换为文本，因为直接存储Bitmap在剪贴板中需要特殊处理
-                            // 这里我们将图片转换为Base64字符串存储，其他应用可以解析
-                            val clipItem = ClipData.Item(dataUrl)
-                            // 使用文本类型，因为ClipData.Item没有直接接受Bitmap的构造函数
-                            val mimeTypes = arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)
-                            val clip = ClipData("synced_image", mimeTypes, clipItem)
-                            cm.setPrimaryClip(clip)
-                            Logger.d(TAG, "已更新剪贴板，包含图片数据URL")
+                        CoroutineScope(Dispatchers.IO).launch {
+                            try {
+                                val bitmap = ImageUtils.decodeDataUrlToBitmap(context, dataUrl)
+                                if (bitmap != null) {
+                                    val clipItem = ClipData.Item(dataUrl)
+                                    val mimeTypes = arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)
+                                    val clip = ClipData("synced_image", mimeTypes, clipItem)
+                                    cm.setPrimaryClip(clip)
+                                    Logger.d(TAG, "已更新剪贴板，包含图片数据URL")
+                                }
+                            } finally {
+                                delay(500)
+                                isInternalUpdate = false
+                            }
                         }
                     }
                 }
@@ -320,10 +323,12 @@ object ClipboardSyncManager {
         } catch (e: Exception) {
             Logger.e(TAG, "更新剪贴板失败", e)
         } finally {
-            // 延迟重置内部更新标志，确保剪贴板变化监听器有足够时间触发
-            CoroutineScope(Dispatchers.IO).launch {
-                delay(500)
-                isInternalUpdate = false
+            // 文本类型在此重置标志，图片类型在协程内部重置
+            if (type == CLIPBOARD_TYPE_TEXT) {
+                CoroutineScope(Dispatchers.IO).launch {
+                    delay(500)
+                    isInternalUpdate = false
+                }
             }
         }
     }

@@ -27,3 +27,26 @@ data class AImageText5(
     val showHighlightColor: Boolean = false,
     val picKey: String
 ) : AComponent { override val type: Int = 5 }
+
+// --- 扩展属性（可空接收者），消除外部重复的 when 表达式 ---
+
+val AComponent?.aPicKey: String?
+    get() = when (this) {
+        is AImageText1 -> picKey
+        is AImageText5 -> picKey
+        else -> null
+    }
+
+val AComponent?.aTitle: String?
+    get() = when (this) {
+        is AImageText1 -> title
+        is AImageText5 -> title
+        else -> null
+    }
+
+val AComponent?.aContent: String?
+    get() = when (this) {
+        is AImageText1 -> content
+        is AImageText5 -> content
+        else -> null
+    }

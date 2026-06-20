@@ -135,21 +135,21 @@ fun AppPickerDialog(
                             Text("显示系统应用", style = MiuixTheme.textStyles.body2, color = MiuixTheme.colorScheme.onSurface)
                         }
 
-                        var expanded by remember { mutableStateOf(false) }
+                        var searchExpanded by remember { mutableStateOf(false) }
 
                         SearchBar(
                             inputField = {
                                 InputField(
                                     query = appSearchQuery,
                                     onQueryChange = { appSearchQuery = it },
-                                    onSearch = { /* 搜索操作已通过 onQueryChange 实时处理 */ },
-                                    expanded = expanded,
-                                    onExpandedChange = { expanded = it },
+                                    onSearch = { },
+                                    expanded = searchExpanded,
+                                    onExpandedChange = { searchExpanded = it },
                                     label = "搜索应用/包名"
                                 )
                             },
-                            expanded = expanded,
-                            onExpandedChange = { expanded = it }
+                            expanded = true,
+                            onExpandedChange = { }
                         ) {
                             // SearchBar 内容区域
                             if (isLoading || allApps.isEmpty()) {

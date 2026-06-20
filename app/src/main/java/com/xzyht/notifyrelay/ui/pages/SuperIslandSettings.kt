@@ -1,26 +1,53 @@
 package com.xzyht.notifyrelay.ui.pages
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.notification.superisland.lifecyle.NotificationGenerator.SpecInjectionMode
-import com.xzyht.notifyrelay.ui.DeveloperModeActivity
+import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils.SpecInjectionMode
+import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
+import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import com.xzyht.notifyrelay.ui.dialog.SuperIslandTestDialog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.StorageManager
+import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
+import notifyrelay.data.database.repository.DatabaseRepository
+import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
@@ -30,6 +57,13 @@ private const val SUPER_ISLAND_KEY = "superisland_enabled"
 private const val SUPER_ISLAND_SHOW_KEY = "superisland_show"
 private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
 private const val SPEC_INJECTION_MODE_KEY = "spec_injection_mode"
+private const val MIRROR_FILTER_ENABLED_KEY = "super_island_mirror_filter_enabled"
+
+private val DEFAULT_MIRROR_PACKAGES = listOf(
+    "com.xiaomi.bluetooth",
+    "com.miui.mishare.connectivity",
+    "com.xiaomi.mirror"
+)
 
 // 注入方式选项
 val specInjectionOptions = listOf(
@@ -41,40 +75,31 @@ val specInjectionOptions = listOf(
 @Composable
 fun UISuperIslandSettings() {
     val context = LocalContext.current
-    
-    
-    
-    // 计算浮窗兼容的默认值
-    val defaultFloatingWindowEnabled = run {
-        val detailedOsVersion = PermissionHelper.getDetailedOsVersion()
-        val isGreater = PermissionHelper.isVersionGreaterThan(detailedOsVersion, "OS3.0.300")
-        // 版本高于OS3.0.300时默认关闭
-        !isGreater
-    }
-    
+
     var enabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_KEY, true)) }
     var showSuperIsland by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_SHOW_KEY, true)) }
-    var floatingWindowEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, defaultFloatingWindowEnabled)) }
-    
-    // 读取注入模式，如果不存在则默认为BOTH（两者都注入）
+    var floatingWindowEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, FloatingReplicaManager.getDefaultFloatingWindowEnabled())) }
+
     val savedInjectionModeOrdinal = StorageManager.getInt(context, SPEC_INJECTION_MODE_KEY, SpecInjectionMode.BOTH.ordinal)
     val savedInjectionMode = SpecInjectionMode.values().getOrElse(savedInjectionModeOrdinal) { SpecInjectionMode.BOTH }
     var specInjectionMode by remember { mutableStateOf(savedInjectionMode) }
-    
-    // 检查是否已有用户设置
+
     val hasFloatingWindowSetting = StorageManager.getString(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, "") != ""
-    
-    // 测试对话框状态
+
+    val defaultFloatingWindowEnabled = FloatingReplicaManager.getDefaultFloatingWindowEnabled()
+
     val showTestDialog = remember { mutableStateOf(false) }
-    
-    // 构建浮窗兼容开关的摘要文本
+
+    var mirrorFilterEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, MIRROR_FILTER_ENABLED_KEY, true)) }
+    var customPackages by remember { mutableStateOf<List<SuperIslandMirrorFilterEntity>>(emptyList()) }
+    var showAppPicker by remember { mutableStateOf(false) }
+    var showCustomPkgInput by remember { mutableStateOf(false) }
+    var customPkgText by remember { mutableStateOf("") }
+
     val floatingWindowSummary = run {
         val baseSummary = "用于a16的livedata通知api被系统支持前使用浮窗展示超级岛"
-        // 获取当前详细OS版本
         val currentOsVersion = PermissionHelper.getDetailedOsVersion() ?: "未知"
-        // 版本比较结果
         val versionComparisonResult = PermissionHelper.isVersionGreaterThan(currentOsVersion, "OS3.0.300")
-        // 在debug构建下显示预设默认值和当前版本及比较结果
         if (DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
             "$baseSummary (当前版本: $currentOsVersion, 版本比较: ${if (versionComparisonResult) "高于" else "低于或等于"} OS3.0.300, 有用户设置: ${if (hasFloatingWindowSetting) "是" else "否"}, 预设默认值: ${if (defaultFloatingWindowEnabled) "开启" else "关闭"})"
         } else {
@@ -82,12 +107,23 @@ fun UISuperIslandSettings() {
         }
     }
 
+    suspend fun loadCustomPackages() {
+        val repo = DatabaseRepository.getInstance(context)
+        customPackages = withContext(Dispatchers.IO) {
+            repo.getAllMirrorFilterPackages()
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        loadCustomPackages()
+    }
+
     MiuixTheme {
         val colorScheme = MiuixTheme.colorScheme
         val textStyles = MiuixTheme.textStyles
 
         Scaffold(
-            popupHost = { }, // 置空，避免与顶层Scaffold冲突
+            popupHost = { },
         ) {
             Surface(color = colorScheme.background) {
                 Column(
@@ -148,11 +184,170 @@ fun UISuperIslandSettings() {
                         }
                     )
 
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+                    SwitchPreference(
+                        title = "镜像应用过滤",
+                        summary = "过滤双向对称应用的远程超级岛复刻（仅本地也存在同包名超级岛时触发）",
+                        checked = mirrorFilterEnabled,
+                        onCheckedChange = {
+                            mirrorFilterEnabled = it
+                            StorageManager.putBoolean(context, MIRROR_FILTER_ENABLED_KEY, it)
+                        }
+                    )
+
+                    Text(
+                        "过滤包名列表",
+                        style = textStyles.main,
+                        color = colorScheme.onSurfaceSecondary,
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+
+                    val installedPkgs = remember { AppRepository.getInstalledPackageNamesSync(context) }
+
+                    DEFAULT_MIRROR_PACKAGES.forEach { pkg ->
+                        val isInstalled = installedPkgs.contains(pkg)
+                        var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+                        var disabledDefaultsPkgs by remember { mutableStateOf(
+                            StorageManager.getString(context, "super_island_mirror_filter_disabled_defaults", "")
+                                .split(",").filter { it.isNotBlank() }.toSet()
+                        ) }
+                        val isEnabled = !disabledDefaultsPkgs.contains(pkg)
+
+                        LaunchedEffect(pkg) {
+                            if (iconBitmap == null) {
+                                iconBitmap = AppRepository.getAppIconAsync(context, pkg)
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            iconBitmap?.let {
+                                Image(
+                                    bitmap = it.asImageBitmap(),
+                                    contentDescription = null,
+                                    modifier = Modifier.size(24.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                            Text(
+                                pkg,
+                                style = textStyles.body2,
+                                color = if (isInstalled) colorScheme.primary else colorScheme.onSurface,
+                                modifier = Modifier.weight(1f)
+                            )
+                            Switch(
+                                checked = isEnabled,
+                                onCheckedChange = { v ->
+                                    val current = StorageManager.getString(context, "super_island_mirror_filter_disabled_defaults", "")
+                                    val disabledSet = current.split(",").filter { it.isNotBlank() }.toMutableSet()
+                                    if (v) disabledSet.remove(pkg) else disabledSet.add(pkg)
+                                    val newValue = disabledSet.joinToString(",")
+                                    StorageManager.putString(context, "super_island_mirror_filter_disabled_defaults", newValue)
+                                    disabledDefaultsPkgs = disabledSet
+                                }
+                            )
+                        }
+                    }
+
+                    customPackages.forEach { pkgEntity ->
+                        key(pkgEntity.packageName) {
+                            val pkg = pkgEntity.packageName
+                            val isInstalled = installedPkgs.contains(pkg)
+                            var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+                            var pkgEnabled by remember { mutableStateOf(pkgEntity.enabled) }
+
+                            LaunchedEffect(pkg) {
+                                if (iconBitmap == null) {
+                                    iconBitmap = AppRepository.getAppIconAsync(context, pkg)
+                                }
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                iconBitmap?.let {
+                                    Image(
+                                        bitmap = it.asImageBitmap(),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(
+                                    pkg,
+                                    style = textStyles.body2,
+                                    color = if (isInstalled) colorScheme.primary else colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Switch(
+                                    checked = pkgEnabled,
+                                    onCheckedChange = { v ->
+                                        pkgEnabled = v
+                                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                                            DatabaseRepository.getInstance(context).setMirrorFilterEnabled(pkg, v)
+                                        }
+                                    }
+                                )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Button(
+                                    onClick = {
+                                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                                            DatabaseRepository.getInstance(context).deleteMirrorFilterPackage(pkg)
+                                            withContext(Dispatchers.Main) {
+                                                loadCustomPackages()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = MiuixIcons.Delete,
+                                        contentDescription = "删除",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Button(
+                            onClick = { showAppPicker = true }
+                        ) {
+                            Text("选择应用")
+                        }
+                    }
                 }
             }
         }
 
-        // 显示测试对话框
         SuperIslandTestDialog(showTestDialog, context)
+
+        if (showAppPicker) {
+            AppPickerDialog(
+                visible = true,
+                onDismiss = { showAppPicker = false },
+                onAppSelected = { pkg ->
+                    showAppPicker = false
+                    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                        DatabaseRepository.getInstance(context).upsertMirrorFilterPackage(
+                            SuperIslandMirrorFilterEntity(pkg, enabled = true)
+                        )
+                        withContext(Dispatchers.Main) {
+                            loadCustomPackages()
+                        }
+                    }
+                },
+                title = "选择镜像过滤应用"
+            )
+        }
     }
 }
+

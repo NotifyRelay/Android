@@ -417,9 +417,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private fun updateDeviceList() {
         val now = System.currentTimeMillis()
         //Logger.d("死神-NotifyRelay", "[updateDeviceList] invoked at $now")
-    val authSnapshot = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
-    val authed = authSnapshot.keys.toSet()
-        val allUuids = (deviceLastSeen.keys + authed).toSet()
+        val authSnapshot = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
+        val authed = authSnapshot.keys.toSet()
+        val lastSeenSnapshot = synchronized(deviceLastSeen) { deviceLastSeen.toMap() }
+        val allUuids = (lastSeenSnapshot.keys + authed).toSet()
         val newMap = mutableMapOf<String, Pair<DeviceInfo, Boolean>>()
         val unauthedTimeout = 5000L // 未认证设备保留两次UDP广播周期（2*2000ms）
         val authedHeartbeatTimeout = 12_000L // 已认证设备心跳超时阈值
@@ -434,37 +435,30 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             
             val deviceInfo = getDeviceInfo(uuid)
             
-            val lastSeen = deviceLastSeen[uuid]
+            val lastSeen = lastSeenSnapshot[uuid]
             val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
-            // 检查时钟回拨
-            var safeLastSeen = lastSeen
-            if (lastSeen != null && now < lastSeen) {
-                Logger.w("死神-NotifyRelay", "检测到时钟回拨: now=$now, lastSeen=$lastSeen, uuid=$uuid，强制重置lastSeen=now")
-                deviceLastSeen[uuid] = now
-                safeLastSeen = now
-            }
             if (auth != null) {
                 // 仅基于心跳包判定在线
-                val diff = if (safeLastSeen != null) now - safeLastSeen else -1L
-                val isOnline = safeLastSeen != null && diff <= authedHeartbeatTimeout
+                val diff = if (lastSeen != null) now - lastSeen else -1L
+                val isOnline = lastSeen != null && diff <= authedHeartbeatTimeout
                 val info = deviceInfo ?: DeviceInfo(uuid, auth.displayName ?: "已认证设备", "", listenPort)
                 val oldOnline = oldMap[uuid]?.second
                 if (oldOnline != null && oldOnline != isOnline) {
-                    Logger.i("天使-死神-NotifyRelay", "[updateDeviceList] 已认证设备状态变化: uuid=$uuid, isOnline=$isOnline, lastSeen=$safeLastSeen, diff=$diff")
+                    Logger.i("天使-死神-NotifyRelay", "[updateDeviceList] 已认证设备状态变化: uuid=$uuid, isOnline=$isOnline, lastSeen=$lastSeen, diff=$diff")
                 }
                 newMap[uuid] = info to isOnline
             } else {
-                val diff = if (safeLastSeen != null) now - safeLastSeen else -1L
-                val isOnline = safeLastSeen != null && diff <= unauthedTimeout
+                val diff = if (lastSeen != null) now - lastSeen else -1L
+                val isOnline = lastSeen != null && diff <= unauthedTimeout
                 val info = deviceInfo
                 val oldOnline = oldMap[uuid]?.second
                 if (oldOnline != null && oldOnline != isOnline) {
-                    Logger.i("死神-NotifyRelay", "[updateDeviceList] 未认证设备状态变化: uuid=$uuid, isOnline=$isOnline, lastSeen=$safeLastSeen, diff=$diff")
+                    Logger.i("死神-NotifyRelay", "[updateDeviceList] 未认证设备状态变化: uuid=$uuid, isOnline=$isOnline, lastSeen=$lastSeen, diff=$diff")
                 }
                 if (isOnline) {
                     if (info != null) newMap[uuid] = info to true
                 } else {
-                    deviceLastSeen.remove(uuid)
+                    synchronized(deviceLastSeen) { deviceLastSeen.remove(uuid) }
                 }
             }
         }
@@ -869,7 +863,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
 
             // 清理 deviceLastSeen
-            try { deviceLastSeen.remove(uuid) } catch (_: Exception) {}
+            try { synchronized(deviceLastSeen) { deviceLastSeen.remove(uuid) } } catch (_: Exception) {}
             
             // 清理 deviceInfoCache
             try {

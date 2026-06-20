@@ -39,7 +39,7 @@ import github.xzynine.superislandui.floating.BigIsland.components.TextButtonComp
 import github.xzynine.superislandui.floating.SmallIsland.compose.BigIslandCollapsedCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandComposeRoot
-import github.xzynine.superislandui.model.componets.MediaSessionData
+import github.xzynine.superislandui.model.components.MediaSessionData
 import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
@@ -329,9 +329,9 @@ fun FloatingWindowContainer(
                         enter = collapsedEnterTransition,
                         exit = collapsedExitTransition
                     ) {
-                        // 提取回落文本：摘要态显示appName和title
-                        val fallbackTitle = entry.appName?.takeIf { it.isNotBlank() }
-                        val fallbackContent = entry.title?.takeIf { it.isNotBlank() }
+                        // 提取回落文本：摘要态优先显示有意义的title，appName作为补充
+                        val fallbackTitle = entry.title?.takeIf { it.isNotBlank() }
+                        val fallbackContent = entry.appName?.takeIf { it.isNotBlank() }
 
                         // 从paramV2Raw中正确解析bigIslandJson，与传统实现保持一致
                         // 使用remember块确保entry.paramV2Raw变化时重新解析

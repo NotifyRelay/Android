@@ -34,18 +34,22 @@ minSdk = 29 (Android 10)，不兼容 API 29 以下版本，请勿使用相应的
 在使用工具方法前，请先查看以下工具包中的实现：
 
 **基础模块 (`:base`)**：
-- `base/src/main/java/notifyrelay/base/util` (基础工具类：DeviceUtils、HapticFeedbackUtils、IntentUtils、Logger、PermissionHelper、ThemeSettingsManager、ToastUtils)
+
+- `base/src/main/java/notifyrelay/base/util` (基础工具类：DeviceUtils（含isTablet平板判断）、HapticFeedbackUtils、IntentUtils、Logger、PermissionHelper、ThemeSettingsManager、ToastUtils)
 
 **核心模块 (`:core`)**：
+
 - `core/src/main/java/notifyrelay/core/util` (核心工具类：BatteryIconConverter、BatteryUtils、DataUrlUtils、EncryptionManager、MediaStoreHelper、ServiceManager)
 
 **数据模块 (`:data`)**：
+
 - `data/src/main/java/notifyrelay/data/database` (Room 数据库：DAO、Entity、Migration)
 - `data/src/main/java/notifyrelay/data/database/repository` (数据库仓库：DatabaseRepository)
 - `data/src/main/java/notifyrelay/data/config` (配置管理：AppConfig、DeviceInfoManager、Scrcpy 相关)
 - `data/src/main/java/notifyrelay/data` (持久化：PersistenceManager、StorageManager)
 
 **主模块 (`:app`)**：
+
 - `app/src/main/java/com/xzyht/notifyrelay/util` (通用工具类，当前仅 `ApkArchMatcher.kt`)
 - `app/src/main/java/com/xzyht/notifyrelay/ui/common` (UI 通用工具：Theme、SystemBarUtils、DoubleClickConfirm、NavigationEventProvider)
 - `app/src/main/java/com/xzyht/notifyrelay/ui/navigation` (导航：Navigator、Routes)
@@ -61,6 +65,7 @@ minSdk = 29 (Android 10)，不兼容 API 29 以下版本，请勿使用相应的
 - `app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland` (浮岛配置、格式化、生命周期、图片处理)
 
 **悬浮岛模块 (`:superislandui`)**：
+
 - `superislandui/src/main/java/github/xzynine/superislandui/common` (浮岛通用：SuperIslandManager、协议、预览、文本分割器等)
 - `superislandui/src/main/java/github/xzynine/superislandui/floating/common` (浮岛渲染：CommonCompose、FocusIconResolver、SuperIslandImageUtil)
 - `superislandui/src/main/java/github/xzynine/superislandui/model` (浮岛数据模型与解析器)
@@ -73,3 +78,8 @@ minSdk = 29 (Android 10)，不兼容 API 29 以下版本，请勿使用相应的
 - 功能开发在独立分支进行，合并到 `main` 时推荐使用非快进合并 (`--no-ff`) 以保留分支提交记录。
 - 当前无长期 `dev` 分支，`main` 为开发主线和发布来源。
 
+### 构建与测试规范
+
+- 在构建与测试时，第一次构建或测试禁止使用筛选输出，以避免隐藏错误信息。
+- 禁止使用2>&1
+- 禁止使用 `&&` 运算符

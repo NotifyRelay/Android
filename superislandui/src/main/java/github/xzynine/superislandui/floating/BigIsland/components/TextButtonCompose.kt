@@ -11,7 +11,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.model.componets.TextButton
+import github.xzynine.superislandui.model.components.TextButton
 import github.xzynine.superislandui.common.PreviewData
 
 /**

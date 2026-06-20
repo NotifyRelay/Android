@@ -231,7 +231,23 @@ fun MusicControlPage() {
             )
         }
         
-
+        // 歌词分割模式设置
+        var lyricsSplitMode by remember { mutableStateOf(StorageManager.getInt(context, "lyrics_split_mode", 0)) }
+        
+        WindowSpinnerPreference(
+            title = "歌词分割模式",
+            summary = "默认：平板时不分割，手机时分割",
+            items = listOf(
+                SpinnerEntry(title = "默认"),
+                SpinnerEntry(title = "分割"),
+                SpinnerEntry(title = "不分割"),
+            ),
+            selectedIndex = lyricsSplitMode,
+            onSelectedIndexChange = { index ->
+                lyricsSplitMode = index
+                StorageManager.putInt(context, "lyrics_split_mode", index)
+            }
+        )
         
         // 媒体控制标题
         Text(

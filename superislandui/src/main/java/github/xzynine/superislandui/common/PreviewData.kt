@@ -1,13 +1,13 @@
 package github.xzynine.superislandui.common
 
-import github.xzynine.superislandui.model.componets.ActionInfo
-import github.xzynine.superislandui.model.componets.AnimIconInfo
-import github.xzynine.superislandui.model.componets.AnimTextInfo
-import github.xzynine.superislandui.model.componets.MediaSessionData
-import github.xzynine.superislandui.model.componets.MultiProgressInfo
-import github.xzynine.superislandui.model.componets.ProgressInfo
-import github.xzynine.superislandui.model.componets.TextButton
-import github.xzynine.superislandui.model.componets.TimerInfo
+import github.xzynine.superislandui.model.components.ActionInfo
+import github.xzynine.superislandui.model.components.AnimIconInfo
+import github.xzynine.superislandui.model.components.AnimTextInfo
+import github.xzynine.superislandui.model.components.MediaSessionData
+import github.xzynine.superislandui.model.components.MultiProgressInfo
+import github.xzynine.superislandui.model.components.ProgressInfo
+import github.xzynine.superislandui.model.components.TextButton
+import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.model.core.ParamV2
 import github.xzynine.superislandui.model.templates.BaseInfo
 import github.xzynine.superislandui.model.templates.ChatInfo

@@ -109,26 +109,26 @@ class TextSplitterUnitTest {
         val totalSplitLength = iconLength + capsuleLength
         
         // 验证短文本不会被拆分（iconText 为空）
-        if (textLength <= 6.0) {
+        if (textLength <= 12) {
             assert(iconText.isEmpty()) { "短文本应该不会被拆分，iconText 应该为空" }
             assert(capsuleText == text) { "短文本应该完全显示在胶囊中" }
         }
         
-        // 验证拆分后的等价长度在预期范围内
+        // 验证拆分后的权重在预期范围内
         if (iconText.isNotEmpty()) {
-            // 图标长度不超过7等价
-            assert(iconLength <= 7.0) { "图标文本长度不应超过7等价长度" }
-            // 胶囊长度至少为1等价
-            assert(capsuleLength >= 1.0) { "胶囊文本长度不应小于1等价长度" }
+            // 图标长度不超过14权重
+            assert(iconLength <= 14) { "图标文本长度不应超过14权重" }
+            // 胶囊长度至少为2权重
+            assert(capsuleLength >= 2) { "胶囊文本长度不应小于2权重" }
         }
         
-        // 在原文本长于13等价长度后，图标加胶囊至少等价10
-        if (textLength > 13.0) {
-            assert(totalSplitLength >= 10.0) { "原文本长于13等价长度时，图标加胶囊至少等价10" }
+        // 在原文本长于26权重后，图标加胶囊至少20权重
+        if (textLength > 26) {
+            assert(totalSplitLength >= 20) { "原文本长于26权重时，图标加胶囊至少20权重" }
         }
         
         // 在原始文本很短的时候胶囊加图标等于原始
-        if (textLength <= 13.0) {
+        if (textLength <= 26) {
             assert(totalSplitLength == textLength) { "原始文本很短时，胶囊加图标长度应等于原始长度" }
         }
         
