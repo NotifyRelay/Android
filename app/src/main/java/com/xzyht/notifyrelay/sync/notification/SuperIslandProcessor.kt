@@ -32,6 +32,13 @@ object SuperIslandProcessor {
     )
     
 
+    private fun dismissBySourceId(sourceId: String) {
+        FloatingReplicaManager.dismissBySource(sourceId)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
+        }
+    }
+
     private val superIslandDeduplicationCache = object : LruCache<String, Boolean>(DEDUP_CACHE_MAX_SIZE) {
         override fun entryRemoved(evicted: Boolean, key: String?, oldValue: Boolean?, newValue: Boolean?) {
             if (evicted && key != null) {
@@ -108,11 +115,7 @@ object SuperIslandProcessor {
                         try {
                             // 如果显式值看起来像完整的 sourceId（包含分隔符），直接移除
                             if (explicitFeatureKey.contains("|")) {
-                                FloatingReplicaManager.dismissBySource(explicitFeatureKey)
-                                // 同时关闭对应的 Live Updates 通知
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(explicitFeatureKey)
-                                }
+                                dismissBySourceId(explicitFeatureKey)
                                 SuperIslandRemoteStore.removeExact(explicitFeatureKey)
                                 superIslandDeduplicationCache.remove(dedupKey)
                                 Logger.i("超级岛", "收到终止通知(显式完整 sourceId)，移除去重缓存: $dedupKey -> source=$explicitFeatureKey")
@@ -124,11 +127,7 @@ object SuperIslandProcessor {
                             if (matched.isNotEmpty()) {
                                 matched.forEach { rid ->
                                     try { 
-                                        FloatingReplicaManager.dismissBySource(rid) 
-                                        // 同时关闭对应的 Live Updates 通知
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                                            LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
-                                        }
+                                        dismissBySourceId(rid)
                                     } catch (_: Exception) {}
                                     superIslandDeduplicationCache.remove("${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
                                     Logger.i("超级岛", "收到终止通知(显式 featureKey 匹配)，移除并关闭通知: $rid -> featureKey=$explicitFeatureKey")
@@ -144,11 +143,7 @@ object SuperIslandProcessor {
                     if (removedKeys.isNotEmpty()) {
                         removedKeys.forEach { rid ->
                             try { 
-                                FloatingReplicaManager.dismissBySource(rid) 
-                                // 同时关闭对应的 Live Updates 通知
-                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(rid)
-                                }
+                                dismissBySourceId(rid)
                             } catch (_: Exception) {}
                             // 同步移除去重缓存（若存在）
                             superIslandDeduplicationCache.remove("${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
@@ -159,11 +154,7 @@ object SuperIslandProcessor {
 
                     // 最后兜底：按照当前计算的 sourceKey 进行移除（可能无对应），以防漏掉
                     try { 
-                        FloatingReplicaManager.dismissBySource(sourceKey) 
-                        // 同时关闭对应的 Live Updates 通知
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                                LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceKey)
-                            }
+                        dismissBySourceId(sourceKey)
                     } catch (_: Exception) {}
                     superIslandDeduplicationCache.remove(dedupKey)
                     Logger.i("超级岛", "收到终止通知(兜底)，尝试移除: $sourceKey")

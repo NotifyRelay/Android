@@ -3,8 +3,8 @@ package com.xzyht.notifyrelay.feature.notification.superisland
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
 
 /**
  * 通知广播接收器，用于处理超级岛通知的点击和关闭事件
@@ -21,20 +21,10 @@ import notifyrelay.data.StorageManager
  *    - 浮窗功能关闭时，通知点击和关闭事件不会触发浮窗操作
  */
 class NotificationBroadcastReceiver : BroadcastReceiver() {
-    // 浮窗功能开关键
-    private val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
-    
-    /**
-     * 检查浮窗功能是否开启
-     */
-    private fun isFloatingWindowEnabled(context: Context): Boolean {
-        return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, FloatingReplicaManager.getDefaultFloatingWindowEnabled())
-    }
-    
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
         // 检查浮窗功能是否开启
-        val floatingWindowEnabled = isFloatingWindowEnabled(context)
+        val floatingWindowEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
         
         when (action) {
             "com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION" -> {

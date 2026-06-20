@@ -1,7 +1,10 @@
 ﻿package com.xzyht.notifyrelay.feature.notification.superisland.lifecycle
 
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 
@@ -58,6 +61,20 @@ object SuperIslandConfigUtils {
      */
     fun isAnySpecInjectionEnabled(context: Context): Boolean {
         return isSuperIslandSpecInjectionEnabled(context) || isLiveUpdatesSpecInjectionEnabled(context)
+    }
+
+    /**
+     * 创建通知移除时的删除 PendingIntent
+     */
+    fun createDeletePendingIntent(context: Context, notificationId: Int): PendingIntent? {
+        return PendingIntent.getBroadcast(
+            context,
+            notificationId,
+            Intent(context, NotificationBroadcastReceiver::class.java)
+                .putExtra("notificationId", notificationId)
+                .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
     }
 
     /**

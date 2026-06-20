@@ -76,34 +76,8 @@ object SuperIslandStructuredDataHelper {
                     }
                 }
 
-                // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
-                picMap?.let { map ->
-                    map.forEach { (picKey, picUrl) ->
-                        // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
-                        if (picKey.startsWith("miui.focus.pic_")) {
-                            extras.putString(picKey, picUrl)
-                        }
-                    }
-
-                    // 添加miui.focus.pics字段，包含所有图片资源的Bundle
-                    val picsBundle = Bundle()
-                    map.forEach { (picKey, picUrl) ->
-                        if (picKey.startsWith("miui.focus.pic_")) {
-                            picsBundle.putString(picKey, picUrl)
-                        }
-                    }
-                    extras.putBundle("miui.focus.pics", picsBundle)
-                    Logger.i(TAG, "添加图片资源成功，共${map.size}个图片")
-                }
-
-                // 添加焦点通知必要的额外字段
-                extras.putBoolean("miui.showAction", true)
-
-                // 添加模拟的action字段
-                val actionsBundle = Bundle()
-                actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
-                actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
-                extras.putBundle("miui.focus.actions", actionsBundle)
+                addPicMapToExtras(extras, picMap)
+                addActionBundlesToExtras(extras)
 
                 // 添加原始通知中存在的其他字段，这些可能影响UI显示
                 // 对于计时器类通知，添加计时器相关字段
@@ -194,33 +168,8 @@ object SuperIslandStructuredDataHelper {
 
             extras.putString("miui.focus.param", fullFocusParam.toString())
 
-            // 添加其他必要的焦点通知字段
-            extras.putBoolean("miui.showAction", true)
-
-            // 添加模拟的action字段
-            val actionsBundle = Bundle()
-            actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
-            actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
-            extras.putBundle("miui.focus.actions", actionsBundle)
-
-            // 添加图片资源
-            picMap?.let { map: Map<String, String> ->
-                // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
-                map.forEach { (picKey, picUrl) ->
-                    if (picKey.startsWith("miui.focus.pic_")) {
-                        extras.putString(picKey, picUrl)
-                    }
-                }
-
-                // 添加miui.focus.pics字段，包含所有图片资源的Bundle
-                val picsBundle = Bundle()
-                map.forEach { (picKey, picUrl) ->
-                    if (picKey.startsWith("miui.focus.pic_")) {
-                        picsBundle.putString(picKey, picUrl)
-                    }
-                }
-                extras.putBundle("miui.focus.pics", picsBundle)
-            }
+            addActionBundlesToExtras(extras)
+            addPicMapToExtras(extras, picMap)
 
             // 添加应用信息
             extras.putBoolean("android.reduced.images", true)
@@ -303,33 +252,8 @@ object SuperIslandStructuredDataHelper {
                 }
             }
 
-            // 按照小米官方文档规范，将每个图片资源作为单独的extra添加
-            picMap?.let { map ->
-                map.forEach { (picKey, picUrl) ->
-                    // 确保key以"miui.focus.pic_"前缀开头，符合小米规范
-                    if (picKey.startsWith("miui.focus.pic_")) {
-                        extras.putString(picKey, picUrl)
-                    }
-                }
-
-                // 添加miui.focus.pics字段，包含所有图片资源的Bundle
-                val picsBundle = Bundle()
-                map.forEach { (picKey, picUrl) ->
-                    if (picKey.startsWith("miui.focus.pic_")) {
-                        picsBundle.putString(picKey, picUrl)
-                    }
-                }
-                extras.putBundle("miui.focus.pics", picsBundle)
-            }
-
-            // 添加焦点通知必要的额外字段
-            extras.putBoolean("miui.showAction", true)
-
-            // 添加模拟的action字段
-            val actionsBundle = Bundle()
-            actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
-            actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
-            extras.putBundle("miui.focus.actions", actionsBundle)
+            addPicMapToExtras(extras, picMap)
+            addActionBundlesToExtras(extras)
 
             // 添加应用信息，与原始通知保持一致
             extras.putBoolean("android.reduced.images", true)
@@ -345,5 +269,31 @@ object SuperIslandStructuredDataHelper {
             Logger.w(TAG, "添加非媒体类型超级岛结构化数据失败 ${e.message}")
             e.printStackTrace()
         }
+    }
+
+    private fun addPicMapToExtras(extras: Bundle, picMap: Map<String, String>?) {
+        picMap?.let { map ->
+            map.forEach { (picKey, picUrl) ->
+                if (picKey.startsWith("miui.focus.pic_")) {
+                    extras.putString(picKey, picUrl)
+                }
+            }
+            val picsBundle = Bundle()
+            map.forEach { (picKey, picUrl) ->
+                if (picKey.startsWith("miui.focus.pic_")) {
+                    picsBundle.putString(picKey, picUrl)
+                }
+            }
+            extras.putBundle("miui.focus.pics", picsBundle)
+            Logger.i(TAG, "添加图片资源成功，共${map.size}个图片")
+        }
+    }
+
+    private fun addActionBundlesToExtras(extras: Bundle) {
+        extras.putBoolean("miui.showAction", true)
+        val actionsBundle = Bundle()
+        actionsBundle.putString("miui.focus.action_1", "dummy_action_1")
+        actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
+        extras.putBundle("miui.focus.actions", actionsBundle)
     }
 }

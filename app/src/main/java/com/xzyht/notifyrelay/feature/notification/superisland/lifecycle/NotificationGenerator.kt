@@ -19,18 +19,21 @@ import github.xzynine.superislandui.common.BitmapUtils
 import github.xzynine.superislandui.common.CapsuleScrollManager
 import github.xzynine.superislandui.common.TextSplitter
 import github.xzynine.superislandui.floating.SmallIsland.left.AComponent
-import github.xzynine.superislandui.floating.SmallIsland.left.AImageText1
-import github.xzynine.superislandui.floating.SmallIsland.left.AImageText5
+import github.xzynine.superislandui.floating.SmallIsland.left.aContent
+import github.xzynine.superislandui.floating.SmallIsland.left.aPicKey
+import github.xzynine.superislandui.floating.SmallIsland.left.aTitle
 import github.xzynine.superislandui.floating.SmallIsland.right.BComponent
-import github.xzynine.superislandui.floating.SmallIsland.right.BFixedWidthDigitInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText2
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText3
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText6
-import github.xzynine.superislandui.floating.SmallIsland.right.BProgressTextInfo
 import github.xzynine.superislandui.floating.SmallIsland.right.BSameWidthDigitInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BTextInfo
+import github.xzynine.superislandui.floating.SmallIsland.right.bContent
+import github.xzynine.superislandui.floating.SmallIsland.right.bPicKey
+import github.xzynine.superislandui.floating.SmallIsland.right.bProgress
+import github.xzynine.superislandui.floating.SmallIsland.right.bProgressColorReach
+import github.xzynine.superislandui.floating.SmallIsland.right.bProgressColorUnReach
+import github.xzynine.superislandui.floating.SmallIsland.right.bProgressIsCCW
+import github.xzynine.superislandui.floating.SmallIsland.right.bTitle
+import github.xzynine.superislandui.floating.SmallIsland.right.isTimerType
+import github.xzynine.superislandui.floating.SmallIsland.right.textToRender
 import notifyrelay.core.util.image.ImageUtils
-import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
@@ -230,14 +233,7 @@ object NotificationGenerator {
 
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
             val deleteIntent = if (floatingWindowEnabled) {
-                PendingIntent.getBroadcast(
-                    context,
-                    notificationId,
-                    Intent(context, NotificationBroadcastReceiver::class.java)
-                        .putExtra("notificationId", notificationId)
-                        .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
+                SuperIslandConfigUtils.createDeletePendingIntent(context, notificationId)
             } else {
                 null
             }
@@ -383,25 +379,10 @@ object NotificationGenerator {
                     val bComponent = bigIslandArea?.bComponent
 
                     // 提取进度数据
-                    val bProgress = when (bComponent) {
-                        is BProgressTextInfo -> bComponent.progress
-                        else -> null
-                    }
-
-                    val bProgressColorReach = when (bComponent) {
-                        is BProgressTextInfo -> bComponent.colorReach
-                        else -> null
-                    }
-
-                    val bProgressColorUnReach = when (bComponent) {
-                        is BProgressTextInfo -> bComponent.colorUnReach
-                        else -> null
-                    }
-
-                    val bProgressIsCCW = when (bComponent) {
-                        is BProgressTextInfo -> bComponent.isCCW
-                        else -> false
-                    }
+                    val bProgress = bComponent.bProgress
+                    val bProgressColorReach = bComponent.bProgressColorReach
+                    val bProgressColorUnReach = bComponent.bProgressColorUnReach
+                    val bProgressIsCCW = bComponent.bProgressIsCCW
 
                     // 处理进度数据，生成位图
                     if (bProgress != null) {
@@ -411,16 +392,7 @@ object NotificationGenerator {
                     // 如果没有进度数据，尝试生成文本位图
                     if (smallIconBitmap == null) {
                         // 优先使用B区文本生成位图
-                        val textToRender = when (bComponent) {
-                            is BImageText2 -> bComponent.title
-                            is BImageText3 -> bComponent.title
-                            is BImageText6 -> bComponent.title
-                            is BTextInfo -> bComponent.title
-                            is BFixedWidthDigitInfo -> bComponent.digit
-                            is BSameWidthDigitInfo -> bComponent.digit
-                            is BProgressTextInfo -> bComponent.title ?: bComponent.content
-                            else -> null
-                        }
+                        val textToRender = bComponent.textToRender
 
                         if (!textToRender.isNullOrBlank()) {
                             smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
@@ -513,7 +485,7 @@ object NotificationGenerator {
                 }
 
                 // 判断是否为正在运行的计时器类型（用于chronometer自动更新）
-                               val isRunningTimer = isTimerType &&
+                val isRunningTimer = isTimerType &&
                     (bComponent.timer!!.timerType == -1 || bComponent.timer!!.timerType == 1)
 
                 // 构建基础通知，调整属性使其更接近实际超级岛通知
@@ -594,19 +566,8 @@ object NotificationGenerator {
                     var smallIconBitmap: Bitmap? = null
 
                     // 提取 A/B 区数据（使用已解析的组件）
-                    val aPicKey = when (aComponent) {
-                        is AImageText1 -> aComponent.picKey
-                        is AImageText5 -> aComponent.picKey
-                        else -> null
-                    }
-
-                    val bPicKey = when (bComponent) {
-                        is BImageText2 -> bComponent.picKey
-                        is BImageText3 -> bComponent.picKey
-                        is BImageText6 -> bComponent.picKey
-                        is BProgressTextInfo -> bComponent.picKey
-                        else -> null
-                    }
+                    val aPicKey = aComponent.aPicKey
+                    val bPicKey = bComponent.bPicKey
 
                     // 处理图标
                     // 优先使用 A 区图标或B区图标
@@ -677,92 +638,23 @@ object NotificationGenerator {
     ): NotificationCompat.Builder {
         try {
             // 提取 A/B 区数据（使用已解析的组件）
-            val aTitle = when (aComponent) {
-                is AImageText1 -> aComponent.title
-                is AImageText5 -> aComponent.title
-                else -> null
-            }
-
-            val aContent = when (aComponent) {
-                is AImageText1 -> aComponent.content
-                is AImageText5 -> aComponent.content
-                else -> null
-            }
-
-            val aPicKey = when (aComponent) {
-                is AImageText1 -> aComponent.picKey
-                is AImageText5 -> aComponent.picKey
-                else -> null
-            }
-
-            val bTitle = when (bComponent) {
-                is BImageText2 -> bComponent.title
-                is BImageText3 -> bComponent.title
-                is BImageText6 -> bComponent.title
-                is BTextInfo -> bComponent.title
-                is BFixedWidthDigitInfo -> bComponent.digit
-                is BSameWidthDigitInfo -> {
-                    // 优先使用timer信息计算计时
-                    if (bComponent.timer != null) {
-                        formatTimerInfo(bComponent.timer!!)
-                    } else {
-                        bComponent.digit
-                    }
-                }
-                is BProgressTextInfo -> bComponent.title
-                else -> null
-            }
-
-            val bContent = when (bComponent) {
-                is BImageText2 -> bComponent.content
-                is BTextInfo -> bComponent.content
-                is BFixedWidthDigitInfo -> bComponent.content
-                is BSameWidthDigitInfo -> {
-                    // 优先使用timer信息计算计时
-                    if (bComponent.timer != null) {
-                        formatTimerInfo(bComponent.timer!!)
-                    } else {
-                        bComponent.content
-                    }
-                }
-                is BProgressTextInfo -> bComponent.content
-                else -> null
-            }
-
-            val bPicKey = when (bComponent) {
-                is BImageText2 -> bComponent.picKey
-                is BImageText3 -> bComponent.picKey
-                is BImageText6 -> bComponent.picKey
-                is BProgressTextInfo -> bComponent.picKey
-                else -> null
-            }
-
-            val bProgress = when (bComponent) {
-                is BProgressTextInfo -> bComponent.progress
-                else -> null
-            }
-
-            val bProgressColorReach = when (bComponent) {
-                is BProgressTextInfo -> bComponent.colorReach
-                else -> null
-            }
-
-            val bProgressColorUnReach = when (bComponent) {
-                is BProgressTextInfo -> bComponent.colorUnReach
-                else -> null
-            }
-
-            val bProgressIsCCW = when (bComponent) {
-                is BProgressTextInfo -> bComponent.isCCW
-                else -> false
-            }
+            val aTitle = aComponent.aTitle
+            val aContent = aComponent.aContent
+            val aPicKey = aComponent.aPicKey
+            val bTitle = bComponent.bTitle
+            val bContent = bComponent.bContent
+            val bPicKey = bComponent.bPicKey
+            val bProgress = bComponent.bProgress
+            val bProgressColorReach = bComponent.bProgressColorReach
+            val bProgressColorUnReach = bComponent.bProgressColorUnReach
+            val bProgressIsCCW = bComponent.bProgressIsCCW
 
             // 设置标准通知字段
             // 判断是否为计时器类型（包括运行中和暂停状态）
-            val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
+            val isTimerType = bComponent.isTimerType
 
             // 根据计时器状态设置标题和内容
-            if (isTimerType) {
+            if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
                 val timer = bComponent.timer
                 val timerTitle = timer?.let {
                     when (it.timerType) {
@@ -862,39 +754,12 @@ object NotificationGenerator {
         bComponent: BComponent?
     ): Bitmap? {
         // 提取 A/B 区图片键
-        val aPicKey = when (aComponent) {
-            is AImageText1 -> aComponent.picKey
-            is AImageText5 -> aComponent.picKey
-            else -> null
-        }
-        
-        val bPicKey = when (bComponent) {
-            is BImageText2 -> bComponent.picKey
-            is BImageText3 -> bComponent.picKey
-            is BImageText6 -> bComponent.picKey
-            is BProgressTextInfo -> bComponent.picKey
-            else -> null
-        }
-        
-        val bProgress = when (bComponent) {
-            is BProgressTextInfo -> bComponent.progress
-            else -> null
-        }
-        
-        val bProgressColorReach = when (bComponent) {
-            is BProgressTextInfo -> bComponent.colorReach
-            else -> null
-        }
-        
-        val bProgressColorUnReach = when (bComponent) {
-            is BProgressTextInfo -> bComponent.colorUnReach
-            else -> null
-        }
-        
-        val bProgressIsCCW = when (bComponent) {
-            is BProgressTextInfo -> bComponent.isCCW
-            else -> false
-        }
+        val aPicKey = aComponent.aPicKey
+        val bPicKey = bComponent.bPicKey
+        val bProgress = bComponent.bProgress
+        val bProgressColorReach = bComponent.bProgressColorReach
+        val bProgressColorUnReach = bComponent.bProgressColorUnReach
+        val bProgressIsCCW = bComponent.bProgressIsCCW
         
         // 处理 smallIcon
         // 优先处理进度数据
@@ -908,27 +773,14 @@ object NotificationGenerator {
         
         // 处理文本位图
         // 检查是否为计时器类型，如果是，不生成文本位图，保留之前的图标
-        val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
+        val isTimerType = bComponent.isTimerType
         if (!isTimerType) {
             // 优先使用 A 区（左侧）文本生成位图，然后才是 B 区（右侧）文本
-            val aText = when (aComponent) {
-                is AImageText1 -> aComponent.title ?: aComponent.content
-                is AImageText5 -> aComponent.title
-                else -> null
-            }
+            val aText = aComponent.aTitle ?: aComponent.aContent
             val textToRender = if (!aText.isNullOrBlank()) {
                 aText
             } else {
-                when (bComponent) {
-                    is BImageText2 -> bComponent.title
-                    is BImageText3 -> bComponent.title
-                    is BImageText6 -> bComponent.title
-                    is BTextInfo -> bComponent.title
-                    is BFixedWidthDigitInfo -> bComponent.digit
-                    is BSameWidthDigitInfo -> bComponent.digit
-                    is BProgressTextInfo -> bComponent.title ?: bComponent.content
-                    else -> null
-                }
+                bComponent.textToRender
             }
             
             Logger.d(TAG, "超级岛 处理文本位图 - textToRender: $textToRender")

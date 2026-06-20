@@ -241,9 +241,12 @@ fun formatTimerInfo(timer: TimerInfo): String {
     }
     
     val seconds = (displayValue / 1000).toInt()
+    return formatTimeFromSeconds(seconds)
+}
+
+private fun formatTimeFromSeconds(seconds: Int): String {
     val minutes = seconds / 60
     val hours = minutes / 60
-    
     return if (hours > 0) {
         String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes % 60, seconds % 60)
     } else {
@@ -256,12 +259,7 @@ fun formatTimerInfo(timer: TimerInfo): String {
  */
 fun formatDuration(ms: Long): String {
     val seconds = (ms / 1000).toInt()
-    val minutes = seconds / 60
-    val hours = minutes / 60
-
-    return if (hours > 0)
-        String.format(Locale.ROOT, "%02d:%02d:%02d", hours, minutes % 60, seconds % 60) else
-        String.format(Locale.ROOT, "%02d:%02d", minutes % 60, seconds % 60)
+    return formatTimeFromSeconds(seconds)
 }
 
 /**

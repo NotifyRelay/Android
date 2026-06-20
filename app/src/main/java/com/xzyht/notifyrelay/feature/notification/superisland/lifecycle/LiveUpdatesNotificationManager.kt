@@ -119,14 +119,7 @@ object LiveUpdatesNotificationManager {
             
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
             val deleteIntent = if (floatingWindowEnabled) {
-                PendingIntent.getBroadcast(
-                    appContext,
-                    notificationId,
-                    Intent(appContext, NotificationBroadcastReceiver::class.java)
-                        .putExtra("notificationId", notificationId)
-                        .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
+                SuperIslandConfigUtils.createDeletePendingIntent(appContext, notificationId)
             } else {
                 null
             }
@@ -191,8 +184,9 @@ object LiveUpdatesNotificationManager {
 
             // 直接设置状态栏关键文本，不再使用反解析后的标题和内容
             // 使用处理后的标题和内容
-            val processedTitle = paramV2?.baseInfo?.title?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
-            val processedContent = paramV2?.baseInfo?.content?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
+            val (processedTitle, processedContent) = processHtmlText(
+                paramV2?.baseInfo?.title, paramV2?.baseInfo?.content
+            )
 
             // 设置状态栏关键文本，优先使用处理后的标题（预计时间），然后是处理后的内容
             val shortText = when {
@@ -416,8 +410,7 @@ object LiveUpdatesNotificationManager {
                 val content = it.content ?: ""
 
                 // 处理HTML，使用LEGACY模式确保颜色标签被支持
-                val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
+                val (processedTitle, processedContent) = processHtmlText(title, content)
 
                 // 参考 NotificationGenerator.kt 的逻辑设置文本
                 updatedBuilder
@@ -436,8 +429,9 @@ object LiveUpdatesNotificationManager {
             }
 
             // 设置状态栏关键文本，与初始创建通知时保持一致
-            val processedTitle = paramV2.baseInfo?.title?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
-            val processedContent = paramV2.baseInfo?.content?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY).toString() } ?: ""
+            val (processedTitle, processedContent) = processHtmlText(
+                paramV2.baseInfo?.title, paramV2.baseInfo?.content
+            )
 
             val shortText = when {
                 processedTitle.isNotEmpty() -> processedTitle
@@ -451,14 +445,7 @@ object LiveUpdatesNotificationManager {
             
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
             val deleteIntent = if (floatingWindowEnabled) {
-                PendingIntent.getBroadcast(
-                    appContext,
-                    notificationId,
-                    Intent(appContext, NotificationBroadcastReceiver::class.java)
-                        .putExtra("notificationId", notificationId)
-                        .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
-                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-                )
+                SuperIslandConfigUtils.createDeletePendingIntent(appContext, notificationId)
             } else {
                 null
             }
@@ -545,8 +532,7 @@ object LiveUpdatesNotificationManager {
                 Logger.d(TAG, "原始内容HTML: $content")
 
                 // 处理HTML，使用LEGACY模式确保颜色标签被支持
-                val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
+                val (processedTitle, processedContent) = processHtmlText(title, content)
 
                 Logger.d(TAG, "处理后标题: $processedTitle")
                 Logger.d(TAG, "处理后内容: $processedContent")
@@ -660,8 +646,7 @@ object LiveUpdatesNotificationManager {
                 val content = it.content ?: ""
 
                 // 处理HTML，使用LEGACY模式确保颜色标签被支持
-                val processedTitle = HtmlCompat.fromHtml(title, HtmlCompat.FROM_HTML_MODE_LEGACY)
-                val processedContent = HtmlCompat.fromHtml(content, HtmlCompat.FROM_HTML_MODE_LEGACY)
+                val (processedTitle, processedContent) = processHtmlText(title, content)
 
                 // 参考 NotificationGenerator.kt 的逻辑设置文本
                 builder
@@ -825,6 +810,15 @@ object LiveUpdatesNotificationManager {
      * @param paramV2Raw ParamV2原始JSON字符串
      * @param picMap 图片映射（已解析）
      */
+    /**
+     * 辅助方法：处理HTML标题和内容，返回纯文本对
+     */
+    private fun processHtmlText(title: String?, content: String?): Pair<String, String> {
+        val processedTitle = HtmlCompat.fromHtml(title ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
+        val processedContent = HtmlCompat.fromHtml(content ?: "", HtmlCompat.FROM_HTML_MODE_LEGACY).toString()
+        return Pair(processedTitle, processedContent)
+    }
+
     private fun addSuperIslandStructuredData(
         builder: NotificationCompat.Builder,
         paramV2: ParamV2?,

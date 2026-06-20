@@ -18,6 +18,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandI
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.NotificationGenerator
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -27,7 +28,6 @@ import kotlinx.coroutines.withContext
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.data.StorageManager
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 
@@ -50,8 +50,6 @@ import java.util.concurrent.ConcurrentHashMap
 object FloatingReplicaManager {
     private const val TAG = "超级岛复刻实现骨架"
     private const val FIXED_WIDTH_DP = 320 // 固定悬浮窗宽度，以确保MultiProgressRenderer完整显示
-    private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
-    
     // 应用上下文，用于在浮窗功能关闭时保存应用上下文
     private var appContext: Context? = null
     
@@ -66,10 +64,10 @@ object FloatingReplicaManager {
     }
 
     /**
-     * 检查浮窗功能是否开启
+     * 检查浮窗功能是否开启，委托给 SuperIslandConfigUtils
      */
     private fun isFloatingWindowEnabled(context: Context): Boolean {
-        return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, getDefaultFloatingWindowEnabled())
+        return SuperIslandConfigUtils.isFloatingWindowEnabled(context)
     }
 
     /**
