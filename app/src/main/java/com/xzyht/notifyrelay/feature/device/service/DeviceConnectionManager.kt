@@ -417,9 +417,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private fun updateDeviceList() {
         val now = System.currentTimeMillis()
         //Logger.d("死神-NotifyRelay", "[updateDeviceList] invoked at $now")
-    val authSnapshot = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
-    val authed = authSnapshot.keys.toSet()
-        val allUuids = (deviceLastSeen.keys + authed).toSet()
+        val authSnapshot = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
+        val authed = authSnapshot.keys.toSet()
+        val lastSeenSnapshot = synchronized(deviceLastSeen) { deviceLastSeen.toMap() }
+        val allUuids = (lastSeenSnapshot.keys + authed).toSet()
         val newMap = mutableMapOf<String, Pair<DeviceInfo, Boolean>>()
         val unauthedTimeout = 5000L // 未认证设备保留两次UDP广播周期（2*2000ms）
         val authedHeartbeatTimeout = 12_000L // 已认证设备心跳超时阈值
@@ -434,7 +435,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             
             val deviceInfo = getDeviceInfo(uuid)
             
-            val lastSeen = deviceLastSeen[uuid]
+            val lastSeen = lastSeenSnapshot[uuid]
             val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
             if (auth != null) {
                 // 仅基于心跳包判定在线
@@ -457,7 +458,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 if (isOnline) {
                     if (info != null) newMap[uuid] = info to true
                 } else {
-                    deviceLastSeen.remove(uuid)
+                    synchronized(deviceLastSeen) { deviceLastSeen.remove(uuid) }
                 }
             }
         }
@@ -862,7 +863,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
 
             // 清理 deviceLastSeen
-            try { deviceLastSeen.remove(uuid) } catch (_: Exception) {}
+            try { synchronized(deviceLastSeen) { deviceLastSeen.remove(uuid) } } catch (_: Exception) {}
             
             // 清理 deviceInfoCache
             try {

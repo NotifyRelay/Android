@@ -68,7 +68,9 @@ object HeartbeatProcessor {
             deviceManager.authenticatedDevices.containsKey(uuid)
         }
 
-        deviceManager.deviceLastSeenInternal[uuid] = System.currentTimeMillis()
+        synchronized(deviceManager.deviceLastSeenInternal) {
+            deviceManager.deviceLastSeenInternal[uuid] = System.currentTimeMillis()
+        }
 
         val device = DeviceInfo(uuid, info.displayName, info.ip, info.port, info.batteryLevel, if (info.isCharging) '1' else '0')
 
