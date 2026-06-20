@@ -66,6 +66,10 @@ object SuperIslandProcessor {
             val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
             val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
 
+            val siType = try { json.optString("type", "") } catch (_: Exception) { "" }
+            val termVal = try { json.optString("terminateValue", "") } catch (_: Exception) { "" }
+            val isEnd = (termVal == SuperIslandProtocol.TERMINATE_VALUE)
+
             val mirrorFilterEnabled = StorageManager.getBoolean(context, "super_island_mirror_filter_enabled", true)
             if (mirrorFilterEnabled) {
                 val disabledDefaults = StorageManager.getString(context, "super_island_mirror_filter_disabled_defaults", "")
@@ -74,13 +78,11 @@ object SuperIslandProcessor {
                 val isCustomEnabled = runBlocking(Dispatchers.IO) {
                     DatabaseRepository.getInstance(context).getEnabledMirrorFilterPackages().contains(mappedPkg)
                 }
-                if ((isDefaultEnabled || isCustomEnabled) && LocalSuperIslandTracker.isActive(mappedPkg)) {
+                if ((isDefaultEnabled || isCustomEnabled) && LocalSuperIslandTracker.isActive(mappedPkg) && !isEnd) {
                     Logger.i("超级岛", "镜像应用过滤(对称)：跳过远程复刻, pkg=$mappedPkg, remoteUuid=$remoteUuid")
                     return true
                 }
             }
-
-            val siType = try { json.optString("type", "") } catch (_: Exception) { "" }
 
             // SI_ACK 属于超级岛协议的确认包，仅用于可靠性确认，不应进入通知/聊天管线
             if (siType == "SI_ACK") {
@@ -105,9 +107,7 @@ object SuperIslandProcessor {
             val dedupKey = "${remoteUuid}|${mappedPkg}|${featureId}"
 
             // 结束包判断：存在 terminateValue 或者显式 featureKeyValue 且 terminateValue 标记
-            val termVal = try { json.optString("terminateValue", "") } catch (_: Exception) { "" }
             val explicitFeatureKey = try { json.optString("featureKeyValue", "") } catch (_: Exception) { "" }
-            val isEnd = (termVal == SuperIslandProtocol.TERMINATE_VALUE)
             if (isEnd) {
                 try {
                     // 优先用显式的 featureKeyValue 进行 dismiss（若有）
