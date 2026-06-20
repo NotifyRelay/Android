@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.StorageManager
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
@@ -55,10 +56,20 @@ object FloatingReplicaManager {
     private var appContext: Context? = null
     
     /**
+     * 获取浮窗兼容的默认值，基于系统版本动态计算
+     * 系统高于 OS3.0.300 时默认关（该版本以上系统浮窗兼容性更好），否则默认开
+     */
+    fun getDefaultFloatingWindowEnabled(): Boolean {
+        val detailedOsVersion = PermissionHelper.getDetailedOsVersion()
+        val isGreater = PermissionHelper.isVersionGreaterThan(detailedOsVersion, "OS3.0.300")
+        return !isGreater
+    }
+
+    /**
      * 检查浮窗功能是否开启
      */
     private fun isFloatingWindowEnabled(context: Context): Boolean {
-        return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, true)
+        return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, getDefaultFloatingWindowEnabled())
     }
 
     /**

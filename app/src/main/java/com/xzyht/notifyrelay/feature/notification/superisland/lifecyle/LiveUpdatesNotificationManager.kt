@@ -14,6 +14,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.toColorInt
 import androidx.core.text.HtmlCompat
+import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.FormattedSuperIslandData
@@ -48,7 +49,7 @@ object LiveUpdatesNotificationManager {
      * 检查浮窗功能是否开启
      */
     private fun isFloatingWindowEnabled(context: Context): Boolean {
-        return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, true)
+        return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, FloatingReplicaManager.getDefaultFloatingWindowEnabled())
     }
 
     /**
