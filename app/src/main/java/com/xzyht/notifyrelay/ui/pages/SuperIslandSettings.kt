@@ -15,6 +15,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -252,61 +253,63 @@ fun UISuperIslandSettings() {
                     }
 
                     customPackages.forEach { pkgEntity ->
-                        val pkg = pkgEntity.packageName
-                        val isInstalled = installedPkgs.contains(pkg)
-                        var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-                        var pkgEnabled by remember { mutableStateOf(pkgEntity.enabled) }
+                        key(pkgEntity.packageName) {
+                            val pkg = pkgEntity.packageName
+                            val isInstalled = installedPkgs.contains(pkg)
+                            var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+                            var pkgEnabled by remember { mutableStateOf(pkgEntity.enabled) }
 
-                        LaunchedEffect(pkg) {
-                            if (iconBitmap == null) {
-                                iconBitmap = AppRepository.getAppIconAsync(context, pkg)
-                            }
-                        }
-
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            iconBitmap?.let {
-                                Image(
-                                    bitmap = it.asImageBitmap(),
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                            }
-                            Text(
-                                pkg,
-                                style = textStyles.body2,
-                                color = if (isInstalled) colorScheme.primary else colorScheme.onSurface,
-                                modifier = Modifier.weight(1f)
-                            )
-                            Switch(
-                                checked = pkgEnabled,
-                                onCheckedChange = { v ->
-                                    pkgEnabled = v
-                                    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                                        DatabaseRepository.getInstance(context).setMirrorFilterEnabled(pkg, v)
-                                    }
+                            LaunchedEffect(pkg) {
+                                if (iconBitmap == null) {
+                                    iconBitmap = AppRepository.getAppIconAsync(context, pkg)
                                 }
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Button(
-                                onClick = {
-                                    kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                                        DatabaseRepository.getInstance(context).deleteMirrorFilterPackage(pkg)
-                                        withContext(Dispatchers.Main) {
-                                            loadCustomPackages()
+                            }
+
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                iconBitmap?.let {
+                                    Image(
+                                        bitmap = it.asImageBitmap(),
+                                        contentDescription = null,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                }
+                                Text(
+                                    pkg,
+                                    style = textStyles.body2,
+                                    color = if (isInstalled) colorScheme.primary else colorScheme.onSurface,
+                                    modifier = Modifier.weight(1f)
+                                )
+                                Switch(
+                                    checked = pkgEnabled,
+                                    onCheckedChange = { v ->
+                                        pkgEnabled = v
+                                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                                            DatabaseRepository.getInstance(context).setMirrorFilterEnabled(pkg, v)
                                         }
                                     }
-                                },
-                                modifier = Modifier.size(32.dp)
-                            ) {
-                                Icon(
-                                    imageVector = MiuixIcons.Delete,
-                                    contentDescription = "删除",
-                                    modifier = Modifier.size(16.dp)
                                 )
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Button(
+                                    onClick = {
+                                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                                            DatabaseRepository.getInstance(context).deleteMirrorFilterPackage(pkg)
+                                            withContext(Dispatchers.Main) {
+                                                loadCustomPackages()
+                                            }
+                                        }
+                                    },
+                                    modifier = Modifier.size(32.dp)
+                                ) {
+                                    Icon(
+                                        imageVector = MiuixIcons.Delete,
+                                        contentDescription = "删除",
+                                        modifier = Modifier.size(16.dp)
+                                    )
+                                }
                             }
                         }
                     }
