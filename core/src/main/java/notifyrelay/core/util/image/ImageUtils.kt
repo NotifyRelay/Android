@@ -1,4 +1,4 @@
-﻿package notifyrelay.core.util.image
+package notifyrelay.core.util.image
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -90,7 +90,7 @@ object ImageUtils {
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
             val b = baos.toByteArray()
             val b64 = Base64.encodeToString(b, Base64.NO_WRAP)
-            "data:image/png;base64,"
+            "data:image/png;base64,$b64"
         } catch (e: Exception) {
             ""
         }
