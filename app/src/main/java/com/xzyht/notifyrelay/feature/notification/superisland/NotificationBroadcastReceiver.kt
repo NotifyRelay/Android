@@ -23,37 +23,32 @@ import notifyrelay.base.util.Logger
 class NotificationBroadcastReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val action = intent.action
-        // 检查浮窗功能是否开启
         val floatingWindowEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
+        val notificationListMode = !floatingWindowEnabled && SuperIslandConfigUtils.isNotificationListMode(context)
         
         when (action) {
             "com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION" -> {
-                // 只有在浮窗功能开启时才处理关闭通知广播
-                if (!floatingWindowEnabled) {
-                    Logger.i("超级岛", "浮窗功能已关闭，不处理关闭通知广播")
+                if (!floatingWindowEnabled && !notificationListMode) {
+                    Logger.i("超级岛", "浮窗/列表均未开启，不处理关闭通知广播")
                     return
                 }
                 
                 val notificationId = intent.getIntExtra("notificationId", 0)
                 Logger.i("超级岛", "接收到关闭通知广播，notificationId=$notificationId")
-                // 调用FloatingReplicaManager的方法关闭对应的浮窗
                 FloatingReplicaManager.closeByNotificationId(notificationId)
             }
             "com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING" -> {
-                // 只有在浮窗功能开启时才处理切换浮窗广播
-                if (!floatingWindowEnabled) {
-                    Logger.i("超级岛", "浮窗功能已关闭，不处理切换浮窗广播")
+                if (!floatingWindowEnabled && !notificationListMode) {
+                    Logger.i("超级岛", "浮窗/列表均未开启，不处理切换广播")
                     return
                 }
                 
-                // 提取重建浮窗所需的数据
                 val sourceId = intent.getStringExtra("sourceId") ?: return
                 val title = intent.getStringExtra("title")
                 val text = intent.getStringExtra("text")
                 val appName = intent.getStringExtra("appName")
                 val paramV2Raw = intent.getStringExtra("paramV2Raw")
                 
-                // 提取图片映射
                 val picMapBundle = intent.getBundleExtra("picMap")
                 val picMap = mutableMapOf<String, String>()
                 picMapBundle?.keySet()?.forEach { key ->
@@ -62,8 +57,7 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
                     }
                 }
                 
-                Logger.i("超级岛", "接收到切换浮窗广播，sourceId=$sourceId")
-                // 调用FloatingReplicaManager的方法切换浮窗状态
+                Logger.i("超级岛", "接收到切换广播，浮窗=$floatingWindowEnabled, 列表=$notificationListMode, sourceId=$sourceId")
                 FloatingReplicaManager.toggleFloating(
                     context, sourceId, title, text, paramV2Raw, 
                     if (picMap.isEmpty()) null else picMap, 

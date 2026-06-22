@@ -115,7 +115,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         } else if (sbn.packageName == applicationContext.packageName) {
             // 检查是否为超级岛相关通知（包括普通超级岛和焦点歌词）
             val channelId = sbn.notification.channelId
-            if (channelId == "super_island_replica" || channelId == "channel_id_focusNotifLyrics") {
+            if (channelId == "super_island_replica") {
                 // 超级岛相关通知被移除，关闭对应的浮窗条目
                 Logger.i(TAG, "超级岛相关通知被移除，关闭对应的浮窗条目: id=${sbn.id}, channelId=$channelId")
                 FloatingReplicaManager.closeByNotificationId(sbn.id)

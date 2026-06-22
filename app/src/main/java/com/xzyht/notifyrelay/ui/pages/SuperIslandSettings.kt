@@ -25,6 +25,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils.SpecInjectionMode
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
@@ -79,6 +80,7 @@ fun UISuperIslandSettings() {
     var enabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_KEY, true)) }
     var showSuperIsland by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_SHOW_KEY, true)) }
     var floatingWindowEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, FloatingReplicaManager.getDefaultFloatingWindowEnabled())) }
+    var notificationListEnabled by remember { mutableStateOf(SuperIslandConfigUtils.isNotificationListMode(context)) }
 
     val savedInjectionModeOrdinal = StorageManager.getInt(context, SPEC_INJECTION_MODE_KEY, SpecInjectionMode.BOTH.ordinal)
     val savedInjectionMode = SpecInjectionMode.values().getOrElse(savedInjectionModeOrdinal) { SpecInjectionMode.BOTH }
@@ -160,7 +162,22 @@ fun UISuperIslandSettings() {
                         checked = floatingWindowEnabled,
                         onCheckedChange = {
                             floatingWindowEnabled = it
-                            StorageManager.putBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, it)
+                            if (it) notificationListEnabled = false
+                            SuperIslandConfigUtils.setFloatingWindowEnabled(context, it)
+                        }
+                    )
+
+                    SwitchPreference(
+                        title = "超级岛列表模式",
+                        summary = "平板默认开启，开启后系统外显仅保留一条超级岛，点击切换",
+                        checked = notificationListEnabled,
+                        onCheckedChange = {
+                            notificationListEnabled = it
+                            if (it) {
+                                floatingWindowEnabled = false
+                                SuperIslandConfigUtils.setFloatingWindowEnabled(context, false)
+                            }
+                            SuperIslandConfigUtils.setNotificationListMode(context, it)
                         }
                     )
 

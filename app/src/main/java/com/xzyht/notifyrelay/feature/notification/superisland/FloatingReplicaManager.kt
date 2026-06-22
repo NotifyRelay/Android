@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland
 
 import android.app.NotificationManager
 import android.content.Context
+import android.widget.Toast
 import android.graphics.PixelFormat
 import android.os.Build
 import android.provider.Settings
@@ -19,6 +20,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.Lifecycl
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils
+import com.xzyht.notifyrelay.feature.notification.superisland.SuperislandListManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -50,6 +52,7 @@ import java.util.concurrent.ConcurrentHashMap
 object FloatingReplicaManager {
     private const val TAG = "超级岛复刻实现骨架"
     private const val FIXED_WIDTH_DP = 320 // 固定悬浮窗宽度，以确保MultiProgressRenderer完整显示
+    private const val LIST_MODE_NOTIFICATION_ID = 30000 // 列表模式下固定通知ID
     // 应用上下文，用于在浮窗功能关闭时保存应用上下文
     private var appContext: Context? = null
     
@@ -309,6 +312,10 @@ object FloatingReplicaManager {
         if (isFloatingWindowEnabled(context)) {
             // 浮窗功能开启，创建浮窗并发送通知
             showFloatingInternal(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked, false)
+        } else if (SuperIslandConfigUtils.isNotificationListMode(context)) {
+            // 列表模式：入列表，按需切换激活条目
+            Logger.i(TAG, "超级岛: 列表模式, sourceId=$sourceId")
+            showFloatingListMode(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked)
         } else {
             // 浮窗功能关闭，仅发送通知，不创建浮窗
             Logger.i(TAG, "超级岛: 浮窗功能已关闭，仅创建通知, sourceId=$sourceId")
@@ -390,6 +397,117 @@ object FloatingReplicaManager {
             }
         }
     }
+
+    // ────────── 列表模式辅助方法 ──────────
+
+    private fun isMediaType(paramV2Raw: String?): Boolean {
+        if (paramV2Raw.isNullOrBlank()) return false
+        return try {
+            org.json.JSONObject(paramV2Raw).optString("business", "") == "media"
+        } catch (_: Exception) {
+            false
+        }
+    }
+
+    private fun showFloatingListMode(
+        context: Context,
+        sourceId: String,
+        title: String?,
+        text: String?,
+        paramV2Raw: String?,
+        picMap: Map<String, String>?,
+        appName: String?,
+        isLocked: Boolean
+    ) {
+        val isMedia = isMediaType(paramV2Raw)
+        val changed = SuperislandListManager.addOrUpdate(
+            SuperislandListManager.ListEntry(
+                sourceId = sourceId,
+                title = title,
+                text = text,
+                paramV2Raw = paramV2Raw,
+                picMap = picMap,
+                appName = appName,
+                isLocked = isLocked,
+                isMedia = isMedia
+            )
+        )
+        if (!changed) return
+        val active = SuperislandListManager.getActive() ?: return
+        sendListModeNotification(context, active)
+    }
+
+    private fun sendListModeNotification(context: Context, entry: SuperislandListManager.ListEntry) {
+        kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            runWithErrorHandlingSuspend("发送列表模式通知") {
+                val internedPicMap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    SuperIslandImageStore.internAll(context, entry.sourceId, entry.picMap)
+                }
+                val formattedData = SuperIslandDataFormatter.formatForDisplay(
+                    context, entry.paramV2Raw, internedPicMap
+                )
+                val paramV2 = formattedData.paramV2
+                val displayTitle = entry.title?.takeIf { it.isNotBlank() }
+                    ?: paramV2?.highlightInfo?.title?.takeIf { it.isNotBlank() }
+                    ?: paramV2?.baseInfo?.title?.takeIf { it.isNotBlank() }
+                val displayText = entry.text?.takeIf { it.isNotBlank() }
+                    ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
+                    ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
+                val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
+                if (isProgressType && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.BAKLAVA) {
+                    LiveUpdatesNotificationManager.initialize(context)
+                    LiveUpdatesNotificationManager.showLiveUpdate(
+                        entry.sourceId, displayTitle, displayText, entry.appName, formattedData,
+                        overrideNotificationId = LIST_MODE_NOTIFICATION_ID
+                    )
+                    addSourceIdMapping(entry.sourceId, entry.sourceId, LIST_MODE_NOTIFICATION_ID)
+                } else {
+                    val notificationId = NotificationGenerator.sendReplicaNotification(
+                        context, key = entry.sourceId,
+                        title = displayTitle, text = displayText, appName = entry.appName,
+                        paramV2 = paramV2, paramV2Raw = formattedData.paramV2Raw,
+                        picMap = formattedData.resolvedPicMap, sourceId = entry.sourceId,
+                        floatingWindowManager = floatingWindowManager,
+                        entryKeyToNotificationId = entryKeyToNotificationId,
+                        overrideNotificationId = LIST_MODE_NOTIFICATION_ID
+                    )
+                    if (notificationId != null) addSourceIdMapping(entry.sourceId, entry.sourceId, notificationId)
+                }
+                scheduleListModeTimeoutFor(entry.sourceId)
+            }
+        }
+    }
+
+    private fun scheduleListModeTimeoutFor(sourceId: String) {
+        timeoutJobs[sourceId]?.cancel()
+        val job = kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
+            kotlinx.coroutines.delay(30_000L)
+            runWithErrorHandling("列表模式超时移除") {
+                dismissBySource(sourceId)
+            }
+        }
+        timeoutJobs[sourceId] = job
+    }
+
+    private fun switchNotificationInList(context: Context) {
+        val next = SuperislandListManager.switchNext()
+        if (next != null) {
+            Toast.makeText(context, "切换", Toast.LENGTH_SHORT).show()
+            sendListModeNotification(context, next)
+        }
+    }
+
+    private fun dismissFromList(context: Context, sourceId: String) {
+        val next = SuperislandListManager.remove(sourceId)
+        if (next != null) {
+            sendListModeNotification(context, next)
+        } else {
+            val nm = context.getSystemService(android.app.NotificationManager::class.java)
+            nm?.cancel(LIST_MODE_NOTIFICATION_ID)
+        }
+    }
+
+    // ────────── 列表模式辅助方法结束 ──────────
 
     /**
      * 内部显示浮窗方法
@@ -532,7 +650,12 @@ object FloatingReplicaManager {
     ) {
         // 检查浮窗功能是否开启
         if (!isFloatingWindowEnabled(context)) {
-            Logger.i(TAG, "超级岛: 浮窗功能已关闭，不处理浮窗状态切换, sourceId=$sourceId")
+            if (SuperIslandConfigUtils.isNotificationListMode(context) && appContext != null) {
+                Logger.i(TAG, "超级岛: 列表模式 - 切换到下一条通知, sourceId=$sourceId")
+                switchNotificationInList(context.applicationContext)
+            } else {
+                Logger.i(TAG, "超级岛: 浮窗功能已关闭，不处理浮窗状态切换, sourceId=$sourceId")
+            }
             return
         }
         
@@ -641,6 +764,24 @@ object FloatingReplicaManager {
      */
     fun closeByNotificationId(notificationId: Int) {
         runWithErrorHandling("根据通知ID关闭浮窗条目") {
+            val ctx = appContext ?: return@runWithErrorHandling
+            
+            // 列表模式：用户划掉通知 → 移除当前激活 → 切到下一个或取消
+            if (!isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
+                Logger.i(TAG, "超级岛: 列表模式关闭通知，notificationId=$notificationId")
+                val active = SuperislandListManager.getActive()
+                if (active != null) {
+                    val next = SuperislandListManager.remove(active.sourceId)
+                    if (next != null) {
+                        sendListModeNotification(ctx, next)
+                    } else {
+                        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                        nm.cancel(LIST_MODE_NOTIFICATION_ID)
+                    }
+                }
+                return@runWithErrorHandling
+            }
+            
             // 首先检查浮窗功能是否开启
             if (appContext != null && !isFloatingWindowEnabled(appContext!!)) {
                 // 浮窗功能已关闭，直接关闭通知，不处理浮窗
@@ -741,6 +882,18 @@ object FloatingReplicaManager {
             // 清理超时任务
             timeoutJobs.remove(sourceId)?.cancel()
             Logger.i(TAG, "dismissBySourceInternal: 清理超时任务, sourceId=$sourceId")
+            
+            // 列表模式：从列表中移除，按需切换到下一条或取消通知
+            val ctx = appContext
+            if (ctx != null && !isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
+                dismissFromList(ctx, sourceId)
+                closedSourceIds[sourceId] = System.currentTimeMillis()
+                if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
+                    blockedInstanceIds.remove(sourceId)
+                }
+                Logger.i(TAG, "dismissBySourceInternal: 列表模式处理完成, sourceId=$sourceId")
+                return@runWithErrorHandling
+            }
             
             // 首先检查浮窗功能是否开启
             val floatingEnabled = if (appContext != null) isFloatingWindowEnabled(appContext!!) else true
