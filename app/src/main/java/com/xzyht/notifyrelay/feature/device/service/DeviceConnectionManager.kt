@@ -268,9 +268,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal val authenticatedDevices = mutableMapOf<String, AuthInfo>()
     // 被拒绝设备表
     private val rejectedDevices = mutableSetOf<String>()
-    // 本地密钥对（简单字符串模拟，实际应用可用RSA/ECDH等）
+    // 本地 ECDH 公钥（Base64 编码的 65 字节未压缩点）
     internal val localPublicKey: String
-    private val localPrivateKey: String
+    // localPrivateKey 不再使用，ECDH 私钥在 Android Keystore 中，不可直接获取
+    @Deprecated("ECDH 私钥在 Keystore 中，不再使用")
+    private val localPrivateKey: String = ""
     internal val listenPort: Int = 23333
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     private val keepAlive = ConnectionKeepAlive(this, coroutineScope)
@@ -285,6 +287,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     internal val rejectedDevicesInternal: MutableSet<String>
         get() = rejectedDevices
+
+    internal val incompatibleDevicesInternal = mutableSetOf<String>()
 
     internal val coroutineScopeInternal: CoroutineScope
         get() = coroutineScope
@@ -373,17 +377,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             StorageManager.putString(context, "device_uuid", newUuid)
             uuid = newUuid
         }
-        // 公钥持久化
-        val savedPub = StorageManager.getString(context, "device_pubkey")
-        if (savedPub.isNotEmpty()) {
-            localPublicKey = savedPub
-        } else {
-            val newPub = UUID.randomUUID().toString().replace("-", "")
-            StorageManager.putString(context, "device_pubkey", newPub)
-            localPublicKey = newPub
-        }
-        // 私钥可临时
-        localPrivateKey = UUID.randomUUID().toString().replace("-", "")
+        // ECDH 公钥（从 Android Keystore 获取或生成 secp256r1 密钥对）
+        localPublicKey = EncryptionManager.getEcdhPublicKeyBase64()
         // 兼容旧用户：首次运行时如无保存则默认true
         if (!AppConfig.getUdpDiscoveryEnabled(context)) {
             AppConfig.setUdpDiscoveryEnabled(context, true)
@@ -437,10 +432,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             
             val lastSeen = lastSeenSnapshot[uuid]
             val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
+            // 不兼容的旧版协议设备，强制离线
+            val isIncompatible = incompatibleDevicesInternal.contains(uuid)
             if (auth != null) {
                 // 仅基于心跳包判定在线
                 val diff = if (lastSeen != null) now - lastSeen else -1L
-                val isOnline = lastSeen != null && diff <= authedHeartbeatTimeout
+                val isOnline = !isIncompatible && lastSeen != null && diff <= authedHeartbeatTimeout
                 val info = deviceInfo ?: DeviceInfo(uuid, auth.displayName ?: "已认证设备", "", listenPort)
                 val oldOnline = oldMap[uuid]?.second
                 if (oldOnline != null && oldOnline != isOnline) {

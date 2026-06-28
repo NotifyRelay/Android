@@ -217,7 +217,11 @@ class ConnectionKeepAlive(
                     val parts = resp.split(":")
                     if (parts.size >= 3) {
                         val remotePubKey = parts[2]
-                        val sharedSecret = EncryptionManager.generateSharedSecret(deviceManager.localPublicKey, remotePubKey)
+                        val sharedSecret = EncryptionManager.generateSharedSecret(
+                            deviceManager.contextInternal,
+                            deviceManager.localPublicKey,
+                            remotePubKey
+                        )
                         synchronized(authenticatedDevices) {
                             authenticatedDevices.remove(device.uuid)
                             authenticatedDevices[device.uuid] = AuthInfo(
@@ -267,6 +271,15 @@ class ConnectionKeepAlive(
                     //Logger.d("死神-NotifyRelay", "认证失败: resp=$resp")
                     return Pair(false, "认证失败")
                 }
+            } catch (e: UnsupportedOperationException) {
+                // 格式不匹配：无需重试，直接提示用户升级
+                val ctx = deviceManager.contextInternal
+                val displayName = device.displayName
+                android.os.Handler(android.os.Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(ctx, "设备 $displayName 使用旧版加密协议，请在对方设备上升级 NotifyRelay", android.widget.Toast.LENGTH_LONG).show()
+                }
+                Logger.e("死神-NotifyRelay", "connectToDevice 格式不匹配: ${e.message}")
+                return Pair(false, e.message)
             } catch (e: Exception) {
                 lastException = e
                 //Logger.d("死神-NotifyRelay", "connectToDevice重试 $retry 失败: ${e.message}")

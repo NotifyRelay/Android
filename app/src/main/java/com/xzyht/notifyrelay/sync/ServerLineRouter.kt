@@ -1,6 +1,7 @@
 package com.xzyht.notifyrelay.sync
 
 import android.content.Context
+import android.widget.Toast
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
@@ -107,8 +108,34 @@ object ServerLineRouter {
                     deviceManager.authenticatedDevices[remoteUuid]?.isAccepted == true
                 }
 
-                // 4. 已认证设备：自动 ACCEPT（静默建立信任链）
+                // 4. 已认证设备：检查格式兼容性
                 if (alreadyAuthed) {
+                    val localIsEcdh = EncryptionManager.isEcdhFormat(deviceManager.localPublicKey)
+                    val remoteIsEcdh = EncryptionManager.isEcdhFormat(remotePubKey)
+                    if (localIsEcdh != remoteIsEcdh) {
+                        // 格式不兼容：加入黑名单并拒绝
+                        synchronized(deviceManager.incompatibleDevicesInternal) {
+                            deviceManager.incompatibleDevicesInternal.add(remoteUuid)
+                        }
+                        Logger.w(TAG, "设备 ${remoteDevice.displayName}($remoteUuid) 使用旧版加密协议，已拒绝连接。请升级该设备")
+                        val writer = OutputStreamWriter(client.getOutputStream())
+                        writer.write("REJECT:${deviceManager.uuid}\n")
+                        writer.flush()
+                        writer.close()
+                        reader.close()
+                        client.close()
+                        // 显示 Toast 提示
+                        android.os.Handler(android.os.Looper.getMainLooper()).post {
+                            android.widget.Toast.makeText(deviceManager.contextInternal,
+                                "设备 ${remoteDevice.displayName} 使用旧版加密协议，请在对方设备上升级 NotifyRelay",
+                                android.widget.Toast.LENGTH_LONG).show()
+                        }
+                        return
+                    }
+                    // 格式一致：从黑名单移除（如果有）
+                    synchronized(deviceManager.incompatibleDevicesInternal) {
+                        deviceManager.incompatibleDevicesInternal.remove(remoteUuid)
+                    }
                     val writer = OutputStreamWriter(client.getOutputStream())
                     val localBattery = getLocalBatteryInfo(deviceManager)
                     val localDeviceType = "android"
@@ -136,20 +163,36 @@ object ServerLineRouter {
                     if (deviceManager.udpDiscoveryEnabled) {
                         // 5. 未认证但有回调且启用了显示未认证设备：交由 UI 确认是否接受连接
                         deviceManager.handshakeRequestHandler!!.onHandshakeRequest(remoteDevice, remotePubKey) { accepted ->
+                            var actuallyAccepted = accepted
                             if (accepted) {
-                                // 用户点击"接受"：生成共享密钥并写入认证表
-                                val sharedSecret = EncryptionManager.generateSharedSecret(deviceManager.localPublicKey, remotePubKey)
-                                synchronized(deviceManager.authenticatedDevices) {
-                                    deviceManager.authenticatedDevices.remove(remoteUuid)
-                                    deviceManager.authenticatedDevices[remoteUuid] = AuthInfo(
-                                        remotePubKey, sharedSecret, true, remoteDevice.displayName,
-                                        deviceType = remoteDeviceType, battery = remoteBattery
+                                try {
+                                    // 用户点击"接受"：生成共享密钥并写入认证表
+                                    val sharedSecret = EncryptionManager.generateSharedSecret(
+                                        deviceManager.contextInternal,
+                                        deviceManager.localPublicKey,
+                                        remotePubKey
                                     )
-                                    deviceManager.saveAuthedDevicesInternal()
+                                    synchronized(deviceManager.authenticatedDevices) {
+                                        deviceManager.authenticatedDevices.remove(remoteUuid)
+                                        deviceManager.authenticatedDevices[remoteUuid] = AuthInfo(
+                                            remotePubKey, sharedSecret, true, remoteDevice.displayName,
+                                            deviceType = remoteDeviceType, battery = remoteBattery
+                                        )
+                                        deviceManager.saveAuthedDevicesInternal()
+                                    }
+                                    try { deviceManager.updateDeviceListInternal() } catch (_: Exception) {}
+                                } catch (e: Exception) {
+                                    val msg = "无法与设备 ${remoteDevice.displayName} 配对：${e.message}"
+                                    Logger.e(TAG, msg)
+                                    // 在 UI 线程显示 Toast 提示
+                                    android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                        Toast.makeText(deviceManager.contextInternal, msg, Toast.LENGTH_LONG).show()
+                                    }
+                                    actuallyAccepted = false
                                 }
-                                try { deviceManager.updateDeviceListInternal() } catch (_: Exception) {}
-                            } else {
-                                // 用户拒绝：记录到本地拒绝名单，避免反复打扰
+                            }
+                            if (!actuallyAccepted) {
+                                // 用户拒绝或密钥派生失败：记录到本地拒绝名单，避免反复打扰
                                 synchronized(deviceManager.rejectedDevicesInternal) {
                                     deviceManager.rejectedDevicesInternal.add(remoteUuid)
                                 }
@@ -160,7 +203,7 @@ object ServerLineRouter {
                                 val localBattery = getLocalBatteryInfo(deviceManager)
                                 val localDeviceType = "android"
                                 val localIp = getLocalIpAddress(deviceManager)
-                                if (accepted) {
+                                if (actuallyAccepted) {
                                     writer.write("ACCEPT:${deviceManager.uuid}:${deviceManager.localPublicKey}:$localIp:$localBattery:$localDeviceType\n")
                                 } else {
                                     writer.write("REJECT:${deviceManager.uuid}\n")

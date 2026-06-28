@@ -37,12 +37,13 @@ object EncryptionManager {
      * RSA - 非对称加密（最高安全）
      */
     enum class EncryptionType {
-        AES,    // AES对称加密（推荐）
+        ECDH,   // ECDH 密钥协商（推荐）
+        AES,    // AES对称加密
         RSA     // RSA非对称加密（最高安全）
     }
 
-    // 当前使用的加密类型（默认AES）
-    private var currentEncryptionType: EncryptionType = EncryptionType.AES
+    // 当前使用的加密类型（默认ECDH）
+    private var currentEncryptionType: EncryptionType = EncryptionType.ECDH
 
     // =================== AES加密实现 ===================
     private object AESEncryption {
@@ -317,6 +318,7 @@ object EncryptionManager {
      */
     fun encrypt(data: String, key: String): String {
         return when (currentEncryptionType) {
+            EncryptionType.ECDH -> AESEncryption.encrypt(data, key)
             EncryptionType.AES -> AESEncryption.encrypt(data, key)
             EncryptionType.RSA -> throw UnsupportedOperationException("RSA encryption requires PublicKey object")
         }
@@ -333,6 +335,7 @@ object EncryptionManager {
      */
     fun decrypt(encryptedData: String, key: String): String {
         return when (currentEncryptionType) {
+            EncryptionType.ECDH -> AESEncryption.decrypt(encryptedData, key)
             EncryptionType.AES -> AESEncryption.decrypt(encryptedData, key)
             EncryptionType.RSA -> throw UnsupportedOperationException("RSA decryption requires PrivateKey object")
         }
@@ -348,9 +351,61 @@ object EncryptionManager {
      */
     fun generateSharedSecret(localKey: String, remoteKey: String): String {
         return when (currentEncryptionType) {
+            EncryptionType.ECDH -> AESEncryption.generateSharedSecret(localKey, remoteKey)
             EncryptionType.AES -> AESEncryption.generateSharedSecret(localKey, remoteKey)
             EncryptionType.RSA -> RSAEncryption.generateSharedSecret(localKey, remoteKey)
         }
+    }
+
+    // =================== ECDH 方法 ===================
+
+    /**
+     * 执行 ECDH 密钥协商，返回 SHA-256 哈希后的 32 字节（Base64 编码）
+     */
+    fun ecdhGenerateSharedSecret(remotePublicKeyBase64: String): String {
+        return EcdhKeyStore.generateSharedSecret(remotePublicKeyBase64)
+    }
+
+    /**
+     * 获取本地 ECDH 公钥的 Base64 编码（65 字节未压缩点）
+     */
+    fun getEcdhPublicKeyBase64(): String {
+        return EcdhKeyStore.getPublicKeyBase64()
+    }
+
+    /**
+     * 检测公钥是否是 ECDH 格式
+     * 旧格式（UUID hex，32 位十六进制字符串）返回 false
+     * 新格式（Base64 编码的 EC 未压缩点）返回 true
+     */
+    fun isEcdhFormat(publicKey: String): Boolean {
+        if (publicKey.length == 32 && publicKey.matches(Regex("^[0-9a-fA-F]{32}$"))) return false
+        return true
+    }
+
+    /**
+     * 格式感知的共享密钥派生
+     *
+     * 两端都是 ECDH 格式 → ECDH 协商 → SHA-256 → Base64
+     * 两端都是旧 UUID 格式 → 旧 HKDF 逻辑
+     *
+     * @param context Android 上下文（用于 Keystore 访问）
+     * @param localKey 本地公钥
+     * @param remoteKey 远端公钥
+     * @return Base64 编码的共享密钥
+     */
+    fun generateSharedSecret(context: android.content.Context, localKey: String, remoteKey: String): String {
+        val localIsEcdh = isEcdhFormat(localKey)
+        val remoteIsEcdh = isEcdhFormat(remoteKey)
+        if (localIsEcdh && remoteIsEcdh) {
+            return ecdhGenerateSharedSecret(remoteKey)
+        }
+        // UUID↔UUID → 旧 HKDF
+        if (!localIsEcdh && !remoteIsEcdh) {
+            return generateSharedSecret(localKey, remoteKey)
+        }
+        // 新旧混用：抛异常，调用方 catch 后拒绝连接
+        throw UnsupportedOperationException("不支持新旧格式混用配对，请升级对方的 NotifyRelay 版本")
     }
 
     // =================== RSA专用方法 ===================
@@ -478,7 +533,8 @@ object EncryptionManager {
      */
     fun getEncryptionTypeDisplayName(type: EncryptionType): String {
         return when (type) {
-            EncryptionType.AES -> "AES加密（推荐）"
+            EncryptionType.ECDH -> "ECDH密钥协商（推荐）"
+            EncryptionType.AES -> "AES加密"
             EncryptionType.RSA -> "RSA加密（最高安全）"
         }
     }
@@ -492,6 +548,8 @@ object EncryptionManager {
      */
     fun getEncryptionTypeDescription(type: EncryptionType): String {
         return when (type) {
+            EncryptionType.ECDH ->
+                "ECDH密钥协商，私钥由硬件安全模块保护。安全性高，推荐用于配对场景。"
             EncryptionType.AES ->
                 "AES对称加密，安全性高，性能良好。推荐用于大多数场景。"
             EncryptionType.RSA ->
@@ -507,7 +565,7 @@ object EncryptionManager {
      * @return 如果为 AES 则返回 true，否则返回 false
      */
     fun supportsSymmetricEncryption(type: EncryptionType): Boolean {
-        return type == EncryptionType.AES
+        return type == EncryptionType.AES || type == EncryptionType.ECDH
     }
 
     /**
