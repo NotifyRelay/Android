@@ -1,0 +1,211 @@
+package com.xzyht.notifyrelay.servers.clipboard
+
+import android.content.ComponentName
+import android.content.Context
+import android.content.Intent
+import android.content.ServiceConnection
+import android.os.IBinder
+import android.util.Base64
+import notifyrelay.base.util.Logger
+import org.fcitx.fcitx5.android.common.ipc.IBroadcastPairingService
+
+object FcitxClipboardManager {
+    private const val TAG = "Fcitx5广播剪切板"
+    private const val FCITX5_PAIRING_ACTION = "org.fcitx.fcitx5.android.BROADCAST_PAIRING"
+    private const val FCITX5_SERVICE_CLASS = "org.fcitx.fcitx5.android.BroadcastPairingService"
+    private val FCITX5_PACKAGES = listOf(
+        "org.fcitx.fcitx5.android",
+        "org.fcitx.fcitx5.android.debug"
+    )
+    private const val CLIPBOARD_KEY_ALIAS = "fcitx5_clipboard_key"
+
+    var isPaired: Boolean = false
+        private set
+
+    private var pairingService: IBroadcastPairingService? = null
+    private var bindingContext: Context? = null
+    private var isBinding = false
+
+    private var pendingPairingRequest: Pair<String, (Boolean) -> Unit>? = null
+
+    fun restorePairedState(context: Context) {
+        isPaired = notifyrelay.core.util.SecureKeyStorage.retrieveAndDecrypt(context, CLIPBOARD_KEY_ALIAS) != null
+    }
+
+    private val serviceConnection = object : ServiceConnection {
+        override fun onServiceConnected(name: ComponentName, service: IBinder) {
+            pairingService = IBroadcastPairingService.Stub.asInterface(service)
+            isBinding = false
+            Logger.d(TAG, "已连接到 Fcitx5 配对服务")
+
+            pendingPairingRequest?.let { (code, callback) ->
+                pendingPairingRequest = null
+                doRequestPairing(code, callback)
+            }
+        }
+
+        override fun onServiceDisconnected(name: ComponentName) {
+            pairingService = null
+            isBinding = false
+            Logger.d(TAG, "Fcitx5 配对服务已断开")
+        }
+    }
+
+    fun bindService(context: Context) {
+        if (pairingService != null || isBinding) return
+        bindingContext = context
+        isBinding = true
+
+        for (pkg in FCITX5_PACKAGES) {
+            val intent = Intent(FCITX5_PAIRING_ACTION).apply {
+                component = ComponentName(pkg, FCITX5_SERVICE_CLASS)
+            }
+            try {
+                val bound = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+                if (bound) {
+                    Logger.d(TAG, "正在绑定 Fcitx5 配对服务 ($pkg)...")
+                    return
+                }
+            } catch (_: Exception) {
+            }
+        }
+        isBinding = false
+        Logger.e(TAG, "绑定 Fcitx5 配对服务失败：所有包名均不可用")
+    }
+
+    fun unbindService() {
+        pendingPairingRequest = null
+        bindingContext?.let { ctx ->
+            try {
+                ctx.unbindService(serviceConnection)
+            } catch (e: Exception) {
+                Logger.e(TAG, "解绑 Fcitx5 配对服务失败", e)
+            }
+        }
+        pairingService = null
+        bindingContext = null
+        isBinding = false
+    }
+
+    fun requestPairing(context: Context, code: String, onResult: (Boolean) -> Unit) {
+        if (pairingService != null) {
+            doRequestPairing(code, onResult)
+            return
+        }
+        pendingPairingRequest = code to onResult
+        bindService(context)
+    }
+
+    private fun doRequestPairing(code: String, onResult: (Boolean) -> Unit) {
+        try {
+            val ctx = bindingContext ?: run {
+                onResult(false)
+                return
+            }
+            val packageName = ctx.packageName
+            val appName = ctx.applicationInfo.loadLabel(ctx.packageManager).toString()
+            val success = pairingService!!.requestPairing(code, packageName, appName)
+            if (success) {
+                isPaired = true
+                val sharedKey = pairingService!!.getSharedKey(packageName)
+                if (sharedKey != null) {
+                    notifyrelay.core.util.SecureKeyStorage.encryptAndStore(ctx, "fcitx5_clipboard_key", sharedKey)
+                    Logger.d(TAG, "Fcitx5 配对成功，密钥已保存")
+                } else {
+                    Logger.w(TAG, "Fcitx5 配对成功但获取密钥失败")
+                }
+            } else {
+                Logger.d(TAG, "Fcitx5 配对失败：配对码错误或已过期")
+            }
+            onResult(success)
+        } catch (e: android.os.DeadObjectException) {
+            Logger.e(TAG, "Fcitx5 服务已断开，清理后重新绑定")
+            val ctx = bindingContext
+            try {
+                ctx?.unbindService(serviceConnection)
+            } catch (_: Exception) {}
+            pairingService = null
+            bindingContext = null
+            isBinding = false
+            pendingPairingRequest = code to onResult
+            if (ctx != null) bindService(ctx)
+            else onResult(false)
+        } catch (e: Exception) {
+            Logger.e(TAG, "Fcitx5 配对请求异常", e)
+            onResult(false)
+        }
+    }
+
+    fun revokePairing(context: Context): Boolean {
+        var remoteSuccess = false
+        try {
+            if (pairingService == null) bindService(context)
+            remoteSuccess = pairingService?.revokePairing(context.packageName) ?: false
+        } catch (e: Exception) {
+            Logger.e(TAG, "远程撤销失败，仅清除本地状态", e)
+        }
+        isPaired = false
+        notifyrelay.core.util.SecureKeyStorage.removeKey(context, "fcitx5_clipboard_key")
+        try {
+            val ks = java.security.KeyStore.getInstance("AndroidKeyStore")
+            ks.load(null)
+            if (ks.containsAlias("fcitx5_clipboard_imported")) {
+                ks.deleteEntry("fcitx5_clipboard_imported")
+            }
+        } catch (_: Exception) {}
+        try { unbindService() } catch (_: Exception) {}
+        Logger.d(TAG, "Fcitx5 配对已撤销")
+        return true
+    }
+
+    fun checkPairingStatus(context: Context): Boolean {
+        return try {
+            if (pairingService == null) bindService(context)
+            val result = pairingService?.isAppPaired(context.packageName) ?: false
+            isPaired = result
+            result
+        } catch (e: Exception) {
+            Logger.e(TAG, "检查 Fcitx5 配对状态失败", e)
+            false
+        }
+    }
+
+    fun decryptClipboardData(context: Context, encryptedData: ByteArray): String? {
+        return try {
+            val secretKey = notifyrelay.core.util.SecureKeyStorage.retrieveAndDecrypt(context, "fcitx5_clipboard_key")
+                ?: return null
+
+            val ivLength = encryptedData[0].toInt() and 0xFF
+            val iv = encryptedData.copyOfRange(1, 1 + ivLength)
+            val ciphertext = encryptedData.copyOfRange(1 + ivLength, encryptedData.size)
+
+            val keystoreKey = ensureClipboardKeyInKeystore(context, secretKey)
+            val cipher = javax.crypto.Cipher.getInstance("AES/GCM/NoPadding")
+            val spec = javax.crypto.spec.GCMParameterSpec(128, iv)
+            cipher.init(javax.crypto.Cipher.DECRYPT_MODE, keystoreKey, spec)
+            String(cipher.doFinal(ciphertext), Charsets.UTF_8)
+        } catch (e: Exception) {
+            Logger.e(TAG, "解密 Fcitx5 剪贴板数据失败", e)
+            null
+        }
+    }
+
+    private fun ensureClipboardKeyInKeystore(context: Context, secretKeyBase64: String): javax.crypto.SecretKey {
+        val alias = "fcitx5_clipboard_imported"
+        val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        if (keyStore.containsAlias(alias)) {
+            return keyStore.getKey(alias, null) as javax.crypto.SecretKey
+        }
+        val keyBytes = Base64.decode(secretKeyBase64, Base64.NO_WRAP)
+        val originalKey = javax.crypto.spec.SecretKeySpec(keyBytes, "AES")
+        val protectionParams = android.security.keystore.KeyProtection.Builder(
+            javax.crypto.Cipher.DECRYPT_MODE
+        )
+            .setBlockModes(android.security.keystore.KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(android.security.keystore.KeyProperties.ENCRYPTION_PADDING_NONE)
+            .build()
+        keyStore.setEntry(alias, java.security.KeyStore.SecretKeyEntry(originalKey), protectionParams)
+        return keyStore.getKey(alias, null) as javax.crypto.SecretKey
+    }
+}

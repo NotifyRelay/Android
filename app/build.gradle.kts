@@ -119,6 +119,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        aidl = true
     }
 
     // 只在 release 构建时启用 ABI splits，debug 只生成 universal APK

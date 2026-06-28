@@ -37,6 +37,9 @@
     <!-- 剪贴板访问权限 -->
     <uses-permission android:name="android.permission.READ_CLIPBOARD_IN_BACKGROUND" android:maxSdkVersion="34" tools:ignore="ProtectedPermissions" />
 
+    <!-- Fcitx5 剪贴板广播接收权限 -->
+    <uses-permission android:name="org.fcitx.fcitx5.android.permission.CLIPBOARD_BROADCAST" />
+
     <application
         android:enableOnBackInvokedCallback="true"
         android:allowBackup="true"
@@ -82,6 +85,15 @@
             </intent-filter>
         </receiver>
         
+        <!-- Fcitx5 剪贴板广播接收器 -->
+        <receiver
+            android:name=".servers.clipboard.FcitxClipboardReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="org.fcitx.fcitx5.android.action.CLIPBOARD_BROADCAST" />
+            </intent-filter>
+        </receiver>
+
         <!-- 超级岛通知广播接收器，用于处理通知删除事件 -->
         <receiver
             android:name=".feature.notification.superisland.NotificationBroadcastReceiver"
@@ -92,13 +104,13 @@
             </intent-filter>
         </receiver>
         
-        <!-- 剪贴板监控服�?-->
+        <!-- 剪贴板监控服务 -->
         <service
             android:name=".servers.ClipboardMonitorService"
             android:exported="false"
             android:foregroundServiceType="dataSync"
             android:stopWithTask="false" />
-            
+
         <!-- 剪贴板同步透明Activity -->
         <activity
             android:name=".ui.activity.ClipboardSyncActivity"
@@ -108,26 +120,13 @@
             android:noHistory="true"
             android:excludeFromRecents="true"
             android:taskAffinity="" />
-            
+
         <!-- 开发者模式Activity -->
         <activity
             android:name=".ui.activity.DeveloperModeActivity"
             android:exported="true"
             android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar" />
-            
-        <!-- 剪贴板无障碍服务 -->
-        <service
-            android:name=".servers.ClipboardAccessibilityService"
-            android:label="NotifyRelay 设备互联"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/clipboard_accessibility_service" />
-        </service>
+
     </application>
 
 </manifest>

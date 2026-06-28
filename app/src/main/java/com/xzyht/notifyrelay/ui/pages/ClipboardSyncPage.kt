@@ -1,9 +1,8 @@
 package com.xzyht.notifyrelay.ui.pages
 
-import android.content.Intent
-import android.provider.Settings
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -17,23 +16,29 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
-import notifyrelay.base.util.Logger
+import com.xzyht.notifyrelay.servers.clipboard.FcitxClipboardManager
+import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import notifyrelay.base.util.ToastUtils
+import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 enum class ClipboardSyncMode(val displayName: String) {
     OFF("关闭"),
-    ACCESSIBILITY("无障碍服务")
+    FCITX5("Fcitx5")
 }
 
 @Composable
@@ -42,30 +47,35 @@ fun ClipboardSyncPage() {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
     val lifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
-    
-    var accessibilityEnabled by remember {
-        mutableStateOf(ClipboardSyncManager.isAccessibilityServiceEnabled(context))
+    val scope = rememberCoroutineScope()
+
+    var fcitx5Paired by remember {
+        FcitxClipboardManager.restorePairedState(context)
+        mutableStateOf(FcitxClipboardManager.isPaired)
     }
-    
+
     var selectedMode by remember {
         mutableIntStateOf(
-            if (accessibilityEnabled) ClipboardSyncMode.ACCESSIBILITY.ordinal
+            if (fcitx5Paired) ClipboardSyncMode.FCITX5.ordinal
             else ClipboardSyncMode.OFF.ordinal
         )
     }
-    
-    fun refreshPermissionStatus() {
-        accessibilityEnabled = ClipboardSyncManager.isAccessibilityServiceEnabled(context)
+
+    var pairingCode by remember { mutableStateOf("") }
+    var pairingState by remember { mutableStateOf("") }
+
+    fun refreshStatus() {
+        fcitx5Paired = FcitxClipboardManager.isPaired
     }
-    
+
     LaunchedEffect(Unit) {
-        refreshPermissionStatus()
+        refreshStatus()
     }
-    
+
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
             if (event == Lifecycle.Event.ON_RESUME) {
-                refreshPermissionStatus()
+                refreshStatus()
             }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
@@ -73,10 +83,11 @@ fun ClipboardSyncPage() {
             lifecycleOwner.lifecycle.removeObserver(observer)
         }
     }
-    
-    LaunchedEffect(accessibilityEnabled) {
-        selectedMode = if (accessibilityEnabled) ClipboardSyncMode.ACCESSIBILITY.ordinal
-        else ClipboardSyncMode.OFF.ordinal
+
+    LaunchedEffect(fcitx5Paired) {
+        if (fcitx5Paired) {
+            selectedMode = ClipboardSyncMode.FCITX5.ordinal
+        }
     }
 
     Column(
@@ -91,21 +102,21 @@ fun ClipboardSyncPage() {
             style = textStyles.title1,
             color = colorScheme.onSurface
         )
-        
+
         Text(
             text = "管理设备间的剪贴板同步功能",
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary
         )
-        
+
         Text(
             text = when (selectedMode) {
-                ClipboardSyncMode.ACCESSIBILITY.ordinal -> if (accessibilityEnabled) "已启用 - 剪贴板同步功能正常运行中" else "未启用 - 请在设置中开启无障碍服务"
+                ClipboardSyncMode.FCITX5.ordinal -> if (fcitx5Paired) "已启用 - 通过 Fcitx5 同步" else "未配对 - 请输入配对码"
                 else -> "已关闭 - 可手动点击通知栏按钮同步"
             },
             style = textStyles.body2,
             color = when (selectedMode) {
-                ClipboardSyncMode.ACCESSIBILITY.ordinal -> if (accessibilityEnabled) colorScheme.primary else colorScheme.error
+                ClipboardSyncMode.FCITX5.ordinal -> if (fcitx5Paired) colorScheme.primary else colorScheme.error
                 else -> colorScheme.onSurfaceSecondary
             }
         )
@@ -113,9 +124,11 @@ fun ClipboardSyncPage() {
 
         WindowDropdownPreference(
             title = "同步模式",
-            summary = if (accessibilityEnabled) "无障碍服务 - 已启用"
-            else if (selectedMode == ClipboardSyncMode.ACCESSIBILITY.ordinal) "无障碍服务 - 点击前往设置"
-            else "关闭",
+            summary = when {
+                fcitx5Paired -> "Fcitx5 - 已配对"
+                selectedMode == ClipboardSyncMode.FCITX5.ordinal -> "Fcitx5 - 未配对"
+                else -> "关闭"
+            },
             items = ClipboardSyncMode.entries.map { it.displayName },
             selectedIndex = selectedMode,
             onSelectedIndexChange = { index ->
@@ -124,36 +137,109 @@ fun ClipboardSyncPage() {
                         selectedMode = ClipboardSyncMode.OFF.ordinal
                         ToastUtils.showShortToast(context, "已关闭剪贴板同步")
                     }
-                    ClipboardSyncMode.ACCESSIBILITY.ordinal -> {
-                        selectedMode = ClipboardSyncMode.ACCESSIBILITY.ordinal
-                        if (!accessibilityEnabled) {
-                            try {
-                                val intent = Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)
-                                intent.flags = Intent.FLAG_ACTIVITY_NEW_TASK
-                                context.startActivity(intent)
-                                ToastUtils.showShortToast(context, "请在设置中启用无障碍服务")
-                            } catch (e: Exception) {
-                                Logger.e("ClipboardSyncPage", "打开无障碍设置失败", e)
-                                ToastUtils.showShortToast(context, "打开设置失败，请手动前往设置")
-                            }
+                    ClipboardSyncMode.FCITX5.ordinal -> {
+                        selectedMode = ClipboardSyncMode.FCITX5.ordinal
+                        if (!fcitx5Paired) {
+                            FcitxClipboardManager.bindService(context)
                         }
                     }
                 }
             }
         )
-        
+
+        if (selectedMode == ClipboardSyncMode.FCITX5.ordinal) {
+            if (fcitx5Paired) {
+                Text(
+                    text = "Fcitx5 配对状态：已配对",
+                    style = textStyles.body1,
+                    color = colorScheme.primary
+                )
+
+                DoubleClickConfirmButton(
+                    text = "撤销配对",
+                    confirmText = "确认撤销?",
+                    onClick = {},
+                    onConfirm = {
+                        scope.launch(Dispatchers.IO) {
+                            FcitxClipboardManager.revokePairing(context)
+                            withContext(Dispatchers.Main) {
+                                fcitx5Paired = false
+                                selectedMode = ClipboardSyncMode.OFF.ordinal
+                                ToastUtils.showShortToast(context, "已撤销 Fcitx5 配对")
+                            }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                Text(
+                    text = "配对状态：未配对",
+                    style = textStyles.body1,
+                    color = colorScheme.error
+                )
+
+                TextField(
+                    value = pairingCode,
+                    onValueChange = { pairingCode = it.take(6) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = "配对码",
+                    useLabelAsPlaceholder = true,
+                    singleLine = true
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Button(
+                        onClick = {
+                            if (pairingCode.length != 6) {
+                                ToastUtils.showShortToast(context, "请输入 6 位配对码")
+                                return@Button
+                            }
+                            pairingState = "配对中..."
+                            scope.launch(Dispatchers.IO) {
+                                FcitxClipboardManager.requestPairing(context, pairingCode) { success ->
+                                    scope.launch(Dispatchers.Main) {
+                                        if (success) {
+                                            fcitx5Paired = true
+                                            pairingState = "配对成功"
+                                            ToastUtils.showShortToast(context, "Fcitx5 配对成功")
+                                        } else {
+                                            pairingState = "配对失败，请重试"
+                                            ToastUtils.showShortToast(context, "Fcitx5 配对失败")
+                                        }
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("配对")
+                    }
+                }
+
+                if (pairingState.isNotEmpty()) {
+                    Text(
+                        text = pairingState,
+                        style = textStyles.body2,
+                        color = colorScheme.onSurfaceSecondary
+                    )
+                }
+            }
+        }
+
         HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-        
+
         Text(
             text = "注意：",
             style = textStyles.body1,
             color = colorScheme.onSurface
         )
-        
+
         Text(
-            text = "1. 剪贴板同步：\n" +
-                    "   - 启用无障碍服务后自动同步\n" +
-                    "   - 关闭后可手动点击通知栏按钮同步",
+            text = "1. Fcitx5 模式：需安装 Fcitx5 输入法并开启剪贴板广播功能\n" +
+                    "2. 关闭时可通过点击通知栏按钮手动同步",
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary
         )
