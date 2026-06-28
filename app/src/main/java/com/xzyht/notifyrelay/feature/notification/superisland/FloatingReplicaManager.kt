@@ -420,7 +420,7 @@ object FloatingReplicaManager {
         isLocked: Boolean
     ) {
         val isMedia = isMediaType(paramV2Raw)
-        val changed = SuperislandListManager.addOrUpdate(
+        SuperislandListManager.addOrUpdate(
             SuperislandListManager.ListEntry(
                 sourceId = sourceId,
                 title = title,
@@ -432,7 +432,6 @@ object FloatingReplicaManager {
                 isMedia = isMedia
             )
         )
-        if (!changed) return
         val active = SuperislandListManager.getActive() ?: return
         sendListModeNotification(context, active)
     }
