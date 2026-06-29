@@ -1,9 +1,13 @@
 package notifyrelay.core.util
 
+import android.content.Context
+import android.security.keystore.KeyProperties
+import android.security.keystore.KeyProtection
 import android.util.Base64
 import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator
+import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.SecureRandom
@@ -576,5 +580,119 @@ object EncryptionManager {
      */
     fun supportsAsymmetricEncryption(type: EncryptionType): Boolean {
         return type == EncryptionType.RSA
+    }
+
+    // =================== Android Keystore AES 密钥管理 ===================
+
+    private val AES_DEVICE_SECRET_PREFIX = "aes_device_secret_"
+    private val AES_GCM_TRANSFORMATION = "AES/GCM/NoPadding"
+    private val GCM_IV_LENGTH = 12
+
+    /**
+     * 将设备 sharedSecret（Base64 编码的 AES-256 密钥）导入 Android Keystore。
+     * 导入后密钥由硬件安全模块保护，应用无法再导出明文。
+     *
+     * @param context Android 上下文
+     * @param uuid 设备 UUID，用于生成唯一的 Key alias
+     * @param base64Key Base64 编码的 AES 密钥
+     */
+    fun importAesKeyToKeystore(context: Context, uuid: String, base64Key: String) {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val alias = AES_DEVICE_SECRET_PREFIX + uuid
+        // 移除旧密钥（如有），确保重新配对时覆盖
+        if (keyStore.containsAlias(alias)) {
+            keyStore.deleteEntry(alias)
+        }
+        val keyBytes = Base64.decode(base64Key, Base64.NO_WRAP)
+        if (keyBytes.size != 32) {
+            android.util.Log.w("EncryptionManager", "importAesKeyToKeystore: unexpected key length ${keyBytes.size} for uuid=$uuid, expected 32 bytes")
+        }
+        val secretKey = SecretKeySpec(keyBytes, KeyProperties.KEY_ALGORITHM_AES)
+        val protectionParams = KeyProtection.Builder(
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        )
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .build()
+        keyStore.setEntry(alias, KeyStore.SecretKeyEntry(secretKey), protectionParams)
+    }
+
+    /**
+     * 使用 Android Keystore 中存储的设备密钥加密数据。
+     * 密钥需事先通过 [importAesKeyToKeystore] 导入。
+     *
+     * @param data 明文字符串（UTF-8）
+     * @param uuid 设备 UUID
+     * @param context Android 上下文
+     * @return Base64 编码的密文（12 字节 IV + GCM 密文，含 16 字节 tag）
+     */
+    fun encryptWithDeviceKey(data: String, uuid: String, context: Context): String {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val alias = AES_DEVICE_SECRET_PREFIX + uuid
+        val secretKey = keyStore.getKey(alias, null) as? SecretKey
+            ?: throw IllegalStateException("Keystore key not found for device $uuid")
+        val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
+        val iv = ByteArray(GCM_IV_LENGTH)
+        SecureRandom().nextBytes(iv)
+        val spec = GCMParameterSpec(128, iv)
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey, spec)
+        val encryptedBytes = cipher.doFinal(data.toByteArray(Charsets.UTF_8))
+        val out = ByteArray(iv.size + encryptedBytes.size)
+        System.arraycopy(iv, 0, out, 0, iv.size)
+        System.arraycopy(encryptedBytes, 0, out, iv.size, encryptedBytes.size)
+        return Base64.encodeToString(out, Base64.NO_WRAP)
+    }
+
+    /**
+     * 使用 Android Keystore 中存储的设备密钥解密数据。
+     *
+     * @param encryptedData Base64 编码的密文
+     * @param uuid 设备 UUID
+     * @param context Android 上下文
+     * @return 明文字符串（UTF-8）
+     */
+    fun decryptWithDeviceKey(encryptedData: String, uuid: String, context: Context): String {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val alias = AES_DEVICE_SECRET_PREFIX + uuid
+        val secretKey = keyStore.getKey(alias, null) as? SecretKey
+            ?: throw IllegalStateException("Keystore key not found for device $uuid")
+        val data = Base64.decode(encryptedData, Base64.NO_WRAP)
+        val iv = data.copyOfRange(0, GCM_IV_LENGTH)
+        val ciphertext = data.copyOfRange(GCM_IV_LENGTH, data.size)
+        val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
+        val spec = GCMParameterSpec(128, iv)
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, spec)
+        return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
+    }
+
+    /**
+     * 从 Android Keystore 中移除指定设备的 AES 密钥。
+     *
+     * @param uuid 设备 UUID
+     * @param context Android 上下文
+     */
+    fun removeDeviceKey(uuid: String, context: Context) {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val alias = AES_DEVICE_SECRET_PREFIX + uuid
+        if (keyStore.containsAlias(alias)) {
+            keyStore.deleteEntry(alias)
+        }
+    }
+
+    /**
+     * 检查指定设备的 AES 密钥是否已导入 Android Keystore。
+     *
+     * @param uuid 设备 UUID
+     * @param context Android 上下文
+     * @return 如果密钥存在返回 true
+     */
+    fun hasDeviceKey(uuid: String, context: Context): Boolean {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        return keyStore.containsAlias(AES_DEVICE_SECRET_PREFIX + uuid)
     }
 }

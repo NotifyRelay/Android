@@ -27,7 +27,6 @@ object NotificationProcessor {
     data class NotificationInput(
         val header: String?,
         val rawData: String,
-        val sharedSecret: String?,
         val remoteUuid: String?,
     )
 
@@ -38,18 +37,18 @@ object NotificationProcessor {
         input: NotificationInput,
         notificationCallbacks: Collection<(String) -> Unit>
     ) {
-        val (header, data, sharedSecret, remoteUuid) = input
+        val (header, data, remoteUuid) = input
 
-        val decrypted = if (sharedSecret != null) {
+        val decrypted = if (remoteUuid != null) {
             try {
-                manager.decryptDataInternal(data, sharedSecret)
+                manager.decryptDataInternal(data, remoteUuid)
             } catch (e: Exception) {
                 Logger.e(TAG, "解密失败: ${e.message}")
                 data
             }
         } else data
 
-        handleJsonLevel(context, manager, header, decrypted, sharedSecret, remoteUuid)
+        handleJsonLevel(context, manager, header, decrypted, remoteUuid)
 
         handleFilterAndReplicate(context, manager, scope, decrypted, remoteUuid)
 
@@ -63,7 +62,6 @@ object NotificationProcessor {
         manager: DeviceConnectionManager,
         header: String?,
         decrypted: String,
-        sharedSecret: String?,
         remoteUuid: String?
     ) {
         try {

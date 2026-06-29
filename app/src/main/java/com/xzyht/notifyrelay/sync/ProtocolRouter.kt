@@ -67,12 +67,12 @@ object ProtocolRouter {
 
         val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[remoteUuid] }
         if (auth == null || !auth.isAccepted) {
-            //Logger.d(TAG, "未认证或未接受的设备，丢弃: uuid=$remoteUuid, header=$header")
+            Logger.d(TAG, "未认证或未接受的设备，丢弃: uuid=$remoteUuid, header=$header")
             return true
         }
 
         // 解密
-        val decrypted = try { deviceManager.decryptData(payload, auth.sharedSecret) } catch (_: Exception) { null }
+        val decrypted = try { deviceManager.decryptData(payload, remoteUuid) } catch (e: Exception) { Logger.e(TAG, "解密失败: uuid=$remoteUuid, header=$header", e); null }
         if (decrypted == null) {
             //Logger.d(TAG, "解密失败: uuid=$remoteUuid, header=$header")
             return true
@@ -83,7 +83,7 @@ object ProtocolRouter {
             when (header) {
                 // 主通道：历史上的 DATA 默认为普通通知（DATA_NOTIFICATION）
                 "DATA", "DATA_NOTIFICATION" -> {
-                    Logger.d(TAG, "接收到 DATA_NOTIFICATION 消息: $decrypted")
+                    Logger.d(TAG, "接收到 DATA_NOTIFICATION 消息: ${decrypted.take(50)}")
                     val routedHeader = "DATA_NOTIFICATION"
                     NotificationProcessor.process(
                         context,
@@ -92,7 +92,6 @@ object ProtocolRouter {
                         NotificationProcessor.NotificationInput(
                             header = routedHeader,
                             rawData = decrypted,
-                            sharedSecret = auth.sharedSecret,
                             remoteUuid = remoteUuid
                         ),
                         deviceManager.notificationDataReceivedCallbacksInternal
@@ -101,13 +100,12 @@ object ProtocolRouter {
                 }
                 "DATA_SUPERISLAND" -> {
                     // 分流到 SuperIslandProcessor 专门处理超级岛通知
-                    Logger.d(TAG, "接收到 DATA_NOTIFICATION 消息: $decrypted")
+                    Logger.d(TAG, "接收到 DATA_NOTIFICATION 消息: ${decrypted.take(50)}")
                     try {
                         val handled = SuperIslandProcessor.process(
                             context,
                             deviceManager,
                             decrypted,
-                            auth.sharedSecret,
                             remoteUuid
                         )
                         if (handled) return true
@@ -118,7 +116,7 @@ object ProtocolRouter {
                 }
                 "DATA_MEDIAPLAY" -> {
                     // 处理远端媒体播放通知，触发超级岛显示
-                    Logger.d(TAG, "接收到 DATA_MEDIAPLAY 消息: $decrypted")
+                    Logger.d(TAG, "接收到 DATA_MEDIAPLAY 消息: ${decrypted.take(50)}")
                     try {
                         val json = JSONObject(decrypted)
                         val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
@@ -131,7 +129,7 @@ object ProtocolRouter {
                 }
                 // DATA_ICON_REQUEST：对方向本机请求应用图标，本机查找后会通过 DATA_ICON_RESPONSE 回传
                 "DATA_ICON_REQUEST" -> {
-                    Logger.d(TAG, "接收到 DATA_ICON_REQUEST 消息: $decrypted 丢给IconSyncManager")
+                    Logger.d(TAG, "接收到 DATA_ICON_REQUEST 消息: ${decrypted.take(50)} 丢给IconSyncManager")
                     val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                     Logger.d(TAG, "source device info: $source")
                     try {
@@ -143,13 +141,13 @@ object ProtocolRouter {
                 }
                 // DATA_ICON_RESPONSE：图标请求的响应，更新本机图标缓存供通知复刻使用
                 "DATA_ICON_RESPONSE" -> {
-                    Logger.d(TAG, "接收到 DATA_ICON_RESPONSE 消息: $decrypted")
+                    Logger.d(TAG, "接收到 DATA_ICON_RESPONSE 消息: ${decrypted.take(50)}")
                     IconSyncManager.handleIconResponse(decrypted, context)
                     true
                 }
                 // DATA_APP_LIST_REQUEST：对方请求本机应用列表，本机查询后通过 DATA_APP_LIST_RESPONSE 返回
                 "DATA_APP_LIST_REQUEST" -> {
-                    Logger.d(TAG, "接收到 DATA_APP_LIST_REQUEST 消息: $decrypted 丢给AppListSyncManager")
+                    Logger.d(TAG, "接收到 DATA_APP_LIST_REQUEST 消息: ${decrypted.take(50)} 丢给AppListSyncManager")
                     val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                     Logger.d(TAG, "source device info: $source")
                     try {
@@ -161,13 +159,13 @@ object ProtocolRouter {
                 }
                 // DATA_APP_LIST_RESPONSE：应用列表请求的响应，用于更新本机缓存/状态
                 "DATA_APP_LIST_RESPONSE" -> {
-                    Logger.d(TAG, "接收到 DATA_APP_LIST_RESPONSE 消息: $decrypted")
+                    Logger.d(TAG, "接收到 DATA_APP_LIST_RESPONSE 消息: ${decrypted.take(50)}")
                     AppListSyncManager.handleAppListResponse(decrypted, context, remoteUuid, deviceManager)
                     true
                 }
                 // DATA_AUDIO_REQUEST：对方请求本机音频转发
                 "DATA_MEDIA_CONTROL" -> {
-                    Logger.d(TAG, "接收到 DATA_MEDIA_CONTROL 消息: $decrypted")
+                    Logger.d(TAG, "接收到 DATA_MEDIA_CONTROL 消息: ${decrypted.take(50)}")
                     // 处理媒体控制命令，包括音频转发和媒体播放控制
                     try {
                         val json = JSONObject(decrypted)
@@ -281,10 +279,8 @@ object ProtocolRouter {
                             when (action) {
                                 "start" -> {
                                     Logger.i(TAG, "开始启动 FTP 服务器")
-                                    val sharedSecret = auth.sharedSecret
                                     val deviceName = deviceManager.getLocalDisplayName()
-                                    Logger.d(TAG, "使用共享密钥派生 FTP 凭据")
-                                    val ftpStartResult = ftpServer.start(sharedSecret, deviceName, context)
+                                    val ftpStartResult = ftpServer.start(deviceName, context)
                                     when (ftpStartResult.status) {
                                         SUCCESS, ALREADY_RUNNING -> {
                                             val ftpInfo = ftpStartResult.serverInfo
@@ -426,21 +422,20 @@ object ProtocolRouter {
                     true
                 }
                 "DATA_CLIPBOARD" -> {
-                    Logger.d(TAG, "接收到 DATA_CLIPBOARD 消息: $decrypted")
+                    Logger.d(TAG, "接收到 DATA_CLIPBOARD 消息: ${decrypted.take(50)}")
                     // 处理剪贴板消息
                     ClipboardProcessor.process(
                         context,
                         ClipboardProcessor.ClipboardInput(
                             header = "DATA_CLIPBOARD",
                             rawData = decrypted,
-                            sharedSecret = auth.sharedSecret,
                             remoteUuid = remoteUuid
                         )
                     )
                     true
                 }
                 "DATA_STATUS" -> {
-                    Logger.d(TAG, "接收到 DATA_STATUS 消息: $decrypted")
+                    Logger.d(TAG, "接收到 DATA_STATUS 消息: ${decrypted.take(50)}")
                     val routedHeader = "DATA_STATUS"
                     StatusProcessor.process(
                         context,
@@ -449,7 +444,6 @@ object ProtocolRouter {
                         StatusProcessor.StatusInput(
                             header = routedHeader,
                             rawData = decrypted,
-                            sharedSecret = auth.sharedSecret,
                             remoteUuid = remoteUuid
                         ),
                         deviceManager.notificationDataReceivedCallbacksInternal
@@ -457,7 +451,7 @@ object ProtocolRouter {
                     true
                 }
                 "DATA_APP_LAUNCH" -> {
-                    Logger.d(TAG, "接收到 DATA_APP_LAUNCH 消息: $decrypted")
+                    Logger.d(TAG, "接收到 DATA_APP_LAUNCH 消息: ${decrypted.take(50)}")
                     val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                     try {
                         source?.let { AppLaunchManager.handleAppLaunchRequest(decrypted, deviceManager, it, context) }

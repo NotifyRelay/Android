@@ -125,6 +125,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             // 过滤掉uuid为"本机"的记录
             if (device.uuid == "本机") continue
             
+            // 确保 sharedSecret 已导入 Android Keystore
+            if (device.sharedSecret.isNotEmpty() && !EncryptionManager.hasDeviceKey(device.uuid, context)) {
+                EncryptionManager.importAesKeyToKeystore(context, device.uuid, device.sharedSecret)
+            }
+            
             authenticatedDevices[device.uuid] = AuthInfo(
                 publicKey = device.publicKey,
                 sharedSecret = device.sharedSecret,
@@ -351,7 +356,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     internal fun saveAuthedDevicesInternal() = saveAuthedDevices()
 
-    internal fun decryptDataInternal(input: String, key: String): String = decryptData(input, key)
+    internal fun decryptDataInternal(input: String, uuid: String): String = decryptData(input, uuid)
 
     internal fun getDeviceInfoInternal(uuid: String): DeviceInfo? = getDeviceInfo(uuid)
     private var serverSocket: ServerSocket? = null
@@ -607,14 +612,42 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     }
 
     // 设备连接重试逻辑已迁移到 ConnectionKeepAlive.performDeviceConnectionWithRetry
-    // 使用加密管理器进行数据加密
-    internal fun encryptData(input: String, key: String): String {
-        return EncryptionManager.encrypt(input, key)
+    // 使用 Android Keystore 中保护的设备密钥进行加密
+    internal fun encryptData(input: String, uuid: String): String {
+        if (EncryptionManager.hasDeviceKey(uuid, context)) {
+            try {
+                return EncryptionManager.encryptWithDeviceKey(input, uuid, context)
+            } catch (_: Exception) {
+                EncryptionManager.removeDeviceKey(uuid, context)
+            }
+        }
+        // 运行时重导：从 AuthInfo 读取 sharedSecret 导入 Keystore 后加密
+        val secret = synchronized(authenticatedDevices) { authenticatedDevices[uuid]?.sharedSecret }
+        if (!secret.isNullOrEmpty()) {
+            Logger.w("死神-NotifyRelay", "encryptData: Keystore 缺少设备 $uuid 的密钥，从 AuthInfo 运行时重导")
+            EncryptionManager.importAesKeyToKeystore(context, uuid, secret)
+            return EncryptionManager.encryptWithDeviceKey(input, uuid, context)
+        }
+        throw IllegalStateException("Keystore key not found for device $uuid")
     }
 
-    // 使用加密管理器进行数据解密（对 ProtocolRouter 开放）
-    internal fun decryptData(input: String, key: String): String {
-        return EncryptionManager.decrypt(input, key)
+    // 使用 Android Keystore 中保护的设备密钥进行解密（对 ProtocolRouter 开放）
+    internal fun decryptData(input: String, uuid: String): String {
+        if (EncryptionManager.hasDeviceKey(uuid, context)) {
+            try {
+                return EncryptionManager.decryptWithDeviceKey(input, uuid, context)
+            } catch (_: Exception) {
+                EncryptionManager.removeDeviceKey(uuid, context)
+            }
+        }
+        // 运行时重导：从 AuthInfo 读取 sharedSecret 导入 Keystore 后解密
+        val secret = synchronized(authenticatedDevices) { authenticatedDevices[uuid]?.sharedSecret }
+        if (!secret.isNullOrEmpty()) {
+            Logger.w("死神-NotifyRelay", "decryptData: Keystore 缺少设备 $uuid 的密钥，从 AuthInfo 运行时重导")
+            EncryptionManager.importAesKeyToKeystore(context, uuid, secret)
+            return EncryptionManager.decryptWithDeviceKey(input, uuid, context)
+        }
+        throw IllegalStateException("Keystore key not found for device $uuid")
     }
 
     // 发送通知数据（加密）
@@ -845,6 +878,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             // 从已建立心跳集合移除
             try { heartbeatedDevices.remove(uuid) } catch (_: Exception) {}
 
+            // 从 Android Keystore 移除设备密钥
+            try { EncryptionManager.removeDeviceKey(uuid, context) } catch (_: Exception) {}
+
             synchronized(authenticatedDevices) {
                 if (authenticatedDevices.containsKey(uuid)) {
                     // 直接从数据库中删除设备
@@ -888,9 +924,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     }
 
     // 发送超级岛ACK（包含接收的hash），用于发送方确认
-    private fun sendSuperIslandAck(remoteUuid: String?, sharedSecret: String?, hash: String, featureKeyValue: String?, mappedPkg: String?) {
+    private fun sendSuperIslandAck(remoteUuid: String?, hash: String, featureKeyValue: String?, mappedPkg: String?) {
         try {
-            if (remoteUuid.isNullOrEmpty() || sharedSecret.isNullOrEmpty()) return
+            if (remoteUuid.isNullOrEmpty()) return
             val device = getDeviceInfo(remoteUuid)
             val auth = synchronized(authenticatedDevices) { authenticatedDevices[remoteUuid] }
             val ip = device?.ip ?: auth?.lastIp
@@ -921,13 +957,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // 提供给 NotificationProcessor 的内部包装，简化 ACK 调用
     internal fun sendSuperIslandAckInternal(
         remoteUuid: String,
-        sharedSecret: String?,
         recvHash: String,
         featureId: String,
         mappedPkg: String?
     ) {
         try {
-            sendSuperIslandAck(remoteUuid, sharedSecret, recvHash, featureId, mappedPkg)
+            sendSuperIslandAck(remoteUuid, recvHash, featureId, mappedPkg)
         } catch (_: Exception) {
         }
     }

@@ -2,35 +2,30 @@
 
 ## 当前状态
 
-`SecureKeyStorage.kt` 已使用 Android Keystore 作为后端。主密钥（AES-256-GCM）存储在 Android Keystore 中，加密后的数据存入 SharedPreferences。
+所有密钥已迁移至 Android Keystore 保护。应用消息的加解密由 Keystore 中的 Cipher API 完成，应用层不接触密钥明文。
 
-## 待迁移密钥清单
+## 迁移完成状态
 
-| 密钥用途 | 当前存储方式 | 优先级 |
-|---------|-------------|--------|
-| Fcitx5 剪贴板密钥 (`fcitx5_clipboard_key`) | SecureKeyStorage (Android Keystore 保护) | 高 |
-| Scrcpy RSA 私钥 | 明文文件 | 高 |
-| 设备 sharedSecret | 明文/SharedPreferences | 中 |
-| `device_pubkey` | 明文/SharedPreferences | 中 |
+| 密钥用途 | 保护方式 | 状态 |
+|---------|---------|------|
+| Fcitx5 剪贴板密钥 (`fcitx5_clipboard_key`) | SecureKeyStorage (AES-256-GCM, Keystore 主密钥) | ✅ 已完成 |
+| 设备 sharedSecret (`aes_device_secret_{uuid}`) | Android Keystore SecretKeyEntry (不可导出) | ✅ 已完成 |
+| 设备间消息加解密 | Android Keystore Cipher API (AES/GCM/NoPadding) | ✅ 已完成 |
 
-## 迁移步骤
+## 已执行的迁移
 
-### 1. Scrcpy RSA 私钥迁移
+### 1. 设备 sharedSecret → Android Keystore
+- `EncryptionManager` 新增 `importAesKeyToKeystore()` / `encryptWithDeviceKey()` / `decryptWithDeviceKey()`
+- 配对时（`ServerLineRouter.kt`）：生成 sharedSecret 后立即导入 Keystore，AuthInfo 不保留明文
+- 加载时（`DeviceConnectionManager.loadAuthedDevices()`）：遗留 DB 数据自动导入 Keystore 并清空 DB
+- 保存时：`sharedSecret` 字段存空（密钥由 Keystore 保护）
 
-- 将现有 RSA 私钥文件写入 SecureKeyStorage
-- 删除明文私钥文件
-
-### 2. 设备 sharedSecret 迁移
-
-- 将设备配对时的 sharedSecret 存入 SecureKeyStorage
-- 移除代码中的明文引用
-
-### 3. device_pubkey 迁移
-
-- 将设备公钥存入 SecureKeyStorage
-- 确保兼容现有已配对的设备
+### 3. 设备间消息加解密 → Keystore Cipher API
+- `DeviceConnectionManager.encryptData()/decryptData()`: 从 `key: String` 改为 `uuid: String`，内部调用 `EncryptionManager.encryptWithDeviceKey()/decryptWithDeviceKey()`
+- 加密由 Keystore 中的 AES SecretKey + Cipher API 完成，应用层不接触密钥明文
+- 同步更新所有调用方：`ProtocolRouter`、`ProtocolSender`、`ServerLineRouter`、`NotificationProcessor`
 
 ## 注意事项
 
-- 迁移后需测试所有功能（剪贴板同步、Scrcpy 投屏、设备连接）是否正常
-- 迁移过程中需处理旧密钥的兼容性，避免用户数据丢失
+- 迁移后需测试所有功能（剪贴板同步、Scrcpy 投屏、设备连接、超级岛、FTP）是否正常
+- FTP 服务器启动时仍引用 `auth.sharedSecret`，当前值为空字符串，可能需要单独处理凭据派生逻辑

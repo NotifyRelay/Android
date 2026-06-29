@@ -172,6 +172,8 @@ object ServerLineRouter {
                                         deviceManager.localPublicKey,
                                         remotePubKey
                                     )
+                                    // 导入 sharedSecret 到 Android Keystore
+                                    EncryptionManager.importAesKeyToKeystore(deviceManager.contextInternal, remoteUuid, sharedSecret)
                                     synchronized(deviceManager.authenticatedDevices) {
                                         deviceManager.authenticatedDevices.remove(remoteUuid)
                                         deviceManager.authenticatedDevices[remoteUuid] = AuthInfo(
@@ -295,7 +297,7 @@ object ServerLineRouter {
                 synchronized(deviceManager.authenticatedDevices) {
                     for ((uuid, auth) in deviceManager.authenticatedDevices) {
                         try {
-                            val decrypted = deviceManager.decryptDataInternal(encryptedPart, auth.sharedSecret)
+                            val decrypted = deviceManager.decryptDataInternal(encryptedPart, uuid)
                             if (decrypted.startsWith("NOTIFYRELAY_DISCOVER:")) {
                                 // 解密成功：更新设备缓存
                                 val parts = decrypted.split(":")

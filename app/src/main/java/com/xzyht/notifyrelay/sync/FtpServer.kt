@@ -113,7 +113,7 @@ object ftpServer {
     )
     
     @Synchronized
-    fun start(sharedSecret: String, deviceName: String, context: Context): ftpStartResult {
+    fun start(deviceName: String, context: Context): ftpStartResult {
         Logger.i(TAG, "FTP 服务器启动请求，设备名称: $deviceName")
         if (isRunning.get()) {
             Logger.i(TAG, "FTP 服务器已在运行，返回当前服务器信息")
@@ -180,7 +180,7 @@ object ftpServer {
                     port = port
                 )
 
-                Logger.i(TAG, "FTP server started: $ipAddress on port $port (derived from sharedSecret)")
+                Logger.i(TAG, "FTP server started: $ipAddress on port $port")
                 return ftpStartResult(StartResult.SUCCESS, serverInfo)
             } catch (e: Exception) {
                 lastException = e

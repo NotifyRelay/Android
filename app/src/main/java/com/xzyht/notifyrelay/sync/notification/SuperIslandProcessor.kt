@@ -51,7 +51,6 @@ object SuperIslandProcessor {
         context: Context,
         manager: DeviceConnectionManager,
         decrypted: String,
-        sharedSecret: String?,
         remoteUuid: String?
     ): Boolean {
         try {
@@ -188,7 +187,7 @@ object SuperIslandProcessor {
 
             val recvHash = try { json.optString("hash", "") } catch (_: Exception) { "" }
             if (!recvHash.isNullOrEmpty()) {
-                try { manager.sendSuperIslandAckInternal(remoteUuid, sharedSecret, recvHash, featureId, mappedPkg) } catch (_: Exception) {}
+                try { manager.sendSuperIslandAckInternal(remoteUuid, recvHash, featureId, mappedPkg) } catch (_: Exception) {}
             }
 
             val mParam2 = merged?.paramV2Raw ?: paramV2Raw
