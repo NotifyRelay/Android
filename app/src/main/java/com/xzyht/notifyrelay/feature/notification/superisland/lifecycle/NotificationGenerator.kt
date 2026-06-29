@@ -67,6 +67,9 @@ object NotificationGenerator {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val scrollRunnable = mutableMapOf<String, Runnable>()
     
+    // 缓存已注入的小图标，供滚动更新时复用（避免丢失实际意义图标）
+    private val cachedSmallIcons = ConcurrentHashMap<String, Icon>()
+    
     /**
      * 设置滚动更新
      */
@@ -102,10 +105,11 @@ object NotificationGenerator {
                 val contentTitle = originalNotification.extras.getString("android.title")
                 val contentText = originalNotification.extras.getString("android.text")
                 
-                // 更新通知
+                // 更新通知（必须设置 smallIcon，否则会抛出 IllegalArgumentException）
                 val updatedBuilder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
                     .setContentTitle(contentTitle ?: "")
                     .setContentText(contentText ?: "")
+                    .setSmallIcon(android.R.drawable.stat_notify_more)
                     .setAutoCancel(false)
                     .setOngoing(true)
                     .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -119,6 +123,18 @@ object NotificationGenerator {
                 // 复制extras
                 val updatedNotification = updatedBuilder.build()
                 updatedNotification.extras.putAll(originalNotification.extras)
+                
+                // 恢复之前缓存的小图标，避免滚动更新时丢失实际意义图标
+                val cachedIcon = cachedSmallIcons[key]
+                if (cachedIcon != null) {
+                    try {
+                        val field = Notification::class.java.getDeclaredField("mSmallIcon")
+                        field.isAccessible = true
+                        field.set(updatedNotification, cachedIcon)
+                    } catch (e: Exception) {
+                        Logger.w(TAG, "滚动更新: 恢复小图标失败: ${e.message}")
+                    }
+                }
                 
                 // 发送更新后的通知
                 notificationManager.notify(notificationId, updatedNotification)
@@ -145,6 +161,7 @@ object NotificationGenerator {
         scrollRunnable.remove(key)?.let {
             mainHandler.removeCallbacks(it)
         }
+        cachedSmallIcons.remove(key)
         CapsuleScrollManager.resetScrollState("${key}_scroll")
     }
     
@@ -156,6 +173,7 @@ object NotificationGenerator {
             mainHandler.removeCallbacks(it.value)
         }
         scrollRunnable.clear()
+        cachedSmallIcons.clear()
         CapsuleScrollManager.clearAll()
     }
     
@@ -352,7 +370,7 @@ object NotificationGenerator {
                     val albumBitmap = loadAlbumBitmapOrNull(context, picMap, iconText.length)
                     val iconBitmap = BitmapUtils.textToBitmap(iconText, albumBitmap = albumBitmap)
                     if (iconBitmap != null) {
-                        injectSmallIcon(notification, iconBitmap)
+                        injectSmallIcon(notification, iconBitmap, key)
                     }
                 } else {
                     // 没有图标文本时，尝试使用专辑图作为小图标
@@ -363,7 +381,7 @@ object NotificationGenerator {
                             // 同步下载专辑图
                             val bitmap = downloadBitmap(context, coverUrl)
                             if (bitmap != null) {
-                                injectSmallIcon(notification, bitmap)
+                                injectSmallIcon(notification, bitmap, key)
                             }
                         }
                     }
@@ -419,7 +437,7 @@ object NotificationGenerator {
                     // 注入小图标
                     // 只有当smallIconBitmap不为null时才注入，否则保留之前的图标
                     if (smallIconBitmap != null) {
-                        injectSmallIcon(notification, smallIconBitmap)
+                        injectSmallIcon(notification, smallIconBitmap, key)
                     } else {
                         // 保留之前的图标，不进行修改
                         Logger.i(TAG, "超级�? 保留之前的小图标，不进行修改")
@@ -723,15 +741,19 @@ object NotificationGenerator {
     // ---- 图标注入辅助方法 ----
 
     /**
-     * 注入小图标到通知
+     * 注入小图标到通知，同时缓存供滚动更新复用
      */
-    private fun injectSmallIcon(notification: Notification, bitmap: Bitmap?) {
+    private fun injectSmallIcon(notification: Notification, bitmap: Bitmap?, cacheKey: String? = null) {
         bitmap?.let {
             try {
                 val icon = Icon.createWithBitmap(it)
                 val field = Notification::class.java.getDeclaredField("mSmallIcon")
                 field.isAccessible = true
                 field.set(notification, icon)
+                // 同时缓存供滚动更新复用，避免反射读取
+                if (cacheKey != null) {
+                    cachedSmallIcons[cacheKey] = icon
+                }
                 Logger.i(TAG, "超级岛 成功注入小图标到胶囊通知")
             } catch (e: Exception) {
                 Logger.w(TAG, "超级岛 注入小图标失败: ${e.message}")
