@@ -353,9 +353,10 @@ object EncryptionManager {
      * @param remoteKey 远端标识或密钥字符串
      * @return 生成的共享密钥字符串（AES 返回 Base64 编码的 32 字节密钥，RSA 返回基于 hashCode 的字符串）
      */
+    @Deprecated("Use generateSharedSecret(context, localKey, remoteKey) instead", ReplaceWith("generateSharedSecret(context, localKey, remoteKey)"))
     fun generateSharedSecret(localKey: String, remoteKey: String): String {
         return when (currentEncryptionType) {
-            EncryptionType.ECDH -> AESEncryption.generateSharedSecret(localKey, remoteKey)
+            EncryptionType.ECDH -> throw UnsupportedOperationException("ECDH requires generateSharedSecret(context, localKey, remoteKey)")
             EncryptionType.AES -> AESEncryption.generateSharedSecret(localKey, remoteKey)
             EncryptionType.RSA -> RSAEncryption.generateSharedSecret(localKey, remoteKey)
         }
@@ -382,9 +383,20 @@ object EncryptionManager {
      * 旧格式（UUID hex，32 位十六进制字符串）返回 false
      * 新格式（Base64 编码的 EC 未压缩点）返回 true
      */
+    enum class KeyFormat { ECDH, LEGACY_UUID, INVALID }
+
+    fun detectKeyFormat(publicKey: String): KeyFormat {
+        if (publicKey.length == 32 && publicKey.matches(Regex("^[0-9a-fA-F]{32}$"))) return KeyFormat.LEGACY_UUID
+        return try {
+            val bytes = Base64.decode(publicKey, Base64.NO_WRAP)
+            if (bytes.size == 65 && bytes[0] == 0x04.toByte()) KeyFormat.ECDH else KeyFormat.INVALID
+        } catch (_: Exception) {
+            KeyFormat.INVALID
+        }
+    }
+
     fun isEcdhFormat(publicKey: String): Boolean {
-        if (publicKey.length == 32 && publicKey.matches(Regex("^[0-9a-fA-F]{32}$"))) return false
-        return true
+        return detectKeyFormat(publicKey) == KeyFormat.ECDH
     }
 
     /**
@@ -605,9 +617,7 @@ object EncryptionManager {
             keyStore.deleteEntry(alias)
         }
         val keyBytes = Base64.decode(base64Key, Base64.NO_WRAP)
-        if (keyBytes.size != 32) {
-            android.util.Log.w("EncryptionManager", "importAesKeyToKeystore: unexpected key length ${keyBytes.size} for uuid=$uuid, expected 32 bytes")
-        }
+        require(keyBytes.size == 32) { "Invalid AES-256 key length: ${keyBytes.size} for uuid=$uuid, expected 32 bytes" }
         val secretKey = SecretKeySpec(keyBytes, KeyProperties.KEY_ALGORITHM_AES)
         val protectionParams = KeyProtection.Builder(
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
@@ -634,10 +644,9 @@ object EncryptionManager {
         val secretKey = keyStore.getKey(alias, null) as? SecretKey
             ?: throw IllegalStateException("Keystore key not found for device $uuid")
         val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
-        val iv = ByteArray(GCM_IV_LENGTH)
-        SecureRandom().nextBytes(iv)
-        val spec = GCMParameterSpec(128, iv)
-        cipher.init(Cipher.ENCRYPT_MODE, secretKey, spec)
+        // 由 Keystore 生成随机 IV（不允许调用方传入）
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+        val iv = cipher.iv
         val encryptedBytes = cipher.doFinal(data.toByteArray(Charsets.UTF_8))
         val out = ByteArray(iv.size + encryptedBytes.size)
         System.arraycopy(iv, 0, out, 0, iv.size)

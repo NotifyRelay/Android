@@ -56,7 +56,7 @@ object ClipboardSyncManager {
             return Pair(true, "手动同步模式")
         }
 
-        if (FcitxClipboardManager.isPaired) {
+        if (isFcitx5Paired(context)) {
             return Pair(true, "Fcitx5 已配对")
         }
         

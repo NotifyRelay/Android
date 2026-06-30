@@ -222,11 +222,16 @@ class ConnectionKeepAlive(
                             deviceManager.localPublicKey,
                             remotePubKey
                         )
+                        EncryptionManager.importAesKeyToKeystore(
+                            deviceManager.contextInternal,
+                            device.uuid,
+                            sharedSecret
+                        )
                         synchronized(authenticatedDevices) {
                             authenticatedDevices.remove(device.uuid)
                             authenticatedDevices[device.uuid] = AuthInfo(
                                 remotePubKey,
-                                sharedSecret,
+                                "",
                                 true,
                                 device.displayName,
                                 device.ip,

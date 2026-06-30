@@ -108,7 +108,7 @@ object ServerLineRouter {
                     deviceManager.authenticatedDevices[remoteUuid]?.isAccepted == true
                 }
 
-                // 4. 已认证设备：检查格式兼容性
+                // 4. 已认证设备：检查格式兼容性和公钥轮换
                 if (alreadyAuthed) {
                     val localIsEcdh = EncryptionManager.isEcdhFormat(deviceManager.localPublicKey)
                     val remoteIsEcdh = EncryptionManager.isEcdhFormat(remotePubKey)
@@ -131,6 +131,45 @@ object ServerLineRouter {
                                 android.widget.Toast.LENGTH_LONG).show()
                         }
                         return
+                    }
+                    // 检查 ECDH 公钥是否发生变化（密钥轮换检测）
+                    if (localIsEcdh && remoteIsEcdh) {
+                        synchronized(deviceManager.authenticatedDevices) {
+                            val existingAuth = deviceManager.authenticatedDevices[remoteUuid]
+                            if (existingAuth != null && existingAuth.publicKey != remotePubKey) {
+                                Logger.w(TAG, "设备 ${remoteDevice.displayName} 公钥已变更，重新派生密钥")
+                                try {
+                                    val newSecret = EncryptionManager.generateSharedSecret(
+                                        deviceManager.contextInternal,
+                                        deviceManager.localPublicKey,
+                                        remotePubKey
+                                    )
+                                    EncryptionManager.importAesKeyToKeystore(deviceManager.contextInternal, remoteUuid, newSecret)
+                                    deviceManager.authenticatedDevices[remoteUuid] = existingAuth.copy(
+                                        publicKey = remotePubKey,
+                                        sharedSecret = newSecret
+                                    )
+                                    deviceManager.saveAuthedDevicesInternal()
+                                    // 保存后清空内存中的明文，后续解密走 Keystore
+                                    deviceManager.authenticatedDevices[remoteUuid] = existingAuth.copy(
+                                        publicKey = remotePubKey,
+                                        sharedSecret = ""
+                                    )
+                                } catch (e: Exception) {
+                                    Logger.e(TAG, "公钥变更后重新派生密钥失败，要求重新配对", e)
+                                    synchronized(deviceManager.incompatibleDevicesInternal) {
+                                        deviceManager.incompatibleDevicesInternal.add(remoteUuid)
+                                    }
+                                    val writer = OutputStreamWriter(client.getOutputStream())
+                                    writer.write("REJECT:${deviceManager.uuid}\n")
+                                    writer.flush()
+                                    writer.close()
+                                    reader.close()
+                                    client.close()
+                                    return
+                                }
+                            }
+                        }
                     }
                     // 格式一致：从黑名单移除（如果有）
                     synchronized(deviceManager.incompatibleDevicesInternal) {

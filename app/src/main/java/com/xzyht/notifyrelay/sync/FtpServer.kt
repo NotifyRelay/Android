@@ -22,6 +22,7 @@ import java.io.IOException
 import java.net.BindException
 import java.net.Inet4Address
 import java.net.NetworkInterface
+import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicBoolean
 
 data class ftpServerInfo(
@@ -78,14 +79,6 @@ object ftpServer {
             // 添加用户
             userManager.save(user)
             
-            // 添加匿名用户支持
-            val anonymousUser = BaseUser()
-            anonymousUser.name = "anonymous"
-            anonymousUser.password = ""
-            anonymousUser.homeDirectory = "/storage/emulated/0/"
-            anonymousUser.authorities = authorities
-            userManager.save(anonymousUser)
-            
             return userManager
         } catch (e: Exception) {
             Logger.e(TAG, "Failed to create user manager", e)
@@ -113,7 +106,7 @@ object ftpServer {
     )
     
     @Synchronized
-    fun start(deviceName: String, context: Context): ftpStartResult {
+    fun start(deviceName: String, context: Context, pcUsername: String? = null, pcPassword: String? = null): ftpStartResult {
         Logger.i(TAG, "FTP 服务器启动请求，设备名称: $deviceName")
         if (isRunning.get()) {
             Logger.i(TAG, "FTP 服务器已在运行，返回当前服务器信息")
@@ -135,12 +128,19 @@ object ftpServer {
             }
         }
 
-        // 简化：不再从共享密钥派生凭据，使用固定用户名密码，主要使用匿名登录
-        // Logger.d(TAG, "从共享密钥派生 FTP 凭据")
-        // val (username, password) = deriveCredentialsFromSharedSecret(sharedSecret)
-        val username = "anonymous"
-        val password = ""
-        Logger.d(TAG, "使用固定用户名: $username")
+        // 优先使用 PC 端传来的凭据，确保两端一致
+        val username: String
+        val password: String
+        if (!pcUsername.isNullOrBlank() && !pcPassword.isNullOrBlank()) {
+            username = pcUsername
+            password = pcPassword
+            Logger.d(TAG, "FTP 使用 PC 端派发的凭据: username=$username")
+        } else {
+            // 回退：每次启动生成随机用户名密码，不使用匿名登录
+            username = "ftp_" + (1..8).map { "abcdefghijklmnopqrstuvwxyz0123456789"[SecureRandom().nextInt(36)] }.joinToString("")
+            password = (1..16).map { "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[SecureRandom().nextInt(62)] }.joinToString("")
+            Logger.d(TAG, "FTP 使用随机凭据（无 PC 端凭据）")
+        }
 
         Logger.d(TAG, "开始在端口范围 $PORT_RANGE 中尝试启动 FTP 服务器")
 

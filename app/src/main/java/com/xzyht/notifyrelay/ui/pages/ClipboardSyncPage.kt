@@ -135,6 +135,10 @@ fun ClipboardSyncPage() {
                 when (index) {
                     ClipboardSyncMode.OFF.ordinal -> {
                         selectedMode = ClipboardSyncMode.OFF.ordinal
+                        if (fcitx5Paired) {
+                            FcitxClipboardManager.revokePairing(context)
+                            fcitx5Paired = false
+                        }
                         ToastUtils.showShortToast(context, "已关闭剪贴板同步")
                     }
                     ClipboardSyncMode.FCITX5.ordinal -> {

@@ -432,8 +432,13 @@ object FloatingReplicaManager {
                 isMedia = isMedia
             )
         )
-        val active = SuperislandListManager.getActive() ?: return
-        sendListModeNotification(context, active)
+        // 刷新此条目的超时
+        scheduleListModeTimeoutFor(sourceId)
+        val active = SuperislandListManager.getActive()
+        // 只在此条目是激活项时才发送通知
+        if (active != null && active.sourceId == sourceId) {
+            sendListModeNotification(context, active)
+        }
     }
 
     private fun sendListModeNotification(context: Context, entry: SuperislandListManager.ListEntry) {
@@ -765,18 +770,25 @@ object FloatingReplicaManager {
         runWithErrorHandling("根据通知ID关闭浮窗条目") {
             val ctx = appContext ?: return@runWithErrorHandling
             
-            // 列表模式：用户划掉通知 → 移除当前激活 → 切到下一个或取消
+            // 列表模式：只在通知ID是列表模式固定ID时处理
             if (!isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
-                Logger.i(TAG, "超级岛: 列表模式关闭通知，notificationId=$notificationId")
-                val active = SuperislandListManager.getActive()
-                if (active != null) {
-                    val next = SuperislandListManager.remove(active.sourceId)
-                    if (next != null) {
-                        sendListModeNotification(ctx, next)
-                    } else {
-                        val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                        nm.cancel(LIST_MODE_NOTIFICATION_ID)
+                if (notificationId == LIST_MODE_NOTIFICATION_ID) {
+                    Logger.i(TAG, "超级岛: 列表模式关闭通知，notificationId=$notificationId")
+                    val active = SuperislandListManager.getActive()
+                    if (active != null) {
+                        val next = SuperislandListManager.remove(active.sourceId)
+                        if (next != null) {
+                            sendListModeNotification(ctx, next)
+                        } else {
+                            val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                            nm.cancel(LIST_MODE_NOTIFICATION_ID)
+                        }
                     }
+                } else {
+                    // 非列表ID通知走普通关闭路径
+                    Logger.i(TAG, "超级岛: 列表模式下关闭非列表通知，notificationId=$notificationId")
+                    val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                    nm.cancel(notificationId)
                 }
                 return@runWithErrorHandling
             }

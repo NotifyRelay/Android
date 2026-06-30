@@ -132,7 +132,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             
             authenticatedDevices[device.uuid] = AuthInfo(
                 publicKey = device.publicKey,
-                sharedSecret = device.sharedSecret,
+                sharedSecret = "",
                 isAccepted = device.isAccepted,
                 displayName = device.displayName,
                 lastIp = device.lastIp,
@@ -293,7 +293,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal val rejectedDevicesInternal: MutableSet<String>
         get() = rejectedDevices
 
-    internal val incompatibleDevicesInternal = mutableSetOf<String>()
+    internal val incompatibleDevicesInternal: MutableSet<String> =
+        java.util.Collections.synchronizedSet(mutableSetOf())
 
     internal val coroutineScopeInternal: CoroutineScope
         get() = coroutineScope
@@ -615,17 +616,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // 使用 Android Keystore 中保护的设备密钥进行加密
     internal fun encryptData(input: String, uuid: String): String {
         if (EncryptionManager.hasDeviceKey(uuid, context)) {
-            try {
-                return EncryptionManager.encryptWithDeviceKey(input, uuid, context)
-            } catch (_: Exception) {
-                EncryptionManager.removeDeviceKey(uuid, context)
-            }
-        }
-        // 运行时重导：从 AuthInfo 读取 sharedSecret 导入 Keystore 后加密
-        val secret = synchronized(authenticatedDevices) { authenticatedDevices[uuid]?.sharedSecret }
-        if (!secret.isNullOrEmpty()) {
-            Logger.w("死神-NotifyRelay", "encryptData: Keystore 缺少设备 $uuid 的密钥，从 AuthInfo 运行时重导")
-            EncryptionManager.importAesKeyToKeystore(context, uuid, secret)
             return EncryptionManager.encryptWithDeviceKey(input, uuid, context)
         }
         throw IllegalStateException("Keystore key not found for device $uuid")
@@ -633,21 +623,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     // 使用 Android Keystore 中保护的设备密钥进行解密（对 ProtocolRouter 开放）
     internal fun decryptData(input: String, uuid: String): String {
-        if (EncryptionManager.hasDeviceKey(uuid, context)) {
-            try {
-                return EncryptionManager.decryptWithDeviceKey(input, uuid, context)
-            } catch (_: Exception) {
-                EncryptionManager.removeDeviceKey(uuid, context)
-            }
+        if (!EncryptionManager.hasDeviceKey(uuid, context)) {
+            throw IllegalStateException("Keystore key not found for device $uuid")
         }
-        // 运行时重导：从 AuthInfo 读取 sharedSecret 导入 Keystore 后解密
-        val secret = synchronized(authenticatedDevices) { authenticatedDevices[uuid]?.sharedSecret }
-        if (!secret.isNullOrEmpty()) {
-            Logger.w("死神-NotifyRelay", "decryptData: Keystore 缺少设备 $uuid 的密钥，从 AuthInfo 运行时重导")
-            EncryptionManager.importAesKeyToKeystore(context, uuid, secret)
-            return EncryptionManager.decryptWithDeviceKey(input, uuid, context)
-        }
-        throw IllegalStateException("Keystore key not found for device $uuid")
+        return EncryptionManager.decryptWithDeviceKey(input, uuid, context)
     }
 
     // 发送通知数据（加密）

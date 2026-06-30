@@ -51,9 +51,10 @@ object FcitxClipboardManager {
         }
     }
 
-    fun bindService(context: Context) {
-        if (pairingService != null || isBinding) return
-        bindingContext = context
+    fun bindService(context: Context): Boolean {
+        if (pairingService != null || isBinding) return true
+        val appContext = context.applicationContext
+        bindingContext = appContext
         isBinding = true
 
         for (pkg in FCITX5_PACKAGES) {
@@ -61,16 +62,17 @@ object FcitxClipboardManager {
                 component = ComponentName(pkg, FCITX5_SERVICE_CLASS)
             }
             try {
-                val bound = context.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
+                val bound = appContext.bindService(intent, serviceConnection, Context.BIND_AUTO_CREATE)
                 if (bound) {
                     Logger.d(TAG, "正在绑定 Fcitx5 配对服务 ($pkg)...")
-                    return
+                    return true
                 }
             } catch (_: Exception) {
             }
         }
         isBinding = false
         Logger.e(TAG, "绑定 Fcitx5 配对服务失败：所有包名均不可用")
+        return false
     }
 
     fun unbindService() {
@@ -93,7 +95,10 @@ object FcitxClipboardManager {
             return
         }
         pendingPairingRequest = code to onResult
-        bindService(context)
+        if (!bindService(context)) {
+            pendingPairingRequest = null
+            onResult(false)
+        }
     }
 
     private fun doRequestPairing(code: String, onResult: (Boolean) -> Unit) {
@@ -106,13 +111,16 @@ object FcitxClipboardManager {
             val appName = ctx.applicationInfo.loadLabel(ctx.packageManager).toString()
             val success = pairingService!!.requestPairing(code, packageName, appName)
             if (success) {
-                isPaired = true
                 val sharedKey = pairingService!!.getSharedKey(packageName)
-                if (sharedKey != null) {
-                    notifyrelay.core.util.SecureKeyStorage.encryptAndStore(ctx, "fcitx5_clipboard_key", sharedKey)
+                if (!sharedKey.isNullOrBlank()) {
+                    notifyrelay.core.util.SecureKeyStorage.encryptAndStore(ctx, CLIPBOARD_KEY_ALIAS, sharedKey)
+                    isPaired = true
                     Logger.d(TAG, "Fcitx5 配对成功，密钥已保存")
                 } else {
                     Logger.w(TAG, "Fcitx5 配对成功但获取密钥失败")
+                    isPaired = false
+                    onResult(false)
+                    return
                 }
             } else {
                 Logger.d(TAG, "Fcitx5 配对失败：配对码错误或已过期")
@@ -175,7 +183,9 @@ object FcitxClipboardManager {
             val secretKey = notifyrelay.core.util.SecureKeyStorage.retrieveAndDecrypt(context, "fcitx5_clipboard_key")
                 ?: return null
 
+            if (encryptedData.size < 2) return null
             val ivLength = encryptedData[0].toInt() and 0xFF
+            if (ivLength <= 0 || encryptedData.size <= 1 + ivLength) return null
             val iv = encryptedData.copyOfRange(1, 1 + ivLength)
             val ciphertext = encryptedData.copyOfRange(1 + ivLength, encryptedData.size)
 
@@ -194,11 +204,16 @@ object FcitxClipboardManager {
         val alias = "fcitx5_clipboard_imported"
         val keyStore = java.security.KeyStore.getInstance("AndroidKeyStore")
         keyStore.load(null)
+        val newKeyBytes = Base64.decode(secretKeyBase64, Base64.NO_WRAP)
+        // 检查现有 key 是否匹配，不匹配则替换
         if (keyStore.containsAlias(alias)) {
-            return keyStore.getKey(alias, null) as javax.crypto.SecretKey
+            val existingKey = keyStore.getKey(alias, null) as? javax.crypto.SecretKey
+            if (existingKey != null && existingKey.encoded.contentEquals(newKeyBytes)) {
+                return existingKey
+            }
+            keyStore.deleteEntry(alias)
         }
-        val keyBytes = Base64.decode(secretKeyBase64, Base64.NO_WRAP)
-        val originalKey = javax.crypto.spec.SecretKeySpec(keyBytes, "AES")
+        val originalKey = javax.crypto.spec.SecretKeySpec(newKeyBytes, "AES")
         val protectionParams = android.security.keystore.KeyProtection.Builder(
             javax.crypto.Cipher.DECRYPT_MODE
         )

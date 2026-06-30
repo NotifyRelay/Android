@@ -67,6 +67,7 @@ object SecureKeyStorage {
             cipher.init(Cipher.DECRYPT_MODE, masterKey, spec)
             String(cipher.doFinal(ciphertext), Charsets.UTF_8)
         } catch (e: Exception) {
+            android.util.Log.w("SecureKeyStorage", "Failed to decrypt stored secure value for alias=$keyAlias", e)
             null
         }
     }

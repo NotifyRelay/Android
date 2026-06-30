@@ -1,5 +1,6 @@
 package notifyrelay.core.util
 
+import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -9,6 +10,8 @@ import java.security.KeyStore
 import java.security.MessageDigest
 import java.security.spec.ECGenParameterSpec
 import javax.crypto.KeyAgreement
+import javax.crypto.Mac
+import javax.crypto.spec.SecretKeySpec
 
 /**
  * Android Keystore ECDH 密钥对管理器
@@ -41,9 +44,14 @@ object EcdhKeyStore {
         val keyPairGenerator = KeyPairGenerator.getInstance(
             KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEY_STORE
         )
+        val purposes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            KeyProperties.PURPOSE_AGREE_KEY
+        } else {
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        }
         val spec = KeyGenParameterSpec.Builder(
             KEY_ALIAS,
-            KeyProperties.PURPOSE_AGREE_KEY
+            purposes
         )
             .setAlgorithmParameterSpec(ECGenParameterSpec(CURVE))
             .setKeySize(256)
@@ -90,6 +98,9 @@ object EcdhKeyStore {
         val keyPair = getOrCreateKeyPair()
         // 解码远端公钥的未压缩点
         val remotePointBytes = Base64.decode(remotePublicKeyBase64, Base64.NO_WRAP)
+        require(remotePointBytes.size == 65 && remotePointBytes[0] == 0x04.toByte()) {
+            "Invalid ECDH public key format"
+        }
         // 构造 EC 公钥
         val keyFactory = java.security.KeyFactory.getInstance("EC")
         val ecPoint = java.security.spec.ECPoint(
@@ -111,11 +122,21 @@ object EcdhKeyStore {
         keyAgreement.doPhase(remotePublicKey, true)
         val sharedSecret = keyAgreement.generateSecret()
 
-        // SHA-256 哈希
-        val digest = MessageDigest.getInstance("SHA-256")
-        val hashed = digest.digest(sharedSecret)
+        // HKDF-SHA256 派生
+        val mac = Mac.getInstance("HmacSHA256")
+        val salt = ByteArray(32) { 0.toByte() }
+        val keySpec = SecretKeySpec(salt, "HmacSHA256")
+        mac.init(keySpec)
+        val prk = mac.doFinal(sharedSecret)
+        // HKDF expand with protocol context info（两端一致）
+        val info = "NotifyRelay-ECDH-v1".toByteArray(Charsets.UTF_8)
+        mac.reset()
+        mac.init(SecretKeySpec(prk, "HmacSHA256"))
+        mac.update(info)
+        mac.update(1.toByte())
+        val okm = mac.doFinal()
 
-        return Base64.encodeToString(hashed, Base64.NO_WRAP)
+        return Base64.encodeToString(okm, Base64.NO_WRAP)
     }
 
     /**

@@ -201,6 +201,15 @@ object NotificationGenerator {
             // 验证规范信息注入开关状态，确保至少有一种开启
             SuperIslandConfigUtils.validateSpecInjectionSwitches(context)
             
+            // 共享通知ID模式下（列表模式），清理旧的滚动任务避免冲突
+            if (overrideNotificationId != null) {
+                scrollRunnable.keys.toList().forEach { oldKey ->
+                    if (oldKey != key) {
+                        stopScrollUpdate(oldKey)
+                    }
+                }
+            }
+            
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
             // 生成唯一的通知ID（列表模式使用固定ID，以便原地更新）

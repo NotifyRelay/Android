@@ -83,7 +83,7 @@ object ProtocolRouter {
             when (header) {
                 // 主通道：历史上的 DATA 默认为普通通知（DATA_NOTIFICATION）
                 "DATA", "DATA_NOTIFICATION" -> {
-                    Logger.d(TAG, "接收到 DATA_NOTIFICATION 消息: ${decrypted.take(50)}")
+                    Logger.d(TAG, "接收到 DATA_NOTIFICATION 消息: uuid=$remoteUuid, size=${decrypted.length}")
                     val routedHeader = "DATA_NOTIFICATION"
                     NotificationProcessor.process(
                         context,
@@ -100,7 +100,7 @@ object ProtocolRouter {
                 }
                 "DATA_SUPERISLAND" -> {
                     // 分流到 SuperIslandProcessor 专门处理超级岛通知
-                    Logger.d(TAG, "接收到 DATA_NOTIFICATION 消息: ${decrypted.take(50)}")
+                    Logger.d(TAG, "接收到 DATA_SUPERISLAND 消息: uuid=$remoteUuid, size=${decrypted.length}")
                     try {
                         val handled = SuperIslandProcessor.process(
                             context,
@@ -116,7 +116,7 @@ object ProtocolRouter {
                 }
                 "DATA_MEDIAPLAY" -> {
                     // 处理远端媒体播放通知，触发超级岛显示
-                    Logger.d(TAG, "接收到 DATA_MEDIAPLAY 消息: ${decrypted.take(50)}")
+                    Logger.d(TAG, "接收到 DATA_MEDIAPLAY 消息: uuid=$remoteUuid, size=${decrypted.length}")
                     try {
                         val json = JSONObject(decrypted)
                         val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
@@ -129,7 +129,7 @@ object ProtocolRouter {
                 }
                 // DATA_ICON_REQUEST：对方向本机请求应用图标，本机查找后会通过 DATA_ICON_RESPONSE 回传
                 "DATA_ICON_REQUEST" -> {
-                    Logger.d(TAG, "接收到 DATA_ICON_REQUEST 消息: ${decrypted.take(50)} 丢给IconSyncManager")
+                    Logger.d(TAG, "接收到 DATA_ICON_REQUEST 消息: uuid=$remoteUuid, size=${decrypted.length} 丢给IconSyncManager")
                     val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                     Logger.d(TAG, "source device info: $source")
                     try {
@@ -141,13 +141,13 @@ object ProtocolRouter {
                 }
                 // DATA_ICON_RESPONSE：图标请求的响应，更新本机图标缓存供通知复刻使用
                 "DATA_ICON_RESPONSE" -> {
-                    Logger.d(TAG, "接收到 DATA_ICON_RESPONSE 消息: ${decrypted.take(50)}")
+                    Logger.d(TAG, "接收到 DATA_ICON_RESPONSE 消息: uuid=$remoteUuid, size=${decrypted.length}")
                     IconSyncManager.handleIconResponse(decrypted, context)
                     true
                 }
                 // DATA_APP_LIST_REQUEST：对方请求本机应用列表，本机查询后通过 DATA_APP_LIST_RESPONSE 返回
                 "DATA_APP_LIST_REQUEST" -> {
-                    Logger.d(TAG, "接收到 DATA_APP_LIST_REQUEST 消息: ${decrypted.take(50)} 丢给AppListSyncManager")
+                    Logger.d(TAG, "接收到 DATA_APP_LIST_REQUEST 消息: uuid=$remoteUuid, size=${decrypted.length} 丢给AppListSyncManager")
                     val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                     Logger.d(TAG, "source device info: $source")
                     try {
@@ -159,13 +159,13 @@ object ProtocolRouter {
                 }
                 // DATA_APP_LIST_RESPONSE：应用列表请求的响应，用于更新本机缓存/状态
                 "DATA_APP_LIST_RESPONSE" -> {
-                    Logger.d(TAG, "接收到 DATA_APP_LIST_RESPONSE 消息: ${decrypted.take(50)}")
+                    Logger.d(TAG, "接收到 DATA_APP_LIST_RESPONSE 消息: uuid=$remoteUuid, size=${decrypted.length}")
                     AppListSyncManager.handleAppListResponse(decrypted, context, remoteUuid, deviceManager)
                     true
                 }
                 // DATA_AUDIO_REQUEST：对方请求本机音频转发
                 "DATA_MEDIA_CONTROL" -> {
-                    Logger.d(TAG, "接收到 DATA_MEDIA_CONTROL 消息: ${decrypted.take(50)}")
+                    Logger.d(TAG, "接收到 DATA_MEDIA_CONTROL 消息: uuid=$remoteUuid, size=${decrypted.length}")
                     // 处理媒体控制命令，包括音频转发和媒体播放控制
                     try {
                         val json = JSONObject(decrypted)
@@ -280,7 +280,9 @@ object ProtocolRouter {
                                 "start" -> {
                                     Logger.i(TAG, "开始启动 FTP 服务器")
                                     val deviceName = deviceManager.getLocalDisplayName()
-                                    val ftpStartResult = ftpServer.start(deviceName, context)
+                                    val pcUsername = json.optString("username", null)
+                                    val pcPassword = json.optString("password", null)
+                                    val ftpStartResult = ftpServer.start(deviceName, context, pcUsername, pcPassword)
                                     when (ftpStartResult.status) {
                                         SUCCESS, ALREADY_RUNNING -> {
                                             val ftpInfo = ftpStartResult.serverInfo
@@ -422,7 +424,7 @@ object ProtocolRouter {
                     true
                 }
                 "DATA_CLIPBOARD" -> {
-                    Logger.d(TAG, "接收到 DATA_CLIPBOARD 消息: ${decrypted.take(50)}")
+                    Logger.d(TAG, "接收到 DATA_CLIPBOARD 消息: uuid=$remoteUuid, size=${decrypted.length}")
                     // 处理剪贴板消息
                     ClipboardProcessor.process(
                         context,
@@ -435,7 +437,7 @@ object ProtocolRouter {
                     true
                 }
                 "DATA_STATUS" -> {
-                    Logger.d(TAG, "接收到 DATA_STATUS 消息: ${decrypted.take(50)}")
+                    Logger.d(TAG, "接收到 DATA_STATUS 消息: uuid=$remoteUuid, size=${decrypted.length}")
                     val routedHeader = "DATA_STATUS"
                     StatusProcessor.process(
                         context,
@@ -451,7 +453,7 @@ object ProtocolRouter {
                     true
                 }
                 "DATA_APP_LAUNCH" -> {
-                    Logger.d(TAG, "接收到 DATA_APP_LAUNCH 消息: ${decrypted.take(50)}")
+                    Logger.d(TAG, "接收到 DATA_APP_LAUNCH 消息: uuid=$remoteUuid, size=${decrypted.length}")
                     val source = deviceManager.resolveDeviceInfo(remoteUuid, clientIp, 23333)
                     try {
                         source?.let { AppLaunchManager.handleAppLaunchRequest(decrypted, deviceManager, it, context) }

@@ -88,7 +88,8 @@
         <!-- Fcitx5 剪贴板广播接收器 -->
         <receiver
             android:name=".servers.clipboard.FcitxClipboardReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:permission="org.fcitx.fcitx5.android.permission.CLIPBOARD_BROADCAST">
             <intent-filter>
                 <action android:name="org.fcitx.fcitx5.android.action.CLIPBOARD_BROADCAST" />
             </intent-filter>
@@ -124,7 +125,7 @@
         <!-- 开发者模式Activity -->
         <activity
             android:name=".ui.activity.DeveloperModeActivity"
-            android:exported="true"
+            android:exported="false"
             android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar" />
 
     </application>

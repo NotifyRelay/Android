@@ -51,10 +51,11 @@ object SuperIslandConfigUtils {
      * 默认值：平板开启，手机关闭。
      */
     fun isNotificationListMode(context: Context): Boolean {
+        val defaultListMode = DeviceUtils.isTablet(context) && !isFloatingWindowEnabled(context)
         return StorageManager.getBoolean(
             context,
             SUPER_ISLAND_NOTIFICATION_LIST_KEY,
-            DeviceUtils.isTablet(context)
+            defaultListMode
         )
     }
 
