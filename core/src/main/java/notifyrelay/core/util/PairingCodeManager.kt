@@ -1,5 +1,7 @@
 package notifyrelay.core.util
 
+import java.security.SecureRandom
+
 /**
  * 配对码管理器，提供统一的配对码生成、验证、过期管理。
  *
@@ -20,6 +22,7 @@ object PairingCodeManager {
     private const val CODE_LENGTH = 6
     private const val EXPIRY_MS = 5 * 60 * 1000L // 5 分钟
 
+    private val secureRandom = SecureRandom()
     private var currentCode: String? = null
     private var generatedAt: Long = 0L
     private var verifiedCode: String? = null
@@ -29,9 +32,10 @@ object PairingCodeManager {
      */
     @Synchronized
     fun generate(): String {
-        val code = (100_000..999_999).random().toString()
+        val code = (secureRandom.nextInt(900_000) + 100_000).toString()
         currentCode = code
         generatedAt = System.currentTimeMillis()
+        verifiedCode = null
         return code
     }
 
@@ -76,6 +80,7 @@ object PairingCodeManager {
     fun clear() {
         currentCode = null
         generatedAt = 0L
+        verifiedCode = null
     }
 
     /**

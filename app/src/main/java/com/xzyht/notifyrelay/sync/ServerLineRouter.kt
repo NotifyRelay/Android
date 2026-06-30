@@ -76,20 +76,25 @@ object ServerLineRouter {
                 val remoteDeviceType: String = parts.getOrNull(5) ?: "unknown"
                 val ip: String = client.inetAddress.hostAddress.orEmpty().ifEmpty { "0.0.0.0" }
 
-                // 检查是否已被拒绝
-                if (deviceManager.rejectedDevicesInternal.contains(remoteUuid)) {
-                    val writer = OutputStreamWriter(client.getOutputStream())
-                    writer.write("REJECT:${deviceManager.uuid}\n")
-                    writer.flush()
-                    writer.close()
-                    reader.close()
-                    client.close()
-                    return
+                // 检查是否已被拒绝（同步访问）
+                synchronized(deviceManager.rejectedDevicesInternal) {
+                    if (deviceManager.rejectedDevicesInternal.contains(remoteUuid)) {
+                        val writer = OutputStreamWriter(client.getOutputStream())
+                        writer.write("REJECT:${deviceManager.uuid}\n")
+                        writer.flush()
+                        writer.close()
+                        reader.close()
+                        client.close()
+                        return
+                    }
                 }
 
-                // 缓存设备信息
-                val displayName = deviceManager.deviceInfoCacheInternal[remoteUuid]?.displayName ?: "未知设备"
-                deviceManager.deviceInfoCacheInternal[remoteUuid] = DeviceInfo(remoteUuid, displayName, ip, 23333)
+                // 缓存设备信息（同步访问）
+                val displayName: String
+                synchronized(deviceManager.deviceInfoCacheInternal) {
+                    displayName = deviceManager.deviceInfoCacheInternal[remoteUuid]?.displayName ?: "未知设备"
+                    deviceManager.deviceInfoCacheInternal[remoteUuid] = DeviceInfo(remoteUuid, displayName, ip, 23333)
+                }
 
                 // 存储配对信息，包含临时公钥
                 val pending = DeviceConnectionManager.PendingPairing(
@@ -202,8 +207,6 @@ object ServerLineRouter {
                     reader.close()
                     client.close()
 
-                    // 5. 清理临时私钥
-                    deviceManager.pendingTempPrivKeyB64 = null
                     Logger.d(TAG, "PAIRING_RESP 配对成功: $remoteUuid")
                 } catch (e: Exception) {
                     Logger.e(TAG, "PAIRING_RESP 解密/验证失败: $remoteUuid", e)
@@ -215,6 +218,8 @@ object ServerLineRouter {
                     } catch (_: Exception) {}
                     try { reader.close() } catch (_: Exception) {}
                     try { client.close() } catch (_: Exception) {}
+                } finally {
+                    deviceManager.pendingTempPrivKeyB64 = null
                 }
             } else {
                 try { reader.close() } catch (_: Exception) {}
@@ -295,14 +300,9 @@ object ServerLineRouter {
                                 EncryptionManager.importAesKeyToKeystore(deviceManager.contextInternal, remoteUuid, newSecret)
                                 deviceManager.authenticatedDevices[remoteUuid] = existingAuth.copy(
                                     publicKey = remotePubKey,
-                                    sharedSecret = newSecret
-                                )
-                                deviceManager.saveAuthedDevicesInternal()
-                                // 保存后清空内存中的明文，后续解密走 Keystore
-                                deviceManager.authenticatedDevices[remoteUuid] = existingAuth.copy(
-                                    publicKey = remotePubKey,
                                     sharedSecret = ""
                                 )
+                                deviceManager.saveAuthedDevicesInternal()
                             } catch (e: Exception) {
                                 Logger.e(TAG, "公钥变更后重新派生密钥失败，要求重新配对", e)
                                 synchronized(deviceManager.incompatibleDevicesInternal) {

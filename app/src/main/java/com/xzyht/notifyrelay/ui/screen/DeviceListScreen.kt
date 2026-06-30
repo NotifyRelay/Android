@@ -516,6 +516,8 @@ fun DeviceListScreen(
             },
             onPairingComplete = { success: Boolean, _: String ->
                 if (success) {
+                    state.showPairingCodeDialog = false
+                    state.pendingConnectDevice = null
                     try {
                         deviceManager.updateDeviceListInternal()
                         val authMap = deviceManager.getAuthenticatedDevices()
@@ -564,17 +566,6 @@ fun DeviceListScreen(
             backgroundColor = DialogDefaults.backgroundColor(),
             enableWindowDim = true,
             onDismissRequest = {
-                // 仅删除设备，不清理历史
-                try {
-                    val removed = deviceManager.removeAuthenticatedDevice(deviceToDelete.uuid, deleteHistory = false)
-                    if (removed) {
-                        authedDeviceUuids = authedDeviceUuids - deviceToDelete.uuid
-                    } else {
-                        ToastUtils.showShortToast(context, "删除设备失败: 设备不存在或已被删除")
-                    }
-                } catch (e: Exception) {
-                    ToastUtils.showShortToast(context, "删除设备失败: ${e.message ?: "未知错误"}")
-                }
                 selectedDevice = null
                 GlobalSelectedDeviceHolder.selectedDevice = null
                 showDeleteHistoryDialog = false

@@ -1,6 +1,5 @@
 package notifyrelay.core.util
 
-import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
@@ -50,14 +49,9 @@ object EcdhKeyStore {
         val keyPairGenerator = KeyPairGenerator.getInstance(
             KeyProperties.KEY_ALGORITHM_EC, ANDROID_KEY_STORE
         )
-        val purposes = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            KeyProperties.PURPOSE_AGREE_KEY
-        } else {
-            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-        }
         val spec = KeyGenParameterSpec.Builder(
             KEY_ALIAS,
-            purposes
+            KeyProperties.PURPOSE_AGREE_KEY
         )
             .setAlgorithmParameterSpec(ECGenParameterSpec(CURVE))
             .setKeySize(256)
@@ -111,11 +105,11 @@ object EcdhKeyStore {
             java.math.BigInteger(1, pointBytes.copyOfRange(1, 33)),
             java.math.BigInteger(1, pointBytes.copyOfRange(33, 65))
         )
-        // 从 Keystore 中获取椭圆曲线参数
-        val keyPair = getOrCreateKeyPair()
-        val paramSpec = keyFactory.getKeySpec(keyPair.public, ECPublicKeySpec::class.java)
-        val params = (paramSpec as ECPublicKeySpec).params
-        val pubKeySpec = ECPublicKeySpec(ecPoint, params)
+        // 直接从 CURVE 名称构造 ECParameterSpec，不触碰 Keystore
+        val algoParams = java.security.AlgorithmParameters.getInstance("EC")
+        algoParams.init(ECGenParameterSpec(CURVE))
+        val ecParams = algoParams.getParameterSpec(java.security.spec.ECParameterSpec::class.java)
+        val pubKeySpec = ECPublicKeySpec(ecPoint, ecParams)
         return keyFactory.generatePublic(pubKeySpec)
     }
 

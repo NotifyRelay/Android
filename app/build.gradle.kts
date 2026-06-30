@@ -47,7 +47,7 @@ android {
 
     defaultConfig {
         applicationId = "com.xzyht.notifyrelay"
-        minSdk = libs.versions.minSdk.get().toInt()
+        minSdk = 31
         targetSdk = libs.versions.targetSdk.get().toInt()
         // 使用自动计算的版本号
         versionCode = computedVersionCode

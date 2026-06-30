@@ -12,6 +12,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -63,6 +64,7 @@ fun PairingCodeDialog(
     if (mode == PairingMode.CLIENT_MODE) {
         // ==================== 发起端：生成临时密钥对，显示配对码 ====================
         val clipboardManager = LocalClipboardManager.current
+        val scope = rememberCoroutineScope()
         val displayCode = remember { pairingCode.ifEmpty { PairingCodeManager.generate() } }
         val tmpKeyPair = remember { EcdhKeyStore.generateEphemeralKeyPair() }
         val tmpPubKeyB64 = remember { EcdhKeyStore.encodePublicKey(tmpKeyPair.public) }
@@ -92,6 +94,7 @@ fun PairingCodeDialog(
                     }
                     attempts++
                 }
+                deviceManager.pendingTempPrivKeyB64 = null
                 onPairingComplete(false, "配对超时")
             }
         }
@@ -146,6 +149,7 @@ fun PairingCodeDialog(
                         text = "取消",
                         onClick = {
                             PairingCodeManager.clear()
+                            deviceManager.pendingTempPrivKeyB64 = null
                             onDismiss()
                         }
                     )
@@ -154,6 +158,7 @@ fun PairingCodeDialog(
         )
     } else {
         // ==================== 接收端：输入配对码，加密回传 ====================
+        val serverScope = rememberCoroutineScope()
         var code by remember { mutableStateOf("") }
         var isPairing by remember { mutableStateOf(false) }
         var errorMsg by remember { mutableStateOf<String?>(null) }
@@ -232,7 +237,7 @@ fun PairingCodeDialog(
                                 }
                                 isPairing = true
 
-                                kotlinx.coroutines.MainScope().launch {
+                                serverScope.launch {
                                     val result = withContext(Dispatchers.IO) {
                                         try {
                                             // 1. 使用发起端的临时公钥加密配对码
@@ -280,6 +285,7 @@ fun PairingCodeDialog(
                                     }
                                     if (result == "配对成功") {
                                         onPairingComplete(true, "配对成功")
+                                        onDismiss()
                                     } else {
                                         isPairing = false
                                         errorMsg = result

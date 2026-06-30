@@ -621,6 +621,8 @@ object EncryptionManager {
      * @param base64Key Base64 编码的 AES 密钥
      */
     fun importAesKeyToKeystore(context: Context, uuid: String, base64Key: String) {
+        val keyBytes = Base64.decode(base64Key, Base64.NO_WRAP)
+        require(keyBytes.size == 32) { "Invalid AES-256 key length: ${keyBytes.size} for uuid=$uuid, expected 32 bytes" }
         val keyStore = KeyStore.getInstance("AndroidKeyStore")
         keyStore.load(null)
         val alias = AES_DEVICE_SECRET_PREFIX + uuid
@@ -628,8 +630,6 @@ object EncryptionManager {
         if (keyStore.containsAlias(alias)) {
             keyStore.deleteEntry(alias)
         }
-        val keyBytes = Base64.decode(base64Key, Base64.NO_WRAP)
-        require(keyBytes.size == 32) { "Invalid AES-256 key length: ${keyBytes.size} for uuid=$uuid, expected 32 bytes" }
         val secretKey = SecretKeySpec(keyBytes, KeyProperties.KEY_ALGORITHM_AES)
         val protectionParams = KeyProtection.Builder(
             KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT

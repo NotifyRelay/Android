@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.sync
 
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import notifyrelay.base.util.Logger
 import notifyrelay.core.util.BatteryUtils
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -38,26 +39,25 @@ object HandshakeSender {
         connectTimeoutMs: Int = 3000
     ): String? {
         return try {
-            val socket = Socket()
-            socket.connect(InetSocketAddress(target.ip, target.port), connectTimeoutMs)
-            val writer = OutputStreamWriter(socket.getOutputStream())
-            val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(target.ip, target.port), connectTimeoutMs)
+                socket.soTimeout = connectTimeoutMs
+                val writer = OutputStreamWriter(socket.getOutputStream())
+                val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
 
-            val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
-            val isCharging = BatteryUtils.isCharging(manager.contextInternal)
-            val batteryStr = if (isCharging) "$batteryLevel+" else "$batteryLevel"
-            val localIp = getLocalIpAddress()
-            val deviceType = "android"
+                val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
+                val isCharging = BatteryUtils.isCharging(manager.contextInternal)
+                val batteryStr = if (isCharging) "$batteryLevel+" else "$batteryLevel"
+                val localIp = getLocalIpAddress()
+                val deviceType = "android"
 
-            val req = "PAIRING_INIT:${manager.uuid}:$tmpPublicKey:$localIp:$batteryStr:$deviceType\n"
-            writer.write(req)
-            writer.flush()
-            val resp = reader.readLine()
-            try { writer.close() } catch (_: Exception) {}
-            try { reader.close() } catch (_: Exception) {}
-            try { socket.close() } catch (_: Exception) {}
-            resp
+                val req = "PAIRING_INIT:${manager.uuid}:$tmpPublicKey:$localIp:$batteryStr:$deviceType\n"
+                writer.write(req)
+                writer.flush()
+                reader.readLine()
+            }
         } catch (e: Exception) {
+            Logger.e(TAG, "sendPairingInit 失败: ${target.uuid}@${target.ip}:${target.port}", e)
             null
         }
     }
@@ -76,26 +76,25 @@ object HandshakeSender {
         connectTimeoutMs: Int = 3000
     ): String? {
         return try {
-            val socket = Socket()
-            socket.connect(InetSocketAddress(target.ip, target.port), connectTimeoutMs)
-            val writer = OutputStreamWriter(socket.getOutputStream())
-            val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(target.ip, target.port), connectTimeoutMs)
+                socket.soTimeout = connectTimeoutMs
+                val writer = OutputStreamWriter(socket.getOutputStream())
+                val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
 
-            val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
-            val isCharging = BatteryUtils.isCharging(manager.contextInternal)
-            val batteryStr = if (isCharging) "$batteryLevel+" else "$batteryLevel"
-            val localIp = getLocalIpAddress()
-            val deviceType = "android"
+                val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
+                val isCharging = BatteryUtils.isCharging(manager.contextInternal)
+                val batteryStr = if (isCharging) "$batteryLevel+" else "$batteryLevel"
+                val localIp = getLocalIpAddress()
+                val deviceType = "android"
 
-            val req = "PAIRING_RESP:${manager.uuid}:$tmpPublicKey:${manager.localPublicKey}:$encryptedCode:$localIp:$batteryStr:$deviceType\n"
-            writer.write(req)
-            writer.flush()
-            val resp = reader.readLine()
-            try { writer.close() } catch (_: Exception) {}
-            try { reader.close() } catch (_: Exception) {}
-            try { socket.close() } catch (_: Exception) {}
-            resp
+                val req = "PAIRING_RESP:${manager.uuid}:$tmpPublicKey:${manager.localPublicKey}:$encryptedCode:$localIp:$batteryStr:$deviceType\n"
+                writer.write(req)
+                writer.flush()
+                reader.readLine()
+            }
         } catch (e: Exception) {
+            Logger.e(TAG, "sendPairingResp 失败: ${target.uuid}@${target.ip}:${target.port}", e)
             null
         }
     }
@@ -110,28 +109,25 @@ object HandshakeSender {
         connectTimeoutMs: Int = 3000
     ): String? {
         return try {
-            val socket = Socket()
-            socket.connect(InetSocketAddress(target.ip, target.port), connectTimeoutMs)
-            val writer = OutputStreamWriter(socket.getOutputStream())
-            val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
+            Socket().use { socket ->
+                socket.connect(InetSocketAddress(target.ip, target.port), connectTimeoutMs)
+                socket.soTimeout = connectTimeoutMs
+                val writer = OutputStreamWriter(socket.getOutputStream())
+                val reader = BufferedReader(InputStreamReader(socket.getInputStream()))
 
-            val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
-            val isCharging = BatteryUtils.isCharging(manager.contextInternal)
-            val batteryStr = if (isCharging) "$batteryLevel+" else "$batteryLevel"
-            val localIp = getLocalIpAddress()
-            val deviceType = "android"
+                val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
+                val isCharging = BatteryUtils.isCharging(manager.contextInternal)
+                val batteryStr = if (isCharging) "$batteryLevel+" else "$batteryLevel"
+                val localIp = getLocalIpAddress()
+                val deviceType = "android"
 
-            val handshake = "HANDSHAKE:${manager.uuid}:${manager.localPublicKey}:$localIp:$batteryStr:$deviceType\n"
-            writer.write(handshake)
-            writer.flush()
-            val resp = reader.readLine()
-            //Logger.d(TAG, "handshake resp=$resp, target=${target.uuid}@${target.ip}:${target.port}")
-            try { writer.close() } catch (_: Exception) {}
-            try { reader.close() } catch (_: Exception) {}
-            try { socket.close() } catch (_: Exception) {}
-            resp
+                val handshake = "HANDSHAKE:${manager.uuid}:${manager.localPublicKey}:$localIp:$batteryStr:$deviceType\n"
+                writer.write(handshake)
+                writer.flush()
+                reader.readLine()
+            }
         } catch (e: Exception) {
-            //Logger.d(TAG, "handshake failed: ${e.message}")
+            Logger.e(TAG, "sendHandshake 失败: ${target.uuid}@${target.ip}:${target.port}", e)
             null
         }
     }

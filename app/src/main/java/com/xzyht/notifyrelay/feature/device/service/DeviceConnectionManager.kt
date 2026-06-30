@@ -142,6 +142,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             // 确保 sharedSecret 已导入 Android Keystore
             if (device.sharedSecret.isNotEmpty() && !EncryptionManager.hasDeviceKey(device.uuid, context)) {
                 EncryptionManager.importAesKeyToKeystore(context, device.uuid, device.sharedSecret)
+                // 导入成功后立即持久化清空 Room 中的明文密钥
+                kotlinx.coroutines.runBlocking {
+                    DatabaseRepository.getInstance(context).saveDevice(device.copy(sharedSecret = ""))
+                }
             }
             
             authenticatedDevices[device.uuid] = AuthInfo(
@@ -608,8 +612,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         val remoteIp: String,
         val tmpPubKey: String = ""  // 发起端的临时公钥，用于加密回传配对码
     )
-    var pendingPairing: PendingPairing? = null
-        internal set
+    private val _pendingPairingLock = Any()
+    private var _pendingPairing: PendingPairing? = null
+    var pendingPairing: PendingPairing?
+        get() = synchronized(_pendingPairingLock) { _pendingPairing }
+        internal set(value) = synchronized(_pendingPairingLock) { _pendingPairing = value }
 
     /**
      * 取消当前待处理的配对请求。
@@ -628,7 +635,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
      * 供 ServerLineRouter.handlePairingResp 解密接收端回传的配对码。
      * 配对完成后应清空。
      */
-    var pendingTempPrivKeyB64: String? = null
+    private val _pendingTempPrivKeyB64Lock = Any()
+    private var _pendingTempPrivKeyB64: String? = null
+    var pendingTempPrivKeyB64: String?
+        get() = synchronized(_pendingTempPrivKeyB64Lock) { _pendingTempPrivKeyB64 }
+        set(value) = synchronized(_pendingTempPrivKeyB64Lock) { _pendingTempPrivKeyB64 = value }
 
     /**
      * 使用长期 ECDH 密钥完成标准密钥交换。
