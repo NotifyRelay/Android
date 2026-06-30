@@ -25,6 +25,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.xzyht.notifyrelay.servers.clipboard.FcitxClipboardManager
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
+import com.xzyht.notifyrelay.ui.dialog.PairingCodeInputField
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,7 +33,6 @@ import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -182,13 +182,10 @@ fun ClipboardSyncPage() {
                     color = colorScheme.error
                 )
 
-                TextField(
-                    value = pairingCode,
-                    onValueChange = { pairingCode = it.take(6) },
-                    modifier = Modifier.fillMaxWidth(),
-                    label = "配对码",
-                    useLabelAsPlaceholder = true,
-                    singleLine = true
+                PairingCodeInputField(
+                    code = pairingCode,
+                    onCodeChange = { pairingCode = it },
+                    enabled = pairingState != "配对中..."
                 )
 
                 Row(

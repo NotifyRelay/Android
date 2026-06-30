@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
@@ -54,16 +55,21 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingl
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.dialog.ConnectDeviceDialog
-import com.xzyht.notifyrelay.ui.dialog.HandshakeRequestDialog
+import com.xzyht.notifyrelay.ui.dialog.PairingCodeDialog
+import com.xzyht.notifyrelay.ui.dialog.PairingMode
 import com.xzyht.notifyrelay.ui.dialog.RejectedDevicesDialog
 import com.xzyht.notifyrelay.ui.navigation.Navigator
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.BatteryIconConverter
 import notifyrelay.core.util.BatteryUtils
+import notifyrelay.core.util.PairingCodeManager
+import top.yukonga.miuix.kmp.layout.DialogDefaults
+import top.yukonga.miuix.kmp.window.WindowDialog
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -92,33 +98,31 @@ object GlobalSelectedDeviceHolder {
  * 用于在父组件和子组件之间共享弹窗状态
  */
 class DeviceListScreenState {
-    var showConnectDialog by mutableStateOf(false)
-        internal set
     var pendingConnectDevice by mutableStateOf<DeviceInfo?>(null)
         internal set
-    var showHandshakeDialog by mutableStateOf(false)
-        internal set
-    var pendingHandshakeRequest by mutableStateOf<HandshakeRequest?>(null)
-        internal set
     var showRejectedDialog by mutableStateOf(false)
+        internal set
+    var showPairingCodeDialog by mutableStateOf(false)
+        internal set
+    var pairingCodeDialogMode by mutableStateOf(com.xzyht.notifyrelay.ui.dialog.PairingMode.SERVER_MODE)
+        internal set
+    var serverPairingCode by mutableStateOf("")
         internal set
     
     /**
      * 检查是否有任何弹窗显示
      */
     fun hasAnyDialogShowing(): Boolean {
-        return showConnectDialog || showHandshakeDialog || showRejectedDialog
+        return showRejectedDialog || showPairingCodeDialog
     }
     
     /**
      * 关闭所有弹窗
      */
     fun dismissAllDialogs() {
-        showConnectDialog = false
-        showHandshakeDialog = false
         showRejectedDialog = false
+        showPairingCodeDialog = false
         pendingConnectDevice = null
-        pendingHandshakeRequest = null
     }
 }
 
@@ -145,6 +149,8 @@ fun DeviceListScreen(
     val devices: List<DeviceInfo> = deviceMap.values.map { it.first }
     val deviceStates: Map<String, Boolean> = deviceMap.mapValues { it.value.second }
     var selectedDevice by remember { mutableStateOf(GlobalSelectedDeviceHolder.selectedDevice) }
+    var showDeleteHistoryDialog by remember { mutableStateOf(false) }
+    var pendingDeleteDevice by remember { mutableStateOf<DeviceInfo?>(null) }
     
     val localBatteryLevel = remember {
         BatteryUtils.getBatteryLevel(context)
@@ -175,13 +181,15 @@ fun DeviceListScreen(
         rejectedDeviceUuids = deviceManager.getRejectedDevices()
     }
 
+    // 有未认证设备连接时：生成配对码并弹出显示
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     DisposableEffect(deviceManager) {
         val handler = object : DeviceConnectionManager.HandshakeRequestHandler {
-            override fun onHandshakeRequest(deviceInfo: DeviceInfo, publicKey: String, callback: (Boolean) -> Unit) {
+            override fun onPairingInitRequest(deviceInfo: DeviceInfo, tmpPublicKey: String) {
                 mainHandler.post {
-                    state.pendingHandshakeRequest = HandshakeRequest(deviceInfo, publicKey, callback)
-                    state.showHandshakeDialog = true
+                    state.pendingConnectDevice = deviceInfo
+                    state.pairingCodeDialogMode = PairingMode.SERVER_MODE
+                    state.showPairingCodeDialog = true
                 }
             }
         }
@@ -207,7 +215,8 @@ fun DeviceListScreen(
             GlobalSelectedDeviceHolder.selectedDevice = deviceInfo
         } else {
             state.pendingConnectDevice = deviceInfo
-            state.showConnectDialog = true
+            state.pairingCodeDialogMode = PairingMode.CLIENT_MODE
+            state.showPairingCodeDialog = true
         }
     }
 
@@ -364,18 +373,8 @@ fun DeviceListScreen(
                     confirmText = "确认?",
                     onClick = {},
                     onConfirm = {
-                        try {
-                            val removed = deviceManager.removeAuthenticatedDevice(device.uuid)
-                            if (removed) {
-                                authedDeviceUuids = authedDeviceUuids - device.uuid
-                            } else {
-                                ToastUtils.showShortToast(context, "删除设备失败: 设备不存在或已被删除")
-                            }
-                        } catch (e: Exception) {
-                            ToastUtils.showShortToast(context, "删除设备失败: ${e.message ?: "未知错误"}")
-                        }
-                        selectedDevice = null
-                        GlobalSelectedDeviceHolder.selectedDevice = null
+                        pendingDeleteDevice = device
+                        showDeleteHistoryDialog = true
                     },
                     modifier = Modifier
                         .defaultMinSize(minHeight = buttonMinHeight, minWidth = 60.dp)
@@ -480,120 +479,49 @@ fun DeviceListScreen(
         }
     }
 
-    if (state.showConnectDialog && state.pendingConnectDevice != null) {
-        val activity = LocalActivity.current as? Activity
-        val showDialog = remember { mutableStateOf(true) }
-        ConnectDeviceDialog(
-            showDialog = showDialog,
-            device = state.pendingConnectDevice,
-            onConnect = { device ->
-                try {
-                    val field = deviceManager.javaClass.getDeclaredField("authenticatedDevices")
-                    field.isAccessible = true
-                    val rawMap = field.get(deviceManager)
-                    val safeMap = if (rawMap is MutableMap<*, *>) {
-                        val m = mutableMapOf<String, Any?>()
-                        for ((k, v) in rawMap) {
-                            if (k is String) m[k] = v
-                        }
-                        m
-                    } else mutableMapOf()
-                    val oldUuids = findOtherUuidsWithSameIp(device.ip, "") + device.uuid
-                    val appContext = context.applicationContext
-                    for (uuid in oldUuids.distinct()) {
-                        safeMap.remove(uuid)
-                        try {
-                            val notificationDataClass = Class.forName("com.xzyht.notifyrelay.feature.device.model.NotificationData")
-                            val getInstance = notificationDataClass.getDeclaredMethod("getInstance", Context::class.java)
-                            val notificationData = getInstance.invoke(null, appContext)
-                            val clearDeviceHistory = notificationDataClass.getDeclaredMethod("clearDeviceHistory", String::class.java, Context::class.java)
-                            clearDeviceHistory.invoke(notificationData, uuid, appContext)
-                        } catch (_: Exception) {}
-                    }
-                    deviceManager.saveAuthedDevicesPublic()
-                    deviceManager.updateDeviceListPublic()
-                } catch (_: Exception) {}
-                deviceManager.connectToDevice(device) { success, msg ->
-                    if (!success && msg != null && activity != null) {
-                        activity.runOnUiThread {
-                            Toast.makeText(activity, "连接失败: $msg", Toast.LENGTH_SHORT).show()
-                        }
-                    } else if (success) {
-                        try {
-                            val field = deviceManager.javaClass.getDeclaredField("authenticatedDevices")
-                            field.isAccessible = true
-                            val rawMap = field.get(deviceManager)
-                            @Suppress("UNCHECKED_CAST")
-                            val map = if (rawMap is Map<*, *>) rawMap as Map<String, *> else null
-                            authedDeviceUuids = map?.filter { entry ->
-                                val v = entry.value
-                                v?.let {
-                                    val isAcceptedField = v.javaClass.getDeclaredField("isAccepted").apply { isAccessible = true }
-                                    isAcceptedField.getBoolean(v)
-                                } ?: false
-                            }?.keys?.toSet() ?: emptySet()
-                        } catch (_: Exception) {}
-                    }
-                    showDialog.value = false
-                    state.showConnectDialog = false
-                    state.pendingConnectDevice = null
-                }
-            },
+    // 配对码对话框 - 服务端模式
+    if (state.showPairingCodeDialog && state.pairingCodeDialogMode == PairingMode.SERVER_MODE) {
+        PairingCodeDialog(
+            mode = PairingMode.SERVER_MODE,
+            deviceManager = deviceManager,
+            pairingCode = state.serverPairingCode,
+            show = state.showPairingCodeDialog,
             onDismiss = {
-                showDialog.value = false
-                state.showConnectDialog = false
-                state.pendingConnectDevice = null
-            }
+                 deviceManager.cancelPendingPairing()
+                 state.showPairingCodeDialog = false
+            },
+            onPairingComplete = { success, _ ->
+                 if (success) {
+                     state.showPairingCodeDialog = false
+                     try {
+                         deviceManager.updateDeviceListInternal()
+                         val authMap = deviceManager.getAuthenticatedDevices()
+                         authedDeviceUuids = authMap.filter { (_, auth) -> auth.isAccepted }.keys.toSet()
+                     } catch (_: Exception) {}
+                 }
+             }
         )
     }
 
-    if (state.showHandshakeDialog && state.pendingHandshakeRequest != null) {
-        val req = state.pendingHandshakeRequest!!
-        val showDialog = remember { mutableStateOf(true) }
-        HandshakeRequestDialog(
-            showDialog = showDialog,
-            handshakeRequest = req,
-            onAccept = { handshakeReq ->
-                try {
-                    val field = deviceManager.javaClass.getDeclaredField("authenticatedDevices")
-                    field.isAccessible = true
-                    val rawMap = field.get(deviceManager)
-                    val safeMap = if (rawMap is MutableMap<*, *>) {
-                        val m = mutableMapOf<String, Any?>()
-                        for ((k, v) in rawMap) {
-                            if (k is String) m[k] = v
-                        }
-                        m
-                    } else mutableMapOf()
-                    val allUuidsToRemove = findOtherUuidsWithSameIp(handshakeReq.device.uuid, "") + handshakeReq.device.uuid
-                    val appContext = context.applicationContext
-                    for (uuid in allUuidsToRemove.distinct()) {
-                        safeMap.remove(uuid)
-                        try {
-                            val notificationDataClass = Class.forName("com.xzyht.notifyrelay.feature.device.model.NotificationData")
-                            val getInstance = notificationDataClass.getDeclaredMethod("getInstance", Context::class.java)
-                            val notificationData = getInstance.invoke(null, appContext)
-                            val clearDeviceHistory = notificationDataClass.getDeclaredMethod("clearDeviceHistory", String::class.java, Context::class.java)
-                            clearDeviceHistory.invoke(notificationData, uuid, appContext)
-                        } catch (_: Exception) {}
-                        deviceManager.saveAuthedDevicesPublic()
-                        deviceManager.updateDeviceListPublic()
-                    }
-                } catch (_: Exception) {}
-                handshakeReq.callback(true)
-                deviceManager.updateDeviceListPublic()
-                try {
-                    val authMap = deviceManager.getAuthenticatedDevices()
-                    authedDeviceUuids = authMap.filter { (_, auth) -> auth.isAccepted }.keys.toSet()
-                } catch (_: Exception) {}
-            },
-            onReject = { handshakeReq ->
-                handshakeReq.callback(false)
-            },
+    // 配对码对话框 - 客户端模式
+    if (state.showPairingCodeDialog && state.pairingCodeDialogMode == PairingMode.CLIENT_MODE && state.pendingConnectDevice != null) {
+        PairingCodeDialog(
+            mode = PairingMode.CLIENT_MODE,
+            deviceManager = deviceManager,
+            targetDevice = state.pendingConnectDevice,
+            show = state.showPairingCodeDialog,
             onDismiss = {
-                showDialog.value = false
-                state.showHandshakeDialog = false
-                state.pendingHandshakeRequest = null
+                state.showPairingCodeDialog = false
+                state.pendingConnectDevice = null
+            },
+            onPairingComplete = { success: Boolean, _: String ->
+                if (success) {
+                    try {
+                        deviceManager.updateDeviceListInternal()
+                        val authMap = deviceManager.getAuthenticatedDevices()
+                        authedDeviceUuids = authMap.filter { (_, auth) -> auth.isAccepted }.keys.toSet()
+                    } catch (_: Exception) {}
+                }
             }
         )
     }
@@ -619,6 +547,91 @@ fun DeviceListScreen(
             onDismiss = {
                 showDialog.value = false
                 state.showRejectedDialog = false
+            }
+        )
+    }
+
+    // 删除设备历史确认弹窗
+    if (showDeleteHistoryDialog && pendingDeleteDevice != null) {
+        val deviceToDelete = pendingDeleteDevice!!
+
+        WindowDialog(
+            show = showDeleteHistoryDialog,
+            title = "删除设备",
+            summary = "是否同时删除「${deviceToDelete.displayName}」的通知历史？",
+            titleColor = DialogDefaults.titleColor(),
+            summaryColor = DialogDefaults.summaryColor(),
+            backgroundColor = DialogDefaults.backgroundColor(),
+            enableWindowDim = true,
+            onDismissRequest = {
+                // 仅删除设备，不清理历史
+                try {
+                    val removed = deviceManager.removeAuthenticatedDevice(deviceToDelete.uuid, deleteHistory = false)
+                    if (removed) {
+                        authedDeviceUuids = authedDeviceUuids - deviceToDelete.uuid
+                    } else {
+                        ToastUtils.showShortToast(context, "删除设备失败: 设备不存在或已被删除")
+                    }
+                } catch (e: Exception) {
+                    ToastUtils.showShortToast(context, "删除设备失败: ${e.message ?: "未知错误"}")
+                }
+                selectedDevice = null
+                GlobalSelectedDeviceHolder.selectedDevice = null
+                showDeleteHistoryDialog = false
+                pendingDeleteDevice = null
+            },
+            content = {
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalAlignment = Alignment.CenterHorizontally
+                ) {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        TextButton(
+                            text = "仅删除设备",
+                            onClick = {
+                                try {
+                                    val removed = deviceManager.removeAuthenticatedDevice(deviceToDelete.uuid, deleteHistory = false)
+                                    if (removed) {
+                                        authedDeviceUuids = authedDeviceUuids - deviceToDelete.uuid
+                                    } else {
+                                        ToastUtils.showShortToast(context, "删除设备失败: 设备不存在或已被删除")
+                                    }
+                                } catch (e: Exception) {
+                                    ToastUtils.showShortToast(context, "删除设备失败: ${e.message ?: "未知错误"}")
+                                }
+                                selectedDevice = null
+                                GlobalSelectedDeviceHolder.selectedDevice = null
+                                showDeleteHistoryDialog = false
+                                pendingDeleteDevice = null
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                        TextButton(
+                            text = "删除并清除历史",
+                            onClick = {
+                                try {
+                                    val removed = deviceManager.removeAuthenticatedDevice(deviceToDelete.uuid, deleteHistory = true)
+                                    if (removed) {
+                                        authedDeviceUuids = authedDeviceUuids - deviceToDelete.uuid
+                                    } else {
+                                        ToastUtils.showShortToast(context, "删除设备失败: 设备不存在或已被删除")
+                                    }
+                                } catch (e: Exception) {
+                                    ToastUtils.showShortToast(context, "删除设备失败: ${e.message ?: "未知错误"}")
+                                }
+                                selectedDevice = null
+                                GlobalSelectedDeviceHolder.selectedDevice = null
+                                showDeleteHistoryDialog = false
+                                pendingDeleteDevice = null
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
             }
         )
     }

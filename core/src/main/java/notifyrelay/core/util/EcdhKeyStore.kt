@@ -4,11 +4,17 @@ import android.os.Build
 import android.security.keystore.KeyGenParameterSpec
 import android.security.keystore.KeyProperties
 import android.util.Base64
+import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator
 import java.security.KeyStore
-import java.security.MessageDigest
+import java.security.PrivateKey
+import java.security.PublicKey
+import java.security.interfaces.ECPublicKey
 import java.security.spec.ECGenParameterSpec
+import java.security.spec.ECPoint
+import java.security.spec.ECPublicKeySpec
+import java.security.spec.PKCS8EncodedKeySpec
 import javax.crypto.KeyAgreement
 import javax.crypto.Mac
 import javax.crypto.spec.SecretKeySpec
@@ -61,25 +67,30 @@ object EcdhKeyStore {
     }
 
     /**
-     * 获取公钥的 Base64 编码（未压缩点，65 字节：0x04 || x || y）
-     * 与 PC 端 BouncyCastle 的 DecodePoint 兼容
+     * 生成临时 ECDH 密钥对（内存级，不经过 Keystore）。
+     * 用于配对码交换阶段的临时密钥协商，用完即弃。
      */
-    fun getPublicKeyBase64(): String {
-        val keyPair = getOrCreateKeyPair()
-        val ecPublicKey = keyPair.public as java.security.interfaces.ECPublicKey
+    fun generateEphemeralKeyPair(): KeyPair {
+        val keyPairGenerator = KeyPairGenerator.getInstance("EC")
+        keyPairGenerator.initialize(ECGenParameterSpec(CURVE))
+        return keyPairGenerator.generateKeyPair()
+    }
+
+    /**
+     * 将 ECDH 公钥编码为 Base64（65 字节未压缩点：0x04 || x || y）
+     */
+    fun encodePublicKey(publicKey: PublicKey): String {
+        val ecPublicKey = publicKey as ECPublicKey
         val w = ecPublicKey.w
         val xBytes = w.affineX.toByteArray()
         val yBytes = w.affineY.toByteArray()
 
-        // 构造未压缩点: 0x04 || x (32字节, 补0前缀) || y (32字节, 补0前缀)
         val pointBytes = ByteArray(65)
-        pointBytes[0] = 0x04  // 未压缩标识
-        // x 坐标, 固定32字节大端, 补零
+        pointBytes[0] = 0x04
         val xLen = xBytes.size
         val xStart = if (xLen > 32) xLen - 32 else 0
         val xPad = 32 - (xLen - xStart)
         System.arraycopy(xBytes, xStart, pointBytes, 1 + xPad, xLen - xStart)
-        // y 坐标
         val yLen = yBytes.size
         val yStart = if (yLen > 32) yLen - 32 else 0
         val yPad = 32 - (yLen - yStart)
@@ -89,38 +100,79 @@ object EcdhKeyStore {
     }
 
     /**
-     * 执行 ECDH 密钥协商，返回 SHA-256 哈希后的 32 字节（Base64 编码）
+     * 解码 Base64 编码的 ECDH 公钥（65 字节未压缩点）
+     */
+    fun decodePublicKey(publicKeyBase64: String): PublicKey {
+        val pointBytes = Base64.decode(publicKeyBase64, Base64.NO_WRAP)
+        require(pointBytes.size == 65 && pointBytes[0] == 0x04.toByte()) { "Invalid ECDH public key format" }
+
+        val keyFactory = KeyFactory.getInstance("EC")
+        val ecPoint = ECPoint(
+            java.math.BigInteger(1, pointBytes.copyOfRange(1, 33)),
+            java.math.BigInteger(1, pointBytes.copyOfRange(33, 65))
+        )
+        // 从 Keystore 中获取椭圆曲线参数
+        val keyPair = getOrCreateKeyPair()
+        val paramSpec = keyFactory.getKeySpec(keyPair.public, ECPublicKeySpec::class.java)
+        val params = (paramSpec as ECPublicKeySpec).params
+        val pubKeySpec = ECPublicKeySpec(ecPoint, params)
+        return keyFactory.generatePublic(pubKeySpec)
+    }
+
+    /**
+     * 将 ECDH 私钥（PKCS8 格式）编码为 Base64。
+     * 用于将临时私钥序列化后传输或存储。
+     */
+    fun encodePrivateKey(privateKey: PrivateKey): String {
+        return Base64.encodeToString(privateKey.encoded, Base64.NO_WRAP)
+    }
+
+    /**
+     * 解码 Base64 编码的 ECDH 私钥（PKCS8 格式）。
+     */
+    fun decodePrivateKey(privateKeyBase64: String): PrivateKey {
+        val keyBytes = Base64.decode(privateKeyBase64, Base64.NO_WRAP)
+        val keyFactory = KeyFactory.getInstance("EC")
+        return keyFactory.generatePrivate(PKCS8EncodedKeySpec(keyBytes))
+    }
+
+    /**
+     * 执行 ECDH 密钥协商，返回原始共享密钥字节数组。
+     *
+     * @param privateKey 私钥（可以是临时私钥或 Keystore 私钥）
+     * @param remotePublicKeyBase64 远端公钥的 Base64 编码
+     * @return 原始共享密钥字节数组
+     */
+    fun deriveRawSharedSecret(privateKey: PrivateKey, remotePublicKeyBase64: String): ByteArray {
+        val remotePublicKey = decodePublicKey(remotePublicKeyBase64)
+        val keyAgreement = KeyAgreement.getInstance("ECDH")
+        keyAgreement.init(privateKey)
+        keyAgreement.doPhase(remotePublicKey, true)
+        return keyAgreement.generateSecret()
+    }
+
+    /**
+     * 获取公钥的 Base64 编码（未压缩点，65 字节：0x04 || x || y）
+     * 与 PC 端 BouncyCastle 的 DecodePoint 兼容
+     */
+    fun getPublicKeyBase64(): String {
+        return encodePublicKey(getOrCreateKeyPair().public)
+    }
+
+    /**
+     * 执行 ECDH 密钥协商，返回 SHA-256 哈希后的 32 字节（Base64 编码）。
+     * 使用 Keystore 中的长期私钥进行协商。
      *
      * @param remotePublicKeyBase64 远端公钥的 Base64 编码（65 字节未压缩点）
      * @return Base64 编码的 32 字节共享密钥
      */
     fun generateSharedSecret(remotePublicKeyBase64: String): String {
-        val keyPair = getOrCreateKeyPair()
-        // 解码远端公钥的未压缩点
-        val remotePointBytes = Base64.decode(remotePublicKeyBase64, Base64.NO_WRAP)
-        require(remotePointBytes.size == 65 && remotePointBytes[0] == 0x04.toByte()) {
-            "Invalid ECDH public key format"
-        }
-        // 构造 EC 公钥
-        val keyFactory = java.security.KeyFactory.getInstance("EC")
-        val ecPoint = java.security.spec.ECPoint(
-            java.math.BigInteger(1, remotePointBytes.copyOfRange(1, 33)),
-            java.math.BigInteger(1, remotePointBytes.copyOfRange(33, 65))
-        )
-        val paramSpec = keyFactory.getKeySpec(keyPair.public, java.security.spec.ECPublicKeySpec::class.java)
-        val params = (paramSpec as java.security.spec.ECPublicKeySpec).params
-        val remotePublicKeySpec = java.security.spec.ECPublicKeySpec(ecPoint, params)
-        val remotePublicKey = keyFactory.generatePublic(remotePublicKeySpec)
-
-        // ECDH 密钥协商
-        val keyAgreement = KeyAgreement.getInstance("ECDH")
         // 从 Keystore 获取私钥
         val keyStore = KeyStore.getInstance(ANDROID_KEY_STORE)
         keyStore.load(null)
-        val privateKey = keyStore.getKey(KEY_ALIAS, null) as java.security.PrivateKey
-        keyAgreement.init(privateKey)
-        keyAgreement.doPhase(remotePublicKey, true)
-        val sharedSecret = keyAgreement.generateSecret()
+        val privateKey = keyStore.getKey(KEY_ALIAS, null) as PrivateKey
+
+        val sharedSecret = deriveRawSharedSecret(privateKey, remotePublicKeyBase64)
 
         // HKDF-SHA256 派生
         val mac = Mac.getInstance("HmacSHA256")

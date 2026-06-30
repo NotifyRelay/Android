@@ -90,7 +90,21 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     
     // 用于比较在线设备缓存是否变化的变量
     private var lastOnlineDevicesCacheJson: String? = null
-    
+
+    // ==================== 握手请求处理接口 ====================
+    /**
+     * 配对请求处理接口。
+     * 当接收到 PAIRING_INIT 时通过此接口通知 UI 层显示配对码输入弹窗。
+     */
+    interface HandshakeRequestHandler {
+        fun onPairingInitRequest(deviceInfo: DeviceInfo, tmpPublicKey: String)
+    }
+
+    /**
+     * 配对请求处理器
+     */
+    var handshakeRequestHandler: HandshakeRequestHandler? = null
+
     internal fun getLocalDisplayName(): String {
         return DeviceUtils.getLocalDeviceName(context)
     }
@@ -218,18 +232,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         } catch (_: Exception) {}
     }
     /**
-     * 握手请求处理接口
-     */
-    interface HandshakeRequestHandler {
-        fun onHandshakeRequest(deviceInfo: DeviceInfo, publicKey: String, callback: (Boolean) -> Unit)
-    }
-
-    /**
-     * 握手请求处理器
-     */
-    var handshakeRequestHandler: HandshakeRequestHandler? = null
-
-    /**
      * 设备发现/连接/数据发送/接收，全部本地实现。
      */
     private val notificationDataReceivedCallbacks = mutableSetOf<(String) -> Unit>()
@@ -292,6 +294,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     internal val rejectedDevicesInternal: MutableSet<String>
         get() = rejectedDevices
+
+    /** 检查指定设备是否已认证 */
+    fun isAuthenticatedInternal(uuid: String): Boolean {
+        return synchronized(authenticatedDevices) { authenticatedDevices.containsKey(uuid) }
+    }
 
     internal val incompatibleDevicesInternal: MutableSet<String> =
         java.util.Collections.synchronizedSet(mutableSetOf())
@@ -575,6 +582,90 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     }
 
     /**
+     * 客户端收到 ACCEPT 后，在本机完成配对：派生密钥、导入 Keystore、标记已认证。
+     */
+    fun completePairing(remoteUuid: String, remotePubKey: String) {
+        try {
+            val secret = EncryptionManager.generateSharedSecret(context, localPublicKey, remotePubKey)
+            EncryptionManager.importAesKeyToKeystore(context, remoteUuid, secret)
+            synchronized(authenticatedDevices) {
+                authenticatedDevices[remoteUuid] = AuthInfo(
+                    remotePubKey, "", true, "未知设备"
+                )
+                saveAuthedDevices()
+            }
+            updateDeviceList()
+            Logger.d("死神-NotifyRelay", "客户端配对完成: $remoteUuid")
+        } catch (e: Exception) {
+            Logger.e("死神-NotifyRelay", "客户端配对失败: $remoteUuid", e)
+        }
+    }
+
+    // 存储待处理的配对请求信息（接收端对话框需要远端临时公钥）
+    data class PendingPairing(
+        val remoteUuid: String,
+        val remotePubKey: String,
+        val remoteIp: String,
+        val tmpPubKey: String = ""  // 发起端的临时公钥，用于加密回传配对码
+    )
+    var pendingPairing: PendingPairing? = null
+        internal set
+
+    /**
+     * 取消当前待处理的配对请求。
+     */
+    fun cancelPendingPairing() {
+        val p = pendingPairing
+        if (p != null) {
+            Logger.d("死神-NotifyRelay", "取消配对: ${p.remoteUuid}")
+        }
+        pendingPairing = null
+        notifyrelay.core.util.PairingCodeManager.clear()
+    }
+
+    /**
+     * 发起端存储在配对阶段的临时 ECDH 私钥（Base64 编码），
+     * 供 ServerLineRouter.handlePairingResp 解密接收端回传的配对码。
+     * 配对完成后应清空。
+     */
+    var pendingTempPrivKeyB64: String? = null
+
+    /**
+     * 使用长期 ECDH 密钥完成标准密钥交换。
+     * 配对码验证通过后，双方使用长期 ECDH 密钥派生共享密钥并导入 Keystore。
+     *
+     * @param uuid 远端设备 UUID
+     * @param remoteLtPubKey 远端长期 ECDH 公钥 Base64
+     * @param displayName 设备显示名称
+     * @param lastIp 设备 IP
+     * @return 是否成功
+     */
+    fun completePairingWithLongTermKeys(
+        uuid: String,
+        remoteLtPubKey: String,
+        displayName: String = "未知设备",
+        lastIp: String? = null
+    ): Boolean {
+        return try {
+            val secret = EncryptionManager.generateSharedSecret(context, localPublicKey, remoteLtPubKey)
+            EncryptionManager.importAesKeyToKeystore(context, uuid, secret)
+            synchronized(authenticatedDevices) {
+                authenticatedDevices[uuid] = AuthInfo(
+                    remoteLtPubKey, "", true, displayName,
+                    lastIp = lastIp
+                )
+                saveAuthedDevices()
+            }
+            updateDeviceList()
+            Logger.d("死神-NotifyRelay", "长期密钥配对完成: $uuid")
+            true
+        } catch (e: Exception) {
+            Logger.e("死神-NotifyRelay", "长期密钥配对失败: $uuid", e)
+            false
+        }
+    }
+
+    /**
      * 公开解析设备信息：优先使用缓存/认证信息，缺失IP时使用提供的回退IP。
      */
     fun resolveDeviceInfo(uuid: String, fallbackIp: String?, fallbackPort: Int = 23333): DeviceInfo? {
@@ -844,7 +935,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
      * - 触发 updateDeviceList() 以通知观察者
      * 返回 true 表示存在并已移除，false 表示没有该uuid
      */
-    fun removeAuthenticatedDevice(uuid: String): Boolean {
+    fun removeAuthenticatedDevice(uuid: String, deleteHistory: Boolean = false): Boolean {
         try {
             var existed = false
             
@@ -857,15 +948,22 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             // 从已建立心跳集合移除
             try { heartbeatedDevices.remove(uuid) } catch (_: Exception) {}
 
+            // 从协议不兼容设备集合移除
+            try { incompatibleDevicesInternal.remove(uuid) } catch (_: Exception) {}
+
             // 从 Android Keystore 移除设备密钥
             try { EncryptionManager.removeDeviceKey(uuid, context) } catch (_: Exception) {}
 
             synchronized(authenticatedDevices) {
                 if (authenticatedDevices.containsKey(uuid)) {
-                    // 直接从数据库中删除设备
+                    // 直接从数据库中删除设备及关联数据
                     coroutineScope.launch {
                         val repository = DatabaseRepository.getInstance(context)
                         repository.deleteDeviceByUuid(uuid)
+                        if (deleteHistory) {
+                            repository.deleteNotificationsByDevice(uuid)
+                            repository.deleteAppDeviceAssociationsByDeviceUuid(uuid)
+                        }
                     }
                     
                     // 从内存中移除

@@ -9,6 +9,8 @@ import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 import notifyrelay.core.util.BatteryUtils
 import notifyrelay.core.util.EncryptionManager
+import notifyrelay.core.util.EcdhKeyStore
+import notifyrelay.core.util.PairingCodeManager
 import java.io.BufferedReader
 import java.io.OutputStreamWriter
 import java.net.Inet4Address
@@ -27,7 +29,7 @@ import java.net.Socket
  */
 object ServerLineRouter {
 
-    private const val TAG = "ServerLineRouter"
+    private const val TAG = "配对"
 
     /**
      * 分发首行协议到对应处理器
@@ -45,14 +47,183 @@ object ServerLineRouter {
         deviceManager: DeviceConnectionManager,
         context: Context
     ) {
-        // 按首行前缀分发：握手 / DATA 加密通道 / 其它（目前主要用于手动发现）
+        // 按首行前缀分发：配对请求 / 已认证握手 / DATA 加密通道 / 其它
         when {
-            // HANDSHAKE：连接建立时的认证握手，决定是否建立「受信任设备」关系
+            line.startsWith("PAIRING_INIT:") -> handlePairingInit(line, client, reader, deviceManager)
+            line.startsWith("PAIRING_RESP:") -> handlePairingResp(line, client, reader, deviceManager, context)
             line.startsWith("HANDSHAKE:") -> handleHandshake(line, client, reader, deviceManager)
-            // DATA*：加密业务通道（通知 / 图标 / 应用列表等），解密与路由交给 ProtocolRouter
             line.startsWith("DATA") -> handleData(line, client, reader, deviceManager, context)
-            // 其他：当前仅用于 NOTIFYRELAY_DISCOVER_MANUAL 等辅助协议（如手动发现）
             else -> handleOther(line, client, reader, deviceManager)
+        }
+    }
+
+    /**
+     * 处理 PAIRING_INIT：发起端通知接收端有配对请求，接收端弹输入框。
+     * 格式：PAIRING_INIT:<uuid>:<pubKey>:<ip>:<battery>:<deviceType>
+     */
+    private fun handlePairingInit(
+        line: String,
+        client: Socket,
+        reader: BufferedReader,
+        deviceManager: DeviceConnectionManager
+    ) {
+        try {
+            val parts = line.split(":")
+            if (parts.size >= 6) {
+                val remoteUuid = parts[1]
+                val tmpPubKey = parts[2]  // 临时公钥
+                val remoteIp: String = parts.getOrNull(3) ?: client.inetAddress.hostAddress.orEmpty().ifEmpty { "0.0.0.0" }
+                val remoteDeviceType: String = parts.getOrNull(5) ?: "unknown"
+                val ip: String = client.inetAddress.hostAddress.orEmpty().ifEmpty { "0.0.0.0" }
+
+                // 检查是否已被拒绝
+                if (deviceManager.rejectedDevicesInternal.contains(remoteUuid)) {
+                    val writer = OutputStreamWriter(client.getOutputStream())
+                    writer.write("REJECT:${deviceManager.uuid}\n")
+                    writer.flush()
+                    writer.close()
+                    reader.close()
+                    client.close()
+                    return
+                }
+
+                // 缓存设备信息
+                val displayName = deviceManager.deviceInfoCacheInternal[remoteUuid]?.displayName ?: "未知设备"
+                deviceManager.deviceInfoCacheInternal[remoteUuid] = DeviceInfo(remoteUuid, displayName, ip, 23333)
+
+                // 存储配对信息，包含临时公钥
+                val pending = DeviceConnectionManager.PendingPairing(
+                    remoteUuid = remoteUuid,
+                    remotePubKey = tmpPubKey,
+                    remoteIp = ip,
+                    tmpPubKey = tmpPubKey
+                )
+                deviceManager.pendingPairing = pending
+
+                // 触发 UI 显示配对码输入弹窗（使用新接口）
+                val remoteDevice = DeviceInfo(remoteUuid, displayName, ip, 23333)
+                deviceManager.handshakeRequestHandler?.onPairingInitRequest(remoteDevice, tmpPubKey)
+
+                try { reader.close() } catch (_: Exception) {}
+                try { client.close() } catch (_: Exception) {}
+                Logger.d(TAG, "PAIRING_INIT 已处理: $remoteUuid")
+            } else {
+                try { reader.close() } catch (_: Exception) {}
+                try { client.close() } catch (_: Exception) {}
+            }
+        } catch (e: Exception) {
+            Logger.e(TAG, "handlePairingInit error: ${e.message}")
+            try { reader.close() } catch (_: Exception) {}
+            try { client.close() } catch (_: Exception) {}
+        }
+    }
+
+    /**
+     * 处理 PAIRING_RESP：接收端用户输入了配对码，加密回传给发起端验证。
+     * 发起端用临时私钥解密配对码，验证通过后执行 ECDH 密钥协商。
+     * 格式：PAIRING_RESP:<uuid_R>:<tmpPub_R>:<ltPub_R>:<encryptedCode>:<ip>:<battery>:<deviceType>
+     */
+    private fun handlePairingResp(
+        line: String,
+        client: Socket,
+        reader: BufferedReader,
+        deviceManager: DeviceConnectionManager,
+        context: android.content.Context
+    ) {
+        try {
+            val parts = line.split(":")
+            if (parts.size >= 8) {
+                val remoteUuid = parts[1]
+                val tmpPubKeyR = parts[2]       // 接收端的临时公钥
+                val ltPubKeyR = parts[3]         // 接收端的长期 ECDH 公钥
+                val encryptedCode = parts[4]     // 加密后的配对码
+                val ip: String = client.inetAddress.hostAddress.orEmpty().ifEmpty { "0.0.0.0" }
+
+                Logger.d(TAG, "收到 PAIRING_RESP: $remoteUuid")
+
+                // 获取发起端存储的临时私钥
+                val tmpPrivKeyB64 = deviceManager.pendingTempPrivKeyB64
+                if (tmpPrivKeyB64 == null) {
+                    Logger.w(TAG, "临时私钥不存在，配对已过期: $remoteUuid")
+                    val writer = OutputStreamWriter(client.getOutputStream())
+                    writer.write("REJECT:${deviceManager.uuid}\n")
+                    writer.flush()
+                    writer.close()
+                    reader.close()
+                    client.close()
+                    return
+                }
+
+                try {
+                    // 1. 用临时私钥解密配对码
+                    val tmpPrivKey = EcdhKeyStore.decodePrivateKey(tmpPrivKeyB64)
+                    val sharedSecret = EcdhKeyStore.deriveRawSharedSecret(tmpPrivKey, tmpPubKeyR)
+                    val aesKey = EncryptionManager.hkdfDeriveKey(sharedSecret)
+                    val code = EncryptionManager.decrypt(encryptedCode, aesKey)
+                    
+                    // 2. 验证配对码
+                    if (!PairingCodeManager.verify(code)) {
+                        Logger.w(TAG, "配对码验证失败: $remoteUuid")
+                        val writer = OutputStreamWriter(client.getOutputStream())
+                        writer.write("REJECT:${deviceManager.uuid}\n")
+                        writer.flush()
+                        writer.close()
+                        reader.close()
+                        client.close()
+                        return
+                    }
+                    Logger.d(TAG, "配对码验证通过: $remoteUuid")
+
+                    // 3. 使用接收端长期公钥完成标准密钥交换
+                    val success = deviceManager.completePairingWithLongTermKeys(
+                        remoteUuid, ltPubKeyR,
+                        displayName = "未知设备",
+                        lastIp = ip
+                    )
+                    if (!success) {
+                        Logger.w(TAG, "密钥交换失败: $remoteUuid")
+                        val writer = OutputStreamWriter(client.getOutputStream())
+                        writer.write("REJECT:${deviceManager.uuid}\n")
+                        writer.flush()
+                        writer.close()
+                        reader.close()
+                        client.close()
+                        return
+                    }
+
+                    // 4. ACCEPT 回传：包含发起端长期公钥
+                    val writer = OutputStreamWriter(client.getOutputStream())
+                    val localBattery = getLocalBatteryInfo(deviceManager)
+                    val localDeviceType = "android"
+                    val localIp = getLocalIpAddress(deviceManager)
+                    writer.write("ACCEPT:$code:${deviceManager.uuid}:${deviceManager.localPublicKey}:$localIp:$localBattery:$localDeviceType\n")
+                    writer.flush()
+                    writer.close()
+                    reader.close()
+                    client.close()
+
+                    // 5. 清理临时私钥
+                    deviceManager.pendingTempPrivKeyB64 = null
+                    Logger.d(TAG, "PAIRING_RESP 配对成功: $remoteUuid")
+                } catch (e: Exception) {
+                    Logger.e(TAG, "PAIRING_RESP 解密/验证失败: $remoteUuid", e)
+                    try {
+                        val writer = OutputStreamWriter(client.getOutputStream())
+                        writer.write("REJECT:${deviceManager.uuid}\n")
+                        writer.flush()
+                        writer.close()
+                    } catch (_: Exception) {}
+                    try { reader.close() } catch (_: Exception) {}
+                    try { client.close() } catch (_: Exception) {}
+                }
+            } else {
+                try { reader.close() } catch (_: Exception) {}
+                try { client.close() } catch (_: Exception) {}
+            }
+        } catch (e: Exception) {
+            Logger.e(TAG, "handlePairingResp error: ${e.message}")
+            try { reader.close() } catch (_: Exception) {}
+            try { client.close() } catch (_: Exception) {}
         }
     }
 
@@ -108,70 +279,46 @@ object ServerLineRouter {
                     deviceManager.authenticatedDevices[remoteUuid]?.isAccepted == true
                 }
 
-                // 4. 已认证设备：检查格式兼容性和公钥轮换
+                // 4. 已认证设备：检查公钥轮换
                 if (alreadyAuthed) {
-                    val localIsEcdh = EncryptionManager.isEcdhFormat(deviceManager.localPublicKey)
-                    val remoteIsEcdh = EncryptionManager.isEcdhFormat(remotePubKey)
-                    if (localIsEcdh != remoteIsEcdh) {
-                        // 格式不兼容：加入黑名单并拒绝
-                        synchronized(deviceManager.incompatibleDevicesInternal) {
-                            deviceManager.incompatibleDevicesInternal.add(remoteUuid)
-                        }
-                        Logger.w(TAG, "设备 ${remoteDevice.displayName}($remoteUuid) 使用旧版加密协议，已拒绝连接。请升级该设备")
-                        val writer = OutputStreamWriter(client.getOutputStream())
-                        writer.write("REJECT:${deviceManager.uuid}\n")
-                        writer.flush()
-                        writer.close()
-                        reader.close()
-                        client.close()
-                        // 显示 Toast 提示
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            android.widget.Toast.makeText(deviceManager.contextInternal,
-                                "设备 ${remoteDevice.displayName} 使用旧版加密协议，请在对方设备上升级 NotifyRelay",
-                                android.widget.Toast.LENGTH_LONG).show()
-                        }
-                        return
-                    }
-                    // 检查 ECDH 公钥是否发生变化（密钥轮换检测）
-                    if (localIsEcdh && remoteIsEcdh) {
-                        synchronized(deviceManager.authenticatedDevices) {
-                            val existingAuth = deviceManager.authenticatedDevices[remoteUuid]
-                            if (existingAuth != null && existingAuth.publicKey != remotePubKey) {
-                                Logger.w(TAG, "设备 ${remoteDevice.displayName} 公钥已变更，重新派生密钥")
-                                try {
-                                    val newSecret = EncryptionManager.generateSharedSecret(
-                                        deviceManager.contextInternal,
-                                        deviceManager.localPublicKey,
-                                        remotePubKey
-                                    )
-                                    EncryptionManager.importAesKeyToKeystore(deviceManager.contextInternal, remoteUuid, newSecret)
-                                    deviceManager.authenticatedDevices[remoteUuid] = existingAuth.copy(
-                                        publicKey = remotePubKey,
-                                        sharedSecret = newSecret
-                                    )
-                                    deviceManager.saveAuthedDevicesInternal()
-                                    // 保存后清空内存中的明文，后续解密走 Keystore
-                                    deviceManager.authenticatedDevices[remoteUuid] = existingAuth.copy(
-                                        publicKey = remotePubKey,
-                                        sharedSecret = ""
-                                    )
-                                } catch (e: Exception) {
-                                    Logger.e(TAG, "公钥变更后重新派生密钥失败，要求重新配对", e)
-                                    synchronized(deviceManager.incompatibleDevicesInternal) {
-                                        deviceManager.incompatibleDevicesInternal.add(remoteUuid)
-                                    }
-                                    val writer = OutputStreamWriter(client.getOutputStream())
-                                    writer.write("REJECT:${deviceManager.uuid}\n")
-                                    writer.flush()
-                                    writer.close()
-                                    reader.close()
-                                    client.close()
-                                    return
+                    // 检查公钥是否发生变化（密钥轮换检测）
+                    synchronized(deviceManager.authenticatedDevices) {
+                        val existingAuth = deviceManager.authenticatedDevices[remoteUuid]
+                        if (existingAuth != null && existingAuth.publicKey != remotePubKey) {
+                            Logger.w(TAG, "设备 ${remoteDevice.displayName} 公钥已变更，重新派生密钥")
+                            try {
+                                val newSecret = EncryptionManager.generateSharedSecret(
+                                    deviceManager.contextInternal,
+                                    deviceManager.localPublicKey,
+                                    remotePubKey
+                                )
+                                EncryptionManager.importAesKeyToKeystore(deviceManager.contextInternal, remoteUuid, newSecret)
+                                deviceManager.authenticatedDevices[remoteUuid] = existingAuth.copy(
+                                    publicKey = remotePubKey,
+                                    sharedSecret = newSecret
+                                )
+                                deviceManager.saveAuthedDevicesInternal()
+                                // 保存后清空内存中的明文，后续解密走 Keystore
+                                deviceManager.authenticatedDevices[remoteUuid] = existingAuth.copy(
+                                    publicKey = remotePubKey,
+                                    sharedSecret = ""
+                                )
+                            } catch (e: Exception) {
+                                Logger.e(TAG, "公钥变更后重新派生密钥失败，要求重新配对", e)
+                                synchronized(deviceManager.incompatibleDevicesInternal) {
+                                    deviceManager.incompatibleDevicesInternal.add(remoteUuid)
                                 }
+                                val writer = OutputStreamWriter(client.getOutputStream())
+                                writer.write("REJECT:${deviceManager.uuid}\n")
+                                writer.flush()
+                                writer.close()
+                                reader.close()
+                                client.close()
+                                return
                             }
                         }
                     }
-                    // 格式一致：从黑名单移除（如果有）
+                    // 从黑名单移除（如果有）
                     synchronized(deviceManager.incompatibleDevicesInternal) {
                         deviceManager.incompatibleDevicesInternal.remove(remoteUuid)
                     }
@@ -197,78 +344,8 @@ object ServerLineRouter {
                             Logger.d(TAG, "已更新已认证设备的 deviceType: $remoteDeviceType, lastIp: $ip")
                         }
                     }
-                    } else if (deviceManager.handshakeRequestHandler != null) {
-                    // 检查是否启用了UDP发现（显示未认证设备）
-                    if (deviceManager.udpDiscoveryEnabled) {
-                        // 5. 未认证但有回调且启用了显示未认证设备：交由 UI 确认是否接受连接
-                        deviceManager.handshakeRequestHandler!!.onHandshakeRequest(remoteDevice, remotePubKey) { accepted ->
-                            var actuallyAccepted = accepted
-                            if (accepted) {
-                                try {
-                                    // 用户点击"接受"：生成共享密钥并写入认证表
-                                    val sharedSecret = EncryptionManager.generateSharedSecret(
-                                        deviceManager.contextInternal,
-                                        deviceManager.localPublicKey,
-                                        remotePubKey
-                                    )
-                                    // 导入 sharedSecret 到 Android Keystore
-                                    EncryptionManager.importAesKeyToKeystore(deviceManager.contextInternal, remoteUuid, sharedSecret)
-                                    synchronized(deviceManager.authenticatedDevices) {
-                                        deviceManager.authenticatedDevices.remove(remoteUuid)
-                                        deviceManager.authenticatedDevices[remoteUuid] = AuthInfo(
-                                            remotePubKey, sharedSecret, true, remoteDevice.displayName,
-                                            deviceType = remoteDeviceType, battery = remoteBattery
-                                        )
-                                        deviceManager.saveAuthedDevicesInternal()
-                                    }
-                                    try { deviceManager.updateDeviceListInternal() } catch (_: Exception) {}
-                                } catch (e: Exception) {
-                                    val msg = "无法与设备 ${remoteDevice.displayName} 配对：${e.message}"
-                                    Logger.e(TAG, msg)
-                                    // 在 UI 线程显示 Toast 提示
-                                    android.os.Handler(android.os.Looper.getMainLooper()).post {
-                                        Toast.makeText(deviceManager.contextInternal, msg, Toast.LENGTH_LONG).show()
-                                    }
-                                    actuallyAccepted = false
-                                }
-                            }
-                            if (!actuallyAccepted) {
-                                // 用户拒绝或密钥派生失败：记录到本地拒绝名单，避免反复打扰
-                                synchronized(deviceManager.rejectedDevicesInternal) {
-                                    deviceManager.rejectedDevicesInternal.add(remoteUuid)
-                                }
-                            }
-                            // 6. 通过 TCP 回写 ACCEPT/REJECT 结果给对端
-                            deviceManager.coroutineScopeInternal.launch {
-                                val writer = OutputStreamWriter(client.getOutputStream())
-                                val localBattery = getLocalBatteryInfo(deviceManager)
-                                val localDeviceType = "android"
-                                val localIp = getLocalIpAddress(deviceManager)
-                                if (actuallyAccepted) {
-                                    writer.write("ACCEPT:${deviceManager.uuid}:${deviceManager.localPublicKey}:$localIp:$localBattery:$localDeviceType\n")
-                                } else {
-                                    writer.write("REJECT:${deviceManager.uuid}\n")
-                                }
-                                writer.flush()
-                                writer.close()
-                                reader.close()
-                                client.close()
-                            }
-                        }
-                    } else {
-                        // 未启用显示未认证设备：直接拒绝连接请求
-                        synchronized(deviceManager.rejectedDevicesInternal) {
-                            deviceManager.rejectedDevicesInternal.add(remoteUuid)
-                        }
-                        val writer = OutputStreamWriter(client.getOutputStream())
-                        writer.write("REJECT:${deviceManager.uuid}\n")
-                        writer.flush()
-                        writer.close()
-                        reader.close()
-                        client.close()
-                    }
                 } else {
-                    // 无 UI 回调时，保守起见一律 REJECT
+                    // 未认证设备：不再支持通过 HANDSHAKE 配对，请使用配对码流程
                     val writer = OutputStreamWriter(client.getOutputStream())
                     writer.write("REJECT:${deviceManager.uuid}\n")
                     writer.flush()

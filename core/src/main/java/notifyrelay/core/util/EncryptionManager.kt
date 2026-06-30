@@ -181,6 +181,19 @@ object EncryptionManager {
             }
             return okm
         }
+
+        /**
+         * 使用 HKDF-SHA256 从原始密钥材料派生 AES-256 密钥（Base64 编码）。
+         *
+         * @param ikm 输入密钥材料
+         * @param info 上下文区分信息，防止不同用途派生相同密钥
+         * @return Base64 编码的 32 字节 AES 密钥
+         */
+        fun hkdfDeriveKey(ikm: ByteArray, info: String): String {
+            val prk = hkdfExtract(null, ikm)
+            val okm = hkdfExpand(prk, info.toByteArray(Charsets.UTF_8), 32)
+            return Base64.encodeToString(okm, Base64.NO_WRAP)
+        }
     }
 
     // =================== RSA加密实现 ===================
@@ -383,10 +396,9 @@ object EncryptionManager {
      * 旧格式（UUID hex，32 位十六进制字符串）返回 false
      * 新格式（Base64 编码的 EC 未压缩点）返回 true
      */
-    enum class KeyFormat { ECDH, LEGACY_UUID, INVALID }
+    enum class KeyFormat { ECDH, INVALID }
 
     fun detectKeyFormat(publicKey: String): KeyFormat {
-        if (publicKey.length == 32 && publicKey.matches(Regex("^[0-9a-fA-F]{32}$"))) return KeyFormat.LEGACY_UUID
         return try {
             val bytes = Base64.decode(publicKey, Base64.NO_WRAP)
             if (bytes.size == 65 && bytes[0] == 0x04.toByte()) KeyFormat.ECDH else KeyFormat.INVALID
@@ -411,17 +423,7 @@ object EncryptionManager {
      * @return Base64 编码的共享密钥
      */
     fun generateSharedSecret(context: android.content.Context, localKey: String, remoteKey: String): String {
-        val localIsEcdh = isEcdhFormat(localKey)
-        val remoteIsEcdh = isEcdhFormat(remoteKey)
-        if (localIsEcdh && remoteIsEcdh) {
-            return ecdhGenerateSharedSecret(remoteKey)
-        }
-        // UUID↔UUID → 旧 HKDF
-        if (!localIsEcdh && !remoteIsEcdh) {
-            return generateSharedSecret(localKey, remoteKey)
-        }
-        // 新旧混用：抛异常，调用方 catch 后拒绝连接
-        throw UnsupportedOperationException("不支持新旧格式混用配对，请升级对方的 NotifyRelay 版本")
+        return ecdhGenerateSharedSecret(remoteKey)
     }
 
     // =================== RSA专用方法 ===================
@@ -506,7 +508,6 @@ object EncryptionManager {
 
     // =================== AES专用方法 ===================
 
-
     /**
      * 生成 AES 对称密钥（快捷方法）
      *
@@ -536,6 +537,17 @@ object EncryptionManager {
      */
     fun stringToAESKey(keyString: String): SecretKey {
         return AESEncryption.stringToKey(keyString)
+    }
+
+    /**
+     * 使用 HKDF-SHA256 从原始密钥材料派生 AES-256 密钥（Base64 编码）。
+     *
+     * @param ikm 输入密钥材料（如 ECDH 共享密钥的原始字节）
+     * @param info 上下文区分信息，防止不同用途派生相同密钥
+     * @return Base64 编码的 32 字节 AES 密钥
+     */
+    fun hkdfDeriveKey(ikm: ByteArray, info: String = "pairing-code-encryption"): String {
+        return AESEncryption.hkdfDeriveKey(ikm, info)
     }
 
     // =================== 配置和工具方法 ===================
