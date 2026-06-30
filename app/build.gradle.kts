@@ -47,7 +47,7 @@ android {
 
     defaultConfig {
         applicationId = "com.xzyht.notifyrelay"
-        minSdk = libs.versions.minSdk.get().toInt()
+        minSdk = 31
         targetSdk = libs.versions.targetSdk.get().toInt()
         // 使用自动计算的版本号
         versionCode = computedVersionCode
@@ -119,6 +119,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        aidl = true
     }
 
     // 只在 release 构建时启用 ABI splits，debug 只生成 universal APK

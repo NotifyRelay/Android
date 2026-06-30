@@ -8,7 +8,6 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.servers.ClipboardAccessibilityService
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -25,7 +24,6 @@ object ClipboardSyncManager {
     private const val CLIPBOARD_TYPE_TEXT = "text"
     private const val CLIPBOARD_TYPE_IMAGE = "image"
     private const val DATA_HEADER = "DATA_CLIPBOARD"
-    private const val ACCESSIBILITY_SERVICE_NAME = "com.xzyht.notifyrelay/com.xzyht.notifyrelay.servers.ClipboardAccessibilityService"
     
     private var clipboardManager: ClipboardManager? = null
     private var lastClipboardContent: String = ""
@@ -39,8 +37,9 @@ object ClipboardSyncManager {
     private var isManualSyncMode = false
     private val ANTI_LOOP_DELAY = 1000L
     
-    fun isAccessibilityServiceEnabled(context: Context): Boolean {
-        return PermissionHelper.isAccessibilityServiceEnabled(context, ACCESSIBILITY_SERVICE_NAME)
+    fun isFcitx5Paired(context: Context): Boolean {
+        FcitxClipboardManager.restorePairedState(context)
+        return FcitxClipboardManager.isPaired
     }
     
     fun setManualSyncMode(context: Context, enabled: Boolean) {
@@ -55,6 +54,10 @@ object ClipboardSyncManager {
     private fun canSyncClipboard(context: Context): Pair<Boolean, String> {
         if (isManualSyncMode) {
             return Pair(true, "手动同步模式")
+        }
+
+        if (isFcitx5Paired(context)) {
+            return Pair(true, "Fcitx5 已配对")
         }
         
         if (PermissionHelper.isAppInForeground(context)) {
@@ -72,7 +75,6 @@ object ClipboardSyncManager {
 
     fun suppressClipboardMonitoring(durationMs: Long = 2000) {
         Logger.d(TAG, "抑制所有剪贴板监听 $durationMs ms")
-        ClipboardAccessibilityService.pauseDetectionTemporary(durationMs)
     }
 
     /**

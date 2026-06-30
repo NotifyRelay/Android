@@ -16,7 +16,6 @@ object ClipboardProcessor {
     data class ClipboardInput(
         val header: String,
         val rawData: String,
-        val sharedSecret: String,
         val remoteUuid: String
     )
 

@@ -26,7 +26,6 @@ object StatusProcessor {
     data class StatusInput(
         val header: String,
         val rawData: String,
-        val sharedSecret: String,
         val remoteUuid: String
     )
 

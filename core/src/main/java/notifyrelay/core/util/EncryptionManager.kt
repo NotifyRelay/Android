@@ -1,9 +1,13 @@
 package notifyrelay.core.util
 
+import android.content.Context
+import android.security.keystore.KeyProperties
+import android.security.keystore.KeyProtection
 import android.util.Base64
 import java.security.KeyFactory
 import java.security.KeyPair
 import java.security.KeyPairGenerator
+import java.security.KeyStore
 import java.security.PrivateKey
 import java.security.PublicKey
 import java.security.SecureRandom
@@ -37,12 +41,13 @@ object EncryptionManager {
      * RSA - 非对称加密（最高安全）
      */
     enum class EncryptionType {
-        AES,    // AES对称加密（推荐）
+        ECDH,   // ECDH 密钥协商（推荐）
+        AES,    // AES对称加密
         RSA     // RSA非对称加密（最高安全）
     }
 
-    // 当前使用的加密类型（默认AES）
-    private var currentEncryptionType: EncryptionType = EncryptionType.AES
+    // 当前使用的加密类型（默认ECDH）
+    private var currentEncryptionType: EncryptionType = EncryptionType.ECDH
 
     // =================== AES加密实现 ===================
     private object AESEncryption {
@@ -175,6 +180,19 @@ object EncryptionManager {
                 copied += toCopy
             }
             return okm
+        }
+
+        /**
+         * 使用 HKDF-SHA256 从原始密钥材料派生 AES-256 密钥（Base64 编码）。
+         *
+         * @param ikm 输入密钥材料
+         * @param info 上下文区分信息，防止不同用途派生相同密钥
+         * @return Base64 编码的 32 字节 AES 密钥
+         */
+        fun hkdfDeriveKey(ikm: ByteArray, info: String): String {
+            val prk = hkdfExtract(null, ikm)
+            val okm = hkdfExpand(prk, info.toByteArray(Charsets.UTF_8), 32)
+            return Base64.encodeToString(okm, Base64.NO_WRAP)
         }
     }
 
@@ -317,6 +335,7 @@ object EncryptionManager {
      */
     fun encrypt(data: String, key: String): String {
         return when (currentEncryptionType) {
+            EncryptionType.ECDH -> AESEncryption.encrypt(data, key)
             EncryptionType.AES -> AESEncryption.encrypt(data, key)
             EncryptionType.RSA -> throw UnsupportedOperationException("RSA encryption requires PublicKey object")
         }
@@ -333,6 +352,7 @@ object EncryptionManager {
      */
     fun decrypt(encryptedData: String, key: String): String {
         return when (currentEncryptionType) {
+            EncryptionType.ECDH -> AESEncryption.decrypt(encryptedData, key)
             EncryptionType.AES -> AESEncryption.decrypt(encryptedData, key)
             EncryptionType.RSA -> throw UnsupportedOperationException("RSA decryption requires PrivateKey object")
         }
@@ -346,11 +366,64 @@ object EncryptionManager {
      * @param remoteKey 远端标识或密钥字符串
      * @return 生成的共享密钥字符串（AES 返回 Base64 编码的 32 字节密钥，RSA 返回基于 hashCode 的字符串）
      */
+    @Deprecated("Use generateSharedSecret(context, localKey, remoteKey) instead", ReplaceWith("generateSharedSecret(context, localKey, remoteKey)"))
     fun generateSharedSecret(localKey: String, remoteKey: String): String {
         return when (currentEncryptionType) {
+            EncryptionType.ECDH -> throw UnsupportedOperationException("ECDH requires generateSharedSecret(context, localKey, remoteKey)")
             EncryptionType.AES -> AESEncryption.generateSharedSecret(localKey, remoteKey)
             EncryptionType.RSA -> RSAEncryption.generateSharedSecret(localKey, remoteKey)
         }
+    }
+
+    // =================== ECDH 方法 ===================
+
+    /**
+     * 执行 ECDH 密钥协商，返回 SHA-256 哈希后的 32 字节（Base64 编码）
+     */
+    fun ecdhGenerateSharedSecret(remotePublicKeyBase64: String): String {
+        return EcdhKeyStore.generateSharedSecret(remotePublicKeyBase64)
+    }
+
+    /**
+     * 获取本地 ECDH 公钥的 Base64 编码（65 字节未压缩点）
+     */
+    fun getEcdhPublicKeyBase64(): String {
+        return EcdhKeyStore.getPublicKeyBase64()
+    }
+
+    /**
+     * 检测公钥是否是 ECDH 格式
+     * 旧格式（UUID hex，32 位十六进制字符串）返回 false
+     * 新格式（Base64 编码的 EC 未压缩点）返回 true
+     */
+    enum class KeyFormat { ECDH, INVALID }
+
+    fun detectKeyFormat(publicKey: String): KeyFormat {
+        return try {
+            val bytes = Base64.decode(publicKey, Base64.NO_WRAP)
+            if (bytes.size == 65 && bytes[0] == 0x04.toByte()) KeyFormat.ECDH else KeyFormat.INVALID
+        } catch (_: Exception) {
+            KeyFormat.INVALID
+        }
+    }
+
+    fun isEcdhFormat(publicKey: String): Boolean {
+        return detectKeyFormat(publicKey) == KeyFormat.ECDH
+    }
+
+    /**
+     * 格式感知的共享密钥派生
+     *
+     * 两端都是 ECDH 格式 → ECDH 协商 → SHA-256 → Base64
+     * 两端都是旧 UUID 格式 → 旧 HKDF 逻辑
+     *
+     * @param context Android 上下文（用于 Keystore 访问）
+     * @param localKey 本地公钥
+     * @param remoteKey 远端公钥
+     * @return Base64 编码的共享密钥
+     */
+    fun generateSharedSecret(context: android.content.Context, localKey: String, remoteKey: String): String {
+        return ecdhGenerateSharedSecret(remoteKey)
     }
 
     // =================== RSA专用方法 ===================
@@ -435,7 +508,6 @@ object EncryptionManager {
 
     // =================== AES专用方法 ===================
 
-
     /**
      * 生成 AES 对称密钥（快捷方法）
      *
@@ -467,6 +539,17 @@ object EncryptionManager {
         return AESEncryption.stringToKey(keyString)
     }
 
+    /**
+     * 使用 HKDF-SHA256 从原始密钥材料派生 AES-256 密钥（Base64 编码）。
+     *
+     * @param ikm 输入密钥材料（如 ECDH 共享密钥的原始字节）
+     * @param info 上下文区分信息，防止不同用途派生相同密钥
+     * @return Base64 编码的 32 字节 AES 密钥
+     */
+    fun hkdfDeriveKey(ikm: ByteArray, info: String = "pairing-code-encryption"): String {
+        return AESEncryption.hkdfDeriveKey(ikm, info)
+    }
+
     // =================== 配置和工具方法 ===================
 
 
@@ -478,7 +561,8 @@ object EncryptionManager {
      */
     fun getEncryptionTypeDisplayName(type: EncryptionType): String {
         return when (type) {
-            EncryptionType.AES -> "AES加密（推荐）"
+            EncryptionType.ECDH -> "ECDH密钥协商（推荐）"
+            EncryptionType.AES -> "AES加密"
             EncryptionType.RSA -> "RSA加密（最高安全）"
         }
     }
@@ -492,6 +576,8 @@ object EncryptionManager {
      */
     fun getEncryptionTypeDescription(type: EncryptionType): String {
         return when (type) {
+            EncryptionType.ECDH ->
+                "ECDH密钥协商，私钥由硬件安全模块保护。安全性高，推荐用于配对场景。"
             EncryptionType.AES ->
                 "AES对称加密，安全性高，性能良好。推荐用于大多数场景。"
             EncryptionType.RSA ->
@@ -507,7 +593,7 @@ object EncryptionManager {
      * @return 如果为 AES 则返回 true，否则返回 false
      */
     fun supportsSymmetricEncryption(type: EncryptionType): Boolean {
-        return type == EncryptionType.AES
+        return type == EncryptionType.AES || type == EncryptionType.ECDH
     }
 
     /**
@@ -518,5 +604,116 @@ object EncryptionManager {
      */
     fun supportsAsymmetricEncryption(type: EncryptionType): Boolean {
         return type == EncryptionType.RSA
+    }
+
+    // =================== Android Keystore AES 密钥管理 ===================
+
+    private val AES_DEVICE_SECRET_PREFIX = "aes_device_secret_"
+    private val AES_GCM_TRANSFORMATION = "AES/GCM/NoPadding"
+    private val GCM_IV_LENGTH = 12
+
+    /**
+     * 将设备 sharedSecret（Base64 编码的 AES-256 密钥）导入 Android Keystore。
+     * 导入后密钥由硬件安全模块保护，应用无法再导出明文。
+     *
+     * @param context Android 上下文
+     * @param uuid 设备 UUID，用于生成唯一的 Key alias
+     * @param base64Key Base64 编码的 AES 密钥
+     */
+    fun importAesKeyToKeystore(context: Context, uuid: String, base64Key: String) {
+        val keyBytes = Base64.decode(base64Key, Base64.NO_WRAP)
+        require(keyBytes.size == 32) { "Invalid AES-256 key length: ${keyBytes.size} for uuid=$uuid, expected 32 bytes" }
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val alias = AES_DEVICE_SECRET_PREFIX + uuid
+        // 移除旧密钥（如有），确保重新配对时覆盖
+        if (keyStore.containsAlias(alias)) {
+            keyStore.deleteEntry(alias)
+        }
+        val secretKey = SecretKeySpec(keyBytes, KeyProperties.KEY_ALGORITHM_AES)
+        val protectionParams = KeyProtection.Builder(
+            KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
+        )
+            .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+            .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+            .build()
+        keyStore.setEntry(alias, KeyStore.SecretKeyEntry(secretKey), protectionParams)
+    }
+
+    /**
+     * 使用 Android Keystore 中存储的设备密钥加密数据。
+     * 密钥需事先通过 [importAesKeyToKeystore] 导入。
+     *
+     * @param data 明文字符串（UTF-8）
+     * @param uuid 设备 UUID
+     * @param context Android 上下文
+     * @return Base64 编码的密文（12 字节 IV + GCM 密文，含 16 字节 tag）
+     */
+    fun encryptWithDeviceKey(data: String, uuid: String, context: Context): String {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val alias = AES_DEVICE_SECRET_PREFIX + uuid
+        val secretKey = keyStore.getKey(alias, null) as? SecretKey
+            ?: throw IllegalStateException("Keystore key not found for device $uuid")
+        val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
+        // 由 Keystore 生成随机 IV（不允许调用方传入）
+        cipher.init(Cipher.ENCRYPT_MODE, secretKey)
+        val iv = cipher.iv
+        val encryptedBytes = cipher.doFinal(data.toByteArray(Charsets.UTF_8))
+        val out = ByteArray(iv.size + encryptedBytes.size)
+        System.arraycopy(iv, 0, out, 0, iv.size)
+        System.arraycopy(encryptedBytes, 0, out, iv.size, encryptedBytes.size)
+        return Base64.encodeToString(out, Base64.NO_WRAP)
+    }
+
+    /**
+     * 使用 Android Keystore 中存储的设备密钥解密数据。
+     *
+     * @param encryptedData Base64 编码的密文
+     * @param uuid 设备 UUID
+     * @param context Android 上下文
+     * @return 明文字符串（UTF-8）
+     */
+    fun decryptWithDeviceKey(encryptedData: String, uuid: String, context: Context): String {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val alias = AES_DEVICE_SECRET_PREFIX + uuid
+        val secretKey = keyStore.getKey(alias, null) as? SecretKey
+            ?: throw IllegalStateException("Keystore key not found for device $uuid")
+        val data = Base64.decode(encryptedData, Base64.NO_WRAP)
+        val iv = data.copyOfRange(0, GCM_IV_LENGTH)
+        val ciphertext = data.copyOfRange(GCM_IV_LENGTH, data.size)
+        val cipher = Cipher.getInstance(AES_GCM_TRANSFORMATION)
+        val spec = GCMParameterSpec(128, iv)
+        cipher.init(Cipher.DECRYPT_MODE, secretKey, spec)
+        return String(cipher.doFinal(ciphertext), Charsets.UTF_8)
+    }
+
+    /**
+     * 从 Android Keystore 中移除指定设备的 AES 密钥。
+     *
+     * @param uuid 设备 UUID
+     * @param context Android 上下文
+     */
+    fun removeDeviceKey(uuid: String, context: Context) {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        val alias = AES_DEVICE_SECRET_PREFIX + uuid
+        if (keyStore.containsAlias(alias)) {
+            keyStore.deleteEntry(alias)
+        }
+    }
+
+    /**
+     * 检查指定设备的 AES 密钥是否已导入 Android Keystore。
+     *
+     * @param uuid 设备 UUID
+     * @param context Android 上下文
+     * @return 如果密钥存在返回 true
+     */
+    fun hasDeviceKey(uuid: String, context: Context): Boolean {
+        val keyStore = KeyStore.getInstance("AndroidKeyStore")
+        keyStore.load(null)
+        return keyStore.containsAlias(AES_DEVICE_SECRET_PREFIX + uuid)
     }
 }

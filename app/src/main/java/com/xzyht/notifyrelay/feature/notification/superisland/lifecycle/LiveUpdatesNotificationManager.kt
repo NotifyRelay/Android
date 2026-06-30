@@ -27,8 +27,8 @@ import notifyrelay.base.util.Logger
 
 object LiveUpdatesNotificationManager {
     private const val TAG = "超级岛进度类型"
-    const val CHANNEL_ID = "live_updates_channel"
-    private const val CHANNEL_NAME = "超级岛Live Updates"
+    const val CHANNEL_ID = "super_island_replica"
+    private const val CHANNEL_NAME = "超级岛复刻"
     private const val NOTIFICATION_BASE_ID = 10000
     private const val ICON_CACHE_SIZE = 10 // 最大缓存10个图标
     
@@ -71,7 +71,7 @@ object LiveUpdatesNotificationManager {
         val channel = NotificationChannel(
             CHANNEL_ID,
             CHANNEL_NAME,
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_HIGH
         )
         notificationManager.createNotificationChannel(channel)
     }
@@ -81,7 +81,8 @@ object LiveUpdatesNotificationManager {
         title: String?,
         text: String?,
         appName: String?,
-        formattedData: FormattedSuperIslandData
+        formattedData: FormattedSuperIslandData,
+        overrideNotificationId: Int? = null
     ) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
             Logger.w(TAG, "当前Android版本不支持Live Updates")
@@ -97,7 +98,7 @@ object LiveUpdatesNotificationManager {
         }
 
         try {
-            val notificationId = sourceId.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
+            val notificationId = overrideNotificationId ?: (sourceId.hashCode().and(0xffff) + NOTIFICATION_BASE_ID)
             
             val paramV2 = formattedData.paramV2
 
@@ -116,16 +117,19 @@ object LiveUpdatesNotificationManager {
 
             // 检查浮窗功能是否开启
             val floatingWindowEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(appContext)
+            // 列表模式（浮窗关闭时）也需要点击意图用于切换
+            val notificationListMode = !floatingWindowEnabled && SuperIslandConfigUtils.isNotificationListMode(appContext)
+            val needClickIntent = floatingWindowEnabled || notificationListMode
             
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
-            val deleteIntent = if (floatingWindowEnabled) {
+            val deleteIntent = if (needClickIntent) {
                 SuperIslandConfigUtils.createDeletePendingIntent(appContext, notificationId)
             } else {
                 null
             }
 
-            // 创建点击意图，用于处理用户点击通知时切换浮窗显示隐藏
-            val contentIntent = if (floatingWindowEnabled) {
+            // 创建点击意图，用于处理用户点击通知时切换浮窗或切换列表
+            val contentIntent = if (needClickIntent) {
                 PendingIntent.getBroadcast(
                     appContext,
                     notificationId,
@@ -148,8 +152,8 @@ object LiveUpdatesNotificationManager {
                 .setContentText(text ?: "")
                 .setSmallIcon(android.R.drawable.stat_notify_more)
 
-            // 只有在浮窗功能开启时才设置删除意图和点击意图
-            if (floatingWindowEnabled) {
+            // 在浮窗或列表模式下设置删除意图和点击意图
+            if (needClickIntent) {
                 notificationBuilder
                     .setDeleteIntent(deleteIntent)
                     .setContentIntent(contentIntent)
@@ -440,16 +444,18 @@ object LiveUpdatesNotificationManager {
 
             // 检查浮窗功能是否开启
             val floatingWindowEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(appContext)
+            val notificationListMode = !floatingWindowEnabled && SuperIslandConfigUtils.isNotificationListMode(appContext)
+            val needClickIntent = floatingWindowEnabled || notificationListMode
             
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
-            val deleteIntent = if (floatingWindowEnabled) {
+            val deleteIntent = if (needClickIntent) {
                 SuperIslandConfigUtils.createDeletePendingIntent(appContext, notificationId)
             } else {
                 null
             }
 
-            // 创建点击意图，用于处理用户点击通知时切换浮窗显示隐藏
-            val contentIntent = if (floatingWindowEnabled) {
+            // 创建点击意图，用于处理用户点击通知时切换浮窗或切换列表
+            val contentIntent = if (needClickIntent) {
                 PendingIntent.getBroadcast(
                     appContext,
                     notificationId,
@@ -465,7 +471,7 @@ object LiveUpdatesNotificationManager {
             }
 
             // 设置意图
-            if (floatingWindowEnabled) {
+            if (needClickIntent) {
                 updatedBuilder
                     .setDeleteIntent(deleteIntent)
                     .setContentIntent(contentIntent)

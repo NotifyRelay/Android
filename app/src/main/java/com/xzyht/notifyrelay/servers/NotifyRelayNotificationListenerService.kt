@@ -115,7 +115,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         } else if (sbn.packageName == applicationContext.packageName) {
             // 检查是否为超级岛相关通知（包括普通超级岛和焦点歌词）
             val channelId = sbn.notification.channelId
-            if (channelId == "super_island_replica" || channelId == "channel_id_focusNotifLyrics") {
+            if (channelId == "super_island_replica") {
                 // 超级岛相关通知被移除，关闭对应的浮窗条目
                 Logger.i(TAG, "超级岛相关通知被移除，关闭对应的浮窗条目: id=${sbn.id}, channelId=$channelId")
                 FloatingReplicaManager.closeByNotificationId(sbn.id)
@@ -693,11 +693,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
 
-        // 检查剪贴板同步状态，为通知主体添加点击事件
+        // 为通知主体添加点击事件，实现剪贴板同步功能
         try {
-            ClipboardSyncManager.isAccessibilityServiceEnabled(this)
-
-            // 为通知主体添加点击事件，实现剪贴板同步功能
             val syncIntent = Intent(this, ClipboardSyncReceiver::class.java).apply {
                 action = ClipboardSyncReceiver.ACTION_MANUAL_SYNC
             }
@@ -716,12 +713,12 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     private fun getNotificationText(): String {
         // 使用 DeviceConnectionManager 提供的线程安全方法获取在线且已认证的设备数量
         val onlineDevices = try { connectionManager.getAuthenticatedOnlineCount() } catch (_: Exception) { 0 }
-        val accessibilityEnabled = try { ClipboardSyncManager.isAccessibilityServiceEnabled(this) } catch (_: Exception) { false }
+        val fcitx5Paired = try { ClipboardSyncManager.isFcitx5Paired(this) } catch (_: Exception) { false }
         //Logger.d(TAG, "getNotificationText: authenticatedOnlineCount=$onlineDevices")
 
         // 优先显示设备连接数，如果有设备连接
         if (onlineDevices > 0) {
-            return if (!accessibilityEnabled) {
+            return if (!fcitx5Paired) {
                 "当前${onlineDevices}台设备已连接，点击以同步剪贴板"
             } else {
                 "当前${onlineDevices}台设备已连接"
@@ -743,8 +740,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             "无设备在线"
         }
 
-        // 无障碍服务未启用时，添加点击提示
-        return if (!accessibilityEnabled) {
+        // Fcitx5 未启用时，添加点击提示
+        return if (!fcitx5Paired) {
             "$baseText，点击通知同步剪贴板"
         } else {
             baseText

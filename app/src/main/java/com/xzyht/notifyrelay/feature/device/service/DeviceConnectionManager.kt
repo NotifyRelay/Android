@@ -90,7 +90,21 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     
     // 用于比较在线设备缓存是否变化的变量
     private var lastOnlineDevicesCacheJson: String? = null
-    
+
+    // ==================== 握手请求处理接口 ====================
+    /**
+     * 配对请求处理接口。
+     * 当接收到 PAIRING_INIT 时通过此接口通知 UI 层显示配对码输入弹窗。
+     */
+    interface HandshakeRequestHandler {
+        fun onPairingInitRequest(deviceInfo: DeviceInfo, tmpPublicKey: String)
+    }
+
+    /**
+     * 配对请求处理器
+     */
+    var handshakeRequestHandler: HandshakeRequestHandler? = null
+
     internal fun getLocalDisplayName(): String {
         return DeviceUtils.getLocalDeviceName(context)
     }
@@ -125,9 +139,18 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             // 过滤掉uuid为"本机"的记录
             if (device.uuid == "本机") continue
             
+            // 确保 sharedSecret 已导入 Android Keystore
+            if (device.sharedSecret.isNotEmpty() && !EncryptionManager.hasDeviceKey(device.uuid, context)) {
+                EncryptionManager.importAesKeyToKeystore(context, device.uuid, device.sharedSecret)
+                // 导入成功后立即持久化清空 Room 中的明文密钥
+                kotlinx.coroutines.runBlocking {
+                    DatabaseRepository.getInstance(context).saveDevice(device.copy(sharedSecret = ""))
+                }
+            }
+            
             authenticatedDevices[device.uuid] = AuthInfo(
                 publicKey = device.publicKey,
-                sharedSecret = device.sharedSecret,
+                sharedSecret = "",
                 isAccepted = device.isAccepted,
                 displayName = device.displayName,
                 lastIp = device.lastIp,
@@ -213,18 +236,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         } catch (_: Exception) {}
     }
     /**
-     * 握手请求处理接口
-     */
-    interface HandshakeRequestHandler {
-        fun onHandshakeRequest(deviceInfo: DeviceInfo, publicKey: String, callback: (Boolean) -> Unit)
-    }
-
-    /**
-     * 握手请求处理器
-     */
-    var handshakeRequestHandler: HandshakeRequestHandler? = null
-
-    /**
      * 设备发现/连接/数据发送/接收，全部本地实现。
      */
     private val notificationDataReceivedCallbacks = mutableSetOf<(String) -> Unit>()
@@ -268,9 +279,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal val authenticatedDevices = mutableMapOf<String, AuthInfo>()
     // 被拒绝设备表
     private val rejectedDevices = mutableSetOf<String>()
-    // 本地密钥对（简单字符串模拟，实际应用可用RSA/ECDH等）
+    // 本地 ECDH 公钥（Base64 编码的 65 字节未压缩点）
     internal val localPublicKey: String
-    private val localPrivateKey: String
+    // localPrivateKey 不再使用，ECDH 私钥在 Android Keystore 中，不可直接获取
+    @Deprecated("ECDH 私钥在 Keystore 中，不再使用")
+    private val localPrivateKey: String = ""
     internal val listenPort: Int = 23333
     private val coroutineScope = CoroutineScope(Dispatchers.IO)
     private val keepAlive = ConnectionKeepAlive(this, coroutineScope)
@@ -285,6 +298,14 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     internal val rejectedDevicesInternal: MutableSet<String>
         get() = rejectedDevices
+
+    /** 检查指定设备是否已认证 */
+    fun isAuthenticatedInternal(uuid: String): Boolean {
+        return synchronized(authenticatedDevices) { authenticatedDevices.containsKey(uuid) }
+    }
+
+    internal val incompatibleDevicesInternal: MutableSet<String> =
+        java.util.Collections.synchronizedSet(mutableSetOf())
 
     internal val coroutineScopeInternal: CoroutineScope
         get() = coroutineScope
@@ -347,7 +368,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     internal fun saveAuthedDevicesInternal() = saveAuthedDevices()
 
-    internal fun decryptDataInternal(input: String, key: String): String = decryptData(input, key)
+    internal fun decryptDataInternal(input: String, uuid: String): String = decryptData(input, uuid)
 
     internal fun getDeviceInfoInternal(uuid: String): DeviceInfo? = getDeviceInfo(uuid)
     private var serverSocket: ServerSocket? = null
@@ -373,17 +394,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             StorageManager.putString(context, "device_uuid", newUuid)
             uuid = newUuid
         }
-        // 公钥持久化
-        val savedPub = StorageManager.getString(context, "device_pubkey")
-        if (savedPub.isNotEmpty()) {
-            localPublicKey = savedPub
-        } else {
-            val newPub = UUID.randomUUID().toString().replace("-", "")
-            StorageManager.putString(context, "device_pubkey", newPub)
-            localPublicKey = newPub
-        }
-        // 私钥可临时
-        localPrivateKey = UUID.randomUUID().toString().replace("-", "")
+        // ECDH 公钥（从 Android Keystore 获取或生成 secp256r1 密钥对）
+        localPublicKey = EncryptionManager.getEcdhPublicKeyBase64()
         // 兼容旧用户：首次运行时如无保存则默认true
         if (!AppConfig.getUdpDiscoveryEnabled(context)) {
             AppConfig.setUdpDiscoveryEnabled(context, true)
@@ -437,10 +449,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             
             val lastSeen = lastSeenSnapshot[uuid]
             val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
+            // 不兼容的旧版协议设备，强制离线
+            val isIncompatible = incompatibleDevicesInternal.contains(uuid)
             if (auth != null) {
                 // 仅基于心跳包判定在线
                 val diff = if (lastSeen != null) now - lastSeen else -1L
-                val isOnline = lastSeen != null && diff <= authedHeartbeatTimeout
+                val isOnline = !isIncompatible && lastSeen != null && diff <= authedHeartbeatTimeout
                 val info = deviceInfo ?: DeviceInfo(uuid, auth.displayName ?: "已认证设备", "", listenPort)
                 val oldOnline = oldMap[uuid]?.second
                 if (oldOnline != null && oldOnline != isOnline) {
@@ -572,6 +586,97 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     }
 
     /**
+     * 客户端收到 ACCEPT 后，在本机完成配对：派生密钥、导入 Keystore、标记已认证。
+     */
+    fun completePairing(remoteUuid: String, remotePubKey: String) {
+        try {
+            val secret = EncryptionManager.generateSharedSecret(context, localPublicKey, remotePubKey)
+            EncryptionManager.importAesKeyToKeystore(context, remoteUuid, secret)
+            synchronized(authenticatedDevices) {
+                authenticatedDevices[remoteUuid] = AuthInfo(
+                    remotePubKey, "", true, "未知设备"
+                )
+                saveAuthedDevices()
+            }
+            updateDeviceList()
+            Logger.d("死神-NotifyRelay", "客户端配对完成: $remoteUuid")
+        } catch (e: Exception) {
+            Logger.e("死神-NotifyRelay", "客户端配对失败: $remoteUuid", e)
+        }
+    }
+
+    // 存储待处理的配对请求信息（接收端对话框需要远端临时公钥）
+    data class PendingPairing(
+        val remoteUuid: String,
+        val remotePubKey: String,
+        val remoteIp: String,
+        val tmpPubKey: String = ""  // 发起端的临时公钥，用于加密回传配对码
+    )
+    private val _pendingPairingLock = Any()
+    private var _pendingPairing: PendingPairing? = null
+    var pendingPairing: PendingPairing?
+        get() = synchronized(_pendingPairingLock) { _pendingPairing }
+        internal set(value) = synchronized(_pendingPairingLock) { _pendingPairing = value }
+
+    /**
+     * 取消当前待处理的配对请求。
+     */
+    fun cancelPendingPairing() {
+        val p = pendingPairing
+        if (p != null) {
+            Logger.d("死神-NotifyRelay", "取消配对: ${p.remoteUuid}")
+        }
+        pendingPairing = null
+        notifyrelay.core.util.PairingCodeManager.clear()
+    }
+
+    /**
+     * 发起端存储在配对阶段的临时 ECDH 私钥（Base64 编码），
+     * 供 ServerLineRouter.handlePairingResp 解密接收端回传的配对码。
+     * 配对完成后应清空。
+     */
+    private val _pendingTempPrivKeyB64Lock = Any()
+    private var _pendingTempPrivKeyB64: String? = null
+    var pendingTempPrivKeyB64: String?
+        get() = synchronized(_pendingTempPrivKeyB64Lock) { _pendingTempPrivKeyB64 }
+        set(value) = synchronized(_pendingTempPrivKeyB64Lock) { _pendingTempPrivKeyB64 = value }
+
+    /**
+     * 使用长期 ECDH 密钥完成标准密钥交换。
+     * 配对码验证通过后，双方使用长期 ECDH 密钥派生共享密钥并导入 Keystore。
+     *
+     * @param uuid 远端设备 UUID
+     * @param remoteLtPubKey 远端长期 ECDH 公钥 Base64
+     * @param displayName 设备显示名称
+     * @param lastIp 设备 IP
+     * @return 是否成功
+     */
+    fun completePairingWithLongTermKeys(
+        uuid: String,
+        remoteLtPubKey: String,
+        displayName: String = "未知设备",
+        lastIp: String? = null
+    ): Boolean {
+        return try {
+            val secret = EncryptionManager.generateSharedSecret(context, localPublicKey, remoteLtPubKey)
+            EncryptionManager.importAesKeyToKeystore(context, uuid, secret)
+            synchronized(authenticatedDevices) {
+                authenticatedDevices[uuid] = AuthInfo(
+                    remoteLtPubKey, "", true, displayName,
+                    lastIp = lastIp
+                )
+                saveAuthedDevices()
+            }
+            updateDeviceList()
+            Logger.d("死神-NotifyRelay", "长期密钥配对完成: $uuid")
+            true
+        } catch (e: Exception) {
+            Logger.e("死神-NotifyRelay", "长期密钥配对失败: $uuid", e)
+            false
+        }
+    }
+
+    /**
      * 公开解析设备信息：优先使用缓存/认证信息，缺失IP时使用提供的回退IP。
      */
     fun resolveDeviceInfo(uuid: String, fallbackIp: String?, fallbackPort: Int = 23333): DeviceInfo? {
@@ -610,14 +715,20 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     }
 
     // 设备连接重试逻辑已迁移到 ConnectionKeepAlive.performDeviceConnectionWithRetry
-    // 使用加密管理器进行数据加密
-    internal fun encryptData(input: String, key: String): String {
-        return EncryptionManager.encrypt(input, key)
+    // 使用 Android Keystore 中保护的设备密钥进行加密
+    internal fun encryptData(input: String, uuid: String): String {
+        if (EncryptionManager.hasDeviceKey(uuid, context)) {
+            return EncryptionManager.encryptWithDeviceKey(input, uuid, context)
+        }
+        throw IllegalStateException("Keystore key not found for device $uuid")
     }
 
-    // 使用加密管理器进行数据解密（对 ProtocolRouter 开放）
-    internal fun decryptData(input: String, key: String): String {
-        return EncryptionManager.decrypt(input, key)
+    // 使用 Android Keystore 中保护的设备密钥进行解密（对 ProtocolRouter 开放）
+    internal fun decryptData(input: String, uuid: String): String {
+        if (!EncryptionManager.hasDeviceKey(uuid, context)) {
+            throw IllegalStateException("Keystore key not found for device $uuid")
+        }
+        return EncryptionManager.decryptWithDeviceKey(input, uuid, context)
     }
 
     // 发送通知数据（加密）
@@ -835,7 +946,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
      * - 触发 updateDeviceList() 以通知观察者
      * 返回 true 表示存在并已移除，false 表示没有该uuid
      */
-    fun removeAuthenticatedDevice(uuid: String): Boolean {
+    fun removeAuthenticatedDevice(uuid: String, deleteHistory: Boolean = false): Boolean {
         try {
             var existed = false
             
@@ -848,12 +959,22 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             // 从已建立心跳集合移除
             try { heartbeatedDevices.remove(uuid) } catch (_: Exception) {}
 
+            // 从协议不兼容设备集合移除
+            try { incompatibleDevicesInternal.remove(uuid) } catch (_: Exception) {}
+
+            // 从 Android Keystore 移除设备密钥
+            try { EncryptionManager.removeDeviceKey(uuid, context) } catch (_: Exception) {}
+
             synchronized(authenticatedDevices) {
                 if (authenticatedDevices.containsKey(uuid)) {
-                    // 直接从数据库中删除设备
+                    // 直接从数据库中删除设备及关联数据
                     coroutineScope.launch {
                         val repository = DatabaseRepository.getInstance(context)
                         repository.deleteDeviceByUuid(uuid)
+                        if (deleteHistory) {
+                            repository.deleteNotificationsByDevice(uuid)
+                            repository.deleteAppDeviceAssociationsByDeviceUuid(uuid)
+                        }
                     }
                     
                     // 从内存中移除
@@ -891,9 +1012,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     }
 
     // 发送超级岛ACK（包含接收的hash），用于发送方确认
-    private fun sendSuperIslandAck(remoteUuid: String?, sharedSecret: String?, hash: String, featureKeyValue: String?, mappedPkg: String?) {
+    private fun sendSuperIslandAck(remoteUuid: String?, hash: String, featureKeyValue: String?, mappedPkg: String?) {
         try {
-            if (remoteUuid.isNullOrEmpty() || sharedSecret.isNullOrEmpty()) return
+            if (remoteUuid.isNullOrEmpty()) return
             val device = getDeviceInfo(remoteUuid)
             val auth = synchronized(authenticatedDevices) { authenticatedDevices[remoteUuid] }
             val ip = device?.ip ?: auth?.lastIp
@@ -924,13 +1045,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // 提供给 NotificationProcessor 的内部包装，简化 ACK 调用
     internal fun sendSuperIslandAckInternal(
         remoteUuid: String,
-        sharedSecret: String?,
         recvHash: String,
         featureId: String,
         mappedPkg: String?
     ) {
         try {
-            sendSuperIslandAck(remoteUuid, sharedSecret, recvHash, featureId, mappedPkg)
+            sendSuperIslandAck(remoteUuid, recvHash, featureId, mappedPkg)
         } catch (_: Exception) {
         }
     }

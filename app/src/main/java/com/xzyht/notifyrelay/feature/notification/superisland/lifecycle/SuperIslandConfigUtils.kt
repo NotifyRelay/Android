@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.NotificationBroadcastReceiver
+import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 
@@ -14,6 +15,7 @@ import notifyrelay.data.StorageManager
 object SuperIslandConfigUtils {
     private const val TAG = "SuperIslandConfigUtils"
     private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
+    private const val SUPER_ISLAND_NOTIFICATION_LIST_KEY = "super_island_notification_list"
     private const val SPEC_INJECTION_MODE_KEY = "spec_injection_mode"
 
     // 注入方式枚举
@@ -29,6 +31,44 @@ object SuperIslandConfigUtils {
      */
     fun isFloatingWindowEnabled(context: Context): Boolean {
         return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, FloatingReplicaManager.getDefaultFloatingWindowEnabled())
+    }
+
+    /**
+     * 设置浮窗开关（与通知列表模式互斥）。
+     * 开启浮窗时自动关闭通知列表模式。
+     */
+    fun setFloatingWindowEnabled(context: Context, enabled: Boolean) {
+        if (enabled && isNotificationListMode(context)) {
+            setNotificationListMode(context, false)
+            Logger.i(TAG, "浮窗开启，自动关闭通知列表模式（互斥）")
+        }
+        StorageManager.putBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, enabled)
+    }
+
+    /**
+     * 检查通知列表模式是否开启。
+     * 该模式仅在浮窗关闭时有效，与浮窗互斥。
+     * 默认值：平板开启，手机关闭。
+     */
+    fun isNotificationListMode(context: Context): Boolean {
+        val defaultListMode = DeviceUtils.isTablet(context) && !isFloatingWindowEnabled(context)
+        return StorageManager.getBoolean(
+            context,
+            SUPER_ISLAND_NOTIFICATION_LIST_KEY,
+            defaultListMode
+        )
+    }
+
+    /**
+     * 设置通知列表模式（与浮窗互斥）。
+     * 开启通知列表模式时自动关闭浮窗。
+     */
+    fun setNotificationListMode(context: Context, enabled: Boolean) {
+        if (enabled && isFloatingWindowEnabled(context)) {
+            setFloatingWindowEnabled(context, false)
+            Logger.i(TAG, "通知列表模式开启，自动关闭浮窗（互斥）")
+        }
+        StorageManager.putBoolean(context, SUPER_ISLAND_NOTIFICATION_LIST_KEY, enabled)
     }
 
     /**

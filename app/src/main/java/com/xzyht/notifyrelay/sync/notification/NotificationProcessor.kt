@@ -27,7 +27,6 @@ object NotificationProcessor {
     data class NotificationInput(
         val header: String?,
         val rawData: String,
-        val sharedSecret: String?,
         val remoteUuid: String?,
     )
 
@@ -38,23 +37,15 @@ object NotificationProcessor {
         input: NotificationInput,
         notificationCallbacks: Collection<(String) -> Unit>
     ) {
-        val (header, data, sharedSecret, remoteUuid) = input
+        val (header, data, remoteUuid) = input
 
-        val decrypted = if (sharedSecret != null) {
-            try {
-                manager.decryptDataInternal(data, sharedSecret)
-            } catch (e: Exception) {
-                Logger.e(TAG, "解密失败: ${e.message}")
-                data
-            }
-        } else data
+        // data 已由 ProtocolRouter 解密为明文，直接处理
+        handleJsonLevel(context, manager, header, data, remoteUuid)
 
-        handleJsonLevel(context, manager, header, decrypted, sharedSecret, remoteUuid)
-
-        handleFilterAndReplicate(context, manager, scope, decrypted, remoteUuid)
+        handleFilterAndReplicate(context, manager, scope, data, remoteUuid)
 
         notificationCallbacks.forEach { callback ->
-            try { callback.invoke(decrypted) } catch (e: Exception) { Logger.e(TAG, "调用UI层回调失败: ${e.message}") }
+            try { callback.invoke(data) } catch (e: Exception) { Logger.e(TAG, "调用UI层回调失败: ${e.message}") }
         }
     }
 
@@ -63,7 +54,6 @@ object NotificationProcessor {
         manager: DeviceConnectionManager,
         header: String?,
         decrypted: String,
-        sharedSecret: String?,
         remoteUuid: String?
     ) {
         try {

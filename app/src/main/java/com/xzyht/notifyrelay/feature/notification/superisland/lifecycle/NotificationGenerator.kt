@@ -67,6 +67,9 @@ object NotificationGenerator {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val scrollRunnable = mutableMapOf<String, Runnable>()
     
+    // 缓存已注入的小图标，供滚动更新时复用（避免丢失实际意义图标）
+    private val cachedSmallIcons = ConcurrentHashMap<String, Icon>()
+    
     /**
      * 设置滚动更新
      */
@@ -102,10 +105,11 @@ object NotificationGenerator {
                 val contentTitle = originalNotification.extras.getString("android.title")
                 val contentText = originalNotification.extras.getString("android.text")
                 
-                // 更新通知
-                val updatedBuilder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
+                // 更新通知（必须设置 smallIcon，否则会抛出 IllegalArgumentException）
+                val updatedBuilder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
                     .setContentTitle(contentTitle ?: "")
                     .setContentText(contentText ?: "")
+                    .setSmallIcon(android.R.drawable.stat_notify_more)
                     .setAutoCancel(false)
                     .setOngoing(true)
                     .setPriority(NotificationCompat.PRIORITY_MAX)
@@ -119,6 +123,18 @@ object NotificationGenerator {
                 // 复制extras
                 val updatedNotification = updatedBuilder.build()
                 updatedNotification.extras.putAll(originalNotification.extras)
+                
+                // 恢复之前缓存的小图标，避免滚动更新时丢失实际意义图标
+                val cachedIcon = cachedSmallIcons[key]
+                if (cachedIcon != null) {
+                    try {
+                        val field = Notification::class.java.getDeclaredField("mSmallIcon")
+                        field.isAccessible = true
+                        field.set(updatedNotification, cachedIcon)
+                    } catch (e: Exception) {
+                        Logger.w(TAG, "滚动更新: 恢复小图标失败: ${e.message}")
+                    }
+                }
                 
                 // 发送更新后的通知
                 notificationManager.notify(notificationId, updatedNotification)
@@ -145,6 +161,7 @@ object NotificationGenerator {
         scrollRunnable.remove(key)?.let {
             mainHandler.removeCallbacks(it)
         }
+        cachedSmallIcons.remove(key)
         CapsuleScrollManager.resetScrollState("${key}_scroll")
     }
     
@@ -156,6 +173,7 @@ object NotificationGenerator {
             mainHandler.removeCallbacks(it.value)
         }
         scrollRunnable.clear()
+        cachedSmallIcons.clear()
         CapsuleScrollManager.clearAll()
     }
     
@@ -176,22 +194,36 @@ object NotificationGenerator {
         picMap: Map<String, String>?,
         sourceId: String,
         floatingWindowManager: FloatingWindowManager,
-        entryKeyToNotificationId: ConcurrentHashMap<String, Int>
+        entryKeyToNotificationId: ConcurrentHashMap<String, Int>,
+        overrideNotificationId: Int? = null
     ): Int? {
         try {
             // 验证规范信息注入开关状态，确保至少有一种开启
             SuperIslandConfigUtils.validateSpecInjectionSwitches(context)
             
+            // 共享通知ID模式下（列表模式），清理旧的滚动任务避免冲突
+            if (overrideNotificationId != null) {
+                scrollRunnable.keys.toList().forEach { oldKey ->
+                    if (oldKey != key) {
+                        stopScrollUpdate(oldKey)
+                    }
+                }
+            }
+            
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             
-            // 生成唯一的通知ID
-            val notificationId = key.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
+            // 生成唯一的通知ID（列表模式使用固定ID，以便原地更新）
+            val notificationId = overrideNotificationId ?: (key.hashCode().and(0xffff) + NOTIFICATION_BASE_ID)
             
             // 检查浮窗功能是否开启
             val floatingWindowEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
+            // 检查列表模式（仅通知 + 切换）
+            val notificationListMode = !floatingWindowEnabled && SuperIslandConfigUtils.isNotificationListMode(context)
+            // 需要设置 click intent 的条件：浮窗开启 或 列表模式
+            val needClickIntent = floatingWindowEnabled || notificationListMode
             
-            // 创建点击意图，用于处理用户点击通知时切换浮窗显示隐藏
-            val contentIntent = if (floatingWindowEnabled) {
+            // 创建点击意图，用于处理用户点击通知时切换浮窗或切换列表
+            val contentIntent = if (needClickIntent) {
                 Intent(context, NotificationBroadcastReceiver::class.java).apply {
                     action = "com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"
                     putExtra("sourceId", sourceId)
@@ -217,7 +249,7 @@ object NotificationGenerator {
                 null
             }
             
-            val pendingContentIntent = if (floatingWindowEnabled && contentIntent != null) {
+            val pendingContentIntent = if (needClickIntent && contentIntent != null) {
                 PendingIntent.getBroadcast(
                     context,
                     notificationId,
@@ -232,27 +264,23 @@ object NotificationGenerator {
             val isMediaType = paramV2?.business == "media"
 
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
-            val deleteIntent = if (floatingWindowEnabled) {
+            val deleteIntent = if (needClickIntent) {
                 SuperIslandConfigUtils.createDeletePendingIntent(context, notificationId)
             } else {
                 null
             }
             
+            // 统一使用"超级岛复刻"通知渠道
+            val channel = NotificationChannel(
+                NOTIFICATION_CHANNEL_ID,
+                "超级岛复刻",
+                NotificationManager.IMPORTANCE_HIGH
+            )
+            notificationManager.createNotificationChannel(channel)
+
             // 对于媒体类型，使用HyperCeiler焦点歌词的特殊处理
             if (isMediaType) {
-                // 创建媒体类型通知渠道
-                val mediaChannel = NotificationChannel(
-                    "channel_id_focusNotifLyrics",
-                    "焦点歌词通知",
-                    NotificationManager.IMPORTANCE_HIGH
-                ).apply {
-                    setSound(null, null)
-                    setShowBadge(false)
-                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                }
-                notificationManager.createNotificationChannel(mediaChannel)
-                
-                val builder = NotificationCompat.Builder(context, "channel_id_focusNotifLyrics")
+                val builder = NotificationCompat.Builder(context, NOTIFICATION_CHANNEL_ID)
                     .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
                     .setContentText(title ?: "")
                     .setSmallIcon(android.R.drawable.stat_notify_more) // 使用系统默认图标
@@ -265,11 +293,11 @@ object NotificationGenerator {
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                     .setRequestPromotedOngoing(true)
 
-                // 只有在浮窗功能开启时才设置删除意图和点击意图
-                if (floatingWindowEnabled) {
+                // 浮窗或列表模式下设置删除意图和点击意图
+                if (needClickIntent) {
                     builder
-                        .setDeleteIntent(deleteIntent) // 设置删除意图，处理用户移除通知的情况
-                        .setContentIntent(pendingContentIntent) // 设置点击意图
+                        .setDeleteIntent(deleteIntent)
+                        .setContentIntent(pendingContentIntent)
                 }
                 
                 // 添加胶囊形式支持
@@ -351,7 +379,7 @@ object NotificationGenerator {
                     val albumBitmap = loadAlbumBitmapOrNull(context, picMap, iconText.length)
                     val iconBitmap = BitmapUtils.textToBitmap(iconText, albumBitmap = albumBitmap)
                     if (iconBitmap != null) {
-                        injectSmallIcon(notification, iconBitmap)
+                        injectSmallIcon(notification, iconBitmap, key)
                     }
                 } else {
                     // 没有图标文本时，尝试使用专辑图作为小图标
@@ -362,7 +390,7 @@ object NotificationGenerator {
                             // 同步下载专辑图
                             val bitmap = downloadBitmap(context, coverUrl)
                             if (bitmap != null) {
-                                injectSmallIcon(notification, bitmap)
+                                injectSmallIcon(notification, bitmap, key)
                             }
                         }
                     }
@@ -418,7 +446,7 @@ object NotificationGenerator {
                     // 注入小图标
                     // 只有当smallIconBitmap不为null时才注入，否则保留之前的图标
                     if (smallIconBitmap != null) {
-                        injectSmallIcon(notification, smallIconBitmap)
+                        injectSmallIcon(notification, smallIconBitmap, key)
                     } else {
                         // 保留之前的图标，不进行修改
                         Logger.i(TAG, "超级�? 保留之前的小图标，不进行修改")
@@ -431,15 +459,7 @@ object NotificationGenerator {
                 // 发送通知
                 notificationManager.notify(notificationId, notification)
             } else {
-                // 非媒体类型，使用原来的通知渠道和构建方式                
-                // 创建通知渠道
-                val channel = NotificationChannel(
-                    NOTIFICATION_CHANNEL_ID,
-                    "超级岛复刻通知",
-                    NotificationManager.IMPORTANCE_HIGH
-                )
-                notificationManager.createNotificationChannel(channel)
-
+                // 非媒体类型，使用原来的通知渠道和构建方式
                 // 使用已解析的 paramV2 中的组件数据，避免重复解析
                 val bigIslandArea = paramV2?.paramIsland?.bigIslandArea
                 val aComponent = bigIslandArea?.aComponent
@@ -505,11 +525,11 @@ object NotificationGenerator {
                     .setOnlyAlertOnce(true) // 只提示一次
                     .setVisibility(NotificationCompat.VISIBILITY_PUBLIC) // 公开可见
 
-                // 只有在浮窗功能开启时才设置删除意图和点击意图
-                if (floatingWindowEnabled) {
+                // 浮窗或列表模式下设置删除意图和点击意图
+                if (needClickIntent) {
                     builder
-                        .setDeleteIntent(deleteIntent) // 设置删除意图
-                        .setContentIntent(pendingContentIntent) // 设置点击意图
+                        .setDeleteIntent(deleteIntent)
+                        .setContentIntent(pendingContentIntent)
                 }
 
                 // 对于计时器类通知，添加计时器相关字段
@@ -730,15 +750,19 @@ object NotificationGenerator {
     // ---- 图标注入辅助方法 ----
 
     /**
-     * 注入小图标到通知
+     * 注入小图标到通知，同时缓存供滚动更新复用
      */
-    private fun injectSmallIcon(notification: Notification, bitmap: Bitmap?) {
+    private fun injectSmallIcon(notification: Notification, bitmap: Bitmap?, cacheKey: String? = null) {
         bitmap?.let {
             try {
                 val icon = Icon.createWithBitmap(it)
                 val field = Notification::class.java.getDeclaredField("mSmallIcon")
                 field.isAccessible = true
                 field.set(notification, icon)
+                // 同时缓存供滚动更新复用，避免反射读取
+                if (cacheKey != null) {
+                    cachedSmallIcons[cacheKey] = icon
+                }
                 Logger.i(TAG, "超级岛 成功注入小图标到胶囊通知")
             } catch (e: Exception) {
                 Logger.w(TAG, "超级岛 注入小图标失败: ${e.message}")
