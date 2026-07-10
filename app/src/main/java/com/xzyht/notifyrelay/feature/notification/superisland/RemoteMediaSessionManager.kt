@@ -253,7 +253,7 @@ object RemoteMediaSessionManager {
             val currentState = SuperIslandProtocol.State(
                 title = finalTitle,
                 text = finalText,
-                paramV2Raw = buildMediaParamV2(finalTitle, finalText).toString(),
+                paramV2Raw = MediaCapsulePresenter.buildParamV2(finalTitle, finalText),
                 pics = currentPics
             )
             
@@ -272,8 +272,13 @@ object RemoteMediaSessionManager {
             if (diff.isEmpty()) {
                 // 没有变化，但仍需更新浮窗，避免被自动移除
                 // 直接调用showFloating更新浮窗时间戳
-                com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.showFloating(
-                    context, sourceKey, finalTitle, finalText, buildMediaParamV2(finalTitle, finalText).toString(), currentPics, appName, false
+                MediaCapsulePresenter.show(
+                    context = context,
+                    sourceId = sourceKey,
+                    title = finalTitle,
+                    text = finalText,
+                    appName = appName,
+                    picMap = currentPics
                 )
                 Logger.i("RemoteMediaSessionManager", "媒体会话无变化，但更新浮窗时间戳: $title - $text (来自 ${device.displayName})")
                 return
@@ -285,7 +290,7 @@ object RemoteMediaSessionManager {
                 // 全量包
                 payload.put("title", finalTitle)
                 payload.put("text", finalText)
-                payload.put("param_v2_raw", buildMediaParamV2(finalTitle, finalText).toString())
+                payload.put("param_v2_raw", MediaCapsulePresenter.buildParamV2(finalTitle, finalText))
                 if (currentPics.isNotEmpty()) {
                     payload.put("pics", JSONObject(currentPics))
                 }
@@ -298,8 +303,13 @@ object RemoteMediaSessionManager {
                 val paramV2 = merged.paramV2Raw
 
                 // 调用超级岛浮窗显示
-                com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.showFloating(
-                    context, sourceKey, merged.title, merged.text, paramV2, pics, appName, false
+                MediaCapsulePresenter.show(
+                    context = context,
+                    sourceId = sourceKey,
+                    title = merged.title,
+                    text = merged.text,
+                    appName = appName,
+                    picMap = pics
                 )
 
                 Logger.i("RemoteMediaSessionManager", "更新远端媒体会话: $title - $text (来自 ${device.displayName}, isFirst=$isFirst)")
@@ -468,7 +478,7 @@ object RemoteMediaSessionManager {
                 val currentState = SuperIslandProtocol.State(
                     title = session.title,
                     text = session.text,
-                    paramV2Raw = buildMediaParamV2(session.title, session.text).toString(),
+                    paramV2Raw = MediaCapsulePresenter.buildParamV2(session.title, session.text),
                     pics = currentPics
                 )
                 
@@ -490,17 +500,24 @@ object RemoteMediaSessionManager {
                     merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
                     
                     if (merged != null) {
-                        // 调用超级岛浮窗显示
-                        com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.showFloating(
-                            context, sourceKey, merged.title, merged.text, merged.paramV2Raw, merged.pics, session.appName, false
+                        MediaCapsulePresenter.show(
+                            context = context,
+                            sourceId = sourceKey,
+                            title = merged.title,
+                            text = merged.text,
+                            appName = session.appName,
+                            picMap = merged.pics
                         )
                         Logger.d("RemoteMediaSessionManager", "已定时复传媒体会话: ${session.title} - ${session.text} (来自 ${device.displayName})")
                     }
                 } else {
-                    // 没有变化，但仍需更新浮窗，避免被自动移除
-                    // 直接调用showFloating更新浮窗时间戳
-                    com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.showFloating(
-                        context, sourceKey, session.title, session.text, buildMediaParamV2(session.title, session.text).toString(), currentPics, session.appName, false
+                    MediaCapsulePresenter.show(
+                        context = context,
+                        sourceId = sourceKey,
+                        title = session.title,
+                        text = session.text,
+                        appName = session.appName,
+                        picMap = currentPics
                     )
                     Logger.d("RemoteMediaSessionManager", "媒体会话无变化，但定时复传更新浮窗时间戳: ${session.title} - ${session.text} (来自 ${device.displayName})")
                 }
@@ -534,27 +551,4 @@ object RemoteMediaSessionManager {
         }
     }
     
-    /**
-     * 构建媒体会话的param_v2结构
-     */
-    private fun buildMediaParamV2(title: String, text: String): JSONObject {
-        val paramV2 = JSONObject()
-        // 添加business字段，标识为media类型
-        paramV2.put("business", "media")
-        val baseInfo = JSONObject()
-        baseInfo.put("title", title)
-        baseInfo.put("content", text)
-        paramV2.put("baseInfo", baseInfo)
-
-        // 布局信息
-        val island = JSONObject()
-        val bigIsland = JSONObject()
-        bigIsland.put("type", "media")
-        island.put("bigIslandArea", bigIsland)
-        paramV2.put("param_island", island)
-        
-        return paramV2
-    }
-
-
 }

@@ -15,7 +15,6 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import androidx.core.app.NotificationCompat
-import org.json.JSONObject
 import com.xzyht.notifyrelay.R
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
@@ -23,6 +22,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingl
 import com.xzyht.notifyrelay.feature.notification.backend.BackendLocalFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.LocalSuperIslandTracker
+import com.xzyht.notifyrelay.feature.notification.superisland.MediaCapsulePresenter
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.sync.MessageSender
@@ -344,43 +344,24 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             try {
                 Logger.i(TAG, "胶囊歌词开关开启，在本机内生成浮窗和通知: title='$finalTitle', text='$finalText'")
                 
-                // 构建图片映射
                 val picMap = mutableMapOf<String, String>()
                 if (!finalCoverUrl.isNullOrBlank()) {
-                    // 添加专辑图，同时添加应用图标键以确保图片能够正确传递
                     picMap["miui.focus.pic_cover"] = finalCoverUrl
                     picMap["miui.focus.pic_app_icon"] = finalCoverUrl
                 }
                 
-                // 创建媒体类型的paramV2Raw，确保触发超长后使用图标文本的功能
-                val paramV2Json = JSONObject()
-                paramV2Json.put("business", "media")
-                paramV2Json.put("protocol", 1)
-                paramV2Json.put("scene", "music")
-                paramV2Json.put("ticker", finalText)
-                paramV2Json.put("content", finalTitle)
-                paramV2Json.put("enableFloat", false)
-                paramV2Json.put("updatable", true)
-                paramV2Json.put("reopen", "close")
-                paramV2Json.put("localTransmit", true)
-                val paramV2Raw = paramV2Json.toString()
-                
-                // 调用 FloatingReplicaManager.showFloating 生成浮窗和通知
-                // 无论播放状态如何，都保持浮窗显示，避免UI变化频繁
                 val appName = getAppName(sbn.packageName)
-                FloatingReplicaManager.showFloating(
+                MediaCapsulePresenter.show(
                     context = applicationContext,
                     sourceId = sbnKey,
-                    title = finalTitle ,  
-                    text = finalText,  
-                    paramV2Raw = paramV2Raw,  // 添加媒体类型的paramV2Raw
-                    picMap = picMap,
-                    appName = appName
+                    title = finalTitle,
+                    text = finalText,
+                    appName = appName,
+                    picMap = picMap
                 )
             } catch (e: Exception) {
                 Logger.e(TAG, "在本机内生成浮窗和通知失败", e)
             }
-        } else {
         }
 
         // 检查状态是否变化，只在内容变化时发送
