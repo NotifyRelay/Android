@@ -146,8 +146,6 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                         System.currentTimeMillis(),
                         deviceManager
                     )
-                    // 清理媒体状态缓存
-                    mediaLastSentTimeByKey.remove(notificationKey)
                     // 更新全局最新媒体通知
                     if (latestMediaSbn?.key == sbn.key) {
                         latestMediaSbn = null
@@ -275,8 +273,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     // 记录本机转发过的超级岛特征ID，用于在移除时发送终止包
     private val superIslandFeatureByKey = ConcurrentHashMap<String, Pair<String, String>>() // sbnKey -> (superPkg, featureId)
 
-    // 媒体播放通知上次发送时间
-    private val mediaLastSentTimeByKey = ConcurrentHashMap<String, Long>()
+
 
     // MediaSession 监控服务实例
     private lateinit var mediaSessionMonitorService: MediaSessionMonitorService
@@ -354,26 +351,20 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        val now = System.currentTimeMillis()
-        val lastSentTime = mediaLastSentTimeByKey[sbnKey] ?: 0
-
-        if (lastSentTime == 0L || now - lastSentTime > 15 * 1000) {
-            try {
-                val appName = getAppName(sbn.packageName)
-                MessageSender.sendMediaPlayNotification(
-                    applicationContext,
-                    sbn.packageName,
-                    appName,
-                    finalTitle,
-                    finalText,
-                    finalCoverUrl,
-                    sbn.postTime,
-                    deviceManager
-                )
-                mediaLastSentTimeByKey[sbnKey] = now
-            } catch (e: Exception) {
-                Logger.e(TAG, "发送媒体播放消息失败", e)
-            }
+        try {
+            val appName = getAppName(sbn.packageName)
+            MessageSender.sendMediaPlayNotification(
+                applicationContext,
+                sbn.packageName,
+                appName,
+                finalTitle,
+                finalText,
+                finalCoverUrl,
+                sbn.postTime,
+                deviceManager
+            )
+        } catch (e: Exception) {
+            Logger.e(TAG, "发送媒体播放消息失败", e)
         }
     }
 

@@ -14,6 +14,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import github.xzynine.superislandui.common.SuperIslandProtocol
+import github.xzynine.superislandui.common.SuperIslandProtocol.PayloadOptions
 import github.xzynine.superislandui.diff.DiffSystem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -336,30 +337,8 @@ object MessageSender {
                 put("time", System.currentTimeMillis())
             }.toString()
 
-            // 将发送任务加入队列（带去重）
             allDevices.forEach { device ->
-                val dedupKey = buildDedupKey(device.uuid, json)
-                // 检查最近是否已发送过相同消息，避免短时间内重复
-                val lastSent = sentKeys[dedupKey]
-                if (lastSent != null && System.currentTimeMillis() - lastSent <= SENT_KEY_TTL_MS) {
-                    //Logger.d(TAG, "跳过已发送的重复聊天消息(短期内): ${device.displayName}")
-                    return@forEach
-                }
-                if (!pendingKeys.add(dedupKey)) {
-                    //Logger.d(TAG, "跳过重复聊天消息入队: ${device.displayName}")
-                    return@forEach
-                }
-                val task = SendTask(device, json, deviceManager, dedupKey = dedupKey)
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        sendChannel.send(task)
-                        //Logger.d(TAG, "聊天消息已加入发送队列: ${device.displayName}, 消息: $message")
-                    } catch (e: Exception) {
-                        // 入队失败时及时移除去重键
-                        pendingKeys.remove(dedupKey)
-                        Logger.e(TAG, "加入发送队列失败: ${device.displayName}", e)
-                    }
-                }
+                enqueueNotification(device, json, deviceManager, "聊天")
             }
 
             // 记录到聊天历史
@@ -377,6 +356,8 @@ object MessageSender {
      * 保持差异发送，仅在封面发生变化时发送包含封面的包，否则仅发送文本部分
      */
     private const val MEDIA_FULL_RESEND_INTERVAL_MS = 6_000L
+    private const val MEDIA_MIN_SEND_INTERVAL_MS = 3_000L
+    private val lastMediaSendTime = mutableMapOf<String, Long>() // deviceUuid -> last any media send
 
     fun sendMediaPlayNotification(
         context: Context,
@@ -415,45 +396,39 @@ object MessageSender {
                 )
                 if (!dd.needSend) return@forEach
 
+                val now = System.currentTimeMillis()
+                val lastSend = synchronized(lastMediaSendTime) { lastMediaSendTime[deviceInfo.uuid] ?: 0L }
+                if (now - lastSend < MEDIA_MIN_SEND_INTERVAL_MS) return@forEach
+                synchronized(lastMediaSendTime) { lastMediaSendTime[deviceInfo.uuid] = now }
+
                 val coverChanged = dd.diff.picsChanged.containsKey("miui.focus.pic_cover")
                 val effectiveType = if (coverChanged && dd.type != "FULL") "FULL" else dd.type
 
-                val payloadObj = JSONObject().apply {
-                    put("packageName", packageName)
-                    put("appName", appName ?: packageName)
-                    put("time", time)
-                    put("isLocked", isLocked)
-                    put("type", "MEDIA_PLAY")
-                    if (effectiveType == "FULL") {
-                        put("mediaType", "FULL")
-                        put("title", state.title ?: "")
-                        put("text", state.text ?: "")
-                        if (coverUrl != null) put("coverUrl", coverUrl)
-                    } else {
-                        put("mediaType", "DELTA")
-                        if (dd.diff.title != null) put("title", dd.diff.title)
-                        if (dd.diff.text != null) put("text", dd.diff.text)
-                    }
-                }
-
-                // 封面变化导致的 FULL 需手动记录全量发送时间
                 if (coverChanged && dd.type != "FULL") {
-                    val now = System.currentTimeMillis()
                     synchronized(fullSentTimePerDevice) {
                         fullSentTimePerDevice.getOrPut(deviceInfo.uuid) { mutableMapOf() }[featureId] = now
                     }
                 }
 
-                val json = payloadObj.toString()
-                val dedupKey = buildDedupKey(deviceInfo.uuid, json)
-                val lastSent = sentKeys[dedupKey]
-                if (lastSent != null && System.currentTimeMillis() - lastSent <= SENT_KEY_TTL_MS) return@forEach
-                if (!pendingKeys.add(dedupKey)) return@forEach
-
-                CoroutineScope(Dispatchers.IO).launch {
-                    try { sendChannel.send(SendTask(deviceInfo, json, deviceManager, dedupKey = dedupKey)) }
-                    catch (e: Exception) { pendingKeys.remove(dedupKey); Logger.e(TAG, "加入发送队列失败: ${deviceInfo.displayName}", e) }
+                val payloadObj = if (effectiveType == "FULL") {
+                    SuperIslandProtocol.buildPayload(
+                        packageName, appName, time, isLocked, state.toJson(),
+                        PayloadOptions.MEDIA_FULL.copy(
+                            extraFields = if (coverUrl != null) mapOf("coverUrl" to coverUrl) else emptyMap()
+                        )
+                    )
+                } else {
+                    val partialState = DiffSystem.State(
+                        title = dd.diff.title, text = dd.diff.text,
+                        paramV2Raw = null, pics = emptyMap()
+                    )
+                    SuperIslandProtocol.buildPayload(
+                        packageName, appName, time, isLocked, partialState.toJson(),
+                        PayloadOptions.MEDIA_DELTA
+                    )
                 }
+
+                enqueueNotification(deviceInfo, payloadObj.toString(), deviceManager, "媒体播放")
             }
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放通知失败", e)
@@ -464,6 +439,20 @@ object MessageSender {
      * 发送媒体播放结束包
      * 用于通知接收端关闭媒体会话超级岛
      */
+    private fun enqueueNotification(
+        deviceInfo: DeviceInfo, json: String, deviceManager: DeviceConnectionManager, tag: String = ""
+    ): Boolean {
+        val dedupKey = buildDedupKey(deviceInfo.uuid, json)
+        val lastSent = sentKeys[dedupKey]
+        if (lastSent != null && System.currentTimeMillis() - lastSent <= SENT_KEY_TTL_MS) return false
+        if (!pendingKeys.add(dedupKey)) return false
+        CoroutineScope(Dispatchers.IO).launch {
+            try { sendChannel.send(SendTask(deviceInfo, json, deviceManager, dedupKey = dedupKey)) }
+            catch (e: Exception) { pendingKeys.remove(dedupKey); Logger.e(TAG, "加入${tag}发送队列失败: ${deviceInfo.displayName}", e) }
+        }
+        return true
+    }
+
     fun sendMediaPlayEndNotification(
         context: Context,
         packageName: String,
@@ -479,17 +468,10 @@ object MessageSender {
             }
 
             val isLocked = PermissionHelper.isDeviceLocked(context)
-            val payload = JSONObject().apply {
-                put("packageName", packageName)
-                put("appName", appName ?: packageName)
-                put("time", time)
-                put("isLocked", isLocked)
-                put("type", "MEDIA_PLAY")
-                put("mediaType", "END")
-                put("terminateValue", "__END__")
-                put("featureKeyName", "si_feature_id")
-                put("featureKeyValue", "media_global")
-            }.toString()
+            val payload = SuperIslandProtocol.buildPayload(
+                packageName, appName, time, isLocked, JSONObject(),
+                PayloadOptions.MEDIA_END
+            ).toString()
 
             authenticatedDevices.forEach { deviceInfo ->
                 synchronized(lastStatePerDevice) {
@@ -498,15 +480,7 @@ object MessageSender {
                 synchronized(fullSentTimePerDevice) {
                     fullSentTimePerDevice[deviceInfo.uuid]?.remove("media_global")
                 }
-
-                val dedupKey = buildDedupKey(deviceInfo.uuid, payload)
-                val lastSent = sentKeys[dedupKey]
-                if (lastSent != null && System.currentTimeMillis() - lastSent <= SENT_KEY_TTL_MS) return@forEach
-                if (!pendingKeys.add(dedupKey)) return@forEach
-                CoroutineScope(Dispatchers.IO).launch {
-                    try { sendChannel.send(SendTask(deviceInfo, payload, deviceManager, dedupKey = dedupKey)) }
-                    catch (e: Exception) { pendingKeys.remove(dedupKey); Logger.e(TAG, "加入媒体结束发送队列失败: ${deviceInfo.displayName}", e) }
-                }
+                enqueueNotification(deviceInfo, payload, deviceManager, "媒体结束")
             }
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放结束通知失败", e)
@@ -553,30 +527,8 @@ object MessageSender {
                 put("isLocked", isLocked)
             }.toString()
 
-            // 将发送任务加入队列（带去重）
             authenticatedDevices.forEach { deviceInfo ->
-                val dedupKey = buildDedupKey(deviceInfo.uuid, json)
-                // 检查是否正在等待发送或最近已发送过
-                val lastSent = sentKeys[dedupKey]
-                if (lastSent != null && System.currentTimeMillis() - lastSent <= SENT_KEY_TTL_MS) {
-                    //Logger.d(TAG, "跳过已发送的重复通知(短期内): ${deviceInfo.displayName}")
-                    return@forEach
-                }
-                if (!pendingKeys.add(dedupKey)) {
-                    //Logger.d(TAG, "跳过重复通知入队: ${deviceInfo.displayName}")
-                    return@forEach
-                }
-                val task = SendTask(deviceInfo, json, deviceManager, dedupKey = dedupKey)
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        sendChannel.send(task)
-                        //Logger.d(TAG, "通知已加入发送队列: ${deviceInfo.displayName}")
-                    } catch (e: Exception) {
-                        // 入队失败时及时移除去重键
-                        pendingKeys.remove(dedupKey)
-                        Logger.e(TAG, "加入发送队列失败: ${deviceInfo.displayName}", e)
-                    }
-                }
+                enqueueNotification(deviceInfo, json, deviceManager, "通知")
             }
 
             Logger.i(TAG, "通知已加入队列，共 ${authenticatedDevices.size} 个设备，当前活跃发送: ${activeSends.get()}")

@@ -227,25 +227,9 @@ object RemoteMediaSessionManager {
             cleanupTimeoutSessions(context)
             setupResendTask(context, device.uuid, currentSession!!, device)
 
-            val lastState = SuperIslandRemoteStore.getState(sourceKey)
-            val currentPics = mutableMapOf<String, String>()
-            lastState?.pics?.let { currentPics.putAll(it) }
-            if (coverUrl != null) {
-                currentPics["miui.focus.pic_cover"] = coverUrl
-            }
-            val currentState = DiffSystem.State(
-                title = finalTitle,
-                text = finalText,
-                paramV2Raw = MediaCapsulePresenter.buildParamV2(finalTitle, finalText),
-                pics = currentPics
+            val (currentState, payload) = buildMediaState(
+                sourceKey, finalTitle, finalText, coverUrl, packageName, appName, timestamp
             )
-
-            val payload = JSONObject().apply {
-                put("packageName", packageName)
-                put("appName", appName ?: packageName)
-                put("time", timestamp)
-            }
-
             applyMediaSessionState(sourceKey, currentState, payload, appName, context)
 
             Logger.i("RemoteMediaSessionManager", "更新远端媒体会话: $title - $text (来自 ${device.displayName})")
@@ -372,6 +356,25 @@ object RemoteMediaSessionManager {
         }
     }
     
+    // 统一构建媒体状态与基础 payload（消除 onMediaMessageReceived / setupResendTask 间的重复）
+    private fun buildMediaState(
+        sourceKey: String, title: String, text: String, coverUrl: String?,
+        packageName: String, appName: String?, timestamp: Long
+    ): Pair<DiffSystem.State, JSONObject> {
+        val lastState = SuperIslandRemoteStore.getState(sourceKey)
+        val currentPics = mutableMapOf<String, String>()
+        lastState?.pics?.let { currentPics.putAll(it) }
+        if (coverUrl != null) currentPics["miui.focus.pic_cover"] = coverUrl
+        val state = DiffSystem.State(title, text,
+            MediaCapsulePresenter.buildParamV2(title, text), currentPics)
+        val payload = JSONObject().apply {
+            put("packageName", packageName)
+            put("appName", appName ?: packageName)
+            put("time", timestamp)
+        }
+        return state to payload
+    }
+
     // 统一处理媒体会话的差异合并与浮窗更新
     private fun applyMediaSessionState(
         sourceKey: String,
@@ -439,24 +442,10 @@ object RemoteMediaSessionManager {
                 }
 
                 val sourceKey = SOURCE_KEY_PREFIX + "_" + deviceUuid
-                val lastState = SuperIslandRemoteStore.getState(sourceKey)
-                val currentPics = mutableMapOf<String, String>()
-                lastState?.pics?.let { currentPics.putAll(it) }
-                session.coverUrl?.let { currentPics["miui.focus.pic_cover"] = it }
-
-                val currentState = DiffSystem.State(
-                    title = session.title,
-                    text = session.text,
-                    paramV2Raw = MediaCapsulePresenter.buildParamV2(session.title, session.text),
-                    pics = currentPics
+                val (currentState, payload) = buildMediaState(
+                    sourceKey, session.title, session.text, session.coverUrl,
+                    session.packageName, session.appName, System.currentTimeMillis()
                 )
-
-                val payload = JSONObject().apply {
-                    put("packageName", session.packageName)
-                    put("appName", session.appName ?: session.packageName)
-                    put("time", System.currentTimeMillis())
-                }
-
                 applyMediaSessionState(sourceKey, currentState, payload, session.appName, context)
 
                 setupResendTask(context, deviceUuid, session, device)

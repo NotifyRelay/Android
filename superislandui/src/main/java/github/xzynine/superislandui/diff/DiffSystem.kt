@@ -13,8 +13,8 @@ object DiffSystem {
         val pics: Map<String, String>
     ) {
         fun toJson(): JSONObject = JSONObject().apply {
-            put("title", title ?: "")
-            put("text", text ?: "")
+            if (!title.isNullOrBlank()) put("title", title)
+            if (!text.isNullOrBlank()) put("text", text)
             if (!paramV2Raw.isNullOrBlank()) put("param_v2_raw", paramV2Raw)
             if (pics.isNotEmpty()) put("pics", JSONObject(pics))
         }

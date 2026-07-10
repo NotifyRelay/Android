@@ -2,13 +2,14 @@ package com.xzyht.notifyrelay.feature.notification.superisland
 import github.xzynine.superislandui.common.SuperIslandProtocol
 import github.xzynine.superislandui.diff.DiffSystem
 import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 接收端超级岛远端状态存储与差异合并。
  * key使用 sourceId（通常为 "superisland:pkg|featureId"）。
  */
 object SuperIslandRemoteStore {
-    private val store = mutableMapOf<String, DiffSystem.State>()
+    private val store = ConcurrentHashMap<String, DiffSystem.State>()
 
     @Synchronized
     fun applyIncoming(sourceId: String, payload: JSONObject): DiffSystem.State? {
@@ -73,7 +74,6 @@ object SuperIslandRemoteStore {
     /**
      * 精确移除指定的 sourceId（如果存在），返回是否成功移除。
      */
-    @Synchronized
     fun removeExact(sourceId: String): Boolean {
         return try {
             store.remove(sourceId) != null
@@ -85,7 +85,6 @@ object SuperIslandRemoteStore {
     /**
      * 获取指定sourceId的状态，用于外部查询当前状态
      */
-    @Synchronized
     fun getState(sourceId: String): DiffSystem.State? {
         return try {
             store[sourceId]
