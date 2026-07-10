@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.superisland
 import github.xzynine.superislandui.common.SuperIslandProtocol
+import github.xzynine.superislandui.diff.DiffSystem
 import org.json.JSONObject
 
 /**
@@ -7,10 +8,10 @@ import org.json.JSONObject
  * key使用 sourceId（通常为 "superisland:pkg|featureId"）。
  */
 object SuperIslandRemoteStore {
-    private val store = mutableMapOf<String, SuperIslandProtocol.State>()
+    private val store = mutableMapOf<String, DiffSystem.State>()
 
     @Synchronized
-    fun applyIncoming(sourceId: String, payload: JSONObject): SuperIslandProtocol.State? {
+    fun applyIncoming(sourceId: String, payload: JSONObject): DiffSystem.State? {
         // 兼容：不再依赖 payload 内的 type/featureKey 字段，改为根据字段自动推断
         return try {
             // 结束包标识：存在 terminateValue 且等于约定值
@@ -85,7 +86,7 @@ object SuperIslandRemoteStore {
      * 获取指定sourceId的状态，用于外部查询当前状态
      */
     @Synchronized
-    fun getState(sourceId: String): SuperIslandProtocol.State? {
+    fun getState(sourceId: String): DiffSystem.State? {
         return try {
             store[sourceId]
         } catch (_: Exception) {
@@ -93,7 +94,7 @@ object SuperIslandRemoteStore {
         }
     }
 
-    private fun parseStateFromFull(obj: JSONObject): SuperIslandProtocol.State {
+    private fun parseStateFromFull(obj: JSONObject): DiffSystem.State {
         val title = obj.optString("title", "").takeIf { it.isNotEmpty() }
         val text = obj.optString("text", "").takeIf { it.isNotEmpty() }
         val p2 = obj.optString("param_v2_raw", "").takeIf { it.isNotEmpty() }
@@ -107,10 +108,10 @@ object SuperIslandRemoteStore {
                 if (!v.isNullOrEmpty()) picsMap[k] = v
             }
         }
-        return SuperIslandProtocol.State(title, text, p2, picsMap)
+        return DiffSystem.State(title, text, p2, picsMap)
     }
 
-    private fun applyDelta(old: SuperIslandProtocol.State?, diffObj: JSONObject?): SuperIslandProtocol.State? {
+    private fun applyDelta(old: DiffSystem.State?, diffObj: JSONObject?): DiffSystem.State? {
         if (diffObj == null) return old
         var title = old?.title
         var text = old?.text
@@ -137,6 +138,6 @@ object SuperIslandRemoteStore {
                 if (!k.isNullOrEmpty()) pics.remove(k)
             }
         }
-        return SuperIslandProtocol.State(title, text, p2, pics)
+        return DiffSystem.State(title, text, p2, pics)
     }
 }

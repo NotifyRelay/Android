@@ -147,7 +147,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                         deviceManager
                     )
                     // 清理媒体状态缓存
-                    mediaPlayStateByKey.remove(notificationKey)
+                    mediaLastSentTimeByKey.remove(notificationKey)
                     // 更新全局最新媒体通知
                     if (latestMediaSbn?.key == sbn.key) {
                         latestMediaSbn = null
@@ -275,21 +275,11 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     // 记录本机转发过的超级岛特征ID，用于在移除时发送终止包
     private val superIslandFeatureByKey = ConcurrentHashMap<String, Pair<String, String>>() // sbnKey -> (superPkg, featureId)
 
-    // 媒体播放通知状态管理：使用sbn.key作为会话键，跟踪每个媒体通知的状态
-    private val mediaPlayStateByKey = ConcurrentHashMap<String, MediaPlayState>()
+    // 媒体播放通知上次发送时间
+    private val mediaLastSentTimeByKey = ConcurrentHashMap<String, Long>()
 
     // MediaSession 监控服务实例
     private lateinit var mediaSessionMonitorService: MediaSessionMonitorService
-
-    // 媒体播放状态数据类
-    data class MediaPlayState(
-        val title: String,
-        val text: String,
-        val packageName: String,
-        val postTime: Long,
-        val coverUrl: String? = null,
-        val sentTime: Long = System.currentTimeMillis() // 添加发送时间戳
-    )
 
     // 使用通用工具将 Drawable 转换为 Bitmap（参照项目中其他模块的实现）
 
@@ -364,25 +354,12 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             }
         }
 
-        // 检查状态是否变化，只在内容变化时发送
-        val currentState = MediaPlayState(finalTitle, finalText, sbn.packageName, sbn.postTime, finalCoverUrl)
-        val lastState = mediaPlayStateByKey[sbnKey]
-
-        // 发送条件：状态变化 或 距离上次发送超过15秒
         val now = System.currentTimeMillis()
-        val sendRequired = lastState == null ||
-                          lastState.title != currentState.title ||
-                          lastState.text != currentState.text ||
-                          lastState.coverUrl != currentState.coverUrl ||
-                          (now - lastState.sentTime > 15 * 1000) // 超过15秒未发送
+        val lastSentTime = mediaLastSentTimeByKey[sbnKey] ?: 0
 
-        if (sendRequired) {
-            // 状态变化或超时，发送消息
-
+        if (lastSentTime == 0L || now - lastSentTime > 15 * 1000) {
             try {
                 val appName = getAppName(sbn.packageName)
-
-                // 使用专门的协议前缀标记媒体通知,使用报文头（"type":"MEDIA_PLAY"）判断媒体消息
                 MessageSender.sendMediaPlayNotification(
                     applicationContext,
                     sbn.packageName,
@@ -393,13 +370,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     sbn.postTime,
                     deviceManager
                 )
-
-                // 更新状态缓存，包含发送时间
-                mediaPlayStateByKey[sbnKey] = currentState.copy(sentTime = now)
+                mediaLastSentTimeByKey[sbnKey] = now
             } catch (e: Exception) {
                 Logger.e(TAG, "发送媒体播放消息失败", e)
             }
-        } else {
         }
     }
 

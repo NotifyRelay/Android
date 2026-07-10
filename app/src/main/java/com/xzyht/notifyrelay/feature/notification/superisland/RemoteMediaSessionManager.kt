@@ -9,6 +9,7 @@ import notifyrelay.data.StorageManager.getBoolean
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import github.xzynine.superislandui.common.SuperIslandProtocol
+import github.xzynine.superislandui.diff.DiffSystem
 import github.xzynine.superislandui.model.components.MediaSessionData
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
@@ -177,21 +178,18 @@ object RemoteMediaSessionManager {
         }
 
         try {
-            // 检查是否为结束包
             val mediaType = json.optString("mediaType", "")
             val terminateValue = json.optString("terminateValue", "")
             val isEndPackage = mediaType.equals("END", true) || terminateValue.equals("__END__", true)
-            
+
             val sourceKey = SOURCE_KEY_PREFIX + "_" + device.uuid
-            
+
             if (isEndPackage) {
-                // 处理结束包
                 Logger.i("RemoteMediaSessionManager", "收到媒体会话结束包，关闭浮窗: ${device.displayName}")
                 closeSessionForDevice(device, "收到结束包")
                 return
             }
-            
-            // 处理普通媒体消息
+
             val packageName = json.optString("packageName", "")
             val appName = json.optString("appName", "")
             val title = json.optString("title", "")
@@ -199,17 +197,15 @@ object RemoteMediaSessionManager {
             val coverUrl = json.optString("coverUrl", "")
             val timestamp = json.optLong("time", System.currentTimeMillis())
 
-            // 即使标题和文本为空，也继续处理，保持浮窗活跃
             if (title.isBlank() && text.isBlank()) {
                 Logger.w("RemoteMediaSessionManager", "收到空的媒体会话数据，继续处理以保持浮窗活跃")
             }
 
-            // 保留旧的会话数据
             val oldSession = mediaSessionCache[device.uuid]?.session
             val finalTitle = title.ifBlank { oldSession?.title ?: "" }
             val finalText = text.ifBlank { oldSession?.text ?: "" }
             val finalCoverUrl = coverUrl ?: oldSession?.coverUrl
-            
+
             currentSession = MediaSessionData(
                 packageName = packageName,
                 appName = appName,
@@ -221,103 +217,38 @@ object RemoteMediaSessionManager {
             )
             currentDevice = device
 
-            // 获取上次状态，计算差异
             val lastFeatureId = mediaFeatureIdCache[device.uuid]
             val currentFeatureId = SuperIslandProtocol.computeFeatureId(
                 packageName, null, title, text
             )
-            val isFirst = lastFeatureId == null
-            val isSameSession = lastFeatureId == currentFeatureId
 
-            // 更新特征ID缓存和最后更新时间
             mediaFeatureIdCache[device.uuid] = currentFeatureId
             mediaLastUpdateTime[device.uuid] = System.currentTimeMillis()
-            
-            // 检查并清理超时会话
             cleanupTimeoutSessions(context)
-            
-            // 创建或更新定时复传任务
             setupResendTask(context, device.uuid, currentSession!!, device)
 
-            // 获取上次状态，用于保留旧的图标
             val lastState = SuperIslandRemoteStore.getState(sourceKey)
-            
-            // 构建当前状态，保留旧的图标和文本
             val currentPics = mutableMapOf<String, String>()
-            // 保留旧的图标
             lastState?.pics?.let { currentPics.putAll(it) }
-            // 如果新消息中有图标，更新图标
             if (coverUrl != null) {
                 currentPics["miui.focus.pic_cover"] = coverUrl
             }
-            val currentState = SuperIslandProtocol.State(
+            val currentState = DiffSystem.State(
                 title = finalTitle,
                 text = finalText,
                 paramV2Raw = MediaCapsulePresenter.buildParamV2(finalTitle, finalText),
                 pics = currentPics
             )
-            
-            // 构建payload
+
             val payload = JSONObject().apply {
                 put("packageName", packageName)
                 put("appName", appName ?: packageName)
                 put("time", timestamp)
             }
-            
-            // 计算差异
-            val diff = SuperIslandProtocol.diff(lastState, currentState)
-            
-            var merged: SuperIslandProtocol.State?
-            
-            if (diff.isEmpty()) {
-                // 没有变化，但仍需更新浮窗，避免被自动移除
-                // 直接调用showFloating更新浮窗时间戳
-                MediaCapsulePresenter.show(
-                    context = context,
-                    sourceId = sourceKey,
-                    title = finalTitle,
-                    text = finalText,
-                    appName = appName,
-                    picMap = currentPics
-                )
-                Logger.i("RemoteMediaSessionManager", "媒体会话无变化，但更新浮窗时间戳: $title - $text (来自 ${device.displayName})")
-                return
-            } else if (lastState != null) {
-                // 差异包
-                payload.put("changes", diff.toJson())
-                merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
-            } else {
-                // 全量包
-                payload.put("title", finalTitle)
-                payload.put("text", finalText)
-                payload.put("param_v2_raw", MediaCapsulePresenter.buildParamV2(finalTitle, finalText))
-                if (currentPics.isNotEmpty()) {
-                    payload.put("pics", JSONObject(currentPics))
-                }
-                merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
-            }
-            
-            if (merged != null) {
-                // 有内容需要展示，更新浮窗
-                val pics = merged.pics
-                val paramV2 = merged.paramV2Raw
 
-                // 调用超级岛浮窗显示
-                MediaCapsulePresenter.show(
-                    context = context,
-                    sourceId = sourceKey,
-                    title = merged.title,
-                    text = merged.text,
-                    appName = appName,
-                    picMap = pics
-                )
+            applyMediaSessionState(sourceKey, currentState, payload, appName, context)
 
-                Logger.i("RemoteMediaSessionManager", "更新远端媒体会话: $title - $text (来自 ${device.displayName}, isFirst=$isFirst)")
-            } else {
-                // 结束包，关闭浮窗
-                com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.dismissBySource(sourceKey)
-                Logger.i("RemoteMediaSessionManager", "关闭远端媒体会话浮窗: $title (来自 ${device.displayName})")
-            }
+            Logger.i("RemoteMediaSessionManager", "更新远端媒体会话: $title - $text (来自 ${device.displayName})")
         } catch (e: Exception) {
             Logger.e("RemoteMediaSessionManager", "处理远端媒体消息失败", e)
         }
@@ -441,103 +372,102 @@ object RemoteMediaSessionManager {
         }
     }
     
+    // 统一处理媒体会话的差异合并与浮窗更新
+    private fun applyMediaSessionState(
+        sourceKey: String,
+        currentState: DiffSystem.State,
+        basePayload: JSONObject,
+        appName: String?,
+        context: Context
+    ) {
+        val lastState = SuperIslandRemoteStore.getState(sourceKey)
+        val diff = DiffSystem.diff(lastState, currentState)
+
+        if (diff.isEmpty()) {
+            MediaCapsulePresenter.show(
+                context = context,
+                sourceId = sourceKey,
+                title = currentState.title ?: "",
+                text = currentState.text ?: "",
+                appName = appName,
+                picMap = currentState.pics
+            )
+            return
+        }
+
+        val payload = JSONObject(basePayload.toString())
+        if (lastState != null) {
+            payload.put("changes", diff.toJson())
+        } else {
+            payload.put("title", currentState.title ?: "")
+            payload.put("text", currentState.text ?: "")
+            if (!currentState.paramV2Raw.isNullOrBlank()) {
+                payload.put("param_v2_raw", currentState.paramV2Raw)
+            }
+            if (currentState.pics.isNotEmpty()) {
+                payload.put("pics", JSONObject(currentState.pics))
+            }
+        }
+
+        val merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
+        if (merged != null) {
+            MediaCapsulePresenter.show(
+                context = context,
+                sourceId = sourceKey,
+                title = merged.title,
+                text = merged.text,
+                appName = appName,
+                picMap = merged.pics
+            )
+        } else {
+            com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.dismissBySource(sourceKey)
+        }
+    }
+
     /**
      * 创建或更新定时复传任务
      */
     private fun setupResendTask(context: Context, deviceUuid: String, session: MediaSessionData, device: DeviceInfo) {
-        // 取消已存在的复传任务
         cancelResendTask(deviceUuid)
-        
-        // 创建新的复传任务
+
         val resendRunnable = Runnable {
             try {
-                // 获取原始的最后更新时间，不再更新它
                 val originalLastUpdateTime = mediaLastUpdateTime[deviceUuid] ?: System.currentTimeMillis()
-                val currentTime = System.currentTimeMillis()
-                
-                // 检查是否已接近超时（比正常超时时间少1秒）
-                if (currentTime - originalLastUpdateTime > (MEDIA_SESSION_TIMEOUT_MS - 1000)) {
-                    // 已接近超时，不再安排下一次复传
+                if (System.currentTimeMillis() - originalLastUpdateTime > (MEDIA_SESSION_TIMEOUT_MS - 1000)) {
                     Logger.i("RemoteMediaSessionManager", "媒体会话已接近超时，停止复传: $deviceUuid")
                     return@Runnable
                 }
-                
-                // 获取上次状态，用于保留旧的图标
+
                 val sourceKey = SOURCE_KEY_PREFIX + "_" + deviceUuid
                 val lastState = SuperIslandRemoteStore.getState(sourceKey)
-                
-                // 构建当前状态，保留旧的图标
                 val currentPics = mutableMapOf<String, String>()
-                // 保留旧的图标
                 lastState?.pics?.let { currentPics.putAll(it) }
-                // 如果会话中有图标，使用会话中的图标
-                val coverUrl = session.coverUrl
-                if (coverUrl != null) {
-                    currentPics["miui.focus.pic_cover"] = coverUrl
-                }
-                val currentState = SuperIslandProtocol.State(
+                session.coverUrl?.let { currentPics["miui.focus.pic_cover"] = it }
+
+                val currentState = DiffSystem.State(
                     title = session.title,
                     text = session.text,
                     paramV2Raw = MediaCapsulePresenter.buildParamV2(session.title, session.text),
                     pics = currentPics
                 )
-                
-                // 构建payload
+
                 val payload = JSONObject().apply {
                     put("packageName", session.packageName)
                     put("appName", session.appName ?: session.packageName)
                     put("time", System.currentTimeMillis())
                 }
-                
-                // 计算差异
-                val diff = SuperIslandProtocol.diff(lastState, currentState)
-                
-                var merged: SuperIslandProtocol.State?
-                
-                if (!diff.isEmpty()) {
-                    // 有变化，发送差异包
-                    payload.put("changes", diff.toJson())
-                    merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
-                    
-                    if (merged != null) {
-                        MediaCapsulePresenter.show(
-                            context = context,
-                            sourceId = sourceKey,
-                            title = merged.title,
-                            text = merged.text,
-                            appName = session.appName,
-                            picMap = merged.pics
-                        )
-                        Logger.d("RemoteMediaSessionManager", "已定时复传媒体会话: ${session.title} - ${session.text} (来自 ${device.displayName})")
-                    }
-                } else {
-                    MediaCapsulePresenter.show(
-                        context = context,
-                        sourceId = sourceKey,
-                        title = session.title,
-                        text = session.text,
-                        appName = session.appName,
-                        picMap = currentPics
-                    )
-                    Logger.d("RemoteMediaSessionManager", "媒体会话无变化，但定时复传更新浮窗时间戳: ${session.title} - ${session.text} (来自 ${device.displayName})")
-                }
-                
-                // 重新安排下一次复传
+
+                applyMediaSessionState(sourceKey, currentState, payload, session.appName, context)
+
                 setupResendTask(context, deviceUuid, session, device)
             } catch (e: Exception) {
                 Logger.e("RemoteMediaSessionManager", "定时复传媒体会话失败: $deviceUuid", e)
             }
         }
-        
-        // 安排第一次复传
+
         handler.postDelayed(resendRunnable, MEDIA_SESSION_RESEND_INTERVAL_MS)
-        
-        // 缓存复传任务
         mediaSessionCache[deviceUuid] = MediaSessionCacheData(
-            context = context,
-            session = session,
-            device = device,
-            resendRunnable = resendRunnable
+            context = context, session = session, device = device, resendRunnable = resendRunnable
         )
     }
     
