@@ -279,6 +279,12 @@ object FloatingReplicaManager {
     // 保存已经关闭过的 sourceId，避免重复关闭
     private val closedSourceIds = ConcurrentHashMap<String, Long>()
     
+    // 检查指定 sourceId 是否在 30 秒内被关闭过
+    fun isSourceRecentlyClosed(sourceId: String): Boolean {
+        val lastClosed = closedSourceIds[sourceId]
+        return lastClosed != null && (System.currentTimeMillis() - lastClosed) < 30_000L
+    }
+    
     // 保存超时任务，确保每个sourceId只有一个活动的超时任务
     private val timeoutJobs = ConcurrentHashMap<String, Job>()
     
@@ -304,19 +310,26 @@ object FloatingReplicaManager {
         // 保存应用上下文，用于后续关闭通知
         appContext = context.applicationContext
         
-        // 清理这个 sourceId 的关闭记录，允许它再次显示
-        closedSourceIds.remove(sourceId)
-        Logger.i(TAG, "showFloating: 清理 sourceId=$sourceId 的关闭记录")
-        
+        // 检查最近是否被关闭过
+        val now = System.currentTimeMillis()
+        val lastClosed = closedSourceIds[sourceId]
+        val isRecentlyClosed = lastClosed != null && (now - lastClosed) < 30_000L
+
         // 检查浮窗功能是否开启
         if (isFloatingWindowEnabled(context)) {
+            closedSourceIds.remove(sourceId)
             // 浮窗功能开启，创建浮窗并发送通知
             showFloatingInternal(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked, false)
+        } else if (isRecentlyClosed && SuperislandListManager.containsSourceId(sourceId)) {
+            Logger.i(TAG, "超级岛: sourceId=$sourceId 在30秒内被关闭过且条目仍在列表中，跳过展示")
+            return
         } else if (SuperIslandConfigUtils.isNotificationListMode(context)) {
+            closedSourceIds.remove(sourceId)
             // 列表模式：入列表，按需切换激活条目
             Logger.i(TAG, "超级岛: 列表模式, sourceId=$sourceId")
             showFloatingListMode(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked)
         } else {
+            closedSourceIds.remove(sourceId)
             // 浮窗功能关闭，仅发送通知，不创建浮窗
             Logger.i(TAG, "超级岛: 浮窗功能已关闭，仅创建通知, sourceId=$sourceId")
             
@@ -438,12 +451,16 @@ object FloatingReplicaManager {
         // 只在此条目是激活项时才发送通知
         if (active != null && active.sourceId == sourceId) {
             sendListModeNotification(context, active)
+        } else {
         }
     }
 
     private fun sendListModeNotification(context: Context, entry: SuperislandListManager.ListEntry) {
         kotlinx.coroutines.CoroutineScope(kotlinx.coroutines.Dispatchers.Main).launch {
             runWithErrorHandlingSuspend("发送列表模式通知") {
+                if (SuperislandListManager.getActive()?.sourceId != entry.sourceId) {
+                    return@runWithErrorHandlingSuspend
+                }
                 val internedPicMap = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
                     SuperIslandImageStore.internAll(context, entry.sourceId, entry.picMap)
                 }
@@ -457,6 +474,9 @@ object FloatingReplicaManager {
                 val displayText = entry.text?.takeIf { it.isNotBlank() }
                     ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
                     ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
+                if (SuperislandListManager.getActive()?.sourceId != entry.sourceId) {
+                    return@runWithErrorHandlingSuspend
+                }
                 val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
                 if (isProgressType && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.BAKLAVA) {
                     LiveUpdatesNotificationManager.initialize(context)
@@ -770,10 +790,33 @@ object FloatingReplicaManager {
         runWithErrorHandling("根据通知ID关闭浮窗条目") {
             val ctx = appContext ?: return@runWithErrorHandling
             
+            // 查找并停止滚动更新，防止 scroll Runnable 重新发布通知
+            var sourceIdToStop: String? = null
+            for ((sourceId, notificationIds) in sourceIdToNotificationIds) {
+                if (notificationIds.contains(notificationId)) {
+                    sourceIdToStop = sourceId
+                    break
+                }
+            }
+            if (sourceIdToStop == null) {
+                val entryKey = entryKeyToNotificationId.entries.find { it.value == notificationId }?.key
+                if (entryKey != null) {
+                    for ((sourceId, keys) in sourceIdToEntryKeyMap) {
+                        if (keys.contains(entryKey)) {
+                            sourceIdToStop = sourceId
+                            break
+                        }
+                    }
+                }
+            }
+            if (sourceIdToStop != null) {
+                NotificationGenerator.stopScrollUpdate(sourceIdToStop)
+                Logger.i(TAG, "超级岛: 关闭通知时停止滚动更新, sourceId=$sourceIdToStop, notificationId=$notificationId")
+            }
+            
             // 列表模式：只在通知ID是列表模式固定ID时处理
             if (!isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
                 if (notificationId == LIST_MODE_NOTIFICATION_ID) {
-                    Logger.i(TAG, "超级岛: 列表模式关闭通知，notificationId=$notificationId")
                     val active = SuperislandListManager.getActive()
                     if (active != null) {
                         val next = SuperislandListManager.remove(active.sourceId)
@@ -783,6 +826,7 @@ object FloatingReplicaManager {
                             val nm = ctx.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                             nm.cancel(LIST_MODE_NOTIFICATION_ID)
                         }
+                    } else {
                     }
                 } else {
                     // 非列表ID通知走普通关闭路径
@@ -798,31 +842,10 @@ object FloatingReplicaManager {
                 // 浮窗功能已关闭，直接关闭通知，不处理浮窗
                 Logger.i(TAG, "超级岛: 浮窗功能已关闭，直接关闭通知，notificationId=$notificationId")
                 
-                // 清理相关的超时任务
-                var sourceIdToClean: String? = null
-                // 从sourceIdToNotificationIds映射中查找对应的sourceId
-                for ((sourceId, notificationIds) in sourceIdToNotificationIds) {
-                    if (notificationIds.contains(notificationId)) {
-                        sourceIdToClean = sourceId
-                        break
-                    }
-                }
-                // 如果找不到，尝试从entryKeyToNotificationId映射中查找entryKey，然后从sourceIdToEntryKeyMap查找sourceId
-                if (sourceIdToClean == null) {
-                    val entryKey = entryKeyToNotificationId.entries.find { it.value == notificationId }?.key
-                    if (entryKey != null) {
-                        for ((sourceId, keys) in sourceIdToEntryKeyMap) {
-                            if (keys.contains(entryKey)) {
-                                sourceIdToClean = sourceId
-                                break
-                            }
-                        }
-                    }
-                }
-                
-                if (sourceIdToClean != null) {
-                    timeoutJobs.remove(sourceIdToClean)?.cancel()
-                    Logger.i(TAG, "超级岛: 清理超时任务, sourceId=$sourceIdToClean, notificationId=$notificationId")
+                // 清理相关的超时任务（重用已查找到的 sourceIdToStop）
+                if (sourceIdToStop != null) {
+                    timeoutJobs.remove(sourceIdToStop)?.cancel()
+                    Logger.i(TAG, "超级岛: 清理超时任务, sourceId=$sourceIdToStop, notificationId=$notificationId")
                 }
                 
                 val context = appContext ?: return@runWithErrorHandling
@@ -890,15 +913,21 @@ object FloatingReplicaManager {
                 return@runWithErrorHandling
             }
             
+            // ★ 先记录关闭时间，防止并发线程在正式移除前就触发 showFloating
+            closedSourceIds[sourceId] = now
+            
             // 清理超时任务
             timeoutJobs.remove(sourceId)?.cancel()
             Logger.i(TAG, "dismissBySourceInternal: 清理超时任务, sourceId=$sourceId")
+            
+            // 停止滚动更新，防止 scroll Runnable 重新发布通知
+            NotificationGenerator.stopScrollUpdate(sourceId)
+            Logger.i(TAG, "dismissBySourceInternal: 已停止滚动更新, sourceId=$sourceId")
             
             // 列表模式：从列表中移除，按需切换到下一条或取消通知
             val ctx = appContext
             if (ctx != null && !isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
                 dismissFromList(ctx, sourceId)
-                closedSourceIds[sourceId] = System.currentTimeMillis()
                 if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
                     blockedInstanceIds.remove(sourceId)
                 }
@@ -1014,10 +1043,6 @@ object FloatingReplicaManager {
                     entryKeyToNotificationId.remove(entryKey)
                 }
             }
-            
-            // 记录这个 sourceId 已经关闭过，避免重复关闭
-            closedSourceIds[sourceId] = System.currentTimeMillis()
-            Logger.i(TAG, "dismissBySourceInternal: 记录 sourceId=$sourceId 已关闭，时间=${closedSourceIds[sourceId]}")
             
             // 如果对应的会话结束（SI_END），同步移除黑名单，允许后续同一通知重新展示
             // 只有在 REMOTE 或 TIMEOUT 移除时才移除黑名单（因为 MANUAL 会加黑名单）

@@ -1,5 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.superisland
 
+import notifyrelay.base.util.Logger
+
 /**
  * 超级岛通知列表管理器。
  * 在平板列表模式下维护所有待切换的通知条目，管理激活切换和 media 优先级。
@@ -86,7 +88,10 @@ object SuperislandListManager {
     @Synchronized
     fun remove(sourceId: String): ListEntry? {
         val idx = entries.indexOfFirst { it.sourceId == sourceId }
-        if (idx < 0) return getActive()
+        if (idx < 0) {
+            val active = getActive()
+            return active
+        }
 
         val wasActive = idx == activeIndex
         entries.removeAt(idx)
@@ -96,7 +101,8 @@ object SuperislandListManager {
         if (entries.isEmpty()) {
             manuallyChanged = false
         }
-        return getActive()
+        val result = getActive()
+        return result
     }
 
     /**
@@ -145,6 +151,10 @@ object SuperislandListManager {
         activeIndex = -1
         manuallyChanged = false
     }
+
+    /** 指定 sourceId 是否在列表中 */
+    @Synchronized
+    fun containsSourceId(sourceId: String): Boolean = entries.any { it.sourceId == sourceId }
 
     /** 列表是否为空 */
     @Synchronized

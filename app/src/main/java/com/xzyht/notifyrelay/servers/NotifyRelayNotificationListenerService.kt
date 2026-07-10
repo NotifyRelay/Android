@@ -80,12 +80,16 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             // 查找对应的媒体通知并处理
             val activeNotifications = instance?.activeNotifications
             if (activeNotifications != null) {
+                val mediaSbn = activeNotifications.firstOrNull { 
+                    it.packageName == packageName && it.notification.category == Notification.CATEGORY_TRANSPORT 
+                }
                 for (sbn in activeNotifications) {
                     if (sbn.packageName == packageName && sbn.notification.category == Notification.CATEGORY_TRANSPORT) {
                         instance?.processMediaNotification(sbn)
                         break
                     }
                 }
+            } else {
             }
         }
         
@@ -119,6 +123,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 // 超级岛相关通知被移除，关闭对应的浮窗条目
                 Logger.i(TAG, "超级岛相关通知被移除，关闭对应的浮窗条目: id=${sbn.id}, channelId=$channelId")
                 FloatingReplicaManager.closeByNotificationId(sbn.id)
+            } else {
             }
         } else {
             // 普通通知被移除时，从已处理缓存中移除，允许下次重新处理
@@ -294,11 +299,11 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
      * 处理媒体播放通知
      */
     private fun processMediaNotification(sbn: StatusBarNotification) {
+        val sbnKey = getNotificationKey(sbn)
         // 更新全局持有的最新媒体通知，方便外部通过工具类触发操作
         try {
             latestMediaSbn = sbn
         } catch (_: Exception) {}
-        val sbnKey = getNotificationKey(sbn)
         
         // 初始化变量
         var finalTitle: String
@@ -375,6 +380,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             } catch (e: Exception) {
                 Logger.e(TAG, "在本机内生成浮窗和通知失败", e)
             }
+        } else {
         }
 
         // 检查状态是否变化，只在内容变化时发送
@@ -412,6 +418,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             } catch (e: Exception) {
                 Logger.e(TAG, "发送媒体播放消息失败", e)
             }
+        } else {
         }
     }
 
@@ -558,6 +565,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     }
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         Logger.i(TAG, "[NotifyListener] onNotificationPosted called, sbnKey=${sbn.key}, pkg=${sbn.packageName}")
+        val isMedia = sbn.notification.category == Notification.CATEGORY_TRANSPORT
         processNotification(sbn)
     }
 
@@ -621,6 +629,9 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
                     for (sbn in actives) {
                         if (sbn.packageName == applicationContext.packageName) continue
+                        val isMedia = sbn.notification.category == Notification.CATEGORY_TRANSPORT
+                        if (isMedia) {
+                        }
                         processNotification(sbn, true)
                     }
                     // 定期清理过期的缓存，避免内存泄漏
