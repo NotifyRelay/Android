@@ -8,6 +8,21 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version libs.versions.kotlinPluginCompose
     id("com.google.devtools.ksp") version "2.3.6"
     id("kotlin-parcelize")
+    alias(libs.plugins.rust.android.gradle)
+}
+
+val rustCoreDir = rootProject.projectDir.resolve("notify-relay-core")
+val rustCorePath = rustCoreDir.absolutePath
+if (rustCoreDir.exists()) {
+    cargo {
+        module = rustCorePath
+        libname = "notify_relay_core"
+        targets = listOf("arm64", "x86_64")
+        profile = "release"
+    }
+    tasks.matching { it.name.startsWith("merge") && it.name.endsWith("NativeLibs") }.configureEach {
+        dependsOn("cargoBuild")
+    }
 }
 // 使用 buildSrc 的 JGit 实现计算版本信息（避免启动外部进程，兼容 configuration-cache）
 // （注意：版本信息在下面会被再次计算；避免重复定义同名 top-level 属性以消除编译歧义）
@@ -230,6 +245,9 @@ dependencies {
     implementation(project(":superislandui"))
     // 依赖scrcpy模块
     implementation(project(":scrcpy"))
+
+    // JNA 加载 Rust 核心库
+    implementation(libs.jna) { artifact { type = "aar" } }
 }
 
 tasks.register("printVersionName") {

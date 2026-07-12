@@ -46,6 +46,8 @@ paging = "3.4.2"
 activityCompose = "1.13.0"
 reorderable = "3.0.0"
 timber = "5.0.1"
+rustAndroidGradle = "0.9.6"
+jna = "5.17.0"
 
 
 [libraries]
@@ -103,6 +105,7 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycle" }
 
 
@@ -122,3 +125,4 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlinPluginCompose" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
+rust-android-gradle = { id = "org.mozilla.rust-android-gradle.rust-android", version.ref = "rustAndroidGradle" }

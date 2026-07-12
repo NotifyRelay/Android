@@ -2,6 +2,7 @@
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
+    alias(libs.plugins.rust.android.gradle) apply false
 }
 
 // Guard: ensure we don't create kotlinLSPProjectDeps task multiple times.
