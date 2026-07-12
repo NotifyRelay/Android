@@ -63,9 +63,9 @@ android {
         val signingKeyAlias = System.getenv("KEY_ALIAS") ?: project.findProperty("KEY_ALIAS") as? String
 
         // Local-only fallback (not committed): read optional properties from two locations, otherwise pick first .jks in PublicHub
-        val publicHubDir = file("D:/xzy/nas-Sync/androidKey/notify-relay/PublicHub")
+        val publicHubDir = file("E:/xzy/nas-Sync/androidKey/notify-relay/PublicHub")
         val localPropFiles = listOf(
-            File("D:/xzy/nas-Sync/androidKey/notify-relay/signing.local.properties"),
+            File("E:/xzy/nas-Sync/androidKey/notify-relay/signing.local.properties"),
             File(publicHubDir, "signing.local.properties")
         )
         val localProps = Properties().apply {
