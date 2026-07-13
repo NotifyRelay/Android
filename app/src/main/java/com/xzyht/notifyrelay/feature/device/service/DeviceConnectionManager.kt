@@ -415,6 +415,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     // Rust 原生上下文
     private var rustContext: com.sun.jna.Pointer? = null
+    internal val rustContextInternal: com.sun.jna.Pointer?
+        get() = rustContext
 
     private var serverSocket: ServerSocket? = null
     private val deviceLastSeen = mutableMapOf<String, Long>()
@@ -785,9 +787,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         val ctx = rustContext ?: throw IllegalStateException("Rust context not initialized")
         val fullLine = NativeCore.encryptMessage(ctx, "DATA", this.uuid, this.localPublicKey, uuid, input)
             ?: throw IllegalStateException("Rust加密失败: encryptMessage, device=$uuid")
-        val parts = fullLine.split(":", limit = 4)
-        if (parts.size < 4) throw IllegalStateException("Rust加密返回格式异常: $fullLine")
-        return parts[3]
+        val prefix = "DATA:${this.uuid}:${this.localPublicKey}:"
+        return if (fullLine.startsWith(prefix)) fullLine.removePrefix(prefix)
+        else throw IllegalStateException("Rust加密返回格式异常: $fullLine")
     }
 
     // 使用 Rust core 解密，失败直接抛异常

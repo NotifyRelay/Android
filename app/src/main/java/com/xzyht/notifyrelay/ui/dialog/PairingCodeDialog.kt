@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.sp
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.HandshakeSender
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -256,10 +257,15 @@ fun PairingCodeDialog(
                                             val resp = HandshakeSender.sendPairingResp(deviceManager, initiator, receiverTmpPubKeyB64, encryptedCode)
                                             
                                             if (resp?.startsWith("ACCEPT:") == true) {
-                                                val parts = resp.split(":")
-                                                // ACCEPT 格式: ACCEPT:<code>:<uuid>:<ltPubKey>:<ip>:<battery>:<deviceType>
-                                                if (parts.size >= 5) {
-                                                    val initiatorLtPubKey = parts[3]
+                                                // ACCEPT 格式: ACCEPT:<uuid>:<ltPubKey>:<ip>:<battery>:<deviceType>
+                                                val ctx = deviceManager.rustContextInternal
+                                                val acceptJson = if (ctx != null) NativeCore.decodeLine(ctx, resp) else null
+                                                val initiatorLtPubKey = if (acceptJson != null) {
+                                                    org.json.JSONObject(acceptJson as String).optString("lt_pub_key", "")
+                                                } else {
+                                                    resp.split(":").getOrElse(2) { "" }
+                                                }
+                                                if (initiatorLtPubKey.isNotEmpty()) {
                                                     // 使用长期 ECDH 密钥完成标准密钥交换
                                                     val success = deviceManager.completePairingWithLongTermKeys(
                                                         remoteUuid, initiatorLtPubKey,

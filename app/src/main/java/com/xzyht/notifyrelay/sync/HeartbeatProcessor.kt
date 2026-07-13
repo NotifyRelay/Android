@@ -3,8 +3,10 @@ package com.xzyht.notifyrelay.sync
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
+import org.json.JSONObject
 
 object HeartbeatProcessor {
 
@@ -19,44 +21,33 @@ object HeartbeatProcessor {
     )
 
     fun parseHeartbeatPayload(msg: String, ip: String, defaultPort: Int): HeartbeatInfo? {
-        val parts = msg.split(":")
-        if (parts.size < 5) return null
-
-        val uuid = parts[0]
-        val rawDisplay = parts[1]
-        val portStr = parts[2]
-        val batteryStr = parts[3]
-        val deviceType = parts[4]
-
-        if (uuid.isEmpty()) return null
-
-        val port = portStr.toIntOrNull() ?: defaultPort
-        val displayName = try {
-            decodeDisplayName(rawDisplay)
-        } catch (_: Exception) {
-            rawDisplay
-        }
-
-        var batteryLevel = 0
-        var isCharging = false
-        try {
-            if (batteryStr.isNotEmpty()) {
-                val chargeSign = batteryStr[0]
-                isCharging = chargeSign == '+'
-                val batteryPart = batteryStr.substring(1)
-                batteryLevel = batteryPart.toIntOrNull()?.coerceIn(0, 100) ?: 0
-            }
-        } catch (_: Exception) {}
-
-        return HeartbeatInfo(uuid, displayName, port, batteryLevel, isCharging, deviceType, ip)
+        val json = NativeCore.parseHeartbeatJson(msg) ?: return null
+        return parseHeartbeatJson(json, ip, defaultPort)
     }
 
-    private fun decodeDisplayName(encoded: String): String {
+    internal fun parseHeartbeatTcpPayload(msg: String, ip: String, defaultPort: Int): HeartbeatInfo? {
+        val json = NativeCore.parseHeartbeatTcpJson(msg) ?: return null
+        return parseHeartbeatJson(json, ip, defaultPort)
+    }
+
+    private fun parseHeartbeatJson(jsonStr: String, ip: String, defaultPort: Int): HeartbeatInfo? {
         return try {
-            val decoded = android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
-            String(decoded, Charsets.UTF_8)
+            val json = JSONObject(jsonStr)
+            val uuid = json.optString("uuid", "")
+            if (uuid.isEmpty()) return null
+            val rawDisplay = json.optString("name_b64", "")
+            val port = json.optInt("port", defaultPort)
+            val battery = json.optInt("battery", 0)
+            val deviceType = json.optString("device_type", "unknown")
+            val displayName = try {
+                val decoded = android.util.Base64.decode(rawDisplay, android.util.Base64.NO_WRAP)
+                String(decoded, Charsets.UTF_8)
+            } catch (_: Exception) {
+                rawDisplay
+            }
+            HeartbeatInfo(uuid, displayName, port, kotlin.math.abs(battery), battery >= 0, deviceType, ip)
         } catch (_: Exception) {
-            encoded
+            null
         }
     }
 

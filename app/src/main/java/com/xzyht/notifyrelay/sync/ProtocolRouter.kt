@@ -44,41 +44,34 @@ object ProtocolRouter {
     }
 
     /**
-     * 处理一条 DATA* 加密通道的 TCP 首行。
+     * 处理已由 Rust 解密后的 DATA* 消息。
      * @return true 表示已处理并应由上层关闭当前连接；false 表示非本路由器负责。
      */
-    fun handleEncryptedDataLine(
-        line: String,
+    fun handleDecryptedData(
+        header: String,
+        localUuid: String,
+        plaintext: String,
         clientIp: String,
         deviceManager: DeviceConnectionManager,
         context: Context
     ): Boolean {
-        // 仅处理以 DATA 开头的加密通道
-        if (!line.startsWith("DATA")) return false
-
-        // 统一解析：DATA_*:<remoteUuid>:<remotePubKey>:<encryptedPayload>
-        val parts = line.split(":", limit = 4)
-        if (parts.size < 4) return true 
-
-        val header = parts[0]
-        val remoteUuid = parts[1]
-        parts[2]
-        val payload = parts[3]
-
-        val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[remoteUuid] }
+        val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[localUuid] }
         if (auth == null || !auth.isAccepted) {
-            Logger.d(TAG, "未认证或未接受的设备，丢弃: uuid=$remoteUuid, header=$header")
+            Logger.d(TAG, "未认证或未接受的设备，丢弃: uuid=$localUuid, header=$header")
             return true
         }
+        return routeDecrypted(header, localUuid, plaintext, clientIp, deviceManager, context, auth)
+    }
 
-        // 解密
-        val decrypted = try { deviceManager.decryptData(payload, remoteUuid) } catch (e: Exception) { Logger.e(TAG, "解密失败: uuid=$remoteUuid, header=$header", e); null }
-        if (decrypted == null) {
-            //Logger.d(TAG, "解密失败: uuid=$remoteUuid, header=$header")
-            return true
-        }
-
-        // 路由
+    private fun routeDecrypted(
+        header: String,
+        remoteUuid: String,
+        decrypted: String,
+        clientIp: String,
+        deviceManager: DeviceConnectionManager,
+        context: Context,
+        auth: AuthInfo?
+    ): Boolean {
         return try {
             when (header) {
                 // 主通道：历史上的 DATA 默认为普通通知（DATA_NOTIFICATION）

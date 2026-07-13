@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.sync
 
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.util.Logger
 import notifyrelay.core.util.BatteryUtils
 import java.io.BufferedReader
@@ -47,12 +48,12 @@ object HandshakeSender {
 
                 val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
                 val isCharging = BatteryUtils.isCharging(manager.contextInternal)
-                val batteryStr = if (isCharging) "$batteryLevel+" else "$batteryLevel"
+                val battery = if (isCharging) batteryLevel else -batteryLevel
                 val localIp = getLocalIpAddress()
-                val deviceType = "android"
 
-                val req = "PAIRING_INIT:${manager.uuid}:$tmpPublicKey:$localIp:$batteryStr:$deviceType\n"
-                writer.write(req)
+                val req = NativeCore.formatPairingInit(manager.uuid, tmpPublicKey, localIp, battery, "android")
+                    ?: return null
+                writer.write(req + "\n")
                 writer.flush()
                 reader.readLine()
             }
@@ -84,12 +85,14 @@ object HandshakeSender {
 
                 val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
                 val isCharging = BatteryUtils.isCharging(manager.contextInternal)
-                val batteryStr = if (isCharging) "$batteryLevel+" else "$batteryLevel"
+                val battery = if (isCharging) batteryLevel else -batteryLevel
                 val localIp = getLocalIpAddress()
-                val deviceType = "android"
 
-                val req = "PAIRING_RESP:${manager.uuid}:$tmpPublicKey:${manager.localPublicKey}:$encryptedCode:$localIp:$batteryStr:$deviceType\n"
-                writer.write(req)
+                val req = NativeCore.formatPairingResp(
+                    manager.uuid, tmpPublicKey, manager.localPublicKey,
+                    encryptedCode, localIp, battery, "android"
+                ) ?: return null
+                writer.write(req + "\n")
                 writer.flush()
                 reader.readLine()
             }
@@ -117,12 +120,13 @@ object HandshakeSender {
 
                 val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
                 val isCharging = BatteryUtils.isCharging(manager.contextInternal)
-                val batteryStr = if (isCharging) "$batteryLevel+" else "$batteryLevel"
+                val battery = if (isCharging) batteryLevel else -batteryLevel
                 val localIp = getLocalIpAddress()
-                val deviceType = "android"
 
-                val handshake = "HANDSHAKE:${manager.uuid}:${manager.localPublicKey}:$localIp:$batteryStr:$deviceType\n"
-                writer.write(handshake)
+                val handshake = NativeCore.formatHandshake(
+                    manager.uuid, manager.localPublicKey, localIp, battery, "android"
+                ) ?: return null
+                writer.write(handshake + "\n")
                 writer.flush()
                 reader.readLine()
             }
@@ -175,12 +179,14 @@ object HeartbeatSender {
 
             val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
             val isCharging = BatteryUtils.isCharging(manager.contextInternal)
-            val chargeSign = if (isCharging) "+" else "-"
+            val battery = if (isCharging) batteryLevel else -batteryLevel
             val displayName = manager.encodeDisplayNameForTransportInternal(manager.localDisplayNameInternal())
             val port = manager.listenPort
-            val payload = "HEARTBEAT_TCP:${manager.uuid}:${displayName}:${port}:${chargeSign}${batteryLevel}:android\n"
+            val payload = NativeCore.formatTcpHeartbeat(
+                manager.uuid, displayName, port.toShort(), battery, "android"
+            ) ?: return false
 
-            writer.write(payload)
+            writer.write(payload + "\n")
             writer.flush()
             try { writer.close() } catch (_: Exception) {}
             try { socket.close() } catch (_: Exception) {}
@@ -201,21 +207,21 @@ object DiscoveryBroadcaster {
         var socket: DatagramSocket? = null
         return try {
             socket = DatagramSocket()
-            socket.broadcast = true // 启用广播
-            // 广播格式：<uuid>:<displayName>:<port>:<+/-><batteryLevel>:<deviceType>
+            socket.broadcast = true
             val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
             val isCharging = BatteryUtils.isCharging(manager.contextInternal)
-            val chargeSign = if (isCharging) "+" else "-"
+            val battery = if (isCharging) batteryLevel else -batteryLevel
             val displayName = manager.encodeDisplayNameForTransportInternal(manager.localDisplayNameInternal())
             val port = manager.listenPort
-            val payload = "${manager.uuid}:${displayName}:${port}:${chargeSign}${batteryLevel}:android"
+            val payload = NativeCore.formatDiscovery(
+                manager.uuid, displayName, port.toShort(), battery, "android"
+            ) ?: return false
             val buf = payload.toByteArray()
-            val address = InetAddress.getByName("255.255.255.255") // 广播地址
+            val address = InetAddress.getByName("255.255.255.255")
             val packet = DatagramPacket(buf, buf.size, address, BROADCAST_PORT)
             socket.send(packet)
             true
         } catch (e: Exception) {
-            //Logger.d(TAG, "broadcast failed - ${e.message}")
             false
         } finally {
             try { socket?.close() } catch (_: Exception) {}

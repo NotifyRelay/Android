@@ -9,6 +9,7 @@ import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -214,67 +215,51 @@ class ConnectionKeepAlive(
                 //Logger.d("死神-NotifyRelay", "connectToDevice: handshake resp=$resp")
 
                 if (resp != null && resp.startsWith("ACCEPT:")) {
-                    val parts = resp.split(":")
-                    if (parts.size >= 3) {
-                        val remotePubKey = parts[2]
-                        val sharedSecret = EncryptionManager.generateSharedSecret(
-                            deviceManager.contextInternal,
-                            deviceManager.localPublicKey,
-                            remotePubKey
-                        )
-                        EncryptionManager.importAesKeyToKeystore(
-                            deviceManager.contextInternal,
-                            device.uuid,
-                            sharedSecret
-                        )
-                        deviceManager.migrateKeyToRust(device.uuid, sharedSecret)
-                        synchronized(authenticatedDevices) {
-                            authenticatedDevices.remove(device.uuid)
-                            authenticatedDevices[device.uuid] = AuthInfo(
-                                remotePubKey,
-                                "",
-                                true,
-                                device.displayName,
-                                device.ip,
-                                device.port
-                            )
-                            deviceManager.saveAuthedDevicesInternal()
-                        }
-                        synchronized(deviceManager.deviceInfoCacheInternal) {
-                            deviceManager.deviceInfoCacheInternal[device.uuid] = device
-                        }
-                        //Logger.d("死神-NotifyRelay", "认证成功，启动心跳: uuid=${device.uuid}, ip=${device.ip}, port=${device.port}")
-                        startHeartbeatToDevice(device.uuid, device.ip, device.port, sharedSecret)
-                        deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
-                        try {
-                            scope.launch {
-                                deviceManager.updateDeviceListInternal()
-                            }
-                        } catch (_: Exception) {}
-
-                        if (device.uuid != deviceManager.uuid) {
-                            val myInfo = deviceManager.getDeviceInfoInternal(deviceManager.uuid)
-                            if (myInfo != null) {
-                                if (!heartbeatedDevices.contains(device.uuid)) {
-                                    //Logger.d("死神-NotifyRelay", "认证成功后自动反向connectToDevice: myInfo=$myInfo, peer=${device.uuid}")
-                                    deviceManager.connectToDevice(myInfo)
-                                } else {
-                                    //Logger.d("死神-NotifyRelay", "对方已建立心跳，不再反向connectToDevice: peer=${device.uuid}")
-                                }
-                            } else {
-                                //Logger.d("死神-NotifyRelay", "本机getDeviceInfo返回null，无法反向connectToDevice")
-                            }
-                        }
-                        return Pair(true, null)
+                    val ctx = deviceManager.rustContextInternal
+                    val acceptJson = if (ctx != null) NativeCore.decodeLine(ctx, resp) else null
+                    val remotePubKey = if (acceptJson != null) {
+                        org.json.JSONObject(acceptJson as String).optString("lt_pub_key", "")
                     } else {
-                        //Logger.d("死神-NotifyRelay", "认证响应格式错误: $resp")
-                        return Pair(false, "认证响应格式错误")
+                        resp.split(":")[2]
                     }
+                    if (remotePubKey.isEmpty()) continue
+                    val sharedSecret = EncryptionManager.generateSharedSecret(
+                        deviceManager.contextInternal,
+                        deviceManager.localPublicKey,
+                        remotePubKey
+                    )
+                    EncryptionManager.importAesKeyToKeystore(
+                        deviceManager.contextInternal,
+                        device.uuid,
+                        sharedSecret
+                    )
+                    deviceManager.migrateKeyToRust(device.uuid, sharedSecret)
+                    synchronized(authenticatedDevices) {
+                        authenticatedDevices.remove(device.uuid)
+                        authenticatedDevices[device.uuid] = AuthInfo(
+                            remotePubKey, "", true, device.displayName, device.ip, device.port
+                        )
+                        deviceManager.saveAuthedDevicesInternal()
+                    }
+                    synchronized(deviceManager.deviceInfoCacheInternal) {
+                        deviceManager.deviceInfoCacheInternal[device.uuid] = device
+                    }
+                    startHeartbeatToDevice(device.uuid, device.ip, device.port, sharedSecret)
+                    deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
+                    try {
+                        scope.launch { deviceManager.updateDeviceListInternal() }
+                    } catch (_: Exception) {}
+
+                    if (device.uuid != deviceManager.uuid) {
+                        val myInfo = deviceManager.getDeviceInfoInternal(deviceManager.uuid)
+                        if (myInfo != null && !heartbeatedDevices.contains(device.uuid)) {
+                            deviceManager.connectToDevice(myInfo)
+                        }
+                    }
+                    return Pair(true, null)
                 } else if (resp != null && resp.startsWith("REJECT:")) {
-                    //Logger.d("死神-NotifyRelay", "对方拒绝连接: uuid=${device.uuid}")
                     return Pair(false, "对方拒绝连接")
                 } else {
-                    //Logger.d("死神-NotifyRelay", "认证失败: resp=$resp")
                     return Pair(false, "认证失败")
                 }
             } catch (e: UnsupportedOperationException) {
