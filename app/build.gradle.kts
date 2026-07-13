@@ -8,21 +8,27 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose") version libs.versions.kotlinPluginCompose
     id("com.google.devtools.ksp") version "2.3.6"
     id("kotlin-parcelize")
-    alias(libs.plugins.rust.android.gradle)
 }
 
 val rustCoreDir = rootProject.projectDir.resolve("notify-relay-core")
 val rustCorePath = rustCoreDir.absolutePath
-if (rustCoreDir.exists()) {
-    cargo {
-        module = rustCorePath
-        libname = "notify_relay_core"
-        targets = listOf("arm64", "x86_64")
-        profile = "release"
-    }
-    tasks.matching { it.name.startsWith("merge") && it.name.endsWith("NativeLibs") }.configureEach {
-        dependsOn("cargoBuild")
-    }
+
+// 自定义 Rust 构建任务（替代不兼容 AGP 9 的 cargo-ndk Gradle 插件）
+// 依赖: cargo install cargo-ndk  &&  rustup target add aarch64-linux-android x86_64-linux-android
+val rustBuild by tasks.registering(Exec::class) {
+    description = "构建 Rust 核心库（需 cargo-ndk + NDK）"
+    group = "rust"
+    onlyIf { rustCoreDir.exists() }
+    workingDir = rustCoreDir
+    commandLine("cargo", "ndk",
+        "-t", "arm64-v8a",
+        "-t", "x86_64",
+        "-o", "${project.projectDir}/src/main/jniLibs",
+        "build", "--release")
+}
+// 将 Rust 构建挂钩到 Gradle 构建生命周期，确保在打包前生成 .so
+tasks.named("preBuild") {
+    dependsOn(rustBuild)
 }
 // 使用 buildSrc 的 JGit 实现计算版本信息（避免启动外部进程，兼容 configuration-cache）
 // （注意：版本信息在下面会被再次计算；避免重复定义同名 top-level 属性以消除编译歧义）
@@ -143,7 +149,7 @@ android {
             // 只在包含 Release 任务时启用分包，否则只 universal
             isEnable = gradle.startParameter.taskNames.any { it.contains("Release") }
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            include("arm64-v8a", "x86_64")
             isUniversalApk = true
         }
     }

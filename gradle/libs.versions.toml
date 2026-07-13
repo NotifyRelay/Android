@@ -46,7 +46,6 @@ paging = "3.4.2"
 activityCompose = "1.13.0"
 reorderable = "3.0.0"
 timber = "5.0.1"
-rustAndroidGradle = "0.9.6"
 jna = "5.17.0"
 
 
@@ -125,4 +124,3 @@ kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlinPluginCompose" }
 android-library = { id = "com.android.library", version.ref = "agp" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
-rust-android-gradle = { id = "org.mozilla.rust-android-gradle.rust-android", version.ref = "rustAndroidGradle" }

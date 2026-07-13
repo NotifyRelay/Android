@@ -13,13 +13,15 @@ interface NotifyRelayCore : Library {
     fun nrc_ecdh_generate_keypair(ctx: Pointer): Int
     fun nrc_ecdh_get_public_key(ctx: Pointer): Pointer
     fun nrc_ecdh_has_keypair(ctx: Pointer): Int
-    fun nrc_ecdh_derive_shared_secret(ctx: Pointer, peerPubKeyB64: String): Int
+    fun nrc_ecdh_derive_shared_secret(ctx: Pointer, peerUuid: String, peerPubKeyB64: String): Int
 
-    fun nrc_migrate_shared_secret(ctx: Pointer, secret: ByteArray, len: Int): Int
+    fun nrc_migrate_shared_secret(ctx: Pointer, deviceUuid: String, secret: ByteArray, len: Int): Int
+
+    fun nrc_remove_device(ctx: Pointer, deviceUuid: String): Int
 
     fun nrc_encrypt_message(
         ctx: Pointer, header: String, localUuid: String,
-        localPubKey: String, plaintext: String
+        localPubKey: String, remoteUuid: String, plaintext: String
     ): Pointer
 
     fun nrc_decrypt_message(ctx: Pointer, encryptedLine: String): Pointer

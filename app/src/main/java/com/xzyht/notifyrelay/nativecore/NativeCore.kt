@@ -17,14 +17,17 @@ object NativeCore {
     fun hasKeypair(ctx: Pointer): Boolean =
         lib.nrc_ecdh_has_keypair(ctx) != 0
 
-    fun deriveSharedSecret(ctx: Pointer, peerPubKey: String): Boolean =
-        lib.nrc_ecdh_derive_shared_secret(ctx, peerPubKey) == 0
+    fun deriveSharedSecret(ctx: Pointer, peerUuid: String, peerPubKey: String): Boolean =
+        lib.nrc_ecdh_derive_shared_secret(ctx, peerUuid, peerPubKey) == 0
 
-    fun migrateSharedSecret(ctx: Pointer, secret: ByteArray): Boolean =
-        lib.nrc_migrate_shared_secret(ctx, secret, secret.size) == 0
+    fun migrateSharedSecret(ctx: Pointer, deviceUuid: String, secret: ByteArray): Boolean =
+        lib.nrc_migrate_shared_secret(ctx, deviceUuid, secret, secret.size) == 0
 
-    fun encryptMessage(ctx: Pointer, header: String, uuid: String, pubKey: String, plaintext: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_encrypt_message(ctx, header, uuid, pubKey, plaintext))
+    fun removeDevice(ctx: Pointer, deviceUuid: String): Boolean =
+        lib.nrc_remove_device(ctx, deviceUuid) == 0
+
+    fun encryptMessage(ctx: Pointer, header: String, localUuid: String, localPubKey: String, remoteUuid: String, plaintext: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_encrypt_message(ctx, header, localUuid, localPubKey, remoteUuid, plaintext))
 
     fun decryptMessage(ctx: Pointer, encryptedLine: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_decrypt_message(ctx, encryptedLine))
@@ -34,7 +37,7 @@ object NativeCore {
         onMessage: NotifyRelayCore.MessageCallback? = null,
         onPairing: NotifyRelayCore.PairingCallback? = null,
         userData: Pointer? = null
-    ): Int = lib.nrc_process_line(ctx, line, onMessage, onPairing, userData)
+    ): Int = lib.nrc_process_line(ctx, line, onMessage, onPairing, userData ?: Pointer.NULL)
 
     fun exportState(ctx: Pointer): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_export_state(ctx))

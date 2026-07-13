@@ -298,6 +298,7 @@ object ServerLineRouter {
                                     remotePubKey
                                 )
                                 EncryptionManager.importAesKeyToKeystore(deviceManager.contextInternal, remoteUuid, newSecret)
+                                deviceManager.migrateKeyToRust(remoteUuid, newSecret)
                                 deviceManager.authenticatedDevices[remoteUuid] = existingAuth.copy(
                                     publicKey = remotePubKey,
                                     sharedSecret = ""

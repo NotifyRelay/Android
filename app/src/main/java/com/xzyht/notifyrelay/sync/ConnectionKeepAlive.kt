@@ -227,6 +227,7 @@ class ConnectionKeepAlive(
                             device.uuid,
                             sharedSecret
                         )
+                        deviceManager.migrateKeyToRust(device.uuid, sharedSecret)
                         synchronized(authenticatedDevices) {
                             authenticatedDevices.remove(device.uuid)
                             authenticatedDevices[device.uuid] = AuthInfo(

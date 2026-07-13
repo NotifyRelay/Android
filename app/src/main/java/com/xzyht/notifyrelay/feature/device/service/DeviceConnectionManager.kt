@@ -1,5 +1,7 @@
 package com.xzyht.notifyrelay.feature.device.service
 
+import com.sun.jna.Pointer
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ServerLineRouter
 import notifyrelay.base.util.Logger
@@ -139,6 +141,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             // 过滤掉uuid为"本机"的记录
             if (device.uuid == "本机") continue
             
+            // 迁移已有共享密钥到 Rust 上下文
+            migrateDeviceKeyToRust(device.uuid, device.publicKey, device.sharedSecret)
+            
             // 确保 sharedSecret 已导入 Android Keystore
             if (device.sharedSecret.isNotEmpty() && !EncryptionManager.hasDeviceKey(device.uuid, context)) {
                 EncryptionManager.importAesKeyToKeystore(context, device.uuid, device.sharedSecret)
@@ -177,6 +182,42 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 _authenticatedDevicesFlow.value = authenticatedDevices.toMap()
                 _rejectedDevicesFlow.value = rejectedDevices.toSet()
             }
+        } catch (_: Exception) {}
+    }
+    
+    // 迁移设备共享密钥到 Rust 上下文
+    private fun migrateDeviceKeyToRust(uuid: String, remotePubKey: String, sharedSecretDb: String) {
+        val ctx = rustContext ?: return
+        try {
+            val aesKeyBytes: ByteArray
+            if (sharedSecretDb.isNotEmpty()) {
+                // 数据库中有明文密钥：直接解码 (Base64 of HKDF-derived AES key)
+                aesKeyBytes = try {
+                    android.util.Base64.decode(sharedSecretDb, android.util.Base64.NO_WRAP)
+                } catch (_: Exception) { return }
+            } else {
+                // 密钥已被清除（已导入 Keystore）：重新通过 ECDH 派生
+                val secretBase64 = try {
+                    EncryptionManager.generateSharedSecret(context, localPublicKey, remotePubKey)
+                } catch (_: Exception) { return }
+                aesKeyBytes = try {
+                    android.util.Base64.decode(secretBase64, android.util.Base64.NO_WRAP)
+                } catch (_: Exception) { return }
+            }
+            if (aesKeyBytes.size != 32) return
+            NativeCore.migrateSharedSecret(ctx, uuid, aesKeyBytes)
+            Logger.d("死神-NotifyRelay", "密钥已迁移到 Rust: $uuid")
+        } catch (e: Exception) {
+            Logger.w("死神-NotifyRelay", "密钥迁移失败: $uuid, ${e.message}")
+        }
+    }
+
+    internal fun migrateKeyToRust(uuid: String, sharedSecretBase64: String) {
+        val ctx = rustContext ?: return
+        try {
+            val aesKeyBytes = android.util.Base64.decode(sharedSecretBase64, android.util.Base64.NO_WRAP)
+            if (aesKeyBytes.size != 32) return
+            NativeCore.migrateSharedSecret(ctx, uuid, aesKeyBytes)
         } catch (_: Exception) {}
     }
 
@@ -371,6 +412,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal fun decryptDataInternal(input: String, uuid: String): String = decryptData(input, uuid)
 
     internal fun getDeviceInfoInternal(uuid: String): DeviceInfo? = getDeviceInfo(uuid)
+
+    // Rust 原生上下文
+    private var rustContext: com.sun.jna.Pointer? = null
+
     private var serverSocket: ServerSocket? = null
     private val deviceLastSeen = mutableMapOf<String, Long>()
     // 心跳定时任务
@@ -399,6 +444,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // 兼容旧用户：首次运行时如无保存则默认true
         if (!AppConfig.getUdpDiscoveryEnabled(context)) {
             AppConfig.setUdpDiscoveryEnabled(context, true)
+        }
+        // 初始化 Rust 上下文
+        try {
+            rustContext = NativeCore.createContext()
+            Logger.d("死神-NotifyRelay", "Rust core 上下文已初始化")
+        } catch (e: Exception) {
+            Logger.e("死神-NotifyRelay", "Rust core 初始化失败", e)
         }
         loadAuthedDevices()
         // 新增：初始补全本机 deviceInfoCache，便于反向 connectToDevice
@@ -592,6 +644,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         try {
             val secret = EncryptionManager.generateSharedSecret(context, localPublicKey, remotePubKey)
             EncryptionManager.importAesKeyToKeystore(context, remoteUuid, secret)
+            // 同步迁移到 Rust
+            try {
+                val aesKeyBytes = android.util.Base64.decode(secret, android.util.Base64.NO_WRAP)
+                if (aesKeyBytes.size == 32) {
+                    rustContext?.let { NativeCore.migrateSharedSecret(it, remoteUuid, aesKeyBytes) }
+                }
+            } catch (_: Exception) {}
             synchronized(authenticatedDevices) {
                 authenticatedDevices[remoteUuid] = AuthInfo(
                     remotePubKey, "", true, "未知设备"
@@ -660,6 +719,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         return try {
             val secret = EncryptionManager.generateSharedSecret(context, localPublicKey, remoteLtPubKey)
             EncryptionManager.importAesKeyToKeystore(context, uuid, secret)
+            // 同步迁移到 Rust
+            try {
+                val aesKeyBytes = android.util.Base64.decode(secret, android.util.Base64.NO_WRAP)
+                if (aesKeyBytes.size == 32) {
+                    rustContext?.let { NativeCore.migrateSharedSecret(it, uuid, aesKeyBytes) }
+                }
+            } catch (_: Exception) {}
             synchronized(authenticatedDevices) {
                 authenticatedDevices[uuid] = AuthInfo(
                     remoteLtPubKey, "", true, displayName,
@@ -714,21 +780,22 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
-    // 设备连接重试逻辑已迁移到 ConnectionKeepAlive.performDeviceConnectionWithRetry
-    // 使用 Android Keystore 中保护的设备密钥进行加密
+    // 使用 Rust core 加密，失败直接抛异常
     internal fun encryptData(input: String, uuid: String): String {
-        if (EncryptionManager.hasDeviceKey(uuid, context)) {
-            return EncryptionManager.encryptWithDeviceKey(input, uuid, context)
-        }
-        throw IllegalStateException("Keystore key not found for device $uuid")
+        val ctx = rustContext ?: throw IllegalStateException("Rust context not initialized")
+        val fullLine = NativeCore.encryptMessage(ctx, "DATA", this.uuid, this.localPublicKey, uuid, input)
+            ?: throw IllegalStateException("Rust加密失败: encryptMessage, device=$uuid")
+        val parts = fullLine.split(":", limit = 4)
+        if (parts.size < 4) throw IllegalStateException("Rust加密返回格式异常: $fullLine")
+        return parts[3]
     }
 
-    // 使用 Android Keystore 中保护的设备密钥进行解密（对 ProtocolRouter 开放）
+    // 使用 Rust core 解密，失败直接抛异常
     internal fun decryptData(input: String, uuid: String): String {
-        if (!EncryptionManager.hasDeviceKey(uuid, context)) {
-            throw IllegalStateException("Keystore key not found for device $uuid")
-        }
-        return EncryptionManager.decryptWithDeviceKey(input, uuid, context)
+        val ctx = rustContext ?: throw IllegalStateException("Rust context not initialized")
+        val fakeLine = "DATA:$uuid:${localPublicKey}:$input"
+        return NativeCore.decryptMessage(ctx, fakeLine)
+            ?: throw IllegalStateException("Rust解密失败: decryptMessage, device=$uuid")
     }
 
     // 发送通知数据（加密）
@@ -964,6 +1031,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
             // 从 Android Keystore 移除设备密钥
             try { EncryptionManager.removeDeviceKey(uuid, context) } catch (_: Exception) {}
+
+            // 从 Rust 上下文移除设备密钥
+            try { rustContext?.let { NativeCore.removeDevice(it, uuid) } } catch (_: Exception) {}
 
             synchronized(authenticatedDevices) {
                 if (authenticatedDevices.containsKey(uuid)) {
