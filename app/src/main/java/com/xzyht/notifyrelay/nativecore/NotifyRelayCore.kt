@@ -149,9 +149,6 @@ interface NotifyRelayCore : Library {
         battery: Int, deviceType: String
     ): Pointer
 
-    fun nrc_parse_heartbeat_json(line: String): Pointer
-    fun nrc_parse_heartbeat_tcp_json(line: String): Pointer
-
     fun nrc_format_heartbeat(
         uuid: String, name: String, port: Short,
         battery: Int, deviceType: String
