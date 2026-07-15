@@ -229,20 +229,6 @@ class ConnectionDiscoveryManager(
         return ips
     }
 
-   
-    /**
-     * 编码用于 UDP/TCP 简单传输：
-     * - 目前使用 Base64(NO_WRAP)，避免与文本协议中的冒号 / 换行冲突；
-     * - 具体实现仍在 DeviceConnectionManager 中，通过 internal 复用。
-     */
-    internal fun encodeDisplayNameForTransportInternal(name: String): String {
-        return try {
-            deviceManager.encodeDisplayNameForTransportInternal(name)
-        } catch (_: Exception) {
-            ""
-        }
-    }
-
     /**
      * 解码并清洗从网络接收到的名称：
      * - Base64 解码后再走 sanitizeDisplayNameInternal，保证入库/展示口径一致。

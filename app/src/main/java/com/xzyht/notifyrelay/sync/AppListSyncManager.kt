@@ -46,8 +46,7 @@ object AppListSyncManager {
             put("scope", scope)
             put("time", System.currentTimeMillis())
         }.toString()
-        val req = NativeCore.createAppListRequestJson(raw) ?: return
-        ProtocolSender.sendEncrypted(deviceManager, targetDevice, "DATA_APP_LIST_REQUEST", req, REQ_TIMEOUT)
+        ProtocolSender.sendEncrypted(deviceManager, targetDevice, "DATA_APP_LIST_REQUEST", raw, REQ_TIMEOUT)
     }
 
     /**
@@ -92,9 +91,7 @@ object AppListSyncManager {
                 put("apps", appArray)
                 put("time", System.currentTimeMillis())
             }.toString()
-            val resp = NativeCore.createAppListResponseJson(raw) ?: return
-
-            sendAppListResponse(deviceManager, sourceDevice, resp)
+            sendAppListResponse(deviceManager, sourceDevice, raw)
             Logger.d(TAG, "已响应应用列表：${sourceDevice.displayName}，共${appArray.length()}项")
         } catch (e: Exception) {
             Logger.e(TAG, "处理应用列表请求失败", e)

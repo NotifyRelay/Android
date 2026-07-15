@@ -279,8 +279,7 @@ fun MusicControlPage() {
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"previous\"}"
-                            val request = NativeCore.createMediaControlJson(raw) ?: return@Button
-                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
+                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
                             ToastUtils.showShortToast(context, "已发送上一首指令到${selectedDevice.displayName}")
                         }
                     } catch (e: Exception) {
@@ -303,8 +302,7 @@ fun MusicControlPage() {
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"playPause\"}"
-                            val request = NativeCore.createMediaControlJson(raw) ?: return@Button
-                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
+                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
                             ToastUtils.showShortToast(context, "已发送播放/暂停指令到${selectedDevice.displayName}")
                         }
                     } catch (e: Exception) {
@@ -327,8 +325,7 @@ fun MusicControlPage() {
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"next\"}"
-                            val request = NativeCore.createMediaControlJson(raw) ?: return@Button
-                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
+                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
                             ToastUtils.showShortToast(context, "已发送下一首指令到${selectedDevice.displayName}")
                         }
                     } catch (e: Exception) {

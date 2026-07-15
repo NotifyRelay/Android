@@ -75,9 +75,8 @@ object AppLaunchManager {
                     put("displayId", displayId)
                 }
             }.toString()
-            val json = NativeCore.createAppLaunchJson(raw) ?: return
             Logger.d(TAG, "发送应用启动请求: $packageName, displayId: $displayId")
-            ProtocolSender.sendEncrypted(deviceManager, target, "DATA_APP_LAUNCH", json)
+            ProtocolSender.sendEncrypted(deviceManager, target, "DATA_APP_LAUNCH", raw)
         } catch (e: Exception) {
             Logger.e(TAG, "发送应用启动请求失败", e)
         }

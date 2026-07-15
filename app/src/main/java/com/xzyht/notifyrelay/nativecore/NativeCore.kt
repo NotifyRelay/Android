@@ -32,23 +32,14 @@ object NativeCore {
     fun decryptMessage(ctx: Pointer, encryptedLine: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_decrypt_message(ctx, encryptedLine))
 
+    fun decryptPayload(ctx: Pointer, localUuid: String, encryptedB64: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_decrypt_payload(ctx, localUuid, encryptedB64))
+
     fun decodeLine(ctx: Pointer, line: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_decode_line(ctx, line))
 
-    fun formatTcpHeartbeat(uuid: String, nameB64: String, port: Short, battery: Int, deviceType: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_tcp_heartbeat(uuid, nameB64, port, battery, deviceType))
-
-    fun formatHeartbeat(uuid: String, nameB64: String, port: Short, battery: Int, deviceType: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_heartbeat(uuid, nameB64, port, battery, deviceType))
-
-    fun formatDiscovery(uuid: String, nameB64: String, port: Short, battery: Int, deviceType: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_discovery(uuid, nameB64, port, battery, deviceType))
-
-    fun parseHeartbeatJson(line: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_heartbeat_json(line))
-
-    fun parseHeartbeatTcpJson(line: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_heartbeat_tcp_json(line))
+    fun formatHandshake(uuid: String, pubKey: String, ip: String, battery: Int, deviceType: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_handshake(uuid, pubKey, ip, battery, deviceType))
 
     fun formatPairingInit(uuid: String, tmpPubKey: String, ip: String, battery: Int, deviceType: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_pairing_init(uuid, tmpPubKey, ip, battery, deviceType))
@@ -59,8 +50,20 @@ object NativeCore {
     fun formatAccept(uuid: String, ltPubKey: String, ip: String, battery: Int, deviceType: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_accept(uuid, ltPubKey, ip, battery, deviceType))
 
-    fun formatHandshake(uuid: String, pubKey: String, ip: String, battery: Int, deviceType: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_handshake(uuid, pubKey, ip, battery, deviceType))
+    fun parseHeartbeatJson(line: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_heartbeat_json(line))
+
+    fun parseHeartbeatTcpJson(line: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_heartbeat_tcp_json(line))
+
+    fun formatHeartbeat(uuid: String, name: String, port: Short, battery: Int, deviceType: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_heartbeat(uuid, name, port, battery, deviceType))
+
+    fun formatTcpHeartbeat(uuid: String, name: String, port: Short, battery: Int, deviceType: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_tcp_heartbeat(uuid, name, port, battery, deviceType))
+
+    fun formatDiscovery(uuid: String, name: String, port: Short, battery: Int, deviceType: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_discovery(uuid, name, port, battery, deviceType))
 
     fun exportState(ctx: Pointer): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_export_state(ctx))
@@ -109,39 +112,37 @@ object NativeCore {
     fun processLine(ctx: Pointer, line: String): Int =
         lib.nrc_process_line(ctx, line)
 
+    fun processUdpBroadcast(ctx: Pointer, line: String): Int =
+        lib.nrc_process_udp_broadcast(ctx, line)
+
     fun setUserData(ctx: Pointer, userData: Pointer) =
         lib.nrc_set_user_data(ctx, userData)
 
-    fun createNotificationJson(json: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_notification_json(json))
+    // ======== Send functions ========
+    fun sendHandshake(ctx: Pointer, uuid: String, pubKey: String, ip: String, battery: Int, deviceType: String) =
+        lib.nrc_send_handshake(ctx, uuid, pubKey, ip, battery, deviceType)
 
-    fun createClipboardJson(json: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_clipboard_json(json))
+    fun sendPairingInit(ctx: Pointer, uuid: String, ip: String, battery: Int, deviceType: String) =
+        lib.nrc_send_pairing_init(ctx, uuid, ip, battery, deviceType)
 
-    fun createMediaControlJson(json: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_media_control_json(json))
+    fun sendPairingResp(ctx: Pointer, uuid: String, ltPub: String, pairingCode: String, ip: String, battery: Int, deviceType: String) =
+        lib.nrc_send_pairing_resp(ctx, uuid, ltPub, pairingCode, ip, battery, deviceType)
 
-    fun createMediaPayloadJson(json: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_media_payload_json(json))
+    fun sendAccept(ctx: Pointer, uuid: String, ltPubKey: String, ip: String, battery: Int, deviceType: String) =
+        lib.nrc_send_accept(ctx, uuid, ltPubKey, ip, battery, deviceType)
 
-    fun createIconRequestJson(json: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_icon_request_json(json))
+    fun sendReject(ctx: Pointer, uuid: String) =
+        lib.nrc_send_reject(ctx, uuid)
 
-    fun createIconResponseJson(json: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_icon_response_json(json))
+    fun sendHeartbeatTcp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String) =
+        lib.nrc_send_heartbeat_tcp(ctx, uuid, name, port, battery, deviceType)
 
-    fun createAppListRequestJson(json: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_app_list_request_json(json))
+    fun sendHeartbeatUdp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String) =
+        lib.nrc_send_heartbeat_udp(ctx, uuid, name, port, battery, deviceType)
 
-    fun createAppListResponseJson(json: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_app_list_response_json(json))
+    fun sendDiscovery(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String) =
+        lib.nrc_send_discovery(ctx, uuid, name, port, battery, deviceType)
 
-    fun createFtpMessageJson(json: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_ftp_message_json(json))
-
-    fun createStatusMessageJson(json: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_status_message_json(json))
-
-    fun createAppLaunchJson(json: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_app_launch_json(json))
+    fun sendDataMessage(ctx: Pointer, header: String, localUuid: String, localPubKey: String, remoteUuid: String, plaintext: String) =
+        lib.nrc_send_data_message(ctx, header, localUuid, localPubKey, remoteUuid, plaintext)
 }

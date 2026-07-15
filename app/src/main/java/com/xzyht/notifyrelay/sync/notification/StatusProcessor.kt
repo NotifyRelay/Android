@@ -180,13 +180,11 @@ object StatusProcessor {
                     put("requestId", requestId)
                 }
             }.toString()
-            val responseJson = NativeCore.createStatusMessageJson(raw) ?: return
-
             ProtocolSender.sendEncrypted(
                 deviceManager,
                 deviceInfo,
                 "DATA_STATUS",
-                responseJson
+                raw
             )
 
             Logger.d(TAG, "发送DATA_STATUS响应: originalHeader=$originalHeader, result=$result")

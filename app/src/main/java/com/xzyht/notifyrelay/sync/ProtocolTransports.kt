@@ -180,7 +180,7 @@ object HeartbeatSender {
             val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
             val isCharging = BatteryUtils.isCharging(manager.contextInternal)
             val battery = if (isCharging) batteryLevel else -batteryLevel
-            val displayName = manager.encodeDisplayNameForTransportInternal(manager.localDisplayNameInternal())
+            val displayName = manager.localDisplayNameInternal()
             val port = manager.listenPort
             val payload = NativeCore.formatTcpHeartbeat(
                 manager.uuid, displayName, port.toShort(), battery, "android"
@@ -211,7 +211,7 @@ object DiscoveryBroadcaster {
             val batteryLevel = BatteryUtils.getBatteryLevel(manager.contextInternal)
             val isCharging = BatteryUtils.isCharging(manager.contextInternal)
             val battery = if (isCharging) batteryLevel else -batteryLevel
-            val displayName = manager.encodeDisplayNameForTransportInternal(manager.localDisplayNameInternal())
+            val displayName = manager.localDisplayNameInternal()
             val port = manager.listenPort
             val payload = NativeCore.formatDiscovery(
                 manager.uuid, displayName, port.toShort(), battery, "android"

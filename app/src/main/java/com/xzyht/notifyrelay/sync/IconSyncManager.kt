@@ -207,8 +207,7 @@ object IconSyncManager {
             }
             put("time", System.currentTimeMillis())
         }.toString()
-        val json = NativeCore.createIconRequestJson(raw) ?: return
-        ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_REQUEST", json, ICON_REQUEST_TIMEOUT)
+        ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_REQUEST", raw, ICON_REQUEST_TIMEOUT)
         //Logger.d(TAG, "发送ICON_REQUEST(${packages.size}) -> ${sourceDevice.displayName}")
     }
 
@@ -264,11 +263,10 @@ object IconSyncManager {
                     }
                     put("time", System.currentTimeMillis())
                 }.toString()
-                val resp = NativeCore.createIconResponseJson(raw) ?: return
                 
                 Logger.d(TAG, "批量图标响应准备发送，包含 ${resultArr.length()} 个图标，${missingArr.length()} 个缺失图标")
                 // 发送响应，即使没有可用图标，也要通知请求方哪些图标缺失
-                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", resp, ICON_REQUEST_TIMEOUT)
+                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, ICON_REQUEST_TIMEOUT)
                 Logger.d(TAG, "批量图标响应已发送(${resultArr.length()}) -> ${sourceDevice.displayName}")
             } else if (single.isNotEmpty()) {
                 val icon = runBlocking {
@@ -284,11 +282,10 @@ object IconSyncManager {
                     }
                     put("time", System.currentTimeMillis())
                 }.toString()
-                val resp = NativeCore.createIconResponseJson(raw) ?: return
                 
                 Logger.d(TAG, "单图标响应准备发送，包名：$single，${if (icon != null) "有图标" else "无图标"}")
                 // 发送响应，即使没有图标，也要通知请求方
-                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", resp, ICON_REQUEST_TIMEOUT)
+                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, ICON_REQUEST_TIMEOUT)
                 Logger.d(TAG, "单图标响应已发送：$single -> ${sourceDevice.displayName}")
             }
         } catch (e: Exception) {

@@ -298,8 +298,7 @@ object RemoteMediaSessionManager {
                 put("type", "MEDIA_CONTROL")
                 put("action", action)
             }.toString()
-            val request = NativeCore.createMediaControlJson(raw) ?: return
-            ProtocolSender.sendEncrypted(deviceManager, device, "DATA_MEDIA_CONTROL", request)
+            ProtocolSender.sendEncrypted(deviceManager, device, "DATA_MEDIA_CONTROL", raw)
             Logger.i("RemoteMediaSessionManager", "已发送媒体控制指令: $action 到 ${device.displayName}")
         } catch (e: Exception) {
             Logger.e("RemoteMediaSessionManager", "发送媒体控制指令失败", e)

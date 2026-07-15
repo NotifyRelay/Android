@@ -34,7 +34,6 @@ import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.core.util.BatteryUtils
-import notifyrelay.core.util.EncryptionManager
 import notifyrelay.core.util.PairingCodeManager
 import notifyrelay.data.StorageManager
 import notifyrelay.data.config.AppConfig
@@ -174,9 +173,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 hasOldKey = true
                 try {
                     ctx?.let { NativeCore.removeDevice(it, device.uuid) }
-                } catch (_: Exception) {}
-                try {
-                    EncryptionManager.removeDeviceKey(device.uuid, context)
                 } catch (_: Exception) {}
                 // 更新数据库：清除密钥，标记未配对，但保留设备记录
                 kotlinx.coroutines.runBlocking {
@@ -367,23 +363,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         get() = context
 
     internal fun localDisplayNameInternal(): String = getLocalDisplayName()
-
-    // 编码用于 UDP/TCP 简单传输（避免冒号分隔冲突）。使用 Base64 无换行。
-    private fun encodeDisplayNameForTransport(name: String): String {
-        try {
-            val clean = sanitizeDisplayName(name)
-            if (clean.isEmpty()) {
-                // 确保设备名称不为空，使用默认值"错误空"以便排除故障点
-                return android.util.Base64.encodeToString("错误空".toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
-            }
-            return android.util.Base64.encodeToString(clean.toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
-        } catch (_: Exception) {
-            // 编码失败时返回默认设备名称的Base64编码，确保UDP广播消息格式正确
-            return android.util.Base64.encodeToString("错误空2".toByteArray(Charsets.UTF_8), android.util.Base64.NO_WRAP)
-        }
-    }
-
-    internal fun encodeDisplayNameForTransportInternal(name: String): String = encodeDisplayNameForTransport(name)
 
     // 解码并清洗从网络接收到的名称
     private fun decodeDisplayNameFromTransport(encoded: String): String {
@@ -811,9 +790,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // 使用 Rust core 解密，失败直接抛异常
     internal fun decryptData(input: String, uuid: String): String {
         val ctx = rustContext ?: throw IllegalStateException("Rust context not initialized")
-        val fakeLine = "DATA:$uuid:${localPublicKey}:$input"
-        return NativeCore.decryptMessage(ctx, fakeLine)
-            ?: throw IllegalStateException("Rust解密失败: decryptMessage, device=$uuid")
+        return NativeCore.decryptPayload(ctx, uuid, input)
+            ?: throw IllegalStateException("Rust解密失败: decryptPayload, device=$uuid")
     }
 
     // 发送通知数据（加密）
@@ -848,8 +826,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     fun requestAudioForwarding(device: DeviceInfo): Boolean {
         try {
             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioRequest\"}"
-            val request = NativeCore.createMediaControlJson(raw) ?: return false
-            ProtocolSender.sendEncrypted(this, device, "DATA_MEDIA_CONTROL", request, 10000L)
+            ProtocolSender.sendEncrypted(this, device, "DATA_MEDIA_CONTROL", raw, 10000L)
             return true
         } catch (_: Exception) {
             return false
@@ -871,8 +848,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 put("content", content)
                 put("time", System.currentTimeMillis())
             }.toString()
-            val json = NativeCore.createClipboardJson(raw) ?: return false
-            ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json, 10000L)
+            ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", raw, 10000L)
             return true
         } catch (_: Exception) {
             return false
@@ -896,10 +872,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 put("content", content)
                 put("time", System.currentTimeMillis())
             }.toString()
-            val json = NativeCore.createClipboardJson(raw) ?: return false
-            
             for (device in devices) {
-                ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json, 10000L)
+                ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", raw, 10000L)
             }
             return true
         } catch (_: Exception) {
@@ -988,8 +962,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                         val ok = device?.let { AudioForwardingService.startAudioForwarding(context, it.ip, ScrcpyDefaults.ADB_PORT, it.displayName) } == true
                         val result = if (ok) "accepted" else "rejected"
                         val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"$result\"}"
-                        val resp = NativeCore.createMediaControlJson(raw) ?: return@cb
-                        device?.let { ProtocolSender.sendEncrypted(this, it, "DATA_MEDIA_CONTROL", resp) }
+                        device?.let { ProtocolSender.sendEncrypted(this, it, "DATA_MEDIA_CONTROL", raw) }
                     }
                     "audioResponse" -> {
                         if (json.optString("result", "rejected") != "accepted") {
@@ -1016,11 +989,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                 StartResult.SUCCESS, StartResult.ALREADY_RUNNING -> {
                                     result.serverInfo?.let { info ->
                                         val raw = JSONObject().apply { put("action", "started"); put("ipAddress", info.ipAddress); put("port", info.port) }.toString()
-                                        val resp = NativeCore.createFtpMessageJson(raw)
-                                        if (resp != null) {
-                                            resolveDeviceInfo(uuid, "", 23333)?.let {
-                                                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", resp)
-                                            }
+                                        resolveDeviceInfo(uuid, "", 23333)?.let {
+                                            ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", raw)
                                         }
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
                                             val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
@@ -1032,22 +1002,16 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                 else -> {
                                     val err = when (result.status) { StartResult.PERMISSION_DENIED -> "PERMISSION_DENIED"; StartResult.PORT_IN_USE -> "PORT_IN_USE"; StartResult.CONFIG_ERROR -> "CONFIG_ERROR"; else -> "FAILED" }
                                     val raw = JSONObject().apply { put("originalHeader", "DATA_FTP"); put("action", "start"); put("result", "error"); put("errorCode", err) }.toString()
-                                    val resp = NativeCore.createFtpMessageJson(raw)
-                                    if (resp != null) {
-                                        resolveDeviceInfo(uuid, "", 23333)?.let {
-                                            ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_STATUS", resp)
-                                        }
+                                    resolveDeviceInfo(uuid, "", 23333)?.let {
+                                        ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_STATUS", raw)
                                     }
                                 }
                             }
                         }
                         "stop" -> { ftpServer.stop()
                             val raw = JSONObject().apply { put("action", "stopped") }.toString()
-                            val resp = NativeCore.createFtpMessageJson(raw)
-                            if (resp != null) {
-                                resolveDeviceInfo(uuid, "", 23333)?.let {
-                                    ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", resp)
-                                }
+                            resolveDeviceInfo(uuid, "", 23333)?.let {
+                                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", raw)
                             }
                         }
                     }
@@ -1108,29 +1072,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             synchronized(dm.authenticatedDevices) {
                                 val existingAuth = dm.authenticatedDevices[remoteUuid]
                                 if (existingAuth != null && existingAuth.publicKey != remotePubKey) {
-                                    Logger.w("CoreCb", "设备公钥已变更，重新派生密钥: $remoteUuid")
-                                    try {
-                                        NativeCore.deriveSharedSecret(dm.rustContextInternal!!, remoteUuid, remotePubKey)
-                                        dm.authenticatedDevices[remoteUuid] = existingAuth.copy(publicKey = remotePubKey, sharedSecret = "")
-                                        dm.saveAuthedDevicesInternal()
-                                    } catch (e: Exception) {
-                                        Logger.e("CoreCb", "公钥变更后重新派生密钥失败", e)
-                                        synchronized(dm.incompatibleDevicesInternal) { dm.incompatibleDevicesInternal.add(remoteUuid) }
-                                        val w = OutputStreamWriter(session.client.getOutputStream())
-                                        w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
-                                        return@invoke
-                                    }
+                                    dm.authenticatedDevices[remoteUuid] = existingAuth.copy(publicKey = remotePubKey, sharedSecret = "")
+                                    dm.saveAuthedDevicesInternal()
                                 }
                             }
                             synchronized(dm.incompatibleDevicesInternal) { dm.incompatibleDevicesInternal.remove(remoteUuid) }
-                            val w = OutputStreamWriter(session.client.getOutputStream())
                             val localIp = ServerLineRouter.getLocalIpAddress(dm)
-                            val acceptMsg = NativeCore.formatAccept(dm.uuid, dm.localPublicKey, localIp, BatteryUtils.getBatteryLevel(dm.contextInternal), remoteDeviceType)
-                            if (acceptMsg == null) {
-                                w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
-                                return@invoke
-                            }
-                            w.write("$acceptMsg\n"); w.flush(); w.close()
+                            NativeCore.sendAccept(dm.rustContextInternal!!, dm.uuid, dm.localPublicKey, localIp, BatteryUtils.getBatteryLevel(dm.contextInternal), remoteDeviceType)
                             synchronized(dm.authenticatedDevices) {
                                 val auth = dm.authenticatedDevices[remoteUuid]
                                 if (auth != null) {
@@ -1139,8 +1087,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                 }
                             }
                         } else {
-                            val w = OutputStreamWriter(session.client.getOutputStream())
-                            w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                            NativeCore.sendReject(dm.rustContextInternal!!, dm.uuid)
                         }
                     } catch (e: Exception) {
                         Logger.e("CoreCb", "on_handshake error: ${e.message}")
@@ -1204,35 +1151,22 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
                             return@invoke
                         }
-                        NativeCore.derivePairingKey(ctx, tmpPubKeyR)
                         val code = NativeCore.decryptPairingCode(ctx, encCode) ?: throw Exception("解密配对码失败")
                         if (!PairingCodeManager.verify(code)) {
                             Logger.w("CoreCb", "配对码验证失败: $remoteUuid")
-                            val w = OutputStreamWriter(session.client.getOutputStream())
-                            w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                            NativeCore.sendReject(dm.rustContextInternal!!, dm.uuid)
                             return@invoke
                         }
                         val success = dm.completePairingWithLongTermKeys(remoteUuid, ltPubKeyR, displayName = "未知设备", lastIp = session.client.inetAddress.hostAddress.orEmpty().ifEmpty { "0.0.0.0" })
                         if (!success) {
-                            val w = OutputStreamWriter(session.client.getOutputStream())
-                            w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                            NativeCore.sendReject(dm.rustContextInternal!!, dm.uuid)
                             return@invoke
                         }
-                        val w = OutputStreamWriter(session.client.getOutputStream())
                         val localIp = ServerLineRouter.getLocalIpAddress(dm)
-                        val acceptMsg = NativeCore.formatAccept(dm.uuid, dm.localPublicKey, localIp, BatteryUtils.getBatteryLevel(dm.contextInternal), "android")
-                        if (acceptMsg == null) {
-                            w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
-                            return@invoke
-                        }
-                        w.write("$acceptMsg\n"); w.flush(); w.close()
+                        NativeCore.sendAccept(dm.rustContextInternal!!, dm.uuid, dm.localPublicKey, localIp, BatteryUtils.getBatteryLevel(dm.contextInternal), "android")
                         Logger.d("CoreCb", "PAIRING_RESP 配对成功: $remoteUuid")
                     } catch (e: Exception) {
                         Logger.e("CoreCb", "on_pairing_resp error", e)
-                        try {
-                            val w = OutputStreamWriter(session.client.getOutputStream())
-                            w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
-                        } catch (_: Exception) { }
                     }
                 }
             }
@@ -1293,15 +1227,47 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
             lib.nrc_set_on_heartbeat_tcp_cb(ctx, cb); rustCallbackRefs.add(cb)
         }
+
+        // ---- on_send (统一发送回调：写入当前 TCP 会话) ----
+        run {
+            val cb = object : NotifyRelayCore.OnSendCb {
+                override fun invoke(line: Pointer?, userData: Pointer?) {
+                    val session = ServerLineRouter.getSessionContext() ?: return
+                    val lineStr = NotifyRelayCore.ptrToString(line) ?: return
+                    try {
+                        val w = java.io.OutputStreamWriter(session.client.getOutputStream())
+                        w.write("$lineStr\n"); w.flush(); w.close()
+                    } catch (_: Exception) {}
+                }
+            }
+            lib.nrc_set_on_send_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
+
+        // ---- on_send_udp (统一 UDP 发送回调) ----
+        run {
+            val cb = object : NotifyRelayCore.OnSendCb {
+                override fun invoke(line: Pointer?, userData: Pointer?) {
+                    val lineStr = NotifyRelayCore.ptrToString(line) ?: return
+                    try {
+                        val socket = java.net.DatagramSocket()
+                        socket.broadcast = true
+                        val buf = lineStr.toByteArray()
+                        val addr = java.net.InetAddress.getByName("255.255.255.255")
+                        socket.send(java.net.DatagramPacket(buf, buf.size, addr, 23334))
+                        socket.close()
+                    } catch (_: Exception) {}
+                }
+            }
+            lib.nrc_set_on_send_udp_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
     }
 
     // 辅助方法：发送媒体控制响应（由回调使用）
     private fun sendMediaControlResponse(remoteUuid: String, action: String, result: String, errorMessage: String?) {
         try {
             val raw = JSONObject().apply { put("originalHeader", "DATA_MEDIA_CONTROL"); put("action", action); put("result", result); if (errorMessage != null) put("errorMessage", errorMessage) }.toString()
-            val resp = NativeCore.createStatusMessageJson(raw) ?: return
             resolveDeviceInfo(remoteUuid, "", 23333)?.let {
-                ProtocolSender.sendEncrypted(this, it, "DATA_STATUS", resp)
+                ProtocolSender.sendEncrypted(this, it, "DATA_STATUS", raw)
             }
         } catch (e: Exception) { Logger.e("CoreCb", "sendMediaControlResponse", e) }
     }
@@ -1439,9 +1405,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             // 从协议不兼容设备集合移除
             try { incompatibleDevicesInternal.remove(uuid) } catch (_: Exception) {}
 
-            // 从 Android Keystore 移除设备密钥
-            try { EncryptionManager.removeDeviceKey(uuid, context) } catch (_: Exception) {}
-
             // 从 Rust 上下文移除设备密钥
             try { rustContext?.let { NativeCore.removeDevice(it, uuid) } } catch (_: Exception) {}
 
@@ -1514,11 +1477,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 }
                 put("time", System.currentTimeMillis())
             }.toString()
-            val ackObj = NativeCore.createStatusMessageJson(raw) ?: return
-
             // 通过统一加密发送器发回对端
             val deviceInfo = DeviceInfo(remoteUuid, DeviceConnectionManagerUtil.getDisplayNameByUuid(remoteUuid), ip, port)
-            ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_STATUS", ackObj, 3000L)
+            ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_STATUS", raw, 3000L)
         } catch (_: Exception) {
         }
     }

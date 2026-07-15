@@ -337,10 +337,8 @@ object MessageSender {
                 put("text", message)
                 put("time", System.currentTimeMillis())
             }.toString()
-            val json = NativeCore.createNotificationJson(raw) ?: return
-
             allDevices.forEach { device ->
-                enqueueNotification(device, json, deviceManager, "聊天")
+                enqueueNotification(device, raw, deviceManager, "聊天")
             }
 
             // 记录到聊天历史
@@ -431,8 +429,7 @@ object MessageSender {
                 }
 
                 val raw = payloadObj.toString()
-                val json = NativeCore.createMediaPayloadJson(raw) ?: return@forEach
-                enqueueNotification(deviceInfo, json, deviceManager, "媒体播放")
+                enqueueNotification(deviceInfo, raw, deviceManager, "媒体播放")
             }
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放通知失败", e)
@@ -472,11 +469,10 @@ object MessageSender {
             }
 
             val isLocked = PermissionHelper.isDeviceLocked(context)
-            val rawPayload = SuperIslandProtocol.buildPayload(
+            val payload = SuperIslandProtocol.buildPayload(
                 packageName, appName, time, isLocked, JSONObject(),
                 PayloadOptions.MEDIA_END
             ).toString()
-            val payload = NativeCore.createMediaPayloadJson(rawPayload) ?: return
 
             authenticatedDevices.forEach { deviceInfo ->
                 synchronized(lastStatePerDevice) {
@@ -531,10 +527,8 @@ object MessageSender {
                 put("time", time)
                 put("isLocked", isLocked)
             }.toString()
-            val json = NativeCore.createNotificationJson(raw) ?: return
-
             authenticatedDevices.forEach { deviceInfo ->
-                enqueueNotification(deviceInfo, json, deviceManager, "通知")
+                enqueueNotification(deviceInfo, raw, deviceManager, "通知")
             }
 
             Logger.i(TAG, "通知已加入队列，共 ${authenticatedDevices.size} 个设备，当前活跃发送: ${activeSends.get()}")
@@ -651,8 +645,7 @@ object MessageSender {
                     }
                 } catch (_: Exception) {}
                 val raw = payloadObj.toString()
-                val json = NativeCore.createMediaPayloadJson(raw) ?: return@forEach
-                val task = SuperIslandTask(deviceInfo, json, deviceManager)
+                val task = SuperIslandTask(deviceInfo, raw, deviceManager)
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         superIslandSendChannel.send(task)
@@ -688,10 +681,9 @@ object MessageSender {
             val featureId = featureIdOverride ?: SuperIslandProtocol.computeFeatureId(
                 superPkg, paramV2Raw, title, text
             )
-            val rawPayload = SuperIslandProtocol.buildEndPayload(
+            val payload = SuperIslandProtocol.buildEndPayload(
                 superPkg, appName, time, isLocked, featureId
             ).toString()
-            val payload = NativeCore.createMediaPayloadJson(rawPayload) ?: return
             authenticatedDevices.forEach { deviceInfo ->
                 // 清理该设备的lastState
                 synchronized(lastStatePerDevice) {

@@ -24,6 +24,7 @@ interface NotifyRelayCore : Library {
     ): Pointer
 
     fun nrc_decrypt_message(ctx: Pointer, encryptedLine: String): Pointer
+    fun nrc_decrypt_payload(ctx: Pointer, localUuid: String, encryptedB64: String): Pointer
     fun nrc_decode_line(ctx: Pointer, line: String): Pointer
 
     // ======== New: Ephemeral ECDH ========
@@ -77,6 +78,14 @@ interface NotifyRelayCore : Library {
         fun invoke(level: Int, message: Pointer?)
     }
 
+    interface OnSendCb : Callback {
+        fun invoke(line: Pointer?, userData: Pointer?)
+    }
+
+    interface OnHeartbeatUdpCb : Callback {
+        fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
+    }
+
     // ======== Callback setters ========
     fun nrc_set_log_callback(cb: OnLogCb?)
     fun nrc_set_on_handshake_cb(ctx: Pointer, cb: OnHandshakeCb?)
@@ -98,38 +107,15 @@ interface NotifyRelayCore : Library {
     fun nrc_set_on_app_launch_cb(ctx: Pointer, cb: OnDataCb?)
     fun nrc_set_on_superisland_cb(ctx: Pointer, cb: OnDataCb?)
     fun nrc_set_on_unknown_data_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_send_cb(ctx: Pointer, cb: OnSendCb?)
+    fun nrc_set_on_send_udp_cb(ctx: Pointer, cb: OnSendCb?)
+    fun nrc_set_on_heartbeat_udp_cb(ctx: Pointer, cb: OnHeartbeatUdpCb?)
 
-    fun nrc_format_heartbeat(
-        uuid: String, name: String, port: Short,
+    // ======== Format helpers (for one-shot sync socket ops) ========
+    fun nrc_format_handshake(
+        uuid: String, pubKey: String, ip: String,
         battery: Int, deviceType: String
     ): Pointer
-
-    fun nrc_parse_heartbeat(line: String): Pointer
-
-    fun nrc_format_discovery(
-        uuid: String, name: String, port: Short,
-        battery: Int, deviceType: String
-    ): Pointer
-
-    fun nrc_format_tcp_heartbeat(
-        uuid: String, name: String, port: Short,
-        battery: Int, deviceType: String
-    ): Pointer
-
-    fun nrc_parse_heartbeat_json(line: String): Pointer
-    fun nrc_parse_heartbeat_tcp_json(line: String): Pointer
-
-    fun nrc_create_notification_json(input: String): Pointer
-    fun nrc_create_clipboard_json(input: String): Pointer
-    fun nrc_create_media_control_json(input: String): Pointer
-    fun nrc_create_media_payload_json(input: String): Pointer
-    fun nrc_create_icon_request_json(input: String): Pointer
-    fun nrc_create_icon_response_json(input: String): Pointer
-    fun nrc_create_app_list_request_json(input: String): Pointer
-    fun nrc_create_app_list_response_json(input: String): Pointer
-    fun nrc_create_ftp_message_json(input: String): Pointer
-    fun nrc_create_status_message_json(input: String): Pointer
-    fun nrc_create_app_launch_json(input: String): Pointer
 
     fun nrc_format_pairing_init(
         uuid: String, tmpPubKey: String, ip: String,
@@ -147,10 +133,37 @@ interface NotifyRelayCore : Library {
         battery: Int, deviceType: String
     ): Pointer
 
-    fun nrc_format_handshake(
-        uuid: String, pubKey: String, ip: String,
+    fun nrc_parse_heartbeat_json(line: String): Pointer
+    fun nrc_parse_heartbeat_tcp_json(line: String): Pointer
+
+    fun nrc_format_heartbeat(
+        uuid: String, name: String, port: Short,
         battery: Int, deviceType: String
     ): Pointer
+
+    fun nrc_format_discovery(
+        uuid: String, name: String, port: Short,
+        battery: Int, deviceType: String
+    ): Pointer
+
+    fun nrc_format_tcp_heartbeat(
+        uuid: String, name: String, port: Short,
+        battery: Int, deviceType: String
+    ): Pointer
+
+    // ======== Send functions (for established connections) ========
+    fun nrc_send_handshake(ctx: Pointer, uuid: String, pubKey: String, ip: String, battery: Int, deviceType: String)
+    fun nrc_send_pairing_init(ctx: Pointer, uuid: String, ip: String, battery: Int, deviceType: String)
+    fun nrc_send_pairing_resp(ctx: Pointer, uuid: String, ltPub: String, pairingCode: String, ip: String, battery: Int, deviceType: String)
+    fun nrc_send_accept(ctx: Pointer, uuid: String, ltPubKey: String, ip: String, battery: Int, deviceType: String)
+    fun nrc_send_reject(ctx: Pointer, uuid: String)
+    fun nrc_send_heartbeat_tcp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
+    fun nrc_send_heartbeat_udp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
+    fun nrc_send_discovery(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
+    fun nrc_send_data_message(ctx: Pointer, header: String, localUuid: String, localPubKey: String, remoteUuid: String, plaintext: String)
+
+    // ======== UDP broadcast processing ========
+    fun nrc_process_udp_broadcast(ctx: Pointer, line: String): Int
 
     fun nrc_export_state(ctx: Pointer): Pointer
     fun nrc_import_state(ctx: Pointer, json: String): Int

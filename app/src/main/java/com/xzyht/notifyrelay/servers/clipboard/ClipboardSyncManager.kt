@@ -345,7 +345,7 @@ object ClipboardSyncManager {
             put("content", content)
             put("time", time)
         }.toString()
-        return NativeCore.createClipboardJson(raw) ?: raw
+        return raw
     }
     
     /**

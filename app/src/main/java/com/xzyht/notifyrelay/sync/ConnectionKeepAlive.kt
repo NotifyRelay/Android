@@ -214,17 +214,10 @@ class ConnectionKeepAlive(
                 //Logger.d("死神-NotifyRelay", "connectToDevice: handshake resp=$resp")
 
                 if (resp != null && resp.startsWith("ACCEPT:")) {
-                    val ctx = deviceManager.rustContextInternal
-                    if (ctx == null) continue
-                    val acceptJson = NativeCore.decodeLine(ctx, resp)
-                    if (acceptJson == null) continue
-                    val remotePubKey = org.json.JSONObject(acceptJson).optString("lt_pub_key", "")
-                    if (remotePubKey.isEmpty()) continue
-                    NativeCore.deriveSharedSecret(ctx!!, device.uuid, remotePubKey)
                     synchronized(authenticatedDevices) {
                         authenticatedDevices.remove(device.uuid)
                         authenticatedDevices[device.uuid] = AuthInfo(
-                            remotePubKey, "", true, device.displayName, device.ip, device.port
+                            "", "", true, device.displayName, device.ip, device.port
                         )
                         deviceManager.saveAuthedDevicesInternal()
                     }
