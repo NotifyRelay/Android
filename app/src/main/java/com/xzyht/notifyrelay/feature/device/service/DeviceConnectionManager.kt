@@ -1152,11 +1152,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             return@invoke
                         }
                         val code = NativeCore.decryptPairingCode(ctx, encCode) ?: throw Exception("解密配对码失败")
-                        if (!PairingCodeManager.verify(code)) {
+                        val storedCode = notifyrelay.core.util.PairingCodeManager.getCurrent() ?: ""
+                        if (storedCode.isEmpty() || !NativeCore.verifyPairingCode(storedCode, code)) {
                             Logger.w("CoreCb", "配对码验证失败: $remoteUuid")
                             NativeCore.sendReject(dm.rustContextInternal!!, dm.uuid)
                             return@invoke
                         }
+                        notifyrelay.core.util.PairingCodeManager.clear()
                         val success = dm.completePairingWithLongTermKeys(remoteUuid, ltPubKeyR, displayName = "未知设备", lastIp = session.client.inetAddress.hostAddress.orEmpty().ifEmpty { "0.0.0.0" })
                         if (!success) {
                             NativeCore.sendReject(dm.rustContextInternal!!, dm.uuid)
@@ -1177,7 +1179,18 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         run {
             val cb = object : NotifyRelayCore.OnAcceptCb {
                 override fun invoke(uuid: Pointer?, ltPubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
-                    // ACCEPT 在服务端 routeLine 中无操作（由客户端侧处理）
+                    val session = ServerLineRouter.getSessionContext() ?: return
+                    val dm = session.deviceManager
+                    val remoteUuid = ptr2str(uuid) ?: return
+                    val remoteLtPubKey = ptr2str(ltPubKey) ?: return
+                    val remoteIp = ptr2str(ip) ?: ""
+                    val clientIp = session.client.inetAddress.hostAddress.orEmpty().ifEmpty { "0.0.0.0" }
+                    try {
+                        dm.completePairingWithLongTermKeys(remoteUuid, remoteLtPubKey, lastIp = clientIp)
+                        Logger.d("CoreCb", "ACCEPT 已处理: $remoteUuid")
+                    } catch (e: Exception) {
+                        Logger.e("CoreCb", "on_accept error: ${e.message}")
+                    }
                 }
             }
             lib.nrc_set_on_accept_cb(ctx, cb); rustCallbackRefs.add(cb)
@@ -1187,10 +1200,49 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         run {
             val cb = object : NotifyRelayCore.OnRejectCb {
                 override fun invoke(uuid: Pointer?, userData: Pointer?) {
-                    // REJECT 在服务端 routeLine 中无操作（由客户端侧处理）
+                    val session = ServerLineRouter.getSessionContext() ?: return
+                    val dm = session.deviceManager
+                    val remoteUuid = ptr2str(uuid) ?: return
+                    try {
+                        synchronized(dm.rejectedDevicesInternal) {
+                            dm.rejectedDevicesInternal.add(remoteUuid)
+                        }
+                        Logger.w("CoreCb", "REJECT 已处理: $remoteUuid")
+                    } catch (e: Exception) {
+                        Logger.e("CoreCb", "on_reject error: ${e.message}")
+                    }
                 }
             }
             lib.nrc_set_on_reject_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
+
+        // ---- on_heartbeat_udp ----
+        run {
+            val cb = object : NotifyRelayCore.OnHeartbeatUdpCb {
+                override fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?) {
+                    val dm = _callbackInstance ?: return
+                    val remoteUuid = ptr2str(uuid) ?: return
+                    val remoteNameB64 = ptr2str(nameB64) ?: return
+                    val remoteDeviceType = ptr2str(deviceType) ?: "unknown"
+                    val ip = "0.0.0.0"
+                    try {
+                        val displayName = try {
+                            dm.decodeDisplayNameFromTransportInternal(remoteNameB64)
+                        } catch (_: Exception) { remoteNameB64 }
+                        val info = HeartbeatProcessor.HeartbeatInfo(
+                            uuid = remoteUuid, displayName = displayName,
+                            port = port.toInt(), batteryLevel = kotlin.math.abs(battery),
+                            isCharging = battery >= 0, deviceType = remoteDeviceType, ip = ip
+                        )
+                        if (info.uuid != dm.uuid) {
+                            HeartbeatProcessor.processHeartbeat(info, dm)
+                        }
+                    } catch (e: Exception) {
+                        Logger.e("CoreCb", "on_heartbeat_udp error", e)
+                    }
+                }
+            }
+            lib.nrc_set_on_heartbeat_udp_cb(ctx, cb); rustCallbackRefs.add(cb)
         }
 
         // ---- on_heartbeat_tcp ----

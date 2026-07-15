@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.nativecore
 import com.sun.jna.Pointer
 
 object NativeCore {
-    private val lib = NotifyRelayCore.instance()
+    internal val lib = NotifyRelayCore.instance()
 
     fun createContext(): Pointer = lib.nrc_init()
     fun destroyContext(ctx: Pointer) = lib.nrc_destroy(ctx)
@@ -49,12 +49,6 @@ object NativeCore {
 
     fun formatAccept(uuid: String, ltPubKey: String, ip: String, battery: Int, deviceType: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_accept(uuid, ltPubKey, ip, battery, deviceType))
-
-    fun parseHeartbeatJson(line: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_heartbeat_json(line))
-
-    fun parseHeartbeatTcpJson(line: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_heartbeat_tcp_json(line))
 
     fun formatHeartbeat(uuid: String, name: String, port: Short, battery: Int, deviceType: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_format_heartbeat(uuid, name, port, battery, deviceType))
@@ -145,4 +139,15 @@ object NativeCore {
 
     fun sendDataMessage(ctx: Pointer, header: String, localUuid: String, localPubKey: String, remoteUuid: String, plaintext: String) =
         lib.nrc_send_data_message(ctx, header, localUuid, localPubKey, remoteUuid, plaintext)
+
+    // ======== New utility functions ========
+
+    fun verifyPairingCode(storedCode: String, inputCode: String): Boolean =
+        lib.nrc_verify_pairing_code(storedCode, inputCode) != 0
+
+    fun computeDedupKey(deviceUuid: String, data: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_dedup_key(deviceUuid, data))
+
+    fun computeFeatureId(packageName: String, title: String, text: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_feature_id(packageName, title, text))
 }

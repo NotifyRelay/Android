@@ -86,6 +86,22 @@ interface NotifyRelayCore : Library {
         fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
     }
 
+    // ======== New callback types for heartbeat without JSON re-parse ========
+    interface OnHeartbeatWithCb : Callback {
+        fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
+    }
+    interface OnHeartbeatTcpWithCb : Callback {
+        fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?)
+    }
+
+    // ======== New utility functions ========
+    fun nrc_verify_pairing_code(storedCode: String, inputCode: String): Int
+    fun nrc_compute_dedup_key(deviceUuid: String, data: String): Pointer
+    fun nrc_heartbeat_has_timed_out(lastHeartbeatSec: Long, nowSec: Long, timeoutSec: Long): Int
+    fun nrc_compute_feature_id(packageName: String, title: String, text: String): Pointer
+    fun nrc_parse_heartbeat_with_cb(line: String, cb: OnHeartbeatWithCb?, userData: Pointer?): Int
+    fun nrc_parse_heartbeat_tcp_with_cb(line: String, cb: OnHeartbeatTcpWithCb?, userData: Pointer?): Int
+
     // ======== Callback setters ========
     fun nrc_set_log_callback(cb: OnLogCb?)
     fun nrc_set_on_handshake_cb(ctx: Pointer, cb: OnHandshakeCb?)

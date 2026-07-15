@@ -39,6 +39,7 @@ object ServerLineRouter {
 
     /**
      * 统一路由：所有消息类型均走 Rust [NativeCore.processLine]。
+     * Rust 上下文不可用时记录警告（不再单独回落处理，统一走 Rust）。
      *
      * 回调执行期间通过 [sessionLocal] 传递 TCP 会话上下文。
      */
@@ -50,7 +51,7 @@ object ServerLineRouter {
     ) {
         val ctx = deviceManager.rustContextInternal
         if (ctx == null) {
-            handleOther(line, client, reader, deviceManager)
+            Logger.w(TAG, "Rust 上下文不可用，无法处理消息: $line")
             return
         }
 
@@ -67,26 +68,6 @@ object ServerLineRouter {
             try { reader.close() } catch (_: Exception) {}
             try { client.close() } catch (_: Exception) {}
         }
-    }
-
-    /**
-     * 回落处理：Rust 上下文不可用时直接处理已知协议
-     */
-    internal fun handleOther(
-        line: String,
-        client: Socket,
-        reader: BufferedReader,
-        deviceManager: DeviceConnectionManager
-    ) {
-        try {
-            if (line.startsWith("HEARTBEAT_TCP:")) {
-                val clientIp = client.inetAddress.hostAddress.orEmpty()
-                val heartbeatInfo = HeartbeatProcessor.parseHeartbeatTcpPayload(line, clientIp, deviceManager.listenPort)
-                if (heartbeatInfo != null && heartbeatInfo.uuid != deviceManager.uuid) {
-                    HeartbeatProcessor.processHeartbeat(heartbeatInfo, deviceManager)
-                }
-            }
-        } catch (_: Exception) { }
     }
 
     internal fun getLocalIpAddress(deviceManager: DeviceConnectionManager): String {

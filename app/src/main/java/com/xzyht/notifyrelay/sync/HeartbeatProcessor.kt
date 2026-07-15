@@ -1,12 +1,13 @@
 package com.xzyht.notifyrelay.sync
 
+import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
-import org.json.JSONObject
 
 object HeartbeatProcessor {
 
@@ -20,29 +21,43 @@ object HeartbeatProcessor {
         val ip: String
     )
 
+    /**
+     * 通过 Rust 回调式解析直接构造 HeartbeatInfo，消除 JSON 中间格式
+     */
     fun parseHeartbeatPayload(msg: String, ip: String, defaultPort: Int): HeartbeatInfo? {
-        val json = NativeCore.parseHeartbeatJson(msg) ?: return null
-        return parseHeartbeatJson(json, ip, defaultPort)
+        val result = mutableListOf<HeartbeatInfo>()
+        val cb = object : NotifyRelayCore.OnHeartbeatWithCb {
+            override fun invoke(uuidPtr: Pointer?, nameB64Ptr: Pointer?, port: Short, battery: Int, deviceTypePtr: Pointer?, userData: Pointer?) {
+                val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
+                val nameB64 = NotifyRelayCore.ptrToString(nameB64Ptr) ?: ""
+                val deviceType = NotifyRelayCore.ptrToString(deviceTypePtr) ?: "unknown"
+                val displayName = try {
+                    val decoded = java.util.Base64.getDecoder().decode(nameB64)
+                    String(decoded, Charsets.UTF_8)
+                } catch (_: Exception) { nameB64 }
+                result.add(HeartbeatInfo(uuid, displayName, port.toInt(), kotlin.math.abs(battery), battery >= 0, deviceType, ip))
+            }
+        }
+        NativeCore.lib.nrc_parse_heartbeat_with_cb(msg, cb, null)
+        return result.firstOrNull()
     }
 
     internal fun parseHeartbeatTcpPayload(msg: String, ip: String, defaultPort: Int): HeartbeatInfo? {
-        val json = NativeCore.parseHeartbeatTcpJson(msg) ?: return null
-        return parseHeartbeatJson(json, ip, defaultPort)
-    }
-
-    private fun parseHeartbeatJson(jsonStr: String, ip: String, defaultPort: Int): HeartbeatInfo? {
-        return try {
-            val json = JSONObject(jsonStr)
-            val uuid = json.optString("uuid", "")
-            if (uuid.isEmpty()) return null
-            val displayName = json.optString("name", "")
-            val port = json.optInt("port", defaultPort)
-            val battery = json.optInt("battery", 0)
-            val deviceType = json.optString("device_type", "unknown")
-            HeartbeatInfo(uuid, displayName, port, kotlin.math.abs(battery), battery >= 0, deviceType, ip)
-        } catch (_: Exception) {
-            null
+        val result = mutableListOf<HeartbeatInfo>()
+        val cb = object : NotifyRelayCore.OnHeartbeatTcpWithCb {
+            override fun invoke(uuidPtr: Pointer?, nameB64Ptr: Pointer?, port: Short, battery: Int, deviceTypePtr: Pointer?, ipPtr: Pointer?, userData: Pointer?) {
+                val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
+                val nameB64 = NotifyRelayCore.ptrToString(nameB64Ptr) ?: ""
+                val deviceType = NotifyRelayCore.ptrToString(deviceTypePtr) ?: "unknown"
+                val displayName = try {
+                    val decoded = java.util.Base64.getDecoder().decode(nameB64)
+                    String(decoded, Charsets.UTF_8)
+                } catch (_: Exception) { nameB64 }
+                result.add(HeartbeatInfo(uuid, displayName, port.toInt(), kotlin.math.abs(battery), battery >= 0, deviceType, ip))
+            }
         }
+        NativeCore.lib.nrc_parse_heartbeat_tcp_with_cb(msg, cb, null)
+        return result.firstOrNull()
     }
 
     fun processHeartbeat(info: HeartbeatInfo, deviceManager: DeviceConnectionManager) {
