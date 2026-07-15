@@ -310,4 +310,5 @@ object EncryptionManager {
         keyStore.load(null)
         return keyStore.containsAlias(AES_DEVICE_SECRET_PREFIX + uuid)
     }
+
 }

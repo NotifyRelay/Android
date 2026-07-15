@@ -68,6 +68,12 @@ object NativeCore {
     fun importState(ctx: Pointer, json: String): Boolean =
         lib.nrc_import_state(ctx, json) == 0
 
+    fun encryptLocalState(ctx: Pointer, plaintext: String, deviceUuid: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_encrypt_local_state(ctx, plaintext, deviceUuid))
+
+    fun decryptLocalState(ctx: Pointer, encryptedB64: String, deviceUuid: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_decrypt_local_state(ctx, encryptedB64, deviceUuid))
+
     // ======== New methods ========
 
     fun generateEphemeralKeypair(ctx: Pointer): Boolean =

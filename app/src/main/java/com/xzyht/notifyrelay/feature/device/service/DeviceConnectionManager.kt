@@ -452,9 +452,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         try {
             rustContext = NativeCore.createContext()
             val ctx = rustContext!!
-            val savedState = StorageManager.getString(context, "rust_core_state")
-            if (savedState.isNotEmpty()) {
-                NativeCore.importState(ctx, savedState)
+            val savedStateEnc = StorageManager.getString(context, "rust_core_state")
+            if (savedStateEnc.isNotEmpty()) {
+                val decrypted = NativeCore.decryptLocalState(ctx, savedStateEnc, uuid)
+                if (decrypted != null) {
+                    NativeCore.importState(ctx, decrypted)
+                }
             }
             if (!NativeCore.hasKeypair(ctx)) {
                 NativeCore.generateKeypair(ctx)
@@ -462,7 +465,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             initPubKey = NativeCore.getPublicKey(ctx) ?: ""
             val stateJson = NativeCore.exportState(ctx)
             if (stateJson != null) {
-                StorageManager.putString(context, "rust_core_state", stateJson)
+                val encrypted = NativeCore.encryptLocalState(ctx, stateJson, uuid)
+                if (encrypted != null) {
+                    StorageManager.putString(context, "rust_core_state", encrypted)
+                }
             }
             Logger.d("死神-NotifyRelay", "Rust core 上下文已初始化")
             // 注册 Rust 回调

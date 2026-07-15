@@ -146,6 +146,8 @@ interface NotifyRelayCore : Library {
 
     fun nrc_export_state(ctx: Pointer): Pointer
     fun nrc_import_state(ctx: Pointer, json: String): Int
+    fun nrc_encrypt_local_state(ctx: Pointer, plaintext: String, deviceUuid: String): Pointer
+    fun nrc_decrypt_local_state(ctx: Pointer, encryptedB64: String, deviceUuid: String): Pointer
 
     fun nrc_free_string(s: Pointer)
 
