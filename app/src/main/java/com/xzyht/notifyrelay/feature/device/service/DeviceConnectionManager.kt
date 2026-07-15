@@ -217,6 +217,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
         } catch (_: Exception) {}
         if (hasOldKey) {
+            saveRustCoreState()
             Logger.i("死神-NotifyRelay", "检测到旧版密钥，已清除配对，请重新配对设备")
         }
     }
@@ -661,6 +662,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 )
                 saveAuthedDevices()
             }
+            saveRustCoreState()
             updateDeviceList()
             Logger.d("死神-NotifyRelay", "客户端配对完成: $remoteUuid")
         } catch (e: Exception) {
@@ -732,6 +734,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 )
                 saveAuthedDevices()
             }
+            saveRustCoreState()
             updateDeviceList()
             Logger.d("死神-NotifyRelay", "长期密钥配对完成: $uuid")
             true
@@ -1352,6 +1355,18 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
+    // 保存 Rust Core 状态到持久化存储，确保重启后 device_keys 可恢复
+    internal fun saveRustCoreState() {
+        try {
+            val ctx = rustContext ?: return
+            val stateJson = NativeCore.exportState(ctx) ?: return
+            val encrypted = NativeCore.encryptLocalState(ctx, stateJson, uuid) ?: return
+            StorageManager.putString(context, "rust_core_state", encrypted)
+        } catch (e: Exception) {
+            Logger.e("死神-NotifyRelay", "保存 Rust Core 状态失败", e)
+        }
+    }
+
     // 封装设备信息缓存更新操作
     private fun updateDeviceInfoCache(uuid: String, deviceInfo: DeviceInfo) {
         synchronized(deviceInfoCache) {
@@ -1458,7 +1473,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             try { incompatibleDevicesInternal.remove(uuid) } catch (_: Exception) {}
 
             // 从 Rust 上下文移除设备密钥
-            try { rustContext?.let { NativeCore.removeDevice(it, uuid) } } catch (_: Exception) {}
+            try {
+                rustContext?.let { NativeCore.removeDevice(it, uuid) }
+                saveRustCoreState()
+            } catch (_: Exception) {}
 
             synchronized(authenticatedDevices) {
                 if (authenticatedDevices.containsKey(uuid)) {
