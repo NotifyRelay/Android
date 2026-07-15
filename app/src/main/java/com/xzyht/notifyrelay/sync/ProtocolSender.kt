@@ -48,8 +48,7 @@ object ProtocolSender {
                         try {
                             socket.connect(InetSocketAddress(target.ip, target.port), 5000)
                             val writer = OutputStreamWriter(socket.getOutputStream())
-                            val encrypted = deviceManager.encryptData(plaintext, target.uuid)
-                            val payload = "$header:${deviceManager.uuid}:${deviceManager.localPublicKey}:${encrypted}"
+                            val payload = deviceManager.encryptData(plaintext, target.uuid, header)
                             writer.write(payload + "\n")
                             writer.flush()
                             //Logger.d(TAG, "已发送 $header -> ${target.displayName}")

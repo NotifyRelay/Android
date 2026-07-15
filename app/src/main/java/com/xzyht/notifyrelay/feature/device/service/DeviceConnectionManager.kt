@@ -14,6 +14,7 @@ import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
 import com.xzyht.notifyrelay.sync.IconSyncManager
 import com.xzyht.notifyrelay.sync.ProtocolSender
+import com.xzyht.notifyrelay.sync.HeartbeatProcessor
 import com.xzyht.notifyrelay.sync.ServerLineRouter
 import com.xzyht.notifyrelay.sync.ftpServer
 import com.xzyht.notifyrelay.sync.ftpServer.StartResult
@@ -32,7 +33,9 @@ import kotlinx.coroutines.launch
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.DeviceUtils
+import notifyrelay.core.util.BatteryUtils
 import notifyrelay.core.util.EncryptionManager
+import notifyrelay.core.util.PairingCodeManager
 import notifyrelay.data.StorageManager
 import notifyrelay.data.config.AppConfig
 import notifyrelay.data.config.ScrcpyDefaults
@@ -41,7 +44,9 @@ import notifyrelay.data.database.repository.DatabaseRepository
 import org.json.JSONObject
 import java.io.BufferedReader
 import java.io.InputStreamReader
+import java.io.OutputStreamWriter
 import java.net.ServerSocket
+import java.net.Socket
 import java.util.UUID
 
 data class DeviceInfo(
@@ -796,13 +801,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     }
 
     // 使用 Rust core 加密，失败直接抛异常
-    internal fun encryptData(input: String, uuid: String): String {
+    // header 为协议头（如 DATA_NOTIFICATION），返回完整报文：$header:uuid:pubKey:encrypted
+    internal fun encryptData(input: String, uuid: String, header: String = "DATA"): String {
         val ctx = rustContext ?: throw IllegalStateException("Rust context not initialized")
-        val fullLine = NativeCore.encryptMessage(ctx, "DATA", this.uuid, this.localPublicKey, uuid, input)
+        return NativeCore.encryptMessage(ctx, header, this.uuid, this.localPublicKey, uuid, input)
             ?: throw IllegalStateException("Rust加密失败: encryptMessage, device=$uuid")
-        val prefix = "DATA:${this.uuid}:${this.localPublicKey}:"
-        return if (fullLine.startsWith(prefix)) fullLine.removePrefix(prefix)
-        else throw IllegalStateException("Rust加密返回格式异常: $fullLine")
     }
 
     // 使用 Rust core 解密，失败直接抛异常
@@ -1070,6 +1073,220 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         cb({ lib.nrc_set_on_unknown_data_cb(ctx, it) }, "DATA_UNKNOWN") { uuid, text ->
             Logger.d("CoreCb", "未知DATA通道: uuid=$uuid, size=${text.length}")
         }
+
+        // ==================== 非 DATA 回调注册 ====================
+
+        // ---- on_handshake ----
+        run {
+            val cb = object : NotifyRelayCore.OnHandshakeCb {
+                override fun invoke(uuid: Pointer?, pubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
+                    val session = ServerLineRouter.getSessionContext() ?: return
+                    val dm = session.deviceManager
+                    val remoteUuid = ptr2str(uuid) ?: return
+                    val remotePubKey = ptr2str(pubKey) ?: return
+                    val remoteIp = ptr2str(ip) ?: return
+                    val remoteDeviceType = ptr2str(deviceType) ?: "unknown"
+                    val clientIp = session.client.inetAddress.hostAddress.orEmpty().ifEmpty { "0.0.0.0" }
+
+                    try {
+                        synchronized(dm.deviceInfoCacheInternal) {
+                            val old = dm.deviceInfoCacheInternal[remoteUuid]
+                            val displayName = old?.displayName ?: "未知设备"
+                            dm.deviceInfoCacheInternal[remoteUuid] = DeviceInfo(remoteUuid, displayName, clientIp, old?.port ?: 23333)
+                        }
+                        synchronized(dm.authenticatedDevices) {
+                            val auth = dm.authenticatedDevices[remoteUuid]
+                            if (auth != null) {
+                                dm.authenticatedDevices[remoteUuid] = auth.copy(lastIp = clientIp)
+                                dm.saveAuthedDevicesInternal()
+                            }
+                        }
+                        val alreadyAuthed = synchronized(dm.authenticatedDevices) {
+                            dm.authenticatedDevices[remoteUuid]?.isAccepted == true
+                        }
+                        if (alreadyAuthed) {
+                            synchronized(dm.authenticatedDevices) {
+                                val existingAuth = dm.authenticatedDevices[remoteUuid]
+                                if (existingAuth != null && existingAuth.publicKey != remotePubKey) {
+                                    Logger.w("CoreCb", "设备公钥已变更，重新派生密钥: $remoteUuid")
+                                    try {
+                                        NativeCore.deriveSharedSecret(dm.rustContextInternal!!, remoteUuid, remotePubKey)
+                                        dm.authenticatedDevices[remoteUuid] = existingAuth.copy(publicKey = remotePubKey, sharedSecret = "")
+                                        dm.saveAuthedDevicesInternal()
+                                    } catch (e: Exception) {
+                                        Logger.e("CoreCb", "公钥变更后重新派生密钥失败", e)
+                                        synchronized(dm.incompatibleDevicesInternal) { dm.incompatibleDevicesInternal.add(remoteUuid) }
+                                        val w = OutputStreamWriter(session.client.getOutputStream())
+                                        w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                                        return@invoke
+                                    }
+                                }
+                            }
+                            synchronized(dm.incompatibleDevicesInternal) { dm.incompatibleDevicesInternal.remove(remoteUuid) }
+                            val w = OutputStreamWriter(session.client.getOutputStream())
+                            val localIp = ServerLineRouter.getLocalIpAddress(dm)
+                            val acceptMsg = NativeCore.formatAccept(dm.uuid, dm.localPublicKey, localIp, BatteryUtils.getBatteryLevel(dm.contextInternal), remoteDeviceType)
+                                ?: "ACCEPT:${dm.uuid}:${dm.localPublicKey}:$localIp:${ServerLineRouter.getLocalBatteryInfo(dm)}:$remoteDeviceType"
+                            w.write("$acceptMsg\n"); w.flush(); w.close()
+                            synchronized(dm.authenticatedDevices) {
+                                val auth = dm.authenticatedDevices[remoteUuid]
+                                if (auth != null) {
+                                    dm.authenticatedDevices[remoteUuid] = auth.copy(deviceType = remoteDeviceType, lastIp = clientIp)
+                                    dm.saveAuthedDevicesInternal()
+                                }
+                            }
+                        } else {
+                            val w = OutputStreamWriter(session.client.getOutputStream())
+                            w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                        }
+                    } catch (e: Exception) {
+                        Logger.e("CoreCb", "on_handshake error: ${e.message}")
+                    }
+                }
+            }
+            lib.nrc_set_on_handshake_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
+
+        // ---- on_pairing_init ----
+        run {
+            val cb = object : NotifyRelayCore.OnPairingInitCb {
+                override fun invoke(uuid: Pointer?, tmpPubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
+                    val session = ServerLineRouter.getSessionContext() ?: return
+                    val dm = session.deviceManager
+                    val remoteUuid = ptr2str(uuid) ?: return
+                    val tmpPub = ptr2str(tmpPubKey) ?: return
+                    val remoteIp = ptr2str(ip) ?: return
+                    val clientIp = session.client.inetAddress.hostAddress.orEmpty().ifEmpty { "0.0.0.0" }
+
+                    try {
+                        synchronized(dm.rejectedDevicesInternal) {
+                            if (dm.rejectedDevicesInternal.contains(remoteUuid)) {
+                                val w = OutputStreamWriter(session.client.getOutputStream())
+                                w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                                return@invoke
+                            }
+                        }
+                        val displayName: String
+                        synchronized(dm.deviceInfoCacheInternal) {
+                            displayName = dm.deviceInfoCacheInternal[remoteUuid]?.displayName ?: "未知设备"
+                            dm.deviceInfoCacheInternal[remoteUuid] = DeviceInfo(remoteUuid, displayName, clientIp, 23333)
+                        }
+                        dm.pendingPairing = PendingPairing(remoteUuid = remoteUuid, remotePubKey = tmpPub, remoteIp = clientIp, tmpPubKey = tmpPub)
+                        val remoteDevice = DeviceInfo(remoteUuid, displayName, clientIp, 23333)
+                        dm.handshakeRequestHandler?.onPairingInitRequest(remoteDevice, tmpPub)
+                        Logger.d("CoreCb", "PAIRING_INIT 已处理: $remoteUuid")
+                    } catch (e: Exception) {
+                        Logger.e("CoreCb", "on_pairing_init error: ${e.message}")
+                    }
+                }
+            }
+            lib.nrc_set_on_pairing_init_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
+
+        // ---- on_pairing_resp ----
+        run {
+            val cb = object : NotifyRelayCore.OnPairingRespCb {
+                override fun invoke(uuid: Pointer?, tmpPub: Pointer?, ltPub: Pointer?, encryptedCode: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
+                    val session = ServerLineRouter.getSessionContext() ?: return
+                    val dm = session.deviceManager
+                    val remoteUuid = ptr2str(uuid) ?: return
+                    val tmpPubKeyR = ptr2str(tmpPub) ?: return
+                    val ltPubKeyR = ptr2str(ltPub) ?: return
+                    val encCode = ptr2str(encryptedCode) ?: return
+
+                    try {
+                        val ctx = dm.rustContextInternal
+                        if (ctx == null) {
+                            val w = OutputStreamWriter(session.client.getOutputStream())
+                            w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                            return@invoke
+                        }
+                        NativeCore.derivePairingKey(ctx, tmpPubKeyR)
+                        val code = NativeCore.decryptPairingCode(ctx, encCode) ?: throw Exception("解密配对码失败")
+                        if (!PairingCodeManager.verify(code)) {
+                            Logger.w("CoreCb", "配对码验证失败: $remoteUuid")
+                            val w = OutputStreamWriter(session.client.getOutputStream())
+                            w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                            return@invoke
+                        }
+                        val success = dm.completePairingWithLongTermKeys(remoteUuid, ltPubKeyR, displayName = "未知设备", lastIp = session.client.inetAddress.hostAddress.orEmpty().ifEmpty { "0.0.0.0" })
+                        if (!success) {
+                            val w = OutputStreamWriter(session.client.getOutputStream())
+                            w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                            return@invoke
+                        }
+                        val w = OutputStreamWriter(session.client.getOutputStream())
+                        val localIp = ServerLineRouter.getLocalIpAddress(dm)
+                        val acceptMsg = NativeCore.formatAccept(dm.uuid, dm.localPublicKey, localIp, BatteryUtils.getBatteryLevel(dm.contextInternal), "android")
+                            ?: "ACCEPT:${dm.uuid}:${dm.localPublicKey}:$localIp:${ServerLineRouter.getLocalBatteryInfo(dm)}:android"
+                        w.write("$acceptMsg\n"); w.flush(); w.close()
+                        Logger.d("CoreCb", "PAIRING_RESP 配对成功: $remoteUuid")
+                    } catch (e: Exception) {
+                        Logger.e("CoreCb", "on_pairing_resp error", e)
+                        try {
+                            val w = OutputStreamWriter(session.client.getOutputStream())
+                            w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                        } catch (_: Exception) { }
+                    }
+                }
+            }
+            lib.nrc_set_on_pairing_resp_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
+
+        // ---- on_accept ----
+        run {
+            val cb = object : NotifyRelayCore.OnAcceptCb {
+                override fun invoke(uuid: Pointer?, ltPubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
+                    // ACCEPT 在服务端 routeLine 中无操作（由客户端侧处理）
+                }
+            }
+            lib.nrc_set_on_accept_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
+
+        // ---- on_reject ----
+        run {
+            val cb = object : NotifyRelayCore.OnRejectCb {
+                override fun invoke(uuid: Pointer?, userData: Pointer?) {
+                    // REJECT 在服务端 routeLine 中无操作（由客户端侧处理）
+                }
+            }
+            lib.nrc_set_on_reject_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
+
+        // ---- on_heartbeat_tcp ----
+        run {
+            val cb = object : NotifyRelayCore.OnHeartbeatTcpCb {
+                override fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?) {
+                    val session = ServerLineRouter.getSessionContext() ?: return
+                    val dm = session.deviceManager
+                    val remoteUuid = ptr2str(uuid) ?: return
+                    val remoteNameB64 = ptr2str(nameB64) ?: return
+                    val remoteDeviceType = ptr2str(deviceType) ?: "unknown"
+                    val clientIp = session.client.inetAddress.hostAddress.orEmpty()
+
+                    try {
+                        val line = "HEARTBEAT_TCP:$remoteUuid:$remoteNameB64:$port:$battery:$remoteDeviceType"
+                        val info = HeartbeatProcessor.parseHeartbeatTcpPayload(line, clientIp, dm.listenPort)
+                        if (info != null && info.uuid != dm.uuid) {
+                            HeartbeatProcessor.processHeartbeat(info, dm)
+                        }
+                    } catch (e: Exception) {
+                        Logger.e("CoreCb", "on_heartbeat_tcp error", e)
+                    }
+                }
+            }
+            lib.nrc_set_on_heartbeat_tcp_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
+
+        // ---- on_discover_manual ----
+        run {
+            val cb = object : NotifyRelayCore.OnDiscoverManualCb {
+                override fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?) {
+                    // DISCOVER_MANUAL 格式与 Rust 编码器不匹配，走 routeLine 回落
+                }
+            }
+            lib.nrc_set_on_discover_manual_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
     }
 
     // 辅助方法：发送媒体控制响应（由回调使用）
@@ -1095,7 +1312,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             val reader = BufferedReader(InputStreamReader(client.getInputStream()))
                             val line = reader.readLine()
                             if (line != null) {
-                                ServerLineRouter.routeLine(line, client, reader, this@DeviceConnectionManager, context)
+                                ServerLineRouter.routeLine(line, client, reader, this@DeviceConnectionManager)
                             } else {
                                 try { reader.close() } catch (_: Exception) {}
                                 try { client.close() } catch (_: Exception) {}
