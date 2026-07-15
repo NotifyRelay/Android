@@ -3,6 +3,7 @@ package com.xzyht.notifyrelay.sync
 import android.content.Context
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.servers.appslist.AppListHelper
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import kotlinx.coroutines.launch
@@ -40,11 +41,12 @@ object AppListSyncManager {
         scope: String = "user"
     ) {
         context.hashCode()
-        val req = JSONObject().apply {
+        val raw = JSONObject().apply {
             put("type", "APP_LIST_REQUEST")
             put("scope", scope)
             put("time", System.currentTimeMillis())
         }.toString()
+        val req = NativeCore.createAppListRequestJson(raw) ?: return
         ProtocolSender.sendEncrypted(deviceManager, targetDevice, "DATA_APP_LIST_REQUEST", req, REQ_TIMEOUT)
     }
 
@@ -83,13 +85,14 @@ object AppListSyncManager {
                 } catch (_: Exception) {}
             }
 
-            val resp = JSONObject().apply {
+            val raw = JSONObject().apply {
                 put("type", "APP_LIST_RESPONSE")
                 put("scope", scope)
                 put("total", appArray.length())
                 put("apps", appArray)
                 put("time", System.currentTimeMillis())
             }.toString()
+            val resp = NativeCore.createAppListResponseJson(raw) ?: return
 
             sendAppListResponse(deviceManager, sourceDevice, resp)
             Logger.d(TAG, "已响应应用列表：${sourceDevice.displayName}，共${appArray.length()}项")

@@ -4,6 +4,7 @@ import android.content.Context
 import android.os.Handler
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
@@ -166,7 +167,7 @@ object StatusProcessor {
         requestId: String = ""
     ) {
         try {
-            val responseJson = JSONObject().apply {
+            val raw = JSONObject().apply {
                 put("originalHeader", originalHeader)
                 put("result", result)
                 if (errorCode.isNotEmpty()) {
@@ -178,13 +179,14 @@ object StatusProcessor {
                 if (requestId.isNotEmpty()) {
                     put("requestId", requestId)
                 }
-            }
+            }.toString()
+            val responseJson = NativeCore.createStatusMessageJson(raw) ?: return
 
             ProtocolSender.sendEncrypted(
                 deviceManager,
                 deviceInfo,
                 "DATA_STATUS",
-                responseJson.toString()
+                responseJson
             )
 
             Logger.d(TAG, "发送DATA_STATUS响应: originalHeader=$originalHeader, result=$result")

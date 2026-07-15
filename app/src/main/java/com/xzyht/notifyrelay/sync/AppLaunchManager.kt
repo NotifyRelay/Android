@@ -6,6 +6,7 @@ import android.content.Intent
 import android.os.Build
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
 
@@ -67,15 +68,16 @@ object AppLaunchManager {
         displayId: Int = -1
     ) {
         try {
-            val json = JSONObject().apply {
+            val raw = JSONObject().apply {
                 put("action", "launchApp")
                 put("packageName", packageName)
                 if (displayId > 0) {
                     put("displayId", displayId)
                 }
-            }
+            }.toString()
+            val json = NativeCore.createAppLaunchJson(raw) ?: return
             Logger.d(TAG, "发送应用启动请求: $packageName, displayId: $displayId")
-            ProtocolSender.sendEncrypted(deviceManager, target, "DATA_APP_LAUNCH", json.toString())
+            ProtocolSender.sendEncrypted(deviceManager, target, "DATA_APP_LAUNCH", json)
         } catch (e: Exception) {
             Logger.e(TAG, "发送应用启动请求失败", e)
         }

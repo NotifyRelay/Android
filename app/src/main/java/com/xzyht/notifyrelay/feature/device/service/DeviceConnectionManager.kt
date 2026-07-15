@@ -844,7 +844,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
      */
     fun requestAudioForwarding(device: DeviceInfo): Boolean {
         try {
-            val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioRequest\"}"
+            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioRequest\"}"
+            val request = NativeCore.createMediaControlJson(raw) ?: return false
             ProtocolSender.sendEncrypted(this, device, "DATA_MEDIA_CONTROL", request, 10000L)
             return true
         } catch (_: Exception) {
@@ -861,13 +862,14 @@ class DeviceConnectionManager(private val context: android.content.Context) {
      */
     fun sendClipboardToDevice(device: DeviceInfo, clipboardType: String, content: String): Boolean {
         try {
-            val json = org.json.JSONObject().apply {
+            val raw = org.json.JSONObject().apply {
                 put("type", "clipboard")
                 put("clipboardType", clipboardType)
                 put("content", content)
                 put("time", System.currentTimeMillis())
-            }
-            ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
+            }.toString()
+            val json = NativeCore.createClipboardJson(raw) ?: return false
+            ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json, 10000L)
             return true
         } catch (_: Exception) {
             return false
@@ -885,15 +887,16 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             val devices = getAuthenticatedOnlineDevices()
             if (devices.isEmpty()) return false
             
-            val json = org.json.JSONObject().apply {
+            val raw = org.json.JSONObject().apply {
                 put("type", "clipboard")
                 put("clipboardType", clipboardType)
                 put("content", content)
                 put("time", System.currentTimeMillis())
-            }
+            }.toString()
+            val json = NativeCore.createClipboardJson(raw) ?: return false
             
             for (device in devices) {
-                ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json.toString(), 10000L)
+                ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", json, 10000L)
             }
             return true
         } catch (_: Exception) {
@@ -981,7 +984,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                         val device = resolveDeviceInfo(uuid, "", 23333)
                         val ok = device?.let { AudioForwardingService.startAudioForwarding(context, it.ip, ScrcpyDefaults.ADB_PORT, it.displayName) } == true
                         val result = if (ok) "accepted" else "rejected"
-                        val resp = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"$result\"}"
+                        val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"$result\"}"
+                        val resp = NativeCore.createMediaControlJson(raw) ?: return@cb
                         device?.let { ProtocolSender.sendEncrypted(this, it, "DATA_MEDIA_CONTROL", resp) }
                     }
                     "audioResponse" -> {
@@ -1008,9 +1012,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             when (result.status) {
                                 StartResult.SUCCESS, StartResult.ALREADY_RUNNING -> {
                                     result.serverInfo?.let { info ->
-                                        val resp = JSONObject().apply { put("action", "started"); put("ipAddress", info.ipAddress); put("port", info.port) }
-                                        resolveDeviceInfo(uuid, "", 23333)?.let {
-                                            ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", resp.toString())
+                                        val raw = JSONObject().apply { put("action", "started"); put("ipAddress", info.ipAddress); put("port", info.port) }.toString()
+                                        val resp = NativeCore.createFtpMessageJson(raw)
+                                        if (resp != null) {
+                                            resolveDeviceInfo(uuid, "", 23333)?.let {
+                                                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", resp)
+                                            }
                                         }
                                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
                                             val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
@@ -1021,17 +1028,23 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                 }
                                 else -> {
                                     val err = when (result.status) { StartResult.PERMISSION_DENIED -> "PERMISSION_DENIED"; StartResult.PORT_IN_USE -> "PORT_IN_USE"; StartResult.CONFIG_ERROR -> "CONFIG_ERROR"; else -> "FAILED" }
-                                    val resp = JSONObject().apply { put("originalHeader", "DATA_FTP"); put("action", "start"); put("result", "error"); put("errorCode", err) }
-                                    resolveDeviceInfo(uuid, "", 23333)?.let {
-                                        ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_STATUS", resp.toString())
+                                    val raw = JSONObject().apply { put("originalHeader", "DATA_FTP"); put("action", "start"); put("result", "error"); put("errorCode", err) }.toString()
+                                    val resp = NativeCore.createFtpMessageJson(raw)
+                                    if (resp != null) {
+                                        resolveDeviceInfo(uuid, "", 23333)?.let {
+                                            ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_STATUS", resp)
+                                        }
                                     }
                                 }
                             }
                         }
                         "stop" -> { ftpServer.stop()
-                            val resp = JSONObject().apply { put("action", "stopped") }
-                            resolveDeviceInfo(uuid, "", 23333)?.let {
-                                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", resp.toString())
+                            val raw = JSONObject().apply { put("action", "stopped") }.toString()
+                            val resp = NativeCore.createFtpMessageJson(raw)
+                            if (resp != null) {
+                                resolveDeviceInfo(uuid, "", 23333)?.let {
+                                    ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", resp)
+                                }
                             }
                         }
                     }
@@ -1062,9 +1075,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // 辅助方法：发送媒体控制响应（由回调使用）
     private fun sendMediaControlResponse(remoteUuid: String, action: String, result: String, errorMessage: String?) {
         try {
-            val resp = JSONObject().apply { put("originalHeader", "DATA_MEDIA_CONTROL"); put("action", action); put("result", result); if (errorMessage != null) put("errorMessage", errorMessage) }
+            val raw = JSONObject().apply { put("originalHeader", "DATA_MEDIA_CONTROL"); put("action", action); put("result", result); if (errorMessage != null) put("errorMessage", errorMessage) }.toString()
+            val resp = NativeCore.createStatusMessageJson(raw) ?: return
             resolveDeviceInfo(remoteUuid, "", 23333)?.let {
-                ProtocolSender.sendEncrypted(this, it, "DATA_STATUS", resp.toString())
+                ProtocolSender.sendEncrypted(this, it, "DATA_STATUS", resp)
             }
         } catch (e: Exception) { Logger.e("CoreCb", "sendMediaControlResponse", e) }
     }
@@ -1265,7 +1279,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             if (ip.isNullOrEmpty() || ip == "0.0.0.0") return
 
             // 使用DATA_STATUS发送超级岛ack
-            val ackObj = org.json.JSONObject().apply {
+            val raw = org.json.JSONObject().apply {
                 put("originalHeader", "DATA_SUPERISLAND")
                 put("result", "success")
                 put("action", "SI_ACK")
@@ -1276,11 +1290,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                     put("featureKeyValue", featureKeyValue)
                 }
                 put("time", System.currentTimeMillis())
-            }
+            }.toString()
+            val ackObj = NativeCore.createStatusMessageJson(raw) ?: return
 
             // 通过统一加密发送器发回对端
             val deviceInfo = DeviceInfo(remoteUuid, DeviceConnectionManagerUtil.getDisplayNameByUuid(remoteUuid), ip, port)
-            ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_STATUS", ackObj.toString(), 3000L)
+            ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_STATUS", ackObj, 3000L)
         } catch (_: Exception) {
         }
     }

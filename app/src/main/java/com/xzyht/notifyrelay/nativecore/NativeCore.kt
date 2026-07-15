@@ -111,4 +111,37 @@ object NativeCore {
 
     fun setUserData(ctx: Pointer, userData: Pointer) =
         lib.nrc_set_user_data(ctx, userData)
+
+    fun createNotificationJson(json: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_notification_json(json))
+
+    fun createClipboardJson(json: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_clipboard_json(json))
+
+    fun createMediaControlJson(json: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_media_control_json(json))
+
+    fun createMediaPayloadJson(json: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_media_payload_json(json))
+
+    fun createIconRequestJson(json: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_icon_request_json(json))
+
+    fun createIconResponseJson(json: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_icon_response_json(json))
+
+    fun createAppListRequestJson(json: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_app_list_request_json(json))
+
+    fun createAppListResponseJson(json: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_app_list_response_json(json))
+
+    fun createFtpMessageJson(json: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_ftp_message_json(json))
+
+    fun createStatusMessageJson(json: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_status_message_json(json))
+
+    fun createAppLaunchJson(json: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_create_app_launch_json(json))
 }

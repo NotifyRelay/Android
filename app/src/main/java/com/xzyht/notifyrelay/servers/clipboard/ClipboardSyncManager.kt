@@ -8,6 +8,7 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -339,11 +340,12 @@ object ClipboardSyncManager {
      * 构建剪贴板JSON消息
      */
     private fun buildClipboardJsonString(type: String, content: String, time: Long): String {
-        return JSONObject().apply {
+        val raw = JSONObject().apply {
             put("clipboardType", type)
             put("content", content)
             put("time", time)
         }.toString()
+        return NativeCore.createClipboardJson(raw) ?: raw
     }
     
     /**

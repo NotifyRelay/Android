@@ -123,6 +123,18 @@ interface NotifyRelayCore : Library {
     fun nrc_parse_heartbeat_json(line: String): Pointer
     fun nrc_parse_heartbeat_tcp_json(line: String): Pointer
 
+    fun nrc_create_notification_json(input: String): Pointer
+    fun nrc_create_clipboard_json(input: String): Pointer
+    fun nrc_create_media_control_json(input: String): Pointer
+    fun nrc_create_media_payload_json(input: String): Pointer
+    fun nrc_create_icon_request_json(input: String): Pointer
+    fun nrc_create_icon_response_json(input: String): Pointer
+    fun nrc_create_app_list_request_json(input: String): Pointer
+    fun nrc_create_app_list_response_json(input: String): Pointer
+    fun nrc_create_ftp_message_json(input: String): Pointer
+    fun nrc_create_status_message_json(input: String): Pointer
+    fun nrc_create_app_launch_json(input: String): Pointer
+
     fun nrc_format_pairing_init(
         uuid: String, tmpPubKey: String, ip: String,
         battery: Int, deviceType: String

@@ -13,6 +13,7 @@ import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import github.xzynine.superislandui.common.SuperIslandProtocol
 import github.xzynine.superislandui.common.SuperIslandProtocol.PayloadOptions
 import github.xzynine.superislandui.diff.DiffSystem
@@ -329,13 +330,14 @@ object MessageSender {
 
             // 构建标准 JSON 格式的消息
             val pkgName: String = context.packageName
-            val json = JSONObject().apply {
+            val raw = JSONObject().apply {
                 put("packageName", pkgName)
                 put("appName", "NotifyRelay")
                 put("title", "聊天测试")
                 put("text", message)
                 put("time", System.currentTimeMillis())
             }.toString()
+            val json = NativeCore.createNotificationJson(raw) ?: return
 
             allDevices.forEach { device ->
                 enqueueNotification(device, json, deviceManager, "聊天")
@@ -428,7 +430,9 @@ object MessageSender {
                     )
                 }
 
-                enqueueNotification(deviceInfo, payloadObj.toString(), deviceManager, "媒体播放")
+                val raw = payloadObj.toString()
+                val json = NativeCore.createMediaPayloadJson(raw) ?: return@forEach
+                enqueueNotification(deviceInfo, json, deviceManager, "媒体播放")
             }
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放通知失败", e)
@@ -468,10 +472,11 @@ object MessageSender {
             }
 
             val isLocked = PermissionHelper.isDeviceLocked(context)
-            val payload = SuperIslandProtocol.buildPayload(
+            val rawPayload = SuperIslandProtocol.buildPayload(
                 packageName, appName, time, isLocked, JSONObject(),
                 PayloadOptions.MEDIA_END
             ).toString()
+            val payload = NativeCore.createMediaPayloadJson(rawPayload) ?: return
 
             authenticatedDevices.forEach { deviceInfo ->
                 synchronized(lastStatePerDevice) {
@@ -518,7 +523,7 @@ object MessageSender {
             val isLocked = PermissionHelper.isDeviceLocked(context)
 
             // 构建标准 JSON 格式的通知数据
-            val json = JSONObject().apply {
+            val raw = JSONObject().apply {
                 put("packageName", packageName)
                 put("appName", appName ?: packageName)
                 put("title", title ?: "")
@@ -526,6 +531,7 @@ object MessageSender {
                 put("time", time)
                 put("isLocked", isLocked)
             }.toString()
+            val json = NativeCore.createNotificationJson(raw) ?: return
 
             authenticatedDevices.forEach { deviceInfo ->
                 enqueueNotification(deviceInfo, json, deviceManager, "通知")
@@ -644,7 +650,9 @@ object MessageSender {
                         synchronized(siPendingAcks) { map[featureId] = PendingAck(h, System.currentTimeMillis()) }
                     }
                 } catch (_: Exception) {}
-                val task = SuperIslandTask(deviceInfo, payloadObj.toString(), deviceManager)
+                val raw = payloadObj.toString()
+                val json = NativeCore.createMediaPayloadJson(raw) ?: return@forEach
+                val task = SuperIslandTask(deviceInfo, json, deviceManager)
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         superIslandSendChannel.send(task)
@@ -680,9 +688,10 @@ object MessageSender {
             val featureId = featureIdOverride ?: SuperIslandProtocol.computeFeatureId(
                 superPkg, paramV2Raw, title, text
             )
-            val payload = SuperIslandProtocol.buildEndPayload(
+            val rawPayload = SuperIslandProtocol.buildEndPayload(
                 superPkg, appName, time, isLocked, featureId
             ).toString()
+            val payload = NativeCore.createMediaPayloadJson(rawPayload) ?: return
             authenticatedDevices.forEach { deviceInfo ->
                 // 清理该设备的lastState
                 synchronized(lastStatePerDevice) {

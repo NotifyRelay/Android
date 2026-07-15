@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.feature.notification.superisland.MediaMessageReceiveMode
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.servers.MediaControlUtil
@@ -277,7 +278,8 @@ fun MusicControlPage() {
                             ToastUtils.showShortToast(context, "已发送上一首指令到本机")
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                            val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"previous\"}"
+                            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"previous\"}"
+                            val request = NativeCore.createMediaControlJson(raw) ?: return@Button
                             ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
                             ToastUtils.showShortToast(context, "已发送上一首指令到${selectedDevice.displayName}")
                         }
@@ -300,7 +302,8 @@ fun MusicControlPage() {
                             ToastUtils.showShortToast(context, "已发送播放/暂停指令到本机")
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                            val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"playPause\"}"
+                            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"playPause\"}"
+                            val request = NativeCore.createMediaControlJson(raw) ?: return@Button
                             ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
                             ToastUtils.showShortToast(context, "已发送播放/暂停指令到${selectedDevice.displayName}")
                         }
@@ -323,7 +326,8 @@ fun MusicControlPage() {
                             ToastUtils.showShortToast(context, "已发送下一首指令到本机")
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                            val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"next\"}"
+                            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"next\"}"
+                            val request = NativeCore.createMediaControlJson(raw) ?: return@Button
                             ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
                             ToastUtils.showShortToast(context, "已发送下一首指令到${selectedDevice.displayName}")
                         }
