@@ -67,4 +67,42 @@ object NativeCore {
 
     fun importState(ctx: Pointer, json: String): Boolean =
         lib.nrc_import_state(ctx, json) == 0
+
+    // ======== New methods ========
+
+    fun generateEphemeralKeypair(ctx: Pointer): Boolean =
+        lib.nrc_ecdh_generate_ephemeral_keypair(ctx) == 0
+
+    fun getEphemeralPublicKey(ctx: Pointer): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_ecdh_get_ephemeral_public_key(ctx))
+
+    fun hasEphemeralKeypair(ctx: Pointer): Boolean =
+        lib.nrc_ecdh_has_ephemeral_keypair(ctx) != 0
+
+    fun clearEphemeralKeypair(ctx: Pointer) =
+        lib.nrc_ecdh_clear_ephemeral_keypair(ctx)
+
+    fun derivePairingKey(ctx: Pointer, peerEphPubB64: String): Boolean =
+        lib.nrc_ecdh_derive_pairing_key(ctx, peerEphPubB64) == 0
+
+    fun encryptPairingCode(ctx: Pointer, code: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_ecdh_encrypt_pairing_code(ctx, code))
+
+    fun decryptPairingCode(ctx: Pointer, encryptedB64: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_ecdh_decrypt_pairing_code(ctx, encryptedB64))
+
+    fun deriveLongTermKey(ctx: Pointer, peerUuid: String, peerLtPubB64: String): Boolean =
+        lib.nrc_ecdh_derive_long_term_key(ctx, peerUuid, peerLtPubB64) == 0
+
+    fun exportDeviceKey(ctx: Pointer, deviceUuid: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_export_device_key(ctx, deviceUuid))
+
+    fun exportLocalKeypair(ctx: Pointer): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_export_local_keypair(ctx))
+
+    fun processLine(ctx: Pointer, line: String): Int =
+        lib.nrc_process_line(ctx, line)
+
+    fun setUserData(ctx: Pointer, userData: Pointer) =
+        lib.nrc_set_user_data(ctx, userData)
 }

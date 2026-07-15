@@ -11,8 +11,6 @@ import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 import notifyrelay.core.util.BatteryUtils
-import notifyrelay.core.util.EncryptionManager
-import notifyrelay.core.util.EcdhKeyStore
 import notifyrelay.core.util.PairingCodeManager
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -169,10 +167,10 @@ object ServerLineRouter {
 
             Logger.d(TAG, "收到 PAIRING_RESP: $remoteUuid")
 
-            // 获取发起端存储的临时私钥
-            val tmpPrivKeyB64 = deviceManager.pendingTempPrivKeyB64
-            if (tmpPrivKeyB64 == null) {
-                Logger.w(TAG, "临时私钥不存在，配对已过期: $remoteUuid")
+            // 临时密钥已存储在 Rust 上下文中（由 CLIENT_MODE 的 PairingCodeDialog 生成）
+            val ctx = deviceManager.rustContextInternal
+            if (ctx == null) {
+                Logger.w(TAG, "Rust 上下文未初始化，配对已过期: $remoteUuid")
                 val writer = OutputStreamWriter(client.getOutputStream())
                 writer.write("REJECT:${deviceManager.uuid}\n")
                 writer.flush()
@@ -183,11 +181,9 @@ object ServerLineRouter {
             }
 
             try {
-                // 1. 用临时私钥解密配对码
-                val tmpPrivKey = EcdhKeyStore.decodePrivateKey(tmpPrivKeyB64)
-                val sharedSecret = EcdhKeyStore.deriveRawSharedSecret(tmpPrivKey, tmpPubKeyR)
-                val aesKey = EncryptionManager.hkdfDeriveKey(sharedSecret)
-                val code = EncryptionManager.decrypt(encryptedCode, aesKey)
+                // 1. 用 Rust 核心解密配对码
+                NativeCore.derivePairingKey(ctx, tmpPubKeyR)
+                val code = NativeCore.decryptPairingCode(ctx, encryptedCode) ?: throw Exception("解密配对码失败")
 
                 // 2. 验证配对码
                 if (!PairingCodeManager.verify(code)) {
@@ -242,8 +238,6 @@ object ServerLineRouter {
                 } catch (_: Exception) {}
                 try { reader.close() } catch (_: Exception) {}
                 try { client.close() } catch (_: Exception) {}
-            } finally {
-                deviceManager.pendingTempPrivKeyB64 = null
             }
         } catch (e: Exception) {
             Logger.e(TAG, "handlePairingResp error: ${e.message}")
@@ -308,13 +302,8 @@ object ServerLineRouter {
                     if (existingAuth != null && existingAuth.publicKey != remotePubKey) {
                         Logger.w(TAG, "设备 ${remoteDevice.displayName} 公钥已变更，重新派生密钥")
                         try {
-                            val newSecret = EncryptionManager.generateSharedSecret(
-                                deviceManager.contextInternal,
-                                deviceManager.localPublicKey,
-                                remotePubKey
-                            )
-                            EncryptionManager.importAesKeyToKeystore(deviceManager.contextInternal, remoteUuid, newSecret)
-                            deviceManager.migrateKeyToRust(remoteUuid, newSecret)
+                            val ctx = deviceManager.rustContextInternal
+                            NativeCore.deriveSharedSecret(ctx!!, remoteUuid, remotePubKey)
                             deviceManager.authenticatedDevices[remoteUuid] = existingAuth.copy(
                                 publicKey = remotePubKey,
                                 sharedSecret = ""

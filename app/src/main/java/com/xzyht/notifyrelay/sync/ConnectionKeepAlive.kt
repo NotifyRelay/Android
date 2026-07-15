@@ -4,7 +4,6 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo
-import notifyrelay.core.util.EncryptionManager
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
@@ -223,17 +222,7 @@ class ConnectionKeepAlive(
                         resp.split(":")[2]
                     }
                     if (remotePubKey.isEmpty()) continue
-                    val sharedSecret = EncryptionManager.generateSharedSecret(
-                        deviceManager.contextInternal,
-                        deviceManager.localPublicKey,
-                        remotePubKey
-                    )
-                    EncryptionManager.importAesKeyToKeystore(
-                        deviceManager.contextInternal,
-                        device.uuid,
-                        sharedSecret
-                    )
-                    deviceManager.migrateKeyToRust(device.uuid, sharedSecret)
+                    NativeCore.deriveSharedSecret(ctx!!, device.uuid, remotePubKey)
                     synchronized(authenticatedDevices) {
                         authenticatedDevices.remove(device.uuid)
                         authenticatedDevices[device.uuid] = AuthInfo(
@@ -244,7 +233,7 @@ class ConnectionKeepAlive(
                     synchronized(deviceManager.deviceInfoCacheInternal) {
                         deviceManager.deviceInfoCacheInternal[device.uuid] = device
                     }
-                    startHeartbeatToDevice(device.uuid, device.ip, device.port, sharedSecret)
+                    startHeartbeatToDevice(device.uuid, device.ip, device.port, "")
                     deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
                     try {
                         scope.launch { deviceManager.updateDeviceListInternal() }

@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.nativecore
 
+import com.sun.jna.Callback
 import com.sun.jna.Library
 import com.sun.jna.Native
 import com.sun.jna.Pointer
@@ -15,7 +16,6 @@ interface NotifyRelayCore : Library {
     fun nrc_ecdh_derive_shared_secret(ctx: Pointer, peerUuid: String, peerPubKeyB64: String): Int
 
     fun nrc_migrate_shared_secret(ctx: Pointer, deviceUuid: String, secret: ByteArray, len: Int): Int
-
     fun nrc_remove_device(ctx: Pointer, deviceUuid: String): Int
 
     fun nrc_encrypt_message(
@@ -24,8 +24,79 @@ interface NotifyRelayCore : Library {
     ): Pointer
 
     fun nrc_decrypt_message(ctx: Pointer, encryptedLine: String): Pointer
-
     fun nrc_decode_line(ctx: Pointer, line: String): Pointer
+
+    // ======== New: Ephemeral ECDH ========
+    fun nrc_ecdh_generate_ephemeral_keypair(ctx: Pointer): Int
+    fun nrc_ecdh_get_ephemeral_public_key(ctx: Pointer): Pointer
+    fun nrc_ecdh_has_ephemeral_keypair(ctx: Pointer): Int
+    fun nrc_ecdh_clear_ephemeral_keypair(ctx: Pointer)
+
+    // ======== New: Pairing code ========
+    fun nrc_ecdh_derive_pairing_key(ctx: Pointer, peerEphPubB64: String): Int
+    fun nrc_ecdh_encrypt_pairing_code(ctx: Pointer, code: String): Pointer
+    fun nrc_ecdh_decrypt_pairing_code(ctx: Pointer, encryptedB64: String): Pointer
+
+    // ======== New: Long-term key alias ========
+    fun nrc_ecdh_derive_long_term_key(ctx: Pointer, peerUuid: String, peerLtPubB64: String): Int
+
+    // ======== New: Key export ========
+    fun nrc_export_device_key(ctx: Pointer, deviceUuid: String): Pointer
+    fun nrc_export_local_keypair(ctx: Pointer): Pointer
+
+    // ======== New: Unified process ========
+    fun nrc_process_line(ctx: Pointer, line: String): Int
+
+    // ======== New: User data ========
+    fun nrc_set_user_data(ctx: Pointer, userData: Pointer)
+
+    // ======== Callback interfaces ========
+    interface OnHandshakeCb : Callback {
+        fun invoke(uuid: Pointer?, pubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)
+    }
+    interface OnPairingInitCb : Callback {
+        fun invoke(uuid: Pointer?, tmpPubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)
+    }
+    interface OnPairingRespCb : Callback {
+        fun invoke(uuid: Pointer?, tmpPub: Pointer?, ltPub: Pointer?, encryptedCode: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)
+    }
+    interface OnAcceptCb : Callback {
+        fun invoke(uuid: Pointer?, ltPubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)
+    }
+    interface OnRejectCb : Callback {
+        fun invoke(uuid: Pointer?, userData: Pointer?)
+    }
+    interface OnHeartbeatTcpCb : Callback {
+        fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?)
+    }
+    interface OnDiscoverManualCb : Callback {
+        fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
+    }
+    interface OnDataCb : Callback {
+        fun invoke(localUuid: Pointer?, plaintext: Pointer?, userData: Pointer?)
+    }
+
+    // ======== Callback setters ========
+    fun nrc_set_on_handshake_cb(ctx: Pointer, cb: OnHandshakeCb?)
+    fun nrc_set_on_pairing_init_cb(ctx: Pointer, cb: OnPairingInitCb?)
+    fun nrc_set_on_pairing_resp_cb(ctx: Pointer, cb: OnPairingRespCb?)
+    fun nrc_set_on_accept_cb(ctx: Pointer, cb: OnAcceptCb?)
+    fun nrc_set_on_reject_cb(ctx: Pointer, cb: OnRejectCb?)
+    fun nrc_set_on_heartbeat_tcp_cb(ctx: Pointer, cb: OnHeartbeatTcpCb?)
+    fun nrc_set_on_discover_manual_cb(ctx: Pointer, cb: OnDiscoverManualCb?)
+    fun nrc_set_on_notification_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_media_play_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_icon_request_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_icon_response_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_app_list_request_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_app_list_response_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_media_control_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_ftp_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_clipboard_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_status_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_app_launch_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_superisland_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_unknown_data_cb(ctx: Pointer, cb: OnDataCb?)
 
     fun nrc_format_heartbeat(
         uuid: String, name: String, port: Short,
@@ -45,7 +116,6 @@ interface NotifyRelayCore : Library {
     ): Pointer
 
     fun nrc_parse_heartbeat_json(line: String): Pointer
-
     fun nrc_parse_heartbeat_tcp_json(line: String): Pointer
 
     fun nrc_format_pairing_init(

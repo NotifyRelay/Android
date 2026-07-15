@@ -37,9 +37,6 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
-import java.security.KeyPair
-import notifyrelay.core.util.EcdhKeyStore
-import notifyrelay.core.util.EncryptionManager
 
 /**
  * 配对码对话框。
@@ -67,12 +64,14 @@ fun PairingCodeDialog(
         val clipboardManager = LocalClipboardManager.current
         val scope = rememberCoroutineScope()
         val displayCode = remember { pairingCode.ifEmpty { PairingCodeManager.generate() } }
-        val tmpKeyPair = remember { EcdhKeyStore.generateEphemeralKeyPair() }
-        val tmpPubKeyB64 = remember { EcdhKeyStore.encodePublicKey(tmpKeyPair.public) }
-        // 存储临时私钥供 ServerLineRouter.handlePairingResp 解密配对码用
-        LaunchedEffect(Unit) {
-            deviceManager.pendingTempPrivKeyB64 = android.util.Base64.encodeToString(tmpKeyPair.private.encoded, android.util.Base64.NO_WRAP)
+        val tmpPubKeyB64 = remember {
+            val ctx = deviceManager.rustContextInternal
+            if (ctx != null) {
+                NativeCore.generateEphemeralKeypair(ctx)
+                NativeCore.getEphemeralPublicKey(ctx) ?: ""
+            } else ""
         }
+        // 临时密钥已存储在 Rust 上下文中，handlePairingResp 通过 ctx 访问
 
         // 发送 PAIRING_INIT（携带临时公钥）
         LaunchedEffect(show) {
@@ -244,16 +243,14 @@ fun PairingCodeDialog(
                                             // 1. 使用发起端的临时公钥加密配对码
                                             val initiator = DeviceInfo(remoteUuid, targetDevice?.displayName ?: "", remoteIp, 23333)
                                             
-                                            // 加密配对码：使用临时密钥 + ECDH
-                                            val receiverTmpKeyPair = EcdhKeyStore.generateEphemeralKeyPair()
-                                            val sharedSecret = EcdhKeyStore.deriveRawSharedSecret(
-                                                receiverTmpKeyPair.private, remoteTmpPubKey
-                                            )
-                                            val aesKey = EncryptionManager.hkdfDeriveKey(sharedSecret)
-                                            val encryptedCode = EncryptionManager.encrypt(code, aesKey)
-                                            
+                                            // 使用 Rust 核心加密配对码
+                                            val ctx = deviceManager.rustContextInternal
+                                            NativeCore.generateEphemeralKeypair(ctx!!)
+                                            NativeCore.derivePairingKey(ctx, remoteTmpPubKey)
+                                            val encryptedCode = NativeCore.encryptPairingCode(ctx, code) ?: throw Exception("加密配对码失败")
+
                                             // 发送 PAIRING_RESP（加密后的配对码）
-                                            val receiverTmpPubKeyB64 = EcdhKeyStore.encodePublicKey(receiverTmpKeyPair.public)
+                                            val receiverTmpPubKeyB64 = NativeCore.getEphemeralPublicKey(ctx) ?: ""
                                             val resp = HandshakeSender.sendPairingResp(deviceManager, initiator, receiverTmpPubKeyB64, encryptedCode)
                                             
                                             if (resp?.startsWith("ACCEPT:") == true) {

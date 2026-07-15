@@ -189,23 +189,18 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private fun migrateDeviceKeyToRust(uuid: String, remotePubKey: String, sharedSecretDb: String) {
         val ctx = rustContext ?: return
         try {
-            val aesKeyBytes: ByteArray
             if (sharedSecretDb.isNotEmpty()) {
                 // 数据库中有明文密钥：直接解码 (Base64 of HKDF-derived AES key)
-                aesKeyBytes = try {
+                val aesKeyBytes = try {
                     android.util.Base64.decode(sharedSecretDb, android.util.Base64.NO_WRAP)
                 } catch (_: Exception) { return }
+                if (aesKeyBytes.size == 32) {
+                    NativeCore.migrateSharedSecret(ctx, uuid, aesKeyBytes)
+                }
             } else {
-                // 密钥已被清除（已导入 Keystore）：重新通过 ECDH 派生
-                val secretBase64 = try {
-                    EncryptionManager.generateSharedSecret(context, localPublicKey, remotePubKey)
-                } catch (_: Exception) { return }
-                aesKeyBytes = try {
-                    android.util.Base64.decode(secretBase64, android.util.Base64.NO_WRAP)
-                } catch (_: Exception) { return }
+                // 密钥已被清除：通过 Rust 派生
+                NativeCore.deriveSharedSecret(ctx, uuid, remotePubKey)
             }
-            if (aesKeyBytes.size != 32) return
-            NativeCore.migrateSharedSecret(ctx, uuid, aesKeyBytes)
             Logger.d("死神-NotifyRelay", "密钥已迁移到 Rust: $uuid")
         } catch (e: Exception) {
             Logger.w("死神-NotifyRelay", "密钥迁移失败: $uuid, ${e.message}")
@@ -441,19 +436,32 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             StorageManager.putString(context, "device_uuid", newUuid)
             uuid = newUuid
         }
-        // ECDH 公钥（从 Android Keystore 获取或生成 secp256r1 密钥对）
-        localPublicKey = EncryptionManager.getEcdhPublicKeyBase64()
         // 兼容旧用户：首次运行时如无保存则默认true
         if (!AppConfig.getUdpDiscoveryEnabled(context)) {
             AppConfig.setUdpDiscoveryEnabled(context, true)
         }
-        // 初始化 Rust 上下文
+        // 初始化 Rust 上下文并获取/生成本机 ECDH 密钥对
+        var initPubKey = ""
         try {
             rustContext = NativeCore.createContext()
+            val ctx = rustContext!!
+            val savedState = StorageManager.getString(context, "rust_core_state")
+            if (savedState.isNotEmpty()) {
+                NativeCore.importState(ctx, savedState)
+            }
+            if (!NativeCore.hasKeypair(ctx)) {
+                NativeCore.generateKeypair(ctx)
+            }
+            initPubKey = NativeCore.getPublicKey(ctx) ?: ""
+            val stateJson = NativeCore.exportState(ctx)
+            if (stateJson != null) {
+                StorageManager.putString(context, "rust_core_state", stateJson)
+            }
             Logger.d("死神-NotifyRelay", "Rust core 上下文已初始化")
         } catch (e: Exception) {
             Logger.e("死神-NotifyRelay", "Rust core 初始化失败", e)
         }
+        localPublicKey = initPubKey
         loadAuthedDevices()
         // 新增：初始补全本机 deviceInfoCache，便于反向 connectToDevice
         val displayName = getLocalDisplayName()
@@ -644,15 +652,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
      */
     fun completePairing(remoteUuid: String, remotePubKey: String) {
         try {
-            val secret = EncryptionManager.generateSharedSecret(context, localPublicKey, remotePubKey)
-            EncryptionManager.importAesKeyToKeystore(context, remoteUuid, secret)
-            // 同步迁移到 Rust
-            try {
-                val aesKeyBytes = android.util.Base64.decode(secret, android.util.Base64.NO_WRAP)
-                if (aesKeyBytes.size == 32) {
-                    rustContext?.let { NativeCore.migrateSharedSecret(it, remoteUuid, aesKeyBytes) }
-                }
-            } catch (_: Exception) {}
+            val ctx = rustContext
+            if (ctx != null) {
+                NativeCore.deriveSharedSecret(ctx, remoteUuid, remotePubKey)
+            }
             synchronized(authenticatedDevices) {
                 authenticatedDevices[remoteUuid] = AuthInfo(
                     remotePubKey, "", true, "未知设备"
@@ -719,15 +722,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         lastIp: String? = null
     ): Boolean {
         return try {
-            val secret = EncryptionManager.generateSharedSecret(context, localPublicKey, remoteLtPubKey)
-            EncryptionManager.importAesKeyToKeystore(context, uuid, secret)
-            // 同步迁移到 Rust
-            try {
-                val aesKeyBytes = android.util.Base64.decode(secret, android.util.Base64.NO_WRAP)
-                if (aesKeyBytes.size == 32) {
-                    rustContext?.let { NativeCore.migrateSharedSecret(it, uuid, aesKeyBytes) }
-                }
-            } catch (_: Exception) {}
+            val ctx = rustContext
+            if (ctx != null) {
+                NativeCore.deriveSharedSecret(ctx, uuid, remoteLtPubKey)
+            }
             synchronized(authenticatedDevices) {
                 authenticatedDevices[uuid] = AuthInfo(
                     remoteLtPubKey, "", true, displayName,
