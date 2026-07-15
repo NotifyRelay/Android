@@ -7,7 +7,6 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 import notifyrelay.core.util.BatteryUtils
@@ -54,6 +53,18 @@ object ServerLineRouter {
             handleOther(line, client, reader, deviceManager)
             return
         }
+
+        // DATA_* 走 processLine → Rust 内部解密 → 回调分发
+        if (line.startsWith("DATA")) {
+            val headerName = line.split(":").getOrElse(0) { "DATA" }
+            Logger.d(TAG, "DATA消息路由到 Rust processLine: $headerName")
+            val result = NativeCore.processLine(ctx, line)
+            Logger.d(TAG, "Rust processLine 返回: $result ($headerName)")
+            try { reader.close() } catch (_: Exception) {}
+            try { client.close() } catch (_: Exception) {}
+            return
+        }
+
         val jsonStr = NativeCore.decodeLine(ctx, line) ?: run {
             handleOther(line, client, reader, deviceManager)
             return
@@ -71,18 +82,7 @@ object ServerLineRouter {
             }
             "HEARTBEAT_TCP" -> handleOther(line, client, reader, deviceManager)
             else -> {
-                if (json.has("type") && json.optString("type") == "data") {
-                    ProtocolRouter.handleDecryptedData(
-                        header = json.getString("header"),
-                        localUuid = json.getString("local_uuid"),
-                        plaintext = json.getString("plaintext"),
-                        clientIp = client.inetAddress?.hostAddress ?: "0.0.0.0",
-                        deviceManager = deviceManager,
-                        context = context
-                    )
-                } else {
-                    handleOther(line, client, reader, deviceManager)
-                }
+                handleOther(line, client, reader, deviceManager)
                 try { reader.close() } catch (_: Exception) {}
                 try { client.close() } catch (_: Exception) {}
             }

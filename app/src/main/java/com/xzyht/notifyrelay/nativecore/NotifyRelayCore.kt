@@ -76,7 +76,12 @@ interface NotifyRelayCore : Library {
         fun invoke(localUuid: Pointer?, plaintext: Pointer?, userData: Pointer?)
     }
 
+    interface OnLogCb : Callback {
+        fun invoke(level: Int, message: Pointer?)
+    }
+
     // ======== Callback setters ========
+    fun nrc_set_log_callback(cb: OnLogCb?)
     fun nrc_set_on_handshake_cb(ctx: Pointer, cb: OnHandshakeCb?)
     fun nrc_set_on_pairing_init_cb(ctx: Pointer, cb: OnPairingInitCb?)
     fun nrc_set_on_pairing_resp_cb(ctx: Pointer, cb: OnPairingRespCb?)
