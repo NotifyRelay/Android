@@ -35,16 +35,10 @@ object HeartbeatProcessor {
             val json = JSONObject(jsonStr)
             val uuid = json.optString("uuid", "")
             if (uuid.isEmpty()) return null
-            val rawDisplay = json.optString("name_b64", "")
+            val displayName = json.optString("name", "")
             val port = json.optInt("port", defaultPort)
             val battery = json.optInt("battery", 0)
             val deviceType = json.optString("device_type", "unknown")
-            val displayName = try {
-                val decoded = android.util.Base64.decode(rawDisplay, android.util.Base64.NO_WRAP)
-                String(decoded, Charsets.UTF_8)
-            } catch (_: Exception) {
-                rawDisplay
-            }
             HeartbeatInfo(uuid, displayName, port, kotlin.math.abs(battery), battery >= 0, deviceType, ip)
         } catch (_: Exception) {
             null
