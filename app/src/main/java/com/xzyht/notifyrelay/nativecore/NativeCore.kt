@@ -150,4 +150,20 @@ object NativeCore {
 
     fun computeFeatureId(packageName: String, title: String, text: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_feature_id(packageName, title, text))
+
+    fun heartbeatTick(ctx: Pointer, timeoutSec: Long): Int =
+        lib.nrc_heartbeat_tick(ctx, timeoutSec)
+
+    // ======== Dedup engine ========
+    fun dedupCheckAndPend(ctx: Pointer, dedupKey: String, ttlMs: Long): Boolean =
+        lib.nrc_dedup_check_and_pend(ctx, dedupKey, ttlMs) != 0
+
+    fun dedupMarkSent(ctx: Pointer, dedupKey: String) =
+        lib.nrc_dedup_mark_sent(ctx, dedupKey)
+
+    fun dedupClearPending(ctx: Pointer, dedupKey: String) =
+        lib.nrc_dedup_clear_pending(ctx, dedupKey)
+
+    fun dedupCleanup(ctx: Pointer, nowMs: Long, ttlMs: Long) =
+        lib.nrc_dedup_cleanup(ctx, nowMs, ttlMs)
 }

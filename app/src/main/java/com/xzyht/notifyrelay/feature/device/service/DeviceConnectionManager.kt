@@ -530,6 +530,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             while (true) {
                 delay(1000)
                 try {
+                    val ctx = rustContext
+                    if (ctx != null) {
+                        NativeCore.heartbeatTick(ctx, 12L)
+                    }
                     updateDeviceList()
                 } catch (e: Exception) {
                     Logger.e("死神-NotifyRelay", "startOfflineDeviceCleaner定时器异常: ${e.message}")
@@ -567,7 +571,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 // 仅基于心跳包判定在线
                 val diff = if (lastSeen != null) now - lastSeen else -1L
                 val isOnline = !isIncompatible && lastSeen != null && diff <= authedHeartbeatTimeout
-                val info = deviceInfo ?: DeviceInfo(uuid, auth.displayName ?: "已认证设备", "", listenPort)
+                val info = deviceInfo ?: let {
+                    Logger.w("死神-NotifyRelay", "updateDeviceList: 设备 $uuid 无缓存信息, auth.lastIp=${auth.lastIp}")
+                    DeviceInfo(uuid, auth.displayName ?: "已认证设备", auth.lastIp.orEmpty(), listenPort)
+                }
                 val oldOnline = oldMap[uuid]?.second
                 if (oldOnline != null && oldOnline != isOnline) {
                     Logger.i("天使-死神-NotifyRelay", "[updateDeviceList] 已认证设备状态变化: uuid=$uuid, isOnline=$isOnline, lastSeen=$lastSeen, diff=$diff")
@@ -836,6 +843,17 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // header 为协议头（如 DATA_NOTIFICATION），返回完整报文：$header:uuid:pubKey:encrypted
     internal fun encryptData(input: String, uuid: String, header: String = "DATA"): String {
         val ctx = rustContext ?: throw IllegalStateException("Rust context not initialized")
+        val keyB64 = NativeCore.exportDeviceKey(ctx, uuid)
+        if (keyB64 == null) {
+            Logger.e("死神-NotifyRelay", "encryptData: 设备密钥不在Rust中 uuid=$uuid，尝试重新迁移")
+            val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
+            if (auth != null && auth.sharedSecret.isNotEmpty()) {
+                val keyBytes = try { android.util.Base64.decode(auth.sharedSecret, android.util.Base64.NO_WRAP) } catch (_: Exception) { null }
+                if (keyBytes != null && keyBytes.size == 32) {
+                    NativeCore.migrateSharedSecret(ctx, uuid, keyBytes)
+                }
+            }
+        }
         return NativeCore.encryptMessage(ctx, header, this.uuid, this.localPublicKey, uuid, input)
             ?: throw IllegalStateException("Rust加密失败: encryptMessage, device=$uuid")
     }
@@ -1364,6 +1382,20 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 }
             }
             lib.nrc_set_on_send_udp_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
+
+        // ---- on_device_timeout (设备心跳超时回调) ----
+        run {
+            val cb = object : NotifyRelayCore.OnDeviceTimeoutCb {
+                override fun invoke(uuidPtr: Pointer?, userData: Pointer?) {
+                    val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
+                    synchronized(deviceLastSeen) {
+                        // 将 lastSeen 设为过期值，updateDeviceList 下次扫描会将其标记离线
+                        deviceLastSeen[uuid] = System.currentTimeMillis() - 30_000L
+                    }
+                }
+            }
+            lib.nrc_set_on_device_timeout_cb(ctx, cb); rustCallbackRefs.add(cb)
         }
     }
 

@@ -86,6 +86,20 @@ interface NotifyRelayCore : Library {
         fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
     }
 
+    interface OnDeviceTimeoutCb : Callback {
+        fun invoke(uuid: Pointer?, userData: Pointer?)
+    }
+
+    // ======== Heartbeat tick & device timeout ========
+    fun nrc_heartbeat_tick(ctx: Pointer, timeoutSec: Long): Int
+    fun nrc_set_on_device_timeout_cb(ctx: Pointer, cb: OnDeviceTimeoutCb?)
+
+    // ======== Dedup engine ========
+    fun nrc_dedup_check_and_pend(ctx: Pointer, dedupKey: String, ttlMs: Long): Int
+    fun nrc_dedup_mark_sent(ctx: Pointer, dedupKey: String)
+    fun nrc_dedup_clear_pending(ctx: Pointer, dedupKey: String)
+    fun nrc_dedup_cleanup(ctx: Pointer, nowMs: Long, ttlMs: Long)
+
     // ======== New callback types for heartbeat without JSON re-parse ========
     interface OnHeartbeatWithCb : Callback {
         fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
