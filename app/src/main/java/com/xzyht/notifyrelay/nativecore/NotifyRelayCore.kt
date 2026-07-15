@@ -69,9 +69,6 @@ interface NotifyRelayCore : Library {
     interface OnHeartbeatTcpCb : Callback {
         fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?)
     }
-    interface OnDiscoverManualCb : Callback {
-        fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
-    }
     interface OnDataCb : Callback {
         fun invoke(localUuid: Pointer?, plaintext: Pointer?, userData: Pointer?)
     }
@@ -88,7 +85,6 @@ interface NotifyRelayCore : Library {
     fun nrc_set_on_accept_cb(ctx: Pointer, cb: OnAcceptCb?)
     fun nrc_set_on_reject_cb(ctx: Pointer, cb: OnRejectCb?)
     fun nrc_set_on_heartbeat_tcp_cb(ctx: Pointer, cb: OnHeartbeatTcpCb?)
-    fun nrc_set_on_discover_manual_cb(ctx: Pointer, cb: OnDiscoverManualCb?)
     fun nrc_set_on_notification_cb(ctx: Pointer, cb: OnDataCb?)
     fun nrc_set_on_media_play_cb(ctx: Pointer, cb: OnDataCb?)
     fun nrc_set_on_icon_request_cb(ctx: Pointer, cb: OnDataCb?)

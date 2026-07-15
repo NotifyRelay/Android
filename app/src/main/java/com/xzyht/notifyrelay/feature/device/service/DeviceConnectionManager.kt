@@ -1126,7 +1126,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             val w = OutputStreamWriter(session.client.getOutputStream())
                             val localIp = ServerLineRouter.getLocalIpAddress(dm)
                             val acceptMsg = NativeCore.formatAccept(dm.uuid, dm.localPublicKey, localIp, BatteryUtils.getBatteryLevel(dm.contextInternal), remoteDeviceType)
-                                ?: "ACCEPT:${dm.uuid}:${dm.localPublicKey}:$localIp:${ServerLineRouter.getLocalBatteryInfo(dm)}:$remoteDeviceType"
+                            if (acceptMsg == null) {
+                                w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                                return@invoke
+                            }
                             w.write("$acceptMsg\n"); w.flush(); w.close()
                             synchronized(dm.authenticatedDevices) {
                                 val auth = dm.authenticatedDevices[remoteUuid]
@@ -1218,7 +1221,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                         val w = OutputStreamWriter(session.client.getOutputStream())
                         val localIp = ServerLineRouter.getLocalIpAddress(dm)
                         val acceptMsg = NativeCore.formatAccept(dm.uuid, dm.localPublicKey, localIp, BatteryUtils.getBatteryLevel(dm.contextInternal), "android")
-                            ?: "ACCEPT:${dm.uuid}:${dm.localPublicKey}:$localIp:${ServerLineRouter.getLocalBatteryInfo(dm)}:android"
+                        if (acceptMsg == null) {
+                            w.write("REJECT:${dm.uuid}\n"); w.flush(); w.close()
+                            return@invoke
+                        }
                         w.write("$acceptMsg\n"); w.flush(); w.close()
                         Logger.d("CoreCb", "PAIRING_RESP 配对成功: $remoteUuid")
                     } catch (e: Exception) {
@@ -1265,9 +1271,19 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                     val clientIp = session.client.inetAddress.hostAddress.orEmpty()
 
                     try {
-                        val line = "HEARTBEAT_TCP:$remoteUuid:$remoteNameB64:$port:$battery:$remoteDeviceType"
-                        val info = HeartbeatProcessor.parseHeartbeatTcpPayload(line, clientIp, dm.listenPort)
-                        if (info != null && info.uuid != dm.uuid) {
+                        val displayName = try {
+                            dm.decodeDisplayNameFromTransportInternal(remoteNameB64)
+                        } catch (_: Exception) { remoteNameB64 }
+                        val info = HeartbeatProcessor.HeartbeatInfo(
+                            uuid = remoteUuid,
+                            displayName = displayName,
+                            port = port.toInt(),
+                            batteryLevel = kotlin.math.abs(battery),
+                            isCharging = battery >= 0,
+                            deviceType = remoteDeviceType,
+                            ip = clientIp
+                        )
+                        if (info.uuid != dm.uuid) {
                             HeartbeatProcessor.processHeartbeat(info, dm)
                         }
                     } catch (e: Exception) {
@@ -1276,16 +1292,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 }
             }
             lib.nrc_set_on_heartbeat_tcp_cb(ctx, cb); rustCallbackRefs.add(cb)
-        }
-
-        // ---- on_discover_manual ----
-        run {
-            val cb = object : NotifyRelayCore.OnDiscoverManualCb {
-                override fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?) {
-                    // DISCOVER_MANUAL 格式与 Rust 编码器不匹配，走 routeLine 回落
-                }
-            }
-            lib.nrc_set_on_discover_manual_cb(ctx, cb); rustCallbackRefs.add(cb)
         }
     }
 

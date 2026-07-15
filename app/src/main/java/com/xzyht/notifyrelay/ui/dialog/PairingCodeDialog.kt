@@ -254,14 +254,11 @@ fun PairingCodeDialog(
                                             val resp = HandshakeSender.sendPairingResp(deviceManager, initiator, receiverTmpPubKeyB64, encryptedCode)
                                             
                                             if (resp?.startsWith("ACCEPT:") == true) {
-                                                // ACCEPT 格式: ACCEPT:<uuid>:<ltPubKey>:<ip>:<battery>:<deviceType>
                                                 val ctx = deviceManager.rustContextInternal
-                                                val acceptJson = if (ctx != null) NativeCore.decodeLine(ctx, resp) else null
-                                                val initiatorLtPubKey = if (acceptJson != null) {
-                                                    org.json.JSONObject(acceptJson as String).optString("lt_pub_key", "")
-                                                } else {
-                                                    resp.split(":").getOrElse(2) { "" }
-                                                }
+                                                if (ctx == null) return@withContext "配对失败：响应格式错误"
+                                                val acceptJson = NativeCore.decodeLine(ctx, resp)
+                                                if (acceptJson == null) return@withContext "配对失败：响应格式错误"
+                                                val initiatorLtPubKey = org.json.JSONObject(acceptJson).optString("lt_pub_key", "")
                                                 if (initiatorLtPubKey.isNotEmpty()) {
                                                     // 使用长期 ECDH 密钥完成标准密钥交换
                                                     val success = deviceManager.completePairingWithLongTermKeys(
