@@ -165,27 +165,41 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         
         val ctx = rustContext
         var hasOldKey = false
+        // 收集需要回填 sharedSecret 的设备
+        val backfillUpdates = mutableListOf<DeviceEntity>()
+        
         for (device in devices) {
             if (device.uuid == "本机") continue
             
             if (device.sharedSecret.isNotEmpty()) {
-                // 旧版明文密钥（C#/Kotlin ECDH），与 Rust HKDF 不兼容，清除配对
-                hasOldKey = true
-                try {
-                    ctx?.let { NativeCore.removeDevice(it, device.uuid) }
-                } catch (_: Exception) {}
-                // 更新数据库：清除密钥，标记未配对，但保留设备记录
-                kotlinx.coroutines.runBlocking {
-                    DatabaseRepository.getInstance(context).saveDevice(
-                        device.copy(sharedSecret = "", isAccepted = false)
-                    )
+                // 尝试解析为新式 base64 AES 密钥
+                val keyBytes = try {
+                    android.util.Base64.decode(device.sharedSecret, android.util.Base64.NO_WRAP)
+                } catch (_: Exception) { null }
+                
+                if (keyBytes != null && keyBytes.size == 32) {
+                    // 新式密钥：导入 Rust 上下文
+                    ctx?.let { NativeCore.migrateSharedSecret(it, device.uuid, keyBytes) }
+                } else {
+                    // 旧版明文密钥（C#/Kotlin ECDH），与 Rust HKDF 不兼容，清除配对
+                    hasOldKey = true
+                    try {
+                        ctx?.let { NativeCore.removeDevice(it, device.uuid) }
+                    } catch (_: Exception) {}
+                    kotlinx.coroutines.runBlocking {
+                        DatabaseRepository.getInstance(context).saveDevice(
+                            device.copy(sharedSecret = "", isAccepted = false)
+                        )
+                    }
+                    continue  // 跳过认证状态恢复
                 }
-            } else if (device.isAccepted) {
-                // 已通过 Rust 重新配对过的设备，恢复认证状态
+            }
+            
+            if (device.isAccepted) {
                 synchronized(authenticatedDevices) {
                     authenticatedDevices[device.uuid] = AuthInfo(
                         publicKey = device.publicKey,
-                        sharedSecret = "",
+                        sharedSecret = device.sharedSecret,
                         isAccepted = true,
                         displayName = device.displayName,
                         lastIp = device.lastIp,
@@ -208,6 +222,38 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
         }
         
+        // 回填：对 sharedSecret 为空但 Rust 中有密钥的设备，补充持久化
+        if (ctx != null) {
+            synchronized(authenticatedDevices) {
+                for ((uuid, auth) in authenticatedDevices) {
+                    if (uuid == "本机") continue
+                    if (auth.isAccepted && auth.sharedSecret.isEmpty()) {
+                        val keyB64 = NativeCore.exportDeviceKey(ctx, uuid)
+                        if (keyB64 != null) {
+                            authenticatedDevices[uuid] = auth.copy(sharedSecret = keyB64)
+                            backfillUpdates.add(
+                                DeviceEntity(
+                                    uuid = uuid,
+                                    publicKey = auth.publicKey,
+                                    sharedSecret = keyB64,
+                                    isAccepted = true,
+                                    displayName = auth.displayName ?: "",
+                                    lastIp = auth.lastIp ?: "",
+                                    lastPort = auth.lastPort ?: 23333
+                                )
+                            )
+                        }
+                    }
+                }
+            }
+            if (backfillUpdates.isNotEmpty()) {
+                kotlinx.coroutines.runBlocking {
+                    val repo = DatabaseRepository.getInstance(context)
+                    backfillUpdates.forEach { repo.saveDevice(it) }
+                }
+            }
+        }
+        
         // 更新设备列表和 Flow
         try {
             coroutineScope.launch {
@@ -227,17 +273,20 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         try {
             // 保存到Room数据库
             val deviceEntities = mutableListOf<DeviceEntity>()
+            val ctx = rustContext
             for ((uuid, auth) in authenticatedDevices) {
                 // 过滤掉uuid为"本机"的记录
                 if (uuid == "本机") continue
                 
                 if (auth.isAccepted) {
+                    // 从 Rust 导出实际 AES 密钥（base64）作为持久化 fallback
+                    val keyB64 = if (ctx != null) NativeCore.exportDeviceKey(ctx, uuid) ?: "" else ""
                     val name = auth.displayName ?: deviceInfoCache[uuid]?.displayName ?: DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid)
                     val info = deviceInfoCache[uuid]
                     val deviceEntity = DeviceEntity(
                         uuid = uuid,
                         publicKey = auth.publicKey,
-                        sharedSecret = auth.sharedSecret,
+                        sharedSecret = keyB64,
                         isAccepted = true,
                         displayName = name,
                         lastIp = info?.ip ?: auth.lastIp ?: "",
@@ -463,6 +512,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
         localPublicKey = initPubKey
         loadAuthedDevices()
+        saveRustCoreState()
         // 新增：初始补全本机 deviceInfoCache，便于反向 connectToDevice
         val displayName = getLocalDisplayName()
         val localIp = discoveryManager.getLocalIpAddressInternal()
