@@ -31,7 +31,8 @@ object ProtocolSender {
         CoroutineScope(Dispatchers.IO).launch {
             try {
                 val payload = deviceManager.encryptData(plaintext, target.uuid, header)
-                OneShotTcpClient.sendOnly(target.ip, target.port, payload, timeoutMs.toInt())
+                val ctx = deviceManager.rustContextInternal ?: return@launch
+                OneShotTcpClient.sendOnly(ctx, target.ip, target.port, payload, timeoutMs.toInt())
             } catch (e: Exception) {
                 Logger.w(TAG, "发送失败 $header -> ${target.displayName}", e)
             }

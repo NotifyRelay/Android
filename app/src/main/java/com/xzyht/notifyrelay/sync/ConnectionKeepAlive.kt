@@ -6,10 +6,12 @@ import android.widget.Toast
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.core.util.BatteryUtils
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.sync.getLocalIpAddress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -71,12 +73,21 @@ class ConnectionKeepAlive(
                     // 判断是否需要使用TCP心跳：锁屏时或WLAN直连模式下使用TCP
                     val useTcpHeartbeat = shouldUseTcpHeartbeat()
 
-                    if (useTcpHeartbeat && targetIp.isNotEmpty() && targetIp != "0.0.0.0") {
-                        // TCP心跳：向对方主动建立TCP连接发送心跳
-                        success = HeartbeatSender.sendTcpHeartbeat(
-                            deviceManager,
-                            DeviceInfo(uuid, info?.displayName ?: auth?.displayName ?: "已认证设备", targetIp, targetPort)
-                        )
+                    if (useTcpHeartbeat) {
+                        // TCP心跳：通过 Rust TCP 会话发送
+                        success = try {
+                            val ctx = deviceManager.rustContextInternal
+                            if (ctx != null) {
+                                val batteryLevel = BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+                                val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
+                                val battery = if (isCharging) batteryLevel else -batteryLevel
+                                val displayName = deviceManager.localDisplayNameInternal()
+                                NativeCore.sendHeartbeatTcp(ctx, deviceManager.uuid, displayName, deviceManager.listenPort.toShort(), battery, "android")
+                            }
+                            true
+                        } catch (e: Exception) {
+                            false
+                        }
                     } else {
                         // UDP广播心跳
                         success = try {
@@ -210,40 +221,37 @@ class ConnectionKeepAlive(
 
         for (retry in 0 until maxRetries) {
             try {
-                val resp = HandshakeSender.sendHandshake(deviceManager, device, 3000)
-                //Logger.d("死神-NotifyRelay", "connectToDevice: handshake resp=$resp")
+                val ctx = deviceManager.rustContextInternal
+                if (ctx == null) return Pair(false, "未初始化")
+                val batteryLevel = BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+                val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
+                val battery = if (isCharging) batteryLevel else -batteryLevel
+                val localIp = getLocalIpAddress()
+                val result = NativeCore.sendHandshake(ctx, deviceManager.uuid, deviceManager.localPublicKey, localIp, battery, "android")
 
-                if (resp != null && resp.startsWith("ACCEPT:")) {
-                    synchronized(authenticatedDevices) {
-                        authenticatedDevices.remove(device.uuid)
-                        authenticatedDevices[device.uuid] = AuthInfo(
-                            "", "", true, device.displayName, device.ip, device.port
-                        )
-                        deviceManager.saveAuthedDevicesInternal()
-                    }
-                    synchronized(deviceManager.deviceInfoCacheInternal) {
-                        deviceManager.deviceInfoCacheInternal[device.uuid] = device
-                    }
-                    startHeartbeatToDevice(device.uuid, device.ip, device.port, "")
-                    deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
-                    try {
-                        scope.launch { deviceManager.updateDeviceListInternal() }
-                    } catch (_: Exception) {}
+                if (result == 0) {
+                    delay(500)
+                    if (deviceManager.isAuthenticatedInternal(device.uuid)) {
+                        startHeartbeatToDevice(device.uuid, device.ip, device.port, "")
+                        deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
+                        try {
+                            scope.launch { deviceManager.updateDeviceListInternal() }
+                        } catch (_: Exception) {}
 
-                    if (device.uuid != deviceManager.uuid) {
-                        val myInfo = deviceManager.getDeviceInfoInternal(deviceManager.uuid)
-                        if (myInfo != null && !heartbeatedDevices.contains(device.uuid)) {
-                            deviceManager.connectToDevice(myInfo)
+                        if (device.uuid != deviceManager.uuid) {
+                            val myInfo = deviceManager.getDeviceInfoInternal(deviceManager.uuid)
+                            if (myInfo != null && !heartbeatedDevices.contains(device.uuid)) {
+                                deviceManager.connectToDevice(myInfo)
+                            }
                         }
+                        return Pair(true, null)
+                    } else {
+                        return Pair(false, "认证失败")
                     }
-                    return Pair(true, null)
-                } else if (resp != null && resp.startsWith("REJECT:")) {
-                    return Pair(false, "对方拒绝连接")
                 } else {
-                    return Pair(false, "认证失败")
+                    return Pair(false, "连接失败")
                 }
             } catch (e: UnsupportedOperationException) {
-                // 格式不匹配：无需重试，直接提示用户升级
                 val ctx = deviceManager.contextInternal
                 val displayName = device.displayName
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
@@ -253,7 +261,6 @@ class ConnectionKeepAlive(
                 return Pair(false, e.message)
             } catch (e: Exception) {
                 lastException = e
-                //Logger.d("死神-NotifyRelay", "connectToDevice重试 $retry 失败: ${e.message}")
                 if (retry < maxRetries - 1) {
                     delay(1000)
                 }

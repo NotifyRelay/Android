@@ -7,9 +7,11 @@ import com.sun.jna.Pointer
 
 interface NotifyRelayCore : Library {
 
+    // ======== Lifecycle ========
     fun nrc_init(): Pointer
     fun nrc_destroy(ctx: Pointer)
 
+    // ======== ECDH key management ========
     fun nrc_ecdh_generate_keypair(ctx: Pointer): Int
     fun nrc_ecdh_get_public_key(ctx: Pointer): Pointer
     fun nrc_ecdh_has_keypair(ctx: Pointer): Int
@@ -18,37 +20,16 @@ interface NotifyRelayCore : Library {
     fun nrc_migrate_shared_secret(ctx: Pointer, deviceUuid: String, secret: ByteArray, len: Int): Int
     fun nrc_remove_device(ctx: Pointer, deviceUuid: String): Int
 
+    // ======== Encrypt (for sending data) ========
     fun nrc_encrypt_message(
         ctx: Pointer, header: String, localUuid: String,
         localPubKey: String, remoteUuid: String, plaintext: String
     ): Pointer
 
-    fun nrc_decrypt_message(ctx: Pointer, encryptedLine: String): Pointer
-    fun nrc_decrypt_payload(ctx: Pointer, localUuid: String, encryptedB64: String): Pointer
-    fun nrc_decode_line(ctx: Pointer, line: String): Pointer
-
-    // ======== New: Ephemeral ECDH ========
-    fun nrc_ecdh_generate_ephemeral_keypair(ctx: Pointer): Int
-    fun nrc_ecdh_get_ephemeral_public_key(ctx: Pointer): Pointer
-    fun nrc_ecdh_has_ephemeral_keypair(ctx: Pointer): Int
-    fun nrc_ecdh_clear_ephemeral_keypair(ctx: Pointer)
-
-    // ======== New: Pairing code ========
-    fun nrc_ecdh_derive_pairing_key(ctx: Pointer, peerEphPubB64: String): Int
-    fun nrc_ecdh_encrypt_pairing_code(ctx: Pointer, code: String): Pointer
-    fun nrc_ecdh_decrypt_pairing_code(ctx: Pointer, encryptedB64: String): Pointer
-
-    // ======== New: Long-term key alias ========
-    fun nrc_ecdh_derive_long_term_key(ctx: Pointer, peerUuid: String, peerLtPubB64: String): Int
-
-    // ======== New: Key export ========
-    fun nrc_export_device_key(ctx: Pointer, deviceUuid: String): Pointer
-    fun nrc_export_local_keypair(ctx: Pointer): Pointer
-
-    // ======== New: Unified process ========
+    // ======== Unified process ========
     fun nrc_process_line(ctx: Pointer, line: String): Int
 
-    // ======== New: User data ========
+    // ======== User data ========
     fun nrc_set_user_data(ctx: Pointer, userData: Pointer)
 
     // ======== Callback interfaces ========
@@ -68,26 +49,25 @@ interface NotifyRelayCore : Library {
         fun invoke(uuid: Pointer?, userData: Pointer?)
     }
     interface OnHeartbeatTcpCb : Callback {
-        fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?)
+        fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?)
     }
     interface OnDataCb : Callback {
         fun invoke(localUuid: Pointer?, plaintext: Pointer?, userData: Pointer?)
     }
-
     interface OnLogCb : Callback {
         fun invoke(level: Int, message: Pointer?)
     }
-
     interface OnHeartbeatUdpCb : Callback {
-        fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
+        fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
     }
-
     interface OnDeviceTimeoutCb : Callback {
         fun invoke(uuid: Pointer?, userData: Pointer?)
     }
+    interface OnPairingResultCb : Callback {
+        fun invoke(uuid: Pointer?, success: Int, errorMsg: Pointer?, userData: Pointer?)
+    }
 
-    // ======== Heartbeat tick & device timeout ========
-    fun nrc_heartbeat_tick(ctx: Pointer, timeoutSec: Long): Int
+    // ======== Device timeout ========
     fun nrc_set_on_device_timeout_cb(ctx: Pointer, cb: OnDeviceTimeoutCb?)
 
     // ======== Dedup engine ========
@@ -96,22 +76,10 @@ interface NotifyRelayCore : Library {
     fun nrc_dedup_clear_pending(ctx: Pointer, dedupKey: String)
     fun nrc_dedup_cleanup(ctx: Pointer, nowMs: Long, ttlMs: Long)
 
-    // ======== New callback types for heartbeat without JSON re-parse ========
-    interface OnHeartbeatWithCb : Callback {
-        fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
-    }
-    interface OnHeartbeatTcpWithCb : Callback {
-        fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?)
-    }
-
-    // ======== New utility functions ========
-    fun nrc_verify_pairing_code(storedCode: String, inputCode: String): Int
+    // ======== Utility functions ========
     fun nrc_compute_dedup_key(deviceUuid: String, data: String): Pointer
-    fun nrc_heartbeat_has_timed_out(lastHeartbeatSec: Long, nowSec: Long, timeoutSec: Long): Int
     fun nrc_compute_feature_id(superPkg: String, paramV2Raw: String, title: String, text: String, instanceId: String): Pointer
     fun nrc_compute_feature_id_simple(packageName: String, title: String, text: String): Pointer
-    fun nrc_parse_heartbeat_with_cb(line: String, cb: OnHeartbeatWithCb?, userData: Pointer?): Int
-    fun nrc_parse_heartbeat_tcp_with_cb(line: String, cb: OnHeartbeatTcpWithCb?, userData: Pointer?): Int
 
     // ======== Text similarity & dedup ========
     fun nrc_text_similarity(a: String, b: String): Double
@@ -126,9 +94,9 @@ interface NotifyRelayCore : Library {
     fun nrc_check_filter_mode(ctx: Pointer, mappedPkg: String, originalPkg: String, title: String, text: String): Int
     fun nrc_filter_notification(ctx: Pointer, pkg: String, title: String, text: String): Pointer
 
-    // ======== OneShot TCP client ========
-    fun nrc_oneshot_send_receive(ip: String, port: Short, payload: String, connectTimeoutMs: Int, readTimeoutMs: Int): Pointer
-    fun nrc_oneshot_send_only(ip: String, port: Short, payload: String, connectTimeoutMs: Int): Int
+    // ======== OneShot TCP client (new signature: ctx param, unified timeout, returns status) ========
+    fun nrc_oneshot_send_receive(ctx: Pointer, ip: String, port: Short, payload: String, timeoutMs: Int): Int
+    fun nrc_oneshot_send_only(ctx: Pointer, ip: String, port: Short, payload: String, timeoutMs: Int): Int
 
     // ======== FTP credential derivation ========
     fun nrc_derive_ftp_credentials(sharedSecretB64: String): Pointer
@@ -157,48 +125,12 @@ interface NotifyRelayCore : Library {
     fun nrc_set_on_superisland_cb(ctx: Pointer, cb: OnDataCb?)
     fun nrc_set_on_unknown_data_cb(ctx: Pointer, cb: OnDataCb?)
     fun nrc_set_on_heartbeat_udp_cb(ctx: Pointer, cb: OnHeartbeatUdpCb?)
+    fun nrc_set_on_pairing_result_cb(ctx: Pointer, cb: OnPairingResultCb?)
 
-    // ======== Format helpers (for one-shot sync socket ops) ========
-    fun nrc_format_handshake(
-        uuid: String, pubKey: String, ip: String,
-        battery: Int, deviceType: String
-    ): Pointer
-
-    fun nrc_format_pairing_init(
-        uuid: String, tmpPubKey: String, ip: String,
-        battery: Int, deviceType: String
-    ): Pointer
-
-    fun nrc_format_pairing_resp(
-        uuid: String, tmpPub: String, ltPub: String,
-        encryptedCode: String, ip: String,
-        battery: Int, deviceType: String
-    ): Pointer
-
-    fun nrc_format_accept(
-        uuid: String, ltPubKey: String, ip: String,
-        battery: Int, deviceType: String
-    ): Pointer
-
-    fun nrc_format_heartbeat(
-        uuid: String, name: String, port: Short,
-        battery: Int, deviceType: String
-    ): Pointer
-
-    fun nrc_format_discovery(
-        uuid: String, name: String, port: Short,
-        battery: Int, deviceType: String
-    ): Pointer
-
-    fun nrc_format_tcp_heartbeat(
-        uuid: String, name: String, port: Short,
-        battery: Int, deviceType: String
-    ): Pointer
-
-    // ======== Send functions (for established connections) ========
-    fun nrc_send_handshake(ctx: Pointer, uuid: String, pubKey: String, ip: String, battery: Int, deviceType: String)
-    fun nrc_send_pairing_init(ctx: Pointer, uuid: String, ip: String, battery: Int, deviceType: String)
-    fun nrc_send_pairing_resp(ctx: Pointer, uuid: String, ltPub: String, pairingCode: String, ip: String, battery: Int, deviceType: String)
+    // ======== Send functions ========
+    fun nrc_send_handshake(ctx: Pointer, uuid: String, pubKey: String, ip: String, battery: Int, deviceType: String): Int
+    fun nrc_send_pairing_init(ctx: Pointer, uuid: String, expectedCode: String, ip: String, battery: Int, deviceType: String): Int
+    fun nrc_send_pairing_resp(ctx: Pointer, uuid: String, ltPub: String, pairingCode: String, ip: String, battery: Int, deviceType: String): Int
     fun nrc_send_accept(ctx: Pointer, uuid: String, ltPubKey: String, ip: String, battery: Int, deviceType: String)
     fun nrc_send_reject(ctx: Pointer, uuid: String)
     fun nrc_send_heartbeat_tcp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
@@ -206,19 +138,25 @@ interface NotifyRelayCore : Library {
     fun nrc_send_discovery(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
     fun nrc_send_data_message(ctx: Pointer, header: String, localUuid: String, localPubKey: String, remoteUuid: String, plaintext: String)
 
-    // ======== UDP broadcast processing ========
-    fun nrc_process_udp_broadcast(ctx: Pointer, line: String): Int
+    // ======== Periodic broadcast ========
+    fun nrc_periodic_broadcast(
+        ctx: Pointer, action: Int,
+        uuid: String?, name: String?, battery: Int, deviceType: String?
+    ): Int
 
+    // ======== State persistence ========
     fun nrc_export_state(ctx: Pointer): Pointer
     fun nrc_import_state(ctx: Pointer, json: String): Int
     fun nrc_encrypt_local_state(ctx: Pointer, plaintext: String, deviceUuid: String): Pointer
     fun nrc_decrypt_local_state(ctx: Pointer, encryptedB64: String, deviceUuid: String): Pointer
 
+    fun nrc_export_device_key(ctx: Pointer, deviceUuid: String): Pointer
     fun nrc_free_string(s: Pointer)
 
     // ======== Network layer ========
     fun nrc_start_tcp_server(ctx: Pointer, port: Short): Int
     fun nrc_stop_tcp_server(ctx: Pointer): Int
+    fun nrc_restart_udp_listener(ctx: Pointer): Int
     fun nrc_send_to_device(ctx: Pointer, uuid: String, message: String): Int
     fun nrc_broadcast_message(ctx: Pointer, message: String): Int
     fun nrc_get_connected_device_count(ctx: Pointer): Int

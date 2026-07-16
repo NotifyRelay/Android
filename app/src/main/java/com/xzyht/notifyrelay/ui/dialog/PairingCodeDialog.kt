@@ -21,11 +21,10 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.sync.HandshakeSender
+import com.xzyht.notifyrelay.sync.getLocalIpAddress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -38,11 +37,6 @@ import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 
-/**
- * 配对码对话框。
- * - CLIENT_MODE（发起端）：生成并显示配对码
- * - SERVER_MODE（接收端）：输入对方显示的配对码
- */
 enum class PairingMode { CLIENT_MODE, SERVER_MODE }
 
 @Composable
@@ -60,28 +54,23 @@ fun PairingCodeDialog(
     val colorScheme = MiuixTheme.colorScheme
 
     if (mode == PairingMode.CLIENT_MODE) {
-        // ==================== 发起端：生成临时密钥对，显示配对码 ====================
         val clipboardManager = LocalClipboardManager.current
         val scope = rememberCoroutineScope()
         val displayCode = remember { pairingCode.ifEmpty { PairingCodeManager.generate() } }
-        val tmpPubKeyB64 = remember {
-            val ctx = deviceManager.rustContextInternal
-            if (ctx != null) {
-                NativeCore.generateEphemeralKeypair(ctx)
-                NativeCore.getEphemeralPublicKey(ctx) ?: ""
-            } else ""
-        }
-        // 临时密钥已存储在 Rust 上下文中，handlePairingResp 通过 ctx 访问
 
-        // 发送 PAIRING_INIT（携带临时公钥）
         LaunchedEffect(show) {
             if (show && targetDevice != null) {
                 delay(500)
                 withContext(Dispatchers.IO) {
-                    val initResp = HandshakeSender.sendPairingInit(deviceManager, targetDevice, tmpPubKeyB64)
-                    Logger.d("配对", "PAIRING_INIT response: $initResp")
+                    val ctx = deviceManager.rustContextInternal
+                    if (ctx != null) {
+                        val batteryLevel = notifyrelay.core.util.BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+                        val isCharging = notifyrelay.core.util.BatteryUtils.isCharging(deviceManager.contextInternal)
+                        val battery = if (isCharging) batteryLevel else -batteryLevel
+                        val localIp = getLocalIpAddress()
+                        NativeCore.sendPairingInit(ctx, deviceManager.uuid, displayCode, localIp, battery, "android")
+                    }
                 }
-                // 等待配对完成：尝试 30 次，每次 3 秒
                 var attempts = 0
                 while (attempts < 30) {
                     delay(3000)
@@ -94,7 +83,6 @@ fun PairingCodeDialog(
                     }
                     attempts++
                 }
-                deviceManager.pendingTempPrivKeyB64 = null
                 onPairingComplete(false, "配对超时")
             }
         }
@@ -149,7 +137,6 @@ fun PairingCodeDialog(
                         text = "取消",
                         onClick = {
                             PairingCodeManager.clear()
-                            deviceManager.pendingTempPrivKeyB64 = null
                             onDismiss()
                         }
                     )
@@ -157,7 +144,6 @@ fun PairingCodeDialog(
             }
         )
     } else {
-        // ==================== 接收端：输入配对码，加密回传 ====================
         val serverScope = rememberCoroutineScope()
         var code by remember { mutableStateOf("") }
         var isPairing by remember { mutableStateOf(false) }
@@ -169,9 +155,6 @@ fun PairingCodeDialog(
         }
         val remoteUuid = remember {
             pending?.remoteUuid ?: targetDevice?.uuid ?: ""
-        }
-        val remoteTmpPubKey = remember {
-            pending?.tmpPubKey ?: ""  // 发起端的临时公钥，用于加密配对码
         }
 
         WindowDialog(
@@ -200,7 +183,6 @@ fun PairingCodeDialog(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
-                    // 使用统一的 6 位配对码输入组件
                     PairingCodeInputField(
                         code = code,
                         onCodeChange = {
@@ -231,54 +213,25 @@ fun PairingCodeDialog(
                                     errorMsg = "连接信息不完整，请重新发起配对"
                                     return@TextButton
                                 }
-                                if (remoteTmpPubKey.isEmpty()) {
-                                    errorMsg = "未获取到发起端密钥信息"
-                                    return@TextButton
-                                }
                                 isPairing = true
 
                                 serverScope.launch {
                                     val result = withContext(Dispatchers.IO) {
                                         try {
-                                            // 1. 使用发起端的临时公钥加密配对码
-                                            val initiator = DeviceInfo(remoteUuid, targetDevice?.displayName ?: "", remoteIp, 23333)
-                                            
-                                            // 使用 Rust 核心加密配对码
                                             val ctx = deviceManager.rustContextInternal
-                                            NativeCore.generateEphemeralKeypair(ctx!!)
-                                            NativeCore.derivePairingKey(ctx, remoteTmpPubKey)
-                                            val encryptedCode = NativeCore.encryptPairingCode(ctx, code) ?: throw Exception("加密配对码失败")
+                                            if (ctx == null) return@withContext "配对失败：未初始化"
+                                            val ltPubKey = deviceManager.localPublicKey
+                                            NativeCore.sendPairingResp(ctx, remoteUuid, ltPubKey, code, remoteIp, 50, "android")
 
-                                            // 发送 PAIRING_RESP（加密后的配对码）
-                                            val receiverTmpPubKeyB64 = NativeCore.getEphemeralPublicKey(ctx) ?: ""
-                                            val resp = HandshakeSender.sendPairingResp(deviceManager, initiator, receiverTmpPubKeyB64, encryptedCode)
-                                            
-                                            if (resp?.startsWith("ACCEPT:") == true) {
-                                                val ctx = deviceManager.rustContextInternal
-                                                if (ctx == null) return@withContext "配对失败：响应格式错误"
-                                                val acceptJson = NativeCore.decodeLine(ctx, resp)
-                                                if (acceptJson == null) return@withContext "配对失败：响应格式错误"
-                                                val initiatorLtPubKey = org.json.JSONObject(acceptJson).optString("lt_pub_key", "")
-                                                if (initiatorLtPubKey.isNotEmpty()) {
-                                                    // 使用长期 ECDH 密钥完成标准密钥交换
-                                                    val success = deviceManager.completePairingWithLongTermKeys(
-                                                        remoteUuid, initiatorLtPubKey,
-                                                        displayName = targetDevice?.displayName ?: "",
-                                                        lastIp = remoteIp
-                                                    )
-                                                    if (success) {
-                                                        "配对成功"
-                                                    } else {
-                                                        "密钥交换失败"
-                                                    }
-                                                } else {
-                                                    "配对失败：响应格式错误"
+                                            var attempts = 0
+                                            while (attempts < 10) {
+                                                delay(1000)
+                                                if (deviceManager.isAuthenticatedInternal(remoteUuid)) {
+                                                    return@withContext "配对成功"
                                                 }
-                                            } else if (resp?.startsWith("REJECT:") == true) {
-                                                "对方拒绝了配对请求"
-                                            } else {
-                                                "配对失败，请确认配对码后重试"
+                                                attempts++
                                             }
+                                            "配对超时"
                                         } catch (e: Exception) {
                                             "配对失败: ${e.message}"
                                         }
