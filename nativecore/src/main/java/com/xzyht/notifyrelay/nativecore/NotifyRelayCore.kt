@@ -163,6 +163,45 @@ interface NotifyRelayCore : Library {
     fun nrc_is_device_connected(ctx: Pointer, uuid: String): Int
     fun nrc_remove_device_session(ctx: Pointer, uuid: String): Int
 
+    // ======== Heartbeat sender ========
+    fun nrc_start_heartbeat_sender(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, intervalMs: Long, mode: Int): Long
+    fun nrc_update_heartbeat_params(ctx: Pointer, handlePtr: Long, uuid: String, name: String, battery: Int, deviceType: String)
+    fun nrc_stop_heartbeat_sender(ctx: Pointer, handlePtr: Long)
+
+    // ======== Offline detector ========
+    fun nrc_start_offline_detector(ctx: Pointer, timeoutSec: Long, checkIntervalMs: Long): Long
+    fun nrc_stop_offline_detector(ctx: Pointer)
+
+    // ======== Sender queue ========
+    fun nrc_create_sender_queue(ctx: Pointer): Long
+    fun nrc_start_sender_queue(ctx: Pointer, queuePtr: Long)
+    fun nrc_enqueue_message(ctx: Pointer, queuePtr: Long, deviceUuid: String, deviceIp: String, header: String, plaintext: String, dedupKey: String?)
+    fun nrc_stop_sender_queue(ctx: Pointer, queuePtr: Long)
+
+    // ======== Diff ========
+    fun nrc_compute_superisland_diff(oldState: String, newState: String): Pointer
+
+    // ======== Network change ========
+    fun nrc_on_network_changed(ctx: Pointer, localIp: String?)
+
+    // ======== Local IP ========
+    fun nrc_get_local_ip(): Pointer
+
+    // ======== Discovery ========
+    fun nrc_add_known_device(ctx: Pointer, uuid: String, ip: String)
+    fun nrc_remove_known_device(ctx: Pointer, uuid: String)
+    fun nrc_record_discovered_device(ctx: Pointer, uuid: String, name: String?, ip: String, port: Short, battery: Int, deviceType: String)
+    fun nrc_get_discovered_devices(ctx: Pointer): Pointer
+    fun nrc_start_known_device_scanner(ctx: Pointer)
+    fun nrc_stop_known_device_scanner(ctx: Pointer)
+
+    // ======== Reconnect ========
+    fun nrc_create_reconnect_state(ctx: Pointer): Long
+    fun nrc_reconnect_add_target(ctx: Pointer, statePtr: Long, uuid: String, ip: String)
+    fun nrc_reconnect_remove_target(ctx: Pointer, statePtr: Long, uuid: String)
+    fun nrc_reconnect_start(ctx: Pointer, statePtr: Long, intervalSecs: Long, maxRetries: Int)
+    fun nrc_reconnect_stop(ctx: Pointer, statePtr: Long)
+
     // ======== Network callbacks ========
     interface OnDeviceConnectedCb : Callback {
         fun invoke(uuid: Pointer?, ip: Pointer?, userData: Pointer?)

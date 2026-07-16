@@ -11,11 +11,9 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.sync.getLocalIpAddress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.collections.iterator
 
 /**
  * 连接保活与重连策略封装：
@@ -50,69 +48,33 @@ class ConnectionKeepAlive(
 
     /**
      * 启动某个设备的心跳任务。
-     * - 每 4 秒发送一次心跳
-     * - 连续失败 5 次后触发 handleHeartbeatFailure
-     * - 锁屏时或WLAN直连模式下使用TCP心跳，否则使用UDP广播
+     * 使用 Rust heartbeat sender 发送心跳，支持动态切换 TCP/UDP 模式。
      */
     fun startHeartbeatToDevice(uuid: String, initialIp: String, initialPort: Int, sharedSecret: String) {
-        heartbeatJobs[uuid]?.cancel()
+        stopHeartbeatToDevice(uuid)
         heartbeatedDevices.add(uuid)
-        //Logger.d("死神-NotifyRelay", "[KeepAlive] startHeartbeatToDevice: uuid=$uuid, ip=$initialIp, port=$initialPort")
 
-        val job = scope.launch {
-            var failCount = 0
-            val maxFail = 5
-            while (true) {
-                var success = false
-                try {
-                    val info = deviceManager.getDeviceInfoInternal(uuid)
-                    val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[uuid] }
-                    val targetIp = info?.ip ?: auth?.lastIp ?: initialIp
-                    val targetPort = info?.port ?: auth?.lastPort ?: initialPort
+        val ctx = deviceManager.rustContextInternal ?: return
+        val batteryLevel = BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+        val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
+        val battery = if (isCharging) batteryLevel else -batteryLevel
+        val displayName = deviceManager.localDisplayNameInternal()
+        val mode = if (shouldUseTcpHeartbeat()) 1L else 0L
 
-                    // 判断是否需要使用TCP心跳：锁屏时或WLAN直连模式下使用TCP
-                    val useTcpHeartbeat = shouldUseTcpHeartbeat()
+        val handle = NativeCore.startHeartbeatSender(ctx, uuid, displayName, battery, "android", 4000L, mode.toInt())
+        heartbeatJobs[uuid] = handle
+    }
 
-                    if (useTcpHeartbeat) {
-                        // TCP心跳：通过 Rust TCP 会话发送
-                        success = try {
-                            val ctx = deviceManager.rustContextInternal
-                            if (ctx != null) {
-                                val batteryLevel = BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
-                                val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
-                                val battery = if (isCharging) batteryLevel else -batteryLevel
-                                val displayName = deviceManager.localDisplayNameInternal()
-                                NativeCore.sendHeartbeatTcp(ctx, deviceManager.uuid, displayName, deviceManager.listenPort.toShort(), battery, "android")
-                            }
-                            true
-                        } catch (e: Exception) {
-                            false
-                        }
-                    } else {
-                        // UDP广播心跳
-                        success = try {
-                            DiscoveryBroadcaster.sendBroadcast(deviceManager)
-                        } catch (e: Exception) {
-                            false
-                        }
-                    }
-                } catch (e: Exception) {
-                    //Logger.d("死神-NotifyRelay", "[KeepAlive] 心跳发送失败: $uuid, ${e.message}")
-                }
-
-                if (success) {
-                    failCount = 0
-                } else {
-                    failCount++
-                    if (failCount >= maxFail) {
-                        handleHeartbeatFailure(uuid)
-                        break
-                    }
-                }
-                delay(4000)
-            }
+    private fun stopHeartbeatToDevice(uuid: String) {
+        val ctx = deviceManager.rustContextInternal
+        val handle = heartbeatJobs[uuid]
+        if (ctx != null && handle != null) {
+            try {
+                NativeCore.stopHeartbeatSender(ctx, handle)
+            } catch (_: Exception) {}
         }
-        heartbeatJobs[uuid] = job
+        heartbeatJobs.remove(uuid)
+        heartbeatedDevices.remove(uuid)
     }
 
     /**
@@ -143,9 +105,7 @@ class ConnectionKeepAlive(
      */
     fun handleHeartbeatFailure(uuid: String) {
         Logger.w("死神-NotifyRelay", "[KeepAlive] 心跳连续失败5次，自动停止心跳并尝试重连: $uuid")
-        heartbeatJobs[uuid]?.cancel()
-        heartbeatJobs.remove(uuid)
-        heartbeatedDevices.remove(uuid)
+        stopHeartbeatToDevice(uuid)
 
         scope.launch {
             val info = deviceManager.getDeviceInfoInternal(uuid)
@@ -226,7 +186,7 @@ class ConnectionKeepAlive(
                 val batteryLevel = BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
                 val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
                 val battery = if (isCharging) batteryLevel else -batteryLevel
-                val localIp = getLocalIpAddress()
+                val localIp = NativeCore.getLocalIp() ?: "0.0.0.0"
                 val result = NativeCore.sendHandshake(ctx, deviceManager.uuid, deviceManager.localPublicKey, localIp, battery, "android")
 
                 if (result == 0) {

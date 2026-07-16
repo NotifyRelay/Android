@@ -14,9 +14,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.net.Inet4Address
-import java.net.NetworkInterface
-import kotlin.collections.iterator
 
 /**
  * 负责「网络环境」与「设备发现」的整体协调：
@@ -94,27 +91,7 @@ class ConnectionDiscoveryManager(
     }
 
     internal fun getLocalIpAddressInternal(): String {
-        try {
-            val en = NetworkInterface.getNetworkInterfaces()
-            var bestIp: String? = null
-            while (en.hasMoreElements()) {
-                val intf = en.nextElement()
-                val addrs = intf.inetAddresses
-                while (addrs.hasMoreElements()) {
-                    val addr = addrs.nextElement()
-                    if (!addr.isLoopbackAddress && addr is Inet4Address) {
-                        val ip = addr.hostAddress ?: "0.0.0.0"
-                        if (ip.startsWith("192.168.") || ip.startsWith("10.") || ip.startsWith("172.")) {
-                            if (bestIp == null || ip.startsWith("192.168.43.")) {
-                                bestIp = ip
-                            }
-                        }
-                    }
-                }
-            }
-            return bestIp ?: "0.0.0.0"
-        } catch (_: Exception) {}
-        return "0.0.0.0"
+        return NativeCore.getLocalIp() ?: "0.0.0.0"
     }
     private fun getCurrentNetworkType(): NetworkType {
         try {
@@ -217,6 +194,11 @@ class ConnectionDiscoveryManager(
             deviceManager.deviceInfoCacheInternal[deviceManager.uuid] = DeviceInfo(deviceManager.uuid, displayName, newIp, deviceManager.listenPort)
         }
         //Logger.d("死神-NotifyRelay", "本地IP更新为: $newIp")
+        // 通知 Rust core 网络变化
+        val ctx = deviceManager.rustContextInternal
+        if (ctx != null) {
+            NativeCore.onNetworkChanged(ctx, newIp)
+        }
         stopDiscovery()
         startDiscovery()
 

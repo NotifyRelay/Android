@@ -5,6 +5,14 @@ import com.sun.jna.Pointer
 object NativeCore {
     val lib = NotifyRelayCore.instance()
 
+    // 网络层新特性的内部状态
+    var senderQueuePtr: Long = 0L
+        private set
+    var offlineDetectorHandle: Long = 0L
+        private set
+    var reconnectStatePtr: Long = 0L
+        private set
+
     fun createContext(): Pointer = lib.nrc_init()
     fun destroyContext(ctx: Pointer) = lib.nrc_destroy(ctx)
 
@@ -167,4 +175,111 @@ object NativeCore {
 
     fun generateRandomPassword(): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_generate_random_password())
+
+    // ======== Heartbeat sender ========
+    fun startHeartbeatSender(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, intervalMs: Long, mode: Int): Long =
+        lib.nrc_start_heartbeat_sender(ctx, uuid, name, battery, deviceType, intervalMs, mode)
+
+    fun updateHeartbeatParams(ctx: Pointer, handlePtr: Long, uuid: String, name: String, battery: Int, deviceType: String) =
+        lib.nrc_update_heartbeat_params(ctx, handlePtr, uuid, name, battery, deviceType)
+
+    fun stopHeartbeatSender(ctx: Pointer, handlePtr: Long) =
+        lib.nrc_stop_heartbeat_sender(ctx, handlePtr)
+
+    // ======== Offline detector ========
+    fun startOfflineDetector(ctx: Pointer, timeoutSec: Long = 30, checkIntervalMs: Long = 3000): Long =
+        lib.nrc_start_offline_detector(ctx, timeoutSec, checkIntervalMs)
+
+    fun stopOfflineDetector(ctx: Pointer) =
+        lib.nrc_stop_offline_detector(ctx)
+
+    // ======== Sender queue ========
+    fun createSenderQueue(ctx: Pointer): Long =
+        lib.nrc_create_sender_queue(ctx)
+
+    fun startSenderQueue(ctx: Pointer, queuePtr: Long) =
+        lib.nrc_start_sender_queue(ctx, queuePtr)
+
+    fun enqueueMessage(ctx: Pointer, queuePtr: Long, deviceUuid: String, deviceIp: String, header: String, plaintext: String, dedupKey: String? = null) =
+        lib.nrc_enqueue_message(ctx, queuePtr, deviceUuid, deviceIp, header, plaintext, dedupKey)
+
+    fun stopSenderQueue(ctx: Pointer, queuePtr: Long) =
+        lib.nrc_stop_sender_queue(ctx, queuePtr)
+
+    // ======== Diff ========
+    fun computeSuperislandDiff(oldState: String, newState: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_superisland_diff(oldState, newState))
+
+    // ======== Network change ========
+    fun onNetworkChanged(ctx: Pointer, localIp: String?) =
+        lib.nrc_on_network_changed(ctx, localIp)
+
+    // ======== Local IP ========
+    fun getLocalIp(): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_local_ip())
+
+    // ======== Discovery ========
+    fun addKnownDevice(ctx: Pointer, uuid: String, ip: String) =
+        lib.nrc_add_known_device(ctx, uuid, ip)
+
+    fun removeKnownDevice(ctx: Pointer, uuid: String) =
+        lib.nrc_remove_known_device(ctx, uuid)
+
+    fun recordDiscoveredDevice(ctx: Pointer, uuid: String, name: String?, ip: String, port: Short, battery: Int, deviceType: String) =
+        lib.nrc_record_discovered_device(ctx, uuid, name, ip, port, battery, deviceType)
+
+    fun getDiscoveredDevices(ctx: Pointer): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_discovered_devices(ctx))
+
+    fun startKnownDeviceScanner(ctx: Pointer) =
+        lib.nrc_start_known_device_scanner(ctx)
+
+    fun stopKnownDeviceScanner(ctx: Pointer) =
+        lib.nrc_stop_known_device_scanner(ctx)
+
+    // ======== Reconnect ========
+    fun createReconnectState(ctx: Pointer): Long =
+        lib.nrc_create_reconnect_state(ctx)
+
+    fun reconnectAddTarget(ctx: Pointer, statePtr: Long, uuid: String, ip: String) =
+        lib.nrc_reconnect_add_target(ctx, statePtr, uuid, ip)
+
+    fun reconnectRemoveTarget(ctx: Pointer, statePtr: Long, uuid: String) =
+        lib.nrc_reconnect_remove_target(ctx, statePtr, uuid)
+
+    fun reconnectStart(ctx: Pointer, statePtr: Long, intervalSecs: Long = 10, maxRetries: Int = 5) =
+        lib.nrc_reconnect_start(ctx, statePtr, intervalSecs, maxRetries)
+
+    fun reconnectStop(ctx: Pointer, statePtr: Long) =
+        lib.nrc_reconnect_stop(ctx, statePtr)
+
+    // ======== Initialize new network features ========
+    fun initializeNewFeatures(ctx: Pointer) {
+        if (senderQueuePtr == 0L) {
+            senderQueuePtr = createSenderQueue(ctx)
+            startSenderQueue(ctx, senderQueuePtr)
+        }
+        if (offlineDetectorHandle == 0L) {
+            offlineDetectorHandle = startOfflineDetector(ctx)
+        }
+        if (reconnectStatePtr == 0L) {
+            reconnectStatePtr = createReconnectState(ctx)
+            reconnectStart(ctx, reconnectStatePtr)
+        }
+    }
+
+    fun stopNewFeatures(ctx: Pointer) {
+        if (senderQueuePtr != 0L) {
+            stopSenderQueue(ctx, senderQueuePtr)
+            senderQueuePtr = 0L
+        }
+        if (offlineDetectorHandle != 0L) {
+            stopOfflineDetector(ctx)
+            offlineDetectorHandle = 0L
+        }
+        if (reconnectStatePtr != 0L) {
+            reconnectStop(ctx, reconnectStatePtr)
+            reconnectStatePtr = 0L
+        }
+    }
 }

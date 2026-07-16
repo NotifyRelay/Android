@@ -400,7 +400,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal val heartbeatedDevicesInternal: MutableSet<String>
         get() = heartbeatedDevices
 
-    internal val heartbeatJobsInternal: MutableMap<String, kotlinx.coroutines.Job>
+    internal val heartbeatJobsInternal: MutableMap<String, Long>
         get() = heartbeatJobs
 
     internal val contextInternal: android.content.Context
@@ -449,7 +449,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     private val deviceLastSeen = mutableMapOf<String, Long>()
     // 心跳定时任务
-    private val heartbeatJobs = mutableMapOf<String, kotlinx.coroutines.Job>()
+    private val heartbeatJobs = mutableMapOf<String, Long>()
     // UI全局开关：是否启用UDP发现，使用内存缓存避免频繁数据库访问
     // 使用AppConfig管理UDP发现配置
     var udpDiscoveryEnabled: Boolean
@@ -1341,6 +1341,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 val result = NativeCore.startTcpServer(ctx, listenPort.toShort())
                 if (result == 0) {
                     Logger.i("死神-NotifyRelay", "Rust TCP 服务器已启动，端口: $listenPort")
+                    // TCP 服务器启动后初始化新网络特性（发送队列、离线检测、重连状态机）
+                    NativeCore.initializeNewFeatures(ctx)
                 } else {
                     Logger.e("死神-NotifyRelay", "启动 Rust TCP 服务器失败")
                 }
@@ -1388,24 +1390,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     // 获取本机 IP 地址
     private fun getLocalIpAddress(): String {
-        return try {
-            val interfaces = java.net.NetworkInterface.getNetworkInterfaces()
-            while (interfaces.hasMoreElements()) {
-                val networkInterface = interfaces.nextElement()
-                if (networkInterface.isLoopback || !networkInterface.isUp) continue
-
-                val addresses = networkInterface.inetAddresses
-                while (addresses.hasMoreElements()) {
-                    val address = addresses.nextElement()
-                    if (address is java.net.Inet4Address && !address.isLoopbackAddress) {
-                        return address.hostAddress ?: "0.0.0.0"
-                    }
-                }
-            }
-            "0.0.0.0"
-        } catch (_: Exception) {
-            "0.0.0.0"
-        }
+        return NativeCore.getLocalIp() ?: "0.0.0.0"
     }
 
     /**
@@ -1479,7 +1464,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             
             // 取消心跳任务
             try {
-                heartbeatJobs[uuid]?.cancel()
+                val handle = heartbeatJobs[uuid]
+                if (handle != null && rustContext != null) {
+                    NativeCore.stopHeartbeatSender(rustContext!!, handle)
+                }
                 heartbeatJobs.remove(uuid)
             } catch (_: Exception) {}
             

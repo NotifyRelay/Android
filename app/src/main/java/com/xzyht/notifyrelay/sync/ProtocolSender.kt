@@ -3,39 +3,40 @@ package com.xzyht.notifyrelay.sync
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
+import com.xzyht.notifyrelay.nativecore.NativeCore
 
 /**
  * 统一加密发送器
  *
- * 封装加密、认证检查、TCP发送与报文头拼装：
- * 最终报文格式：`<HEADER>:<localUuid>:<localPublicKey>:<encryptedPayload>\n`
+ * 通过 Rust sender queue 异步发送加密数据：
+ * - 入队后由 Rust 侧处理加密、限流、重试和去重
+ * - 返回后不保证立即发送成功
  */
 object ProtocolSender {
 
     private const val TAG = "ProtocolSender"
-    private const val DEFAULT_TIMEOUT = 10000L
 
     fun sendEncrypted(
         deviceManager: DeviceConnectionManager,
         target: DeviceInfo,
         header: String,
         plaintext: String,
-        timeoutMs: Long = DEFAULT_TIMEOUT
+        timeoutMs: Long = 10000L
     ) {
         val auth = deviceManager.authenticatedDevices[target.uuid]
         if (auth == null || !auth.isAccepted) return
 
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val payload = deviceManager.encryptData(plaintext, target.uuid, header)
-                val ctx = deviceManager.rustContextInternal ?: return@launch
-                OneShotTcpClient.sendOnly(ctx, target.ip, target.port, payload, timeoutMs.toInt())
-            } catch (e: Exception) {
-                Logger.w(TAG, "发送失败 $header -> ${target.displayName}", e)
-            }
+        val queuePtr = NativeCore.senderQueuePtr
+        if (queuePtr == 0L) {
+            Logger.w(TAG, "发送队列未初始化，丢弃消息: $header -> ${target.displayName}")
+            return
+        }
+
+        val ctx = deviceManager.rustContextInternal ?: return
+        try {
+            NativeCore.enqueueMessage(ctx, queuePtr, target.uuid, target.ip, header, plaintext, null)
+        } catch (e: Exception) {
+            Logger.w(TAG, "入队失败 $header -> ${target.displayName}", e)
         }
     }
 }

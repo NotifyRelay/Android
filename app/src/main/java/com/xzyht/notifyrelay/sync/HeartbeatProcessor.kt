@@ -3,6 +3,7 @@ package com.xzyht.notifyrelay.sync
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 
@@ -21,6 +22,14 @@ object HeartbeatProcessor {
     fun processHeartbeat(info: HeartbeatInfo, deviceManager: DeviceConnectionManager) {
         val uuid = info.uuid
         if (uuid == deviceManager.uuid) return
+
+        // 记录发现的设备到 Rust core
+        val ctx = deviceManager.rustContextInternal
+        if (ctx != null) {
+            try {
+                NativeCore.recordDiscoveredDevice(ctx, uuid, info.displayName, info.ip, info.port.toShort(), info.batteryLevel, info.deviceType)
+            } catch (_: Exception) {}
+        }
 
         val isAuthed = synchronized(deviceManager.authenticatedDevices) {
             deviceManager.authenticatedDevices.containsKey(uuid)
