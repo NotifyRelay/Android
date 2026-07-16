@@ -450,6 +450,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private val deviceLastSeen = mutableMapOf<String, Long>()
     // 心跳定时任务
     private val heartbeatJobs = mutableMapOf<String, Long>()
+    private var serverStarted = false
     // UI全局开关：是否启用UDP发现，使用内存缓存避免频繁数据库访问
     // 使用AppConfig管理UDP发现配置
     var udpDiscoveryEnabled: Boolean
@@ -508,6 +509,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         localPublicKey = initPubKey
         loadAuthedDevices()
         saveRustCoreState()
+        // 尽早初始化发送队列等新特性，避免发送窗口期
+        rustContext?.let { NativeCore.initializeNewFeatures(it) }
         // 新增：初始补全本机 deviceInfoCache，便于反向 connectToDevice
         val displayName = getLocalDisplayName()
         val localIp = discoveryManager.getLocalIpAddressInternal()
@@ -1338,14 +1341,17 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         coroutineScope.launch {
             try {
                 val ctx = rustContext ?: return@launch
-                val result = NativeCore.startTcpServer(ctx, listenPort.toShort())
-                if (result == 0) {
-                    Logger.i("死神-NotifyRelay", "Rust TCP 服务器已启动，端口: $listenPort")
-                    // TCP 服务器启动后初始化新网络特性（发送队列、离线检测、重连状态机）
-                    NativeCore.initializeNewFeatures(ctx)
-                } else {
-                    Logger.e("死神-NotifyRelay", "启动 Rust TCP 服务器失败")
+                if (!serverStarted) {
+                    val result = NativeCore.startTcpServer(ctx, listenPort.toShort())
+                    if (result == 0) {
+                        Logger.i("死神-NotifyRelay", "Rust TCP 服务器已启动，端口: $listenPort")
+                        serverStarted = true
+                    } else {
+                        Logger.e("死神-NotifyRelay", "启动 Rust TCP 服务器失败")
+                    }
                 }
+                // 无论 TCP 是否已启动，总是初始化新网络特性（发送队列、离线检测、重连状态机）
+                NativeCore.initializeNewFeatures(ctx)
             } catch (e: Exception) {
                 Logger.e("死神-NotifyRelay", "启动 Rust TCP 服务器异常", e)
             }

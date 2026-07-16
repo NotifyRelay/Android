@@ -65,8 +65,8 @@ object NativeCore {
         lib.nrc_set_user_data(ctx, userData)
 
     // ======== Send functions ========
-    fun sendHandshake(ctx: Pointer, uuid: String, pubKey: String, ip: String, battery: Int, deviceType: String): Int =
-        lib.nrc_send_handshake(ctx, uuid, pubKey, ip, battery, deviceType)
+    fun sendHandshake(ctx: Pointer, uuid: String, pubKey: String, localIp: String, targetIp: String, battery: Int, deviceType: String): Int =
+        lib.nrc_send_handshake(ctx, uuid, pubKey, localIp, targetIp, battery, deviceType)
 
     fun sendPairingInit(ctx: Pointer, uuid: String, expectedCode: String, ip: String, battery: Int, deviceType: String): Int =
         lib.nrc_send_pairing_init(ctx, uuid, expectedCode, ip, battery, deviceType)
@@ -177,8 +177,8 @@ object NativeCore {
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_generate_random_password())
 
     // ======== Heartbeat sender ========
-    fun startHeartbeatSender(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, intervalMs: Long, mode: Int): Long =
-        lib.nrc_start_heartbeat_sender(ctx, uuid, name, battery, deviceType, intervalMs, mode)
+    fun startHeartbeatSender(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, ip: String, intervalMs: Long, mode: Int): Long =
+        lib.nrc_start_heartbeat_sender(ctx, uuid, name, battery, deviceType, ip, intervalMs, mode)
 
     fun updateHeartbeatParams(ctx: Pointer, handlePtr: Long, uuid: String, name: String, battery: Int, deviceType: String) =
         lib.nrc_update_heartbeat_params(ctx, handlePtr, uuid, name, battery, deviceType)

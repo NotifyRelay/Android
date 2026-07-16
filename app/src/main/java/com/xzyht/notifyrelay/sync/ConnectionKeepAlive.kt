@@ -61,7 +61,7 @@ class ConnectionKeepAlive(
         val displayName = deviceManager.localDisplayNameInternal()
         val mode = if (shouldUseTcpHeartbeat()) 1L else 0L
 
-        val handle = NativeCore.startHeartbeatSender(ctx, uuid, displayName, battery, "android", 4000L, mode.toInt())
+        val handle = NativeCore.startHeartbeatSender(ctx, uuid, displayName, battery, "android", initialIp, 4000L, mode.toInt())
         heartbeatJobs[uuid] = handle
     }
 
@@ -187,7 +187,7 @@ class ConnectionKeepAlive(
                 val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
                 val battery = if (isCharging) batteryLevel else -batteryLevel
                 val localIp = NativeCore.getLocalIp() ?: "0.0.0.0"
-                val result = NativeCore.sendHandshake(ctx, deviceManager.uuid, deviceManager.localPublicKey, localIp, battery, "android")
+                val result = NativeCore.sendHandshake(ctx, deviceManager.uuid, deviceManager.localPublicKey, localIp, device.ip, battery, "android")
 
                 if (result == 0) {
                     delay(500)

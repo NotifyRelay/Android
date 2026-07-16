@@ -128,7 +128,7 @@ interface NotifyRelayCore : Library {
     fun nrc_set_on_pairing_result_cb(ctx: Pointer, cb: OnPairingResultCb?)
 
     // ======== Send functions ========
-    fun nrc_send_handshake(ctx: Pointer, uuid: String, pubKey: String, ip: String, battery: Int, deviceType: String): Int
+    fun nrc_send_handshake(ctx: Pointer, uuid: String, pubKey: String, localIp: String, targetIp: String, battery: Int, deviceType: String): Int
     fun nrc_send_pairing_init(ctx: Pointer, uuid: String, expectedCode: String, ip: String, battery: Int, deviceType: String): Int
     fun nrc_send_pairing_resp(ctx: Pointer, uuid: String, ltPub: String, pairingCode: String, ip: String, battery: Int, deviceType: String): Int
     fun nrc_send_accept(ctx: Pointer, uuid: String, ltPubKey: String, ip: String, battery: Int, deviceType: String)
@@ -164,7 +164,7 @@ interface NotifyRelayCore : Library {
     fun nrc_remove_device_session(ctx: Pointer, uuid: String): Int
 
     // ======== Heartbeat sender ========
-    fun nrc_start_heartbeat_sender(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, intervalMs: Long, mode: Int): Long
+    fun nrc_start_heartbeat_sender(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, ip: String, intervalMs: Long, mode: Int): Long
     fun nrc_update_heartbeat_params(ctx: Pointer, handlePtr: Long, uuid: String, name: String, battery: Int, deviceType: String)
     fun nrc_stop_heartbeat_sender(ctx: Pointer, handlePtr: Long)
 
