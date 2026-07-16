@@ -6,5 +6,8 @@
 	url = git@github.com:xzy-nine/ScrcpyForAndroid.git
 	branch = library
 [submodule "notify-relay-core"]
-	path = notify-relay-core
+	path = nativecore/notify-relay-core
+	url = git@github.com:NotifyRelay/core.git
+[submodule "nativecore/notify-relay-core"]
+	path = nativecore/notify-relay-core
 	url = git@github.com:NotifyRelay/core.git

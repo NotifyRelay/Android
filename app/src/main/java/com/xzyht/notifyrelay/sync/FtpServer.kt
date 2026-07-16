@@ -5,6 +5,7 @@ import android.os.Build
 import android.os.Environment
 import android.os.Handler
 import android.os.Looper
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import org.apache.ftpserver.FtpServer
@@ -22,7 +23,6 @@ import java.io.IOException
 import java.net.BindException
 import java.net.Inet4Address
 import java.net.NetworkInterface
-import java.security.SecureRandom
 import java.util.concurrent.atomic.AtomicBoolean
 
 data class ftpServerInfo(
@@ -136,9 +136,10 @@ object ftpServer {
             password = pcPassword
             Logger.d(TAG, "FTP 使用 PC 端派发的凭据: username=$username")
         } else {
-            // 回退：每次启动生成随机用户名密码，不使用匿名登录
-            username = "ftp_" + (1..8).map { "abcdefghijklmnopqrstuvwxyz0123456789"[SecureRandom().nextInt(36)] }.joinToString("")
-            password = (1..16).map { "abcdefghijklmnopqrstuvwxyz0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"[SecureRandom().nextInt(62)] }.joinToString("")
+            // 回退：使用 Rust Core 生成随机凭据
+            val randomPassword = NativeCore.generateRandomPassword() ?: ""
+            username = "ftp_" + randomPassword.take(8).lowercase()
+            password = randomPassword
             Logger.d(TAG, "FTP 使用随机凭据（无 PC 端凭据）")
         }
 

@@ -31,3 +31,4 @@ include(":checkupdata")
 
 include(":superislandui")
 include(":scrcpy")
+include(":nativecore")

@@ -108,9 +108,32 @@ interface NotifyRelayCore : Library {
     fun nrc_verify_pairing_code(storedCode: String, inputCode: String): Int
     fun nrc_compute_dedup_key(deviceUuid: String, data: String): Pointer
     fun nrc_heartbeat_has_timed_out(lastHeartbeatSec: Long, nowSec: Long, timeoutSec: Long): Int
-    fun nrc_compute_feature_id(packageName: String, title: String, text: String): Pointer
+    fun nrc_compute_feature_id(superPkg: String, paramV2Raw: String, title: String, text: String, instanceId: String): Pointer
+    fun nrc_compute_feature_id_simple(packageName: String, title: String, text: String): Pointer
     fun nrc_parse_heartbeat_with_cb(line: String, cb: OnHeartbeatWithCb?, userData: Pointer?): Int
     fun nrc_parse_heartbeat_tcp_with_cb(line: String, cb: OnHeartbeatTcpWithCb?, userData: Pointer?): Int
+
+    // ======== Text similarity & dedup ========
+    fun nrc_text_similarity(a: String, b: String): Double
+    fun nrc_should_deduplicate(newTitle: String, newText: String, oldTitle: String, oldText: String): Int
+
+    // ======== Filter ========
+    fun nrc_set_filter_config(
+        ctx: Pointer, filterMode: String, filterListJson: String,
+        packageGroupsJson: String, groupEnabledJson: String, installedPkgsJson: String
+    ): Int
+    fun nrc_map_local_package(ctx: Pointer, pkg: String): Pointer
+    fun nrc_check_filter_mode(ctx: Pointer, mappedPkg: String, originalPkg: String, title: String, text: String): Int
+    fun nrc_filter_notification(ctx: Pointer, pkg: String, title: String, text: String): Pointer
+
+    // ======== OneShot TCP client ========
+    fun nrc_oneshot_send_receive(ip: String, port: Short, payload: String, connectTimeoutMs: Int, readTimeoutMs: Int): Pointer
+    fun nrc_oneshot_send_only(ip: String, port: Short, payload: String, connectTimeoutMs: Int): Int
+
+    // ======== FTP credential derivation ========
+    fun nrc_derive_ftp_credentials(sharedSecretB64: String): Pointer
+    fun nrc_derive_password_hash(password: String): Pointer
+    fun nrc_generate_random_password(): Pointer
 
     // ======== Callback setters ========
     fun nrc_set_log_callback(cb: OnLogCb?)

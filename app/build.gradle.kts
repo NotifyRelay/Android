@@ -10,33 +10,6 @@ plugins {
     id("kotlin-parcelize")
 }
 
-val rustCoreDir = rootProject.projectDir.resolve("notify-relay-core")
-val rustCorePath = rustCoreDir.absolutePath
-
-// 自定义 Rust 构建任务（替代不兼容 AGP 9 的 cargo-ndk Gradle 插件）
-// 依赖: cargo install cargo-ndk  &&  rustup target add aarch64-linux-android x86_64-linux-android
-val rustBuild by tasks.registering(Exec::class) {
-    description = "构建 Rust 核心库（需 cargo-ndk + NDK）"
-    group = "rust"
-    onlyIf { rustCoreDir.exists() }
-    inputs.dir(rustCoreDir.resolve("src"))
-    inputs.file(rustCoreDir.resolve("Cargo.toml"))
-    inputs.file(rustCoreDir.resolve("Cargo.lock"))
-    outputs.dir(project.projectDir.resolve("src/main/jniLibs"))
-    workingDir = rustCoreDir
-    commandLine("cargo", "ndk",
-        "-t", "arm64-v8a",
-        "-t", "x86_64",
-        "-o", "${project.projectDir}/src/main/jniLibs",
-        "build", "--release")
-}
-// 将 Rust 构建挂钩到 Gradle 构建生命周期，确保在打包前生成 .so
-tasks.named("preBuild") {
-    dependsOn(rustBuild)
-}
-// 使用 buildSrc 的 JGit 实现计算版本信息（避免启动外部进程，兼容 configuration-cache）
-// （注意：版本信息在下面会被再次计算；避免重复定义同名 top-level 属性以消除编译歧义）
-
 
 
 // 自动生成版本号：遵循仓库约定
@@ -255,9 +228,8 @@ dependencies {
     implementation(project(":superislandui"))
     // 依赖scrcpy模块
     implementation(project(":scrcpy"))
-
-    // JNA 加载 Rust 核心库
-    implementation(libs.jna) { artifact { type = "aar" } }
+    // 依赖nativecore模块（Rust FFI 绑定 + JNA）
+    implementation(project(":nativecore"))
 }
 
 tasks.register("printVersionName") {

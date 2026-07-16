@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.nativecore
 import com.sun.jna.Pointer
 
 object NativeCore {
-    internal val lib = NotifyRelayCore.instance()
+    val lib = NotifyRelayCore.instance()
 
     fun createContext(): Pointer = lib.nrc_init()
     fun destroyContext(ctx: Pointer) = lib.nrc_destroy(ctx)
@@ -148,8 +148,11 @@ object NativeCore {
     fun computeDedupKey(deviceUuid: String, data: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_dedup_key(deviceUuid, data))
 
-    fun computeFeatureId(packageName: String, title: String, text: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_feature_id(packageName, title, text))
+    fun computeFeatureId(superPkg: String, paramV2Raw: String, title: String, text: String, instanceId: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_feature_id(superPkg, paramV2Raw, title, text, instanceId))
+
+    fun computeFeatureIdSimple(packageName: String, title: String, text: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_feature_id_simple(packageName, title, text))
 
     fun heartbeatTick(ctx: Pointer, timeoutSec: Long): Int =
         lib.nrc_heartbeat_tick(ctx, timeoutSec)
@@ -186,4 +189,47 @@ object NativeCore {
 
     fun removeDeviceSession(ctx: Pointer, uuid: String): Int =
         lib.nrc_remove_device_session(ctx, uuid)
+
+    // ======== Text similarity & dedup ========
+
+    fun textSimilarity(a: String, b: String): Double =
+        lib.nrc_text_similarity(a, b)
+
+    fun shouldDeduplicate(newTitle: String, newText: String, oldTitle: String, oldText: String): Boolean =
+        lib.nrc_should_deduplicate(newTitle, newText, oldTitle, oldText) != 0
+
+    // ======== Filter ========
+
+    fun setFilterConfig(
+        ctx: Pointer, filterMode: String, filterListJson: String,
+        packageGroupsJson: String, groupEnabledJson: String, installedPkgsJson: String
+    ): Int = lib.nrc_set_filter_config(ctx, filterMode, filterListJson, packageGroupsJson, groupEnabledJson, installedPkgsJson)
+
+    fun mapLocalPackage(ctx: Pointer, pkg: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_map_local_package(ctx, pkg))
+
+    fun checkFilterMode(ctx: Pointer, mappedPkg: String, originalPkg: String, title: String, text: String): Boolean =
+        lib.nrc_check_filter_mode(ctx, mappedPkg, originalPkg, title, text) != 0
+
+    fun filterNotification(ctx: Pointer, pkg: String, title: String, text: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_filter_notification(ctx, pkg, title, text))
+
+    // ======== OneShot TCP client ========
+
+    fun oneshotSendReceive(ip: String, port: Short, payload: String, connectTimeoutMs: Int = 3000, readTimeoutMs: Int = 3000): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_oneshot_send_receive(ip, port, payload, connectTimeoutMs, readTimeoutMs))
+
+    fun oneshotSendOnly(ip: String, port: Short, payload: String, connectTimeoutMs: Int = 3000): Boolean =
+        lib.nrc_oneshot_send_only(ip, port, payload, connectTimeoutMs) != 0
+
+    // ======== FTP credential derivation ========
+
+    fun deriveFtpCredentials(sharedSecretB64: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_derive_ftp_credentials(sharedSecretB64))
+
+    fun derivePasswordHash(password: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_derive_password_hash(password))
+
+    fun generateRandomPassword(): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_generate_random_password())
 }
