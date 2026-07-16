@@ -19,6 +19,10 @@ val rustBuild by tasks.registering(Exec::class) {
     description = "构建 Rust 核心库（需 cargo-ndk + NDK）"
     group = "rust"
     onlyIf { rustCoreDir.exists() }
+    inputs.dir(rustCoreDir.resolve("src"))
+    inputs.file(rustCoreDir.resolve("Cargo.toml"))
+    inputs.file(rustCoreDir.resolve("Cargo.lock"))
+    outputs.dir(project.projectDir.resolve("src/main/jniLibs"))
     workingDir = rustCoreDir
     commandLine("cargo", "ndk",
         "-t", "arm64-v8a",

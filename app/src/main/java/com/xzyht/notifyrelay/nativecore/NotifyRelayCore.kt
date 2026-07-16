@@ -78,10 +78,6 @@ interface NotifyRelayCore : Library {
         fun invoke(level: Int, message: Pointer?)
     }
 
-    interface OnSendCb : Callback {
-        fun invoke(line: Pointer?, userData: Pointer?)
-    }
-
     interface OnHeartbeatUdpCb : Callback {
         fun invoke(uuid: Pointer?, nameB64: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
     }
@@ -137,8 +133,6 @@ interface NotifyRelayCore : Library {
     fun nrc_set_on_app_launch_cb(ctx: Pointer, cb: OnDataCb?)
     fun nrc_set_on_superisland_cb(ctx: Pointer, cb: OnDataCb?)
     fun nrc_set_on_unknown_data_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_send_cb(ctx: Pointer, cb: OnSendCb?)
-    fun nrc_set_on_send_udp_cb(ctx: Pointer, cb: OnSendCb?)
     fun nrc_set_on_heartbeat_udp_cb(ctx: Pointer, cb: OnHeartbeatUdpCb?)
 
     // ======== Format helpers (for one-shot sync socket ops) ========
@@ -198,6 +192,30 @@ interface NotifyRelayCore : Library {
     fun nrc_decrypt_local_state(ctx: Pointer, encryptedB64: String, deviceUuid: String): Pointer
 
     fun nrc_free_string(s: Pointer)
+
+    // ======== Network layer ========
+    fun nrc_start_tcp_server(ctx: Pointer, port: Short): Int
+    fun nrc_stop_tcp_server(ctx: Pointer): Int
+    fun nrc_send_to_device(ctx: Pointer, uuid: String, message: String): Int
+    fun nrc_broadcast_message(ctx: Pointer, message: String): Int
+    fun nrc_get_connected_device_count(ctx: Pointer): Int
+    fun nrc_is_device_connected(ctx: Pointer, uuid: String): Int
+    fun nrc_remove_device_session(ctx: Pointer, uuid: String): Int
+
+    // ======== Network callbacks ========
+    interface OnDeviceConnectedCb : Callback {
+        fun invoke(uuid: Pointer?, ip: Pointer?, userData: Pointer?)
+    }
+    interface OnDeviceDisconnectedCb : Callback {
+        fun invoke(uuid: Pointer?, userData: Pointer?)
+    }
+    interface OnTcpErrorCb : Callback {
+        fun invoke(error: Pointer?, userData: Pointer?)
+    }
+
+    fun nrc_set_on_device_connected_cb(ctx: Pointer, cb: OnDeviceConnectedCb?)
+    fun nrc_set_on_device_disconnected_cb(ctx: Pointer, cb: OnDeviceDisconnectedCb?)
+    fun nrc_set_on_tcp_error_cb(ctx: Pointer, cb: OnTcpErrorCb?)
 
     companion object {
         private var _instance: NotifyRelayCore? = null

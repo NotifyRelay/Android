@@ -166,4 +166,24 @@ object NativeCore {
 
     fun dedupCleanup(ctx: Pointer, nowMs: Long, ttlMs: Long) =
         lib.nrc_dedup_cleanup(ctx, nowMs, ttlMs)
+
+    // ======== Network layer ========
+
+    fun startTcpServer(ctx: Pointer, port: Short): Int =
+        lib.nrc_start_tcp_server(ctx, port)
+
+    fun stopTcpServer(ctx: Pointer): Int =
+        lib.nrc_stop_tcp_server(ctx)
+
+    fun broadcastMessage(ctx: Pointer, message: String): Int =
+        lib.nrc_broadcast_message(ctx, message)
+
+    fun getConnectedDeviceCount(ctx: Pointer): Int =
+        lib.nrc_get_connected_device_count(ctx)
+
+    fun isDeviceConnected(ctx: Pointer, uuid: String): Boolean =
+        lib.nrc_is_device_connected(ctx, uuid) != 0
+
+    fun removeDeviceSession(ctx: Pointer, uuid: String): Int =
+        lib.nrc_remove_device_session(ctx, uuid)
 }
