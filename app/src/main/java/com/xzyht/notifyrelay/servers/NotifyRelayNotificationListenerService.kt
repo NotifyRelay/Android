@@ -406,13 +406,13 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         // 当开关开启且检测到超级岛数据时，只发送超级岛分支，不再走普通通知转发
         val superIslandHandledAndStop: Boolean = if (superIslandEnabled) {
             try {
-                val superData = SuperIslandManager.extractSuperIslandData(sbn, applicationContext)
-                if (superData != null) {
-                    Logger.i(TAG, "超级岛: 检测到超级岛数据，准备转发，pkg=${superData.sourcePackage}, title=${superData.title}")
-                    superData.sourcePackage?.let { LocalSuperIslandTracker.markActive(it) }
-
-                    // 过滤本应用的超级岛通知，不进行转发
-                    if (sbn.packageName != applicationContext.packageName) {
+                if (sbn.packageName == applicationContext.packageName) {
+                    false
+                } else {
+                    val superData = SuperIslandManager.extractSuperIslandData(sbn, applicationContext)
+                    if (superData != null) {
+                        Logger.i(TAG, "超级岛: 检测到超级岛数据，准备转发，pkg=${superData.sourcePackage}, title=${superData.title}")
+                        superData.sourcePackage?.let { LocalSuperIslandTracker.markActive(it) }
                         try {
                             val deviceManager = this.deviceManager
                             // 不再使用包名前缀标记；通过通道头 DATA_SUPERISLAND 区分超级岛
@@ -447,11 +447,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                         } catch (e: Exception) {
                             Logger.w(TAG, "超级岛: 转发超级岛数据失败: ${e.message}")
                         }
+                        true
+                    } else {
+                        false
                     }
-                    // 已按超级岛分支处理，本条不再继续普通转发
-                    true
-                } else {
-                    false
                 }
             } catch (_: Exception) {
                 false
