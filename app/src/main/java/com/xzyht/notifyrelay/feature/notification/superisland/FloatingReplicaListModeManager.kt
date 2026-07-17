@@ -4,6 +4,7 @@ import android.content.Context
 import android.app.NotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils
@@ -62,12 +63,19 @@ object FloatingReplicaListModeManager {
     fun sendListModeNotification(context: Context, entry: SuperislandListManager.ListEntry) {
         CoroutineScope(Dispatchers.Main).launch {
             runWithErrorHandlingSuspend("发送列表模式通知") {
+                val taskVersion = FloatingReplicaMappingManager.nextVersion(entry.sourceId)
+
                 if (SuperislandListManager.getActive()?.sourceId != entry.sourceId) {
                     return@runWithErrorHandlingSuspend
                 }
                 val internedPicMap = withContext(Dispatchers.IO) {
                     SuperIslandImageStore.internAll(context, entry.sourceId, entry.picMap)
                 }
+
+                if (SuperislandListManager.getActive()?.sourceId != entry.sourceId || !FloatingReplicaMappingManager.isLatestVersion(entry.sourceId, taskVersion)) {
+                    return@runWithErrorHandlingSuspend
+                }
+
                 val formattedData = SuperIslandDataFormatter.formatForDisplay(
                     context, entry.paramV2Raw, internedPicMap
                 )
@@ -78,9 +86,6 @@ object FloatingReplicaListModeManager {
                 val displayText = entry.text?.takeIf { it.isNotBlank() }
                     ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
                     ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
-                if (SuperislandListManager.getActive()?.sourceId != entry.sourceId) {
-                    return@runWithErrorHandlingSuspend
-                }
                 val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
                 if (isProgressType && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.BAKLAVA) {
                     LiveUpdatesNotificationManager.initialize(context)
@@ -88,6 +93,7 @@ object FloatingReplicaListModeManager {
                         entry.sourceId, displayTitle, displayText, entry.appName, formattedData,
                         overrideNotificationId = LIST_MODE_NOTIFICATION_ID
                     )
+                    FloatingReplicaMappingManager.putNotificationId(entry.sourceId, LIST_MODE_NOTIFICATION_ID)
                     FloatingReplicaMappingManager.addSourceIdMapping(entry.sourceId, entry.sourceId, LIST_MODE_NOTIFICATION_ID)
                 } else {
                     val notificationId = NotificationGenerator.sendReplicaNotification(
@@ -96,7 +102,7 @@ object FloatingReplicaListModeManager {
                         paramV2 = paramV2, paramV2Raw = formattedData.paramV2Raw,
                         picMap = formattedData.resolvedPicMap, sourceId = entry.sourceId,
                         floatingWindowManager = FloatingReplicaWindowManager.getFloatingWindowManager(),
-                        entryKeyToNotificationId = FloatingReplicaNotificationManager.getEntryKeyToNotificationId()
+                        overrideNotificationId = LIST_MODE_NOTIFICATION_ID
                     )
                     if (notificationId != null) FloatingReplicaMappingManager.addSourceIdMapping(entry.sourceId, entry.sourceId, notificationId)
                 }
@@ -125,6 +131,7 @@ object FloatingReplicaListModeManager {
     }
 
     fun dismissFromList(context: Context, sourceId: String) {
+        FloatingReplicaMappingManager.removeSourceIdMappings(sourceId)
         val next = SuperislandListManager.remove(sourceId)
         if (next != null) {
             sendListModeNotification(context, next)
@@ -138,23 +145,7 @@ object FloatingReplicaListModeManager {
         if (notificationId == LIST_MODE_NOTIFICATION_ID) {
             val active = SuperislandListManager.getActive()
             if (active != null) {
-                val sourceId = active.sourceId
-
-                NotificationGenerator.stopScrollUpdate(sourceId)
-                Logger.i(TAG, "超级岛: 关闭列表模式通知时停止滚动更新, sourceId=$sourceId, notificationId=$notificationId")
-
-                FloatingReplicaMappingManager.cancelTimeoutJob(sourceId)
-                Logger.i(TAG, "超级岛: 清理列表模式通知超时任务, sourceId=$sourceId")
-
-                FloatingReplicaMappingManager.removeSourceIdMappings(sourceId)
-
-                val next = SuperislandListManager.remove(sourceId)
-                if (next != null) {
-                    sendListModeNotification(context, next)
-                } else {
-                    val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    nm.cancel(LIST_MODE_NOTIFICATION_ID)
-                }
+                FloatingReplicaWindowManager.dismissBySourceInternal(active.sourceId, FloatingWindowManager.RemovalReason.MANUAL)
             }
         } else {
             Logger.i(TAG, "超级岛: 列表模式下关闭非列表通知，notificationId=$notificationId")

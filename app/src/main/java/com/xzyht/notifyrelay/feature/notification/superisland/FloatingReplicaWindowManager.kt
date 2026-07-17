@@ -32,13 +32,13 @@ object FloatingReplicaWindowManager {
     private val floatingWindowManager = FloatingWindowManager().apply {
         onEntriesEmpty = {
             removeOverlayContainer()
-            NotificationGenerator.clearAllReplicaNotifications(overlayView?.get()?.context, FloatingReplicaNotificationManager.getEntryKeyToNotificationId())
+            NotificationGenerator.clearAllReplicaNotifications(overlayView?.get()?.context)
         }
         onEntryRemoved = { key, reason ->
             if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
                 val context = overlayView?.get()?.context
                 if (context != null) {
-                    NotificationGenerator.cancelReplicaNotification(context, key, FloatingReplicaNotificationManager.getEntryKeyToNotificationId())
+                    NotificationGenerator.cancelReplicaNotification(context, key)
                 } else {
                     FloatingReplicaMappingManager.removeNotificationId(key)
                 }
@@ -115,6 +115,8 @@ object FloatingReplicaWindowManager {
 
             CoroutineScope(Dispatchers.Main).launch {
                 runWithErrorHandlingSuspend("显示浮窗(协程)") {
+                    val taskVersion = FloatingReplicaMappingManager.nextVersion(sourceId)
+
                     if (overlayLifecycleOwner == null) {
                         overlayLifecycleOwner = FloatingWindowLifecycleOwner()
                     }
@@ -122,6 +124,10 @@ object FloatingReplicaWindowManager {
 
                     val internedPicMap = withContext(Dispatchers.IO) {
                         SuperIslandImageStore.internAll(context, sourceId, picMap)
+                    }
+
+                    if (!FloatingReplicaMappingManager.isLatestVersion(sourceId, taskVersion)) {
+                        return@runWithErrorHandlingSuspend
                     }
 
                     val formattedData = SuperIslandDataFormatter.formatForDisplay(context, paramV2Raw, internedPicMap)
@@ -170,11 +176,12 @@ object FloatingReplicaWindowManager {
                                     sourceId, title, text, appName, formattedData
                                 )
                                 val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
+                                FloatingReplicaMappingManager.putNotificationId(entryKey, liveUpdateNotificationId)
                                 FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
                                 Logger.i(TAG, "浮窗创建时发送Live Updates复合通知作为生命周期管理: sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
                             }
                         } else {
-                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, floatingWindowManager, FloatingReplicaNotificationManager.getEntryKeyToNotificationId())
+                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, floatingWindowManager)
                             FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, notificationId)
                             Logger.i(TAG, "浮窗创建时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
                         }

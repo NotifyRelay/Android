@@ -7,6 +7,7 @@ import notifyrelay.base.util.Logger
 import kotlinx.coroutines.Job
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.atomic.AtomicLong
 
 object FloatingReplicaMappingManager {
     private const val TAG = "超级岛映射管理"
@@ -19,17 +20,19 @@ object FloatingReplicaMappingManager {
 
     fun getAppContext(): android.content.Context? = appContextRef
 
-    private val sourceIdToEntryKeyMap = ConcurrentHashMap<String, MutableList<String>>()
+    private val sourceIdToEntryKeyMap = ConcurrentHashMap<String, MutableSet<String>>()
 
     private val entryKeyToNotificationId = ConcurrentHashMap<String, Int>()
 
-    private val sourceIdToNotificationIds = ConcurrentHashMap<String, MutableList<Int>>()
+    private val sourceIdToNotificationIds = ConcurrentHashMap<String, MutableSet<Int>>()
 
     private val closedSourceIds = ConcurrentHashMap<String, Long>()
 
     private val timeoutJobs = ConcurrentHashMap<String, Job>()
 
     private val hiddenEntries = ConcurrentHashMap<String, FloatingEntry>()
+
+    private val sourceVersions = ConcurrentHashMap<String, AtomicLong>()
 
     private val blockedInstanceIds = ConcurrentHashMap<String, Long>()
     private const val BLOCK_EXPIRE_MS = 15_000L
@@ -42,44 +45,33 @@ object FloatingReplicaMappingManager {
 
     fun addSourceIdMapping(sourceId: String, entryKey: String, notificationId: Int? = null) {
         if (sourceId.isNotBlank()) {
-            val entryKeys = sourceIdToEntryKeyMap.getOrPut(sourceId) { mutableListOf() }
-            if (!entryKeys.contains(entryKey)) {
-                entryKeys.add(entryKey)
-            }
-
+            sourceIdToEntryKeyMap.computeIfAbsent(sourceId) { ConcurrentHashMap.newKeySet() }.add(entryKey)
             if (notificationId != null) {
-                val notificationIds = sourceIdToNotificationIds.getOrPut(sourceId) { mutableListOf() }
-                if (!notificationIds.contains(notificationId)) {
-                    notificationIds.add(notificationId)
-                }
+                sourceIdToNotificationIds.computeIfAbsent(sourceId) { ConcurrentHashMap.newKeySet() }.add(notificationId)
             }
         }
     }
 
     fun removeSourceIdMapping(key: String): List<String>? {
         val sourceIdsToRemove = mutableListOf<String>()
-        val sourceIdsToUpdate = mutableMapOf<String, MutableList<String>>()
 
         sourceIdToEntryKeyMap.forEach { (sourceId, keys) ->
             if (keys.contains(key)) {
-                val updatedKeys = keys.toMutableList()
-                updatedKeys.remove(key)
-                if (updatedKeys.isEmpty()) {
-                    sourceIdsToRemove.add(sourceId)
-                    sourceIdToNotificationIds.remove(sourceId)
-                } else {
-                    sourceIdsToUpdate[sourceId] = updatedKeys
+                sourceIdToEntryKeyMap.compute(sourceId) { _, currentKeys ->
+                    if (currentKeys != null) {
+                        currentKeys.remove(key)
+                        if (currentKeys.isEmpty()) {
+                            sourceIdsToRemove.add(sourceId)
+                            null
+                        } else {
+                            currentKeys
+                        }
+                    } else null
                 }
             }
         }
 
-        sourceIdsToUpdate.forEach {
-            sourceIdToEntryKeyMap[it.key] = it.value
-        }
-
-        sourceIdsToRemove.forEach {
-            sourceIdToEntryKeyMap.remove(it)
-        }
+        sourceIdsToRemove.forEach { sourceIdToNotificationIds.remove(it) }
 
         return if (sourceIdsToRemove.isNotEmpty()) {
             Logger.i(TAG, "removeSourceIdMapping: 成功移除 sourceIds=$sourceIdsToRemove, key=$key")
@@ -91,7 +83,7 @@ object FloatingReplicaMappingManager {
     }
 
     fun getSourceIdEntryKeys(sourceId: String): List<String>? {
-        return sourceIdToEntryKeyMap[sourceId]
+        return sourceIdToEntryKeyMap[sourceId]?.toList()
     }
 
     fun getNotificationId(entryKey: String): Int? {
@@ -106,12 +98,18 @@ object FloatingReplicaMappingManager {
         return entryKeyToNotificationId.remove(entryKey)
     }
 
+    fun getAllNotificationIds(): Map<String, Int> = HashMap(entryKeyToNotificationId)
+
+    fun clearAllNotificationIds() {
+        entryKeyToNotificationId.clear()
+    }
+
     fun getNotificationIdsBySourceId(sourceId: String): List<Int>? {
         return sourceIdToNotificationIds[sourceId]?.toList()
     }
 
     fun removeNotificationIdsBySourceId(sourceId: String): List<Int>? {
-        return sourceIdToNotificationIds.remove(sourceId)
+        return sourceIdToNotificationIds.remove(sourceId)?.toList()
     }
 
     fun removeSourceIdMappings(sourceId: String) {
@@ -120,6 +118,15 @@ object FloatingReplicaMappingManager {
         entryKeys?.forEach { entryKey ->
             entryKeyToNotificationId.remove(entryKey)
         }
+        sourceVersions.remove(sourceId)
+    }
+
+    fun nextVersion(sourceId: String): Long {
+        return sourceVersions.computeIfAbsent(sourceId) { AtomicLong(0) }.incrementAndGet()
+    }
+
+    fun isLatestVersion(sourceId: String, version: Long): Boolean {
+        return sourceVersions[sourceId]?.get() == version
     }
 
     fun handleRemovalReason(
