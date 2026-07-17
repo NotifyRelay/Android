@@ -6,7 +6,6 @@ import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.util.Base64
-import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
@@ -371,13 +370,10 @@ object IconSyncManager {
     }
 
     private suspend fun getLocalAppIcon(context: Context, packageName: String): Bitmap? {
-        // packageName 应为实际应用包名
-        val actualPackageName = packageName
-
         return try {
-            AppRepository.getAppIconAsync(context, actualPackageName) ?: run {
+            AppRepository.getAppIconAsync(context, packageName) ?: run {
                 val pm = context.packageManager
-                val appInfo = pm.getApplicationInfo(actualPackageName, 0)
+                val appInfo = pm.getApplicationInfo(packageName, 0)
                 val drawable = pm.getApplicationIcon(appInfo)
                 if (drawable is BitmapDrawable) {
                     drawable.bitmap

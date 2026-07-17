@@ -6,7 +6,6 @@ import android.content.Intent
 import android.os.Build
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
 

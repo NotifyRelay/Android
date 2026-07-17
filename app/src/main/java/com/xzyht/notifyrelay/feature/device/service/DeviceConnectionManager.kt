@@ -5,6 +5,7 @@ import android.os.Environment
 import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
+import com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.servers.MediaControlUtil
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardProcessor
@@ -481,6 +482,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         var initPubKey = ""
         try {
             rustContext = NativeCore.createContext()
+            BackendRemoteFilter.rustContext = rustContext
             val ctx = rustContext!!
             val savedStateEnc = StorageManager.getString(context, "rust_core_state")
             if (savedStateEnc.isNotEmpty()) {

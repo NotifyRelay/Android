@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Handler
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
@@ -56,12 +55,10 @@ object StatusProcessor {
             // 处理不同类型的状态响应
             when (originalHeader) {
                 "DATA_FTP" -> {
-                    // 处理FTP相关状态响应
-                    handleFtpStatusResponse(json, deviceManager, input.remoteUuid)
+                    Logger.d(TAG, "FTP状态响应: action=${json.optString("action")}, result=$result")
                 }
                 "DATA_MEDIA_CONTROL" -> {
-                    // 处理媒体控制相关状态响应
-                    handleMediaControlStatusResponse(json, deviceManager, input.remoteUuid)
+                    Logger.d(TAG, "媒体控制状态响应: action=${json.optString("action")}, result=$result")
                 }
                 "DATA_SUPERISLAND" -> {
                     // 处理超级岛相关状态响应
@@ -95,38 +92,6 @@ object StatusProcessor {
         } catch (e: Exception) {
             Logger.e(TAG, "处理DATA_STATUS消息失败", e)
         }
-    }
-
-    /**
-     * 处理FTP状态响应
-     */
-    private fun handleFtpStatusResponse(
-        json: JSONObject,
-        deviceManager: DeviceConnectionManager,
-        remoteUuid: String
-    ) {
-        val action = json.optString("action", "")
-        val result = json.optString("result", "")
-
-        Logger.d(TAG, "处理FTP状态响应: action=$action, result=$result")
-
-        // 根据需要处理不同的FTP状态响应
-    }
-
-    /**
-     * 处理媒体控制状态响应
-     */
-    private fun handleMediaControlStatusResponse(
-        json: JSONObject,
-        deviceManager: DeviceConnectionManager,
-        remoteUuid: String
-    ) {
-        val action = json.optString("action", "")
-        val result = json.optString("result", "")
-
-        Logger.d(TAG, "处理媒体控制状态响应: action=$action, result=$result")
-
-        // 根据需要处理不同的媒体控制状态响应
     }
 
     /**

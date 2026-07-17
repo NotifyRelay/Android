@@ -3,7 +3,6 @@ package com.xzyht.notifyrelay.sync
 import android.content.Context
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.servers.appslist.AppListHelper
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import kotlinx.coroutines.launch

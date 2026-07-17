@@ -34,9 +34,7 @@ data class ftpServerInfo(
 
 object ftpServer {
     private const val TAG = "ftpServer"
-    // 简化：移除密码生成相关常量，使用匿名登录
-    // private const val DERIVED_USERNAME_PREFIX = "ftp_"
-    // private const val DERIVED_PASSWORD_LENGTH = 32
+
 
     private val PORT_RANGE = 5151..5169
 

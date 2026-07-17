@@ -89,7 +89,6 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                         break
                     }
                 }
-            } else {
             }
         }
         
@@ -123,7 +122,6 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 // 超级岛相关通知被移除，关闭对应的浮窗条目
                 Logger.i(TAG, "超级岛相关通知被移除，关闭对应的浮窗条目: id=${sbn.id}, channelId=$channelId")
                 FloatingReplicaManager.closeByNotificationId(sbn.id)
-            } else {
             }
         } else {
             // 普通通知被移除时，从已处理缓存中移除，允许下次重新处理
@@ -574,9 +572,6 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
                     for (sbn in actives) {
                         if (sbn.packageName == applicationContext.packageName) continue
-                        val isMedia = sbn.notification.category == Notification.CATEGORY_TRANSPORT
-                        if (isMedia) {
-                        }
                         processNotification(sbn, true)
                     }
                     // 定期清理过期的缓存，避免内存泄漏

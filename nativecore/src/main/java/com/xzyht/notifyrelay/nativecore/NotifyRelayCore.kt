@@ -10,6 +10,7 @@ interface NotifyRelayCore : Library {
     // ======== Lifecycle ========
     fun nrc_init(): Pointer
     fun nrc_destroy(ctx: Pointer)
+    fun nrc_get_git_hash(): Pointer
 
     // ======== ECDH key management ========
     fun nrc_ecdh_generate_keypair(ctx: Pointer): Int
@@ -86,13 +87,10 @@ interface NotifyRelayCore : Library {
     fun nrc_should_deduplicate(newTitle: String, newText: String, oldTitle: String, oldText: String): Int
 
     // ======== Filter ========
-    fun nrc_set_filter_config(
-        ctx: Pointer, filterMode: String, filterListJson: String,
-        packageGroupsJson: String, groupEnabledJson: String, installedPkgsJson: String
-    ): Int
+    fun nrc_set_filter_config(ctx: Pointer, configJson: String): Int
     fun nrc_map_local_package(ctx: Pointer, pkg: String): Pointer
     fun nrc_check_filter_mode(ctx: Pointer, mappedPkg: String, originalPkg: String, title: String, text: String): Int
-    fun nrc_filter_notification(ctx: Pointer, pkg: String, title: String, text: String): Pointer
+    fun nrc_filter_notification(ctx: Pointer, pkg: String, title: String, text: String): Int
 
     // ======== OneShot TCP client (new signature: ctx param, unified timeout, returns status) ========
     fun nrc_oneshot_send_receive(ctx: Pointer, ip: String, port: Short, payload: String, timeoutMs: Int): Int

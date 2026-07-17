@@ -24,9 +24,7 @@ object AppListHelper {
                 !isSystemApp && !isUpdatedSystemApp && !isSelf
             }
         } catch (e: Exception) {
-            {
-                Logger.e("AppListHelper", "获取已安装应用列表失败: ${e.message}", e)
-            }
+            Logger.e("AppListHelper", "获取已安装应用列表失败: ${e.message}", e)
             emptyList()
         }
     }
@@ -42,9 +40,6 @@ object AppListHelper {
             val pm = context.packageManager
             val apps = pm.getInstalledApplications(0)
             val result = apps.size > 2 // 简单的检查，至少有几个应用
-            {
-                //Logger.d("AppListHelper", "canQueryApps 检查结果: 应用数量=${apps.size}, 可查询=$result")
-            }
             result
         } catch (e: Exception) {
             {
@@ -67,9 +62,7 @@ object AppListHelper {
             val appInfo = pm.getApplicationInfo(packageName, 0)
             pm.getApplicationLabel(appInfo).toString()
         } catch (e: Exception) {
-            {
-                Logger.w("AppListHelper", "获取应用名失败, 包名=$packageName, 错误=${e.message}", e)
-            }
+            Logger.w("AppListHelper", "获取应用名失败, 包名=$packageName, 错误=${e.message}", e)
             packageName // 如果获取失败，返回包名
         }
     }

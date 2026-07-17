@@ -1,8 +1,10 @@
 package com.xzyht.notifyrelay.nativecore
 
+import android.util.Log
 import com.sun.jna.Pointer
 
 object NativeCore {
+    private const val TAG = "NativeCore"
     val lib = NotifyRelayCore.instance()
 
     // 网络层新特性的内部状态
@@ -123,10 +125,8 @@ object NativeCore {
         lib.nrc_should_deduplicate(newTitle, newText, oldTitle, oldText) != 0
 
     // ======== Filter ========
-    fun setFilterConfig(
-        ctx: Pointer, filterMode: String, filterListJson: String,
-        packageGroupsJson: String, groupEnabledJson: String, installedPkgsJson: String
-    ): Int = lib.nrc_set_filter_config(ctx, filterMode, filterListJson, packageGroupsJson, groupEnabledJson, installedPkgsJson)
+    fun setFilterConfig(ctx: Pointer, configJson: String): Int =
+        lib.nrc_set_filter_config(ctx, configJson)
 
     fun mapLocalPackage(ctx: Pointer, pkg: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_map_local_package(ctx, pkg))
@@ -134,8 +134,8 @@ object NativeCore {
     fun checkFilterMode(ctx: Pointer, mappedPkg: String, originalPkg: String, title: String, text: String): Boolean =
         lib.nrc_check_filter_mode(ctx, mappedPkg, originalPkg, title, text) != 0
 
-    fun filterNotification(ctx: Pointer, pkg: String, title: String, text: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_filter_notification(ctx, pkg, title, text))
+    fun filterNotification(ctx: Pointer, pkg: String, title: String, text: String): Boolean =
+        lib.nrc_filter_notification(ctx, pkg, title, text) != 0
 
     // ======== Network layer ========
     fun startTcpServer(ctx: Pointer, port: Short): Int =
@@ -253,8 +253,13 @@ object NativeCore {
     fun reconnectStop(ctx: Pointer, statePtr: Long) =
         lib.nrc_reconnect_stop(ctx, statePtr)
 
+    // ======== Version ========
+    fun getGitHash(): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_git_hash())
+
     // ======== Initialize new network features ========
     fun initializeNewFeatures(ctx: Pointer) {
+        Log.i(TAG, "NotifyRelay Core loaded (git: ${getGitHash()})")
         if (senderQueuePtr == 0L) {
             senderQueuePtr = createSenderQueue(ctx)
             startSenderQueue(ctx, senderQueuePtr)

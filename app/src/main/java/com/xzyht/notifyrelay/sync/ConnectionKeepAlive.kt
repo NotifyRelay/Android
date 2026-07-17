@@ -61,7 +61,7 @@ class ConnectionKeepAlive(
         val displayName = deviceManager.localDisplayNameInternal()
         val mode = if (shouldUseTcpHeartbeat()) 1L else 0L
 
-        val handle = NativeCore.startHeartbeatSender(ctx, uuid, displayName, battery, "android", initialIp, 4000L, mode.toInt())
+        val handle = NativeCore.startHeartbeatSender(ctx, deviceManager.uuid, displayName, battery, "android", initialIp, 4000L, mode.toInt())
         heartbeatJobs[uuid] = handle
     }
 
