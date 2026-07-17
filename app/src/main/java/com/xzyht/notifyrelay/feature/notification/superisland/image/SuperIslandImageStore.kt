@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Looper
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import github.xzynine.superislandui.common.SuperIslandProtocol
+import github.xzynine.superislandui.diff.DiffSystem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
@@ -50,7 +50,7 @@ object SuperIslandImageStore {
         val now = System.currentTimeMillis()
         for ((key, value) in input) {
             if (value.isBlank()) continue
-            val hash = SuperIslandProtocol.sha256(value)
+            val hash = DiffSystem.sha256(value)
             repo.upsertSuperIslandImageBinding(normalizedPackage, key, hash, value, now)
         }
         return input.toMap()
@@ -69,7 +69,7 @@ object SuperIslandImageStore {
         val out = mutableMapOf<String, String>()
         for ((key, value) in input) {
             if (value.isBlank()) continue
-            val hash = SuperIslandProtocol.sha256(value)
+            val hash = DiffSystem.sha256(value)
             val imageId = repo.upsertSuperIslandImageBinding(normalizedPackage, key, hash, value, now)
             if (imageId > 0) {
                 out[key] = imageId.toString()
@@ -190,7 +190,7 @@ object SuperIslandImageStore {
                     continue
                 }
                 val resolved = resolveLegacyValue(rawValue, legacyImages) ?: continue
-                val hash = SuperIslandProtocol.sha256(resolved)
+                val hash = DiffSystem.sha256(resolved)
                 val imageId = repo.upsertSuperIslandImageBinding(packageName, key, hash, resolved, now)
                 if (imageId > 0) {
                     newMap[key] = imageId.toString()
