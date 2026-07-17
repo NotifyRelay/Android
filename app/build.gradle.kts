@@ -73,8 +73,11 @@ android {
         localPropFiles.filter { it.isFile }.forEach { file ->
             file.inputStream().use { localProps.load(it) }
         }
-        val localKeystore = if (keyBaseDir.isDirectory) {
-            File(keyBaseDir, "PublicHub").takeIf { it.isFile }
+        val localKeystore = if (keyBaseDir.isFile) {
+            keyBaseDir
+        } else if (keyBaseDir.isDirectory) {
+            keyBaseDir.listFiles()?.firstOrNull { it.isFile && it.name == "PublicHub.jks" }
+                ?: keyBaseDir.listFiles()?.firstOrNull { it.isFile && it.name == "PublicHub" }
         } else {
             null
         }
