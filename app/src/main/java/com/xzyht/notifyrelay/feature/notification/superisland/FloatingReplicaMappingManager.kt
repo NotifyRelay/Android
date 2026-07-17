@@ -27,6 +27,7 @@ object FloatingReplicaMappingManager {
     private val sourceIdToNotificationIds = ConcurrentHashMap<String, MutableSet<Int>>()
 
     private val closedSourceIds = ConcurrentHashMap<String, Long>()
+    private val closedSourceVersions = ConcurrentHashMap<String, Long>()
 
     private val timeoutJobs = ConcurrentHashMap<String, Job>()
 
@@ -181,6 +182,7 @@ object FloatingReplicaMappingManager {
 
     fun markSourceClosed(sourceId: String) {
         closedSourceIds[sourceId] = System.currentTimeMillis()
+        sourceVersions[sourceId]?.get()?.let { closedSourceVersions[sourceId] = it }
     }
 
     fun removeClosedSource(sourceId: String) {
@@ -188,8 +190,11 @@ object FloatingReplicaMappingManager {
     }
 
     fun isSourceRecentlyClosedWithinMinute(sourceId: String): Boolean {
-        val lastClosed = closedSourceIds[sourceId]
-        return lastClosed != null && (System.currentTimeMillis() - lastClosed) < 60_000L
+        val lastClosed = closedSourceIds[sourceId] ?: return false
+        if (System.currentTimeMillis() - lastClosed >= 60_000L) return false
+        val closedVersion = closedSourceVersions[sourceId] ?: return false
+        val currentVersion = sourceVersions[sourceId]?.get() ?: return false
+        return currentVersion == closedVersion
     }
 
     fun cancelTimeoutJob(sourceId: String) {

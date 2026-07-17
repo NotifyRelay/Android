@@ -265,7 +265,9 @@ object FloatingReplicaWindowManager {
                 return@runWithErrorHandling
             }
 
-            FloatingReplicaMappingManager.markSourceClosed(sourceId)
+            if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
+                FloatingReplicaMappingManager.markSourceClosed(sourceId)
+            }
 
             FloatingReplicaMappingManager.cancelTimeoutJob(sourceId)
             Logger.i(TAG, "dismissBySourceInternal: 清理超时任务, sourceId=$sourceId")
