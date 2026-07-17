@@ -47,14 +47,15 @@ object HeartbeatProcessor {
             synchronized(deviceManager.authenticatedDevices) {
                 val auth = deviceManager.authenticatedDevices[uuid]
                 if (auth != null) {
+                    val effectiveIp = info.ip.takeUnless { it == "0.0.0.0" || it.isBlank() }
                     val needsUpdate = auth.displayName != info.displayName ||
-                            auth.lastIp != info.ip ||
+                            (effectiveIp != null && auth.lastIp != effectiveIp) ||
                             auth.deviceType != info.deviceType
 
                     if (needsUpdate) {
                         deviceManager.authenticatedDevices[uuid] = auth.copy(
                             displayName = info.displayName,
-                            lastIp = info.ip,
+                            lastIp = effectiveIp ?: auth.lastIp,
                             deviceType = info.deviceType
                         )
                         needSave = true
@@ -70,8 +71,10 @@ object HeartbeatProcessor {
                 deviceManager.saveAuthedDevicesInternal()
             }
 
-            synchronized(deviceManager.deviceInfoCacheInternal) {
-                deviceManager.deviceInfoCacheInternal[uuid] = device
+            if (info.ip != "0.0.0.0" && info.ip.isNotBlank()) {
+                synchronized(deviceManager.deviceInfoCacheInternal) {
+                    deviceManager.deviceInfoCacheInternal[uuid] = device
+                }
             }
             DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
 
@@ -79,8 +82,10 @@ object HeartbeatProcessor {
                 deviceManager.updateDeviceListInternal()
             }
         } else {
-            synchronized(deviceManager.deviceInfoCacheInternal) {
-                deviceManager.deviceInfoCacheInternal[uuid] = device
+            if (info.ip != "0.0.0.0" && info.ip.isNotBlank()) {
+                synchronized(deviceManager.deviceInfoCacheInternal) {
+                    deviceManager.deviceInfoCacheInternal[uuid] = device
+                }
             }
             DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
 

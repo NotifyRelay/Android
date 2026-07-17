@@ -175,7 +175,7 @@ interface NotifyRelayCore : Library {
     // ======== Sender queue ========
     fun nrc_create_sender_queue(ctx: Pointer): Long
     fun nrc_start_sender_queue(ctx: Pointer, queuePtr: Long)
-    fun nrc_enqueue_message(ctx: Pointer, queuePtr: Long, deviceUuid: String, deviceIp: String, header: String, plaintext: String, dedupKey: String?)
+    fun nrc_enqueue_message(ctx: Pointer, queuePtr: Long, deviceUuid: String, header: String, plaintext: String, dedupKey: String?)
     fun nrc_stop_sender_queue(ctx: Pointer, queuePtr: Long)
 
     // ======== Diff ========

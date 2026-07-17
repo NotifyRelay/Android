@@ -200,8 +200,8 @@ object NativeCore {
     fun startSenderQueue(ctx: Pointer, queuePtr: Long) =
         lib.nrc_start_sender_queue(ctx, queuePtr)
 
-    fun enqueueMessage(ctx: Pointer, queuePtr: Long, deviceUuid: String, deviceIp: String, header: String, plaintext: String, dedupKey: String? = null) =
-        lib.nrc_enqueue_message(ctx, queuePtr, deviceUuid, deviceIp, header, plaintext, dedupKey)
+    fun enqueueMessage(ctx: Pointer, queuePtr: Long, deviceUuid: String, header: String, plaintext: String, dedupKey: String? = null) =
+        lib.nrc_enqueue_message(ctx, queuePtr, deviceUuid, header, plaintext, dedupKey)
 
     fun stopSenderQueue(ctx: Pointer, queuePtr: Long) =
         lib.nrc_stop_sender_queue(ctx, queuePtr)

@@ -34,7 +34,7 @@ object ProtocolSender {
 
         val ctx = deviceManager.rustContextInternal ?: return
         try {
-            NativeCore.enqueueMessage(ctx, queuePtr, target.uuid, target.ip, header, plaintext, null)
+            NativeCore.enqueueMessage(ctx, queuePtr, target.uuid, header, plaintext, null)
         } catch (e: Exception) {
             Logger.w(TAG, "入队失败 $header -> ${target.displayName}", e)
         }

@@ -643,17 +643,19 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     }
 
     private fun getDeviceInfo(uuid: String): DeviceInfo? {
-        // 优先从缓存取（含真实ip）
+        // 优先从缓存取（含真实ip），跳过无效IP
         synchronized(deviceInfoCache) {
-            deviceInfoCache[uuid]?.let { return it }
+            deviceInfoCache[uuid]?.takeUnless { it.ip == "0.0.0.0" || it.ip.isBlank() }
+                ?.let { return it }
         }
-        // 其次从设备流取
-        _devices.value[uuid]?.first?.let { return it }
+        // 其次从设备流取，跳过无效IP
+        _devices.value[uuid]?.first?.takeUnless { it.ip == "0.0.0.0" || it.ip.isBlank() }
+            ?.let { return it }
         // 最后从认证表补全（无ip）
         val auth = authenticatedDevices[uuid]
         if (auth != null) {
             val name = auth.displayName ?: DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid)
-            val ip = auth.lastIp ?: ""
+            val ip = auth.lastIp?.takeUnless { it == "0.0.0.0" || it.isBlank() } ?: ""
             val port = auth.lastPort ?: listenPort
             return DeviceInfo(uuid, name, ip, port)
         }
