@@ -43,7 +43,10 @@ object FloatingReplicaManager {
         val isRecentlyClosed = FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)
 
         if (isFloatingWindowEnabled(context)) {
-            FloatingReplicaMappingManager.removeClosedSource(sourceId)
+            if (isRecentlyClosed) {
+                Logger.i(TAG, "超级岛: sourceId=$sourceId 在30秒内被关闭过，跳过浮窗展示")
+                return
+            }
             FloatingReplicaWindowManager.showFloatingInternal(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked, false)
         } else if (isRecentlyClosed && SuperislandListManager.containsSourceId(sourceId)) {
             Logger.i(TAG, "超级岛: sourceId=$sourceId 在30秒内被关闭过且条目仍在列表中，跳过展示")

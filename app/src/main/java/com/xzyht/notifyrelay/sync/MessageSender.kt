@@ -64,6 +64,7 @@ object MessageSender {
     private data class PendingAck(val hash: String, val ts: Long)
     private val siPendingAcks = mutableMapOf<String, MutableMap<String, PendingAck>>() // deviceUuid -> featureId -> pending
     private val siForceFullNext = ConcurrentHashMap.newKeySet<String>() // key: deviceUuid|featureId
+    private val diffStateLock = Any()
 
     private class DiffDecision(
         val type: String, // "FULL" 或 "DELTA"
@@ -96,11 +97,16 @@ object MessageSender {
         val type = if (firstOrForce || timeForFull) "FULL" else "DELTA"
         val needSend = firstOrForce || timeForFull || !diff.isEmpty()
 
-        synchronized(lastStatePerDevice) { deviceMap[featureId] = newState }
-        if (firstOrForce || timeForFull) {
-            synchronized(fullSentTimePerDevice) { fullMap[featureId] = now }
-        }
         return DiffDecision(type, diff, needSend)
+    }
+
+    private fun commitDiffState(deviceUuid: String, featureId: String, newState: DiffSystem.State, now: Long, isFull: Boolean) {
+        synchronized(diffStateLock) {
+            lastStatePerDevice.getOrPut(deviceUuid) { mutableMapOf() }[featureId] = newState
+            if (isFull) {
+                fullSentTimePerDevice.getOrPut(deviceUuid) { mutableMapOf() }[featureId] = now
+            }
+        }
     }
 
     init {
@@ -404,12 +410,6 @@ object MessageSender {
                 val coverChanged = dd.diff.picsChanged.containsKey("miui.focus.pic_cover")
                 val effectiveType = if (coverChanged && dd.type != "FULL") "FULL" else dd.type
 
-                if (coverChanged && dd.type != "FULL") {
-                    synchronized(fullSentTimePerDevice) {
-                        fullSentTimePerDevice.getOrPut(deviceInfo.uuid) { mutableMapOf() }[featureId] = now
-                    }
-                }
-
                 val payloadObj = if (effectiveType == "FULL") {
                     SuperIslandProtocol.buildPayload(
                         packageName, appName, time, isLocked, state.toJson(),
@@ -428,7 +428,9 @@ object MessageSender {
                     )
                 }
 
-                enqueueNotification(deviceInfo, payloadObj.toString(), deviceManager, "媒体播放")
+                if (enqueueNotification(deviceInfo, payloadObj.toString(), deviceManager, "媒体播放")) {
+                    commitDiffState(deviceInfo.uuid, featureId, state, now, effectiveType == "FULL")
+                }
             }
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放通知失败", e)
@@ -645,10 +647,11 @@ object MessageSender {
                     }
                 } catch (_: Exception) {}
                 val task = SuperIslandTask(deviceInfo, payloadObj.toString(), deviceManager)
+                val now = System.currentTimeMillis()
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         superIslandSendChannel.send(task)
-                        //Logger.d("超级岛", "超级岛: 数据已加入超级岛发送队列：${deviceInfo.displayName}")
+                        commitDiffState(deviceInfo.uuid, featureId, newState, now, dd.type == "FULL")
                     } catch (e: Exception) {
                         Logger.e("超级岛", "超级岛: 加入超级岛发送队列失败：${deviceInfo.displayName}", e)
                     }
