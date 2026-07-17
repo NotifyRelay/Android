@@ -17,6 +17,11 @@ val rustBuild by tasks.registering(Exec::class) {
     inputs.file(rustCoreDir.resolve("Cargo.toml"))
     inputs.file(rustCoreDir.resolve("Cargo.lock"))
     outputs.dir(project.projectDir.resolve("src/main/jniLibs"))
+    outputs.upToDateWhen {
+        val arm = project.projectDir.resolve("src/main/jniLibs/arm64-v8a/libnotify_relay_core.so").exists()
+        val x86 = project.projectDir.resolve("src/main/jniLibs/x86_64/libnotify_relay_core.so").exists()
+        arm && x86
+    }
     workingDir = rustCoreDir
     commandLine("cargo", "ndk",
         "-t", "arm64-v8a",
