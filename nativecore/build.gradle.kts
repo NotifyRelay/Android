@@ -17,7 +17,7 @@ val rustBuild by tasks.registering(Exec::class) {
     }
     inputs.dir(rustCoreDir.resolve("src"))
     inputs.file(rustCoreDir.resolve("Cargo.toml"))
-    inputs.file(rustCoreDir.resolve("Cargo.lock"))
+    inputs.file(rustCoreDir.resolve("Cargo.lock")).optional()
     val outDir = project.layout.buildDirectory.dir("generated/rust/jniLibs").get().asFile
     outputs.dir(outDir)
     workingDir = rustCoreDir

@@ -655,7 +655,7 @@ object MessageSender {
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         superIslandSendChannel.send(task)
-                        commitDiffState(deviceInfo.uuid, featureId, newState, now, dd.type == "FULL")
+                        commitDiffState(deviceInfo.uuid, featureId, newState, System.currentTimeMillis(), dd.type == "FULL")
                     } catch (e: Exception) {
                         Logger.e("超级岛", "超级岛: 加入超级岛发送队列失败：${deviceInfo.displayName}", e)
                     }
