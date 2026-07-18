@@ -41,7 +41,7 @@ interface NotifyRelayCore : Library {
         fun invoke(uuid: Pointer?, tmpPubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)
     }
     interface OnPairingRespCb : Callback {
-        fun invoke(uuid: Pointer?, tmpPub: Pointer?, ltPub: Pointer?, encryptedCode: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)
+        fun invoke(uuid: Pointer?, spake2Pub: Pointer?, ltPub: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)
     }
     interface OnAcceptCb : Callback {
         fun invoke(uuid: Pointer?, ltPubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)

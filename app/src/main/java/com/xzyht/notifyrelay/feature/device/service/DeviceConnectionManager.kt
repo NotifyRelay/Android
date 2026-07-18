@@ -761,12 +761,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
-    // 存储待处理的配对请求信息（接收端对话框需要远端临时公钥）
     data class PendingPairing(
         val remoteUuid: String,
         val remotePubKey: String,
-        val remoteIp: String,
-        val tmpPubKey: String = ""  // 发起端的临时公钥，用于加密回传配对码
+        val remoteIp: String
     )
     private val _pendingPairingLock = Any()
     private var _pendingPairing: PendingPairing? = null
@@ -1199,10 +1197,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // ---- on_pairing_init ----
         run {
             val cb = object : NotifyRelayCore.OnPairingInitCb {
-                override fun invoke(uuid: Pointer?, tmpPubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
+                override fun invoke(uuid: Pointer?, spake2Pub: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
                     val dm = _callbackInstance ?: return
                     val remoteUuid = ptr2str(uuid) ?: return
-                    val tmpPub = ptr2str(tmpPubKey) ?: return
+                    val spake2PubStr = ptr2str(spake2Pub) ?: return
                     val remoteIp = ptr2str(ip) ?: return
 
                     try {
@@ -1217,10 +1215,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             displayName = dm.deviceInfoCacheInternal[remoteUuid]?.displayName ?: "未知设备"
                             dm.deviceInfoCacheInternal[remoteUuid] = DeviceInfo(remoteUuid, displayName, remoteIp, 23333)
                         }
-                        dm.pendingPairing = PendingPairing(remoteUuid = remoteUuid, remotePubKey = tmpPub, remoteIp = remoteIp, tmpPubKey = tmpPub)
+                        dm.pendingPairing = PendingPairing(remoteUuid = remoteUuid, remotePubKey = spake2PubStr, remoteIp = remoteIp)
                         val remoteDevice = DeviceInfo(remoteUuid, displayName, remoteIp, 23333)
                         android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            dm.handshakeRequestHandler?.onPairingInitRequest(remoteDevice, tmpPub)
+                            dm.handshakeRequestHandler?.onPairingInitRequest(remoteDevice, spake2PubStr)
                         }
                         Logger.d("CoreCb", "PAIRING_INIT 已处理: $remoteUuid")
                     } catch (e: Exception) {
@@ -1236,7 +1234,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // 此处仅在异常路径（收到的 PAIRING_RESP 无对应发起方上下文）时触发
         run {
             val cb = object : NotifyRelayCore.OnPairingRespCb {
-                override fun invoke(uuid: Pointer?, tmpPub: Pointer?, ltPub: Pointer?, encryptedCode: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
+                override fun invoke(uuid: Pointer?, spake2Pub: Pointer?, ltPub: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
                     val remoteUuid = ptr2str(uuid) ?: return
                     Logger.w("CoreCb", "收到意外的 PAIRING_RESP: $remoteUuid")
                 }
