@@ -279,8 +279,12 @@ fun MusicControlPage() {
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"previous\"}"
-                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
-                            ToastUtils.showShortToast(context, "已发送上一首指令到${selectedDevice.displayName}")
+                            val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
+                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
+                                ToastUtils.showShortToast(context, "已发送上一首指令到${selectedDevice.displayName}")
+                            } else {
+                                ToastUtils.showShortToast(context, "发送上一首指令失败")
+                            }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "发送上一首指令失败", e)
@@ -302,8 +306,12 @@ fun MusicControlPage() {
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"playPause\"}"
-                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
-                            ToastUtils.showShortToast(context, "已发送播放/暂停指令到${selectedDevice.displayName}")
+                            val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
+                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
+                                ToastUtils.showShortToast(context, "已发送播放/暂停指令到${selectedDevice.displayName}")
+                            } else {
+                                ToastUtils.showShortToast(context, "发送播放/暂停指令失败")
+                            }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "发送播放/暂停指令失败", e)
@@ -325,8 +333,12 @@ fun MusicControlPage() {
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"next\"}"
-                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
-                            ToastUtils.showShortToast(context, "已发送下一首指令到${selectedDevice.displayName}")
+                            val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
+                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
+                                ToastUtils.showShortToast(context, "已发送下一首指令到${selectedDevice.displayName}")
+                            } else {
+                                ToastUtils.showShortToast(context, "发送下一首指令失败")
+                            }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "发送下一首指令失败", e)

@@ -16,7 +16,12 @@ object NativeCore {
         private set
 
     fun createContext(): Pointer = lib.nrc_init()
-    fun destroyContext(ctx: Pointer) = lib.nrc_destroy(ctx)
+    fun destroyContext(ctx: Pointer) {
+        lib.nrc_destroy(ctx)
+        senderQueuePtr = 0L
+        offlineDetectorHandle = 0L
+        reconnectStatePtr = 0L
+    }
 
     fun generateKeypair(ctx: Pointer): Boolean =
         lib.nrc_ecdh_generate_keypair(ctx) == 0
@@ -70,8 +75,8 @@ object NativeCore {
     fun sendHandshake(ctx: Pointer, uuid: String, pubKey: String, localIp: String, targetIp: String, battery: Int, deviceType: String): Int =
         lib.nrc_send_handshake(ctx, uuid, pubKey, localIp, targetIp, battery, deviceType)
 
-    fun sendPairingInit(ctx: Pointer, uuid: String, expectedCode: String, ip: String, battery: Int, deviceType: String): Int =
-        lib.nrc_send_pairing_init(ctx, uuid, expectedCode, ip, battery, deviceType)
+    fun sendPairingInit(ctx: Pointer, localUuid: String, targetUuid: String, expectedCode: String, battery: Int, deviceType: String): Int =
+        lib.nrc_send_pairing_init(ctx, localUuid, targetUuid, expectedCode, battery, deviceType)
 
     fun sendPairingResp(ctx: Pointer, uuid: String, ltPub: String, pairingCode: String, ip: String, battery: Int, deviceType: String): Int =
         lib.nrc_send_pairing_resp(ctx, uuid, ltPub, pairingCode, ip, battery, deviceType)
@@ -81,6 +86,16 @@ object NativeCore {
 
     fun sendReject(ctx: Pointer, uuid: String) =
         lib.nrc_send_reject(ctx, uuid)
+
+    // ======== Pairing code management (Rust-generated) ========
+    fun generatePairingCode(ctx: Pointer, ttlSecs: Int = 300): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_generate_pairing_code(ctx, ttlSecs))
+
+    fun clearPairingCode(ctx: Pointer) =
+        lib.nrc_clear_pairing_code(ctx)
+
+    fun validatePairingCode(ctx: Pointer, code: String): Int =
+        lib.nrc_validate_pairing_code(ctx, code)
 
     fun sendHeartbeatTcp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String) =
         lib.nrc_send_heartbeat_tcp(ctx, uuid, name, port, battery, deviceType)

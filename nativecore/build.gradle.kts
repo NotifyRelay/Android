@@ -12,21 +12,19 @@ val rustCoreDir = project.projectDir.resolve("notify-relay-core")
 val rustBuild by tasks.registering(Exec::class) {
     description = "构建 Rust 核心库（需 cargo-ndk + NDK）"
     group = "rust"
-    onlyIf { rustCoreDir.exists() }
+    doFirst {
+        require(rustCoreDir.exists()) { "Rust 子模块未同步，请执行 git submodule update --init" }
+    }
     inputs.dir(rustCoreDir.resolve("src"))
     inputs.file(rustCoreDir.resolve("Cargo.toml"))
     inputs.file(rustCoreDir.resolve("Cargo.lock"))
-    outputs.dir(project.projectDir.resolve("src/main/jniLibs"))
-    outputs.upToDateWhen {
-        val arm = project.projectDir.resolve("src/main/jniLibs/arm64-v8a/libnotify_relay_core.so").exists()
-        val x86 = project.projectDir.resolve("src/main/jniLibs/x86_64/libnotify_relay_core.so").exists()
-        arm && x86
-    }
+    val outDir = project.layout.buildDirectory.dir("generated/rust/jniLibs").get().asFile
+    outputs.dir(outDir)
     workingDir = rustCoreDir
     commandLine("cargo", "ndk",
         "-t", "arm64-v8a",
         "-t", "x86_64",
-        "-o", "${project.projectDir}/src/main/jniLibs",
+        "-o", outDir.absolutePath,
         "build", "--release")
 }
 
@@ -46,6 +44,12 @@ android {
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    sourceSets {
+        getByName("main") {
+            jniLibs.srcDir(project.file("build/generated/rust/jniLibs"))
+        }
     }
 }
 

@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONObject
 
 /**
@@ -545,7 +546,12 @@ object RemoteFilterConfig {
             StorageManager.putBoolean(context, "enable_lock_screen_only", enableLockScreenOnly, StorageManager.PrefsType.FILTER)
             StorageManager.putStringSet(context, KEY_FILTER_LIST, filterList.map { it.first + (it.second?.let { k->"|"+k } ?: "") }.toSet(), StorageManager.PrefsType.FILTER)
 
-            //Logger.d("RemoteFilterConfig", "Configuration saved successfully")
+            // 保存后立即同步到 Rust 侧
+            val ctx = BackendRemoteFilter.rustContext
+            if (ctx != null) {
+                val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
+                syncToRust(ctx, installedPkgs)
+            }
         } catch (e: Exception) {
             Logger.e("RemoteFilterConfig", "Failed to save configuration", e)
         }
@@ -563,59 +569,65 @@ object RemoteFilterConfig {
     }
 
     /** 将当前配置同步到 Rust Core */
-    fun syncToRust(ctx: Pointer, installedPkgs: Set<String>) {
+    fun syncToRust(ctx: Pointer, installedPkgs: Set<String>): Boolean {
         val json = buildRustConfigJson(installedPkgs)
-        NativeCore.setFilterConfig(ctx, json)
+        return NativeCore.setFilterConfig(ctx, json) == 0
     }
 
     /** 构建 Rust nrc_set_filter_config 所需的 JSON */
     private fun buildRustConfigJson(installedPkgs: Set<String>): String {
-        val pkgGroups = buildString {
-            append("[")
-            val allGroups = defaultPackageGroups.withIndex()
-                .filter { defaultGroupEnabled.getOrNull(it.index) == true }
-                .map { it.value } +
-                customPackageGroups.withIndex()
-                .filter { customGroupEnabled.getOrNull(it.index) == true }
-                .map { it.value }
-            allGroups.forEachIndexed { i, group ->
-                if (i > 0) append(",")
-                append("""{"groupName":"group_$i","packages":""")
-                append(JSONObject().apply {
-                    put("packages", group)
-                }.getString("packages"))
-                append("}")
+        val root = JSONObject()
+
+        root.put("enablePackageGroupMapping", enablePackageGroupMapping)
+
+        // 包名组：使用连续索引
+        val pkgGroupsArr = JSONArray()
+        val enabledMap = JSONObject()
+        var groupIdx = 0
+        for ((i, group) in defaultPackageGroups.withIndex()) {
+            val enabled = defaultGroupEnabled.getOrNull(i) ?: true
+            if (enabled) {
+                val g = JSONObject()
+                g.put("groupName", "group_$groupIdx")
+                g.put("packages", JSONArray(group))
+                pkgGroupsArr.put(g)
+                enabledMap.put("group_$groupIdx", true)
+                groupIdx++
             }
-            append("]")
         }
-        val groupEnabled = buildString {
-            append("{")
-            (defaultPackageGroups.indices + customPackageGroups.indices).forEach { i ->
-                val enabled = when {
-                    i < defaultGroupEnabled.size -> defaultGroupEnabled[i]
-                    i - defaultPackageGroups.size < customGroupEnabled.size -> customGroupEnabled[i - defaultPackageGroups.size]
-                    else -> true
-                }
-                if (i > 0) append(",")
-                append("\"group_$i\":$enabled")
+        for ((i, group) in customPackageGroups.withIndex()) {
+            val enabled = customGroupEnabled.getOrNull(i) ?: true
+            if (enabled) {
+                val g = JSONObject()
+                g.put("groupName", "group_$groupIdx")
+                g.put("packages", JSONArray(group))
+                pkgGroupsArr.put(g)
+                enabledMap.put("group_$groupIdx", true)
+                groupIdx++
             }
-            append("}")
         }
+        root.put("packageGroups", pkgGroupsArr)
+        root.put("groupEnabled", enabledMap)
+
+        // 过滤模式
         val filterModeNum = when (filterMode) {
             "white" -> 1
             "black" -> 2
             else -> 0
         }
-        val filterListArr = buildString {
-            append("[")
-            filterList.forEachIndexed { i, (pkg, keyword) ->
-                if (i > 0) append(",")
-                val entry = if (keyword != null) "$pkg|$keyword" else pkg
-                append(JSONObject().apply { put("e", entry) }.getString("e"))
-            }
-            append("]")
+        root.put("filterMode", filterModeNum)
+
+        // 黑白名单
+        val filterListArr = JSONArray()
+        for ((pkg, keyword) in filterList) {
+            filterListArr.put(if (keyword != null) "$pkg|$keyword" else pkg)
         }
-        return """{"enablePackageGroupMapping":$enablePackageGroupMapping,"packageGroups":$pkgGroups,"groupEnabled":$groupEnabled,"filterMode":$filterModeNum,"filterList":$filterListArr,"enablePeerMode":$enablePeerMode,"installedPackages":${installedPkgs.toList().let { JSONObject().apply { put("p", it) }.getJSONArray("p").toString() }}}"""
+        root.put("filterList", filterListArr)
+
+        root.put("enablePeerMode", enablePeerMode)
+        root.put("installedPackages", JSONArray(installedPkgs.toList()))
+
+        return root.toString()
     }
 
     /** 包名映射 — 委托给 Rust Core */

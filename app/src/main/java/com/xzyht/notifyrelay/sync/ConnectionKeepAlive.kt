@@ -14,6 +14,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 连接保活与重连策略封装：
@@ -52,7 +53,6 @@ class ConnectionKeepAlive(
      */
     fun startHeartbeatToDevice(uuid: String, initialIp: String, initialPort: Int, sharedSecret: String) {
         stopHeartbeatToDevice(uuid)
-        heartbeatedDevices.add(uuid)
 
         val ctx = deviceManager.rustContextInternal ?: return
         val batteryLevel = BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
@@ -63,6 +63,7 @@ class ConnectionKeepAlive(
 
         val handle = NativeCore.startHeartbeatSender(ctx, deviceManager.uuid, displayName, battery, "android", initialIp, 4000L, mode.toInt())
         heartbeatJobs[uuid] = handle
+        heartbeatedDevices.add(uuid)
     }
 
     private fun stopHeartbeatToDevice(uuid: String) {
@@ -187,29 +188,39 @@ class ConnectionKeepAlive(
                 val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
                 val battery = if (isCharging) batteryLevel else -batteryLevel
                 val localIp = NativeCore.getLocalIp() ?: "0.0.0.0"
-                val result = NativeCore.sendHandshake(ctx, deviceManager.uuid, deviceManager.localPublicKey, localIp, device.ip, battery, "android")
+                val deferred = deviceManager.registerHandshakeWaiter(device.uuid)
+                val sendOk = NativeCore.sendHandshake(ctx, deviceManager.uuid, deviceManager.localPublicKey, localIp, device.ip, battery, "android")
 
-                if (result == 0) {
-                    delay(500)
-                    if (deviceManager.isAuthenticatedInternal(device.uuid)) {
-                        startHeartbeatToDevice(device.uuid, device.ip, device.port, "")
-                        deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
-                        try {
-                            scope.launch { deviceManager.updateDeviceListInternal() }
-                        } catch (_: Exception) {}
+                if (sendOk == 0) {
+                    val handshakeResult = withTimeoutOrNull(5000) { deferred.await() }
+                    when (handshakeResult) {
+                        true -> {
+                            startHeartbeatToDevice(device.uuid, device.ip, device.port, "")
+                            deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
+                            try {
+                                scope.launch { deviceManager.updateDeviceListInternal() }
+                            } catch (_: Exception) {}
 
-                        if (device.uuid != deviceManager.uuid) {
-                            val myInfo = deviceManager.getDeviceInfoInternal(deviceManager.uuid)
-                            if (myInfo != null && !heartbeatedDevices.contains(device.uuid)) {
-                                deviceManager.connectToDevice(myInfo)
+                            if (device.uuid != deviceManager.uuid) {
+                                val myInfo = deviceManager.getDeviceInfoInternal(deviceManager.uuid)
+                                if (myInfo != null && !heartbeatedDevices.contains(device.uuid)) {
+                                    deviceManager.connectToDevice(myInfo)
+                                }
                             }
+                            return Pair(true, null)
                         }
-                        return Pair(true, null)
-                    } else {
-                        return Pair(false, "认证失败")
+                        false -> {
+                            lastException = UnsupportedOperationException("对方拒绝连接")
+                            if (retry < maxRetries - 1) delay(1000)
+                        }
+                        null -> {
+                            lastException = UnsupportedOperationException("握手超时")
+                            if (retry < maxRetries - 1) delay(1000)
+                        }
                     }
                 } else {
-                    return Pair(false, "连接失败")
+                    lastException = UnsupportedOperationException("发送握手失败")
+                    if (retry < maxRetries - 1) delay(1000)
                 }
             } catch (e: UnsupportedOperationException) {
                 val ctx = deviceManager.contextInternal
@@ -224,6 +235,8 @@ class ConnectionKeepAlive(
                 if (retry < maxRetries - 1) {
                     delay(1000)
                 }
+            } finally {
+                deviceManager.resolveHandshake(device.uuid, false)
             }
         }
 

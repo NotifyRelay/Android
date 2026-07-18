@@ -23,9 +23,9 @@ object HeartbeatProcessor {
         val uuid = info.uuid
         if (uuid == deviceManager.uuid) return
 
-        // 记录发现的设备到 Rust core
+        // 记录发现的设备到 Rust core（排除无效 IP）
         val ctx = deviceManager.rustContextInternal
-        if (ctx != null) {
+        if (ctx != null && info.ip != "0.0.0.0" && info.ip.isNotBlank()) {
             try {
                 NativeCore.recordDiscoveredDevice(ctx, uuid, info.displayName, info.ip, info.port.toShort(), info.batteryLevel, info.deviceType)
             } catch (_: Exception) {}
@@ -71,10 +71,8 @@ object HeartbeatProcessor {
                 deviceManager.saveAuthedDevicesInternal()
             }
 
-            if (info.ip != "0.0.0.0" && info.ip.isNotBlank()) {
-                synchronized(deviceManager.deviceInfoCacheInternal) {
-                    deviceManager.deviceInfoCacheInternal[uuid] = device
-                }
+            synchronized(deviceManager.deviceInfoCacheInternal) {
+                deviceManager.deviceInfoCacheInternal[uuid] = device
             }
             DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
 
@@ -82,10 +80,8 @@ object HeartbeatProcessor {
                 deviceManager.updateDeviceListInternal()
             }
         } else {
-            if (info.ip != "0.0.0.0" && info.ip.isNotBlank()) {
-                synchronized(deviceManager.deviceInfoCacheInternal) {
-                    deviceManager.deviceInfoCacheInternal[uuid] = device
-                }
+            synchronized(deviceManager.deviceInfoCacheInternal) {
+                deviceManager.deviceInfoCacheInternal[uuid] = device
             }
             DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
 

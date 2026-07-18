@@ -446,7 +446,11 @@ object MessageSender {
     private fun enqueueNotification(
         deviceInfo: DeviceInfo, json: String, deviceManager: DeviceConnectionManager, tag: String = ""
     ): Boolean {
-        val ctx = deviceManager.rustContextInternal ?: return false
+        val ctx = deviceManager.rustContextInternal
+        if (ctx == null) {
+            Logger.w(TAG, "Rust 未初始化，跳过入队: ${deviceInfo.displayName}")
+            return false
+        }
         dedupCtx = ctx
         val dedupKey = NativeCore.computeDedupKey(deviceInfo.uuid, json) ?: return false
         if (!NativeCore.dedupCheckAndPend(ctx, dedupKey, SENT_KEY_TTL_MS)) return false

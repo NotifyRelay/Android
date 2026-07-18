@@ -135,7 +135,9 @@ object ftpServer {
             Logger.d(TAG, "FTP 使用 PC 端派发的凭据: username=$username")
         } else {
             // 回退：使用 Rust Core 生成随机凭据
-            val randomPassword = NativeCore.generateRandomPassword() ?: ""
+            val randomPassword = NativeCore.generateRandomPassword()
+                ?.takeIf { it.isNotBlank() && it.length >= 8 }
+                ?: return ftpStartResult(StartResult.CONFIG_ERROR)
             username = "ftp_" + randomPassword.take(8).lowercase()
             password = randomPassword
             Logger.d(TAG, "FTP 使用随机凭据（无 PC 端凭据）")

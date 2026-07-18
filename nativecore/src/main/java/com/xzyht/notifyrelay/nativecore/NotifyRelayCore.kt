@@ -127,9 +127,14 @@ interface NotifyRelayCore : Library {
 
     // ======== Send functions ========
     fun nrc_send_handshake(ctx: Pointer, uuid: String, pubKey: String, localIp: String, targetIp: String, battery: Int, deviceType: String): Int
-    fun nrc_send_pairing_init(ctx: Pointer, uuid: String, expectedCode: String, ip: String, battery: Int, deviceType: String): Int
+    fun nrc_send_pairing_init(ctx: Pointer, localUuid: String, targetUuid: String, expectedCode: String, battery: Int, deviceType: String): Int
     fun nrc_send_pairing_resp(ctx: Pointer, uuid: String, ltPub: String, pairingCode: String, ip: String, battery: Int, deviceType: String): Int
     fun nrc_send_accept(ctx: Pointer, uuid: String, ltPubKey: String, ip: String, battery: Int, deviceType: String)
+
+    // ======== Pairing code management (Rust-generated) ========
+    fun nrc_generate_pairing_code(ctx: Pointer, ttlSecs: Int): Pointer
+    fun nrc_clear_pairing_code(ctx: Pointer)
+    fun nrc_validate_pairing_code(ctx: Pointer, code: String): Int
     fun nrc_send_reject(ctx: Pointer, uuid: String)
     fun nrc_send_heartbeat_tcp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
     fun nrc_send_heartbeat_udp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
@@ -216,20 +221,19 @@ interface NotifyRelayCore : Library {
     fun nrc_set_on_tcp_error_cb(ctx: Pointer, cb: OnTcpErrorCb?)
 
     companion object {
-        private var _instance: NotifyRelayCore? = null
-
-        fun instance(): NotifyRelayCore {
-            if (_instance == null) {
-                _instance = Native.load("notify_relay_core", NotifyRelayCore::class.java)
-            }
-            return _instance!!
+        private val _instance: NotifyRelayCore by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
+            Native.load("notify_relay_core", NotifyRelayCore::class.java)
         }
+
+        fun instance(): NotifyRelayCore = _instance
 
         fun ptrToStringAndFree(ptr: Pointer?): String? {
             if (ptr == null || Pointer.nativeValue(ptr) == 0L) return null
-            val result = ptr.getString(0, "UTF-8")
-            instance().nrc_free_string(ptr)
-            return result
+            return try {
+                ptr.getString(0, "UTF-8")
+            } finally {
+                instance().nrc_free_string(ptr)
+            }
         }
 
         fun ptrToString(ptr: Pointer?): String? {

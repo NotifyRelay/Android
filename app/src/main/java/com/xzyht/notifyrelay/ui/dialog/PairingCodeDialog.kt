@@ -24,11 +24,11 @@ import androidx.compose.ui.unit.sp
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.sync.getLocalIpAddress
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
 import notifyrelay.base.util.Logger
 import notifyrelay.core.util.PairingCodeManager
 import top.yukonga.miuix.kmp.basic.Text
@@ -56,34 +56,41 @@ fun PairingCodeDialog(
     if (mode == PairingMode.CLIENT_MODE) {
         val clipboardManager = LocalClipboardManager.current
         val scope = rememberCoroutineScope()
-        val displayCode = remember { pairingCode.ifEmpty { PairingCodeManager.generate() } }
+        val displayCode = remember { PairingCodeManager.generate() }
 
         LaunchedEffect(show) {
             if (show && targetDevice != null) {
                 delay(500)
-                withContext(Dispatchers.IO) {
+                val handshakeDeferred = deviceManager.registerHandshakeWaiter(targetDevice.uuid)
+                val initSuccess = withContext(Dispatchers.IO) {
                     val ctx = deviceManager.rustContextInternal
-                    if (ctx != null) {
+                    if (ctx == null) {
+                        false
+                    } else {
                         val batteryLevel = notifyrelay.core.util.BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
                         val isCharging = notifyrelay.core.util.BatteryUtils.isCharging(deviceManager.contextInternal)
                         val battery = if (isCharging) batteryLevel else -batteryLevel
-                        val localIp = getLocalIpAddress()
-                        NativeCore.sendPairingInit(ctx, deviceManager.uuid, displayCode, localIp, battery, "android")
+                        NativeCore.sendPairingInit(ctx, deviceManager.uuid, targetDevice!!.uuid, displayCode, battery, "android") == 0
                     }
                 }
-                var attempts = 0
-                while (attempts < 30) {
-                    delay(3000)
-                    if (deviceManager.isAuthenticatedInternal(targetDevice.uuid)) {
-                        withContext(Dispatchers.Main) {
-                            onPairingComplete(true, "配对成功")
-                            onDismiss()
-                        }
-                        return@LaunchedEffect
-                    }
-                    attempts++
+                if (!initSuccess) {
+                    onPairingComplete(false, "配对初始化失败")
+                    onDismiss()
+                    return@LaunchedEffect
                 }
-                onPairingComplete(false, "配对超时")
+                val result = withTimeoutOrNull(90_000L) {
+                    handshakeDeferred.await()
+                }
+                withContext(Dispatchers.Main) {
+                    if (result == true) {
+                        onPairingComplete(true, "配对成功")
+                    } else if (result == false) {
+                        onPairingComplete(false, "配对码验证失败")
+                    } else {
+                        onPairingComplete(false, "配对超时")
+                    }
+                    onDismiss()
+                }
             }
         }
 
@@ -216,26 +223,24 @@ fun PairingCodeDialog(
                                 isPairing = true
 
                                 serverScope.launch {
-                                    val result = withContext(Dispatchers.IO) {
-                                        try {
-                                            val ctx = deviceManager.rustContextInternal
-                                            if (ctx == null) return@withContext "配对失败：未初始化"
-                                            val ltPubKey = deviceManager.localPublicKey
-                                            NativeCore.sendPairingResp(ctx, remoteUuid, ltPubKey, code, remoteIp, 50, "android")
-
-                                            var attempts = 0
-                                            while (attempts < 10) {
-                                                delay(1000)
-                                                if (deviceManager.isAuthenticatedInternal(remoteUuid)) {
-                                                    return@withContext "配对成功"
-                                                }
-                                                attempts++
-                                            }
-                                            "配对超时"
-                                        } catch (e: Exception) {
-                                            "配对失败: ${e.message}"
-                                        }
-                                    }
+                                                    val result = withContext(Dispatchers.IO) {
+                                                        try {
+                                                            val ctx = deviceManager.rustContextInternal
+                                                            if (ctx == null) return@withContext "配对失败：未初始化"
+                                                            val ltPubKey = deviceManager.localPublicKey
+                                                            val handshakeDeferred = deviceManager.registerHandshakeWaiter(remoteUuid)
+                                                            val sendOk = NativeCore.sendPairingResp(ctx, remoteUuid, ltPubKey, code, remoteIp, 50, "android")
+                                                            if (sendOk != 0) return@withContext "配对失败：发送响应失败"
+                                                            val success = withTimeoutOrNull(30_000L) {
+                                                                handshakeDeferred.await()
+                                                            }
+                                                            if (success == true) "配对成功"
+                                                            else if (success == false) "配对失败：对方拒绝了配对"
+                                                            else "配对超时"
+                                                        } catch (e: Exception) {
+                                                            "配对失败: ${e.message}"
+                                                        }
+                                                    }
                                     if (result == "配对成功") {
                                         onPairingComplete(true, "配对成功")
                                         onDismiss()

@@ -10,10 +10,9 @@ object OneShotTcpClient {
         ip: String,
         port: Int,
         payload: String,
-        connectTimeoutMs: Int = 3000,
-        readTimeoutMs: Int = 3000,
+        timeoutMs: Int = 3000,
     ): Boolean {
-        return NativeCore.oneshotSendReceive(ctx, ip, port.toShort(), payload, readTimeoutMs)
+        return NativeCore.oneshotSendReceive(ctx, ip, port.toShort(), payload, timeoutMs)
     }
 
     fun sendOnly(
@@ -21,8 +20,8 @@ object OneShotTcpClient {
         ip: String,
         port: Int,
         payload: String,
-        connectTimeoutMs: Int = 3000,
+        timeoutMs: Int = 3000,
     ): Boolean {
-        return NativeCore.oneshotSendOnly(ctx, ip, port.toShort(), payload, connectTimeoutMs)
+        return NativeCore.oneshotSendOnly(ctx, ip, port.toShort(), payload, timeoutMs)
     }
 }
