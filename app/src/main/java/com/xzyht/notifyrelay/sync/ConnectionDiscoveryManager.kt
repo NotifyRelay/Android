@@ -255,20 +255,20 @@ class ConnectionDiscoveryManager(
     }
 
     fun startDiscovery() {
-        if (deviceManager.isWifiDirectNetworkInternal()) {
-            startWifiDirectDiscovery(deviceManager.localDisplayNameInternal())
-            deviceManager.startServerInternal()
-            return
-        }
-
         val udpEnabled = deviceManager.udpDiscoveryEnabled
         
-        // 启动 Rust 定时广播
+        // 启动 Rust 定时广播（Wi-Fi Direct 和普通网络都需要）
         val ctx = deviceManager.rustContextInternal
         if (ctx != null && udpEnabled) {
             val displayName = deviceManager.localDisplayNameInternal()
             val battery = notifyrelay.core.util.BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
             NativeCore.periodicBroadcast(ctx, 1, deviceManager.uuid, displayName, battery, "android")
+        }
+
+        if (deviceManager.isWifiDirectNetworkInternal()) {
+            startWifiDirectDiscovery(deviceManager.localDisplayNameInternal())
+            deviceManager.startServerInternal()
+            return
         }
 
         manualDiscoveryJob?.cancel()
@@ -333,27 +333,6 @@ class ConnectionDiscoveryManager(
     }
 
     private fun startWifiDirectDiscovery(localDisplayName: String) {
-        scope.launch {
-            val ips = getWifiDirectIpRangeInternal()
-            val authed = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices.toMap() }
-            //Logger.d("死神-NotifyRelay", "WLAN直连发现：扫描${ips.size}个IP，认证设备数量：${authed.size}")
-
-            for ((uuid, auth) in authed) {
-                if (uuid == deviceManager.uuid) continue
-                val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
-                    deviceManager.heartbeatedDevicesInternal.contains(uuid)
-                }
-                if (isHeartbeated) continue
-                val ip = auth.lastIp
-                val port = auth.lastPort ?: deviceManager.listenPort
-                if (!ip.isNullOrEmpty() && ip != "0.0.0.0") {
-                    //Logger.d("死神-NotifyRelay", "WLAN直连：尝试连接已认证设备 $uuid at $ip:$port")
-                    deviceManager.connectToDevice(DeviceInfo(uuid, auth.displayName ?: "WLAN直连设备", ip, port))
-                    delay(500)
-                }
-            }
-
-            //Logger.d("死神-NotifyRelay", "WLAN直连发现完成")
-        }
+        startManualDiscoveryForAuthedDevices(localDisplayName)
     }
 }

@@ -181,6 +181,7 @@ class ConnectionKeepAlive(
         var lastException: Exception? = null
 
         for (retry in 0 until maxRetries) {
+            var deferred: kotlinx.coroutines.CompletableDeferred<Boolean>? = null
             try {
                 val ctx = deviceManager.rustContextInternal
                 if (ctx == null) return Pair(false, "未初始化")
@@ -188,7 +189,7 @@ class ConnectionKeepAlive(
                 val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
                 val battery = if (isCharging) batteryLevel else -batteryLevel
                 val localIp = NativeCore.getLocalIp() ?: "0.0.0.0"
-                val deferred = deviceManager.registerHandshakeWaiter(device.uuid)
+                deferred = deviceManager.registerHandshakeWaiter(device.uuid)
                 val sendOk = NativeCore.sendHandshake(ctx, deviceManager.uuid, deviceManager.localPublicKey, localIp, device.ip, battery, "android")
 
                 if (sendOk == 0) {
@@ -196,7 +197,9 @@ class ConnectionKeepAlive(
                     when (handshakeResult) {
                         true -> {
                             startHeartbeatToDevice(device.uuid, device.ip, device.port, "")
-                            deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
+                            synchronized(deviceManager.deviceLastSeenInternal) {
+                                deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
+                            }
                             try {
                                 scope.launch { deviceManager.updateDeviceListInternal() }
                             } catch (_: Exception) {}
@@ -236,7 +239,7 @@ class ConnectionKeepAlive(
                     delay(1000)
                 }
             } finally {
-                deviceManager.resolveHandshake(device.uuid, false)
+                deferred?.let { deviceManager.cancelHandshakeWaiter(device.uuid, it) }
             }
         }
 

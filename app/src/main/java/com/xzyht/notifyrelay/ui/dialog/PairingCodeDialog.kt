@@ -62,34 +62,43 @@ fun PairingCodeDialog(
             if (show && targetDevice != null) {
                 delay(500)
                 val handshakeDeferred = deviceManager.registerHandshakeWaiter(targetDevice.uuid)
-                val initSuccess = withContext(Dispatchers.IO) {
-                    val ctx = deviceManager.rustContextInternal
-                    if (ctx == null) {
-                        false
-                    } else {
-                        val batteryLevel = notifyrelay.core.util.BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
-                        val isCharging = notifyrelay.core.util.BatteryUtils.isCharging(deviceManager.contextInternal)
-                        val battery = if (isCharging) batteryLevel else -batteryLevel
-                        NativeCore.sendPairingInit(ctx, deviceManager.uuid, targetDevice!!.uuid, displayCode, battery, "android") == 0
+                try {
+                    val initSuccess = withContext(Dispatchers.IO) {
+                        val ctx = deviceManager.rustContextInternal
+                        if (ctx == null) {
+                            false
+                        } else {
+                            val batteryLevel = notifyrelay.core.util.BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+                            val isCharging = notifyrelay.core.util.BatteryUtils.isCharging(deviceManager.contextInternal)
+                            val battery = if (isCharging) batteryLevel else -batteryLevel
+                            NativeCore.sendPairingInit(ctx, deviceManager.uuid, targetDevice!!.uuid, displayCode, battery, "android") == 0
+                        }
                     }
-                }
-                if (!initSuccess) {
-                    onPairingComplete(false, "配对初始化失败")
-                    onDismiss()
-                    return@LaunchedEffect
-                }
-                val result = withTimeoutOrNull(90_000L) {
-                    handshakeDeferred.await()
-                }
-                withContext(Dispatchers.Main) {
-                    if (result == true) {
-                        onPairingComplete(true, "配对成功")
-                    } else if (result == false) {
-                        onPairingComplete(false, "配对码验证失败")
-                    } else {
-                        onPairingComplete(false, "配对超时")
+                    if (!initSuccess) {
+                        onPairingComplete(false, "配对初始化失败")
+                        onDismiss()
+                        return@LaunchedEffect
                     }
-                    onDismiss()
+                    val result = withTimeoutOrNull(90_000L) {
+                        handshakeDeferred.await()
+                    }
+                    withContext(Dispatchers.Main) {
+                        if (result == true) {
+                            onPairingComplete(true, "配对成功")
+                        } else if (result == false) {
+                            onPairingComplete(false, "配对码验证失败")
+                        } else {
+                            onPairingComplete(false, "配对超时")
+                        }
+                        onDismiss()
+                    }
+                } catch (e: Exception) {
+                    withContext(Dispatchers.Main) {
+                        onPairingComplete(false, "配对异常: ${e.message}")
+                        onDismiss()
+                    }
+                } finally {
+                    deviceManager.cancelHandshakeWaiter(targetDevice.uuid, handshakeDeferred)
                 }
             }
         }
@@ -223,30 +232,34 @@ fun PairingCodeDialog(
                                 isPairing = true
 
                                 serverScope.launch {
-                                                    val result = withContext(Dispatchers.IO) {
-                                                        try {
-                                                            val ctx = deviceManager.rustContextInternal
-                                                            if (ctx == null) return@withContext "配对失败：未初始化"
-                                                            val ltPubKey = deviceManager.localPublicKey
-                                                            val handshakeDeferred = deviceManager.registerHandshakeWaiter(remoteUuid)
-                                                            val sendOk = NativeCore.sendPairingResp(ctx, remoteUuid, ltPubKey, code, remoteIp, 50, "android")
-                                                            if (sendOk != 0) return@withContext "配对失败：发送响应失败"
-                                                            val success = withTimeoutOrNull(30_000L) {
-                                                                handshakeDeferred.await()
+                                                    val handshakeDeferred = deviceManager.registerHandshakeWaiter(remoteUuid)
+                                                    try {
+                                                        val result = withContext(Dispatchers.IO) {
+                                                            try {
+                                                                val ctx = deviceManager.rustContextInternal
+                                                                if (ctx == null) return@withContext "配对失败：未初始化"
+                                                                val ltPubKey = deviceManager.localPublicKey
+                                                                val sendOk = NativeCore.sendPairingResp(ctx, remoteUuid, ltPubKey, code, remoteIp, 50, "android")
+                                                                if (sendOk != 0) return@withContext "配对失败：发送响应失败"
+                                                                val success = withTimeoutOrNull(30_000L) {
+                                                                    handshakeDeferred.await()
+                                                                }
+                                                                if (success == true) "配对成功"
+                                                                else if (success == false) "配对失败：对方拒绝了配对"
+                                                                else "配对超时"
+                                                            } catch (e: Exception) {
+                                                                "配对失败: ${e.message}"
                                                             }
-                                                            if (success == true) "配对成功"
-                                                            else if (success == false) "配对失败：对方拒绝了配对"
-                                                            else "配对超时"
-                                                        } catch (e: Exception) {
-                                                            "配对失败: ${e.message}"
                                                         }
-                                                    }
-                                    if (result == "配对成功") {
-                                        onPairingComplete(true, "配对成功")
-                                        onDismiss()
-                                    } else {
-                                        isPairing = false
-                                        errorMsg = result
+                                        if (result == "配对成功") {
+                                            onPairingComplete(true, "配对成功")
+                                            onDismiss()
+                                        } else {
+                                            isPairing = false
+                                            errorMsg = result
+                                        }
+                                    } finally {
+                                        deviceManager.cancelHandshakeWaiter(remoteUuid, handshakeDeferred)
                                     }
                                 }
                             }

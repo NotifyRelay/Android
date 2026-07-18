@@ -72,7 +72,9 @@ object HeartbeatProcessor {
             }
 
             synchronized(deviceManager.deviceInfoCacheInternal) {
-                deviceManager.deviceInfoCacheInternal[uuid] = device
+                val existing = deviceManager.deviceInfoCacheInternal[uuid]
+                val effectiveIp = info.ip.takeUnless { it == "0.0.0.0" || it.isBlank() } ?: existing?.ip ?: info.ip
+                deviceManager.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, info.displayName, effectiveIp, info.port, info.batteryLevel, if (info.isCharging) '1' else '0')
             }
             DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
 
@@ -81,7 +83,9 @@ object HeartbeatProcessor {
             }
         } else {
             synchronized(deviceManager.deviceInfoCacheInternal) {
-                deviceManager.deviceInfoCacheInternal[uuid] = device
+                val existing = deviceManager.deviceInfoCacheInternal[uuid]
+                val effectiveIp = info.ip.takeUnless { it == "0.0.0.0" || it.isBlank() } ?: existing?.ip ?: info.ip
+                deviceManager.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, info.displayName, effectiveIp, info.port, info.batteryLevel, if (info.isCharging) '1' else '0')
             }
             DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
 

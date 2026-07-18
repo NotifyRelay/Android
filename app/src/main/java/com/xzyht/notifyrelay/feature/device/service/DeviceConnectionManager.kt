@@ -409,6 +409,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     fun registerHandshakeWaiter(uuid: String): CompletableDeferred<Boolean> {
         val deferred = CompletableDeferred<Boolean>()
         synchronized(pendingHandshakeResults) {
+            pendingHandshakeResults[uuid]?.cancel()
             pendingHandshakeResults[uuid] = deferred
         }
         return deferred
@@ -418,6 +419,16 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     fun resolveHandshake(uuid: String, success: Boolean) {
         synchronized(pendingHandshakeResults) {
             pendingHandshakeResults.remove(uuid)?.complete(success)
+        }
+    }
+
+    /** 按 Deferred 实例清理等待器，防止迟到请求完成或移除其他等待器 */
+    fun cancelHandshakeWaiter(uuid: String, deferred: CompletableDeferred<Boolean>) {
+        synchronized(pendingHandshakeResults) {
+            if (pendingHandshakeResults[uuid] === deferred) {
+                pendingHandshakeResults.remove(uuid)
+                deferred.cancel()
+            }
         }
     }
 
@@ -676,27 +687,19 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     }
 
     private fun getDeviceInfo(uuid: String): DeviceInfo? {
-        // 优先从缓存取（含真实ip），跳过无效IP
         synchronized(deviceInfoCache) {
             deviceInfoCache[uuid]?.takeUnless { it.ip == "0.0.0.0" || it.ip.isBlank() }
                 ?.let { return it }
         }
-        // 缓存中有但IP无效时仍返回（未认证设备通过UDP发现时IP可能为0.0.0.0）
-        synchronized(deviceInfoCache) {
-            deviceInfoCache[uuid]?.let { return it }
-        }
-        // 其次从设备流取，跳过无效IP
         _devices.value[uuid]?.first?.takeUnless { it.ip == "0.0.0.0" || it.ip.isBlank() }
             ?.let { return it }
-        // 最后从认证表补全（无ip）
-        val auth = authenticatedDevices[uuid]
+        val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
         if (auth != null) {
             val name = auth.displayName ?: DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid)
             val ip = auth.lastIp?.takeUnless { it == "0.0.0.0" || it.isBlank() } ?: ""
             val port = auth.lastPort ?: listenPort
             return DeviceInfo(uuid, name, ip, port)
         }
-        // 新增：本机兜底逻辑
         if (uuid == this.uuid) {
             val displayName = getLocalDisplayName()
             val localIp = discoveryManager.getLocalIpAddressInternal()
