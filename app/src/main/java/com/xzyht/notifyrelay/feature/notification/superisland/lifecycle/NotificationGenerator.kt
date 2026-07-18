@@ -37,9 +37,8 @@ import notifyrelay.core.util.image.ImageUtils
 import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
 import java.util.concurrent.ConcurrentHashMap
-
+import notifyrelay.data.StorageManager
 /**
  * 通知生成器，负责处理超级岛通知的生成和注入
  * 
@@ -194,7 +193,6 @@ object NotificationGenerator {
         picMap: Map<String, String>?,
         sourceId: String,
         floatingWindowManager: FloatingWindowManager,
-        entryKeyToNotificationId: ConcurrentHashMap<String, Int>,
         overrideNotificationId: Int? = null
     ): Int? {
         try {
@@ -637,7 +635,7 @@ object NotificationGenerator {
         }
 
         // 保存entryKey到notificationId的映射
-        entryKeyToNotificationId[key] = notificationId
+        com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaMappingManager.putNotificationId(key, notificationId)
 
         Logger.i(TAG, "超级岛 发送复刻通知成功，key=$key, notificationId=$notificationId")
         return notificationId
@@ -942,9 +940,9 @@ object NotificationGenerator {
     /**
      * 取消复刻通知
      */
-    internal fun cancelReplicaNotification(context: Context, key: String, entryKeyToNotificationId: ConcurrentHashMap<String, Int>) {
+    internal fun cancelReplicaNotification(context: Context, key: String) {
         try {
-            val notificationId = entryKeyToNotificationId.remove(key)
+            val notificationId = com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaMappingManager.removeNotificationId(key)
             if (notificationId != null) {
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 notificationManager.cancel(notificationId)
@@ -960,13 +958,14 @@ object NotificationGenerator {
     /**
      * 清除所有复刻通知
      */
-    internal fun clearAllReplicaNotifications(context: Context?, entryKeyToNotificationId: ConcurrentHashMap<String, Int>) {
+    internal fun clearAllReplicaNotifications(context: Context?) {
         try {
             if (context != null) {
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 
                 // 取消所有映射中的通知
-                entryKeyToNotificationId.forEach { (key, notificationId) ->
+                val allIds = com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaMappingManager.getAllNotificationIds()
+                allIds.forEach { (key, notificationId) ->
                     notificationManager.cancel(notificationId)
                     // 停止对应的滚动更新
                     stopScrollUpdate(key)
@@ -975,7 +974,7 @@ object NotificationGenerator {
             }
             
             // 清空映射
-            entryKeyToNotificationId.clear()
+            com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaMappingManager.clearAllNotificationIds()
             // 清空所有滚动更新
             clearAllScrollUpdates()
             Logger.i(TAG, "超级岛 清除所有复刻通知成功")

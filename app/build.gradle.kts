@@ -60,32 +60,35 @@ android {
         val signingKeyPassword = System.getenv("KEY_PASSWORD") ?: project.findProperty("KEY_PASSWORD") as? String
         val signingKeyAlias = System.getenv("KEY_ALIAS") ?: project.findProperty("KEY_ALIAS") as? String
 
-        // Local-only fallback (not committed): read optional properties from two locations, otherwise pick first .jks in PublicHub
-        val publicHubDir = file("E:/xzy/nas-Sync/androidKey/notify-relay/PublicHub")
-        val localPropFiles = listOf(
-            File("E:/xzy/nas-Sync/androidKey/notify-relay/signing.local.properties"),
-            File(publicHubDir, "signing.local.properties")
-        )
         val localProps = Properties().apply {
-            localPropFiles.filter { it.isFile }.forEach { file ->
-                file.inputStream().use { load(it) }
-            }
+            rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
         }
-        val localKeystore = if (publicHubDir.isDirectory) {
-            publicHubDir.listFiles()?.firstOrNull { it.extension == "jks" }
+        val keyBaseDir = file(localProps.getProperty("KEYSTORE_PATH") ?: "PublicHub")
+        val localPropFiles = listOf(
+            rootProject.file("signing.local.properties"),
+            File(keyBaseDir, "signing.local.properties")
+        )
+        localPropFiles.filter { it.isFile }.forEach { file ->
+            file.inputStream().use { localProps.load(it) }
+        }
+        val localKeystore = if (keyBaseDir.isFile) {
+            keyBaseDir
+        } else if (keyBaseDir.isDirectory) {
+            keyBaseDir.listFiles()?.firstOrNull { it.isFile && it.name == "PublicHub.jks" }
+                ?: keyBaseDir.listFiles()?.firstOrNull { it.isFile && it.name == "PublicHub" }
         } else {
             null
         }
 
         val resolvedKeystore = keystorePath
-            ?: localProps.getProperty("KEYSTORE_PATH")
             ?: localKeystore?.absolutePath
         val resolvedStorePassword = signingStorePassword ?: localProps.getProperty("STORE_PASSWORD")
         val resolvedKeyPassword = signingKeyPassword ?: localProps.getProperty("KEY_PASSWORD")
         val resolvedKeyAlias = signingKeyAlias ?: localProps.getProperty("KEY_ALIAS")
+        val hasSigningCredentials = !resolvedKeystore.isNullOrBlank() && !resolvedStorePassword.isNullOrBlank() && !resolvedKeyPassword.isNullOrBlank() && !resolvedKeyAlias.isNullOrBlank()
 
-        if (!resolvedKeystore.isNullOrBlank() && !resolvedStorePassword.isNullOrBlank() && !resolvedKeyPassword.isNullOrBlank() && !resolvedKeyAlias.isNullOrBlank()) {
-            create("release") {
+        create("release") {
+            if (hasSigningCredentials) {
                 storeFile = rootProject.file(resolvedKeystore)
                 storePassword = resolvedStorePassword
                 keyAlias = resolvedKeyAlias
