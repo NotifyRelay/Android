@@ -1,0 +1,11 @@
+# Rust 编译产物
+src/main/jniLibs/
+src/main/assets/
+
+# Gradle 构建产物
+build/
+.gradle/
+
+# IDE
+.idea/
+*.iml

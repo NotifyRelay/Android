@@ -6,6 +6,59 @@
 ## 应用简介
 本应用可实现多设备间的通知相互转发功能。通过获取设备通知访问权限、应用列表权限及网络权限，设备间可双向转发通知原文。转发消息包含原通知的应用跳转接口，若接收设备安装了对应应用，点击转发消息即可跳转至与发送方一致的应用。
 
+## 构建环境要求
+
+本项目使用 Rust 编写核心加密与协议模块（`notify-relay-core`），构建前需安装以下环境：
+
+### 1. 安装 Rust
+
+```sh
+# Windows (使用 rustup-init.exe)
+# 从 https://rustup.rs 下载安装
+# 或使用 winget:
+winget install Rustlang.Rustup
+
+# Linux / macOS:
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+```
+
+安装后重启终端，验证：
+```sh
+rustc --version
+cargo --version
+```
+
+### 2. 添加 Android 编译目标
+
+```sh
+rustup target add aarch64-linux-android x86_64-linux-android
+```
+
+### 3. 安装 cargo-ndk
+
+```sh
+cargo install cargo-ndk
+```
+
+### 4. 安装 Android NDK
+
+通过 Android Studio SDK Manager 安装 NDK（Side-by-side）。  
+确保 `local.properties` 中正确配置了 SDK 路径，或在 Android Studio 中直接打开项目。
+
+### 5. 构建 APK
+
+```sh
+# Windows
+gradlew.bat assembleDebug
+
+# Linux / macOS
+./gradlew assembleDebug
+```
+
+首次构建时会自动编译 Rust 原生库（耗时约 2-5 分钟）。后续构建如有缓存则仅需数秒。
+
+> **注意**：预编译 APK 可在 [Releases](https://github.com/NotifyRelay/Android/releases) 页面下载，无需自行构建。
+
 ## 开始使用
 进入应用后显示欢迎界面,请授权所有的必须权限;
 权限使用说明如下:

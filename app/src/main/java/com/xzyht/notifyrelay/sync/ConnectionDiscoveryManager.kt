@@ -9,16 +9,11 @@ import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.Inet4Address
-import java.net.NetworkInterface
-import java.net.SocketTimeoutException
-import kotlin.collections.iterator
 
 /**
  * 负责「网络环境」与「设备发现」的整体协调：
@@ -48,16 +43,7 @@ class ConnectionDiscoveryManager(
         get() = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
-    @Volatile
-    private var broadcastThread: Thread? = null
-    @Volatile
-    private var listenThread: Thread? = null
     private var manualDiscoveryJob: Job? = null
-    
-    // 添加内部变量控制线程运行状态，避免频繁访问deviceManager.udpDiscoveryEnabled
-    @Volatile
-    private var isDiscoveryRunning = false
-
     private val manualDiscoveryInterval = 2000L
 
     /**
@@ -98,72 +84,6 @@ class ConnectionDiscoveryManager(
         }
     }
     
-    /**
-     * 提取UDP监听线程创建逻辑
-     */
-    private fun extractUdpListenThread(threadName: String) {
-        // 先停止旧线程，确保状态正确
-        try {
-            synchronized(this) {
-                listenThread?.interrupt()
-                listenThread = null
-            }
-        } catch (_: Exception) {}
-        
-        val newThread = Thread {
-            var socket: DatagramSocket? = null
-            try {
-                socket = DatagramSocket(23334)
-                socket.soTimeout = 1000 // 设置超时，避免线程阻塞在receive()上
-                val buf = ByteArray(256)
-                
-                while (isDiscoveryRunning || deviceManager.isWifiDirectNetworkInternal()) {
-                    try {
-                        val packet = DatagramPacket(buf, buf.size)
-                        socket.receive(packet)
-                        val msg = String(packet.data, 0, packet.length)
-                        val ip = packet.address.hostAddress
-
-                        val heartbeatInfo = HeartbeatProcessor.parseHeartbeatPayload(msg, ip, deviceManager.listenPort)
-                        if (heartbeatInfo != null && heartbeatInfo.uuid != deviceManager.uuid) {
-                            HeartbeatProcessor.processHeartbeat(heartbeatInfo, deviceManager)
-                        }
-                    } catch (e: SocketTimeoutException) {
-                        continue
-                    }
-                }
-                Logger.i("卢西奥-死神-NotifyRelay", "$threadName 已关闭")
-            } catch (e: InterruptedException) {
-                // 正常中断，退出线程
-                Logger.i("卢西奥-死神-NotifyRelay", "$threadName 被中断")
-            } catch (e: Exception) {
-                if (socket != null && socket.isClosed) {
-                    Logger.i("卢西奥-死神-NotifyRelay", "$threadName 正常关闭")
-                } else {
-                    Logger.e("卢西奥-死神-NotifyRelay", "$threadName 异常: ${e.message}")
-                    e.printStackTrace()
-                }
-            } finally {
-                try {
-                    socket?.close()
-                } catch (_: Exception) {
-                }
-                synchronized(this@ConnectionDiscoveryManager) {
-                    // 只有当当前线程仍是 listenThread 时才置 null，避免覆盖新线程引用
-                    if (listenThread === Thread.currentThread()) {
-                        listenThread = null
-                    }
-                }
-            }
-        }
-        
-        synchronized(this) {
-            listenThread = newThread
-            listenThread?.isDaemon = true
-            listenThread?.start()
-        }
-    }
-
     enum class NetworkType {
         REGULAR,
         HOTSPOT,
@@ -171,27 +91,7 @@ class ConnectionDiscoveryManager(
     }
 
     internal fun getLocalIpAddressInternal(): String {
-        try {
-            val en = NetworkInterface.getNetworkInterfaces()
-            var bestIp: String? = null
-            while (en.hasMoreElements()) {
-                val intf = en.nextElement()
-                val addrs = intf.inetAddresses
-                while (addrs.hasMoreElements()) {
-                    val addr = addrs.nextElement()
-                    if (!addr.isLoopbackAddress && addr is Inet4Address) {
-                        val ip = addr.hostAddress ?: "0.0.0.0"
-                        if (ip.startsWith("192.168.") || ip.startsWith("10.") || ip.startsWith("172.")) {
-                            if (bestIp == null || ip.startsWith("192.168.43.")) {
-                                bestIp = ip
-                            }
-                        }
-                    }
-                }
-            }
-            return bestIp ?: "0.0.0.0"
-        } catch (_: Exception) {}
-        return "0.0.0.0"
+        return NativeCore.getLocalIp() ?: "0.0.0.0"
     }
     private fun getCurrentNetworkType(): NetworkType {
         try {
@@ -227,20 +127,6 @@ class ConnectionDiscoveryManager(
             }
         }
         return ips
-    }
-
-   
-    /**
-     * 编码用于 UDP/TCP 简单传输：
-     * - 目前使用 Base64(NO_WRAP)，避免与文本协议中的冒号 / 换行冲突；
-     * - 具体实现仍在 DeviceConnectionManager 中，通过 internal 复用。
-     */
-    internal fun encodeDisplayNameForTransportInternal(name: String): String {
-        return try {
-            deviceManager.encodeDisplayNameForTransportInternal(name)
-        } catch (_: Exception) {
-            ""
-        }
     }
 
     /**
@@ -308,6 +194,11 @@ class ConnectionDiscoveryManager(
             deviceManager.deviceInfoCacheInternal[deviceManager.uuid] = DeviceInfo(deviceManager.uuid, displayName, newIp, deviceManager.listenPort)
         }
         //Logger.d("死神-NotifyRelay", "本地IP更新为: $newIp")
+        // 通知 Rust core 网络变化
+        val ctx = deviceManager.rustContextInternal
+        if (ctx != null) {
+            NativeCore.onNetworkChanged(ctx, newIp)
+        }
         stopDiscovery()
         startDiscovery()
 
@@ -356,67 +247,30 @@ class ConnectionDiscoveryManager(
     }
 
     fun stopDiscovery() {
-        isDiscoveryRunning = false
-        
-        try {
-            synchronized(this) {
-                broadcastThread?.interrupt()
-                broadcastThread = null
-            }
-        } catch (_: Exception) {}
-        try {
-            synchronized(this) {
-                listenThread?.interrupt()
-                listenThread = null
-            }
-        } catch (_: Exception) {}
+        val ctx = deviceManager.rustContextInternal
+        if (ctx != null) {
+            NativeCore.periodicBroadcast(ctx, 0)
+        }
         manualDiscoveryJob?.cancel()
     }
 
     fun startDiscovery() {
+        val udpEnabled = deviceManager.udpDiscoveryEnabled
+        
+        // 启动 Rust 定时广播（Wi-Fi Direct 和普通网络都需要）
+        val ctx = deviceManager.rustContextInternal
+        if (ctx != null && udpEnabled) {
+            val displayName = deviceManager.localDisplayNameInternal()
+            val battery = notifyrelay.core.util.BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+            NativeCore.periodicBroadcast(ctx, 1, deviceManager.uuid, displayName, battery, "android")
+        }
+
         if (deviceManager.isWifiDirectNetworkInternal()) {
-            //Logger.d("死神-NotifyRelay", "检测到WLAN直连模式，启动WLAN直连发现")
             startWifiDirectDiscovery(deviceManager.localDisplayNameInternal())
             deviceManager.startServerInternal()
             return
         }
 
-        val udpEnabled = deviceManager.udpDiscoveryEnabled
-        
-        isDiscoveryRunning = true
-        
-        // 启动心跳广播线程，定期广播发送心跳消息
-        synchronized(this) {
-            if (broadcastThread == null) {
-                broadcastThread = Thread {
-                    try {
-                        while (isDiscoveryRunning) {
-                            DiscoveryBroadcaster.sendBroadcast(deviceManager)
-                            Thread.sleep(2000) // 每2秒广播一次
-                        }
-                        Logger.i("卢西奥-死神-NotifyRelay", "心跳广播线程已关闭")
-                    } catch (e: InterruptedException) {
-                        // 正常中断，退出线程
-                        Logger.i("卢西奥-死神-NotifyRelay", "心跳广播线程被中断")
-                    } catch (e: Exception) {
-                        Logger.e("卢西奥-死神-NotifyRelay", "心跳广播异常: ${e.message}")
-                        e.printStackTrace()
-                    } finally {
-                        synchronized(this@ConnectionDiscoveryManager) {
-                            // 只有当当前线程仍是 broadcastThread 时才置 null，避免覆盖新线程引用
-                            if (broadcastThread === Thread.currentThread()) {
-                                broadcastThread = null
-                            }
-                        }
-                    }
-                }
-                broadcastThread?.isDaemon = true
-                broadcastThread?.start()
-            }
-        }
-        
-        // 确保监听线程运行（无论之前状态如何，都检查并创建）
-        extractUdpListenThread("UDP监听线程")
         manualDiscoveryJob?.cancel()
         
         // 连接到已认证设备
@@ -432,7 +286,6 @@ class ConnectionDiscoveryManager(
                 val ip = info?.ip
                 val port = info?.port ?: deviceManager.listenPort
                 if (!ip.isNullOrEmpty() && ip != "0.0.0.0") {
-                    //Logger.d("死神-NotifyRelay", "自动connectToDevice: $uuid, $ip")
                     connectToAuthedDevice(DeviceInfo(uuid, info.displayName, ip, port))
                 }
             }
@@ -480,30 +333,6 @@ class ConnectionDiscoveryManager(
     }
 
     private fun startWifiDirectDiscovery(localDisplayName: String) {
-        scope.launch {
-            val ips = getWifiDirectIpRangeInternal()
-            val authed = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices.toMap() }
-            //Logger.d("死神-NotifyRelay", "WLAN直连发现：扫描${ips.size}个IP，认证设备数量：${authed.size}")
-
-            for ((uuid, auth) in authed) {
-                if (uuid == deviceManager.uuid) continue
-                val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
-                    deviceManager.heartbeatedDevicesInternal.contains(uuid)
-                }
-                if (isHeartbeated) continue
-                val ip = auth.lastIp
-                val port = auth.lastPort ?: deviceManager.listenPort
-                if (!ip.isNullOrEmpty() && ip != "0.0.0.0") {
-                    //Logger.d("死神-NotifyRelay", "WLAN直连：尝试连接已认证设备 $uuid at $ip:$port")
-                    deviceManager.connectToDevice(DeviceInfo(uuid, auth.displayName ?: "WLAN直连设备", ip, port))
-                    delay(500)
-                }
-            }
-
-            //Logger.d("死神-NotifyRelay", "WLAN直连发现完成")
-        }
-        
-        // 在WLAN直连模式下也启动监听线程，确保能接收其他设备的心跳消息
-        extractUdpListenThread("WLAN直连UDP监听线程")
+        startManualDiscoveryForAuthedDevices(localDisplayName)
     }
 }

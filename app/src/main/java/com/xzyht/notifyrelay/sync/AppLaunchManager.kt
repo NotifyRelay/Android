@@ -67,15 +67,15 @@ object AppLaunchManager {
         displayId: Int = -1
     ) {
         try {
-            val json = JSONObject().apply {
+            val raw = JSONObject().apply {
                 put("action", "launchApp")
                 put("packageName", packageName)
                 if (displayId > 0) {
                     put("displayId", displayId)
                 }
-            }
+            }.toString()
             Logger.d(TAG, "发送应用启动请求: $packageName, displayId: $displayId")
-            ProtocolSender.sendEncrypted(deviceManager, target, "DATA_APP_LAUNCH", json.toString())
+            ProtocolSender.sendEncrypted(deviceManager, target, "DATA_APP_LAUNCH", raw)
         } catch (e: Exception) {
             Logger.e(TAG, "发送应用启动请求失败", e)
         }

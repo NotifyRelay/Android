@@ -1,7 +1,12 @@
 [submodule "checkupdata"]
 	path = checkupdata
 	url = git@github.com:xzy-nine-common/checkupdata-android.git
+    branch = main
 [submodule "scrcpy"]
 	path = scrcpy
 	url = git@github.com:xzy-nine/ScrcpyForAndroid.git
 	branch = library
+[submodule "nativecore/notify-relay-core"]
+	path = nativecore/notify-relay-core
+	url = git@github.com:NotifyRelay/core.git
+    branch = main

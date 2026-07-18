@@ -40,12 +40,12 @@ object AppListSyncManager {
         scope: String = "user"
     ) {
         context.hashCode()
-        val req = JSONObject().apply {
+        val raw = JSONObject().apply {
             put("type", "APP_LIST_REQUEST")
             put("scope", scope)
             put("time", System.currentTimeMillis())
         }.toString()
-        ProtocolSender.sendEncrypted(deviceManager, targetDevice, "DATA_APP_LIST_REQUEST", req, REQ_TIMEOUT)
+        ProtocolSender.sendEncrypted(deviceManager, targetDevice, "DATA_APP_LIST_REQUEST", raw, REQ_TIMEOUT)
     }
 
     /**
@@ -83,15 +83,14 @@ object AppListSyncManager {
                 } catch (_: Exception) {}
             }
 
-            val resp = JSONObject().apply {
+            val raw = JSONObject().apply {
                 put("type", "APP_LIST_RESPONSE")
                 put("scope", scope)
                 put("total", appArray.length())
                 put("apps", appArray)
                 put("time", System.currentTimeMillis())
             }.toString()
-
-            sendAppListResponse(deviceManager, sourceDevice, resp)
+            sendAppListResponse(deviceManager, sourceDevice, raw)
             Logger.d(TAG, "已响应应用列表：${sourceDevice.displayName}，共${appArray.length()}项")
         } catch (e: Exception) {
             Logger.e(TAG, "处理应用列表请求失败", e)

@@ -1,6 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.superisland
 
 import android.content.Context
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
 import notifyrelay.base.util.Logger
@@ -293,11 +294,11 @@ object RemoteMediaSessionManager {
         val device = currentDevice ?: return
 
         try {
-            val request = JSONObject().apply {
+            val raw = JSONObject().apply {
                 put("type", "MEDIA_CONTROL")
                 put("action", action)
-            }
-            ProtocolSender.sendEncrypted(deviceManager, device, "DATA_MEDIA_CONTROL", request.toString())
+            }.toString()
+            ProtocolSender.sendEncrypted(deviceManager, device, "DATA_MEDIA_CONTROL", raw)
             Logger.i("RemoteMediaSessionManager", "已发送媒体控制指令: $action 到 ${device.displayName}")
         } catch (e: Exception) {
             Logger.e("RemoteMediaSessionManager", "发送媒体控制指令失败", e)

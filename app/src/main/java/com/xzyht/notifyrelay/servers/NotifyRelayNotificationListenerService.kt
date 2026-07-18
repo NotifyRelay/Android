@@ -89,7 +89,6 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                         break
                     }
                 }
-            } else {
             }
         }
         
@@ -123,7 +122,6 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 // 超级岛相关通知被移除，关闭对应的浮窗条目
                 Logger.i(TAG, "超级岛相关通知被移除，关闭对应的浮窗条目: id=${sbn.id}, channelId=$channelId")
                 FloatingReplicaManager.closeByNotificationId(sbn.id)
-            } else {
             }
         } else {
             // 普通通知被移除时，从已处理缓存中移除，允许下次重新处理
@@ -406,13 +404,13 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         // 当开关开启且检测到超级岛数据时，只发送超级岛分支，不再走普通通知转发
         val superIslandHandledAndStop: Boolean = if (superIslandEnabled) {
             try {
-                val superData = SuperIslandManager.extractSuperIslandData(sbn, applicationContext)
-                if (superData != null) {
-                    Logger.i(TAG, "超级岛: 检测到超级岛数据，准备转发，pkg=${superData.sourcePackage}, title=${superData.title}")
-                    superData.sourcePackage?.let { LocalSuperIslandTracker.markActive(it) }
-
-                    // 过滤本应用的超级岛通知，不进行转发
-                    if (sbn.packageName != applicationContext.packageName) {
+                if (sbn.packageName == applicationContext.packageName) {
+                    false
+                } else {
+                    val superData = SuperIslandManager.extractSuperIslandData(sbn, applicationContext)
+                    if (superData != null) {
+                        Logger.i(TAG, "超级岛: 检测到超级岛数据，准备转发，pkg=${superData.sourcePackage}, title=${superData.title}")
+                        superData.sourcePackage?.let { LocalSuperIslandTracker.markActive(it) }
                         try {
                             val deviceManager = this.deviceManager
                             // 不再使用包名前缀标记；通过通道头 DATA_SUPERISLAND 区分超级岛
@@ -447,11 +445,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                         } catch (e: Exception) {
                             Logger.w(TAG, "超级岛: 转发超级岛数据失败: ${e.message}")
                         }
+                        true
+                    } else {
+                        false
                     }
-                    // 已按超级岛分支处理，本条不再继续普通转发
-                    true
-                } else {
-                    false
                 }
             } catch (_: Exception) {
                 false
@@ -575,9 +572,6 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
                     for (sbn in actives) {
                         if (sbn.packageName == applicationContext.packageName) continue
-                        val isMedia = sbn.notification.category == Notification.CATEGORY_TRANSPORT
-                        if (isMedia) {
-                        }
                         processNotification(sbn, true)
                     }
                     // 定期清理过期的缓存，避免内存泄漏

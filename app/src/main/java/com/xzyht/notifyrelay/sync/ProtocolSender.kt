@@ -3,66 +3,47 @@ package com.xzyht.notifyrelay.sync
 import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withTimeout
-import java.io.OutputStreamWriter
-import java.net.InetSocketAddress
-import java.net.Socket
+import com.xzyht.notifyrelay.nativecore.NativeCore
 
 /**
  * 统一加密发送器
  *
- * 封装加密、认证检查、TCP发送与报文头拼装：
- * 最终报文格式：`<HEADER>:<localUuid>:<localPublicKey>:<encryptedPayload>\n`
+ * 通过 Rust sender queue 异步发送加密数据：
+ * - 入队后由 Rust 侧处理加密、限流、重试和去重
+ * - 返回后不保证立即发送成功
  */
 object ProtocolSender {
 
     private const val TAG = "ProtocolSender"
-    private const val DEFAULT_TIMEOUT = 10000L
 
-    /**
-     * 发送一条加密负载到指定设备。
-     * @param header 例如：DATA_JSON / DATA_ICON_REQUEST / DATA_ICON_RESPONSE / DATA_APP_LIST_REQUEST 等
-     * @param plaintext 明文 JSON 字符串
-     */
+    /** 入队结果 */
+    enum class EnqueueResult { SUCCESS, QUEUE_UNINITIALIZED, MISSING_CONTEXT, AUTH_FAILED, NATIVE_ERROR }
+
     fun sendEncrypted(
         deviceManager: DeviceConnectionManager,
         target: DeviceInfo,
         header: String,
         plaintext: String,
-        timeoutMs: Long = DEFAULT_TIMEOUT
-    ) {
-        try {
-            val auth = deviceManager.authenticatedDevices[target.uuid]
-            if (auth == null || !auth.isAccepted) {
-                //Logger.d(TAG, "设备未认证或未接受：${target.displayName}")
-                return
-            }
+        timeoutMs: Long = 10000L
+    ): EnqueueResult {
+        val auth = synchronized(deviceManager.authenticatedDevices) {
+            deviceManager.authenticatedDevices[target.uuid]
+        }
+        if (auth == null || !auth.isAccepted) return EnqueueResult.AUTH_FAILED
 
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    withTimeout(timeoutMs) {
-                        val socket = Socket()
-                        try {
-                            socket.connect(InetSocketAddress(target.ip, target.port), 5000)
-                            val writer = OutputStreamWriter(socket.getOutputStream())
-                            val encrypted = deviceManager.encryptData(plaintext, target.uuid)
-                            val payload = "$header:${deviceManager.uuid}:${deviceManager.localPublicKey}:${encrypted}"
-                            writer.write(payload + "\n")
-                            writer.flush()
-                            //Logger.d(TAG, "已发送 $header -> ${target.displayName}")
-                        } finally {
-                            try { socket.close() } catch (_: Exception) {}
-                        }
-                    }
-                } catch (e: Exception) {
-                    Logger.w(TAG, "发送失败 $header -> ${target.displayName}", e)
-                }
-            }
+        val queuePtr = NativeCore.senderQueuePtr
+        if (queuePtr == 0L) {
+            Logger.w(TAG, "发送队列未初始化，丢弃消息: $header -> ${target.displayName}")
+            return EnqueueResult.QUEUE_UNINITIALIZED
+        }
+
+        val ctx = deviceManager.rustContextInternal ?: return EnqueueResult.MISSING_CONTEXT
+        return try {
+            NativeCore.enqueueMessage(ctx, queuePtr, target.uuid, header, plaintext, null)
+            EnqueueResult.SUCCESS
         } catch (e: Exception) {
-            Logger.e(TAG, "发送异常: $header", e)
+            Logger.w(TAG, "入队失败 $header -> ${target.displayName}", e)
+            EnqueueResult.NATIVE_ERROR
         }
     }
 }

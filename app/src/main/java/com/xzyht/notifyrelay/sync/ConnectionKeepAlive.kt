@@ -4,16 +4,17 @@ import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
 import com.xzyht.notifyrelay.feature.device.service.AuthInfo
-import notifyrelay.core.util.EncryptionManager
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.core.util.BatteryUtils
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.collections.iterator
+import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * 连接保活与重连策略封装：
@@ -48,60 +49,33 @@ class ConnectionKeepAlive(
 
     /**
      * 启动某个设备的心跳任务。
-     * - 每 4 秒发送一次心跳
-     * - 连续失败 5 次后触发 handleHeartbeatFailure
-     * - 锁屏时或WLAN直连模式下使用TCP心跳，否则使用UDP广播
+     * 使用 Rust heartbeat sender 发送心跳，支持动态切换 TCP/UDP 模式。
      */
     fun startHeartbeatToDevice(uuid: String, initialIp: String, initialPort: Int, sharedSecret: String) {
-        heartbeatJobs[uuid]?.cancel()
+        stopHeartbeatToDevice(uuid)
+
+        val ctx = deviceManager.rustContextInternal ?: return
+        val batteryLevel = BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+        val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
+        val battery = if (isCharging) batteryLevel else -batteryLevel
+        val displayName = deviceManager.localDisplayNameInternal()
+        val mode = if (shouldUseTcpHeartbeat()) 1L else 0L
+
+        val handle = NativeCore.startHeartbeatSender(ctx, deviceManager.uuid, displayName, battery, "android", initialIp, 4000L, mode.toInt())
+        heartbeatJobs[uuid] = handle
         heartbeatedDevices.add(uuid)
-        //Logger.d("死神-NotifyRelay", "[KeepAlive] startHeartbeatToDevice: uuid=$uuid, ip=$initialIp, port=$initialPort")
+    }
 
-        val job = scope.launch {
-            var failCount = 0
-            val maxFail = 5
-            while (true) {
-                var success = false
-                try {
-                    val info = deviceManager.getDeviceInfoInternal(uuid)
-                    val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[uuid] }
-                    val targetIp = info?.ip ?: auth?.lastIp ?: initialIp
-                    val targetPort = info?.port ?: auth?.lastPort ?: initialPort
-
-                    // 判断是否需要使用TCP心跳：锁屏时或WLAN直连模式下使用TCP
-                    val useTcpHeartbeat = shouldUseTcpHeartbeat()
-
-                    if (useTcpHeartbeat && targetIp.isNotEmpty() && targetIp != "0.0.0.0") {
-                        // TCP心跳：向对方主动建立TCP连接发送心跳
-                        success = HeartbeatSender.sendTcpHeartbeat(
-                            deviceManager,
-                            DeviceInfo(uuid, info?.displayName ?: auth?.displayName ?: "已认证设备", targetIp, targetPort)
-                        )
-                    } else {
-                        // UDP广播心跳
-                        success = try {
-                            DiscoveryBroadcaster.sendBroadcast(deviceManager)
-                        } catch (e: Exception) {
-                            false
-                        }
-                    }
-                } catch (e: Exception) {
-                    //Logger.d("死神-NotifyRelay", "[KeepAlive] 心跳发送失败: $uuid, ${e.message}")
-                }
-
-                if (success) {
-                    failCount = 0
-                } else {
-                    failCount++
-                    if (failCount >= maxFail) {
-                        handleHeartbeatFailure(uuid)
-                        break
-                    }
-                }
-                delay(4000)
-            }
+    private fun stopHeartbeatToDevice(uuid: String) {
+        val ctx = deviceManager.rustContextInternal
+        val handle = heartbeatJobs[uuid]
+        if (ctx != null && handle != null) {
+            try {
+                NativeCore.stopHeartbeatSender(ctx, handle)
+            } catch (_: Exception) {}
         }
-        heartbeatJobs[uuid] = job
+        heartbeatJobs.remove(uuid)
+        heartbeatedDevices.remove(uuid)
     }
 
     /**
@@ -132,9 +106,7 @@ class ConnectionKeepAlive(
      */
     fun handleHeartbeatFailure(uuid: String) {
         Logger.w("死神-NotifyRelay", "[KeepAlive] 心跳连续失败5次，自动停止心跳并尝试重连: $uuid")
-        heartbeatJobs[uuid]?.cancel()
-        heartbeatJobs.remove(uuid)
-        heartbeatedDevices.remove(uuid)
+        stopHeartbeatToDevice(uuid)
 
         scope.launch {
             val info = deviceManager.getDeviceInfoInternal(uuid)
@@ -209,75 +181,51 @@ class ConnectionKeepAlive(
         var lastException: Exception? = null
 
         for (retry in 0 until maxRetries) {
+            var deferred: kotlinx.coroutines.CompletableDeferred<Boolean>? = null
             try {
-                val resp = HandshakeSender.sendHandshake(deviceManager, device, 3000)
-                //Logger.d("死神-NotifyRelay", "connectToDevice: handshake resp=$resp")
+                val ctx = deviceManager.rustContextInternal
+                if (ctx == null) return Pair(false, "未初始化")
+                val batteryLevel = BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+                val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
+                val battery = if (isCharging) batteryLevel else -batteryLevel
+                val localIp = NativeCore.getLocalIp() ?: "0.0.0.0"
+                deferred = deviceManager.registerHandshakeWaiter(device.uuid)
+                val sendOk = NativeCore.sendHandshake(ctx, deviceManager.uuid, deviceManager.localPublicKey, localIp, device.ip, battery, "android")
 
-                if (resp != null && resp.startsWith("ACCEPT:")) {
-                    val parts = resp.split(":")
-                    if (parts.size >= 3) {
-                        val remotePubKey = parts[2]
-                        val sharedSecret = EncryptionManager.generateSharedSecret(
-                            deviceManager.contextInternal,
-                            deviceManager.localPublicKey,
-                            remotePubKey
-                        )
-                        EncryptionManager.importAesKeyToKeystore(
-                            deviceManager.contextInternal,
-                            device.uuid,
-                            sharedSecret
-                        )
-                        synchronized(authenticatedDevices) {
-                            authenticatedDevices.remove(device.uuid)
-                            authenticatedDevices[device.uuid] = AuthInfo(
-                                remotePubKey,
-                                "",
-                                true,
-                                device.displayName,
-                                device.ip,
-                                device.port
-                            )
-                            deviceManager.saveAuthedDevicesInternal()
-                        }
-                        synchronized(deviceManager.deviceInfoCacheInternal) {
-                            deviceManager.deviceInfoCacheInternal[device.uuid] = device
-                        }
-                        //Logger.d("死神-NotifyRelay", "认证成功，启动心跳: uuid=${device.uuid}, ip=${device.ip}, port=${device.port}")
-                        startHeartbeatToDevice(device.uuid, device.ip, device.port, sharedSecret)
-                        deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
-                        try {
-                            scope.launch {
-                                deviceManager.updateDeviceListInternal()
+                if (sendOk == 0) {
+                    val handshakeResult = withTimeoutOrNull(5000) { deferred.await() }
+                    when (handshakeResult) {
+                        true -> {
+                            startHeartbeatToDevice(device.uuid, device.ip, device.port, "")
+                            synchronized(deviceManager.deviceLastSeenInternal) {
+                                deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
                             }
-                        } catch (_: Exception) {}
+                            try {
+                                scope.launch { deviceManager.updateDeviceListInternal() }
+                            } catch (_: Exception) {}
 
-                        if (device.uuid != deviceManager.uuid) {
-                            val myInfo = deviceManager.getDeviceInfoInternal(deviceManager.uuid)
-                            if (myInfo != null) {
-                                if (!heartbeatedDevices.contains(device.uuid)) {
-                                    //Logger.d("死神-NotifyRelay", "认证成功后自动反向connectToDevice: myInfo=$myInfo, peer=${device.uuid}")
+                            if (device.uuid != deviceManager.uuid) {
+                                val myInfo = deviceManager.getDeviceInfoInternal(deviceManager.uuid)
+                                if (myInfo != null && !heartbeatedDevices.contains(device.uuid)) {
                                     deviceManager.connectToDevice(myInfo)
-                                } else {
-                                    //Logger.d("死神-NotifyRelay", "对方已建立心跳，不再反向connectToDevice: peer=${device.uuid}")
                                 }
-                            } else {
-                                //Logger.d("死神-NotifyRelay", "本机getDeviceInfo返回null，无法反向connectToDevice")
                             }
+                            return Pair(true, null)
                         }
-                        return Pair(true, null)
-                    } else {
-                        //Logger.d("死神-NotifyRelay", "认证响应格式错误: $resp")
-                        return Pair(false, "认证响应格式错误")
+                        false -> {
+                            lastException = UnsupportedOperationException("对方拒绝连接")
+                            if (retry < maxRetries - 1) delay(1000)
+                        }
+                        null -> {
+                            lastException = UnsupportedOperationException("握手超时")
+                            if (retry < maxRetries - 1) delay(1000)
+                        }
                     }
-                } else if (resp != null && resp.startsWith("REJECT:")) {
-                    //Logger.d("死神-NotifyRelay", "对方拒绝连接: uuid=${device.uuid}")
-                    return Pair(false, "对方拒绝连接")
                 } else {
-                    //Logger.d("死神-NotifyRelay", "认证失败: resp=$resp")
-                    return Pair(false, "认证失败")
+                    lastException = UnsupportedOperationException("发送握手失败")
+                    if (retry < maxRetries - 1) delay(1000)
                 }
             } catch (e: UnsupportedOperationException) {
-                // 格式不匹配：无需重试，直接提示用户升级
                 val ctx = deviceManager.contextInternal
                 val displayName = device.displayName
                 android.os.Handler(android.os.Looper.getMainLooper()).post {
@@ -287,10 +235,11 @@ class ConnectionKeepAlive(
                 return Pair(false, e.message)
             } catch (e: Exception) {
                 lastException = e
-                //Logger.d("死神-NotifyRelay", "connectToDevice重试 $retry 失败: ${e.message}")
                 if (retry < maxRetries - 1) {
                     delay(1000)
                 }
+            } finally {
+                deferred?.let { deviceManager.cancelHandshakeWaiter(device.uuid, it) }
             }
         }
 

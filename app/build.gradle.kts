@@ -9,8 +9,6 @@ plugins {
     id("com.google.devtools.ksp") version "2.3.6"
     id("kotlin-parcelize")
 }
-// 使用 buildSrc 的 JGit 实现计算版本信息（避免启动外部进程，兼容 configuration-cache）
-// （注意：版本信息在下面会被再次计算；避免重复定义同名 top-level 属性以消除编译歧义）
 
 
 
@@ -131,7 +129,7 @@ android {
             // 只在包含 Release 任务时启用分包，否则只 universal
             isEnable = gradle.startParameter.taskNames.any { it.contains("Release") }
             reset()
-            include("armeabi-v7a", "arm64-v8a", "x86", "x86_64")
+            include("arm64-v8a", "x86_64")
             isUniversalApk = true
         }
     }
@@ -233,6 +231,8 @@ dependencies {
     implementation(project(":superislandui"))
     // 依赖scrcpy模块
     implementation(project(":scrcpy"))
+    // 依赖nativecore模块（Rust FFI 绑定 + JNA）
+    implementation(project(":nativecore"))
 }
 
 tasks.register("printVersionName") {

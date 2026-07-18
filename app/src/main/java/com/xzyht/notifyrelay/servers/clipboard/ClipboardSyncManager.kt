@@ -339,11 +339,12 @@ object ClipboardSyncManager {
      * 构建剪贴板JSON消息
      */
     private fun buildClipboardJsonString(type: String, content: String, time: Long): String {
-        return JSONObject().apply {
+        val raw = JSONObject().apply {
             put("clipboardType", type)
             put("content", content)
             put("time", time)
         }.toString()
+        return raw
     }
     
     /**

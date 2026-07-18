@@ -13,6 +13,7 @@ import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import github.xzynine.superislandui.common.SuperIslandProtocol
 import github.xzynine.superislandui.common.SuperIslandProtocol.PayloadOptions
 import github.xzynine.superislandui.diff.DiffSystem
@@ -24,7 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Semaphore
 import org.json.JSONObject
-import java.security.MessageDigest
+import com.sun.jna.Pointer
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicInteger
 
@@ -50,11 +51,10 @@ object MessageSender {
     private val MAX_CONCURRENT_SUPERISLAND_SENDS = 3
     private val superSendSemaphore = Semaphore(MAX_CONCURRENT_SUPERISLAND_SENDS)
     private val activeSuperSends = AtomicInteger(0)
-    // 去重集合：防止同一设备、同一数据在未完成前被重复入队
-    private val pendingKeys = ConcurrentHashMap.newKeySet<String>()
-    // 已发送记录（带 TTL），防止短时间内重复发送已成功发送的通知
-    private const val SENT_KEY_TTL_MS = 3_000L // 3秒内视为已发送，避免重复
-    private val sentKeys = ConcurrentHashMap<String, Long>()
+    // 去重 TTL
+    private const val SENT_KEY_TTL_MS = 3_000L
+    // Rust dedup 上下文缓存（首次使用时赋值）
+    private var dedupCtx: Pointer? = null
 
     // 跟踪每个设备下每个会话的上次完整状态与全量发送时间
     private val lastStatePerDevice = mutableMapOf<String, MutableMap<String, DiffSystem.State>>()
@@ -118,13 +118,14 @@ object MessageSender {
         CoroutineScope(Dispatchers.IO).launch {
             processSuperIslandSendQueue()
         }
-        // 定期清理已发送记录，避免内存无限增长
+        // 定期清理 Rust 侧去重记录
         CoroutineScope(Dispatchers.IO).launch {
             while (true) {
                 try {
-                    val now = System.currentTimeMillis()
-                    val toRemove = sentKeys.entries.filter { now - it.value > SENT_KEY_TTL_MS }.map { it.key }
-                    toRemove.forEach { sentKeys.remove(it) }
+                    val ctx = dedupCtx
+                    if (ctx != null) {
+                        NativeCore.dedupCleanup(ctx, System.currentTimeMillis(), SENT_KEY_TTL_MS)
+                    }
                 } catch (_: Exception) {}
                 delay(10_000L)
             }
@@ -179,8 +180,9 @@ object MessageSender {
                 try {
                     sendNotificationDataWithRetry(task)
                 } finally {
-                    // 任务结束，移除去重键
-                    pendingKeys.remove(task.dedupKey)
+                    task.deviceManager.rustContextInternal?.let { ctx ->
+                        NativeCore.dedupClearPending(ctx, task.dedupKey)
+                    }
                     sendSemaphore.release()
                     activeSends.decrementAndGet()
                 }
@@ -229,7 +231,9 @@ object MessageSender {
                 } catch (_: Exception) { "DATA_NOTIFICATION" }
                 ProtocolSender.sendEncrypted(task.deviceManager, task.device, header, task.data, 10000L)
                 success = true
-                try { sentKeys[task.dedupKey] = System.currentTimeMillis() } catch (_: Exception) {}
+                task.deviceManager.rustContextInternal?.let { ctx ->
+                    NativeCore.dedupMarkSent(ctx, task.dedupKey)
+                }
                 
                 if (header == "DATA_MEDIAPLAY") {
                     try {
@@ -335,16 +339,15 @@ object MessageSender {
 
             // 构建标准 JSON 格式的消息
             val pkgName: String = context.packageName
-            val json = JSONObject().apply {
+            val raw = JSONObject().apply {
                 put("packageName", pkgName)
                 put("appName", "NotifyRelay")
                 put("title", "聊天测试")
                 put("text", message)
                 put("time", System.currentTimeMillis())
             }.toString()
-
             allDevices.forEach { device ->
-                enqueueNotification(device, json, deviceManager, "聊天")
+                enqueueNotification(device, raw, deviceManager, "聊天")
             }
 
             // 记录到聊天历史
@@ -427,10 +430,8 @@ object MessageSender {
                         PayloadOptions.MEDIA_DELTA
                     )
                 }
-
-                if (enqueueNotification(deviceInfo, payloadObj.toString(), deviceManager, "媒体播放")) {
-                    commitDiffState(deviceInfo.uuid, featureId, state, now, effectiveType == "FULL")
-                }
+                val raw = payloadObj.toString()
+                enqueueNotification(deviceInfo, raw, deviceManager, "媒体播放")
             }
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放通知失败", e)
@@ -444,13 +445,17 @@ object MessageSender {
     private fun enqueueNotification(
         deviceInfo: DeviceInfo, json: String, deviceManager: DeviceConnectionManager, tag: String = ""
     ): Boolean {
-        val dedupKey = buildDedupKey(deviceInfo.uuid, json)
-        val lastSent = sentKeys[dedupKey]
-        if (lastSent != null && System.currentTimeMillis() - lastSent <= SENT_KEY_TTL_MS) return false
-        if (!pendingKeys.add(dedupKey)) return false
+        val ctx = deviceManager.rustContextInternal
+        if (ctx == null) {
+            Logger.w(TAG, "Rust 未初始化，跳过入队: ${deviceInfo.displayName}")
+            return false
+        }
+        dedupCtx = ctx
+        val dedupKey = NativeCore.computeDedupKey(deviceInfo.uuid, json) ?: return false
+        if (!NativeCore.dedupCheckAndPend(ctx, dedupKey, SENT_KEY_TTL_MS)) return false
         CoroutineScope(Dispatchers.IO).launch {
             try { sendChannel.send(SendTask(deviceInfo, json, deviceManager, dedupKey = dedupKey)) }
-            catch (e: Exception) { pendingKeys.remove(dedupKey); Logger.e(TAG, "加入${tag}发送队列失败: ${deviceInfo.displayName}", e) }
+            catch (e: Exception) { NativeCore.dedupClearPending(ctx, dedupKey); Logger.e(TAG, "加入${tag}发送队列失败: ${deviceInfo.displayName}", e) }
         }
         return true
     }
@@ -508,7 +513,6 @@ object MessageSender {
         deviceManager: DeviceConnectionManager
     ) {
         try {
-            // 获取所有已认证设备
             val authenticatedDevices = getAuthenticatedDevices(deviceManager)
 
             if (authenticatedDevices.isEmpty()) {
@@ -520,7 +524,7 @@ object MessageSender {
             val isLocked = PermissionHelper.isDeviceLocked(context)
 
             // 构建标准 JSON 格式的通知数据
-            val json = JSONObject().apply {
+            val raw = JSONObject().apply {
                 put("packageName", packageName)
                 put("appName", appName ?: packageName)
                 put("title", title ?: "")
@@ -528,9 +532,8 @@ object MessageSender {
                 put("time", time)
                 put("isLocked", isLocked)
             }.toString()
-
             authenticatedDevices.forEach { deviceInfo ->
-                enqueueNotification(deviceInfo, json, deviceManager, "通知")
+                enqueueNotification(deviceInfo, raw, deviceManager, "通知")
             }
 
             Logger.i(TAG, "通知已加入队列，共 ${authenticatedDevices.size} 个设备，当前活跃发送: ${activeSends.get()}")
@@ -646,12 +649,13 @@ object MessageSender {
                         synchronized(siPendingAcks) { map[featureId] = PendingAck(h, System.currentTimeMillis()) }
                     }
                 } catch (_: Exception) {}
-                val task = SuperIslandTask(deviceInfo, payloadObj.toString(), deviceManager)
-                val now = System.currentTimeMillis()
+                val raw = payloadObj.toString()
+                val task = SuperIslandTask(deviceInfo, raw, deviceManager)
+
                 CoroutineScope(Dispatchers.IO).launch {
                     try {
                         superIslandSendChannel.send(task)
-                        commitDiffState(deviceInfo.uuid, featureId, newState, now, dd.type == "FULL")
+                        commitDiffState(deviceInfo.uuid, featureId, newState, System.currentTimeMillis(), dd.type == "FULL")
                     } catch (e: Exception) {
                         Logger.e("超级岛", "超级岛: 加入超级岛发送队列失败：${deviceInfo.displayName}", e)
                     }
@@ -833,13 +837,4 @@ object MessageSender {
         return !message.isNullOrBlank()
     }
 
-    // 根据设备UUID与数据内容构建去重键（SHA-256）
-    private fun buildDedupKey(deviceUuid: String, data: String): String {
-        val digest = MessageDigest.getInstance("SHA-256").digest((deviceUuid + "|" + data).toByteArray())
-        return digest.joinToString(separator = "") { byte ->
-            val v = (byte.toInt() and 0xFF)
-            val s = v.toString(16)
-            if (s.length == 1) "0$s" else s
-        }
-    }
 }

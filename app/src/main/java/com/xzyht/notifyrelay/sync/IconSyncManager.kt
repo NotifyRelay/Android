@@ -197,7 +197,7 @@ object IconSyncManager {
         sourceDevice: DeviceInfo
     ) {
         if (packages.size == 0) return
-        val json = JSONObject().apply {
+        val raw = JSONObject().apply {
             put("type", "ICON_REQUEST")
             if (packages.size == 1) {
                 put("packageName", packages.first())
@@ -206,7 +206,7 @@ object IconSyncManager {
             }
             put("time", System.currentTimeMillis())
         }.toString()
-        ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_REQUEST", json, ICON_REQUEST_TIMEOUT)
+        ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_REQUEST", raw, ICON_REQUEST_TIMEOUT)
         //Logger.d(TAG, "发送ICON_REQUEST(${packages.size}) -> ${sourceDevice.displayName}")
     }
 
@@ -252,7 +252,7 @@ object IconSyncManager {
                 }
                 
                 // 构建响应，包含可用图标和缺失图标信息
-                val resp = JSONObject().apply { 
+                val raw = JSONObject().apply { 
                     put("type", "ICON_RESPONSE")
                     if (resultArr.length() > 0) {
                         put("icons", resultArr)
@@ -265,13 +265,13 @@ object IconSyncManager {
                 
                 Logger.d(TAG, "批量图标响应准备发送，包含 ${resultArr.length()} 个图标，${missingArr.length()} 个缺失图标")
                 // 发送响应，即使没有可用图标，也要通知请求方哪些图标缺失
-                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", resp, ICON_REQUEST_TIMEOUT)
+                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, ICON_REQUEST_TIMEOUT)
                 Logger.d(TAG, "批量图标响应已发送(${resultArr.length()}) -> ${sourceDevice.displayName}")
             } else if (single.isNotEmpty()) {
                 val icon = runBlocking {
                     getLocalAppIcon(context, single)
                 }
-                val resp = JSONObject().apply { 
+                val raw = JSONObject().apply { 
                     put("type", "ICON_RESPONSE")
                     put("packageName", single)
                     if (icon != null) {
@@ -284,7 +284,7 @@ object IconSyncManager {
                 
                 Logger.d(TAG, "单图标响应准备发送，包名：$single，${if (icon != null) "有图标" else "无图标"}")
                 // 发送响应，即使没有图标，也要通知请求方
-                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", resp, ICON_REQUEST_TIMEOUT)
+                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, ICON_REQUEST_TIMEOUT)
                 Logger.d(TAG, "单图标响应已发送：$single -> ${sourceDevice.displayName}")
             }
         } catch (e: Exception) {
@@ -370,13 +370,10 @@ object IconSyncManager {
     }
 
     private suspend fun getLocalAppIcon(context: Context, packageName: String): Bitmap? {
-        // packageName 应为实际应用包名
-        val actualPackageName = packageName
-
         return try {
-            AppRepository.getAppIconAsync(context, actualPackageName) ?: run {
+            AppRepository.getAppIconAsync(context, packageName) ?: run {
                 val pm = context.packageManager
-                val appInfo = pm.getApplicationInfo(actualPackageName, 0)
+                val appInfo = pm.getApplicationInfo(packageName, 0)
                 val drawable = pm.getApplicationIcon(appInfo)
                 if (drawable is BitmapDrawable) {
                     drawable.bitmap

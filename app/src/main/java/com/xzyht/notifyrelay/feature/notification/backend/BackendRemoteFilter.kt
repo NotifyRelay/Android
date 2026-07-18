@@ -1,21 +1,29 @@
 package com.xzyht.notifyrelay.feature.notification.backend
 
 import android.content.Context
-import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
+import com.sun.jna.Pointer
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import org.json.JSONArray
+import org.json.JSONObject
 
 /**
  * 后端接收通知过滤器
  * 处理从远程设备接收的通知的过滤逻辑
+ * 过滤决策委托给 Rust NativeCore
  */
 object BackendRemoteFilter {
+
+    /** Rust 上下文指针，由 DeviceConnectionManager 创建时设置 */
+    var rustContext: Pointer? = null
 
     // 结构化协程作用域，替代 GlobalScope
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -59,7 +67,7 @@ object BackendRemoteFilter {
 
     /**
      * 过滤远程通知
-     * 包含包名映射、智能去重（先发送后撤回机制）、黑白名单/对等模式
+     * 包含包名映射（Rust）、智能去重、黑白名单/对等模式（Rust）
      */
     fun filterRemoteNotification(data: String, context: Context): FilterResult {
         // 确保配置已加载（只加载一次）
@@ -68,56 +76,40 @@ object BackendRemoteFilter {
                 try {
                     RemoteFilterConfig.load(context)
                     RemoteFilterConfig.isLoaded = true
-                    //Logger.d("NotifyRelay(狂鼠)", "远程过滤配置加载成功")
+                    rustContext?.let { ctx ->
+                        val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
+                        RemoteFilterConfig.syncToRust(ctx, installedPkgs)
+                    }
                 } catch (e: Exception) {
                     Logger.e("NotifyRelay(狂鼠)", "远程过滤配置加载失败", e)
-                    return FilterResult(true, "", "", "", data) // 默认通过
+                    return FilterResult(true, "", "", "", data)
                 }
             }
         }
         try {
             val json = org.json.JSONObject(data)
-            var pkg = json.optString("packageName")
+            val pkg = json.optString("packageName")
             val title = json.optString("title")
             val text = json.optString("text")
             val isLocked = json.optBoolean("isLocked", false)
 
-            //Logger.d("NotifyRelay(狂鼠)智能去重", "收到远程通知 - 时间:$time, 包名:$pkg, 标题:$title, 内容:$text, 锁屏:$isLocked")
-
             val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
             val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg, installedPkgs)
 
-            //Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 开始过滤 pkg=$pkg, mappedPkg=$mappedPkg, title=$title, text=$text")
-
-            // 对等模式过滤
-            if (RemoteFilterConfig.filterMode == "peer" || RemoteFilterConfig.enablePeerMode) {
+            // 对等模式过滤（保持 Kotlin 实现）
+            if (RemoteFilterConfig.enablePeerMode) {
                 if (mappedPkg !in installedPkgs) {
-                    //Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 对等模式过滤 - mappedPkg=$mappedPkg 不在本机已安装应用")
                     return FilterResult(false, mappedPkg, title, text, data)
                 }
-                //Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 对等模式通过 - mappedPkg=$mappedPkg 已安装")
             }
 
-            // 黑白名单过滤
-            if (RemoteFilterConfig.filterMode == "black" || RemoteFilterConfig.filterMode == "white") {
-                val match = RemoteFilterConfig.filterList.any { (filterPkg, keyword) ->
-                    val pkgMatch = (mappedPkg == filterPkg || pkg == filterPkg)
-                    val keywordMatch = keyword.isNullOrBlank() || title.contains(keyword) || text.contains(keyword)
-                    val totalMatch = pkgMatch && keywordMatch
-                    if (totalMatch) {
-                        //Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 名单匹配 - filterPkg=$filterPkg, keyword=$keyword, pkgMatch=$pkgMatch, keywordMatch=$keywordMatch")
-                    }
-                    totalMatch
-                }
-                if (RemoteFilterConfig.filterMode == "black" && match) {
-                    //Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 命中黑名单 - filtered=$match mappedPkg=$mappedPkg title=$title text=$text")
+            // 黑白名单过滤 — 委托给 Rust Core（含关键词匹配）
+            val filterMode = RemoteFilterConfig.filterMode
+            if (filterMode == "black" || filterMode == "white") {
+                val pass = RemoteFilterConfig.checkFilterWithRust(mappedPkg, title, text)
+                if (!pass) {
                     return FilterResult(false, mappedPkg, title, text, data)
                 }
-                if (RemoteFilterConfig.filterMode == "white" && !match) {
-                    //Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 未命中白名单 - mappedPkg=$mappedPkg title=$title text=$text")
-                    return FilterResult(false, mappedPkg, title, text, data)
-                }
-                //Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 名单过滤通过 - mode=${RemoteFilterConfig.filterMode}, match=$match")
             }
 
             // 锁屏通知过滤
@@ -219,33 +211,24 @@ object BackendRemoteFilter {
     }
 
     /**
-     * 检查内存中的重复通知（优化性能）
+     * 检查内存中的重复通知 — 使用 Rust shouldDeduplicate 比较文本相似度
      */
     private fun checkDuplicateInMemory(localList: List<NotificationRecord>, title: String, text: String, now: Long): Boolean {
-        val timeWindowNotifications = mutableListOf<NotificationRecord>()
         var hasDuplicate = false
 
         for (notification in localList) {
             try {
-                // 去除标题中的应用名称前缀再比较
-                val normalizedLocalTitle = normalizeTitle(notification.title ?: "")
-                val normalizedPendingTitle = normalizeTitle(title)
-                val match = notification.device == "本机" && normalizedLocalTitle == normalizedPendingTitle && (notification.text ?: "") == text
-                // 只要内容匹配即可，不检查时间
-                val finalMatch = match
-                if (finalMatch) {
+                if (notification.device != "本机") continue
+                val oldTitle = normalizeTitle(notification.title ?: "")
+                val oldText = notification.text ?: ""
+                val newTitle = normalizeTitle(title)
+                if (NativeCore.shouldDeduplicate(newTitle, text, oldTitle, oldText)) {
                     hasDuplicate = true
-                }
-                // 收集时间区间内的所有通知（用于调试）
-                if (Math.abs(notification.time - now) <= 5000) {
-                    timeWindowNotifications.add(notification)
                 }
             } catch (e: Exception) {
                 Logger.e("智能去重", "内存检查异常", e)
             }
         }
-
-        //Logger.d("智能去重", "内存检查完成 - 历史数量:${localList.size}, 是否重复:$hasDuplicate")
 
         return hasDuplicate
     }
@@ -563,7 +546,12 @@ object RemoteFilterConfig {
             StorageManager.putBoolean(context, "enable_lock_screen_only", enableLockScreenOnly, StorageManager.PrefsType.FILTER)
             StorageManager.putStringSet(context, KEY_FILTER_LIST, filterList.map { it.first + (it.second?.let { k->"|"+k } ?: "") }.toSet(), StorageManager.PrefsType.FILTER)
 
-            //Logger.d("RemoteFilterConfig", "Configuration saved successfully")
+            // 保存后立即同步到 Rust 侧
+            val ctx = BackendRemoteFilter.rustContext
+            if (ctx != null) {
+                val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
+                syncToRust(ctx, installedPkgs)
+            }
         } catch (e: Exception) {
             Logger.e("RemoteFilterConfig", "Failed to save configuration", e)
         }
@@ -580,22 +568,77 @@ object RemoteFilterConfig {
         }
     }
 
-    // 包名映射：返回本地等价包名
-    fun mapToLocalPackage(pkg: String, installedPkgs: Set<String>): String {
-        for (group in packageGroups) {
-            if (pkg in group) {
-                // 优先本机已安装且有效的包名，按组中顺序尝试
-                for (candidatePkg in group) {
-                    if (candidatePkg in installedPkgs) {
-                        //Logger.d("NotifyRelay(狂鼠)", "mapToLocalPackage: 尝试包名 $candidatePkg")
-                        return candidatePkg
-                    }
-                }
-                // 如果没有已安装的包名，则取第一个（用于显示原始包名）
-                //Logger.d("NotifyRelay(狂鼠)", "mapToLocalPackage: 无已安装包名，使用组第一个 ${group.first()}")
-                return group.first()
+    /** 将当前配置同步到 Rust Core */
+    fun syncToRust(ctx: Pointer, installedPkgs: Set<String>): Boolean {
+        val json = buildRustConfigJson(installedPkgs)
+        return NativeCore.setFilterConfig(ctx, json) == 0
+    }
+
+    /** 构建 Rust nrc_set_filter_config 所需的 JSON */
+    private fun buildRustConfigJson(installedPkgs: Set<String>): String {
+        val root = JSONObject()
+
+        root.put("enablePackageGroupMapping", enablePackageGroupMapping)
+
+        // 包名组：使用连续索引
+        val pkgGroupsArr = JSONArray()
+        val enabledMap = JSONObject()
+        var groupIdx = 0
+        for ((i, group) in defaultPackageGroups.withIndex()) {
+            val enabled = defaultGroupEnabled.getOrNull(i) ?: true
+            if (enabled) {
+                val g = JSONObject()
+                g.put("groupName", "group_$groupIdx")
+                g.put("packages", JSONArray(group))
+                pkgGroupsArr.put(g)
+                enabledMap.put("group_$groupIdx", true)
+                groupIdx++
             }
         }
-        return pkg
+        for ((i, group) in customPackageGroups.withIndex()) {
+            val enabled = customGroupEnabled.getOrNull(i) ?: true
+            if (enabled) {
+                val g = JSONObject()
+                g.put("groupName", "group_$groupIdx")
+                g.put("packages", JSONArray(group))
+                pkgGroupsArr.put(g)
+                enabledMap.put("group_$groupIdx", true)
+                groupIdx++
+            }
+        }
+        root.put("packageGroups", pkgGroupsArr)
+        root.put("groupEnabled", enabledMap)
+
+        // 过滤模式
+        val filterModeNum = when (filterMode) {
+            "white" -> 1
+            "black" -> 2
+            else -> 0
+        }
+        root.put("filterMode", filterModeNum)
+
+        // 黑白名单
+        val filterListArr = JSONArray()
+        for ((pkg, keyword) in filterList) {
+            filterListArr.put(if (keyword != null) "$pkg|$keyword" else pkg)
+        }
+        root.put("filterList", filterListArr)
+
+        root.put("enablePeerMode", enablePeerMode)
+        root.put("installedPackages", JSONArray(installedPkgs.toList()))
+
+        return root.toString()
+    }
+
+    /** 包名映射 — 委托给 Rust Core */
+    fun mapToLocalPackage(pkg: String, installedPkgs: Set<String>): String {
+        val ctx = BackendRemoteFilter.rustContext ?: return pkg
+        return NativeCore.mapLocalPackage(ctx, pkg) ?: pkg
+    }
+
+    /** 检查过滤模式（含关键词匹配）— 委托给 Rust Core */
+    fun checkFilterWithRust(pkg: String, title: String, text: String): Boolean {
+        val ctx = BackendRemoteFilter.rustContext ?: return true
+        return NativeCore.filterNotification(ctx, pkg, title, text)
     }
 }

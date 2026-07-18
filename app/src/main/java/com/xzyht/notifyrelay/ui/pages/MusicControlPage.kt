@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.feature.notification.superisland.MediaMessageReceiveMode
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.servers.MediaControlUtil
@@ -277,9 +278,13 @@ fun MusicControlPage() {
                             ToastUtils.showShortToast(context, "已发送上一首指令到本机")
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                            val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"previous\"}"
-                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
-                            ToastUtils.showShortToast(context, "已发送上一首指令到${selectedDevice.displayName}")
+                            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"previous\"}"
+                            val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
+                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
+                                ToastUtils.showShortToast(context, "已发送上一首指令到${selectedDevice.displayName}")
+                            } else {
+                                ToastUtils.showShortToast(context, "发送上一首指令失败")
+                            }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "发送上一首指令失败", e)
@@ -300,9 +305,13 @@ fun MusicControlPage() {
                             ToastUtils.showShortToast(context, "已发送播放/暂停指令到本机")
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                            val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"playPause\"}"
-                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
-                            ToastUtils.showShortToast(context, "已发送播放/暂停指令到${selectedDevice.displayName}")
+                            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"playPause\"}"
+                            val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
+                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
+                                ToastUtils.showShortToast(context, "已发送播放/暂停指令到${selectedDevice.displayName}")
+                            } else {
+                                ToastUtils.showShortToast(context, "发送播放/暂停指令失败")
+                            }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "发送播放/暂停指令失败", e)
@@ -323,9 +332,13 @@ fun MusicControlPage() {
                             ToastUtils.showShortToast(context, "已发送下一首指令到本机")
                         } else {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                            val request = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"next\"}"
-                            ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", request)
-                            ToastUtils.showShortToast(context, "已发送下一首指令到${selectedDevice.displayName}")
+                            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"next\"}"
+                            val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
+                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
+                                ToastUtils.showShortToast(context, "已发送下一首指令到${selectedDevice.displayName}")
+                            } else {
+                                ToastUtils.showShortToast(context, "发送下一首指令失败")
+                            }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "发送下一首指令失败", e)
