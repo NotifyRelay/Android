@@ -35,6 +35,17 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install cargo-ndk
+        run: cargo install cargo-ndk
+
+      - name: Add Rust targets for Android
+        run: rustup target add aarch64-linux-android x86_64-linux-android
+
       - name: Decode keystore into app module
         run: |
           echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
