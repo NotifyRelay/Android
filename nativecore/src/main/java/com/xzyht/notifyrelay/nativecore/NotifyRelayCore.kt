@@ -34,26 +34,11 @@ interface NotifyRelayCore : Library {
     fun nrc_set_user_data(ctx: Pointer, userData: Pointer)
 
     // ======== Callback interfaces ========
-    interface OnHandshakeCb : Callback {
-        fun invoke(uuid: Pointer?, pubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)
-    }
-    interface OnPairingInitCb : Callback {
-        fun invoke(uuid: Pointer?, tmpPubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)
-    }
-    interface OnPairingRespCb : Callback {
-        fun invoke(uuid: Pointer?, spake2Pub: Pointer?, ltPub: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)
-    }
-    interface OnAcceptCb : Callback {
-        fun invoke(uuid: Pointer?, ltPubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?)
-    }
-    interface OnRejectCb : Callback {
-        fun invoke(uuid: Pointer?, userData: Pointer?)
-    }
-    interface OnHeartbeatTcpCb : Callback {
-        fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?)
+    interface OnPairingCb : Callback {
+        fun invoke(uuid: Pointer?, messageType: Pointer?, data: Pointer?, intValue: Int, extra: Pointer?, userData: Pointer?)
     }
     interface OnDataCb : Callback {
-        fun invoke(localUuid: Pointer?, plaintext: Pointer?, userData: Pointer?)
+        fun invoke(uuid: Pointer?, messageType: Pointer?, plaintext: Pointer?, userData: Pointer?)
     }
     interface OnLogCb : Callback {
         fun invoke(level: Int, message: Pointer?)
@@ -64,18 +49,12 @@ interface NotifyRelayCore : Library {
     interface OnDeviceTimeoutCb : Callback {
         fun invoke(uuid: Pointer?, userData: Pointer?)
     }
-    interface OnPairingResultCb : Callback {
-        fun invoke(uuid: Pointer?, success: Int, errorMsg: Pointer?, userData: Pointer?)
-    }
 
     // ======== Device timeout ========
     fun nrc_set_on_device_timeout_cb(ctx: Pointer, cb: OnDeviceTimeoutCb?)
 
     // ======== Dedup engine ========
-    fun nrc_dedup_check_and_pend(ctx: Pointer, dedupKey: String, ttlMs: Long): Int
-    fun nrc_dedup_mark_sent(ctx: Pointer, dedupKey: String)
-    fun nrc_dedup_clear_pending(ctx: Pointer, dedupKey: String)
-    fun nrc_dedup_cleanup(ctx: Pointer, nowMs: Long, ttlMs: Long)
+    fun nrc_dedup(ctx: Pointer, action: Int, dedupKey: String, arg1Ms: Long, arg2Ms: Long): Int
 
     // ======== Utility functions ========
     fun nrc_compute_dedup_key(deviceUuid: String, data: String): Pointer
@@ -103,27 +82,9 @@ interface NotifyRelayCore : Library {
 
     // ======== Callback setters ========
     fun nrc_set_log_callback(cb: OnLogCb?)
-    fun nrc_set_on_handshake_cb(ctx: Pointer, cb: OnHandshakeCb?)
-    fun nrc_set_on_pairing_init_cb(ctx: Pointer, cb: OnPairingInitCb?)
-    fun nrc_set_on_pairing_resp_cb(ctx: Pointer, cb: OnPairingRespCb?)
-    fun nrc_set_on_accept_cb(ctx: Pointer, cb: OnAcceptCb?)
-    fun nrc_set_on_reject_cb(ctx: Pointer, cb: OnRejectCb?)
-    fun nrc_set_on_heartbeat_tcp_cb(ctx: Pointer, cb: OnHeartbeatTcpCb?)
-    fun nrc_set_on_notification_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_media_play_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_icon_request_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_icon_response_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_app_list_request_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_app_list_response_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_media_control_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_ftp_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_clipboard_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_status_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_app_launch_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_superisland_cb(ctx: Pointer, cb: OnDataCb?)
-    fun nrc_set_on_unknown_data_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_pairing_cb(ctx: Pointer, cb: OnPairingCb?)
+    fun nrc_set_on_data_cb(ctx: Pointer, cb: OnDataCb?)
     fun nrc_set_on_heartbeat_udp_cb(ctx: Pointer, cb: OnHeartbeatUdpCb?)
-    fun nrc_set_on_pairing_result_cb(ctx: Pointer, cb: OnPairingResultCb?)
 
     // ======== Send functions ========
     fun nrc_send_handshake(ctx: Pointer, uuid: String, pubKey: String, localIp: String, targetIp: String, battery: Int, deviceType: String): Int
@@ -136,7 +97,6 @@ interface NotifyRelayCore : Library {
     fun nrc_clear_pairing_code(ctx: Pointer)
     fun nrc_validate_pairing_code(ctx: Pointer, code: String): Int
     fun nrc_send_reject(ctx: Pointer, uuid: String)
-    fun nrc_send_heartbeat_tcp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
     fun nrc_send_heartbeat_udp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
     fun nrc_send_discovery(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
     fun nrc_send_data_message(ctx: Pointer, header: String, localUuid: String, localPubKey: String, remoteUuid: String, plaintext: String)
@@ -160,7 +120,6 @@ interface NotifyRelayCore : Library {
     fun nrc_start_tcp_server(ctx: Pointer, port: Short): Int
     fun nrc_stop_tcp_server(ctx: Pointer): Int
     fun nrc_restart_udp_listener(ctx: Pointer): Int
-    fun nrc_send_to_device(ctx: Pointer, uuid: String, message: String): Int
     fun nrc_broadcast_message(ctx: Pointer, message: String): Int
     fun nrc_get_connected_device_count(ctx: Pointer): Int
     fun nrc_is_device_connected(ctx: Pointer, uuid: String): Int

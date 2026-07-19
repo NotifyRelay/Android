@@ -124,7 +124,7 @@ object MessageSender {
                 try {
                     val ctx = dedupCtx
                     if (ctx != null) {
-                        NativeCore.dedupCleanup(ctx, System.currentTimeMillis(), SENT_KEY_TTL_MS)
+                        NativeCore.dedup(ctx, 3, "", System.currentTimeMillis(), SENT_KEY_TTL_MS)
                     }
                 } catch (_: Exception) {}
                 delay(10_000L)
@@ -181,7 +181,7 @@ object MessageSender {
                     sendNotificationDataWithRetry(task)
                 } finally {
                     task.deviceManager.rustContextInternal?.let { ctx ->
-                        NativeCore.dedupClearPending(ctx, task.dedupKey)
+                        NativeCore.dedup(ctx, 2, task.dedupKey, 0L, 0L)
                     }
                     sendSemaphore.release()
                     activeSends.decrementAndGet()
@@ -232,7 +232,7 @@ object MessageSender {
                 ProtocolSender.sendEncrypted(task.deviceManager, task.device, header, task.data, 10000L)
                 success = true
                 task.deviceManager.rustContextInternal?.let { ctx ->
-                    NativeCore.dedupMarkSent(ctx, task.dedupKey)
+                    NativeCore.dedup(ctx, 1, task.dedupKey, 0L, 0L)
                 }
                 
                 if (header == "DATA_MEDIAPLAY") {
@@ -452,10 +452,10 @@ object MessageSender {
         }
         dedupCtx = ctx
         val dedupKey = NativeCore.computeDedupKey(deviceInfo.uuid, json) ?: return false
-        if (!NativeCore.dedupCheckAndPend(ctx, dedupKey, SENT_KEY_TTL_MS)) return false
+        if (NativeCore.dedup(ctx, 0, dedupKey, SENT_KEY_TTL_MS, 0L) == 0) return false
         CoroutineScope(Dispatchers.IO).launch {
             try { sendChannel.send(SendTask(deviceInfo, json, deviceManager, dedupKey = dedupKey)) }
-            catch (e: Exception) { NativeCore.dedupClearPending(ctx, dedupKey); Logger.e(TAG, "加入${tag}发送队列失败: ${deviceInfo.displayName}", e) }
+            catch (e: Exception) { NativeCore.dedup(ctx, 2, dedupKey, 0L, 0L); Logger.e(TAG, "加入${tag}发送队列失败: ${deviceInfo.displayName}", e) }
         }
         return true
     }

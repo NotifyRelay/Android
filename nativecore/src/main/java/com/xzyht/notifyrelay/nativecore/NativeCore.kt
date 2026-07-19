@@ -97,9 +97,6 @@ object NativeCore {
     fun validatePairingCode(ctx: Pointer, code: String): Int =
         lib.nrc_validate_pairing_code(ctx, code)
 
-    fun sendHeartbeatTcp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String) =
-        lib.nrc_send_heartbeat_tcp(ctx, uuid, name, port, battery, deviceType)
-
     fun sendHeartbeatUdp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String) =
         lib.nrc_send_heartbeat_udp(ctx, uuid, name, port, battery, deviceType)
 
@@ -120,17 +117,8 @@ object NativeCore {
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_feature_id_simple(packageName, title, text))
 
     // ======== Dedup engine ========
-    fun dedupCheckAndPend(ctx: Pointer, dedupKey: String, ttlMs: Long): Boolean =
-        lib.nrc_dedup_check_and_pend(ctx, dedupKey, ttlMs) != 0
-
-    fun dedupMarkSent(ctx: Pointer, dedupKey: String) =
-        lib.nrc_dedup_mark_sent(ctx, dedupKey)
-
-    fun dedupClearPending(ctx: Pointer, dedupKey: String) =
-        lib.nrc_dedup_clear_pending(ctx, dedupKey)
-
-    fun dedupCleanup(ctx: Pointer, nowMs: Long, ttlMs: Long) =
-        lib.nrc_dedup_cleanup(ctx, nowMs, ttlMs)
+    fun dedup(ctx: Pointer, action: Int, dedupKey: String, arg1Ms: Long = 0L, arg2Ms: Long = 0L): Int =
+        lib.nrc_dedup(ctx, action, dedupKey, arg1Ms, arg2Ms)
 
     // ======== Text similarity & dedup ========
     fun textSimilarity(a: String, b: String): Double =
