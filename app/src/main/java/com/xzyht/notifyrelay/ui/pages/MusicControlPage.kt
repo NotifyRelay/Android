@@ -61,6 +61,9 @@ fun MusicControlPage() {
     // 胶囊歌词开关状态
     var capsuleLyricsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "capsule_lyrics_enabled")) }
     
+    // 发送媒体通知到对端
+    var sendMediaNotificationsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "send_media_notifications_enabled", true)) }
+    
 
 
     Column(
@@ -228,6 +231,33 @@ fun MusicControlPage() {
                 onCheckedChange = { enabled ->
                     capsuleLyricsEnabled = enabled
                     StorageManager.putBoolean(context, "capsule_lyrics_enabled", enabled)
+                }
+            )
+        }
+        
+        // 发送媒体通知到对端
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "发送媒体通知到它端",
+                    style = textStyles.body1,
+                    color = colorScheme.onSurface
+                )
+                Text(
+                    text = "关闭后不再发送媒体通知到对端",
+                    style = textStyles.body2,
+                    color = colorScheme.onSurfaceSecondary
+                )
+            }
+            Switch(
+                checked = sendMediaNotificationsEnabled,
+                onCheckedChange = { enabled ->
+                    sendMediaNotificationsEnabled = enabled
+                    StorageManager.putBoolean(context, "send_media_notifications_enabled", enabled)
                 }
             )
         }
