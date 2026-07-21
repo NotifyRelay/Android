@@ -566,6 +566,20 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         startOfflineDeviceCleaner()
         discoveryManager.registerNetworkCallback()
         startWifiDirectReconnectionChecker()
+        // 启动 mDNS 广告和发现
+        startMdnsServices()
+    }
+
+    private fun startMdnsServices() {
+        try {
+            val ctx = rustContext ?: return
+            val displayName = getLocalDisplayName()
+            NativeCore.startMdnsAdvertiser(ctx, uuid, displayName, listenPort.toShort(), localPublicKey, "android")
+            NativeCore.startMdnsDiscovery(ctx)
+            Logger.d("死神-NotifyRelay", "mDNS 服务已启动")
+        } catch (e: Exception) {
+            Logger.e("死神-NotifyRelay", "启动 mDNS 服务失败", e)
+        }
     }
 
     // 统一设备状态管理：3秒未发现未认证设备直接移除，已认证设备置灰
@@ -1331,17 +1345,18 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
         // ---- on_heartbeat_udp ----
         val heartbeatUdpCb = object : NotifyRelayCore.OnHeartbeatUdpCb {
-            override fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?) {
+            override fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?) {
                 val dm = _callbackInstance ?: return
                 val remoteUuid = ptr2str(uuid) ?: return
                 val remoteName = ptr2str(name) ?: return
                 val remoteDeviceType = ptr2str(deviceType) ?: "unknown"
-                val ip = "0.0.0.0"
+                val srcIp = ptr2str(ip)
+                val resolvedIp = if (srcIp.isNullOrBlank() || srcIp == "0.0.0.0") "0.0.0.0" else srcIp
                 try {
                     val info = HeartbeatProcessor.HeartbeatInfo(
                         uuid = remoteUuid, displayName = remoteName,
                         port = port.toInt(), batteryLevel = kotlin.math.abs(battery),
-                        isCharging = battery >= 0, deviceType = remoteDeviceType, ip = ip
+                        isCharging = battery >= 0, deviceType = remoteDeviceType, ip = resolvedIp
                     )
                     if (info.uuid != dm.uuid) {
                         HeartbeatProcessor.processHeartbeat(info, dm)
@@ -1353,6 +1368,30 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
         lib.nrc_set_on_heartbeat_udp_cb(ctx, heartbeatUdpCb); rustCallbackRefs.add(heartbeatUdpCb)
 
+        // ---- on_mdns_discovered ----
+        val mdnsDiscoveredCb = object : NotifyRelayCore.OnMdnsDiscoveredCb {
+            override fun invoke(uuid: Pointer?, name: Pointer?, ip: Pointer?, port: Short, deviceType: Pointer?, userData: Pointer?) {
+                val dm = _callbackInstance ?: return
+                val remoteUuid = ptr2str(uuid) ?: return
+                val remoteName = ptr2str(name) ?: return
+                val remoteIp = ptr2str(ip) ?: "0.0.0.0"
+                val remoteDeviceType = ptr2str(deviceType) ?: "unknown"
+                try {
+                    val info = HeartbeatProcessor.HeartbeatInfo(
+                        uuid = remoteUuid, displayName = remoteName,
+                        port = port.toInt(), batteryLevel = -1,
+                        isCharging = false, deviceType = remoteDeviceType, ip = remoteIp
+                    )
+                    if (info.uuid != dm.uuid) {
+                        HeartbeatProcessor.processHeartbeat(info, dm)
+                    }
+                } catch (e: Exception) {
+                    Logger.e("CoreCb", "on_mdns_discovered error", e)
+                }
+            }
+        }
+        lib.nrc_set_on_mdns_discovered_cb(ctx, mdnsDiscoveredCb); rustCallbackRefs.add(mdnsDiscoveredCb)
+
         // ---- on_device_timeout (设备心跳超时回调) ----
         val deviceTimeoutCb = object : NotifyRelayCore.OnDeviceTimeoutCb {
             override fun invoke(uuidPtr: Pointer?, userData: Pointer?) {
@@ -1363,6 +1402,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
         }
         lib.nrc_set_on_device_timeout_cb(ctx, deviceTimeoutCb); rustCallbackRefs.add(deviceTimeoutCb)
+
+        // ---- 日志回调（接入 Logger.CURRENT_LEVEL 等级控制） ----
+        NativeCore.setLogCallback(ctx)
     }
 
     // 辅助方法：发送媒体控制响应（由回调使用）

@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.nativecore
 
 import android.util.Log
 import com.sun.jna.Pointer
+import notifyrelay.base.util.Logger as AppLogger
 
 object NativeCore {
     private const val TAG = "NativeCore"
@@ -228,6 +229,19 @@ object NativeCore {
     fun getLocalIp(): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_local_ip())
 
+    // ======== mDNS ========
+    fun startMdnsAdvertiser(ctx: Pointer, uuid: String, name: String, port: Short, pubkey: String, deviceType: String): Int =
+        lib.nrc_start_mdns_advertiser(ctx, uuid, name, port, pubkey, deviceType)
+
+    fun stopMdnsAdvertiser(ctx: Pointer): Int =
+        lib.nrc_stop_mdns_advertiser(ctx)
+
+    fun startMdnsDiscovery(ctx: Pointer): Int =
+        lib.nrc_start_mdns_discovery(ctx)
+
+    fun stopMdnsDiscovery(ctx: Pointer): Int =
+        lib.nrc_stop_mdns_discovery(ctx)
+
     // ======== Discovery ========
     fun addKnownDevice(ctx: Pointer, uuid: String, ip: String) =
         lib.nrc_add_known_device(ctx, uuid, ip)
@@ -318,6 +332,27 @@ object NativeCore {
 
     fun setContext(ctx: Pointer?) { _rustContext = ctx }
     fun getContext(): Pointer? = _rustContext
+
+    // ======== Log callback ========
+    private var logCallbackRef: Any? = null
+
+    fun setLogCallback(ctx: Pointer) {
+        val cb = object : NotifyRelayCore.OnLogCb {
+            override fun invoke(level: Int, message: Pointer?) {
+                val msg = NotifyRelayCore.ptrToString(message) ?: return
+                    when (level) {
+                        1 -> AppLogger.e("Rust", msg)
+                        2 -> AppLogger.w("Rust", msg)
+                        3 -> AppLogger.i("Rust", msg)
+                        4 -> AppLogger.d("Rust", msg)
+                        5 -> AppLogger.v("Rust", msg)
+                        else -> AppLogger.d("Rust", msg)
+                    }
+            }
+        }
+        lib.nrc_set_log_callback(cb)
+        logCallbackRef = cb
+    }
 
     // ======== Version ========
     fun getGitHash(): String? =

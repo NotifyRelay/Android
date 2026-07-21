@@ -44,7 +44,10 @@ interface NotifyRelayCore : Library {
         fun invoke(level: Int, message: Pointer?)
     }
     interface OnHeartbeatUdpCb : Callback {
-        fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
+        fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?)
+    }
+    interface OnMdnsDiscoveredCb : Callback {
+        fun invoke(uuid: Pointer?, name: Pointer?, ip: Pointer?, port: Short, deviceType: Pointer?, userData: Pointer?)
     }
     interface OnDeviceTimeoutCb : Callback {
         fun invoke(uuid: Pointer?, userData: Pointer?)
@@ -194,6 +197,13 @@ interface NotifyRelayCore : Library {
     fun nrc_set_on_device_connected_cb(ctx: Pointer, cb: OnDeviceConnectedCb?)
     fun nrc_set_on_device_disconnected_cb(ctx: Pointer, cb: OnDeviceDisconnectedCb?)
     fun nrc_set_on_tcp_error_cb(ctx: Pointer, cb: OnTcpErrorCb?)
+    fun nrc_set_on_mdns_discovered_cb(ctx: Pointer, cb: OnMdnsDiscoveredCb?)
+
+    // ======== mDNS ========
+    fun nrc_start_mdns_advertiser(ctx: Pointer, uuid: String, name: String, port: Short, pubkey: String, deviceType: String): Int
+    fun nrc_stop_mdns_advertiser(ctx: Pointer): Int
+    fun nrc_start_mdns_discovery(ctx: Pointer): Int
+    fun nrc_stop_mdns_discovery(ctx: Pointer): Int
 
     companion object {
         private val _instance: NotifyRelayCore by lazy(LazyThreadSafetyMode.SYNCHRONIZED) {
