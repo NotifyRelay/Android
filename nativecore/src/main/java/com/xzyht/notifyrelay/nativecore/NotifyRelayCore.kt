@@ -50,6 +50,22 @@ interface NotifyRelayCore : Library {
         fun invoke(uuid: Pointer?, userData: Pointer?)
     }
 
+    // ======== Audio stream ========
+    interface OnAudioDataCb : Callback {
+        fun invoke(deviceUuid: Pointer?, pcmData: Pointer?, pcmLen: Int, sampleRate: Int, channels: Int, userData: Pointer?)
+    }
+
+    interface OnAudioEventCb : Callback {
+        fun invoke(deviceUuid: Pointer?, event: Pointer?, errorMsg: Pointer?, userData: Pointer?)
+    }
+
+    fun nrc_audio_start(ctx: Pointer, direction: String, deviceIp: String, port: Int, sampleRate: Int, channels: Int, remoteUuid: String): Int
+    fun nrc_audio_write_frame(ctx: Pointer, pcmData: ByteArray, pcmLen: Int): Int
+    fun nrc_audio_stop(ctx: Pointer): Int
+    fun nrc_register_audio_data_cb(ctx: Pointer, cb: OnAudioDataCb?)
+    fun nrc_register_audio_event_cb(ctx: Pointer, cb: OnAudioEventCb?)
+    fun nrc_audio_is_active(ctx: Pointer): Int
+
     // ======== Device timeout ========
     fun nrc_set_on_device_timeout_cb(ctx: Pointer, cb: OnDeviceTimeoutCb?)
 

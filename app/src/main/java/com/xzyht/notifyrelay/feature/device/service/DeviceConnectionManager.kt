@@ -5,6 +5,7 @@ import android.os.Environment
 import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
+import com.xzyht.notifyrelay.feature.audio.AudioRelayPlayer
 import com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.servers.MediaControlUtil
@@ -525,6 +526,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         try {
             rustContext = NativeCore.createContext()
             BackendRemoteFilter.rustContext = rustContext
+            NativeCore.setContext(rustContext)
             val ctx = rustContext!!
             val savedStateEnc = StorageManager.getString(context, "rust_core_state")
             if (savedStateEnc.isNotEmpty()) {
@@ -1221,16 +1223,36 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                 "previous" -> try { MediaControlUtil.previous(); sendMediaControlResponse(uuid, "previous", "success", null) }
                                 catch (e: Exception) { sendMediaControlResponse(uuid, "previous", "error", e.message) }
                                 "audioRequest" -> {
-                                    val device = resolveDeviceInfo(uuid, "", 23333)
-                                    val ok = device?.let { AudioForwardingService.startAudioForwarding(context, it.ip, ScrcpyDefaults.ADB_PORT, it.displayName) } == true
-                                    val result = if (ok) "accepted" else "rejected"
-                                    val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"$result\"}"
-                                    device?.let { ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_MEDIA_CONTROL", raw) }
+                                    val relayMode = StorageManager.getInt(context, "audio_relay_mode", 0)
+                                    if (relayMode == 1) {
+                                        // 中继模式：Rust 内部自动发控制消息
+                                        val device = resolveDeviceInfo(uuid, "", 23333)
+                                        device?.let {
+                                            audioRelayPlayer.start("send", deviceIp = it.ip, remoteUuid = uuid)
+                                        }
+                                    } else {
+                                        // scrcpy 模式：现有逻辑
+                                        val device = resolveDeviceInfo(uuid, "", 23333)
+                                        val ok = device?.let { AudioForwardingService.startAudioForwarding(context, it.ip, ScrcpyDefaults.ADB_PORT, it.displayName) } == true
+                                        val result = if (ok) "accepted" else "rejected"
+                                        val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"$result\"}"
+                                        device?.let { ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_MEDIA_CONTROL", raw) }
+                                    }
                                 }
                                 "audioResponse" -> {
                                     if (json.optString("result", "rejected") != "accepted") {
                                         coroutineScope.launch { notifyrelay.base.util.ToastUtils.showShortToast(context, "音频转发请求被拒绝") }
                                     }
+                                }
+                                "audioStart" -> {
+                                    val sr = json.optInt("sampleRate", 48000)
+                                    val ch = json.optInt("channels", 2)
+                                    val device = resolveDeviceInfo(uuid, "", 23333)
+                                    val ip = device?.ip ?: ""
+                                    audioRelayPlayer.start("recv", sr, ch, deviceIp = ip, remoteUuid = uuid)
+                                }
+                                "audioStop" -> {
+                                    audioRelayPlayer.stop()
                                 }
                             }
                         }
@@ -1594,6 +1616,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         } catch (_: Exception) {
         }
     }
+
+    val audioRelayPlayer = AudioRelayPlayer()
 
     // 新增：WLAN直连定期重连检查器
     private fun startWifiDirectReconnectionChecker() {

@@ -7,6 +7,8 @@ object NativeCore {
     private const val TAG = "NativeCore"
     val lib = NotifyRelayCore.instance()
 
+    private var _rustContext: Pointer? = null
+
     // 网络层新特性的内部状态
     var senderQueuePtr: Long = 0L
         private set
@@ -15,9 +17,14 @@ object NativeCore {
     var reconnectStatePtr: Long = 0L
         private set
 
-    fun createContext(): Pointer = lib.nrc_init()
+    fun createContext(): Pointer {
+        val ctx = lib.nrc_init()
+        _rustContext = ctx
+        return ctx
+    }
     fun destroyContext(ctx: Pointer) {
         lib.nrc_destroy(ctx)
+        if (_rustContext == ctx) _rustContext = null
         senderQueuePtr = 0L
         offlineDetectorHandle = 0L
         reconnectStatePtr = 0L
@@ -255,6 +262,62 @@ object NativeCore {
 
     fun reconnectStop(ctx: Pointer, statePtr: Long) =
         lib.nrc_reconnect_stop(ctx, statePtr)
+
+    // ======== Audio stream ========
+    private var audioDataCallback: ((ByteArray, Int, Int) -> Unit)? = null
+    private var audioDataCallbackRef: Any? = null
+    private var audioEventCallbackRef: Any? = null
+
+    fun registerAudioDataCallback(cb: (ByteArray, Int, Int) -> Unit) {
+        audioDataCallback = cb
+    }
+
+    fun audioStart(direction: String, deviceIp: String, port: Int, sampleRate: Int, channels: Int, remoteUuid: String = ""): Int {
+        val ctx = getContext() ?: return -1
+        setupAudioCallbacks()
+        return lib.nrc_audio_start(ctx, direction, deviceIp, port, sampleRate, channels, remoteUuid)
+    }
+
+    fun audioWriteFrame(pcmData: ByteArray): Int {
+        val ctx = getContext() ?: return -1
+        return lib.nrc_audio_write_frame(ctx, pcmData, pcmData.size)
+    }
+
+    fun audioStop(): Int {
+        val ctx = getContext() ?: return -1
+        return lib.nrc_audio_stop(ctx)
+    }
+
+    fun audioIsActive(): Boolean {
+        val ctx = getContext() ?: return false
+        return lib.nrc_audio_is_active(ctx) != 0
+    }
+
+    private fun setupAudioCallbacks() {
+        if (audioDataCallbackRef != null) return
+        val dataCb = object : NotifyRelayCore.OnAudioDataCb {
+            override fun invoke(deviceUuid: Pointer?, pcmData: Pointer?, pcmLen: Int, sampleRate: Int, channels: Int, userData: Pointer?) {
+                if (pcmData == null || pcmLen <= 0) return
+                val arr = pcmData.getByteArray(0, pcmLen)
+                audioDataCallback?.invoke(arr, sampleRate, channels)
+            }
+        }
+        val eventCb = object : NotifyRelayCore.OnAudioEventCb {
+            override fun invoke(deviceUuid: Pointer?, event: Pointer?, errorMsg: Pointer?, userData: Pointer?) {
+                val evt = event?.getString(0, "UTF-8") ?: "null"
+                val err = errorMsg?.getString(0, "UTF-8") ?: ""
+                Log.d(TAG, "音频事件: $evt, 错误: $err")
+            }
+        }
+        val ctx = getContext() ?: return
+        lib.nrc_register_audio_data_cb(ctx, dataCb)
+        lib.nrc_register_audio_event_cb(ctx, eventCb)
+        audioDataCallbackRef = dataCb
+        audioEventCallbackRef = eventCb
+    }
+
+    fun setContext(ctx: Pointer?) { _rustContext = ctx }
+    fun getContext(): Pointer? = _rustContext
 
     // ======== Version ========
     fun getGitHash(): String? =
