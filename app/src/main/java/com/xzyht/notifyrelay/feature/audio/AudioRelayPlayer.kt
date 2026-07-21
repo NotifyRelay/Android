@@ -83,7 +83,12 @@ class AudioRelayPlayer {
 
     fun stop() {
         isRunning = false
-        NativeCore.audioStop()
+        audioJob?.cancel()
+        audioJob = null
+        audioScope = null
+        try {
+            NativeCore.audioStop()
+        } catch (_: Exception) {}
         try {
             audioTrack?.stop()
         } catch (_: Exception) {}
@@ -91,8 +96,6 @@ class AudioRelayPlayer {
             audioTrack?.release()
         } catch (_: Exception) {}
         audioTrack = null
-        audioJob?.cancel()
-        audioScope = null
     }
 
     val isActive: Boolean

@@ -1271,11 +1271,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                     }
                                 }
                                 "audioStart" -> {
-                                    val sr = json.optInt("sampleRate", 48000)
-                                    val ch = json.optInt("channels", 2)
-                                    val device = resolveDeviceInfo(uuid, "", 23333)
-                                    val ip = device?.ip ?: ""
-                                    audioRelayPlayer.start("recv", sr, ch, deviceIp = ip, remoteUuid = uuid)
+                                    coroutineScope.launch {
+                                        val sr = json.optInt("sampleRate", 48000)
+                                        val ch = json.optInt("channels", 2)
+                                        val device = resolveDeviceInfo(uuid, "", 23333)
+                                        val ip = device?.ip ?: ""
+                                        audioRelayPlayer.start("recv", sr, ch, deviceIp = ip, remoteUuid = uuid)
+                                    }
                                 }
                                 "audioStop" -> {
                                     coroutineScope.launch {
