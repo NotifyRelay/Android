@@ -31,7 +31,6 @@ class AudioRelayPlayer {
                 // 接收方：连接发送方的 :23335
                 audioScope = CoroutineScope(Dispatchers.IO)
                 audioJob = audioScope?.launch {
-                    Thread.sleep(500) // 等发送方就绪
                     val ctx = NativeCore.getContext()
                     if (ctx != null) {
                         NativeCore.audioStart("recv", deviceIp, 23335, sampleRate, channels, remoteUuid)
@@ -43,9 +42,10 @@ class AudioRelayPlayer {
                 } else {
                     AudioFormat.CHANNEL_OUT_MONO
                 }
-                val bufferSize = AudioTrack.getMinBufferSize(
+                val minBuffer = AudioTrack.getMinBufferSize(
                     sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT
                 )
+                val bufferSize = (minBuffer * 4).coerceAtLeast(65536)
                 audioTrack = AudioTrack.Builder()
                     .setAudioAttributes(
                         AudioAttributes.Builder()
@@ -58,12 +58,14 @@ class AudioRelayPlayer {
                             .setSampleRate(sampleRate)
                             .setChannelMask(channelConfig).build()
                     )
-                    .setBufferSizeInBytes(bufferSize.coerceAtLeast(4096))
+                    .setBufferSizeInBytes(bufferSize)
                     .setTransferMode(AudioTrack.MODE_STREAM).build()
                 audioTrack?.play()
 
                 NativeCore.registerAudioDataCallback { pcmData, sr, ch ->
-                    audioTrack?.write(pcmData, 0, pcmData.size)
+                    try {
+                        audioTrack?.write(pcmData, 0, pcmData.size)
+                    } catch (_: Exception) {}
                 }
             }
             "send" -> {
