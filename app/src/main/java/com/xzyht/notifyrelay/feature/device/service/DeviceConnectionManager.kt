@@ -1278,7 +1278,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                     audioRelayPlayer.start("recv", sr, ch, deviceIp = ip, remoteUuid = uuid)
                                 }
                                 "audioStop" -> {
-                                    audioRelayPlayer.stop()
+                                    coroutineScope.launch {
+                                        audioRelayPlayer.stop()
+                                    }
                                 }
                             }
                         }
