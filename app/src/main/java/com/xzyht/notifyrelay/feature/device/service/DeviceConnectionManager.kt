@@ -1056,14 +1056,22 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                 synchronized(dm.authenticatedDevices) {
                                     val existingAuth = dm.authenticatedDevices[uuid]
                                     if (existingAuth != null && existingAuth.publicKey != pubKey) {
-                                        NativeCore.sendReject(dm.rustContextInternal!!, dm.uuid)
+                                        val rejectCtx = dm.rustContextInternal!!
+                                        val rejectUuid = dm.uuid
+                                        dm.coroutineScopeInternal.launch { NativeCore.sendReject(rejectCtx, rejectUuid) }
                                         Logger.w("CoreCb", "已认证设备公钥变化，要求重新配对: $uuid")
                                         return
                                     }
                                 }
                                 synchronized(dm.incompatibleDevicesInternal) { dm.incompatibleDevicesInternal.remove(uuid) }
                                 val localIp = getLocalIpAddress()
-                                NativeCore.sendAccept(dm.rustContextInternal!!, dm.uuid, dm.localPublicKey, localIp, BatteryUtils.getBatteryLevel(dm.contextInternal), deviceType)
+                                val acceptCtx = dm.rustContextInternal!!
+                                val acceptUuid = dm.uuid
+                                val acceptPub = dm.localPublicKey
+                                val battery = BatteryUtils.getBatteryLevel(dm.contextInternal)
+                                dm.coroutineScopeInternal.launch {
+                                    NativeCore.sendAccept(acceptCtx, acceptUuid, acceptPub, localIp, battery, deviceType)
+                                }
                                 synchronized(dm.authenticatedDevices) {
                                     val auth = dm.authenticatedDevices[uuid]
                                     if (auth != null) {
@@ -1072,7 +1080,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                     }
                                 }
                             } else {
-                                NativeCore.sendReject(dm.rustContextInternal!!, dm.uuid)
+                                val rejectCtx = dm.rustContextInternal!!
+                                val rejectUuid = dm.uuid
+                                dm.coroutineScopeInternal.launch { NativeCore.sendReject(rejectCtx, rejectUuid) }
                             }
                         }
                         "PAIRING_INIT" -> {
@@ -1088,7 +1098,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             }
                             synchronized(dm.rejectedDevicesInternal) {
                                 if (dm.rejectedDevicesInternal.contains(uuid)) {
-                                    NativeCore.sendReject(dm.rustContextInternal!!, dm.uuid)
+                                    val rejectCtx = dm.rustContextInternal!!
+                                    val rejectUuid = dm.uuid
+                                    dm.coroutineScopeInternal.launch { NativeCore.sendReject(rejectCtx, rejectUuid) }
                                     return
                                 }
                             }
