@@ -1310,13 +1310,20 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                         val device = resolveDeviceInfo(uuid, "", 23333)
                                         val ip = device?.ip ?: ""
                                         audioRelayPlayer.start("recv", sr, ch, deviceIp = ip, remoteUuid = uuid)
-                                        showAudioRelayNotification(device?.displayName ?: ip)
+                                        showAudioRelayNotification(device?.displayName ?: ip, uuid)
                                     }
                                 }
                                 "audioStop" -> {
                                     coroutineScope.launch {
                                         audioRelayPlayer.stop()
                                         cancelAudioRelayNotification()
+                                        val device = resolveDeviceInfo(uuid, "", 23333)
+                                        if (device != null) {
+                                            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioStop\",\"result\":\"ok\"}"
+                                            try {
+                                                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, device, "DATA_MEDIA_CONTROL", raw)
+                                            } catch (_: Exception) {}
+                                        }
                                     }
                                 }
                             }
@@ -1711,6 +1718,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     }
 
     val audioRelayPlayer = AudioRelayPlayer()
+    private var currentAudioRelayUuid: String = ""
 
     private data class PendingAudioSend(
         val deviceIp: String,
@@ -1738,13 +1746,17 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     private fun startAudioRelaySend(deviceIp: String, deviceName: String, remoteUuid: String) {
         val projection = NativeCore.mediaProjection ?: return
+        currentAudioRelayUuid = remoteUuid
         audioRelayPlayer.start("send", deviceIp = deviceIp, remoteUuid = remoteUuid)
         audioRelayPlayer.startSendCapture(projection)
         showAudioRelayNotification(deviceName)
     }
 
-    private fun showAudioRelayNotification(deviceName: String) {
+    private fun showAudioRelayNotification(deviceName: String, remoteUuid: String = "") {
         ensureNotificationChannel(context)
+        if (remoteUuid.isNotEmpty()) {
+            currentAudioRelayUuid = remoteUuid
+        }
         val intent = Intent(ACTION_STOP_AUDIO_RELAY)
         val pendingIntent = PendingIntent.getBroadcast(
             context, 0, intent,
@@ -1754,6 +1766,16 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             audioRelayNotificationReceiver = object : BroadcastReceiver() {
                 override fun onReceive(ctx: Context?, intent: Intent?) {
                     if (intent?.action == ACTION_STOP_AUDIO_RELAY) {
+                        val uuid = currentAudioRelayUuid
+                        if (uuid.isNotEmpty()) {
+                            val device = resolveDeviceInfo(uuid, "", 23333)
+                            if (device != null) {
+                                val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioStop\"}"
+                                try {
+                                    ProtocolSender.sendEncrypted(this@DeviceConnectionManager, device, "DATA_MEDIA_CONTROL", raw)
+                                } catch (_: Exception) {}
+                            }
+                        }
                         audioRelayPlayer.stop()
                         cancelAudioRelayNotification()
                     }

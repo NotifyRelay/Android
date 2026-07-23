@@ -28,18 +28,21 @@ class AudioRelayPlayer {
         channels: Int = 2,
         deviceIp: String = "",
         remoteUuid: String = ""
-    ) {
-        if (isRunning) return
+    ): Boolean {
+        if (isRunning) return false
         isRunning = true
 
         when (direction) {
             "recv" -> {
-                audioScope = CoroutineScope(Dispatchers.IO)
-                audioJob = audioScope?.launch {
-                    val ctx = NativeCore.getContext()
-                    if (ctx != null) {
-                        NativeCore.audioStart("recv", deviceIp, 23335, sampleRate, channels, remoteUuid)
-                    }
+                val ctx = NativeCore.getContext()
+                if (ctx == null) {
+                    isRunning = false
+                    return false
+                }
+                val ret = NativeCore.audioStart("recv", deviceIp, 23335, sampleRate, channels, remoteUuid)
+                if (ret != 0) {
+                    isRunning = false
+                    return false
                 }
 
                 val channelConfig = if (channels == 2) {
@@ -74,15 +77,19 @@ class AudioRelayPlayer {
                 }
             }
             "send" -> {
-                audioScope = CoroutineScope(Dispatchers.IO)
-                audioJob = audioScope?.launch {
-                    val ctx = NativeCore.getContext()
-                    if (ctx != null) {
-                        NativeCore.audioStart("send", "", 23335, sampleRate, channels, remoteUuid)
-                    }
+                val ctx = NativeCore.getContext()
+                if (ctx == null) {
+                    isRunning = false
+                    return false
+                }
+                val ret = NativeCore.audioStart("send", "", 23335, sampleRate, channels, remoteUuid)
+                if (ret != 0) {
+                    isRunning = false
+                    return false
                 }
             }
         }
+        return true
     }
 
     fun startSendCapture(mediaProjection: MediaProjection, sampleRate: Int = 48000, channels: Int = 2) {
