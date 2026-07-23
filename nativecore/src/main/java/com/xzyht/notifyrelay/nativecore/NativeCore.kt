@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.nativecore
 
+import android.media.projection.MediaProjection
 import android.util.Log
 import com.sun.jna.Pointer
 import notifyrelay.base.util.Logger as AppLogger
@@ -9,6 +10,7 @@ object NativeCore {
     val lib = NotifyRelayCore.instance()
 
     private var _rustContext: Pointer? = null
+    var mediaProjection: MediaProjection? = null
 
     // 网络层新特性的内部状态
     var senderQueuePtr: Long = 0L

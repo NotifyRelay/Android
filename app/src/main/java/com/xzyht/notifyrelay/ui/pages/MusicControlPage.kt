@@ -129,9 +129,8 @@ fun MusicControlPage() {
                         val relayMode = StorageManager.getInt(context, "audio_relay_mode", 0)
                         
                         if (relayMode == 1) {
-                            // 中继模式：Rust 内部自动发控制消息，平台只传参
-                            deviceManager.audioRelayPlayer.start("send", deviceIp = selectedDevice.ip, remoteUuid = selectedDevice.uuid)
-                            ToastUtils.showShortToast(context, "已启动中继音频发送")
+                            // 中继模式：先请求 MediaProjection 授权，再启动发送
+                            deviceManager.startSendTo(selectedDevice.ip, selectedDevice.displayName, selectedDevice.uuid)
                         } else {
                             // scrcpy 模式：发送 audioRequest（现有逻辑）
                             val success = deviceManager.requestAudioForwarding(selectedDevice)

@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.ui.activity
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
@@ -58,6 +59,7 @@ import com.xzyht.notifyrelay.sync.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
@@ -139,6 +141,15 @@ class MainActivity : FragmentActivity() {
 
     private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
         recreate()
+    }
+
+    private val screenCaptureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            NativeCore.mediaProjection = mpm.getMediaProjection(result.resultCode, result.data!!)
+            DeviceConnectionManager.getInstance(this).startPendingAudioRelaySend()
+        }
+        stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -227,6 +238,12 @@ class MainActivity : FragmentActivity() {
             intent.putExtra("from", "MainActivity")
             guideLauncher.launch(intent)
             return
+        }
+
+        DeviceConnectionManager.getInstance(this).onRequestMediaProjection = {
+            startForegroundService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+            val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            screenCaptureLauncher.launch(mpm.createScreenCaptureIntent())
         }
 
         // 后台初始化，避免阻塞 UI 线程

@@ -1,7 +1,15 @@
 package com.xzyht.notifyrelay.feature.device.service
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
 import android.os.Build
 import android.os.Environment
+import androidx.core.app.NotificationCompat
 import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
@@ -98,21 +106,41 @@ data class AuthInfo(
 
 // =================== 设备连接管理器主类 ===================
 class DeviceConnectionManager(private val context: android.content.Context) {
-    // 单例实例
     companion object {
-        /**
-         * 获取单例实例
-         * 内部使用DeviceConnectionManagerSingleton确保全局唯一实例
-         */
-        fun getInstance(context: android.content.Context): DeviceConnectionManager {
-            return DeviceConnectionManagerSingleton.getDeviceManager(context)
+        private const val AUDIO_RELAY_CHANNEL_ID = "audio_relay"
+        private const val AUDIO_RELAY_NOTIFY_ID = 1001
+        private const val ACTION_STOP_AUDIO_RELAY = "com.xzyht.notifyrelay.STOP_AUDIO_RELAY"
+
+        private var stopReceiverRegistered = false
+
+        fun ensureNotificationChannel(context: android.content.Context) {
+            val channel = NotificationChannel(
+                AUDIO_RELAY_CHANNEL_ID, "音频中继", NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "音频中继服务状态"
+                setShowBadge(false)
+                enableLights(false)
+                enableVibration(false)
+            }
+            val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            nm.createNotificationChannel(channel)
         }
 
         // 静态引用，供 native 回调线程从 Rust 回调中调度到实例方法
         private var _callbackInstance: DeviceConnectionManager? = null
         internal fun getCallbackInstance(): DeviceConnectionManager? = _callbackInstance
+
+        /**
+         * 获取单例实例
+         */
+        fun getInstance(context: android.content.Context): DeviceConnectionManager {
+            return DeviceConnectionManagerSingleton.getDeviceManager(context)
+        }
     }
-    
+
+    private var audioRelayNotificationReceiver: BroadcastReceiver? = null
+    var onRequestMediaProjection: (() -> Unit)? = null
+
     // 用于比较在线设备缓存是否变化的变量
     private var lastOnlineDevicesCacheJson: String? = null
 
@@ -1254,7 +1282,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                         // 中继模式：Rust 内部自动发控制消息
                                         val device = resolveDeviceInfo(uuid, "", 23333)
                                         device?.let {
-                                            audioRelayPlayer.start("send", deviceIp = it.ip, remoteUuid = uuid)
+                                            if (NativeCore.mediaProjection != null) {
+                                                startAudioRelaySend(it.ip, it.displayName, uuid)
+                                            } else {
+                                                pendingAudioRelaySend = PendingAudioSend(it.ip, it.displayName, uuid)
+                                                onRequestMediaProjection?.invoke()
+                                            }
                                         }
                                     } else {
                                         // scrcpy 模式：现有逻辑
@@ -1277,11 +1310,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                         val device = resolveDeviceInfo(uuid, "", 23333)
                                         val ip = device?.ip ?: ""
                                         audioRelayPlayer.start("recv", sr, ch, deviceIp = ip, remoteUuid = uuid)
+                                        showAudioRelayNotification(device?.displayName ?: ip)
                                     }
                                 }
                                 "audioStop" -> {
                                     coroutineScope.launch {
                                         audioRelayPlayer.stop()
+                                        cancelAudioRelayNotification()
                                     }
                                 }
                             }
@@ -1676,6 +1711,83 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     }
 
     val audioRelayPlayer = AudioRelayPlayer()
+
+    private data class PendingAudioSend(
+        val deviceIp: String,
+        val deviceName: String,
+        val remoteUuid: String
+    )
+    private var pendingAudioRelaySend: PendingAudioSend? = null
+
+    fun startSendTo(deviceIp: String, deviceName: String, remoteUuid: String) {
+        if (NativeCore.mediaProjection != null) {
+            startAudioRelaySend(deviceIp, deviceName, remoteUuid)
+        } else {
+            pendingAudioRelaySend = PendingAudioSend(deviceIp, deviceName, remoteUuid)
+            onRequestMediaProjection?.invoke()
+        }
+    }
+
+    fun startPendingAudioRelaySend() {
+        val pending = pendingAudioRelaySend ?: return
+        pendingAudioRelaySend = null
+        if (NativeCore.mediaProjection != null) {
+            startAudioRelaySend(pending.deviceIp, pending.deviceName, pending.remoteUuid)
+        }
+    }
+
+    private fun startAudioRelaySend(deviceIp: String, deviceName: String, remoteUuid: String) {
+        val projection = NativeCore.mediaProjection ?: return
+        audioRelayPlayer.start("send", deviceIp = deviceIp, remoteUuid = remoteUuid)
+        audioRelayPlayer.startSendCapture(projection)
+        showAudioRelayNotification(deviceName)
+    }
+
+    private fun showAudioRelayNotification(deviceName: String) {
+        ensureNotificationChannel(context)
+        val intent = Intent(ACTION_STOP_AUDIO_RELAY)
+        val pendingIntent = PendingIntent.getBroadcast(
+            context, 0, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+        if (audioRelayNotificationReceiver == null) {
+            audioRelayNotificationReceiver = object : BroadcastReceiver() {
+                override fun onReceive(ctx: Context?, intent: Intent?) {
+                    if (intent?.action == ACTION_STOP_AUDIO_RELAY) {
+                        audioRelayPlayer.stop()
+                        cancelAudioRelayNotification()
+                    }
+                }
+            }
+            context.registerReceiver(
+                audioRelayNotificationReceiver,
+                IntentFilter(ACTION_STOP_AUDIO_RELAY),
+                Context.RECEIVER_EXPORTED
+            )
+        }
+        val notification = NotificationCompat.Builder(context, AUDIO_RELAY_CHANNEL_ID)
+            .setContentTitle("正在接收音频")
+            .setContentText("从 $deviceName 接收音频中")
+            .setSmallIcon(android.R.drawable.ic_media_play)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_TRANSPORT)
+            .setShowWhen(false)
+            .setRequestPromotedOngoing(true)
+            .addAction(android.R.drawable.ic_media_pause, "停止", pendingIntent)
+            .build()
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.notify(AUDIO_RELAY_NOTIFY_ID, notification)
+    }
+
+    private fun cancelAudioRelayNotification() {
+        try {
+            audioRelayNotificationReceiver?.let { context.unregisterReceiver(it) }
+        } catch (_: Exception) {}
+        audioRelayNotificationReceiver = null
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(AUDIO_RELAY_NOTIFY_ID)
+    }
 
     // 新增：WLAN直连定期重连检查器
     private fun startWifiDirectReconnectionChecker() {
