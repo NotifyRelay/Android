@@ -289,9 +289,6 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         try {
             latestMediaSbn = sbn
         } catch (_: Exception) {}
-        
-        // 检查发送媒体通知开关
-        if (!getStorageBoolean("send_media_notifications_enabled", true)) return
 
         // 初始化变量
         var finalTitle: String
@@ -351,6 +348,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 Logger.e(TAG, "在本机内生成浮窗和通知失败", e)
             }
         }
+
+        if (!getStorageBoolean("send_media_notifications_enabled", true)) return
 
         try {
             val appName = getAppName(sbn.packageName)
