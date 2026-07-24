@@ -288,10 +288,10 @@ object NativeCore {
         audioDataCallback = cb
     }
 
-    fun audioStart(direction: String, deviceIp: String, port: Int, sampleRate: Int, channels: Int, remoteUuid: String = ""): Int {
+    fun audioStart(direction: String, port: Int, sampleRate: Int, channels: Int, remoteUuid: String = ""): Int {
         val ctx = getContext() ?: return -1
         setupAudioCallbacks()
-        return lib.nrc_audio_start(ctx, direction, deviceIp, port, sampleRate, channels, remoteUuid)
+        return lib.nrc_audio_start(ctx, direction, port, sampleRate, channels, remoteUuid)
     }
 
     fun audioWriteFrame(pcmData: ByteArray): Int {

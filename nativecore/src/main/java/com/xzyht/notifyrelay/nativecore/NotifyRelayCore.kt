@@ -62,7 +62,7 @@ interface NotifyRelayCore : Library {
         fun invoke(deviceUuid: Pointer?, event: Pointer?, errorMsg: Pointer?, userData: Pointer?)
     }
 
-    fun nrc_audio_start(ctx: Pointer, direction: String, deviceIp: String, port: Int, sampleRate: Int, channels: Int, remoteUuid: String): Int
+    fun nrc_audio_start(ctx: Pointer, direction: String, port: Int, sampleRate: Int, channels: Int, remoteUuid: String): Int
     fun nrc_audio_write_frame(ctx: Pointer, pcmData: ByteArray, pcmLen: Int): Int
     fun nrc_audio_stop(ctx: Pointer): Int
     fun nrc_register_audio_data_cb(ctx: Pointer, cb: OnAudioDataCb?)

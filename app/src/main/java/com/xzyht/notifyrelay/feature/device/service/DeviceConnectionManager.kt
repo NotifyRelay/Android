@@ -1309,7 +1309,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                         val ch = json.optInt("channels", 2)
                                         val device = resolveDeviceInfo(uuid, "", 23333)
                                         val ip = device?.ip ?: ""
-                                        audioRelayPlayer.start("recv", sr, ch, deviceIp = ip, remoteUuid = uuid)
+                                        audioRelayPlayer.start("recv", sr, ch, remoteUuid = uuid)
                                         showAudioRelayNotification(device?.displayName ?: ip, uuid)
                                     }
                                 }
@@ -1747,7 +1747,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private fun startAudioRelaySend(deviceIp: String, deviceName: String, remoteUuid: String) {
         val projection = NativeCore.mediaProjection ?: return
         currentAudioRelayUuid = remoteUuid
-        audioRelayPlayer.start("send", deviceIp = deviceIp, remoteUuid = remoteUuid)
+        audioRelayPlayer.start("send", remoteUuid = remoteUuid)
         audioRelayPlayer.startSendCapture(projection)
         showAudioRelayNotification(deviceName)
     }

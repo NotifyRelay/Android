@@ -26,7 +26,6 @@ class AudioRelayPlayer {
         direction: String,
         sampleRate: Int = 48000,
         channels: Int = 2,
-        deviceIp: String = "",
         remoteUuid: String = ""
     ): Boolean {
         if (isRunning) return false
@@ -39,7 +38,7 @@ class AudioRelayPlayer {
                     isRunning = false
                     return false
                 }
-                val ret = NativeCore.audioStart("recv", deviceIp, 23335, sampleRate, channels, remoteUuid)
+                val ret = NativeCore.audioStart("recv", 23335, sampleRate, channels, remoteUuid)
                 if (ret != 0) {
                     isRunning = false
                     return false
@@ -82,7 +81,7 @@ class AudioRelayPlayer {
                     isRunning = false
                     return false
                 }
-                val ret = NativeCore.audioStart("send", "", 23335, sampleRate, channels, remoteUuid)
+                val ret = NativeCore.audioStart("send", 23335, sampleRate, channels, remoteUuid)
                 if (ret != 0) {
                     isRunning = false
                     return false
