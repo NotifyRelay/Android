@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
+import notifyrelay.base.util.Logger
 
 class AudioRelayPlayer {
 
@@ -22,6 +23,10 @@ class AudioRelayPlayer {
     private var audioJob: Job? = null
     private var captureJob: Job? = null
 
+    private var callbackFrames = 0
+    private var totalEnergy = 0L
+    private var writeErrors = 0
+
     fun start(
         direction: String,
         sampleRate: Int = 48000,
@@ -30,6 +35,9 @@ class AudioRelayPlayer {
     ): Boolean {
         if (isRunning) return false
         isRunning = true
+        callbackFrames = 0
+        totalEnergy = 0L
+        writeErrors = 0
 
         when (direction) {
             "recv" -> {
@@ -70,9 +78,14 @@ class AudioRelayPlayer {
                 audioTrack?.play()
 
                 NativeCore.registerAudioDataCallback { pcmData, sr, ch ->
+                    callbackFrames++
+                    totalEnergy += pcmData.take(200).sumOf { kotlin.math.abs(it.toInt()) }
                     try {
-                        audioTrack?.write(pcmData, 0, pcmData.size)
-                    } catch (_: Exception) {}
+                        val ret = audioTrack?.write(pcmData, 0, pcmData.size)
+                        if (ret != null && ret < 0) writeErrors++
+                    } catch (_: Exception) {
+                        writeErrors++
+                    }
                 }
             }
             "send" -> {
@@ -160,6 +173,9 @@ class AudioRelayPlayer {
             audioTrack?.release()
         } catch (_: Exception) {}
         audioTrack = null
+
+        val avgEnergy = if (callbackFrames > 0) totalEnergy / callbackFrames else 0L
+        Logger.i("AudioRelay", "会话结束: callbackFrames=$callbackFrames, avgEnergy=$avgEnergy, writeErrors=$writeErrors")
     }
 
     val isActive: Boolean
