@@ -23,6 +23,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.BuildConfig
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.ui.dialog.UpdateDialog
 import com.xzyht.notifyrelay.util.ApkArchMatcher
 import github.xzynine.checkupdata.CheckUpdateManager
@@ -135,6 +136,15 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                     }
                 },
                 modifier = Modifier.padding(horizontal = 16.dp)
+            )
+
+            Text(
+                text = "Rust Core: ${NativeCore.getGitHash() ?: "未加载"}",
+                style = textStyles.body2,
+                color = colorScheme.onSurfaceSecondary,
+                modifier = Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 4.dp)
             )
 
             Spacer(modifier = Modifier.height(8.dp))
