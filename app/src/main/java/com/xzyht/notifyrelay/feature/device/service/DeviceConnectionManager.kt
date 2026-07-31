@@ -1260,12 +1260,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                         // 中继模式：Rust 内部自动发控制消息
                                         val device = resolveDeviceInfo(uuid, "", 23333)
                                         device?.let {
-                                            if (NativeCore.mediaProjection != null) {
-                                                startAudioRelaySend(it.ip, it.displayName, uuid)
-                                            } else {
-                                                pendingAudioRelaySend = PendingAudioSend(it.ip, it.displayName, uuid)
-                                                onRequestMediaProjection?.invoke()
-                                            }
+                                            pendingAudioRelaySend = PendingAudioSend(it.ip, it.displayName, uuid)
+                                            onRequestMediaProjection?.invoke()
                                         }
                                     } else {
                                         // scrcpy 模式：现有逻辑
@@ -1663,12 +1659,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private var pendingAudioRelaySend: PendingAudioSend? = null
 
     fun startSendTo(deviceIp: String, deviceName: String, remoteUuid: String) {
-        if (NativeCore.mediaProjection != null) {
-            startAudioRelaySend(deviceIp, deviceName, remoteUuid)
-        } else {
-            pendingAudioRelaySend = PendingAudioSend(deviceIp, deviceName, remoteUuid)
-            onRequestMediaProjection?.invoke()
-        }
+        pendingAudioRelaySend = PendingAudioSend(deviceIp, deviceName, remoteUuid)
+        onRequestMediaProjection?.invoke()
     }
 
     fun startPendingAudioRelaySend() {
@@ -1711,7 +1703,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         )
     }
 
-    private fun stopAudioRelay() {
+    fun stopAudioRelay() {
         val uuid = currentAudioRelayUuid
         if (uuid.isNotEmpty()) {
             val device = resolveDeviceInfo(uuid, "", 23333)
@@ -1732,6 +1724,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         } catch (_: Exception) {}
         audioRelayNotificationReceiver = null
         com.xzyht.notifyrelay.servers.AudioRelayForegroundService.stop(context)
+        com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.stop(context)
     }
 
     // 新增：WLAN直连定期重连检查器

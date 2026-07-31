@@ -196,6 +196,7 @@ fun MusicControlPage() {
         Button(
             onClick = {
                 io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.stopAudioForwarding(context)
+                DeviceConnectionManagerSingleton.getDeviceManager(context).stopAudioRelay()
                 ToastUtils.showShortToast(context, "已停止音频转发")
             },
             modifier = Modifier.fillMaxWidth()
