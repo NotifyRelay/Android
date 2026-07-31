@@ -10,6 +10,7 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
 import notifyrelay.base.util.Logger
@@ -130,13 +131,34 @@ class AudioRelayPlayer {
 
         audioRecord?.startRecording()
 
-        val buf = ByteArray(bufferSize)
+        // 静默时补发的静音 PCM 块大小（20ms，与 Opus 帧对齐），维持 RTP 流连续
+        val bytesPerFrame = sampleRate * channels * 2 * 20 / 1000
+        val silenceChunk = ByteArray(bytesPerFrame)
+        val buf = ByteArray(bytesPerFrame)
+        val frameIntervalMs = 20L
+        var nextFrameAt = 0L
         captureJob = CoroutineScope(Dispatchers.IO).launch {
             while (isActive && isRunning) {
+                // 按实时速率节流发送（50 帧/秒），避免积压突发导致对端 UDP 缓冲溢出丢包
+                val now = System.currentTimeMillis()
+                if (nextFrameAt > now) {
+                    delay(nextFrameAt - now)
+                } else if (now - nextFrameAt > 200) {
+                    // 发送落后过多：重置节奏，避免积压导致突发
+                    nextFrameAt = now
+                }
+                nextFrameAt += frameIntervalMs
+
                 val read = audioRecord?.read(buf, 0, buf.size) ?: -1
-                if (read <= 0) break
+                if (read < 0) {
+                    Logger.w("AudioRelay", "屏幕音频捕获读取错误: $read")
+                    break
+                }
                 try {
-                    NativeCore.audioWriteFrame(buf.take(read).toByteArray())
+                    // AudioPlaybackCapture 在无音频源时 read 返回 0（正常静默），
+                    // 补发静音帧维持 RTP 流连续，等待而非终止
+                    val frame = if (read > 0) buf.take(read).toByteArray() else silenceChunk
+                    NativeCore.audioWriteFrame(frame)
                 } catch (_: Exception) {}
             }
             try {
