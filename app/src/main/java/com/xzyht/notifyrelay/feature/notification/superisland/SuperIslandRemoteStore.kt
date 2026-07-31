@@ -13,7 +13,6 @@ object SuperIslandRemoteStore {
 
     @Synchronized
     fun applyIncoming(sourceId: String, payload: JSONObject): DiffSystem.State? {
-        // 兼容：不再依赖 payload 内的 type/featureKey 字段，改为根据字段自动推断
         return try {
             // 结束包标识：存在 terminateValue 且等于约定值
             val term = payload.optString("terminateValue", "")
@@ -22,15 +21,7 @@ object SuperIslandRemoteStore {
                 return null
             }
 
-            // 差异包标识：存在 changes 字段
-            if (payload.has("changes")) {
-                val old = store[sourceId]
-                val merged = applyDelta(old, payload.optJSONObject("changes"))
-                if (merged != null) store[sourceId] = merged
-                return merged
-            }
-
-            // 其它视为全量包（兼容旧包以及首包）
+            // Rust 合并引擎已输出全量，直接解析存储
             val state = parseStateFromFull(payload)
             store[sourceId] = state
             state
@@ -108,35 +99,5 @@ object SuperIslandRemoteStore {
             }
         }
         return DiffSystem.State(title, text, p2, picsMap)
-    }
-
-    private fun applyDelta(old: DiffSystem.State?, diffObj: JSONObject?): DiffSystem.State? {
-        if (diffObj == null) return old
-        var title = old?.title
-        var text = old?.text
-        var p2 = old?.paramV2Raw
-        val pics = old?.pics?.toMutableMap() ?: mutableMapOf()
-
-        if (diffObj.has("title")) title = diffObj.optString("title", "")
-        if (diffObj.has("text")) text = diffObj.optString("text", "")
-        if (diffObj.has("param_v2_raw")) p2 = diffObj.optString("param_v2_raw", "")
-
-        val picsChanged = diffObj.optJSONObject("pics")
-        if (picsChanged != null) {
-            val it = picsChanged.keys()
-            while (it.hasNext()) {
-                val k = it.next()
-                val v = picsChanged.optString(k)
-                if (!v.isNullOrEmpty()) pics[k] = v
-            }
-        }
-        val removed = diffObj.optJSONArray("pics_removed")
-        if (removed != null) {
-            for (i in 0 until removed.length()) {
-                val k = removed.optString(i)
-                if (!k.isNullOrEmpty()) pics.remove(k)
-            }
-        }
-        return DiffSystem.State(title, text, p2, pics)
     }
 }

@@ -185,11 +185,6 @@ object SuperIslandProcessor {
 
             val merged = SuperIslandRemoteStore.applyIncoming(sourceKey, json)
 
-            val recvHash = try { json.optString("hash", "") } catch (_: Exception) { "" }
-            if (!recvHash.isNullOrEmpty()) {
-                try { manager.sendSuperIslandAckInternal(remoteUuid, recvHash, featureId, mappedPkg) } catch (_: Exception) {}
-            }
-
             val mParam2 = merged?.paramV2Raw ?: paramV2Raw
             
             // 解析 title/text 的优先级：merged > 顶层包字段 > paramV2Raw.iconTextInfo

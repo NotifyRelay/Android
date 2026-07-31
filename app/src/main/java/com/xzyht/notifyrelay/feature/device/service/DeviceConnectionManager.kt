@@ -27,7 +27,6 @@ import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
 import com.xzyht.notifyrelay.sync.notification.StatusProcessor
 import com.xzyht.notifyrelay.sync.notification.SuperIslandProcessor
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
-import github.xzynine.superislandui.common.SuperIslandProtocol
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
@@ -1650,49 +1649,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         } catch (e: Exception) {
             Logger.w("死神-NotifyRelay", "removeAuthenticatedDevice failed: ${e.message}")
             return false
-        }
-    }
-
-    // 发送超级岛ACK（包含接收的hash），用于发送方确认
-    private fun sendSuperIslandAck(remoteUuid: String?, hash: String, featureKeyValue: String?, mappedPkg: String?) {
-        try {
-            if (remoteUuid.isNullOrEmpty()) return
-            val device = getDeviceInfo(remoteUuid)
-            val auth = synchronized(authenticatedDevices) { authenticatedDevices[remoteUuid] }
-            val ip = device?.ip ?: auth?.lastIp
-            val port = device?.port ?: (auth?.lastPort ?: 23333)
-            if (ip.isNullOrEmpty() || ip == "0.0.0.0") return
-
-            // 使用DATA_STATUS发送超级岛ack
-            val raw = org.json.JSONObject().apply {
-                put("originalHeader", "DATA_SUPERISLAND")
-                put("result", "success")
-                put("action", "SI_ACK")
-                put("packageName", mappedPkg ?: "superisland:ack")
-                put("hash", hash)
-                if (!featureKeyValue.isNullOrEmpty()) {
-                    put("featureKeyName", SuperIslandProtocol.FEATURE_KEY_NAME)
-                    put("featureKeyValue", featureKeyValue)
-                }
-                put("time", System.currentTimeMillis())
-            }.toString()
-            // 通过统一加密发送器发回对端
-            val deviceInfo = DeviceInfo(remoteUuid, DeviceConnectionManagerUtil.getDisplayNameByUuid(remoteUuid), ip, port)
-            ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_STATUS", raw, 3000L)
-        } catch (_: Exception) {
-        }
-    }
-
-    // 提供给 NotificationProcessor 的内部包装，简化 ACK 调用
-    internal fun sendSuperIslandAckInternal(
-        remoteUuid: String,
-        recvHash: String,
-        featureId: String,
-        mappedPkg: String?
-    ) {
-        try {
-            sendSuperIslandAck(remoteUuid, recvHash, featureId, mappedPkg)
-        } catch (_: Exception) {
         }
     }
 

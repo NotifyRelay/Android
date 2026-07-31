@@ -228,10 +228,8 @@ object RemoteMediaSessionManager {
             cleanupTimeoutSessions(context)
             setupResendTask(context, device.uuid, currentSession!!, device)
 
-            val (currentState, payload) = buildMediaState(
-                sourceKey, finalTitle, finalText, coverUrl, packageName, appName, timestamp
-            )
-            applyMediaSessionState(sourceKey, currentState, payload, appName, context)
+            val currentState = buildMediaState(finalTitle, finalText, coverUrl)
+            applyMediaSessionState(sourceKey, currentState, appName, context)
 
             Logger.i("RemoteMediaSessionManager", "更新远端媒体会话: $title - $text (来自 ${device.displayName})")
         } catch (e: Exception) {
@@ -357,75 +355,45 @@ object RemoteMediaSessionManager {
         }
     }
     
-    // 统一构建媒体状态与基础 payload（消除 onMediaMessageReceived / setupResendTask 间的重复）
-    private fun buildMediaState(
-        sourceKey: String, title: String, text: String, coverUrl: String?,
-        packageName: String, appName: String?, timestamp: Long
-    ): Pair<DiffSystem.State, JSONObject> {
-        val lastState = SuperIslandRemoteStore.getState(sourceKey)
+    // 构建媒体全量状态（Rust 合并引擎已输出全量，本地无需 diff）
+    private fun buildMediaState(title: String, text: String, coverUrl: String?): DiffSystem.State {
         val currentPics = mutableMapOf<String, String>()
-        lastState?.pics?.let { currentPics.putAll(it) }
         if (coverUrl != null) currentPics["miui.focus.pic_cover"] = coverUrl
-        val state = DiffSystem.State(title, text,
-            MediaCapsulePresenter.buildParamV2(title, text), currentPics)
-        val payload = JSONObject().apply {
-            put("packageName", packageName)
-            put("appName", appName ?: packageName)
-            put("time", timestamp)
-        }
-        return state to payload
+        return DiffSystem.State(
+            title,
+            text,
+            MediaCapsulePresenter.buildParamV2(title, text),
+            currentPics
+        )
     }
 
-    // 统一处理媒体会话的差异合并与浮窗更新
+    // 直接以全量状态更新浮窗（Rust 合并引擎已输出全量，本地无需差异合并）
     private fun applyMediaSessionState(
         sourceKey: String,
         currentState: DiffSystem.State,
-        basePayload: JSONObject,
         appName: String?,
         context: Context
     ) {
-        val lastState = SuperIslandRemoteStore.getState(sourceKey)
-        val diff = DiffSystem.diff(lastState, currentState)
-
-        if (diff.isEmpty()) {
-            MediaCapsulePresenter.show(
-                context = context,
-                sourceId = sourceKey,
-                title = currentState.title ?: "",
-                text = currentState.text ?: "",
-                appName = appName,
-                picMap = currentState.pics
-            )
-            return
-        }
-
-        val payload = JSONObject(basePayload.toString())
-        if (lastState != null) {
-            payload.put("changes", diff.toJson())
-        } else {
-            payload.put("title", currentState.title ?: "")
-            payload.put("text", currentState.text ?: "")
+        // 以全量形式写入远端存储，保持 store 语义（结束包/清理时仍可移除）
+        val payload = JSONObject().apply {
+            put("title", currentState.title ?: "")
+            put("text", currentState.text ?: "")
             if (!currentState.paramV2Raw.isNullOrBlank()) {
-                payload.put("param_v2_raw", currentState.paramV2Raw)
+                put("param_v2_raw", currentState.paramV2Raw)
             }
             if (currentState.pics.isNotEmpty()) {
-                payload.put("pics", JSONObject(currentState.pics))
+                put("pics", JSONObject(currentState.pics))
             }
         }
-
-        val merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
-        if (merged != null) {
-            MediaCapsulePresenter.show(
-                context = context,
-                sourceId = sourceKey,
-                title = merged.title,
-                text = merged.text,
-                appName = appName,
-                picMap = merged.pics
-            )
-        } else {
-            com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.dismissBySource(sourceKey)
-        }
+        SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
+        MediaCapsulePresenter.show(
+            context = context,
+            sourceId = sourceKey,
+            title = currentState.title ?: "",
+            text = currentState.text ?: "",
+            appName = appName,
+            picMap = currentState.pics
+        )
     }
 
     /**
@@ -443,11 +411,8 @@ object RemoteMediaSessionManager {
                 }
 
                 val sourceKey = SOURCE_KEY_PREFIX + "_" + deviceUuid
-                val (currentState, payload) = buildMediaState(
-                    sourceKey, session.title, session.text, session.coverUrl,
-                    session.packageName, session.appName, System.currentTimeMillis()
-                )
-                applyMediaSessionState(sourceKey, currentState, payload, session.appName, context)
+                val currentState = buildMediaState(session.title, session.text, session.coverUrl)
+                applyMediaSessionState(sourceKey, currentState, session.appName, context)
 
                 setupResendTask(context, deviceUuid, session, device)
             } catch (e: Exception) {

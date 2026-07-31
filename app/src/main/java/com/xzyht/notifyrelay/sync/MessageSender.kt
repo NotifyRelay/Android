@@ -14,9 +14,6 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import github.xzynine.superislandui.common.SuperIslandProtocol
-import github.xzynine.superislandui.common.SuperIslandProtocol.PayloadOptions
-import github.xzynine.superislandui.diff.DiffSystem
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
@@ -43,80 +40,17 @@ object MessageSender {
 
     // 发送队列
     private val sendChannel = Channel<SendTask>(Channel.Factory.UNLIMITED)
-    // 超级岛单独发送队列（不去重、持续发送）
-    private val superIslandSendChannel = Channel<SuperIslandTask>(Channel.Factory.UNLIMITED)
     private val sendSemaphore = Semaphore(MAX_CONCURRENT_SENDS)
     private val activeSends = AtomicInteger(0)
-    // 超级岛发送并发控制（独立于普通通知）
-    private val MAX_CONCURRENT_SUPERISLAND_SENDS = 3
-    private val superSendSemaphore = Semaphore(MAX_CONCURRENT_SUPERISLAND_SENDS)
-    private val activeSuperSends = AtomicInteger(0)
     // 去重 TTL
     private const val SENT_KEY_TTL_MS = 3_000L
     // Rust dedup 上下文缓存（首次使用时赋值）
     private var dedupCtx: Pointer? = null
 
-    // 跟踪每个设备下每个会话的上次完整状态与全量发送时间
-    private val lastStatePerDevice = mutableMapOf<String, MutableMap<String, DiffSystem.State>>()
-    private val fullSentTimePerDevice = mutableMapOf<String, MutableMap<String, Long>>() // deviceUuid -> featureId -> lastFullSentMs
-    // 超级岛：ACK 跟踪与强制全量发送控制
-    private const val SI_ACK_TIMEOUT_MS = 4_000L
-    private data class PendingAck(val hash: String, val ts: Long)
-    private val siPendingAcks = mutableMapOf<String, MutableMap<String, PendingAck>>() // deviceUuid -> featureId -> pending
-    private val siForceFullNext = ConcurrentHashMap.newKeySet<String>() // key: deviceUuid|featureId
-    private val diffStateLock = Any()
-
-    private class DiffDecision(
-        val type: String, // "FULL" 或 "DELTA"
-        val diff: DiffSystem.Diff,
-        val needSend: Boolean
-    )
-
-    private fun computeDiffDecision(
-        deviceUuid: String,
-        featureId: String,
-        newState: DiffSystem.State,
-        forceFull: Boolean = false,
-        fullResendIntervalMs: Long = 0
-    ): DiffDecision {
-        val deviceMap = synchronized(lastStatePerDevice) {
-            lastStatePerDevice.getOrPut(deviceUuid) { mutableMapOf() }
-        }
-        val old = synchronized(lastStatePerDevice) { deviceMap[featureId] }
-        val diff = DiffSystem.diff(old, newState)
-
-        val now = System.currentTimeMillis()
-        val firstOrForce = old == null || forceFull
-
-        val fullMap = synchronized(fullSentTimePerDevice) {
-            fullSentTimePerDevice.getOrPut(deviceUuid) { mutableMapOf() }
-        }
-        val lastFull = synchronized(fullSentTimePerDevice) { fullMap[featureId] ?: 0L }
-        val timeForFull = fullResendIntervalMs > 0 && (now - lastFull > fullResendIntervalMs)
-
-        val type = if (firstOrForce || timeForFull) "FULL" else "DELTA"
-        val needSend = firstOrForce || timeForFull || !diff.isEmpty()
-
-        return DiffDecision(type, diff, needSend)
-    }
-
-    private fun commitDiffState(deviceUuid: String, featureId: String, newState: DiffSystem.State, now: Long, isFull: Boolean) {
-        synchronized(diffStateLock) {
-            lastStatePerDevice.getOrPut(deviceUuid) { mutableMapOf() }[featureId] = newState
-            if (isFull) {
-                fullSentTimePerDevice.getOrPut(deviceUuid) { mutableMapOf() }[featureId] = now
-            }
-        }
-    }
-
     init {
         // 启动队列处理协程
         CoroutineScope(Dispatchers.IO).launch {
             processSendQueue()
-        }
-        // 启动超级岛队列处理协程（独立）
-        CoroutineScope(Dispatchers.IO).launch {
-            processSuperIslandSendQueue()
         }
         // 定期清理 Rust 侧去重记录
         CoroutineScope(Dispatchers.IO).launch {
@@ -130,26 +64,6 @@ object MessageSender {
                 delay(10_000L)
             }
         }
-        // 超级岛：ACK 超时扫描，超时则标记下次强制全量
-        CoroutineScope(Dispatchers.IO).launch {
-            while (true) {
-                try {
-                    val now = System.currentTimeMillis()
-                    val snapshot = synchronized(siPendingAcks) { siPendingAcks.mapValues { it.value.toMap() }.toMap() }
-                    snapshot.forEach { (deviceUuid, featureMap) ->
-                        featureMap.forEach { (featureId, pending) ->
-                            if (now - pending.ts > SI_ACK_TIMEOUT_MS) {
-                                val key = "$deviceUuid|$featureId"
-                                siForceFullNext.add(key)
-                                synchronized(siPendingAcks) { siPendingAcks[deviceUuid]?.remove(featureId) }
-                                Logger.w("超级岛", "ACK超时：标记下次全量 device=$deviceUuid, feature=$featureId")
-                            }
-                        }
-                    }
-                } catch (_: Exception) {}
-                delay(2_000L)
-            }
-        }
     }
 
     private data class SendTask(
@@ -158,14 +72,6 @@ object MessageSender {
         val deviceManager: DeviceConnectionManager,
         val retryCount: Int = 0,
         val dedupKey: String
-    )
-
-    // 超级岛发送任务（不使用去重键）
-    private data class SuperIslandTask(
-        val device: DeviceInfo,
-        val data: String,
-        val deviceManager: DeviceConnectionManager,
-        val retryCount: Int = 0
     )
 
     /**
@@ -185,26 +91,6 @@ object MessageSender {
                     }
                     sendSemaphore.release()
                     activeSends.decrementAndGet()
-                }
-            }
-        }
-    }
-
-    /**
-     * 处理超级岛发送队列（独立于普通通知队列，不走去重逻辑）
-     */
-    private suspend fun processSuperIslandSendQueue() {
-        for (task in superIslandSendChannel) {
-            superSendSemaphore.acquire()
-            activeSuperSends.incrementAndGet()
-
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    // 改为即时发送一次，不进行重试（实时性优先）
-                    sendSuperIslandDataOnce(task)
-                } finally {
-                    superSendSemaphore.release()
-                    activeSuperSends.decrementAndGet()
                 }
             }
         }
@@ -235,21 +121,6 @@ object MessageSender {
                     NativeCore.dedup(ctx, 1, task.dedupKey, 0L, 0L)
                 }
                 
-                if (header == "DATA_MEDIAPLAY") {
-                    try {
-                        val obj = JSONObject(task.data)
-                        val mediaType = obj.optString("mediaType", "")
-                        if (mediaType.equals("END", true)) {
-                            synchronized(lastStatePerDevice) {
-                                lastStatePerDevice.getOrPut(task.device.uuid) { mutableMapOf() }.remove("media_global")
-                            }
-                            synchronized(fullSentTimePerDevice) {
-                                fullSentTimePerDevice.getOrPut(task.device.uuid) { mutableMapOf() }.remove("media_global")
-                            }
-                        }
-                    } catch (_: Exception) {}
-                }
-                
                 //Logger.d(TAG, "通知发送成功到设备: ${task.device.displayName}, data: ${task.data}")
 
                 if (success) return
@@ -265,58 +136,6 @@ object MessageSender {
 
         if (!success) {
             Logger.e(TAG, "发送最终失败，放弃重试: ${task.device.displayName}")
-        }
-    }
-
-    /**
-     * 超级岛数据发送（带重试），不会更新去重表或使用去重键，保证尽可能持续发送
-     */
-    private suspend fun sendSuperIslandDataWithRetry(task: SuperIslandTask) {
-        var success = false
-
-        repeat(MAX_RETRY_ATTEMPTS) { attempt ->
-            try {
-                val auth = task.deviceManager.authenticatedDevices[task.device.uuid]
-                if (auth == null || !auth.isAccepted) {
-                    //Logger.d("超级岛", "超级岛: 设备未认证，跳过发送: ${task.device.displayName}")
-                    return
-                }
-
-                ProtocolSender.sendEncrypted(task.deviceManager, task.device, "DATA_SUPERISLAND", task.data, 10000L)
-                success = true
-                //Logger.d("超级岛", "超级岛: 发送成功到设备: ${task.device.displayName}")
-
-                if (success) return
-
-            } catch (e: Exception) {
-                Logger.w("超级岛", "超级岛: 发送失败 (尝试 ${attempt + 1}/${MAX_RETRY_ATTEMPTS}): ${task.device.displayName}, 错误: ${e.message}")
-
-                if (attempt < MAX_RETRY_ATTEMPTS - 1) {
-                    delay(RETRY_DELAY_MS * (attempt + 1)) // 递增延迟
-                }
-            }
-        }
-
-        if (!success) {
-            Logger.e("超级岛", "超级岛: 发送最终失败，放弃重试: ${task.device.displayName}")
-        }
-    }
-
-    /**
-     * 超级岛即时发送（不重试）。实时性优先：尝试一次发送，遇到错误记录日志后返回。
-     */
-    private suspend fun sendSuperIslandDataOnce(task: SuperIslandTask) {
-        try {
-            val auth = task.deviceManager.authenticatedDevices[task.device.uuid]
-            if (auth == null || !auth.isAccepted) {
-                //Logger.d("超级岛", "超级岛: 设备未认证，跳过发送: ${task.device.displayName}")
-                return
-            }
-
-            ProtocolSender.sendEncrypted(task.deviceManager, task.device, "DATA_SUPERISLAND", task.data, 10000L)
-            //Logger.d("超级岛", "超级岛: 发送成功到设备: ${task.device.displayName}")
-        } catch (e: Exception) {
-            Logger.w("超级岛", "超级岛: 实时发送失败: ${task.device.displayName}, 错误: ${e.message}")
         }
     }
 
@@ -362,11 +181,8 @@ object MessageSender {
     /**
      * 发送媒体播放通知
      * 使用专门的协议前缀标记媒体通知，支持状态变化跟踪
-     * 保持差异发送，仅在封面发生变化时发送包含封面的包，否则仅发送文本部分
+     * 差异计算（FULL/DELTA）、合并、ACK 与心跳均由 Rust 合并引擎负责。
      */
-    private const val MEDIA_FULL_RESEND_INTERVAL_MS = 6_000L
-    private const val MEDIA_MIN_SEND_INTERVAL_MS = 3_000L
-    private val lastMediaSendTime = mutableMapOf<String, Long>() // deviceUuid -> last any media send
 
     fun sendMediaPlayNotification(
         context: Context,
@@ -379,59 +195,29 @@ object MessageSender {
         deviceManager: DeviceConnectionManager
     ) {
         try {
-            val authenticatedDevices = getAuthenticatedDevices(deviceManager)
-            if (authenticatedDevices.isEmpty()) {
-                Logger.w(TAG, "没有已认证的设备")
-                return
-            }
+            // 推送「全量」媒体状态：差异计算（FULL/DELTA）、合并与 ACK 均由 Rust 合并引擎负责。
+            val ctx = deviceManager.rustContextInternal ?: return
+            val queuePtr = NativeCore.senderQueuePtr
+            if (queuePtr == 0L) return
 
             val isLocked = PermissionHelper.isDeviceLocked(context)
+            val content = JSONObject().apply {
+                put("packageName", packageName)
+                put("appName", appName ?: packageName)
+                put("title", title ?: "")
+                put("text", text ?: "")
+                put("coverUrl", coverUrl ?: "")
+                put("time", time)
+                put("isLocked", isLocked)
+                put("isPlaying", true)
+            }.toString()
 
-            val state = DiffSystem.State(
-                title = title,
-                text = text,
-                paramV2Raw = null,
-                pics = if (coverUrl != null) mapOf("miui.focus.pic_cover" to coverUrl) else emptyMap()
-            )
-
-            val featureId = "media_global"
-
-            authenticatedDevices.forEach { deviceInfo ->
-                val dd = computeDiffDecision(
-                    deviceUuid = deviceInfo.uuid,
-                    featureId = featureId,
-                    newState = state,
-                    fullResendIntervalMs = MEDIA_FULL_RESEND_INTERVAL_MS
-                )
-                if (!dd.needSend) return@forEach
-
-                val now = System.currentTimeMillis()
-                val lastSend = synchronized(lastMediaSendTime) { lastMediaSendTime[deviceInfo.uuid] ?: 0L }
-                if (now - lastSend < MEDIA_MIN_SEND_INTERVAL_MS) return@forEach
-                synchronized(lastMediaSendTime) { lastMediaSendTime[deviceInfo.uuid] = now }
-
-                val coverChanged = dd.diff.picsChanged.containsKey("miui.focus.pic_cover")
-                val effectiveType = if (coverChanged && dd.type != "FULL") "FULL" else dd.type
-
-                val payloadObj = if (effectiveType == "FULL") {
-                    SuperIslandProtocol.buildPayload(
-                        packageName, appName, time, isLocked, state.toJson(),
-                        PayloadOptions.MEDIA_FULL.copy(
-                            extraFields = if (coverUrl != null) mapOf("coverUrl" to coverUrl) else emptyMap()
-                        )
-                    )
-                } else {
-                    val partialState = DiffSystem.State(
-                        title = dd.diff.title, text = dd.diff.text,
-                        paramV2Raw = null, pics = emptyMap()
-                    )
-                    SuperIslandProtocol.buildPayload(
-                        packageName, appName, time, isLocked, partialState.toJson(),
-                        PayloadOptions.MEDIA_DELTA
-                    )
+            getAuthenticatedDevices(deviceManager).forEach { device ->
+                try {
+                    NativeCore.pushMediaState(ctx, queuePtr, device.uuid, content, false)
+                } catch (e: Exception) {
+                    Logger.w(TAG, "推送媒体状态失败: ${device.displayName}", e)
                 }
-                val raw = payloadObj.toString()
-                enqueueNotification(deviceInfo, raw, deviceManager, "媒体播放")
             }
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放通知失败", e)
@@ -468,26 +254,17 @@ object MessageSender {
         deviceManager: DeviceConnectionManager
     ) {
         try {
-            val authenticatedDevices = getAuthenticatedDevices(deviceManager)
-            if (authenticatedDevices.isEmpty()) {
-                Logger.w(TAG, "没有已认证的设备")
-                return
-            }
+            // 推送结束标记：Rust 合并引擎会回传 terminateValue="__END__" 全量，接收端据此移除媒体卡片。
+            val ctx = deviceManager.rustContextInternal ?: return
+            val queuePtr = NativeCore.senderQueuePtr
+            if (queuePtr == 0L) return
 
-            val isLocked = PermissionHelper.isDeviceLocked(context)
-            val payload = SuperIslandProtocol.buildPayload(
-                packageName, appName, time, isLocked, JSONObject(),
-                PayloadOptions.MEDIA_END
-            ).toString()
-
-            authenticatedDevices.forEach { deviceInfo ->
-                synchronized(lastStatePerDevice) {
-                    lastStatePerDevice[deviceInfo.uuid]?.remove("media_global")
+            getAuthenticatedDevices(deviceManager).forEach { device ->
+                try {
+                    NativeCore.pushMediaState(ctx, queuePtr, device.uuid, "{}", true)
+                } catch (e: Exception) {
+                    Logger.w(TAG, "推送媒体结束失败: ${device.displayName}", e)
                 }
-                synchronized(fullSentTimePerDevice) {
-                    fullSentTimePerDevice[deviceInfo.uuid]?.remove("media_global")
-                }
-                enqueueNotification(deviceInfo, payload, deviceManager, "媒体结束")
             }
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放结束通知失败", e)
@@ -564,6 +341,10 @@ object MessageSender {
                 return
             }
 
+            val ctx = deviceManager.rustContextInternal ?: return
+            val queuePtr = NativeCore.senderQueuePtr
+            if (queuePtr == 0L) return
+
             val isLocked = PermissionHelper.isDeviceLocked(context)
 
             // 处理图片：若 picMap 中是本地 URI/file 路径则读取并编码为 base64 data URI，http(s) 地址或其他字符串保持不变
@@ -605,60 +386,26 @@ object MessageSender {
                 }
             }
 
-            // 计算特征键（支持外部传入首包固定ID，避免后续波动）
-            val featureId = featureIdOverride ?: SuperIslandProtocol.computeFeatureId(
-                superPkg, paramV2Raw, title, text
-            )
-
             val finalPics: Map<String, String> = if (processedPics.isNotEmpty()) processedPics.toMap() else (picMap?.toMap() ?: emptyMap())
-            val newState = DiffSystem.State(
-                title = title,
-                text = text,
-                paramV2Raw = paramV2Raw,
-                pics = finalPics
-            )
 
-            // 将超级岛发送任务加入独立队列（不去重，实时性优先）
-            authenticatedDevices.forEach { deviceInfo ->
-                val forceFull = siForceFullNext.contains("${deviceInfo.uuid}|$featureId")
+            // 组装「全量」超级岛状态：差异计算（FULL/DELTA）、合并、ACK 与心跳均由 Rust 合并引擎负责。
+            val content = JSONObject().apply {
+                put("packageName", superPkg)
+                put("appName", appName ?: superPkg)
+                put("title", title ?: "")
+                put("text", text ?: "")
+                put("param_v2_raw", paramV2Raw ?: "")
+                put("time", time)
+                put("isLocked", isLocked)
+                put("featureIdOverride", featureIdOverride ?: "")
+                put("pics", JSONObject(finalPics))
+            }.toString()
 
-                val dd = computeDiffDecision(
-                    deviceUuid = deviceInfo.uuid,
-                    featureId = featureId,
-                    newState = newState,
-                    forceFull = forceFull,
-                    fullResendIntervalMs = 30_000L
-                )
-
-                // 超级岛始终发送（即使无差异，也作为心跳包）
-                val payloadObj = if (dd.type == "FULL") {
-                    SuperIslandProtocol.buildFullPayload(
-                        superPkg, appName, time, isLocked, featureId, newState
-                    )
-                } else {
-                    SuperIslandProtocol.buildDeltaPayload(
-                        superPkg, appName, time, isLocked, featureId, dd.diff
-                    )
-                }
-
-                // 记录待ACK哈希
+            getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
-                    val h = payloadObj.optString("hash", "")
-                    if (h.isNotEmpty()) {
-                        val map = synchronized(siPendingAcks) { siPendingAcks.getOrPut(deviceInfo.uuid) { mutableMapOf() } }
-                        synchronized(siPendingAcks) { map[featureId] = PendingAck(h, System.currentTimeMillis()) }
-                    }
-                } catch (_: Exception) {}
-                val raw = payloadObj.toString()
-                val task = SuperIslandTask(deviceInfo, raw, deviceManager)
-
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        superIslandSendChannel.send(task)
-                        commitDiffState(deviceInfo.uuid, featureId, newState, System.currentTimeMillis(), dd.type == "FULL")
-                    } catch (e: Exception) {
-                        Logger.e("超级岛", "超级岛: 加入超级岛发送队列失败：${deviceInfo.displayName}", e)
-                    }
+                    NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, false)
+                } catch (e: Exception) {
+                    Logger.e("超级岛", "超级岛: 推送超级岛状态失败: ${device.displayName}", e)
                 }
             }
         } catch (e: Exception) {
@@ -681,28 +428,26 @@ object MessageSender {
         featureIdOverride: String? = null
     ) {
         try {
-            val authenticatedDevices = getAuthenticatedDevices(deviceManager)
-            if (authenticatedDevices.isEmpty()) return
-            val isLocked = PermissionHelper.isDeviceLocked(context)
-            val featureId = featureIdOverride ?: SuperIslandProtocol.computeFeatureId(
-                superPkg, paramV2Raw, title, text
-            )
-            val payload = SuperIslandProtocol.buildEndPayload(
-                superPkg, appName, time, isLocked, featureId
-            ).toString()
-            authenticatedDevices.forEach { deviceInfo ->
-                // 清理该设备的lastState
-                synchronized(lastStatePerDevice) {
-                    lastStatePerDevice[deviceInfo.uuid]?.remove(featureId)
-                }
-                val task = SuperIslandTask(deviceInfo, payload, deviceManager)
-                CoroutineScope(Dispatchers.IO).launch {
-                    try {
-                        superIslandSendChannel.send(task)
-                        //Logger.d("超级岛", "超级岛: 终止数据已加入发送队列：${deviceInfo.displayName}")
-                    } catch (e: Exception) {
-                        Logger.e("超级岛", "超级岛: 终止数据入队失败：${deviceInfo.displayName}", e)
-                    }
+            // 推送结束标记：Rust 合并引擎会回传 terminateValue="__END__" 全量，接收端据此移除该超级岛卡片。
+            val ctx = deviceManager.rustContextInternal ?: return
+            val queuePtr = NativeCore.senderQueuePtr
+            if (queuePtr == 0L) return
+
+            val content = JSONObject().apply {
+                put("packageName", superPkg)
+                put("appName", appName ?: superPkg)
+                put("title", title ?: "")
+                put("text", text ?: "")
+                put("param_v2_raw", paramV2Raw ?: "")
+                put("time", time)
+                put("featureIdOverride", featureIdOverride ?: "")
+            }.toString()
+
+            getAuthenticatedDevices(deviceManager).forEach { device ->
+                try {
+                    NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, true)
+                } catch (e: Exception) {
+                    Logger.e("超级岛", "超级岛: 推送超级岛结束失败: ${device.displayName}", e)
                 }
             }
         } catch (e: Exception) {
@@ -808,24 +553,6 @@ object MessageSender {
      */
     fun hasAvailableDevices(deviceManager: DeviceConnectionManager): Boolean {
         return deviceManager.devices.value.isNotEmpty()
-    }
-
-    // 接收端ACK回调：当收到对方SI_ACK时调用，确认hash送达，清理待ACK并解除强制全量
-    fun onSuperIslandAck(deviceUuid: String, featureId: String?, hash: String?) {
-        try {
-            if (featureId.isNullOrEmpty() || hash.isNullOrEmpty()) return
-            val pending = synchronized(siPendingAcks) { siPendingAcks[deviceUuid]?.get(featureId) }
-            if (pending != null && pending.hash == hash) {
-                synchronized(siPendingAcks) { siPendingAcks[deviceUuid]?.remove(featureId) }
-                val key = "$deviceUuid|$featureId"
-                siForceFullNext.remove(key)
-                //Logger.d("超级岛", "ACK匹配成功：device=$deviceUuid, feature=$featureId")
-            } else {
-                val key = "$deviceUuid|$featureId"
-                siForceFullNext.add(key)
-                Logger.w("超级岛", "ACK哈希不匹配或无待确认：标记下次全量 device=$deviceUuid, feature=$featureId, ackHash=$hash")
-            }
-        } catch (_: Exception) {}
     }
 
     /**

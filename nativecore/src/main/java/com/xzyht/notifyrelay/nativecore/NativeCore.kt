@@ -216,12 +216,15 @@ object NativeCore {
     fun enqueueMessage(ctx: Pointer, queuePtr: Long, deviceUuid: String, header: String, plaintext: String, dedupKey: String? = null) =
         lib.nrc_enqueue_message(ctx, queuePtr, deviceUuid, header, plaintext, dedupKey)
 
+    // 推送「全量」超级岛/媒体状态；Rust 内部计算差异、合并、ACK 与心跳，接收端经 on_data 回传全量。
+    fun pushSuperislandState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean) =
+        lib.nrc_push_superisland_state(ctx, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0)
+
+    fun pushMediaState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean) =
+        lib.nrc_push_media_state(ctx, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0)
+
     fun stopSenderQueue(ctx: Pointer, queuePtr: Long) =
         lib.nrc_stop_sender_queue(ctx, queuePtr)
-
-    // ======== Diff ========
-    fun computeSuperislandDiff(oldState: String, newState: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_superisland_diff(oldState, newState))
 
     // ======== Network change ========
     fun onNetworkChanged(ctx: Pointer, localIp: String?) =
