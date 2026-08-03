@@ -14,130 +14,18 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.sync.Semaphore
 import org.json.JSONObject
-import com.sun.jna.Pointer
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
 
 /**
  * 消息发送类
  * 整合聊天测试和普通通知转发的消息发送功能
- * 支持队列和限流，避免大量并发发送导致的通知丢失
+ * 发送队列、限流、重试与去重均由 Rust core 发送队列统一处理
  */
 object MessageSender {
 
     private const val TAG = "MessageSender"
-    private const val MAX_CONCURRENT_SENDS = 5 // 最大并发发送数
-    private const val MAX_RETRY_ATTEMPTS = 3 // 最大重试次数
-    private const val RETRY_DELAY_MS = 1000L // 重试延迟
-
-    // 发送队列
-    private val sendChannel = Channel<SendTask>(Channel.Factory.UNLIMITED)
-    private val sendSemaphore = Semaphore(MAX_CONCURRENT_SENDS)
-    private val activeSends = AtomicInteger(0)
-    // 去重 TTL
-    private const val SENT_KEY_TTL_MS = 3_000L
-    // Rust dedup 上下文缓存（首次使用时赋值）
-    private var dedupCtx: Pointer? = null
-
-    init {
-        // 启动队列处理协程
-        CoroutineScope(Dispatchers.IO).launch {
-            processSendQueue()
-        }
-        // 定期清理 Rust 侧去重记录
-        CoroutineScope(Dispatchers.IO).launch {
-            while (true) {
-                try {
-                    val ctx = dedupCtx
-                    if (ctx != null) {
-                        NativeCore.dedup(ctx, 3, "", System.currentTimeMillis(), SENT_KEY_TTL_MS)
-                    }
-                } catch (_: Exception) {}
-                delay(10_000L)
-            }
-        }
-    }
-
-    private data class SendTask(
-        val device: DeviceInfo,
-        val data: String,
-        val deviceManager: DeviceConnectionManager,
-        val retryCount: Int = 0,
-        val dedupKey: String
-    )
-
-    /**
-     * 处理发送队列
-     */
-    private suspend fun processSendQueue() {
-        for (task in sendChannel) {
-            sendSemaphore.acquire()
-            activeSends.incrementAndGet()
-
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    sendNotificationDataWithRetry(task)
-                } finally {
-                    task.deviceManager.rustContextInternal?.let { ctx ->
-                        NativeCore.dedup(ctx, 2, task.dedupKey, 0L, 0L)
-                    }
-                    sendSemaphore.release()
-                    activeSends.decrementAndGet()
-                }
-            }
-        }
-    }
-
-    /**
-     * 带重试的通知数据发送
-     */
-    private suspend fun sendNotificationDataWithRetry(task: SendTask) {
-        var success = false
-
-        repeat(MAX_RETRY_ATTEMPTS) { attempt ->
-            try {
-                val auth = task.deviceManager.authenticatedDevices[task.device.uuid]
-                if (auth == null || !auth.isAccepted) {
-                    //Logger.d(TAG, "设备未认证，跳过发送: ${task.device.displayName}")
-                    return
-                }
-
-                // 根据负载类型选择报文头（媒体播放使用 DATA_MEDIAPLAY，其它使用 DATA_NOTIFICATION）
-                val header = try {
-                    val obj = JSONObject(task.data)
-                    if (obj.optString("type", "").equals("MEDIA_PLAY", true)) "DATA_MEDIAPLAY" else "DATA_NOTIFICATION"
-                } catch (_: Exception) { "DATA_NOTIFICATION" }
-                ProtocolSender.sendEncrypted(task.deviceManager, task.device, header, task.data, 10000L)
-                success = true
-                task.deviceManager.rustContextInternal?.let { ctx ->
-                    NativeCore.dedup(ctx, 1, task.dedupKey, 0L, 0L)
-                }
-                
-                //Logger.d(TAG, "通知发送成功到设备: ${task.device.displayName}, data: ${task.data}")
-
-                if (success) return
-
-            } catch (e: Exception) {
-                Logger.w(TAG, "发送失败 (尝试 ${attempt + 1}/${MAX_RETRY_ATTEMPTS}): ${task.device.displayName}, 错误: ${e.message}")
-
-                if (attempt < MAX_RETRY_ATTEMPTS - 1) {
-                    delay(RETRY_DELAY_MS * (attempt + 1)) // 递增延迟
-                }
-            }
-        }
-
-        if (!success) {
-            Logger.e(TAG, "发送最终失败，放弃重试: ${task.device.displayName}")
-        }
-    }
 
     /**
      * 发送聊天测试消息
@@ -172,7 +60,7 @@ object MessageSender {
             // 记录到聊天历史
             ChatMemory.append(context, "发送: $message")
 
-            Logger.i(TAG, "聊天消息已加入队列，共发送到 ${allDevices.size} 个设备，当前活跃发送: ${activeSends.get()}")
+            Logger.i(TAG, "聊天消息已加入队列，共发送到 ${allDevices.size} 个设备")
         } catch (e: Exception) {
             Logger.e(TAG, "发送聊天消息失败", e)
         }
@@ -225,8 +113,7 @@ object MessageSender {
     }
     
     /**
-     * 发送媒体播放结束包
-     * 用于通知接收端关闭媒体会话超级岛
+     * 将通知 JSON 入队发送（经 Rust 发送队列：加密、限流、重试、去重由 Rust 统一处理）
      */
     private fun enqueueNotification(
         deviceInfo: DeviceInfo, json: String, deviceManager: DeviceConnectionManager, tag: String = ""
@@ -236,12 +123,13 @@ object MessageSender {
             Logger.w(TAG, "Rust 未初始化，跳过入队: ${deviceInfo.displayName}")
             return false
         }
-        dedupCtx = ctx
         val dedupKey = NativeCore.computeDedupKey(deviceInfo.uuid, json) ?: return false
-        if (NativeCore.dedup(ctx, 0, dedupKey, SENT_KEY_TTL_MS, 0L) == 0) return false
-        CoroutineScope(Dispatchers.IO).launch {
-            try { sendChannel.send(SendTask(deviceInfo, json, deviceManager, dedupKey = dedupKey)) }
-            catch (e: Exception) { NativeCore.dedup(ctx, 2, dedupKey, 0L, 0L); Logger.e(TAG, "加入${tag}发送队列失败: ${deviceInfo.displayName}", e) }
+        val result = ProtocolSender.sendEncrypted(
+            deviceManager, deviceInfo, "DATA_NOTIFICATION", json, dedupKey = dedupKey
+        )
+        if (result != ProtocolSender.EnqueueResult.SUCCESS) {
+            Logger.w(TAG, "加入${tag}发送队列失败: ${deviceInfo.displayName}, result=$result")
+            return false
         }
         return true
     }
@@ -313,7 +201,7 @@ object MessageSender {
                 enqueueNotification(deviceInfo, raw, deviceManager, "通知")
             }
 
-            Logger.i(TAG, "通知已加入队列，共 ${authenticatedDevices.size} 个设备，当前活跃发送: ${activeSends.get()}")
+            Logger.i(TAG, "通知已加入队列，共 ${authenticatedDevices.size} 个设备")
         } catch (e: Exception) {
             Logger.e(TAG, "发送通知消息失败", e)
         }
