@@ -216,6 +216,25 @@ object NativeCore {
     fun enqueueMessage(ctx: Pointer, queuePtr: Long, deviceUuid: String, header: String, plaintext: String, dedupKey: String? = null) =
         lib.nrc_enqueue_message(ctx, queuePtr, deviceUuid, header, plaintext, dedupKey)
 
+    // ======== Clipboard ========
+    /**
+     * 剪贴板内容变化入口。Rust 内部完成去重/防循环/频率限制/2MB 阈值判定并直接入队发送。
+     * 返回 JSON：{"action": "sent"|"skipped"|"file_transfer", "reason": "..."}
+     */
+    fun clipboardOnChanged(ctx: Pointer?, queuePtr: Long, targetsJson: String, mime: String, content: String, nowMs: Long, force: Boolean): String? {
+        val c = ctx ?: return null
+        return NotifyRelayCore.ptrToStringAndFree(lib.nrc_clipboard_on_changed(c, queuePtr, targetsJson, mime, content, nowMs, if (force) 1 else 0))
+    }
+
+    /**
+     * 收到远程剪贴板报文入口。Rust 解析/归一化并登记防循环时间窗。
+     * 返回 JSON：{"type": "text"|"image", "content": "..."}
+     */
+    fun clipboardOnReceived(ctx: Pointer?, payloadJson: String, nowMs: Long): String? {
+        val c = ctx ?: return null
+        return NotifyRelayCore.ptrToStringAndFree(lib.nrc_clipboard_on_received(c, payloadJson, nowMs))
+    }
+
     // 推送「全量」超级岛/媒体状态；Rust 内部计算差异、合并、ACK 与心跳，接收端经 on_data 回传全量。
     fun pushSuperislandState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean) =
         lib.nrc_push_superisland_state(ctx, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0)

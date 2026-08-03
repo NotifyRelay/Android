@@ -158,6 +158,10 @@ interface NotifyRelayCore : Library {
     fun nrc_start_sender_queue(ctx: Pointer, queuePtr: Long)
     fun nrc_enqueue_message(ctx: Pointer, queuePtr: Long, deviceUuid: String, header: String, plaintext: String, dedupKey: String?)
 
+    // ======== Clipboard ========
+    fun nrc_clipboard_on_changed(ctx: Pointer, queuePtr: Long, targetsJson: String, mime: String, content: String, nowMs: Long, force: Int): Pointer
+    fun nrc_clipboard_on_received(ctx: Pointer, payloadJson: String, nowMs: Long): Pointer
+
     // 推送「全量」超级岛/媒体状态（Rust 内部计算差异、合并、ACK 与心跳）；接收端经 on_data 回传全量。
     fun nrc_push_superisland_state(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Int)
     fun nrc_push_media_state(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Int)
