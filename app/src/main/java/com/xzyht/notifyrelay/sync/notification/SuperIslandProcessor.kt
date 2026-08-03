@@ -2,7 +2,6 @@ package com.xzyht.notifyrelay.sync.notification
 
 import android.content.Context
 import android.os.Build
-import android.util.LruCache
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
@@ -13,6 +12,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.SuperIslandRemoteS
 import github.xzynine.superislandui.common.SuperIslandProtocol
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStore
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
@@ -23,7 +23,8 @@ import org.json.JSONObject
 
 object SuperIslandProcessor {
     private const val TAG = "SuperIslandProcessor"
-    private const val DEDUP_CACHE_MAX_SIZE = 1024
+    // 锁屏去重 TTL（毫秒）：同一远端岛在锁屏期间的重复包直接丢弃
+    private const val SI_DEDUP_TTL_MS = 300_000L
 
     private val DEFAULT_MIRROR_PACKAGES = listOf(
         "com.xiaomi.bluetooth",
@@ -39,12 +40,16 @@ object SuperIslandProcessor {
         }
     }
 
-    private val superIslandDeduplicationCache = object : LruCache<String, Boolean>(DEDUP_CACHE_MAX_SIZE) {
-        override fun entryRemoved(evicted: Boolean, key: String?, oldValue: Boolean?, newValue: Boolean?) {
-            if (evicted && key != null) {
-                try { Logger.i("超级岛", "去重缓存被驱逐: $key") } catch (_: Exception) {}
-            }
-        }
+    /** 锁屏去重：命中返回 true（应丢弃） */
+    private fun dedupCheck(manager: DeviceConnectionManager, dedupKey: String): Boolean {
+        val ctx = manager.rustContextInternal ?: return false
+        return NativeCore.dedup(ctx, 0, dedupKey, SI_DEDUP_TTL_MS, 0L) == 0
+    }
+
+    /** 清除锁屏去重登记（结束包 / 合并失败时调用） */
+    private fun dedupClear(manager: DeviceConnectionManager, dedupKey: String) {
+        val ctx = manager.rustContextInternal ?: return
+        try { NativeCore.dedup(ctx, 2, dedupKey, 0L, 0L) } catch (_: Exception) {}
     }
 
     fun process(
@@ -116,7 +121,7 @@ object SuperIslandProcessor {
                             if (explicitFeatureKey.contains("|")) {
                                 dismissBySourceId(explicitFeatureKey)
                                 SuperIslandRemoteStore.removeExact(explicitFeatureKey)
-                                superIslandDeduplicationCache.remove(dedupKey)
+                                dedupClear(manager, dedupKey)
                                 Logger.i("超级岛", "收到终止通知(显式完整 sourceId)，移除去重缓存: $dedupKey -> source=$explicitFeatureKey")
                                 return true
                             }
@@ -128,7 +133,7 @@ object SuperIslandProcessor {
                                     try { 
                                         dismissBySourceId(rid)
                                     } catch (_: Exception) {}
-                                    superIslandDeduplicationCache.remove("${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
+                                    dedupClear(manager, "${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
                                     Logger.i("超级岛", "收到终止通知(显式 featureKey 匹配)，移除并关闭通知: $rid -> featureKey=$explicitFeatureKey")
                                 }
                                 return true
@@ -145,7 +150,7 @@ object SuperIslandProcessor {
                                 dismissBySourceId(rid)
                             } catch (_: Exception) {}
                             // 同步移除去重缓存（若存在）
-                            superIslandDeduplicationCache.remove("${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
+                            dedupClear(manager, "${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
                             Logger.i("超级岛", "收到终止通知，按前缀移除并关闭通知: $rid")
                         }
                         return true
@@ -155,7 +160,7 @@ object SuperIslandProcessor {
                     try { 
                         dismissBySourceId(sourceKey)
                     } catch (_: Exception) {}
-                    superIslandDeduplicationCache.remove(dedupKey)
+                    dedupClear(manager, dedupKey)
                     Logger.i("超级岛", "收到终止通知(兜底)，尝试移除: $sourceKey")
                     return true
                 } catch (e: Exception) {
@@ -172,11 +177,10 @@ object SuperIslandProcessor {
                 
                 if (shouldSkipDedup) {
                     Logger.i("超级岛", "澎湃系统版本高于OS3.0.200，跳过锁屏去重: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
-                } else if (superIslandDeduplicationCache.get(dedupKey) != null) {
+                } else if (dedupCheck(manager, dedupKey)) {
                     Logger.i("超级岛", "锁屏重复通知去重: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
                     return true
                 } else {
-                    superIslandDeduplicationCache.put(dedupKey, true)
                     Logger.i("超级岛", "首次处理超级岛通知，添加到去重缓存: $dedupKey, title=${mTitle ?: "无标题"}")
                 }
             } else {
@@ -271,7 +275,7 @@ object SuperIslandProcessor {
             }
 
             if (merged == null && isLocked) {
-                superIslandDeduplicationCache.remove(dedupKey)
+                dedupClear(manager, dedupKey)
                 Logger.i("超级岛", "合并失败，移除去重缓存: $dedupKey")
             }
 
