@@ -1004,16 +1004,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
-    init {
-        // 启动图标同步过期请求清理协程
-        coroutineScope.launch {
-            while (true) {
-                delay(60000) // 每分钟清理一次
-                IconSyncManager.cleanupExpiredRequests()
-            }
-        }
-    }
-
     // 注册 Rust 回调，使用统一的配对和数据回调接口
     private fun setupRustCallbacks() {
         val ctx = rustContext ?: return

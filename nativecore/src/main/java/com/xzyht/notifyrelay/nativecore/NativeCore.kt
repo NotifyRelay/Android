@@ -4,6 +4,8 @@ import android.media.projection.MediaProjection
 import android.util.Log
 import com.sun.jna.Pointer
 import notifyrelay.base.util.Logger as AppLogger
+import org.json.JSONArray
+import org.json.JSONObject
 
 object NativeCore {
     private const val TAG = "NativeCore"
@@ -234,6 +236,46 @@ object NativeCore {
         val c = ctx ?: return null
         return NotifyRelayCore.ptrToStringAndFree(lib.nrc_clipboard_on_received(c, payloadJson, nowMs))
     }
+
+    // ======== App sync (app list & icons) ========
+    /**
+     * 批量过滤并构造图标请求报文（Rust 内部维护 pending 状态与超时清理）。
+     * 返回 ICON_REQUEST 报文 JSON；无需请求时返回 {}。
+     */
+    fun appSyncPrepareIconRequest(
+        ctx: Pointer?,
+        packages: List<String>,
+        installed: List<String>,
+        cached: List<String>,
+        appDeviceMap: Map<String, List<String>>,
+        sourceDeviceUuid: String,
+        nowMs: Long
+    ): String? {
+        val c = ctx ?: return null
+        val appDeviceJson = JSONObject().apply {
+            appDeviceMap.forEach { (k, v) -> put(k, JSONArray(v)) }
+        }.toString()
+        return NotifyRelayCore.ptrToStringAndFree(
+            lib.nrc_app_sync_prepare_icon_request(c, JSONArray(packages).toString(), JSONArray(installed).toString(), JSONArray(cached).toString(), appDeviceJson, sourceDeviceUuid, nowMs)
+        )
+    }
+
+    fun appSyncClearIconPending(ctx: Pointer?, packages: List<String>) {
+        val c = ctx ?: return
+        lib.nrc_app_sync_clear_icon_pending(c, JSONArray(packages).toString())
+    }
+
+    /** 解析图标响应报文，返回 {"icons":[...],"missing":[...]} */
+    fun appSyncParseIconResponse(payload: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_app_sync_parse_icon_response(payload))
+
+    /** 构造应用列表请求报文 */
+    fun appSyncBuildApplistRequest(scope: String, nowMs: Long): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_app_sync_build_applist_request(scope, nowMs))
+
+    /** 解析应用列表响应报文，返回 {"apps":[...],"scope":"..","total":N} */
+    fun appSyncParseApplistResponse(payload: String): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_app_sync_parse_applist_response(payload))
 
     // 推送「全量」超级岛/媒体状态；Rust 内部计算差异、合并、ACK 与心跳，接收端经 on_data 回传全量。
     fun pushSuperislandState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean) =

@@ -162,6 +162,13 @@ interface NotifyRelayCore : Library {
     fun nrc_clipboard_on_changed(ctx: Pointer, queuePtr: Long, targetsJson: String, mime: String, content: String, nowMs: Long, force: Int): Pointer
     fun nrc_clipboard_on_received(ctx: Pointer, payloadJson: String, nowMs: Long): Pointer
 
+    // ======== App sync (app list & icons) ========
+    fun nrc_app_sync_prepare_icon_request(ctx: Pointer, packagesJson: String, installedJson: String, cachedJson: String, appDeviceJson: String, sourceDeviceUuid: String, nowMs: Long): Pointer
+    fun nrc_app_sync_clear_icon_pending(ctx: Pointer, packagesJson: String)
+    fun nrc_app_sync_parse_icon_response(payloadJson: String): Pointer
+    fun nrc_app_sync_build_applist_request(scope: String, nowMs: Long): Pointer
+    fun nrc_app_sync_parse_applist_response(payloadJson: String): Pointer
+
     // 推送「全量」超级岛/媒体状态（Rust 内部计算差异、合并、ACK 与心跳）；接收端经 on_data 回传全量。
     fun nrc_push_superisland_state(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Int)
     fun nrc_push_media_state(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Int)

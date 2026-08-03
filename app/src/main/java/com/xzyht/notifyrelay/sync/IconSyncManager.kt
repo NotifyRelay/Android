@@ -9,10 +9,9 @@ import android.util.Base64
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
@@ -27,20 +26,12 @@ import java.io.ByteArrayOutputStream
  * 图标同步管理器
  *
  * 负责在已认证的设备之间同步应用图标，以避免重复传输并降低网络与性能开销。
- * 功能包括：
- *  - 检查本地是否已有图标，若无则向发送通知的设备请求图标。
- *  - 接收并处理图标请求（ICON_REQUEST）和图标响应（ICON_RESPONSE）。
- *  - 将接收到的图标解码并缓存到本地仓库。
- *
- * 所有日志通过 Logger 的日志级别筛选机制控制输出。
+ * 请求过滤（已缓存/已安装/pending/设备关联）与报文构造由 Rust core（nrc_app_sync_*）处理，
+ * 平台端仅负责位图编解码与本地缓存。
  */
 object IconSyncManager {
 
     private const val TAG = "IconSyncManager"
-    private const val ICON_REQUEST_TIMEOUT = 10000L
-
-    // 正在请求的图标缓存，避免重复请求（packageName -> requestTime）
-    private val pendingRequests = mutableMapOf<String, Long>()
 
     /**
      * 检查并（必要时）请求单个图标。
@@ -51,68 +42,50 @@ object IconSyncManager {
         deviceManager: DeviceConnectionManager,
         sourceDevice: DeviceInfo
     ) {
-        // 检查 AppRepository 缓存
-        val exist = runBlocking {
-            AppRepository.getExternalAppIcon(context, packageName)
-        }
-        if (exist != null) {
-            //Logger.d(TAG, "图标已存在，跳过：$packageName")
-            return
-        }
-        
         // 检查本机已安装应用
         val installedPackages = AppRepository.getInstalledPackageNames(context)
         if (installedPackages.contains(packageName)) {
-            //Logger.d(TAG, "应用已安装，跳过请求：$packageName")
             return
         }
-        
-        // 检查正在请求的图标
-        val now = System.currentTimeMillis()
-        val last = pendingRequests[packageName]
-        if (last != null && (now - last) < ICON_REQUEST_TIMEOUT) {
-            //Logger.d(TAG, "单图标请求进行中，跳过：$packageName")
-            return
-        }
-        
-        // 获取应用的来源设备UUID列表（替代原 getAppDeviceUuids 方法）
         val appDeviceUuids = runBlocking {
             val databaseRepository = DatabaseRepository.getInstance(context)
             val appDevices = databaseRepository.getAppDevicesByPackageName(packageName).first()
             appDevices.map { appDevice -> appDevice.sourceDevice }
         }
-        
-        // 检查是否应该从当前设备请求图标
-        val shouldRequestFromThisDevice = appDeviceUuids.size == 0 || appDeviceUuids.contains(sourceDevice.uuid)
-        
-        if (shouldRequestFromThisDevice) {
-            pendingRequests[packageName] = now
-            CoroutineScope(Dispatchers.IO).launch {
-                try {
-                    requestIconsFromDevice(context, listOf(packageName), deviceManager, sourceDevice)
-                    // 请求成功，关联应用包名与当前设备（替代原 associateAppWithDevice 方法）
-                    val databaseRepository = DatabaseRepository.getInstance(context)
-                    val appDeviceEntities = mutableListOf<AppDeviceEntity>()
-                    val appDeviceEntity = AppDeviceEntity(
-                        packageName = packageName,
-                        sourceDevice = sourceDevice.uuid,
-                        lastUpdated = System.currentTimeMillis()
-                    )
-                    appDeviceEntities.add(appDeviceEntity)
-                    databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
-                } catch (e: Exception) {
-                    Logger.e(TAG, "请求图标失败：$packageName", e)
-                } finally {
-                    pendingRequests.remove(packageName)
-                }
+
+        // Rust 内部完成过滤（缓存/已安装/pending/设备关联）并构造请求报文
+        val requestJson = NativeCore.appSyncPrepareIconRequest(
+            deviceManager.rustContextInternal,
+            listOf(packageName),
+            installedPackages.toList(),
+            listOf(),
+            if (appDeviceUuids.isEmpty()) emptyMap() else mapOf(packageName to appDeviceUuids),
+            sourceDevice.uuid,
+            System.currentTimeMillis()
+        )
+        if (requestJson == null || requestJson == "{}") return
+
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                requestIconsFromDevice(context, requestJson, deviceManager, sourceDevice)
+                // 请求成功，关联应用包名与当前设备
+                val databaseRepository = DatabaseRepository.getInstance(context)
+                val appDeviceEntity = AppDeviceEntity(
+                    packageName = packageName,
+                    sourceDevice = sourceDevice.uuid,
+                    lastUpdated = System.currentTimeMillis()
+                )
+                databaseRepository.saveAppDeviceAssociations(listOf(appDeviceEntity))
+                NativeCore.appSyncClearIconPending(deviceManager.rustContextInternal, listOf(packageName))
+            } catch (e: Exception) {
+                Logger.e(TAG, "请求图标失败：$packageName", e)
+                NativeCore.appSyncClearIconPending(deviceManager.rustContextInternal, listOf(packageName))
             }
-        } else {
-            //Logger.d(TAG, "应用 $packageName 不属于当前设备 $sourceDevice.uuid，跳过请求")
         }
     }
 
     /**
-     * 批量请求多个包名图标（自动过滤已存在或正在请求的）。
+     * 批量请求多个包名图标（自动过滤已存在或正在请求的，过滤逻辑在 Rust 内部）。
      */
     suspend fun requestIconsBatch(
         context: Context,
@@ -120,58 +93,36 @@ object IconSyncManager {
         deviceManager: DeviceConnectionManager,
         sourceDevice: DeviceInfo
     ) {
-        //Logger.d(TAG, "批量请求图标：$packageNames")
         if (packageNames.size == 0) return
-        
-        val now = System.currentTimeMillis()
+
         val installedPackages = AppRepository.getInstalledPackageNames(context)
-        
-        // 预获取所有需要的数据
-        val (iconMap, appDeviceMap) = coroutineScope {
-            // 并行预获取应用图标
-            val iconDeferred = async {
-                AppRepository.getExternalAppIcons(context, packageNames)
-            }
-            
-            // 并行预获取应用设备关联关系
-            val appDeviceDeferred = async {
-                val databaseRepository = DatabaseRepository.getInstance(context)
-                val appDevices = databaseRepository.getAppDevicesByPackageNames(packageNames)
-                appDevices.groupBy { it.packageName }
-                    .mapValues { (_, appDeviceEntities) ->
-                        appDeviceEntities.map { it.sourceDevice }
-                    }
-            }
-            
-            Pair(iconDeferred.await(), appDeviceDeferred.await())
-        }
-        
-        val need = packageNames.filter { pkg ->
-            // 1. 检查 AppRepository 缓存
-            val exist = iconMap[pkg] != null
-            // 2. 检查本机已安装应用
-            val isInstalled = installedPackages.contains(pkg)
-            // 3. 检查正在请求的图标
-            val last = pendingRequests[pkg]
-            val inFlight = last != null && (now - last) < ICON_REQUEST_TIMEOUT
-            // 4. 检查应用与设备的关联关系
-            val appDeviceUuids = appDeviceMap[pkg] ?: emptyList()
-            val isAssociatedWithThisDevice = appDeviceUuids.size == 0 || appDeviceUuids.contains(sourceDevice.uuid)
-            
-            !exist && !isInstalled && !inFlight && isAssociatedWithThisDevice
-        }
-        
-        if (need.size == 0) {
-            //Logger.d(TAG, "所有图标已缓存或已安装，无需批量请求")
-            return
-        }
-        
-        need.forEach { pendingRequests[it] = now }
+
+        // 预获取已缓存图标与设备关联关系
+        val iconMap = AppRepository.getExternalAppIcons(context, packageNames)
+        val cachedPackages = packageNames.filter { iconMap[it] != null }
+
+        val databaseRepository = DatabaseRepository.getInstance(context)
+        val appDevices = databaseRepository.getAppDevicesByPackageNames(packageNames)
+        val appDeviceMap = appDevices.groupBy { it.packageName }
+            .mapValues { (_, entities) -> entities.map { it.sourceDevice } }
+
+        // Rust 内部完成过滤（缓存/已安装/pending/设备关联）并构造请求报文
+        val requestJson = NativeCore.appSyncPrepareIconRequest(
+            deviceManager.rustContextInternal,
+            packageNames,
+            installedPackages.toList(),
+            cachedPackages,
+            appDeviceMap,
+            sourceDevice.uuid,
+            System.currentTimeMillis()
+        )
+        if (requestJson == null || requestJson == "{}") return
+
         val sourceDeviceUuid = sourceDevice.uuid
         try {
-            requestIconsFromDevice(context, need, deviceManager, sourceDevice)
-            // 请求成功，批量关联应用包名与当前设备（替代原 associateAppsWithDevice 方法）
-            val databaseRepository = DatabaseRepository.getInstance(context)
+            requestIconsFromDevice(context, requestJson, deviceManager, sourceDevice)
+            // 请求成功，批量关联应用包名与当前设备
+            val need = parseRequestedPackages(requestJson)
             val appDeviceEntities = need.map {
                 AppDeviceEntity(
                     packageName = it,
@@ -180,34 +131,36 @@ object IconSyncManager {
                 )
             }
             databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
+            NativeCore.appSyncClearIconPending(deviceManager.rustContextInternal, need)
         } catch (e: Exception) {
-            Logger.e(TAG, "批量请求失败：$need", e)
-        } finally {
-            need.forEach { pendingRequests.remove(it) }
+            Logger.e(TAG, "批量请求失败：$packageNames", e)
+            NativeCore.appSyncClearIconPending(deviceManager.rustContextInternal, parseRequestedPackages(requestJson))
+        }
+    }
+
+    private fun parseRequestedPackages(requestJson: String): List<String> {
+        return try {
+            val json = JSONObject(requestJson)
+            json.optString("packageName").takeIf { it.isNotEmpty() }?.let { listOf(it) }
+                ?: json.optJSONArray("packageNames")?.let { arr ->
+                    (0 until arr.length()).map { arr.optString(it) }.filter { it.isNotEmpty() }
+                }
+                ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
         }
     }
 
     /**
-     * 构建并发送（单包或多包） ICON_REQUEST 请求。
+     * 发送由 Rust 构造好的 ICON_REQUEST 请求报文。
      */
     private suspend fun requestIconsFromDevice(
         context: Context,
-        packages: List<String>,
+        requestJson: String,
         deviceManager: DeviceConnectionManager,
         sourceDevice: DeviceInfo
     ) {
-        if (packages.size == 0) return
-        val raw = JSONObject().apply {
-            put("type", "ICON_REQUEST")
-            if (packages.size == 1) {
-                put("packageName", packages.first())
-            } else {
-                put("packageNames", JSONArray(packages))
-            }
-            put("time", System.currentTimeMillis())
-        }.toString()
-        ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_REQUEST", raw, ICON_REQUEST_TIMEOUT)
-        //Logger.d(TAG, "发送ICON_REQUEST(${packages.size}) -> ${sourceDevice.displayName}")
+        ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_REQUEST", requestJson, 10000L)
     }
 
     /**
@@ -239,7 +192,7 @@ object IconSyncManager {
                         val icon = getLocalAppIcon(context, pkg)
                         if (icon != null) {
                             val base64 = bitmapToBase64(icon)
-                            val item = JSONObject().apply { 
+                            val item = JSONObject().apply {
                                 put("packageName", pkg)
                                 put("iconData", base64)
                             }
@@ -250,9 +203,9 @@ object IconSyncManager {
                         }
                     }
                 }
-                
+
                 // 构建响应，包含可用图标和缺失图标信息
-                val raw = JSONObject().apply { 
+                val raw = JSONObject().apply {
                     put("type", "ICON_RESPONSE")
                     if (resultArr.length() > 0) {
                         put("icons", resultArr)
@@ -262,16 +215,15 @@ object IconSyncManager {
                     }
                     put("time", System.currentTimeMillis())
                 }.toString()
-                
+
                 Logger.d(TAG, "批量图标响应准备发送，包含 ${resultArr.length()} 个图标，${missingArr.length()} 个缺失图标")
-                // 发送响应，即使没有可用图标，也要通知请求方哪些图标缺失
-                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, ICON_REQUEST_TIMEOUT)
+                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, 10000L)
                 Logger.d(TAG, "批量图标响应已发送(${resultArr.length()}) -> ${sourceDevice.displayName}")
             } else if (single.isNotEmpty()) {
                 val icon = runBlocking {
                     getLocalAppIcon(context, single)
                 }
-                val raw = JSONObject().apply { 
+                val raw = JSONObject().apply {
                     put("type", "ICON_RESPONSE")
                     put("packageName", single)
                     if (icon != null) {
@@ -281,10 +233,9 @@ object IconSyncManager {
                     }
                     put("time", System.currentTimeMillis())
                 }.toString()
-                
+
                 Logger.d(TAG, "单图标响应准备发送，包名：$single，${if (icon != null) "有图标" else "无图标"}")
-                // 发送响应，即使没有图标，也要通知请求方
-                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, ICON_REQUEST_TIMEOUT)
+                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, 10000L)
                 Logger.d(TAG, "单图标响应已发送：$single -> ${sourceDevice.displayName}")
             }
         } catch (e: Exception) {
@@ -293,52 +244,31 @@ object IconSyncManager {
     }
 
     /**
-     * 处理 ICON_RESPONSE（单个或批量）。
+     * 处理 ICON_RESPONSE（单个或批量）。解析由 Rust 完成。
      */
     fun handleIconResponse(responseData: String, context: Context) {
         try {
-            val json = JSONObject(responseData)
-            if (json.optString("type") != "ICON_RESPONSE") return
+            val parsed = NativeCore.appSyncParseIconResponse(responseData) ?: return
+            val result = JSONObject(parsed)
 
-            val iconsArray = json.optJSONArray("icons")
+            val iconsArray = result.optJSONArray("icons")
             if (iconsArray != null && iconsArray.length() > 0) {
                 for (i in 0 until iconsArray.length()) {
                     val item = iconsArray.optJSONObject(i) ?: continue
                     val pkg = item.optString("packageName")
                     val base64 = item.optString("iconData")
-                    cacheDecodedIcon(context, pkg, base64)
-                }
-                //Logger.d(TAG, "批量图标接收完成：${iconsArray.length()}")
-            }
-
-            val pkg = json.optString("packageName")
-            val base64 = json.optString("iconData")
-            val isMissing = json.optBoolean("missing", false)
-            
-            if (pkg.isNotEmpty()) {
-                if (base64.isNotEmpty()) {
-                    // 处理单个图标响应
-                    cacheDecodedIcon(context, pkg, base64)
-                    //Logger.d(TAG, "单图标接收：$pkg")
-                } else if (isMissing) {
-                    // 处理单个缺失图标响应
-                    //Logger.d(TAG, "单图标缺失：$pkg")
-                    // 标记图标为缺失，避免重复请求（替代原 markIconAsMissing 方法）
-                    runBlocking {
-                        val databaseRepository = DatabaseRepository.getInstance(context)
-                        databaseRepository.markAppIconAsMissing(pkg)
+                    if (pkg.isNotEmpty() && base64.isNotEmpty()) {
+                        cacheDecodedIcon(context, pkg, base64)
                     }
                 }
             }
-            
-            // 处理批量缺失图标
-            val missingArray = json.optJSONArray("missing")
+
+            // 处理缺失图标
+            val missingArray = result.optJSONArray("missing")
             if (missingArray != null && missingArray.length() > 0) {
                 for (i in 0 until missingArray.length()) {
                     val missingPkg = missingArray.optString(i)
                     if (missingPkg.isNotEmpty()) {
-                        //Logger.d(TAG, "批量图标缺失：$missingPkg")
-                    // 标记图标为缺失（替代原 markIconAsMissing 方法）
                         runBlocking {
                             val databaseRepository = DatabaseRepository.getInstance(context)
                             databaseRepository.markAppIconAsMissing(missingPkg)
@@ -390,15 +320,6 @@ object IconSyncManager {
         } catch (e: Exception) {
             Logger.w(TAG, "获取本地图标失败：$packageName", e)
             null
-        }
-    }
-
-    fun cleanupExpiredRequests() {
-        val now = System.currentTimeMillis()
-        pendingRequests.entries.removeIf { (_, t) ->
-            val expired = (now - t) > ICON_REQUEST_TIMEOUT * 2
-            //Logger.d(TAG, "清理过期请求：$pkg")
-            expired
         }
     }
 }
