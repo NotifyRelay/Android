@@ -115,20 +115,8 @@ object ServiceManager {
             }
         }
         
-        // 启动剪贴板监控服务
-        try {
-            val clipboardStarted = startClipboardMonitorService(context)
-            if (!clipboardStarted) {
-                if (errorMessage == null) {
-                    errorMessage = AUTO_START_ERROR_MESSAGE
-                }
-            } else {
-                serviceStarted = true
-            }
-        } catch (e: Exception) {
-            Logger.e("ServiceManager", "启动剪贴板监控服务时发生异常", e)
-            // 剪贴板服务启动失败不影响主要功能，所以不设置错误信息
-        }
+        // 启动剪贴板监控服务已移除：剪贴板同步仅保留手动通知点击与 Fcitx5 广播两种入口
+        // 剪贴板监控服务启动失败不影响主要功能，所以不设置错误信息
 
         return Pair(serviceStarted, errorMessage)
     }

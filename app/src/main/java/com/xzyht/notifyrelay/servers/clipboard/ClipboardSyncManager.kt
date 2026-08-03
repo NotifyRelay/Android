@@ -63,9 +63,15 @@ object ClipboardSyncManager {
     }
 
     fun init(context: Context) {
-        clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         Logger.d(TAG, "剪贴板同步管理器已初始化")
         PermissionHelper.AppForegroundDetector.initialize(context)
+    }
+
+    private fun getClipboardManager(context: Context): ClipboardManager? {
+        if (clipboardManager == null) {
+            clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+        }
+        return clipboardManager
     }
 
     fun suppressClipboardMonitoring(durationMs: Long = 2000) {
@@ -151,7 +157,7 @@ object ClipboardSyncManager {
         }
 
         try {
-            clipboardManager?.let { cm ->
+            getClipboardManager(context)?.let { cm ->
                 // 尝试获取剪贴板内容，捕获可能的权限异常
                 val clip = cm.primaryClip
                 if (clip == null) {
@@ -238,7 +244,7 @@ object ClipboardSyncManager {
      */
     private fun updateLocalClipboardContent(type: String, content: String, context: Context) {
         try {
-            clipboardManager?.let { cm ->
+            getClipboardManager(context)?.let { cm ->
                 when (type) {
                     CLIPBOARD_TYPE_TEXT -> {
                         // 使用便捷方法创建文本剪贴板内容
