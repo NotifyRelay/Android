@@ -619,7 +619,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         try {
             val ctx = rustContext ?: return
             val displayName = getLocalDisplayName()
-            NativeCore.startMdnsAdvertiser(ctx, uuid, displayName, listenPort.toShort(), localPublicKey, "android")
+            NativeCore.startMdnsAdvertiser(ctx, uuid, displayName, listenPort.toShort(), localPublicKey, "android", lastSentSignedBattery)
             NativeCore.startMdnsDiscovery(ctx)
             Logger.d("死神-NotifyRelay", "mDNS 服务已启动")
         } catch (e: Exception) {
@@ -667,11 +667,14 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 val online = obj.optBoolean("online")
                 val ip = obj.optString("ip")
                 val port = obj.optInt("port", listenPort).takeIf { it > 0 } ?: listenPort
-                val battery = obj.optInt("battery", -1)
-                val chargingStatus = if (battery >= 0) '1' else '0'
+                val battery = obj.optInt("battery", -101)
+                val oldInfo = synchronized(deviceInfoCache) { deviceInfoCache[uuid] }
+                // 未知电量（超出 [-100,100]）沿用缓存旧值，不覆盖已显示的电量/充电状态
+                val batteryUnknown = kotlin.math.abs(battery) > 100
+                val chargingStatus = if (batteryUnknown) (oldInfo?.chargingStatus ?: '0')
+                else if (battery >= 0) '1' else '0'
                 val deviceType = obj.optString("deviceType", "unknown")
                 val isAuthed = authSnapshot[uuid]?.isAccepted == true
-                val oldInfo = synchronized(deviceInfoCache) { deviceInfoCache[uuid] }
                 val auth = authSnapshot[uuid]
                 val displayName = obj.optString("name")
                     .ifEmpty { oldInfo?.displayName ?: auth?.displayName ?: DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid) }
@@ -682,7 +685,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                         displayName = displayName,
                         ip = ip,
                         port = port,
-                        batteryLevel = kotlin.math.abs(battery),
+                        batteryLevel = if (batteryUnknown) (oldInfo?.batteryLevel ?: -1) else kotlin.math.abs(battery),
                         chargingStatus = chargingStatus
                     )
                 }
@@ -1341,8 +1344,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 try {
                     val info = HeartbeatProcessor.HeartbeatInfo(
                         uuid = remoteUuid, displayName = remoteName,
-                        port = port.toInt(), batteryLevel = kotlin.math.abs(battery),
-                        isCharging = battery >= 0, deviceType = remoteDeviceType, ip = resolvedIp
+                        port = port.toInt(), batteryLevel = battery,
+                        isCharging = battery > 0, deviceType = remoteDeviceType, ip = resolvedIp
                     )
                     if (info.uuid != dm.uuid) {
                         HeartbeatProcessor.processHeartbeat(info, dm)
@@ -1356,17 +1359,18 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
         // ---- on_mdns_discovered ----
         val mdnsDiscoveredCb = object : NotifyRelayCore.OnMdnsDiscoveredCb {
-            override fun invoke(uuid: Pointer?, name: Pointer?, ip: Pointer?, port: Short, deviceType: Pointer?, userData: Pointer?) {
+            override fun invoke(uuid: Pointer?, name: Pointer?, ip: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?) {
                 val dm = _callbackInstance ?: return
                 val remoteUuid = ptr2str(uuid) ?: return
                 val remoteName = ptr2str(name) ?: return
                 val remoteIp = ptr2str(ip) ?: "0.0.0.0"
                 val remoteDeviceType = ptr2str(deviceType) ?: "unknown"
                 try {
+                    // 广告 TXT 携带 signed 电量（正=充电，负=放电，-101=未知），充电状态由符号推断
                     val info = HeartbeatProcessor.HeartbeatInfo(
                         uuid = remoteUuid, displayName = remoteName,
-                        port = port.toInt(), batteryLevel = -1,
-                        isCharging = false, deviceType = remoteDeviceType, ip = remoteIp
+                        port = port.toInt(), batteryLevel = battery,
+                        isCharging = battery > 0, deviceType = remoteDeviceType, ip = remoteIp
                     )
                     if (info.uuid != dm.uuid) {
                         HeartbeatProcessor.processHeartbeat(info, dm)

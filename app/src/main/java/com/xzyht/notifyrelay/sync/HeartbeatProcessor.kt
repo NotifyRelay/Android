@@ -61,7 +61,11 @@ object HeartbeatProcessor {
             synchronized(deviceManager.deviceInfoCacheInternal) {
                 val existing = deviceManager.deviceInfoCacheInternal[uuid]
                 val effectiveIp = info.ip.takeUnless { it == "0.0.0.0" || it.isBlank() } ?: existing?.ip ?: info.ip
-                deviceManager.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, info.displayName, effectiveIp, info.port, info.batteryLevel, if (info.isCharging) '1' else '0')
+                // 未知电量（超出 [-100,100]）沿用缓存旧值，不覆盖已显示的电量/充电状态
+                val batteryUnknown = kotlin.math.abs(info.batteryLevel) > 100
+                val batteryLevel = if (batteryUnknown) (existing?.batteryLevel ?: -1) else kotlin.math.abs(info.batteryLevel)
+                val chargingStatus = if (batteryUnknown) (existing?.chargingStatus ?: '0') else if (info.isCharging) '1' else '0'
+                deviceManager.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, info.displayName, effectiveIp, info.port, batteryLevel, chargingStatus)
             }
             DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
 
@@ -72,7 +76,11 @@ object HeartbeatProcessor {
             synchronized(deviceManager.deviceInfoCacheInternal) {
                 val existing = deviceManager.deviceInfoCacheInternal[uuid]
                 val effectiveIp = info.ip.takeUnless { it == "0.0.0.0" || it.isBlank() } ?: existing?.ip ?: info.ip
-                deviceManager.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, info.displayName, effectiveIp, info.port, info.batteryLevel, if (info.isCharging) '1' else '0')
+                // 未知电量（超出 [-100,100]）沿用缓存旧值，不覆盖已显示的电量/充电状态
+                val batteryUnknown = kotlin.math.abs(info.batteryLevel) > 100
+                val batteryLevel = if (batteryUnknown) (existing?.batteryLevel ?: -1) else kotlin.math.abs(info.batteryLevel)
+                val chargingStatus = if (batteryUnknown) (existing?.chargingStatus ?: '0') else if (info.isCharging) '1' else '0'
+                deviceManager.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, info.displayName, effectiveIp, info.port, batteryLevel, chargingStatus)
             }
             DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
 

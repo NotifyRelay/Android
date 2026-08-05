@@ -311,8 +311,8 @@ object NativeCore {
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_local_ip())
 
     // ======== mDNS ========
-    fun startMdnsAdvertiser(ctx: Pointer, uuid: String, name: String, port: Short, pubkey: String, deviceType: String): Int =
-        lib.nrc_start_mdns_advertiser(ctx, uuid, name, port, pubkey, deviceType)
+    fun startMdnsAdvertiser(ctx: Pointer, uuid: String, name: String, port: Short, pubkey: String, deviceType: String, battery: Int): Int =
+        lib.nrc_start_mdns_advertiser(ctx, uuid, name, port, pubkey, deviceType, battery)
 
     fun stopMdnsAdvertiser(ctx: Pointer): Int =
         lib.nrc_stop_mdns_advertiser(ctx)

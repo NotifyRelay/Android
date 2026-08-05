@@ -298,7 +298,8 @@ fun DeviceListScreen(
         val isCharging = remember { mutableStateOf(device.chargingStatus) }
 
         LaunchedEffect(device.batteryLevel) {
-            if (device.batteryLevel != -1 && device.batteryLevel != batteryLevel.intValue) {
+            // 未知电量（超出 [-100,100]）不更新显示
+            if (kotlin.math.abs(device.batteryLevel) <= 100 && device.batteryLevel != batteryLevel.intValue) {
                 batteryLevel.intValue = device.batteryLevel.coerceIn(0, 100)
             }
         }

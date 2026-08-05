@@ -47,7 +47,7 @@ interface NotifyRelayCore : Library {
         fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?)
     }
     interface OnMdnsDiscoveredCb : Callback {
-        fun invoke(uuid: Pointer?, name: Pointer?, ip: Pointer?, port: Short, deviceType: Pointer?, userData: Pointer?)
+        fun invoke(uuid: Pointer?, name: Pointer?, ip: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?)
     }
     interface OnDeviceTimeoutCb : Callback {
         fun invoke(uuid: Pointer?, userData: Pointer?)
@@ -220,7 +220,7 @@ interface NotifyRelayCore : Library {
     fun nrc_set_on_mdns_discovered_cb(ctx: Pointer, cb: OnMdnsDiscoveredCb?)
 
     // ======== mDNS ========
-    fun nrc_start_mdns_advertiser(ctx: Pointer, uuid: String, name: String, port: Short, pubkey: String, deviceType: String): Int
+    fun nrc_start_mdns_advertiser(ctx: Pointer, uuid: String, name: String, port: Short, pubkey: String, deviceType: String, battery: Int): Int
     fun nrc_stop_mdns_advertiser(ctx: Pointer): Int
     fun nrc_start_mdns_discovery(ctx: Pointer): Int
     fun nrc_stop_mdns_discovery(ctx: Pointer): Int
