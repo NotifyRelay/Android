@@ -116,8 +116,6 @@ interface NotifyRelayCore : Library {
     fun nrc_clear_pairing_code(ctx: Pointer)
     fun nrc_validate_pairing_code(ctx: Pointer, code: String): Int
     fun nrc_send_reject(ctx: Pointer, uuid: String)
-    fun nrc_send_heartbeat_udp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
-    fun nrc_send_discovery(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String)
     fun nrc_send_data_message(ctx: Pointer, header: String, localUuid: String, localPubKey: String, remoteUuid: String, plaintext: String)
 
     // ======== Periodic broadcast ========
@@ -143,11 +141,6 @@ interface NotifyRelayCore : Library {
     fun nrc_get_connected_device_count(ctx: Pointer): Int
     fun nrc_is_device_connected(ctx: Pointer, uuid: String): Int
     fun nrc_remove_device_session(ctx: Pointer, uuid: String): Int
-
-    // ======== Heartbeat sender ========
-    fun nrc_start_heartbeat_sender(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, ip: String, intervalMs: Long, mode: Int): Long
-    fun nrc_update_heartbeat_params(ctx: Pointer, handlePtr: Long, uuid: String, name: String, battery: Int, deviceType: String)
-    fun nrc_stop_heartbeat_sender(ctx: Pointer, handlePtr: Long)
 
     // ======== Heartbeat scheduler (统一心跳调度, 替代 per-device sender) ========
     fun nrc_start_heartbeat_scheduler(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, intervalMs: Long): Long
@@ -191,8 +184,6 @@ interface NotifyRelayCore : Library {
     // ======== Discovery ========
     fun nrc_add_known_device(ctx: Pointer, uuid: String, ip: String)
     fun nrc_remove_known_device(ctx: Pointer, uuid: String)
-    fun nrc_record_discovered_device(ctx: Pointer, uuid: String, name: String?, ip: String, port: Short, battery: Int, deviceType: String)
-    fun nrc_get_discovered_devices(ctx: Pointer): Pointer
     fun nrc_start_known_device_scanner(ctx: Pointer)
     fun nrc_stop_known_device_scanner(ctx: Pointer)
 

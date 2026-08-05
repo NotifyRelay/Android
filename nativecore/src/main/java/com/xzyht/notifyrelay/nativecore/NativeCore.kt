@@ -110,12 +110,6 @@ object NativeCore {
     fun validatePairingCode(ctx: Pointer, code: String): Int =
         lib.nrc_validate_pairing_code(ctx, code)
 
-    fun sendHeartbeatUdp(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String) =
-        lib.nrc_send_heartbeat_udp(ctx, uuid, name, port, battery, deviceType)
-
-    fun sendDiscovery(ctx: Pointer, uuid: String, name: String, port: Short, battery: Int, deviceType: String) =
-        lib.nrc_send_discovery(ctx, uuid, name, port, battery, deviceType)
-
     fun sendDataMessage(ctx: Pointer, header: String, localUuid: String, localPubKey: String, remoteUuid: String, plaintext: String) =
         lib.nrc_send_data_message(ctx, header, localUuid, localPubKey, remoteUuid, plaintext)
 
@@ -191,16 +185,6 @@ object NativeCore {
 
     fun generateRandomPassword(): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_generate_random_password())
-
-    // ======== Heartbeat sender ========
-    fun startHeartbeatSender(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, ip: String, intervalMs: Long, mode: Int): Long =
-        lib.nrc_start_heartbeat_sender(ctx, uuid, name, battery, deviceType, ip, intervalMs, mode)
-
-    fun updateHeartbeatParams(ctx: Pointer, handlePtr: Long, uuid: String, name: String, battery: Int, deviceType: String) =
-        lib.nrc_update_heartbeat_params(ctx, handlePtr, uuid, name, battery, deviceType)
-
-    fun stopHeartbeatSender(ctx: Pointer, handlePtr: Long) =
-        lib.nrc_stop_heartbeat_sender(ctx, handlePtr)
 
     // ======== Heartbeat scheduler (统一心跳调度) ========
     fun startHeartbeatScheduler(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, intervalMs: Long): Long =
@@ -329,12 +313,6 @@ object NativeCore {
 
     fun removeKnownDevice(ctx: Pointer, uuid: String) =
         lib.nrc_remove_known_device(ctx, uuid)
-
-    fun recordDiscoveredDevice(ctx: Pointer, uuid: String, name: String?, ip: String, port: Short, battery: Int, deviceType: String) =
-        lib.nrc_record_discovered_device(ctx, uuid, name, ip, port, battery, deviceType)
-
-    fun getDiscoveredDevices(ctx: Pointer): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_discovered_devices(ctx))
 
     fun startKnownDeviceScanner(ctx: Pointer) =
         lib.nrc_start_known_device_scanner(ctx)
