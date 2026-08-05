@@ -56,16 +56,7 @@ fun PairingCodeDialog(
         val clipboardManager = LocalClipboardManager.current
         val scope = rememberCoroutineScope()
         val displayCode = remember {
-            val ctx = deviceManager.rustContextInternal
-            if (ctx != null) {
-                NativeCore.generatePairingCode(ctx)
-            } else {
-                val r = java.security.SecureRandom()
-                (r.nextInt(900_000) + 100_000).toString()
-            }
-        } ?: run {
-            val r = java.security.SecureRandom()
-            (r.nextInt(900_000) + 100_000).toString()
+            NativeCore.generatePairingCode(deviceManager.rustContextInternal!!)!!
         }
 
         LaunchedEffect(show) {
