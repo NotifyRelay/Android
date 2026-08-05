@@ -28,6 +28,7 @@ object NativeCore {
         return ctx
     }
     fun destroyContext(ctx: Pointer) {
+        try { stopHeartbeatScheduler(ctx) } catch (_: Exception) {}
         lib.nrc_destroy(ctx)
         if (_rustContext == ctx) _rustContext = null
         senderQueuePtr = 0L
@@ -200,6 +201,20 @@ object NativeCore {
 
     fun stopHeartbeatSender(ctx: Pointer, handlePtr: Long) =
         lib.nrc_stop_heartbeat_sender(ctx, handlePtr)
+
+    // ======== Heartbeat scheduler (统一心跳调度) ========
+    fun startHeartbeatScheduler(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, intervalMs: Long): Long =
+        lib.nrc_start_heartbeat_scheduler(ctx, uuid, name, battery, deviceType, intervalMs)
+
+    fun updateHeartbeatSchedulerParams(ctx: Pointer, name: String, battery: Int, deviceType: String) =
+        lib.nrc_update_heartbeat_scheduler_params(ctx, name, battery, deviceType)
+
+    fun stopHeartbeatScheduler(ctx: Pointer) =
+        lib.nrc_stop_heartbeat_scheduler(ctx)
+
+    // ======== Device state snapshot ========
+    fun getDeviceList(ctx: Pointer, authedTimeoutMs: Long, unauthedTimeoutMs: Long): String? =
+        NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_device_list(ctx, authedTimeoutMs, unauthedTimeoutMs))
 
     // ======== Offline detector ========
     fun startOfflineDetector(ctx: Pointer, timeoutSec: Long = 30, checkIntervalMs: Long = 3000): Long =

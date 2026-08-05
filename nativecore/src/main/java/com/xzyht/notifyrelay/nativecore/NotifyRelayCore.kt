@@ -149,6 +149,14 @@ interface NotifyRelayCore : Library {
     fun nrc_update_heartbeat_params(ctx: Pointer, handlePtr: Long, uuid: String, name: String, battery: Int, deviceType: String)
     fun nrc_stop_heartbeat_sender(ctx: Pointer, handlePtr: Long)
 
+    // ======== Heartbeat scheduler (统一心跳调度, 替代 per-device sender) ========
+    fun nrc_start_heartbeat_scheduler(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, intervalMs: Long): Long
+    fun nrc_update_heartbeat_scheduler_params(ctx: Pointer, name: String, battery: Int, deviceType: String)
+    fun nrc_stop_heartbeat_scheduler(ctx: Pointer)
+
+    // ======== Device state snapshot ========
+    fun nrc_get_device_list(ctx: Pointer, authedTimeoutMs: Long, unauthedTimeoutMs: Long): Pointer
+
     // ======== Offline detector ========
     fun nrc_start_offline_detector(ctx: Pointer, timeoutSec: Long, checkIntervalMs: Long): Long
     fun nrc_stop_offline_detector(ctx: Pointer)

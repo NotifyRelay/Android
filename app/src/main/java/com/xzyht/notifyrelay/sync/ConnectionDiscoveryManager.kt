@@ -28,10 +28,10 @@ import kotlinx.coroutines.launch
  *   - UDP 关闭时：仅依靠「已记忆 IP + 手动发现循环」对认证设备做周期性的主动连接；
  *
  * - 通过 DeviceConnectionManager 暴露的 internal 访问器读写：
- *   - 设备缓存 deviceInfoCache / deviceLastSeen、
+ *   - 设备缓存 deviceInfoCache、
  *   - 已认证设备表 authenticatedDevices、
- *   - 心跳状态 heartbeatedDevices、
  *   - 以及 startServer / updateDeviceList 等入口。
+ *   - 心跳状态（heartbeatedDevices/deviceLastSeen）已迁移至 Rust DeviceRegistry。
  */
 class ConnectionDiscoveryManager(
     private val deviceManager: DeviceConnectionManager,
@@ -47,8 +47,6 @@ class ConnectionDiscoveryManager(
      * 更新设备信息缓存并触发设备列表更新
      */
     private fun updateDeviceInfoCache(device: DeviceInfo) {
-        deviceManager.deviceLastSeenInternal[device.uuid] = System.currentTimeMillis()
-        
         synchronized(deviceManager.deviceInfoCacheInternal) {
             deviceManager.deviceInfoCacheInternal[device.uuid] = device
         }
@@ -73,10 +71,7 @@ class ConnectionDiscoveryManager(
         val isAuthed = synchronized(deviceManager.authenticatedDevices) { 
             deviceManager.authenticatedDevices.containsKey(device.uuid) 
         }
-        val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
-            deviceManager.heartbeatedDevicesInternal.contains(device.uuid)
-        }
-        if (isAuthed && !isHeartbeated) {
+        if (isAuthed) {
             deviceManager.connectToDevice(device)
         }
     }
@@ -238,10 +233,6 @@ class ConnectionDiscoveryManager(
             val authed = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices.toMap() }
             for ((uuid, _) in authed) {
                 if (uuid == deviceManager.uuid) continue
-                val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
-                    deviceManager.heartbeatedDevicesInternal.contains(uuid)
-                }
-                if (isHeartbeated) continue
                 val info = deviceManager.getDeviceInfoInternal(uuid)
                 val ip = info?.ip
                 val port = info?.port ?: deviceManager.listenPort

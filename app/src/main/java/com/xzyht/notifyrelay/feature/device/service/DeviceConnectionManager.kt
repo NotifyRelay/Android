@@ -402,9 +402,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal val deviceInfoCacheInternal: MutableMap<String, DeviceInfo>
         get() = deviceInfoCache
 
-    internal val deviceLastSeenInternal: MutableMap<String, Long>
-        get() = deviceLastSeen
-
     internal val rejectedDevicesInternal: MutableSet<String>
         get() = rejectedDevices
 
@@ -446,19 +443,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal val coroutineScopeInternal: CoroutineScope
         get() = coroutineScope
 
-    private val heartbeatedDevices = mutableSetOf<String>()
-
-    internal val heartbeatedDevicesInternal: MutableSet<String>
-        get() = heartbeatedDevices
-
-    internal val heartbeatJobsInternal: MutableMap<String, Long>
-        get() = heartbeatJobs
-
     internal val contextInternal: android.content.Context
         get() = context
-
-    internal val keepAliveInternal: ConnectionKeepAlive
-        get() = keepAlive
 
     internal fun localDisplayNameInternal(): String = getLocalDisplayName()
 
@@ -498,9 +484,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal val rustContextInternal: com.sun.jna.Pointer?
         get() = rustContext
 
-    private val deviceLastSeen = mutableMapOf<String, Long>()
-    // 心跳定时任务
-    private val heartbeatJobs = mutableMapOf<String, Long>()
     private var serverStarted = false
     // UI全局开关：是否启用UDP发现，使用内存缓存避免频繁数据库访问
     // 使用AppConfig管理UDP发现配置
@@ -564,6 +547,16 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         saveRustCoreState()
         // 尽早初始化发送队列等新特性，避免发送窗口期
         rustContext?.let { NativeCore.initializeNewFeatures(it) }
+        // 启动统一心跳调度器：已配对设备的每设备心跳（Auto 模式）由 Rust 自动启停
+        try {
+            rustContext?.let { ctx ->
+                val batteryLevel = BatteryUtils.getBatteryLevel(context)
+                val battery = if (BatteryUtils.isCharging(context)) batteryLevel else -batteryLevel
+                NativeCore.startHeartbeatScheduler(ctx, uuid, getLocalDisplayName(), battery, "android", 2000L)
+            }
+        } catch (e: Exception) {
+            Logger.e("死神-NotifyRelay", "启动心跳调度器失败", e)
+        }
         // 新增：初始补全本机 deviceInfoCache，便于反向 connectToDevice
         val displayName = getLocalDisplayName()
         val localIp = discoveryManager.getLocalIpAddressInternal()
@@ -593,7 +586,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
-    // 统一设备状态管理：3秒未发现未认证设备直接移除，已认证设备置灰
+    // 统一设备状态管理：1s 定时拉取 Rust 状态快照（在线判定/超时移除已迁移至 Rust DeviceRegistry）
     private fun startOfflineDeviceCleaner() {
         coroutineScope.launch {
             while (true) {
@@ -607,70 +600,70 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
+    // 统一设备状态管理：在线判定/超时移除已迁移至 Rust DeviceRegistry，此处消费状态快照
     private fun updateDeviceList() {
-        val now = System.currentTimeMillis()
-        //Logger.d("死神-NotifyRelay", "[updateDeviceList] invoked at $now")
-        val authSnapshot = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
-        val authed = authSnapshot.keys.toSet()
-        val lastSeenSnapshot = synchronized(deviceLastSeen) { deviceLastSeen.toMap() }
-        val allUuids = (lastSeenSnapshot.keys + authed).toSet()
-        val newMap = mutableMapOf<String, Pair<DeviceInfo, Boolean>>()
-        val unauthedTimeout = 5000L // 未认证设备保留两次UDP广播周期（2*2000ms）
-        val authedHeartbeatTimeout = 12_000L // 已认证设备心跳超时阈值
-        val oldMap = _devices.value
-        // 计算旧的已认证且在线数量快照
-        val oldAuthOnlineCount = try {
-            oldMap.count { (uuid, pair) -> pair.second && (authSnapshot[uuid]?.isAccepted == true) }
-        } catch (_: Exception) { 0 }
-        for (uuid in allUuids) {
-            // 过滤掉uuid为"本机"的记录
-            if (uuid == "本机") continue
-            
-            val deviceInfo = getDeviceInfo(uuid)
-            
-            val lastSeen = lastSeenSnapshot[uuid]
-            val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
-            // 不兼容的旧版协议设备，强制离线
-            val isIncompatible = incompatibleDevicesInternal.contains(uuid)
-            if (auth != null) {
-                // 仅基于心跳包判定在线
-                val diff = if (lastSeen != null) now - lastSeen else -1L
-                val isOnline = !isIncompatible && lastSeen != null && diff <= authedHeartbeatTimeout
-                val info = deviceInfo ?: let {
-                    Logger.w("死神-NotifyRelay", "updateDeviceList: 设备 $uuid 无缓存信息, auth.lastIp=${auth.lastIp}")
-                    DeviceInfo(uuid, auth.displayName ?: "已认证设备", auth.lastIp.orEmpty(), listenPort)
+        refreshDevicesFromRust()
+    }
+
+    /**
+     * 从 Rust 拉取设备状态快照（uuid/ip/电量/在线/配对等），回填 deviceInfoCache，
+     * 生成 _devices（未认证且不在线的设备过滤 = 显示策略），并刷新在线设备缓存。
+     * 1s 定时器（startOfflineDeviceCleaner）与心跳回调共同触发。
+     */
+    private fun refreshDevicesFromRust() {
+        val ctx = rustContext ?: return
+        val json = try {
+            NativeCore.getDeviceList(ctx, 12_000L, 5_000L)
+        } catch (_: Exception) { null } ?: return
+        try {
+            val arr = org.json.JSONArray(json)
+            val authSnapshot = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
+            val newMap = mutableMapOf<String, Pair<DeviceInfo, Boolean>>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val uuid = obj.optString("uuid")
+                if (uuid.isEmpty() || uuid == this.uuid) continue
+                val online = obj.optBoolean("online")
+                val ip = obj.optString("ip")
+                val port = obj.optInt("port", listenPort).takeIf { it > 0 } ?: listenPort
+                val battery = obj.optInt("battery", -1)
+                val chargingStatus = if (battery >= 0) '1' else '0'
+                val deviceType = obj.optString("deviceType", "unknown")
+                val isAuthed = authSnapshot[uuid]?.isAccepted == true
+                val oldInfo = synchronized(deviceInfoCache) { deviceInfoCache[uuid] }
+                val auth = authSnapshot[uuid]
+                val displayName = obj.optString("name")
+                    .ifEmpty { oldInfo?.displayName ?: auth?.displayName ?: DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid) }
+                // 回填缓存（名称/类型以平台持久化与历史缓存为准，IP/电量来自快照）
+                synchronized(deviceInfoCache) {
+                    deviceInfoCache[uuid] = DeviceInfo(
+                        uuid = uuid,
+                        displayName = displayName,
+                        ip = ip,
+                        port = port,
+                        batteryLevel = kotlin.math.abs(battery),
+                        chargingStatus = chargingStatus
+                    )
                 }
-                val oldOnline = oldMap[uuid]?.second
-                if (oldOnline != null && oldOnline != isOnline) {
-                    Logger.i("天使-死神-NotifyRelay", "[updateDeviceList] 已认证设备状态变化: uuid=$uuid, isOnline=$isOnline, lastSeen=$lastSeen, diff=$diff")
+                // 显示策略：未认证且不在线的设备过滤
+                if (!isAuthed && !online) continue
+                synchronized(deviceInfoCache) {
+                    deviceInfoCache[uuid]?.let { newMap[uuid] = it to online }
                 }
-                newMap[uuid] = info to isOnline
-            } else {
-                val diff = if (lastSeen != null) now - lastSeen else -1L
-                val isOnline = lastSeen != null && diff <= unauthedTimeout
-                val info = deviceInfo
-                val oldOnline = oldMap[uuid]?.second
-                if (oldOnline != null && oldOnline != isOnline) {
-                    Logger.i("死神-NotifyRelay", "[updateDeviceList] 未认证设备状态变化: uuid=$uuid, isOnline=$isOnline, lastSeen=$lastSeen, diff=$diff")
-                }
-                if (isOnline) {
-                    if (info != null) newMap[uuid] = info to true
-                } else {
-                    synchronized(deviceLastSeen) { deviceLastSeen.remove(uuid) }
+                // 同步已认证设备的 lastIp/deviceType 元数据
+                if (isAuthed && auth != null) {
+                    val effectiveIp = ip.takeUnless { it == "0.0.0.0" || it.isBlank() }
+                    if (effectiveIp != null && auth.lastIp != effectiveIp || auth.deviceType != deviceType) {
+                        synchronized(authenticatedDevices) {
+                            authenticatedDevices[uuid] = auth.copy(lastIp = effectiveIp ?: auth.lastIp, deviceType = deviceType)
+                        }
+                        saveAuthedDevices()
+                    }
                 }
             }
-        }
-        // 仅在设备列表或在线状态发生实际变化时触发回调，避免频繁刷新
-        // 计算新的已认证且在线数量快照
-        val newAuthOnlineCount = try {
-            newMap.count { (uuid, pair) -> pair.second && (authSnapshot[uuid]?.isAccepted == true) }
-        } catch (_: Exception) { 0 }
-
-        // 直接更新Flow值，UI层通过Flow订阅获取变化
-        _devices.value = newMap
-
-        // 更新在线设备缓存，供 scrcpy 模块使用
-        updateOnlineDevicesCache(newMap, authSnapshot)
+            _devices.value = newMap
+            updateOnlineDevicesCache(newMap, authSnapshot)
+        } catch (_: Exception) {}
     }
 
     private fun updateOnlineDevicesCache(
@@ -1053,7 +1046,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             val ok = dm.completePairingWithLongTermKeys(uuid, ltPubKey, lastIp = ip)
                             dm.resolveHandshake(uuid, ok)
                             if (ok) {
-                                dm.keepAliveInternal.startHeartbeatToDevice(uuid, ip, 23333, "")
+                                // 登记已知设备（uuid+ip），心跳由 Rust 调度器自动启动
+                                dm.registerKnownDevice(uuid, ip)
                             }
                             Logger.d("CoreCb", "ACCEPT 已处理: $uuid")
                         }
@@ -1079,6 +1073,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                     val ltPub = json.optString("remote_pub_key", "")
                                     if (ltPub.isNotEmpty()) {
                                         dm.completePairingWithLongTermKeys(uuid, ltPub)
+                                        // 登记已知设备（uuid+ip），心跳由 Rust 调度器自动启动
+                                        val cachedIp = synchronized(dm.deviceInfoCacheInternal) {
+                                            dm.deviceInfoCacheInternal[uuid]?.ip
+                                        }
+                                        dm.registerKnownDevice(uuid, cachedIp ?: "")
                                     }
                                 }
                                 dm.resolveHandshake(uuid, true)
@@ -1342,10 +1341,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         val deviceTimeoutCb = object : NotifyRelayCore.OnDeviceTimeoutCb {
             override fun invoke(uuidPtr: Pointer?, userData: Pointer?) {
                 val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
-                synchronized(deviceLastSeen) {
-                    deviceLastSeen[uuid] = System.currentTimeMillis() - 30_000L
-                }
-                // 设备超时离线后重新登记重连目标，由 Rust 重连状态机发起新一轮重试
+                // 超时离线状态由 Rust DeviceRegistry 维护，此处仅重新登记重连目标
                 val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
                 if (auth != null) registerReconnectTarget(uuid, auth.lastIp ?: "")
             }
@@ -1535,7 +1531,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     /**
      * 公开API：移除已认证设备（线程安全）。
-     * - 取消与该设备相关的心跳任务
+     * - 从 Rust 上下文移除设备密钥（registry 状态随之清理）
+     * - 从 Rust 重连状态机与已知设备扫描器移除（心跳调度随之停止）
      * - 直接从数据库中删除设备
      * - 从内存中移除设备信息
      * - 触发 updateDeviceList() 以通知观察者
@@ -1545,22 +1542,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         try {
             var existed = false
             
-            // 取消心跳任务
-            try {
-                val handle = heartbeatJobs[uuid]
-                if (handle != null && rustContext != null) {
-                    NativeCore.stopHeartbeatSender(rustContext!!, handle)
-                }
-                heartbeatJobs.remove(uuid)
-            } catch (_: Exception) {}
-            
-            // 从已建立心跳集合移除
-            try { heartbeatedDevices.remove(uuid) } catch (_: Exception) {}
-
             // 从协议不兼容设备集合移除
             try { incompatibleDevicesInternal.remove(uuid) } catch (_: Exception) {}
 
-            // 从 Rust 上下文移除设备密钥
+            // 从 Rust 上下文移除设备密钥（同时清理 registry 状态）
             try {
                 rustContext?.let { NativeCore.removeDevice(it, uuid) }
                 saveRustCoreState()
@@ -1569,7 +1554,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             // 从 Rust 重连状态机移除目标
             removeReconnectTarget(uuid)
 
-            // 从 Rust 已知设备扫描器移除
+            // 从 Rust 已知设备扫描器移除（调度器随之停止该设备心跳）
             removeKnownDevice(uuid)
 
             synchronized(authenticatedDevices) {
@@ -1590,9 +1575,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 }
             }
 
-            // 清理 deviceLastSeen
-            try { synchronized(deviceLastSeen) { deviceLastSeen.remove(uuid) } } catch (_: Exception) {}
-            
             // 清理 deviceInfoCache
             try {
                 synchronized(deviceInfoCache) {
