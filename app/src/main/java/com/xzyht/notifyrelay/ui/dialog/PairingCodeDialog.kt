@@ -60,7 +60,6 @@ fun PairingCodeDialog(
             if (ctx != null) {
                 NativeCore.generatePairingCode(ctx)
             } else {
-                // 极端回退：Rust 上下文未初始化时自行生成 6 位码
                 val r = java.security.SecureRandom()
                 (r.nextInt(900_000) + 100_000).toString()
             }
