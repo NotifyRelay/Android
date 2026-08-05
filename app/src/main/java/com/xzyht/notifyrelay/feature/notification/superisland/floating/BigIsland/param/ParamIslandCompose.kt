@@ -19,6 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import github.xzynine.superislandui.floating.BigIsland.components.ProgressInfoCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.ActionInfo
@@ -137,6 +139,9 @@ fun ParamIslandCompose(
                                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                             val clip = ClipData.newPlainText("verification code", code)
                                             clipboard.setPrimaryClip(clip)
+                                            ClipboardSyncManager.suppressClipboardMonitoring(2000)
+                                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                                            ClipboardSyncManager.syncTextDirectly(deviceManager, code)
                                             Toast.makeText(context, "验证码已复制", Toast.LENGTH_SHORT).show()
                                         } catch (e: Exception) {
                                             Logger.e("ParamIslandCompose", "复制验证码失败", e)
