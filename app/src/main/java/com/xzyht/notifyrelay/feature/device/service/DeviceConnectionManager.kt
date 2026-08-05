@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
 import com.sun.jna.Pointer
@@ -485,6 +486,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         get() = rustContext
 
     private var serverStarted = false
+    // 电池变化监听器（常驻，随 DeviceConnectionManager 生命周期）
+    private var batteryReceiver: BroadcastReceiver? = null
+    // 上次同步给 Rust 心跳调度器的带符号电量（正=充电，负=放电），用于防抖
+    private var lastSentSignedBattery: Int = Int.MIN_VALUE
     // UI全局开关：是否启用UDP发现，使用内存缓存避免频繁数据库访问
     // 使用AppConfig管理UDP发现配置
     var udpDiscoveryEnabled: Boolean
@@ -552,11 +557,14 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             rustContext?.let { ctx ->
                 val batteryLevel = BatteryUtils.getBatteryLevel(context)
                 val battery = if (BatteryUtils.isCharging(context)) batteryLevel else -batteryLevel
+                lastSentSignedBattery = battery
                 NativeCore.startHeartbeatScheduler(ctx, uuid, getLocalDisplayName(), battery, "android", 2000L)
             }
         } catch (e: Exception) {
             Logger.e("死神-NotifyRelay", "启动心跳调度器失败", e)
         }
+        // 电池变化监听：电量/充电状态变化时同步到 Rust 心跳调度器，对端实时显示更新
+        registerBatteryChangeReceiver()
         // 新增：初始补全本机 deviceInfoCache，便于反向 connectToDevice
         val displayName = getLocalDisplayName()
         val localIp = discoveryManager.getLocalIpAddressInternal()
@@ -571,6 +579,39 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // 启动 Rust 已知设备扫描器（持续对认证设备做握手重连/发现）
         try {
             rustContext?.let { NativeCore.startKnownDeviceScanner(it) }
+        } catch (_: Exception) {}
+    }
+
+    // 电池变化监听：ACTION_BATTERY_CHANGED 为粘性广播，注册后立即回调一次当前状态；
+    // 电量或充电状态变化时调用 Rust 调度器参数更新，使心跳报文携带实时电量（正=充电，负=放电）
+    private fun registerBatteryChangeReceiver() {
+        if (batteryReceiver != null) return
+        batteryReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                if (intent?.action != Intent.ACTION_BATTERY_CHANGED) return
+                try {
+                    val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+                    val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                    if (level < 0 || scale <= 0) return
+                    val batteryLevel = (level * 100 / scale).coerceIn(0, 100)
+                    val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                            status == BatteryManager.BATTERY_STATUS_FULL
+                    val signed = if (charging) batteryLevel else -batteryLevel
+                    if (signed == lastSentSignedBattery) return
+                    lastSentSignedBattery = signed
+                    rustContext?.let {
+                        NativeCore.updateHeartbeatSchedulerParams(it, getLocalDisplayName(), signed, "android")
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        try {
+            context.registerReceiver(
+                batteryReceiver,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                Context.RECEIVER_EXPORTED
+            )
         } catch (_: Exception) {}
     }
 
