@@ -105,7 +105,7 @@ object SuperIslandProcessor {
             val featureId = if (!explicitFeatureKeyCandidate.isNullOrBlank()) {
                 explicitFeatureKeyCandidate
             } else {
-                try { SuperIslandProtocol.computeFeatureId(pkg, paramV2Raw, json.optString("title"), json.optString("text")) } catch (_: Exception) { "" }
+                try { NativeCore.computeFeatureId(pkg, paramV2Raw ?: "", json.optString("title"), json.optString("text"), "") ?: "" } catch (_: Exception) { "" }
             }
             val sourceKey = listOfNotNull(remoteUuid, mappedPkg, featureId.takeIf { it.isNotBlank() }).joinToString("|")
             val dedupKey = "${remoteUuid}|${mappedPkg}|${featureId}"

@@ -2,7 +2,6 @@ package github.xzynine.superislandui.common
 
 import github.xzynine.superislandui.diff.DiffSystem
 import org.json.JSONObject
-import java.security.MessageDigest
 
 /**
  * 超级岛同步协议。
@@ -75,60 +74,6 @@ object SuperIslandProtocol {
         }
         if (options.enableAck) obj.put("hash", DiffSystem.sha256(obj.toString()))
         return obj
-    }
-
-    /**
-     * 计算"岛"的特征ID。
-     * - 基于 paramV2/title/text 等稳定内容字段生成特征。
-     * - 如果提供了 instanceId（例如接收端的 sbnKey），会把它包含进特征以确保同内容的不同通知能被区分。
-     */
-    fun computeFeatureId(
-        superPkg: String?,
-        paramV2Raw: String?,
-        title: String?,
-        text: String?,
-        instanceId: String? = null
-    ): String {
-        val keyParts = mutableListOf<String>()
-        keyParts += (superPkg ?: "")
-        try {
-            if (!paramV2Raw.isNullOrBlank()) {
-                val root = JSONObject(paramV2Raw)
-                val chatInfo = root.optJSONObject("chatInfo")
-                val baseInfo = root.optJSONObject("baseInfo")
-                val highlight = root.optJSONObject("highlightInfo")
-                when {
-                    chatInfo != null -> {
-                        val t = chatInfo.optString("title").takeIf { it.isNotBlank() }
-                        if (!t.isNullOrBlank()) keyParts += "chat:" + t
-                    }
-                    baseInfo != null -> {
-                        val t = baseInfo.optString("title").takeIf { it.isNotBlank() }
-                        val c = baseInfo.optString("content").takeIf { it.isNotBlank() }
-                        if (!t.isNullOrBlank()) keyParts += "baseT:" + t
-                        if (!c.isNullOrBlank()) keyParts += "baseC:" + c
-                    }
-                    highlight != null -> {
-                        val t = highlight.optString("title").takeIf { it.isNotBlank() }
-                        if (!t.isNullOrBlank()) keyParts += "hi:" + t
-                    }
-                }
-            }
-        } catch (_: Exception) {}
-        if (keyParts.size <= 1) {
-            if (!title.isNullOrBlank()) keyParts += ("t:" + title)
-            if (!text.isNullOrBlank()) keyParts += ("c:" + text)
-        }
-        if (!instanceId.isNullOrBlank()) {
-            keyParts += "id:" + instanceId
-        }
-        val raw = keyParts.joinToString("|")
-        return sha1(raw)
-    }
-
-    private fun sha1(input: String): String {
-        val bytes = MessageDigest.getInstance("SHA-1").digest(input.toByteArray())
-        return bytes.joinToString("") { b -> ((b.toInt() and 0xFF).toString(16)).padStart(2, '0') }
     }
 
     fun buildFullPayload(

@@ -3,12 +3,10 @@ package com.xzyht.notifyrelay.sync
 import android.os.Handler
 import android.os.Looper
 import android.widget.Toast
-import com.xzyht.notifyrelay.feature.device.service.AuthInfo
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.core.util.BatteryUtils
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.CoroutineScope
@@ -44,7 +42,6 @@ class ConnectionKeepAlive(
 ) {
     private val heartbeatJobs get() = deviceManager.heartbeatJobsInternal
     private val heartbeatedDevices get() = deviceManager.heartbeatedDevicesInternal
-    private val authenticatedDevices get() = deviceManager.authenticatedDevices
     private var lastUsedTcpHeartbeat = false
 
     /**
@@ -96,79 +93,6 @@ class ConnectionKeepAlive(
         }
 
         return useTcp
-    }
-
-    /**
-     * 心跳连续失败后的处理逻辑：
-     * - 取消心跳任务，移除已心跳标记
-     * - 尝试最多 3 次重连
-     * - 失败后通过 Toast 提示用户
-     */
-    fun handleHeartbeatFailure(uuid: String) {
-        Logger.w("死神-NotifyRelay", "[KeepAlive] 心跳连续失败5次，自动停止心跳并尝试重连: $uuid")
-        stopHeartbeatToDevice(uuid)
-
-        scope.launch {
-            val info = deviceManager.getDeviceInfoInternal(uuid)
-            val auth = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices[uuid] }
-            val ip = info?.ip ?: auth?.lastIp
-            val port = info?.port ?: auth?.lastPort ?: deviceManager.listenPort
-            val displayName = info?.displayName ?: auth?.displayName ?: "已认证设备"
-            if (!ip.isNullOrEmpty() && ip != "0.0.0.0") {
-                for (attempt in 1..3) {
-                    //Logger.d("死神-NotifyRelay", "[KeepAlive] 心跳失败后重连尝试 $attempt/3: $uuid, $ip:$port")
-                    deviceManager.connectToDevice(DeviceInfo(uuid, displayName, ip, port))
-                    delay(2000)
-                    if (heartbeatedDevices.contains(uuid)) {
-                        //Logger.d("死神-NotifyRelay", "[KeepAlive] 心跳失败后重连成功: $uuid")
-                        return@launch
-                    }
-                }
-                Logger.w("死神-NotifyRelay", "[KeepAlive] 心跳失败后重连失败，设备离线: $uuid")
-            }
-        }
-
-        val msg = "设备[${DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid)}]离线，已尝试重连，请检查网络或重新发现设备"
-        val ctx = deviceManager.contextInternal
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
-        } else {
-            Handler(Looper.getMainLooper()).post {
-                Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
-            }
-        }
-    }
-
-    /**
-     * WLAN 直连模式下的定期重连检查：
-     * - 每 30 秒检查一次
-     * - 对于未在 heartbeatedDevices 中的认证设备，尝试重连
-     */
-    fun startWifiDirectReconnectionChecker() {
-        scope.launch {
-            while (true) {
-                delay(30_000)
-                if (deviceManager.isWifiDirectNetworkInternal()) {
-                    val authed = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices.toMap() }
-                    //Logger.d("死神-NotifyRelay", "[KeepAlive] WLAN直连定期检查：${authed.size}个认证设备")
-
-                    for ((deviceUuid, auth) in authed) {
-                        if (deviceUuid == deviceManager.uuid) continue
-                        val isOnline = heartbeatedDevices.contains(deviceUuid)
-                        if (!isOnline) {
-                            val info = deviceManager.getDeviceInfoInternal(deviceUuid)
-                            val ip = info?.ip ?: auth.lastIp
-                            val port = info?.port ?: auth.lastPort ?: deviceManager.listenPort
-                            if (!ip.isNullOrEmpty() && ip != "0.0.0.0") {
-                                //Logger.d("死神-NotifyRelay", "[KeepAlive] WLAN直连定期重连离线设备: $deviceUuid, $ip:$port")
-                                deviceManager.connectToDevice(DeviceInfo(deviceUuid, auth.displayName ?: "WLAN直连设备", ip, port))
-                                delay(2000)
-                            }
-                        }
-                    }
-                }
-            }
-        }
     }
 
     /**

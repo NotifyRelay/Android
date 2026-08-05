@@ -62,7 +62,6 @@ import com.xzyht.notifyrelay.ui.navigation.Navigator
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.BatteryIconConverter
 import notifyrelay.core.util.BatteryUtils
-import notifyrelay.core.util.PairingCodeManager
 import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.window.WindowDialog
 import top.yukonga.miuix.kmp.basic.Button

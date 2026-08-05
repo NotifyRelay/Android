@@ -23,11 +23,11 @@ import com.xzyht.notifyrelay.feature.notification.backend.BackendLocalFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.LocalSuperIslandTracker
 import com.xzyht.notifyrelay.feature.notification.superisland.MediaCapsulePresenter
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.sync.MessageSender
 import github.xzynine.superislandui.common.SuperIslandManager
-import github.xzynine.superislandui.common.SuperIslandProtocol
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -421,13 +421,13 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                             val sbnInstanceId = getNotificationKey(sbn, "")
                             // 优先复用历史特征ID，避免因字段轻微变化导致"不同岛"的错判
                             val oldId = try { superIslandFeatureByKey[sbnInstanceId]?.second } catch (_: Exception) { null }
-                            val computedId = SuperIslandProtocol.computeFeatureId(
+                            val computedId = NativeCore.computeFeatureId(
                                 superPkg,
-                                superData.paramV2Raw,
-                                superData.title,
-                                superData.text,
+                                superData.paramV2Raw ?: "",
+                                superData.title ?: "",
+                                superData.text ?: "",
                                 sbnInstanceId
-                            )
+                            ) ?: ""
                             val featureId = oldId ?: computedId
                             // 初次出现时登记；后续保持不变
                             try { if (oldId == null) superIslandFeatureByKey[sbnInstanceId] = superPkg to featureId } catch (_: Exception) {}

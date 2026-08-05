@@ -40,7 +40,6 @@ import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.core.util.BatteryUtils
-import notifyrelay.core.util.PairingCodeManager
 import notifyrelay.data.StorageManager
 import notifyrelay.data.config.AppConfig
 import notifyrelay.data.config.ScrcpyDefaults
@@ -213,6 +212,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                         lastPort = device.lastPort
                     )
                 }
+                registerReconnectTarget(device.uuid, device.lastIp ?: "")
+                registerKnownDevice(device.uuid, device.lastIp ?: "")
             }
             
             // 恢复设备名和 IP 到缓存
@@ -571,9 +572,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
         startOfflineDeviceCleaner()
         discoveryManager.registerNetworkCallback()
-        startWifiDirectReconnectionChecker()
+        // 自动重连已移交 Rust 重连状态机（loadAuthedDevices 中已登记认证设备）
         // 启动 mDNS 广告和发现
         startMdnsServices()
+        // 启动 Rust 已知设备扫描器（持续对认证设备做握手重连/发现）
+        try {
+            rustContext?.let { NativeCore.startKnownDeviceScanner(it) }
+        } catch (_: Exception) {}
     }
 
     private fun startMdnsServices() {
@@ -806,7 +811,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             Logger.d("死神-NotifyRelay", "取消配对: ${p.remoteUuid}")
         }
         pendingPairing = null
-        notifyrelay.core.util.PairingCodeManager.clear()
+        rustContext?.let { NativeCore.clearPairingCode(it) }
     }
 
     /**
@@ -849,6 +854,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 )
                 saveAuthedDevices()
             }
+            registerReconnectTarget(uuid, lastIp ?: "")
             saveRustCoreState()
             updateDeviceList()
             Logger.d("死神-NotifyRelay", "长期密钥配对完成: $uuid")
@@ -897,42 +903,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
-    // 使用 Rust core 加密，失败直接抛异常
-    // header 为协议头（如 DATA_NOTIFICATION），返回完整报文：$header:uuid:pubKey:encrypted
-    internal fun encryptData(input: String, uuid: String, header: String = "DATA"): String {
-        val ctx = rustContext ?: throw IllegalStateException("Rust context not initialized")
-        val keyJson = NativeCore.exportDeviceKey(ctx, uuid)
-        val keyB64 = keyJson?.let { org.json.JSONObject(it).optString("aes_key_b64", "") }
-        if (keyB64 == null || keyB64.isEmpty()) {
-            Logger.e("死神-NotifyRelay", "encryptData: 设备密钥不在Rust中 uuid=$uuid，尝试重新迁移")
-            val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
-            if (auth != null && auth.sharedSecret.isNotEmpty()) {
-                val keyBytes = try { android.util.Base64.decode(auth.sharedSecret, android.util.Base64.NO_WRAP) } catch (_: Exception) { null }
-                if (keyBytes != null && keyBytes.size == 32) {
-                    NativeCore.migrateSharedSecret(ctx, uuid, keyBytes)
-                }
-            }
-        }
-        return NativeCore.encryptMessage(ctx, header, this.uuid, this.localPublicKey, uuid, input)
-            ?: throw IllegalStateException("Rust加密失败: encryptMessage, device=$uuid")
-    }
-
-    // 发送通知数据（加密）
-    fun sendNotificationData(device: DeviceInfo, data: String) {
-        coroutineScope.launch {
-            try {
-                val auth = authenticatedDevices[device.uuid]
-                if (auth == null || !auth.isAccepted) {
-                    //Logger.d("死神-NotifyRelay", "未认证设备，禁止发送")
-                    return@launch
-                }
-                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, device, "DATA_NOTIFICATION", data, 10000L)
-            } catch (e: Exception) {
-                Logger.e("死神-NotifyRelay", "发送通知数据失败", e)
-            }
-        }
-    }
-
     /**
      * 公开API：请求远端设备的“用户应用列表”。
      */
@@ -956,54 +926,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
     
-    /**
-     * 公开API：发送剪贴板内容到指定设备。
-     * @param device 目标设备
-     * @param clipboardType 剪贴板类型（text/image）
-     * @param content 剪贴板内容
-     * @return 是否成功发送请求
-     */
-    fun sendClipboardToDevice(device: DeviceInfo, clipboardType: String, content: String): Boolean {
-        try {
-            val raw = org.json.JSONObject().apply {
-                put("type", "clipboard")
-                put("clipboardType", clipboardType)
-                put("content", content)
-                put("time", System.currentTimeMillis())
-            }.toString()
-            ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", raw, 10000L)
-            return true
-        } catch (_: Exception) {
-            return false
-        }
-    }
-    
-    /**
-     * 公开API：发送剪贴板内容到所有已认证的在线设备。
-     * @param clipboardType 剪贴板类型（text/image）
-     * @param content 剪贴板内容
-     * @return 是否成功发送请求
-     */
-    fun sendClipboardToAllDevices(clipboardType: String, content: String): Boolean {
-        try {
-            val devices = getAuthenticatedOnlineDevices()
-            if (devices.isEmpty()) return false
-            
-            val raw = org.json.JSONObject().apply {
-                put("type", "clipboard")
-                put("clipboardType", clipboardType)
-                put("content", content)
-                put("time", System.currentTimeMillis())
-            }.toString()
-            for (device in devices) {
-                ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", raw, 10000L)
-            }
-            return true
-        } catch (_: Exception) {
-            return false
-        }
-    }
-
     // 注册 Rust 回调，使用统一的配对和数据回调接口
     private fun setupRustCallbacks() {
         val ctx = rustContext ?: return
@@ -1045,6 +967,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                     dm.saveAuthedDevicesInternal()
                                 }
                             }
+                            dm.registerReconnectTarget(uuid, ip)
+            dm.registerKnownDevice(uuid, ip)
                             val alreadyAuthed = synchronized(dm.authenticatedDevices) {
                                 dm.authenticatedDevices[uuid]?.isAccepted == true
                             }
@@ -1421,6 +1345,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 synchronized(deviceLastSeen) {
                     deviceLastSeen[uuid] = System.currentTimeMillis() - 30_000L
                 }
+                // 设备超时离线后重新登记重连目标，由 Rust 重连状态机发起新一轮重试
+                val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
+                if (auth != null) registerReconnectTarget(uuid, auth.lastIp ?: "")
             }
         }
         lib.nrc_set_on_device_timeout_cb(ctx, deviceTimeoutCb); rustCallbackRefs.add(deviceTimeoutCb)
@@ -1478,6 +1405,53 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         synchronized(deviceInfoCache) {
             deviceInfoCache[uuid] = deviceInfo
         }
+    }
+
+    // 将认证设备登记到 Rust 重连状态机（先移除再添加，重置重试周期）
+    private fun registerReconnectTarget(uuid: String, ip: String) {
+        try {
+            val ctx = rustContext ?: return
+            if (NativeCore.reconnectStatePtr == 0L) return
+            if (ip.isNullOrEmpty() || ip == "0.0.0.0") return
+            NativeCore.reconnectRemoveTarget(ctx, NativeCore.reconnectStatePtr, uuid)
+            NativeCore.reconnectAddTarget(ctx, NativeCore.reconnectStatePtr, uuid, ip)
+        } catch (_: Exception) {}
+    }
+
+    // 重新登记所有认证设备到 Rust 重连状态机（网络恢复后调用）
+    internal fun refreshAllReconnectTargetsInternal() {
+        val snapshot = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
+        for ((uuid, auth) in snapshot) {
+            if (uuid == "本机") continue
+            registerReconnectTarget(uuid, auth.lastIp ?: "")
+        }
+    }
+
+    // 从 Rust 重连状态机移除目标
+    private fun removeReconnectTarget(uuid: String) {
+        try {
+            val ctx = rustContext ?: return
+            if (NativeCore.reconnectStatePtr == 0L) return
+            NativeCore.reconnectRemoveTarget(ctx, NativeCore.reconnectStatePtr, uuid)
+        } catch (_: Exception) {}
+    }
+
+    // 将认证设备登记到 Rust 已知设备扫描器（known_device_scanner）
+    private fun registerKnownDevice(uuid: String, ip: String) {
+        try {
+            val ctx = rustContext ?: return
+            if (ip.isNullOrEmpty() || ip == "0.0.0.0") return
+            NativeCore.removeKnownDevice(ctx, uuid)
+            NativeCore.addKnownDevice(ctx, uuid, ip)
+        } catch (_: Exception) {}
+    }
+
+    // 从 Rust 已知设备扫描器移除
+    private fun removeKnownDevice(uuid: String) {
+        try {
+            val ctx = rustContext ?: return
+            NativeCore.removeKnownDevice(ctx, uuid)
+        } catch (_: Exception) {}
     }
 
     // 封装设备信息缓存IP更新操作（保持其他信息不变）
@@ -1591,6 +1565,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 rustContext?.let { NativeCore.removeDevice(it, uuid) }
                 saveRustCoreState()
             } catch (_: Exception) {}
+
+            // 从 Rust 重连状态机移除目标
+            removeReconnectTarget(uuid)
+
+            // 从 Rust 已知设备扫描器移除
+            removeKnownDevice(uuid)
 
             synchronized(authenticatedDevices) {
                 if (authenticatedDevices.containsKey(uuid)) {
@@ -1715,10 +1695,5 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         audioRelayNotificationReceiver = null
         com.xzyht.notifyrelay.servers.AudioRelayForegroundService.stop(context)
         com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.stop(context)
-    }
-
-    // 新增：WLAN直连定期重连检查器
-    private fun startWifiDirectReconnectionChecker() {
-        keepAlive.startWifiDirectReconnectionChecker()
     }
 }

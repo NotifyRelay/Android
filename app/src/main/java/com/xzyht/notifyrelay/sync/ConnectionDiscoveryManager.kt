@@ -11,7 +11,6 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -43,8 +42,6 @@ class ConnectionDiscoveryManager(
         get() = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
-    private var manualDiscoveryJob: Job? = null
-    private val manualDiscoveryInterval = 2000L
 
     /**
      * 更新设备信息缓存并触发设备列表更新
@@ -204,44 +201,10 @@ class ConnectionDiscoveryManager(
 
         val hasValidNetwork = newIp != "0.0.0.0" && newIp.isNotEmpty()
         if (hasValidNetwork) {
+            // 网络恢复后的自动重连交由 Rust 重连状态机处理：重新登记所有认证设备，重置重试周期
             scope.launch {
                 delay(1000)
-                val authed = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices.toMap() }
-                //Logger.d("死神-NotifyRelay", "网络恢复，主动连接 ${authed.size} 个已认证设备")
-                for ((deviceUuid, auth) in authed) {
-                    if (deviceUuid == deviceManager.uuid) continue
-                    val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
-                        deviceManager.heartbeatedDevicesInternal.contains(deviceUuid)
-                    }
-                    if (isHeartbeated) continue
-
-                    val info = deviceManager.getDeviceInfoInternal(deviceUuid)
-                    val ip = info?.ip ?: auth.lastIp
-                    val port = info?.port ?: auth.lastPort ?: deviceManager.listenPort
-
-                    if (!ip.isNullOrEmpty() && ip != "0.0.0.0") {
-                        //Logger.d("死神-NotifyRelay", "网络恢复后主动connectToDevice: $deviceUuid, $ip:$port")
-                        deviceManager.connectToDevice(DeviceInfo(deviceUuid, auth.displayName ?: "已认证设备", ip, port))
-                        delay(500)
-                    }
-                }
-
-                if (deviceManager.isWifiDirectNetworkInternal()) {
-                    //Logger.d("死神-NotifyRelay", "WLAN直连模式，启动额外重连逻辑")
-                    delay(2000)
-                    for ((deviceUuid, auth) in authed) {
-                        if (deviceUuid == deviceManager.uuid) continue
-                        val info = deviceManager.getDeviceInfoInternal(deviceUuid)
-                        val ip = info?.ip ?: auth.lastIp
-                        val port = info?.port ?: auth.lastPort ?: deviceManager.listenPort
-
-                        if (!ip.isNullOrEmpty() && ip != "0.0.0.0") {
-                            //Logger.d("死神-NotifyRelay", "WLAN直连额外重连尝试: $deviceUuid, $ip:$port")
-                            deviceManager.connectToDevice(DeviceInfo(deviceUuid, auth.displayName ?: "WLAN直连设备", ip, port))
-                            delay(1000)
-                        }
-                    }
-                }
+                deviceManager.refreshAllReconnectTargetsInternal()
             }
         }
     }
@@ -251,7 +214,6 @@ class ConnectionDiscoveryManager(
         if (ctx != null) {
             NativeCore.periodicBroadcast(ctx, 0)
         }
-        manualDiscoveryJob?.cancel()
     }
 
     fun startDiscovery() {
@@ -266,12 +228,10 @@ class ConnectionDiscoveryManager(
         }
 
         if (deviceManager.isWifiDirectNetworkInternal()) {
-            startWifiDirectDiscovery(deviceManager.localDisplayNameInternal())
+            // WLAN 直连模式下的持续重连/发现交由 Rust known_device_scanner 处理
             deviceManager.startServerInternal()
             return
         }
-
-        manualDiscoveryJob?.cancel()
         
         // 连接到已认证设备
         scope.launch {
@@ -291,48 +251,5 @@ class ConnectionDiscoveryManager(
             }
         }
         deviceManager.startServerInternal()
-    }
-
-    private fun startManualDiscoveryForAuthedDevices(localDisplayName: String) {
-        manualDiscoveryJob?.cancel()
-        manualDiscoveryJob = scope.launch {
-            var promptCount = 0
-            val failMap = mutableMapOf<String, Int>()
-            val maxFail = 5
-            while (true) {
-                val authed = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices.toMap() }
-                for ((uuid, _) in authed) {
-                    if (uuid == deviceManager.uuid) continue
-                    val isHeartbeated = synchronized(deviceManager.heartbeatedDevicesInternal) {
-                        deviceManager.heartbeatedDevicesInternal.contains(uuid)
-                    }
-                    if (isHeartbeated) continue
-                    if (failMap[uuid] != null && failMap[uuid]!! >= maxFail) continue
-                    val info = deviceManager.getDeviceInfoInternal(uuid)
-                    val ip = info?.ip
-                    val port = info?.port ?: deviceManager.listenPort
-                    if (!ip.isNullOrEmpty() && ip != "0.0.0.0") {
-                        val device = DeviceInfo(uuid, info.displayName, ip, port)
-                        deviceManager.connectToDevice(device) { success, _ ->
-                            if (success) {
-                                failMap.remove(uuid)
-                            } else {
-                                val count = (failMap[uuid] ?: 0) + 1
-                                failMap[uuid] = count
-                            }
-                        }
-                    }
-                }
-                promptCount++
-                delay(manualDiscoveryInterval)
-                if (promptCount % 10 == 0) {
-                    //Logger.d("死神-NotifyRelay", "手动发现持续运行中，promptCount=$promptCount")
-                }
-            }
-        }
-    }
-
-    private fun startWifiDirectDiscovery(localDisplayName: String) {
-        startManualDiscoveryForAuthedDevices(localDisplayName)
     }
 }

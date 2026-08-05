@@ -9,7 +9,6 @@ import notifyrelay.data.StorageManager
 import notifyrelay.data.StorageManager.getBoolean
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import github.xzynine.superislandui.common.SuperIslandProtocol
 import github.xzynine.superislandui.diff.DiffSystem
 import github.xzynine.superislandui.model.components.MediaSessionData
 import org.json.JSONObject
@@ -219,9 +218,9 @@ object RemoteMediaSessionManager {
             currentDevice = device
 
             val lastFeatureId = mediaFeatureIdCache[device.uuid]
-            val currentFeatureId = SuperIslandProtocol.computeFeatureId(
-                packageName, null, title, text
-            )
+            val currentFeatureId = NativeCore.computeFeatureId(
+                packageName, "", title, text, ""
+            ) ?: ""
 
             mediaFeatureIdCache[device.uuid] = currentFeatureId
             mediaLastUpdateTime[device.uuid] = System.currentTimeMillis()

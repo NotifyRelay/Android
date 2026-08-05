@@ -30,7 +30,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import notifyrelay.base.util.Logger
-import notifyrelay.core.util.PairingCodeManager
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.layout.DialogDefaults
@@ -56,7 +55,19 @@ fun PairingCodeDialog(
     if (mode == PairingMode.CLIENT_MODE) {
         val clipboardManager = LocalClipboardManager.current
         val scope = rememberCoroutineScope()
-        val displayCode = remember { PairingCodeManager.generate() }
+        val displayCode = remember {
+            val ctx = deviceManager.rustContextInternal
+            if (ctx != null) {
+                NativeCore.generatePairingCode(ctx)
+            } else {
+                // 极端回退：Rust 上下文未初始化时自行生成 6 位码
+                val r = java.security.SecureRandom()
+                (r.nextInt(900_000) + 100_000).toString()
+            }
+        } ?: run {
+            val r = java.security.SecureRandom()
+            (r.nextInt(900_000) + 100_000).toString()
+        }
 
         LaunchedEffect(show) {
             if (show && targetDevice != null) {
@@ -152,7 +163,7 @@ fun PairingCodeDialog(
                     TextButton(
                         text = "取消",
                         onClick = {
-                            PairingCodeManager.clear()
+                            deviceManager.rustContextInternal?.let { NativeCore.clearPairingCode(it) }
                             onDismiss()
                         }
                     )
