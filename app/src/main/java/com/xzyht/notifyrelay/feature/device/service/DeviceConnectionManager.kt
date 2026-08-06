@@ -4,9 +4,11 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
 import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
+import android.util.Base64
 import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
@@ -14,12 +16,15 @@ import com.xzyht.notifyrelay.feature.audio.AudioRelayPlayer
 import com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.servers.MediaControlUtil
+import com.xzyht.notifyrelay.servers.MediaSessionMonitorService
+import com.xzyht.notifyrelay.servers.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardProcessor
 import com.xzyht.notifyrelay.sync.AppLaunchManager
 import com.xzyht.notifyrelay.sync.AppListSyncManager
 import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
 import com.xzyht.notifyrelay.sync.IconSyncManager
+import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import com.xzyht.notifyrelay.sync.HeartbeatProcessor
 import com.xzyht.notifyrelay.sync.ftpServer
@@ -28,7 +33,9 @@ import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
 import com.xzyht.notifyrelay.sync.notification.StatusProcessor
 import com.xzyht.notifyrelay.sync.notification.SuperIslandProcessor
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
+import github.xzynine.superislandui.common.SuperIslandManager
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -1393,8 +1400,124 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
         lib.nrc_set_on_device_timeout_cb(ctx, deviceTimeoutCb); rustCallbackRefs.add(deviceTimeoutCb)
 
+        // ---- on_state_query (超级岛/媒体心跳查询回调：0=不存在 / 1=存在无变更 / 2=存在有变更) ----
+        // 运行在 Rust 心跳线程且锁已释放，回调内可直接调用 nrc_push_*（isQuery=1）响应变更
+        val stateQueryCb = object : NotifyRelayCore.OnStateQueryCb {
+            override fun invoke(uuidPtr: Pointer?, featureIdPtr: Pointer?, isMedia: Int, userData: Pointer?): Int {
+                val remoteUuid = ptr2str(uuidPtr) ?: return 0
+                val featureId = ptr2str(featureIdPtr) ?: return 0
+                val dm = _callbackInstance ?: return 0
+                return try {
+                    if (isMedia != 0) dm.handleMediaStateQuery(remoteUuid, featureId)
+                    else dm.handleSuperIslandStateQuery(remoteUuid, featureId)
+                } catch (e: Exception) {
+                    Logger.e("CoreCb", "on_state_query error: ${e.message}")
+                    1 // 异常保守保活，等待下一次查询
+                }
+            }
+        }
+        lib.nrc_set_on_state_query_cb(ctx, stateQueryCb); rustCallbackRefs.add(stateQueryCb)
+
         // ---- 日志回调（接入 Logger.CURRENT_LEVEL 等级控制） ----
         NativeCore.setLogCallback(ctx)
+    }
+
+    // ---- 状态查询回调处理（运行在 Rust 心跳线程，锁已释放；回调内可直接调 push(isQuery=1)） ----
+    private val mediaFeatureId = "media_global" // 与 Rust MEDIA_KEY 一致
+
+    /** 超级岛查询：扫描活跃通知，重算 featureId（与 Rust 算法一致，iid 传空）匹配后对比推送 */
+    private fun handleSuperIslandStateQuery(remoteUuid: String, featureId: String): Int {
+        val listener = NotifyRelayNotificationListenerService.instance ?: return 0
+        val actives = listener.activeNotifications ?: return 0
+        for (sbn in actives) {
+            if (sbn.packageName == context.packageName) continue
+            val superData = try { SuperIslandManager.extractSuperIslandData(sbn, context) } catch (_: Exception) { null } ?: continue
+            val superPkg = superData.sourcePackage ?: continue
+            // 重算 featureId：与 Rust 会话 key 严格一致（iid 传空）
+            val computedId = NativeCore.computeFeatureId(
+                superPkg, superData.paramV2Raw ?: "", superData.title ?: "", superData.text ?: "", ""
+            ) ?: ""
+            if (computedId != featureId) continue
+            // 匹配：组装 full（与 sendSuperIslandData 同格式）并对比推送
+            val content = MessageSender.buildSuperIslandFullContent(
+                context, superPkg,
+                superData.appName ?: "超级岛",
+                superData.title, superData.text,
+                sbn.postTime, superData.paramV2Raw,
+                superData.picMap ?: emptyMap(),
+                featureId
+            )
+            return compareAndPushState(remoteUuid, featureId, content, isMedia = false)
+        }
+        // 无匹配：平台上不存在该会话
+        Logger.w("CoreCb", "状态查询: 超级岛会话不存在, fid=$featureId")
+        return 0
+    }
+
+    /** 媒体查询：读取当前媒体会话组装 full 并对比推送；无媒体会话返回 0 */
+    private fun handleMediaStateQuery(remoteUuid: String, featureId: String): Int {
+        if (featureId != mediaFeatureId) return 0
+        val monitor = MediaSessionMonitorService.instance ?: return 0
+        val primary = monitor.getPrimaryController() ?: return 0
+        val pkg = primary.packageName
+        val mediaData = NotifyRelayNotificationListenerService.getMediaSessionData(pkg)
+            ?: return 1 // 有媒体会话但数据未就绪，保守保活等待下次查询
+        var coverUrl: String? = null
+        mediaData.artBitmap?.let { bmp ->
+            try {
+                val stream = ByteArrayOutputStream()
+                bmp.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                coverUrl = "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+            } catch (_: Exception) {}
+        }
+        val content = MessageSender.buildMediaFullContent(
+            context, pkg, pkg, mediaData.title, mediaData.artist, coverUrl, System.currentTimeMillis()
+        )
+        return compareAndPushState(remoteUuid, featureId, content, isMedia = true)
+    }
+
+    /**
+     * 与上次推送缓存对比（仅 Rust diff 字段：title/text/param_v2_raw/pics）：
+     * 缓存缺失 → 保守"有变更"推一次建立缓存；无变更 → 1；变更 → 更新缓存并推(isQuery=1) → 2
+     */
+    private fun compareAndPushState(remoteUuid: String, featureId: String, fullJson: String, isMedia: Boolean): Int {
+        val cached = MessageSender.getLastPushedState(featureId)
+        if (cached == null) {
+            MessageSender.cacheLastPushedState(featureId, fullJson)
+            pushQueryResponse(remoteUuid, featureId, fullJson, isMedia)
+            return 2
+        }
+        if (sameDiffFields(cached, fullJson)) return 1
+        MessageSender.cacheLastPushedState(featureId, fullJson)
+        pushQueryResponse(remoteUuid, featureId, fullJson, isMedia)
+        return 2
+    }
+
+    /** 查询响应推送：仅推给查询对应的远端设备（isQuery=1） */
+    private fun pushQueryResponse(remoteUuid: String, featureId: String, fullJson: String, isMedia: Boolean) {
+        try {
+            val ctx = rustContextInternal ?: return
+            val queuePtr = NativeCore.senderQueuePtr
+            if (queuePtr == 0L) return
+            if (isMedia) NativeCore.pushMediaState(ctx, queuePtr, remoteUuid, fullJson, false, true)
+            else NativeCore.pushSuperislandState(ctx, queuePtr, remoteUuid, fullJson, false, true)
+        } catch (e: Exception) {
+            Logger.w("CoreCb", "查询响应推送失败: $remoteUuid fid=$featureId", e)
+        }
+    }
+
+    /** 与 Rust diff 字段严格对齐（title/text/param_v2_raw/pics），避免错位导致误判 */
+    private fun sameDiffFields(a: String, b: String): Boolean {
+        return try {
+            val ja = JSONObject(a)
+            val jb = JSONObject(b)
+            ja.optString("title") == jb.optString("title") &&
+                ja.optString("text") == jb.optString("text") &&
+                ja.optString("param_v2_raw") == jb.optString("param_v2_raw") &&
+                ja.opt("pics").toString() == jb.opt("pics").toString()
+        } catch (_: Exception) {
+            false
+        }
     }
 
     // 辅助方法：发送媒体控制响应（由回调使用）

@@ -277,11 +277,19 @@ object NativeCore {
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_app_sync_parse_applist_response(payload))
 
     // 推送「全量」超级岛/媒体状态；Rust 内部计算差异、合并、ACK 与心跳，接收端经 on_data 回传全量。
-    fun pushSuperislandState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean) =
-        lib.nrc_push_superisland_state(ctx, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0)
+    // isQuery：true=查询回调响应推送（心跳查询发现变更后由平台推送），false=正常主动推送。
+    fun pushSuperislandState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean, isQuery: Boolean = false) =
+        lib.nrc_push_superisland_state(ctx, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0)
 
-    fun pushMediaState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean) =
-        lib.nrc_push_media_state(ctx, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0)
+    fun pushMediaState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean, isQuery: Boolean = false) =
+        lib.nrc_push_media_state(ctx, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0)
+
+    // 注册状态查询回调（Rust 心跳线程锁外调用，返回 0=不存在 / 1=存在无变更 / 2=存在有变更）
+    private var stateQueryCallbackRef: Any? = null
+    fun setOnStateQueryCallback(ctx: Pointer, cb: NotifyRelayCore.OnStateQueryCb?) {
+        stateQueryCallbackRef = cb
+        lib.nrc_set_on_state_query_cb(ctx, cb)
+    }
 
     fun stopSenderQueue(ctx: Pointer, queuePtr: Long) =
         lib.nrc_stop_sender_queue(ctx, queuePtr)

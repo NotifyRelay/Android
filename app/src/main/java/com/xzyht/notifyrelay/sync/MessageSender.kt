@@ -17,6 +17,7 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 消息发送类
@@ -26,6 +27,53 @@ import org.json.JSONObject
 object MessageSender {
 
     private const val TAG = "MessageSender"
+
+    // 媒体状态在 Rust 中的固定特征 ID（MEDIA_KEY）
+    private const val MEDIA_FEATURE_ID = "media_global"
+
+    // 上次推送全量缓存：featureId -> fullJson（与 Rust diff 字段对齐：title/text/param_v2_raw/pics），
+    // 供心跳查询回调对比；进程重启丢失时查询侧会保守重建缓存。
+    private val lastPushedStateCache = ConcurrentHashMap<String, String>()
+
+    /** 记录/更新某特征ID的上次推送全量（主动推送与查询响应推送均调用） */
+    fun cacheLastPushedState(featureId: String, fullJson: String) {
+        if (featureId.isEmpty()) return
+        lastPushedStateCache[featureId] = fullJson
+    }
+
+    /** 读取某特征ID的上次推送全量（无则返回 null，查询侧保守重建） */
+    fun getLastPushedState(featureId: String): String? = lastPushedStateCache[featureId]
+
+    /** 会话结束后移除缓存 */
+    fun removeLastPushedState(featureId: String) {
+        lastPushedStateCache.remove(featureId)
+    }
+
+    /**
+     * 组装「全量」媒体状态（与 Rust 合并引擎对齐，供主动推送与查询回调共用）。
+     */
+    fun buildMediaFullContent(
+        context: Context,
+        packageName: String,
+        appName: String?,
+        title: String?,
+        text: String?,
+        coverUrl: String?,
+        time: Long,
+        isPlaying: Boolean = true
+    ): String {
+        val isLocked = PermissionHelper.isDeviceLocked(context)
+        return JSONObject().apply {
+            put("packageName", packageName)
+            put("appName", appName ?: packageName)
+            put("title", title ?: "")
+            put("text", text ?: "")
+            put("coverUrl", coverUrl ?: "")
+            put("time", time)
+            put("isLocked", isLocked)
+            put("isPlaying", isPlaying)
+        }.toString()
+    }
 
     /**
      * 发送聊天测试消息
@@ -88,21 +136,14 @@ object MessageSender {
             val queuePtr = NativeCore.senderQueuePtr
             if (queuePtr == 0L) return
 
-            val isLocked = PermissionHelper.isDeviceLocked(context)
-            val content = JSONObject().apply {
-                put("packageName", packageName)
-                put("appName", appName ?: packageName)
-                put("title", title ?: "")
-                put("text", text ?: "")
-                put("coverUrl", coverUrl ?: "")
-                put("time", time)
-                put("isLocked", isLocked)
-                put("isPlaying", true)
-            }.toString()
+            val content = buildMediaFullContent(
+                context, packageName, appName, title, text, coverUrl, time, isPlaying = true
+            )
 
             getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
-                    NativeCore.pushMediaState(ctx, queuePtr, device.uuid, content, false)
+                    NativeCore.pushMediaState(ctx, queuePtr, device.uuid, content, false, false)
+                    cacheLastPushedState(MEDIA_FEATURE_ID, content)
                 } catch (e: Exception) {
                     Logger.w(TAG, "推送媒体状态失败: ${device.displayName}", e)
                 }
@@ -149,7 +190,8 @@ object MessageSender {
 
             getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
-                    NativeCore.pushMediaState(ctx, queuePtr, device.uuid, "{}", true)
+                    NativeCore.pushMediaState(ctx, queuePtr, device.uuid, "{}", true, false)
+                    removeLastPushedState(MEDIA_FEATURE_ID)
                 } catch (e: Exception) {
                     Logger.w(TAG, "推送媒体结束失败: ${device.displayName}", e)
                 }
@@ -208,6 +250,76 @@ object MessageSender {
     }
 
     /**
+     * 组装「全量」超级岛状态（与 Rust 合并引擎对齐，供主动推送与查询回调共用）。
+     * 图片处理：本地 URI/file 路径读取并编码为 base64 data URI，http(s) 地址或其他字符串保持不变。
+     */
+    fun buildSuperIslandFullContent(
+        context: Context,
+        superPkg: String,
+        appName: String?,
+        title: String?,
+        text: String?,
+        time: Long,
+        paramV2Raw: String?,
+        picMap: Map<String, String>?,
+        featureIdOverride: String?
+    ): String {
+        // 处理图片：若 picMap 中是本地 URI/file 路径则读取并编码为 base64 data URI，http(s) 地址或其他字符串保持不变
+        val processedPics = mutableMapOf<String, String>()
+        if (picMap != null) {
+            // 在 IO 线程同步读取后再继续（该接口为同步接口）
+            runBlocking(Dispatchers.IO) {
+                picMap.forEach { (k, v) ->
+                    try {
+                        val lower = v.lowercase()
+                        if (lower.startsWith("content://") || lower.startsWith("file://") || v.startsWith(
+                                "/"
+                            )
+                        ) {
+                            try {
+                                val uri = Uri.parse(v)
+                                context.contentResolver.openInputStream(uri)?.use { input ->
+                                    val bytes = input.readBytes()
+                                    val mime =
+                                        context.contentResolver.getType(uri) ?: "image/png"
+                                    val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                                    processedPics[k] = "data:$mime;base64,$b64"
+                                } ?: run {
+                                    // 无法打开则回退到原始字符串
+                                    processedPics[k] = v
+                                }
+                            } catch (e: Exception) {
+                                // 读取失败则保留原值
+                                processedPics[k] = v
+                            }
+                        } else {
+                            // 非本地资源（如 http:// 或 已经是 base64 字符串），保持原样
+                            processedPics[k] = v
+                        }
+                    } catch (e: Exception) {
+                        processedPics[k] = v
+                    }
+                }
+            }
+        }
+
+        val finalPics: Map<String, String> = if (processedPics.isNotEmpty()) processedPics.toMap() else (picMap?.toMap() ?: emptyMap())
+        val isLocked = PermissionHelper.isDeviceLocked(context)
+
+        return JSONObject().apply {
+            put("packageName", superPkg)
+            put("appName", appName ?: superPkg)
+            put("title", title ?: "")
+            put("text", text ?: "")
+            put("param_v2_raw", paramV2Raw ?: "")
+            put("time", time)
+            put("isLocked", isLocked)
+            put("featureIdOverride", featureIdOverride ?: "")
+            put("pics", JSONObject(finalPics))
+        }.toString()
+    }
+
+    /**
      * 发送超级岛专用数据（包含 param_v2 原始 JSON 与图片 map）
      */
     fun sendSuperIslandData(
@@ -233,65 +345,19 @@ object MessageSender {
             val queuePtr = NativeCore.senderQueuePtr
             if (queuePtr == 0L) return
 
-            val isLocked = PermissionHelper.isDeviceLocked(context)
-
-            // 处理图片：若 picMap 中是本地 URI/file 路径则读取并编码为 base64 data URI，http(s) 地址或其他字符串保持不变
-            val processedPics = mutableMapOf<String, String>()
-            if (picMap != null) {
-                // 在 IO 线程同步读取后再继续（sendSuperIslandData 本身是同步接口）
-                runBlocking(Dispatchers.IO) {
-                    picMap.forEach { (k, v) ->
-                        try {
-                            val lower = v.lowercase()
-                            if (lower.startsWith("content://") || lower.startsWith("file://") || v.startsWith(
-                                    "/"
-                                )
-                            ) {
-                                try {
-                                    val uri = Uri.parse(v)
-                                    context.contentResolver.openInputStream(uri)?.use { input ->
-                                        val bytes = input.readBytes()
-                                        val mime =
-                                            context.contentResolver.getType(uri) ?: "image/png"
-                                        val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                                        processedPics[k] = "data:$mime;base64,$b64"
-                                    } ?: run {
-                                        // 无法打开则回退到原始字符串
-                                        processedPics[k] = v
-                                    }
-                                } catch (e: Exception) {
-                                    // 读取失败则保留原值
-                                    processedPics[k] = v
-                                }
-                            } else {
-                                // 非本地资源（如 http:// 或 已经是 base64 字符串），保持原样
-                                processedPics[k] = v
-                            }
-                        } catch (e: Exception) {
-                            processedPics[k] = v
-                        }
-                    }
-                }
-            }
-
-            val finalPics: Map<String, String> = if (processedPics.isNotEmpty()) processedPics.toMap() else (picMap?.toMap() ?: emptyMap())
-
             // 组装「全量」超级岛状态：差异计算（FULL/DELTA）、合并、ACK 与心跳均由 Rust 合并引擎负责。
-            val content = JSONObject().apply {
-                put("packageName", superPkg)
-                put("appName", appName ?: superPkg)
-                put("title", title ?: "")
-                put("text", text ?: "")
-                put("param_v2_raw", paramV2Raw ?: "")
-                put("time", time)
-                put("isLocked", isLocked)
-                put("featureIdOverride", featureIdOverride ?: "")
-                put("pics", JSONObject(finalPics))
-            }.toString()
+            val content = buildSuperIslandFullContent(
+                context, superPkg, appName, title, text, time, paramV2Raw, picMap, featureIdOverride
+            )
+            // 缓存 key 与 Rust 会话 feature_id 严格一致（iid 传空）
+            val rustFeatureId = NativeCore.computeFeatureId(
+                superPkg, paramV2Raw ?: "", title ?: "", text ?: "", ""
+            ) ?: ""
 
             getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
-                    NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, false)
+                    NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, false, false)
+                    cacheLastPushedState(rustFeatureId, content)
                 } catch (e: Exception) {
                     Logger.e("超级岛", "超级岛: 推送超级岛状态失败: ${device.displayName}", e)
                 }
@@ -331,9 +397,15 @@ object MessageSender {
                 put("featureIdOverride", featureIdOverride ?: "")
             }.toString()
 
+            // 移除推送缓存（与 Rust 会话 feature_id 严格一致，iid 传空）
+            val rustFeatureId = NativeCore.computeFeatureId(
+                superPkg, paramV2Raw ?: "", title ?: "", text ?: "", ""
+            ) ?: ""
+
             getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
-                    NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, true)
+                    NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, true, false)
+                    removeLastPushedState(rustFeatureId)
                 } catch (e: Exception) {
                     Logger.e("超级岛", "超级岛: 推送超级岛结束失败: ${device.displayName}", e)
                 }

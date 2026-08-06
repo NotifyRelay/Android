@@ -40,6 +40,11 @@ interface NotifyRelayCore : Library {
     interface OnDataCb : Callback {
         fun invoke(uuid: Pointer?, messageType: Pointer?, plaintext: Pointer?, userData: Pointer?)
     }
+    // 状态查询回调（Rust 心跳线程锁外调用）：
+    // 参数 (uuid, featureId, isMedia, userData)，返回 0=不存在 / 1=存在无变更 / 2=存在有变更
+    interface OnStateQueryCb : Callback {
+        fun invoke(uuid: Pointer?, featureId: Pointer?, isMedia: Int, userData: Pointer?): Int
+    }
     interface OnLogCb : Callback {
         fun invoke(level: Int, message: Pointer?)
     }
@@ -103,6 +108,7 @@ interface NotifyRelayCore : Library {
     fun nrc_set_log_callback(cb: OnLogCb?)
     fun nrc_set_on_pairing_cb(ctx: Pointer, cb: OnPairingCb?)
     fun nrc_set_on_data_cb(ctx: Pointer, cb: OnDataCb?)
+    fun nrc_set_on_state_query_cb(ctx: Pointer, cb: OnStateQueryCb?)
     fun nrc_set_on_heartbeat_udp_cb(ctx: Pointer, cb: OnHeartbeatUdpCb?)
 
     // ======== Send functions ========
@@ -171,8 +177,9 @@ interface NotifyRelayCore : Library {
     fun nrc_app_sync_parse_applist_response(payloadJson: String): Pointer
 
     // 推送「全量」超级岛/媒体状态（Rust 内部计算差异、合并、ACK 与心跳）；接收端经 on_data 回传全量。
-    fun nrc_push_superisland_state(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Int)
-    fun nrc_push_media_state(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Int)
+    // isQuery：1=查询回调响应推送（心跳查询发现变更后由平台推送），0=正常主动推送。
+    fun nrc_push_superisland_state(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Int, isQuery: Int)
+    fun nrc_push_media_state(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Int, isQuery: Int)
     fun nrc_stop_sender_queue(ctx: Pointer, queuePtr: Long)
 
     // ======== Network change ========
