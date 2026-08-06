@@ -1478,7 +1478,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     /**
      * 与上次推送缓存对比（仅 Rust diff 字段：title/text/param_v2_raw/pics）：
-     * 缓存缺失 → 保守"有变更"推一次建立缓存；无变更 → 1；变更 → 更新缓存并推(isQuery=1) → 2
+     * 缓存缺失 → 保守"有变更"推一次建立缓存；无变更 → 也推一次(isQuery=1)发空差量保活 → 1；变更 → 更新缓存并推(isQuery=1) → 2
      */
     private fun compareAndPushState(remoteUuid: String, featureId: String, fullJson: String, isMedia: Boolean): Int {
         val cached = MessageSender.getLastPushedState(featureId)
@@ -1487,7 +1487,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             pushQueryResponse(remoteUuid, featureId, fullJson, isMedia)
             return 2
         }
-        if (sameDiffFields(cached, fullJson)) return 1
+        if (sameDiffFields(cached, fullJson)) {
+            // 无变更：仍推一次，Rust 端发空差量保活包，刷新远端卡片时间戳防止超时消失
+            pushQueryResponse(remoteUuid, featureId, fullJson, isMedia)
+            return 1
+        }
         MessageSender.cacheLastPushedState(featureId, fullJson)
         pushQueryResponse(remoteUuid, featureId, fullJson, isMedia)
         return 2
