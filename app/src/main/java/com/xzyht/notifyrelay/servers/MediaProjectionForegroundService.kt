@@ -34,16 +34,34 @@ class MediaProjectionForegroundService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // onCreate 已完成 startForeground，此时服务已注册为 mediaProjection 前台服务，
         // 通知外部逻辑可以安全调用 getMediaProjection（Android 14+ 的硬性要求）
+        isForegroundReady = true
         onForegroundReady?.invoke()
-        return START_STICKY
+        return START_NOT_STICKY
+    }
+
+    override fun onDestroy() {
+        isForegroundReady = false
+        onForegroundReady = null
+        super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+        @Volatile
+        private var isForegroundReady = false
+
         var onForegroundReady: (() -> Unit)? = null
+            set(value) {
+                field = value
+                if (value != null && isForegroundReady) {
+                    value.invoke()
+                }
+            }
 
         fun stop(context: Context) {
+            isForegroundReady = false
+            onForegroundReady = null
             context.stopService(Intent(context, MediaProjectionForegroundService::class.java))
         }
     }

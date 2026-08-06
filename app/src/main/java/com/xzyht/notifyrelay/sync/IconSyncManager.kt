@@ -32,6 +32,7 @@ import java.io.ByteArrayOutputStream
 object IconSyncManager {
 
     private const val TAG = "IconSyncManager"
+    private const val ICON_REQUEST_TIMEOUT_MS = 10000L
 
     /**
      * 检查并（必要时）请求单个图标。
@@ -53,12 +54,18 @@ object IconSyncManager {
             appDevices.map { appDevice -> appDevice.sourceDevice }
         }
 
+        // 已缓存图标来源：与批量路径一致，Rust 据此过滤避免对已缓存图标重复发起 ICON_REQUEST
+        val cachedPackages = runBlocking {
+            val iconMap = AppRepository.getExternalAppIcons(context, listOf(packageName))
+            if (iconMap[packageName] != null) listOf(packageName) else emptyList()
+        }
+
         // Rust 内部完成过滤（缓存/已安装/pending/设备关联）并构造请求报文
         val requestJson = NativeCore.appSyncPrepareIconRequest(
             deviceManager.rustContextInternal,
             listOf(packageName),
             installedPackages.toList(),
-            listOf(),
+            cachedPackages,
             if (appDeviceUuids.isEmpty()) emptyMap() else mapOf(packageName to appDeviceUuids),
             sourceDevice.uuid,
             System.currentTimeMillis()
@@ -160,7 +167,13 @@ object IconSyncManager {
         deviceManager: DeviceConnectionManager,
         sourceDevice: DeviceInfo
     ) {
-        ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_REQUEST", requestJson, 10000L)
+        val result = ProtocolSender.sendEncrypted(
+            deviceManager, sourceDevice, "DATA_ICON_REQUEST", requestJson, ICON_REQUEST_TIMEOUT_MS
+        )
+        if (result != ProtocolSender.EnqueueResult.SUCCESS) {
+            // 入队失败时抛异常，使调用方进入 catch 分支清理 pending 状态，避免后续无法重新请求
+            throw IllegalStateException("图标请求入队失败: $result")
+        }
     }
 
     /**
@@ -217,7 +230,7 @@ object IconSyncManager {
                 }.toString()
 
                 Logger.d(TAG, "批量图标响应准备发送，包含 ${resultArr.length()} 个图标，${missingArr.length()} 个缺失图标")
-                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, 10000L)
+                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, ICON_REQUEST_TIMEOUT_MS)
                 Logger.d(TAG, "批量图标响应已发送(${resultArr.length()}) -> ${sourceDevice.displayName}")
             } else if (single.isNotEmpty()) {
                 val icon = runBlocking {
@@ -235,7 +248,7 @@ object IconSyncManager {
                 }.toString()
 
                 Logger.d(TAG, "单图标响应准备发送，包名：$single，${if (icon != null) "有图标" else "无图标"}")
-                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, 10000L)
+                ProtocolSender.sendEncrypted(deviceManager, sourceDevice, "DATA_ICON_RESPONSE", raw, ICON_REQUEST_TIMEOUT_MS)
                 Logger.d(TAG, "单图标响应已发送：$single -> ${sourceDevice.displayName}")
             }
         } catch (e: Exception) {

@@ -7,7 +7,9 @@ import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.ServiceInfo
 import android.os.IBinder
+import androidx.core.app.ServiceCompat
 
 class AudioRelayForegroundService : Service() {
 
@@ -32,6 +34,7 @@ class AudioRelayForegroundService : Service() {
         val text = if (direction == "send") "正在向 $deviceName 发送音频" else "正在从 $deviceName 接收音频"
 
         val stopIntent = Intent(STOP_ACTION).apply {
+            setPackage(packageName)
             putExtra(EXTRA_DEVICE_NAME, deviceName)
         }
         val pendingIntent = android.app.PendingIntent.getBroadcast(
@@ -47,8 +50,13 @@ class AudioRelayForegroundService : Service() {
             .setShowWhen(false)
             .addAction(android.R.drawable.ic_media_pause, "停止", pendingIntent)
             .build()
-        startForeground(NOTIFY_ID, notification)
-        return START_STICKY
+        val foregroundType = if (direction == "send") {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+        } else {
+            ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
+        }
+        ServiceCompat.startForeground(this, NOTIFY_ID, notification, foregroundType)
+        return START_NOT_STICKY
     }
 
     override fun onBind(intent: Intent?): IBinder? = null

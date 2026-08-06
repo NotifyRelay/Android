@@ -30,7 +30,7 @@ class FcitxClipboardReceiver : BroadcastReceiver() {
         val decryptedText = FcitxClipboardManager.decryptClipboardData(context, encryptedData)
         if (decryptedText != null) {
             val deviceManager = DeviceConnectionManager.getInstance(context)
-            ClipboardSyncManager.syncTextDirectly(deviceManager, decryptedText)
+            ClipboardSyncManager.syncTextDirectly(deviceManager, decryptedText, context)
             Logger.d(TAG, "Fcitx5 剪贴板已转发至远端设备")
         }
     }

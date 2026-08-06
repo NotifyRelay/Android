@@ -15,9 +15,10 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.util.concurrent.ConcurrentHashMap
+import java.util.Collections
+import java.util.LinkedHashMap
 
 /**
  * 消息发送类
@@ -33,7 +34,13 @@ object MessageSender {
 
     // 上次推送全量缓存：featureId -> fullJson（与 Rust diff 字段对齐：title/text/param_v2_raw/pics），
     // 供心跳查询回调对比；进程重启丢失时查询侧会保守重建缓存。
-    private val lastPushedStateCache = ConcurrentHashMap<String, String>()
+    // 内容每次变化都会产生新的 featureId key，故采用容量受限的 LRU（accessOrder=true）防止无限增长，
+    // 并用 synchronizedMap 包装保证并发安全。
+    private val lastPushedStateCache: MutableMap<String, String> = Collections.synchronizedMap(
+        object : LinkedHashMap<String, String>(32, 0.75f, true) {
+            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 32
+        }
+    )
 
     /** 记录/更新某特征ID的上次推送全量（主动推送与查询响应推送均调用） */
     fun cacheLastPushedState(featureId: String, fullJson: String) {
@@ -143,11 +150,11 @@ object MessageSender {
             getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
                     NativeCore.pushMediaState(ctx, queuePtr, device.uuid, content, false, false)
-                    cacheLastPushedState(MEDIA_FEATURE_ID, content)
                 } catch (e: Exception) {
                     Logger.w(TAG, "推送媒体状态失败: ${device.displayName}", e)
                 }
             }
+            cacheLastPushedState(MEDIA_FEATURE_ID, content)
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放通知失败", e)
         }
@@ -191,11 +198,11 @@ object MessageSender {
             getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
                     NativeCore.pushMediaState(ctx, queuePtr, device.uuid, "{}", true, false)
-                    removeLastPushedState(MEDIA_FEATURE_ID)
                 } catch (e: Exception) {
                     Logger.w(TAG, "推送媒体结束失败: ${device.displayName}", e)
                 }
             }
+            removeLastPushedState(MEDIA_FEATURE_ID)
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放结束通知失败", e)
         }
@@ -253,7 +260,7 @@ object MessageSender {
      * 组装「全量」超级岛状态（与 Rust 合并引擎对齐，供主动推送与查询回调共用）。
      * 图片处理：本地 URI/file 路径读取并编码为 base64 data URI，http(s) 地址或其他字符串保持不变。
      */
-    fun buildSuperIslandFullContent(
+    suspend fun buildSuperIslandFullContent(
         context: Context,
         superPkg: String,
         appName: String?,
@@ -267,8 +274,7 @@ object MessageSender {
         // 处理图片：若 picMap 中是本地 URI/file 路径则读取并编码为 base64 data URI，http(s) 地址或其他字符串保持不变
         val processedPics = mutableMapOf<String, String>()
         if (picMap != null) {
-            // 在 IO 线程同步读取后再继续（该接口为同步接口）
-            runBlocking(Dispatchers.IO) {
+            withContext(Dispatchers.IO) {
                 picMap.forEach { (k, v) ->
                     try {
                         val lower = v.lowercase()
@@ -322,7 +328,7 @@ object MessageSender {
     /**
      * 发送超级岛专用数据（包含 param_v2 原始 JSON 与图片 map）
      */
-    fun sendSuperIslandData(
+    suspend fun sendSuperIslandData(
         context: Context,
         superPkg: String,
         appName: String?,
@@ -354,7 +360,7 @@ object MessageSender {
                 superPkg, paramV2Raw ?: "", title ?: "", text ?: "", ""
             ) ?: ""
 
-            getAuthenticatedDevices(deviceManager).forEach { device ->
+            authenticatedDevices.forEach { device ->
                 try {
                     NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, false, false)
                     cacheLastPushedState(rustFeatureId, content)
