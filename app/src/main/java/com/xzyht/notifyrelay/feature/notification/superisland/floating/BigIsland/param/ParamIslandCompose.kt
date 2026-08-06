@@ -139,9 +139,8 @@ fun ParamIslandCompose(
                                             val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
                                             val clip = ClipData.newPlainText("verification code", code)
                                             clipboard.setPrimaryClip(clip)
-                                            ClipboardSyncManager.suppressClipboardMonitoring(2000)
                                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                                            ClipboardSyncManager.syncTextDirectly(deviceManager, code)
+                                            ClipboardSyncManager.syncTextDirectly(deviceManager, code, context)
                                             Toast.makeText(context, "验证码已复制", Toast.LENGTH_SHORT).show()
                                         } catch (e: Exception) {
                                             Logger.e("ParamIslandCompose", "复制验证码失败", e)

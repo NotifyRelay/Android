@@ -421,29 +421,34 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                             val sbnInstanceId = getNotificationKey(sbn, "")
                             // 优先复用历史特征ID，避免因字段轻微变化导致"不同岛"的错判
                             val oldId = try { superIslandFeatureByKey[sbnInstanceId]?.second } catch (_: Exception) { null }
+                            // 与 Rust 会话 feature_id 及 MessageSender 缓存 key 严格一致（iid 传空）
                             val computedId = NativeCore.computeFeatureId(
                                 superPkg,
                                 superData.paramV2Raw ?: "",
                                 superData.title ?: "",
                                 superData.text ?: "",
-                                sbnInstanceId
+                                ""
                             ) ?: ""
                             val featureId = oldId ?: computedId
                             // 初次出现时登记；后续保持不变
                             try { if (oldId == null) superIslandFeatureByKey[sbnInstanceId] = superPkg to featureId } catch (_: Exception) {}
-                            MessageSender.sendSuperIslandData(
-                                applicationContext,
-                                superPkg,
-                                superData.appName ?: "超级岛",
-                                superData.title,
-                                superData.text,
-                                sbn.postTime,
-                                superData.paramV2Raw,
-                                // 尝试把 simple pic map 提取为 string map（仅支持 string/url 类值）
-                                (superData.picMap ?: emptyMap()),
-                                deviceManager,
-                                featureIdOverride = featureId
-                            )
+                            // 图片处理（本地 URI 读取/Base64）可能在 IO 线程耗时，异步发送避免阻塞监听线程；
+                            // sendSuperIslandData 内部已捕获全部异常
+                            CoroutineScope(Dispatchers.Default).launch {
+                                MessageSender.sendSuperIslandData(
+                                    applicationContext,
+                                    superPkg,
+                                    superData.appName ?: "超级岛",
+                                    superData.title,
+                                    superData.text,
+                                    sbn.postTime,
+                                    superData.paramV2Raw,
+                                    // 尝试把 simple pic map 提取为 string map（仅支持 string/url 类值）
+                                    (superData.picMap ?: emptyMap()),
+                                    deviceManager,
+                                    featureIdOverride = featureId
+                                )
+                            }
                         } catch (e: Exception) {
                             Logger.w(TAG, "超级岛: 转发超级岛数据失败: ${e.message}")
                         }

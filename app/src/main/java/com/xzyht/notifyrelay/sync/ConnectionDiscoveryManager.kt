@@ -11,6 +11,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
@@ -42,6 +43,7 @@ class ConnectionDiscoveryManager(
         get() = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var reconnectRefreshJob: Job? = null
 
     /**
      * 更新设备信息缓存并触发设备列表更新
@@ -197,7 +199,8 @@ class ConnectionDiscoveryManager(
         val hasValidNetwork = newIp != "0.0.0.0" && newIp.isNotEmpty()
         if (hasValidNetwork) {
             // 网络恢复后的自动重连交由 Rust 重连状态机处理：重新登记所有认证设备，重置重试周期
-            scope.launch {
+            reconnectRefreshJob?.cancel()
+            reconnectRefreshJob = scope.launch {
                 delay(1000)
                 deviceManager.refreshAllReconnectTargetsInternal()
             }

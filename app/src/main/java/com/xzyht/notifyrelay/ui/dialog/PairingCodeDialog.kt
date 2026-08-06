@@ -56,11 +56,16 @@ fun PairingCodeDialog(
         val clipboardManager = LocalClipboardManager.current
         val scope = rememberCoroutineScope()
         val displayCode = remember {
-            NativeCore.generatePairingCode(deviceManager.rustContextInternal!!)!!
+            deviceManager.rustContextInternal?.let { NativeCore.generatePairingCode(it) }
         }
 
         LaunchedEffect(show) {
             if (show && targetDevice != null) {
+                if (displayCode == null) {
+                    onPairingComplete(false, "配对码生成失败：核心未初始化")
+                    onDismiss()
+                    return@LaunchedEffect
+                }
                 delay(500)
                 val handshakeDeferred = deviceManager.registerHandshakeWaiter(targetDevice.uuid)
                 try {
@@ -120,7 +125,7 @@ fun PairingCodeDialog(
                 ) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = displayCode,
+                        text = displayCode ?: "",
                         fontSize = 36.sp,
                         color = colorScheme.primary,
                         textAlign = TextAlign.Center,
@@ -138,7 +143,7 @@ fun PairingCodeDialog(
                     TextButton(
                         text = "点击复制",
                         onClick = {
-                            clipboardManager.setText(AnnotatedString(displayCode))
+                            displayCode?.let { clipboardManager.setText(AnnotatedString(it)) }
                         }
                     )
                     Spacer(modifier = Modifier.height(8.dp))

@@ -64,7 +64,7 @@ fun MusicControlPage() {
     // 发送媒体通知到对端
     var sendMediaNotificationsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "send_media_notifications_enabled", true)) }
     
-    // 音频接收方式（0: scrcpy, 1: 中继）
+    // 音频转发方式（0: scrcpy, 1: 中继）
     var audioRelayMode by remember { mutableStateOf(StorageManager.getInt(context, "audio_relay_mode", 0)) }
     
 
@@ -204,10 +204,10 @@ fun MusicControlPage() {
             Text("停止音频转发")
         }
         
-        // 音频接收方式
+        // 音频转发方式
         WindowSpinnerPreference(
-            title = "音频接收方式",
-            summary = "选择音频接收方式：scrcpy或中继",
+            title = "音频转发方式",
+            summary = "选择音频转发方式：scrcpy（经 adb 转发）或中继（直接音频流），同时控制发送与接收",
             items = listOf(
                 SpinnerEntry(title = "scrcpy（默认）"),
                 SpinnerEntry(title = "中继"),

@@ -6,6 +6,8 @@ import android.content.ClipboardManager
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.os.Handler
+import android.os.Looper
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.nativecore.NativeCore
@@ -14,6 +16,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.image.ImageUtils
 import org.json.JSONObject
 
@@ -69,13 +72,11 @@ object ClipboardSyncManager {
 
     private fun getClipboardManager(context: Context): ClipboardManager? {
         if (clipboardManager == null) {
-            clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            // 使用 applicationContext 避免间接持有 Activity/Service 导致无法回收
+            clipboardManager = context.applicationContext
+                .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         }
         return clipboardManager
-    }
-
-    fun suppressClipboardMonitoring(durationMs: Long = 2000) {
-        Logger.d(TAG, "抑制所有剪贴板监听 $durationMs ms")
     }
 
     /**
@@ -101,6 +102,7 @@ object ClipboardSyncManager {
                 if (clipboardData != null) {
                     val (type, content) = clipboardData
                     handleSendResult(
+                        context,
                         NativeCore.clipboardOnChanged(
                             deviceManager.rustContextInternal,
                             NativeCore.senderQueuePtr,
@@ -136,8 +138,7 @@ object ClipboardSyncManager {
             val content = result.getString("content")
             if (content.isEmpty()) return
 
-            // 收到远端消息时，暂停所有检测一段时间，避免写入剪贴板时触发无障碍事件导致循环
-            suppressClipboardMonitoring(2000)
+            // 防循环由 Rust 内部闭环处理，平台端直接更新本地剪贴板
 
             // 更新本地剪贴板
             updateLocalClipboardContent(type, content, context)
@@ -310,6 +311,7 @@ object ClipboardSyncManager {
                             }
 
                             handleSendResult(
+                                context,
                                 NativeCore.clipboardOnChanged(
                                     deviceManager.rustContextInternal,
                                     NativeCore.senderQueuePtr,
@@ -342,7 +344,7 @@ object ClipboardSyncManager {
      * 直接同步文本内容到其他设备
      * 不触发系统剪贴板读取，不检查前台状态，用于特定场景（如验证码复制）
      */
-    fun syncTextDirectly(deviceManager: DeviceConnectionManager, text: String) {
+    fun syncTextDirectly(deviceManager: DeviceConnectionManager, text: String, context: Context) {
         if (text.isBlank()) return
 
         CoroutineScope(Dispatchers.IO).launch {
@@ -354,6 +356,7 @@ object ClipboardSyncManager {
                 }
 
                 handleSendResult(
+                    context,
                     NativeCore.clipboardOnChanged(
                         deviceManager.rustContextInternal,
                         NativeCore.senderQueuePtr,
@@ -378,9 +381,10 @@ object ClipboardSyncManager {
     }
 
     /**
-     * 处理 Rust 返回的发送结果：file_transfer 动作在 Android 侧尚未实现文件传输通道，暂跳过。
+     * 处理 Rust 返回的发送结果：file_transfer 动作在 Android 侧尚未实现文件传输通道，
+     * 大内容剪贴板会被丢弃，需向用户提示同步失败。
      */
-    private fun handleSendResult(resultJson: String?, type: String) {
+    private fun handleSendResult(context: Context, resultJson: String?, type: String) {
         val action = try {
             JSONObject(resultJson ?: return).optString("action", "skipped")
         } catch (e: Exception) {
@@ -389,8 +393,12 @@ object ClipboardSyncManager {
         when (action) {
             "sent" -> Logger.d(TAG, "剪贴板已发送（Rust 处理）：$type")
             "skipped" -> Logger.d(TAG, "剪贴板已跳过（Rust 处理）")
-            "file_transfer" -> Logger.w(TAG, "剪贴板大内容需走文件传输通道")
-            // TODO: 文件传输通道未实现，收到 file_transfer 动作时暂跳过发送
+            "file_transfer" -> {
+                Logger.w(TAG, "剪贴板大内容需走文件传输通道，同步失败")
+                Handler(Looper.getMainLooper()).post {
+                    ToastUtils.showShortToast(context, "剪贴板内容过大（超过 2MB），同步失败")
+                }
+            }
             else -> Logger.d(TAG, "剪贴板结果未知：$action")
         }
     }

@@ -34,6 +34,9 @@ object NativeCore {
         senderQueuePtr = 0L
         offlineDetectorHandle = 0L
         reconnectStatePtr = 0L
+        stateQueryCallbackRef = null
+        audioDataCallbackRef = null
+        audioEventCallbackRef = null
     }
 
     fun generateKeypair(ctx: Pointer): Boolean =
@@ -278,11 +281,15 @@ object NativeCore {
 
     // 推送「全量」超级岛/媒体状态；Rust 内部计算差异、合并、ACK 与心跳，接收端经 on_data 回传全量。
     // isQuery：true=查询回调响应推送（心跳查询发现变更后由平台推送），false=正常主动推送。
-    fun pushSuperislandState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean, isQuery: Boolean = false) =
-        lib.nrc_push_superisland_state(ctx, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0)
+    fun pushSuperislandState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean, isQuery: Boolean = false) {
+        val c = ctx ?: return
+        lib.nrc_push_superisland_state(c, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0)
+    }
 
-    fun pushMediaState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean, isQuery: Boolean = false) =
-        lib.nrc_push_media_state(ctx, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0)
+    fun pushMediaState(ctx: Pointer?, queuePtr: Long, deviceUuid: String, fullJson: String, isEnd: Boolean, isQuery: Boolean = false) {
+        val c = ctx ?: return
+        lib.nrc_push_media_state(c, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0)
+    }
 
     // 注册状态查询回调（Rust 心跳线程锁外调用，返回 0=不存在 / 1=存在无变更 / 2=存在有变更）
     private var stateQueryCallbackRef: Any? = null

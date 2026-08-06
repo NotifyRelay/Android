@@ -2,9 +2,12 @@ package com.xzyht.notifyrelay.ui.activity
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
@@ -108,10 +111,10 @@ class MainActivity : FragmentActivity() {
     private fun processPendingScreenCapture() {
         if (pendingScreenCapture == null) return
         try {
-            startForegroundService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
             com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = {
                 handleScreenCaptureReady()
             }
+            startForegroundService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
         } catch (e: Exception) {
             Logger.e("NotifyRelay", "屏幕捕获前台服务启动失败，带回前台重试", e)
             bringMainActivityToFront()
@@ -125,9 +128,19 @@ class MainActivity : FragmentActivity() {
             val projection = mpm.getMediaProjection(pending.first, pending.second)
             if (projection != null) {
                 pendingScreenCapture = null
+                val deviceManager = DeviceConnectionManager.getInstance(this)
+                deviceManager.audioRelayPlayer.stopSendCapture()
                 NativeCore.mediaProjection?.stop()
                 NativeCore.mediaProjection = projection
-                DeviceConnectionManager.getInstance(this).startPendingAudioRelaySend()
+                projection.registerCallback(object : MediaProjection.Callback() {
+                    override fun onStop() {
+                        deviceManager.audioRelayPlayer.stopSendCapture()
+                        if (NativeCore.mediaProjection === projection) {
+                            NativeCore.mediaProjection = null
+                        }
+                    }
+                }, Handler(Looper.getMainLooper()))
+                deviceManager.startPendingAudioRelaySend()
             } else {
                 pendingScreenCapture = null
                 stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
@@ -148,23 +161,32 @@ class MainActivity : FragmentActivity() {
         } catch (_: Exception) {}
     }
 
-    private fun checkPermissionsAndStartServices() {
-        lifecycleScope.launch(Dispatchers.Main) {
+    private suspend fun checkPermissionsAndStartServices() {
+        withContext(Dispatchers.Main) {
             showAutoStartBanner.value = false
             bannerMessage.value = null
+        }
 
-            if (!PermissionHelper.checkAllPermissions(this@MainActivity)) {
-                Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
+        val granted = withContext(Dispatchers.IO) {
+            PermissionHelper.checkAllPermissions(this@MainActivity)
+        }
+        if (!granted) {
+            Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
+            withContext(Dispatchers.Main) {
                 val intent = Intent(this@MainActivity, GuideActivity::class.java)
                 intent.putExtra("from", "MainActivity")
                 startActivity(intent)
                 finish()
-                return@launch
             }
+            return
+        }
 
-            val result = ServiceManager.startAllServices(this@MainActivity)
-            val serviceStarted = result.first
-            val errorMessage = result.second
+        val result = withContext(Dispatchers.IO) {
+            ServiceManager.startAllServices(this@MainActivity)
+        }
+        val serviceStarted = result.first
+        val errorMessage = result.second
+        withContext(Dispatchers.Main) {
             if (errorMessage != null) {
                 showAutoStartBanner.value = true
                 bannerMessage.value = errorMessage
@@ -189,6 +211,7 @@ class MainActivity : FragmentActivity() {
     override fun onDestroy() {
         super.onDestroy()
         com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = null
+        DeviceConnectionManager.getInstance(this).onRequestMediaProjection = null
         pendingScreenCapture = null
     }
 

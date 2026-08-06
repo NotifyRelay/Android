@@ -172,16 +172,21 @@ object SuperIslandProcessor {
             val mText = try { json.optString("text", text.orEmpty()) } catch (_: Exception) { text.orEmpty() }
 
             if (isLocked) {
-                val osVersion = PermissionHelper.getDetailedOsVersion()
-                val shouldSkipDedup = PermissionHelper.isVersionGreaterThan(osVersion, "OS3.0.200")
-                
-                if (shouldSkipDedup) {
-                    Logger.i("超级岛", "澎湃系统版本高于OS3.0.200，跳过锁屏去重: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
-                } else if (dedupCheck(manager, dedupKey)) {
-                    Logger.i("超级岛", "锁屏重复通知去重: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
-                    return true
+                if (featureId.isBlank()) {
+                    // 缺失 featureId 时共享去重键会误伤同设备同应用的其他通知，跳过锁屏去重正常展示
+                    Logger.w("超级岛", "featureId 缺失，跳过锁屏去重: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
                 } else {
-                    Logger.i("超级岛", "首次处理超级岛通知，添加到去重缓存: $dedupKey, title=${mTitle ?: "无标题"}")
+                    val osVersion = PermissionHelper.getDetailedOsVersion()
+                    val shouldSkipDedup = PermissionHelper.isVersionGreaterThan(osVersion, "OS3.0.200")
+
+                    if (shouldSkipDedup) {
+                        Logger.i("超级岛", "澎湃系统版本高于OS3.0.200，跳过锁屏去重: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
+                    } else if (dedupCheck(manager, dedupKey)) {
+                        Logger.i("超级岛", "锁屏重复通知去重: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
+                        return true
+                    } else {
+                        Logger.i("超级岛", "首次处理超级岛通知，添加到去重缓存: $dedupKey, title=${mTitle ?: "无标题"}")
+                    }
                 }
             } else {
                 Logger.i("超级岛", "非锁屏状态，正常处理超级岛通知: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
