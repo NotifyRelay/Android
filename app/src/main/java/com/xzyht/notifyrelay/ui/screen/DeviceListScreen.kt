@@ -300,7 +300,7 @@ fun DeviceListScreen(
         LaunchedEffect(device.batteryLevel) {
             // 未知电量（超出 [-100,100]）不更新显示
             if (kotlin.math.abs(device.batteryLevel) <= 100 && device.batteryLevel != batteryLevel.intValue) {
-                batteryLevel.intValue = device.batteryLevel.coerceIn(0, 100)
+                batteryLevel.intValue = device.batteryLevel
             }
         }
         

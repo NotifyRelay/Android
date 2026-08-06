@@ -17,6 +17,9 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.sync.MessageSender
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
@@ -66,19 +69,21 @@ fun showTestNotification(
                 null
             }
             
-            // 发送超级岛数据给其他设备
-            MessageSender.sendSuperIslandData(
-                context = context,
-                superPkg = sourceId,
-                appName = appName,
-                title = title,
-                text = text,
-                time = System.currentTimeMillis(),
-                paramV2Raw = paramV2Raw,
-                picMap = picMap,
-                deviceManager = deviceManager,
-                featureIdOverride = featureIdOverride
-            )
+            // 发送超级岛数据给其他设备（图片处理可能在 IO 线程耗时，异步发送避免阻塞 UI 线程）
+            CoroutineScope(Dispatchers.IO).launch {
+                MessageSender.sendSuperIslandData(
+                    context = context,
+                    superPkg = sourceId,
+                    appName = appName,
+                    title = title,
+                    text = text,
+                    time = System.currentTimeMillis(),
+                    paramV2Raw = paramV2Raw,
+                    picMap = picMap,
+                    deviceManager = deviceManager,
+                    featureIdOverride = featureIdOverride
+                )
+            }
         } catch (e: Exception) {
             // 发送失败时记录日志
             android.util.Log.e("SuperIslandTest", "发送超级岛数据失败: ${e.message}")

@@ -204,7 +204,7 @@ object RemoteMediaSessionManager {
             val oldSession = mediaSessionCache[device.uuid]?.session
             val finalTitle = title.ifBlank { oldSession?.title ?: "" }
             val finalText = text.ifBlank { oldSession?.text ?: "" }
-            val finalCoverUrl = coverUrl ?: oldSession?.coverUrl
+            val finalCoverUrl = coverUrl.ifBlank { oldSession?.coverUrl }
 
             currentSession = MediaSessionData(
                 packageName = packageName,
@@ -217,7 +217,6 @@ object RemoteMediaSessionManager {
             )
             currentDevice = device
 
-            val lastFeatureId = mediaFeatureIdCache[device.uuid]
             val currentFeatureId = NativeCore.computeFeatureId(
                 packageName, "", title, text, ""
             ) ?: ""
@@ -227,7 +226,7 @@ object RemoteMediaSessionManager {
             cleanupTimeoutSessions(context)
             setupResendTask(context, device.uuid, currentSession!!, device)
 
-            val currentState = buildMediaState(finalTitle, finalText, coverUrl)
+            val currentState = buildMediaState(finalTitle, finalText, finalCoverUrl)
             applyMediaSessionState(sourceKey, currentState, appName, context)
 
             Logger.i("RemoteMediaSessionManager", "更新远端媒体会话: $title - $text (来自 ${device.displayName})")
@@ -357,7 +356,7 @@ object RemoteMediaSessionManager {
     // 构建媒体全量状态（Rust 合并引擎已输出全量，本地无需 diff）
     private fun buildMediaState(title: String, text: String, coverUrl: String?): DiffSystem.State {
         val currentPics = mutableMapOf<String, String>()
-        if (coverUrl != null) currentPics["miui.focus.pic_cover"] = coverUrl
+        if (!coverUrl.isNullOrBlank()) currentPics["miui.focus.pic_cover"] = coverUrl
         return DiffSystem.State(
             title,
             text,

@@ -1,21 +1,27 @@
 package com.xzyht.notifyrelay.feature.audio
 
+import android.Manifest
+import android.content.Context
+import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
 import android.media.AudioRecord
 import android.media.AudioTrack
 import android.media.AudioPlaybackCaptureConfiguration
 import android.media.projection.MediaProjection
+import androidx.core.content.ContextCompat
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 
-class AudioRelayPlayer {
+class AudioRelayPlayer(private val context: Context) {
 
     private var audioTrack: AudioTrack? = null
     private var audioRecord: AudioRecord? = null
@@ -101,12 +107,21 @@ class AudioRelayPlayer {
                     return false
                 }
             }
+            else -> {
+                Logger.w("AudioRelay", "未知音频方向: $direction")
+                isRunning = false
+                return false
+            }
         }
         return true
     }
 
     fun startSendCapture(mediaProjection: MediaProjection, sampleRate: Int = 48000, channels: Int = 2) {
         if (!isRunning) return
+        if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+            Logger.w("AudioRelay", "缺少 RECORD_AUDIO 权限，无法启动屏幕音频捕获")
+            return
+        }
         val channelConfig = if (channels == 2) AudioFormat.CHANNEL_IN_STEREO else AudioFormat.CHANNEL_IN_MONO
         val minBuffer = AudioRecord.getMinBufferSize(sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT)
         val bufferSize = (minBuffer * 2).coerceAtLeast(8192)
@@ -138,42 +153,54 @@ class AudioRelayPlayer {
         val frameIntervalMs = 20L
         var nextFrameAt = 0L
         captureJob = CoroutineScope(Dispatchers.IO).launch {
-            while (isActive && isRunning) {
-                // 按实时速率节流发送（50 帧/秒），避免积压突发导致对端 UDP 缓冲溢出丢包
-                val now = System.currentTimeMillis()
-                if (nextFrameAt > now) {
-                    delay(nextFrameAt - now)
-                } else if (now - nextFrameAt > 200) {
-                    // 发送落后过多：重置节奏，避免积压导致突发
-                    nextFrameAt = now
-                }
-                nextFrameAt += frameIntervalMs
+            try {
+                while (isActive && isRunning) {
+                    // 按实时速率节流发送（50 帧/秒），避免积压突发导致对端 UDP 缓冲溢出丢包
+                    val now = System.currentTimeMillis()
+                    if (nextFrameAt > now) {
+                        delay(nextFrameAt - now)
+                    } else if (now - nextFrameAt > 200) {
+                        // 发送落后过多：重置节奏，避免积压导致突发
+                        nextFrameAt = now
+                    }
+                    nextFrameAt += frameIntervalMs
 
-                val read = audioRecord?.read(buf, 0, buf.size) ?: -1
-                if (read < 0) {
-                    Logger.w("AudioRelay", "屏幕音频捕获读取错误: $read")
-                    break
+                    val read = audioRecord?.read(buf, 0, buf.size) ?: -1
+                    if (read < 0) {
+                        Logger.w("AudioRelay", "屏幕音频捕获读取错误: $read")
+                        break
+                    }
+                    try {
+                        // AudioPlaybackCapture 在无音频源时 read 返回 0（正常静默），
+                        // 补发静音帧维持 RTP 流连续，等待而非终止
+                        val frame = if (read > 0) buf.copyOf(read) else silenceChunk
+                        NativeCore.audioWriteFrame(frame)
+                    } catch (_: Exception) {}
                 }
+            } finally {
                 try {
-                    // AudioPlaybackCapture 在无音频源时 read 返回 0（正常静默），
-                    // 补发静音帧维持 RTP 流连续，等待而非终止
-                    val frame = if (read > 0) buf.take(read).toByteArray() else silenceChunk
-                    NativeCore.audioWriteFrame(frame)
+                    audioRecord?.stop()
                 } catch (_: Exception) {}
+                try {
+                    audioRecord?.release()
+                } catch (_: Exception) {}
+                audioRecord = null
             }
-            try {
-                audioRecord?.stop()
-            } catch (_: Exception) {}
-            try {
-                audioRecord?.release()
-            } catch (_: Exception) {}
-            audioRecord = null
         }
+    }
+
+    fun stopSendCapture() {
+        captureJob?.let {
+            runBlocking { it.cancelAndJoin() }
+        }
+        captureJob = null
     }
 
     fun stop() {
         isRunning = false
-        captureJob?.cancel()
+        captureJob?.let {
+            runBlocking { it.cancelAndJoin() }
+        }
         captureJob = null
         audioJob?.cancel()
         audioJob = null
@@ -181,13 +208,6 @@ class AudioRelayPlayer {
         try {
             NativeCore.audioStop()
         } catch (_: Exception) {}
-        try {
-            audioRecord?.stop()
-        } catch (_: Exception) {}
-        try {
-            audioRecord?.release()
-        } catch (_: Exception) {}
-        audioRecord = null
         try {
             audioTrack?.stop()
         } catch (_: Exception) {}

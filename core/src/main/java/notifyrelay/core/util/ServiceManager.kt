@@ -37,26 +37,6 @@ object ServiceManager {
             false
         }
     }
-    
-    /**
-     * 启动剪贴板监控服务。
-     *
-     * @param context 应用或组件上下文，用于调用 startService。
-     * @return 启动请求是否成功（不代表系统已实际在前台运行，仅表示调用未抛出异常）
-     */
-    fun startClipboardMonitorService(context: Context): Boolean {
-        return try {
-            val cn = ComponentName(context, "com.xzyht.notifyrelay.servers.ClipboardMonitorService")
-            val restartIntent = Intent()
-            restartIntent.component = cn
-            restartIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            context.startService(restartIntent)
-            true
-        } catch (e: Exception) {
-            Logger.e("ServiceManager", "启动剪贴板监控服务失败", e)
-            false
-        }
-    }
 
     /**
      * 检查指定服务是否正在运行。
@@ -88,10 +68,11 @@ object ServiceManager {
     }
 
     /**
-     * 启动所有必要的后台服务（当前包括通知监听服务和剪贴板监控服务）。
+     * 启动所有必要的后台服务（当前仅包括通知监听服务；剪贴板监控服务已移除，
+     * 剪贴板同步由手动通知点击与 Fcitx5 广播两种入口触发）。
      *
      * @param context 用于启动服务的上下文。
-     * @return Pair 第一个元素表示是否至少有一个服务成功发起启动请求；
+     * @return Pair 第一个元素表示通知监听服务是否成功发起启动请求；
      *         第二个元素为可选的错误提示字符串，当存在启动失败且需要提示用户时返回该字符串，否则为 null。
      */
     fun startAllServices(context: Context): Pair<Boolean, String?> {
@@ -114,9 +95,6 @@ object ServiceManager {
                 errorMessage = AUTO_START_ERROR_MESSAGE
             }
         }
-        
-        // 启动剪贴板监控服务已移除：剪贴板同步仅保留手动通知点击与 Fcitx5 广播两种入口
-        // 剪贴板监控服务启动失败不影响主要功能，所以不设置错误信息
 
         return Pair(serviceStarted, errorMessage)
     }

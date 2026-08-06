@@ -617,7 +617,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             context.registerReceiver(
                 batteryReceiver,
                 IntentFilter(Intent.ACTION_BATTERY_CHANGED),
-                Context.RECEIVER_EXPORTED
+                Context.RECEIVER_NOT_EXPORTED
             )
         } catch (_: Exception) {}
     }
@@ -704,9 +704,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 // 同步已认证设备的 lastIp/deviceType 元数据
                 if (isAuthed && auth != null) {
                     val effectiveIp = ip.takeUnless { it == "0.0.0.0" || it.isBlank() }
-                    if (effectiveIp != null && auth.lastIp != effectiveIp || auth.deviceType != deviceType) {
+                    val validType = deviceType.takeUnless { it.isBlank() || it == "unknown" }
+                    val ipChanged = effectiveIp != null && auth.lastIp != effectiveIp
+                    val typeChanged = validType != null && auth.deviceType != validType
+                    if (ipChanged || typeChanged) {
                         synchronized(authenticatedDevices) {
-                            authenticatedDevices[uuid] = auth.copy(lastIp = effectiveIp ?: auth.lastIp, deviceType = deviceType)
+                            authenticatedDevices[uuid] = auth.copy(lastIp = effectiveIp ?: auth.lastIp, deviceType = validType ?: auth.deviceType)
                         }
                         saveAuthedDevices()
                     }
@@ -1255,6 +1258,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                                     coroutineScope.launch {
                                         audioRelayPlayer.stop()
                                         cancelAudioRelayNotification()
+                                        if (json.optString("result", "").isNotEmpty()) return@launch
                                         val device = resolveDeviceInfo(uuid, "", 23333)
                                         if (device != null) {
                                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioStop\",\"result\":\"ok\"}"
@@ -1438,21 +1442,30 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 superPkg, superData.paramV2Raw ?: "", superData.title ?: "", superData.text ?: "", ""
             ) ?: ""
             if (computedId != featureId) continue
-            // 匹配：组装 full（与 sendSuperIslandData 同格式）并对比推送
-            val content = MessageSender.buildSuperIslandFullContent(
-                context, superPkg,
-                superData.appName ?: "超级岛",
-                superData.title, superData.text,
-                sbn.postTime, superData.paramV2Raw,
-                superData.picMap ?: emptyMap(),
-                featureId
-            )
+            // 匹配：组装 full（与 sendSuperIslandData 同格式）并对比推送。
+            // 该回调运行在 Rust 心跳线程且必须同步返回 0/1/2，无法异步处理；
+            // 查询路径的 picMap 来自已提取的活跃通知（多为 data URI/http，无 IO），
+            // 仅本地 file/content URI 时才会发生实际文件读取，故在此包装 runBlocking 是必要且可接受的。
+            val content = kotlinx.coroutines.runBlocking {
+                MessageSender.buildSuperIslandFullContent(
+                    context, superPkg,
+                    superData.appName ?: "超级岛",
+                    superData.title, superData.text,
+                    sbn.postTime, superData.paramV2Raw,
+                    superData.picMap ?: emptyMap(),
+                    featureId
+                )
+            }
             return compareAndPushState(remoteUuid, featureId, content, isMedia = false)
         }
         // 无匹配：平台上不存在该会话
         Logger.w("CoreCb", "状态查询: 超级岛会话不存在, fid=$featureId")
         return 0
     }
+
+    private var cachedMediaBitmap: Bitmap? = null
+    private var cachedMediaCoverUrl: String? = null
+    private val mediaCoverCacheLock = Any()
 
     /** 媒体查询：读取当前媒体会话组装 full 并对比推送；无媒体会话返回 0 */
     private fun handleMediaStateQuery(remoteUuid: String, featureId: String): Int {
@@ -1462,13 +1475,17 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         val pkg = primary.packageName
         val mediaData = NotifyRelayNotificationListenerService.getMediaSessionData(pkg)
             ?: return 1 // 有媒体会话但数据未就绪，保守保活等待下次查询
-        var coverUrl: String? = null
-        mediaData.artBitmap?.let { bmp ->
-            try {
-                val stream = ByteArrayOutputStream()
-                bmp.compress(Bitmap.CompressFormat.JPEG, 80, stream)
-                coverUrl = "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
-            } catch (_: Exception) {}
+        val coverUrl = synchronized(mediaCoverCacheLock) {
+            val bmp = mediaData.artBitmap
+            if (bmp !== cachedMediaBitmap) {
+                cachedMediaBitmap = bmp
+                cachedMediaCoverUrl = if (bmp == null) null else try {
+                    val stream = ByteArrayOutputStream()
+                    bmp.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                    "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+                } catch (_: Exception) { null }
+            }
+            cachedMediaCoverUrl
         }
         val content = MessageSender.buildMediaFullContent(
             context, pkg, pkg, mediaData.title, mediaData.artist, coverUrl, System.currentTimeMillis()
@@ -1774,7 +1791,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
-    val audioRelayPlayer = AudioRelayPlayer()
+    val audioRelayPlayer = AudioRelayPlayer(context)
     private var currentAudioRelayUuid: String = ""
 
     private data class PendingAudioSend(
@@ -1822,11 +1839,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 }
             }
         }
-        context.registerReceiver(
-            audioRelayNotificationReceiver,
-            IntentFilter(com.xzyht.notifyrelay.servers.AudioRelayForegroundService.STOP_ACTION),
-            Context.RECEIVER_EXPORTED
-        )
+        try {
+            context.registerReceiver(
+                audioRelayNotificationReceiver,
+                IntentFilter(com.xzyht.notifyrelay.servers.AudioRelayForegroundService.STOP_ACTION),
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } catch (_: Exception) {}
     }
 
     fun stopAudioRelay() {
