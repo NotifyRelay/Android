@@ -180,7 +180,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         val backfillUpdates = mutableListOf<DeviceEntity>()
         
         for (device in devices) {
-            if (device.uuid == "本机") continue
+            if (device.uuid == "本机" || device.uuid == this.uuid) continue
             
             if (device.sharedSecret.isNotEmpty()) {
                 // 尝试解析为新式 base64 AES 密钥
@@ -1574,6 +1574,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // 将认证设备登记到 Rust 重连状态机（先移除再添加，重置重试周期）
     private fun registerReconnectTarget(uuid: String, ip: String) {
         try {
+            if (uuid == this.uuid) return
             val ctx = rustContext ?: return
             if (NativeCore.reconnectStatePtr == 0L) return
             if (ip.isNullOrEmpty() || ip == "0.0.0.0") return
@@ -1603,6 +1604,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // 将认证设备登记到 Rust 已知设备扫描器（known_device_scanner）
     private fun registerKnownDevice(uuid: String, ip: String) {
         try {
+            if (uuid == this.uuid) return
             val ctx = rustContext ?: return
             if (ip.isNullOrEmpty() || ip == "0.0.0.0") return
             NativeCore.removeKnownDevice(ctx, uuid)
