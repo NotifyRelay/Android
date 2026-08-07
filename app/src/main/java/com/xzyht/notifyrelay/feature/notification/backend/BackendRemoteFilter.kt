@@ -11,6 +11,7 @@ import notifyrelay.data.StorageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONObject
@@ -435,6 +436,9 @@ object BackendRemoteFilter {
                     //Logger.d("智能去重", "监控协程结束 - 所有通知已处理完成")
                     break
                 }
+
+                // 避免无待处理任务时忙转（最多损失 100ms 判定精度，15s 撤回窗口不受影响）
+                delay(100)
             }
         }
     }

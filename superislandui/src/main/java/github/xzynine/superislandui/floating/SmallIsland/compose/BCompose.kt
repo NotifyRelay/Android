@@ -174,7 +174,10 @@ fun BCompose(
                 }
                 
                 if (timer != null) {
+                    // 仅计时进行中（正计时 timerType=1 / 倒计时 timerType=-1）才每秒刷新，暂停/无效类型静态显示
+                    val isTimerRunning = timer.timerType == 1 || timer.timerType == -1
                     LaunchedEffect(timer) {
+                        if (!isTimerRunning) return@LaunchedEffect
                         // 每秒更新一次时间
                         while (true) {
                             titleText = formatTimerInfo(timer)

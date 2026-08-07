@@ -557,7 +557,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         foregroundJob?.cancel()
         foregroundJob = CoroutineScope(Dispatchers.Default).launch {
             while (true) {
-                delay(5000)
+                delay(30000)
                 val actives = activeNotifications
                 if (actives != null) {
 

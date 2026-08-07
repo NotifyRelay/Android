@@ -65,6 +65,10 @@ object RemoteMediaSessionManager {
     
     // 定期检查超时会话的任务
     private lateinit var cleanupRunnable: Runnable
+
+    // 清理循环是否运行中（有活跃会话时才运行，无会话即停止，避免常驻空转）
+    @Volatile
+    private var cleanupLoopRunning = false
     
     // 初始化定期检查任务
     private fun initCleanupRunnable() {
@@ -80,8 +84,10 @@ object RemoteMediaSessionManager {
             } catch (e: Exception) {
                 Logger.e("RemoteMediaSessionManager", "定期检查超时会话失败", e)
             } finally {
-                // 重新安排下一次检查
-                handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
+                // 仍有活跃会话才继续调度，否则停止循环
+                if (cleanupLoopRunning) {
+                    handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
+                }
             }
         }
     }
@@ -102,10 +108,28 @@ object RemoteMediaSessionManager {
         isEnabled = mode != MediaMessageReceiveMode.Off
         Logger.i("RemoteMediaSessionManager", "远端媒体超级岛接收模式: $mode")
         
-        // 初始化定期检查任务
+        // 初始化定期检查任务（惰性启动：收到媒体会话时才运行，避免常驻空转）
         initCleanupRunnable()
-        // 启动定期检查超时会话的任务
+    }
+
+    /**
+     * 确保超时会话清理循环在运行（有活跃媒体会话时调用）
+     */
+    private fun ensureCleanupLoop() {
+        if (cleanupLoopRunning) {
+            return
+        }
+        cleanupLoopRunning = true
+        handler.removeCallbacks(cleanupRunnable)
         handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
+    }
+
+    /**
+     * 停止超时会话清理循环（无活跃会话时）
+     */
+    private fun stopCleanupLoop() {
+        cleanupLoopRunning = false
+        handler.removeCallbacks(cleanupRunnable)
     }
 
     fun isEnabled(context: Context): Boolean {
@@ -225,6 +249,8 @@ object RemoteMediaSessionManager {
             mediaLastUpdateTime[device.uuid] = System.currentTimeMillis()
             cleanupTimeoutSessions(context)
             setupResendTask(context, device.uuid, currentSession!!, device)
+            // 有活跃会话，确保清理循环运行
+            ensureCleanupLoop()
 
             val currentState = buildMediaState(finalTitle, finalText, finalCoverUrl)
             applyMediaSessionState(sourceKey, currentState, appName, context)
@@ -256,6 +282,7 @@ object RemoteMediaSessionManager {
         mediaSessionCache.clear()
         currentSession = null
         currentDevice = null
+        stopCleanupLoop()
         Logger.i("RemoteMediaSessionManager", "已清除所有远端媒体会话")
     }
 
@@ -350,6 +377,11 @@ object RemoteMediaSessionManager {
             } catch (e: Exception) {
                 Logger.e("RemoteMediaSessionManager", "清理超时媒体会话失败: $deviceUuid", e)
             }
+        }
+
+        // 无任何活跃会话时停止清理循环，避免常驻空转
+        if (mediaLastUpdateTime.isEmpty()) {
+            stopCleanupLoop()
         }
     }
     
