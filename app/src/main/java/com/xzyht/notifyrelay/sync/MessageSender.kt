@@ -17,8 +17,6 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
-import java.util.Collections
-import java.util.LinkedHashMap
 
 /**
  * 消息发送类
@@ -28,33 +26,6 @@ import java.util.LinkedHashMap
 object MessageSender {
 
     private const val TAG = "MessageSender"
-
-    // 媒体状态在 Rust 中的固定特征 ID（MEDIA_KEY）
-    private const val MEDIA_FEATURE_ID = "media_global"
-
-    // 上次推送全量缓存：featureId -> fullJson（与 Rust diff 字段对齐：title/text/param_v2_raw/pics），
-    // 供心跳查询回调对比；进程重启丢失时查询侧会保守重建缓存。
-    // 内容每次变化都会产生新的 featureId key，故采用容量受限的 LRU（accessOrder=true）防止无限增长，
-    // 并用 synchronizedMap 包装保证并发安全。
-    private val lastPushedStateCache: MutableMap<String, String> = Collections.synchronizedMap(
-        object : LinkedHashMap<String, String>(32, 0.75f, true) {
-            override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, String>?): Boolean = size > 32
-        }
-    )
-
-    /** 记录/更新某特征ID的上次推送全量（主动推送与查询响应推送均调用） */
-    fun cacheLastPushedState(featureId: String, fullJson: String) {
-        if (featureId.isEmpty()) return
-        lastPushedStateCache[featureId] = fullJson
-    }
-
-    /** 读取某特征ID的上次推送全量（无则返回 null，查询侧保守重建） */
-    fun getLastPushedState(featureId: String): String? = lastPushedStateCache[featureId]
-
-    /** 会话结束后移除缓存 */
-    fun removeLastPushedState(featureId: String) {
-        lastPushedStateCache.remove(featureId)
-    }
 
     /**
      * 组装「全量」媒体状态（与 Rust 合并引擎对齐，供主动推送与查询回调共用）。
@@ -154,7 +125,6 @@ object MessageSender {
                     Logger.w(TAG, "推送媒体状态失败: ${device.displayName}", e)
                 }
             }
-            cacheLastPushedState(MEDIA_FEATURE_ID, content)
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放通知失败", e)
         }
@@ -202,7 +172,6 @@ object MessageSender {
                     Logger.w(TAG, "推送媒体结束失败: ${device.displayName}", e)
                 }
             }
-            removeLastPushedState(MEDIA_FEATURE_ID)
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放结束通知失败", e)
         }
@@ -355,13 +324,10 @@ object MessageSender {
             val content = buildSuperIslandFullContent(
                 context, superPkg, appName, title, text, time, paramV2Raw, picMap, featureIdOverride
             )
-            // 缓存 key 与 Rust 会话 feature_id 严格一致（平台端传入的稳定 sbn.key）
-            val rustFeatureId = featureIdOverride ?: ""
 
             authenticatedDevices.forEach { device ->
                 try {
                     NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, false, false)
-                    cacheLastPushedState(rustFeatureId, content)
                 } catch (e: Exception) {
                     Logger.e("超级岛", "超级岛: 推送超级岛状态失败: ${device.displayName}", e)
                 }
@@ -401,13 +367,9 @@ object MessageSender {
                 put("featureIdOverride", featureIdOverride ?: "")
             }.toString()
 
-            // 移除推送缓存（与 Rust 会话 feature_id 严格一致，平台端传入的稳定 sbn.key）
-            val rustFeatureId = featureIdOverride ?: ""
-
             getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
                     NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, true, false)
-                    removeLastPushedState(rustFeatureId)
                 } catch (e: Exception) {
                     Logger.e("超级岛", "超级岛: 推送超级岛结束失败: ${device.displayName}", e)
                 }

@@ -478,8 +478,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     internal fun decodeDisplayNameFromTransportInternal(encoded: String): String = decodeDisplayNameFromTransport(encoded)
 
-    internal fun startServerInternal() = startServer()
-
     internal fun updateDeviceListInternal() = updateDeviceList()
 
     internal fun saveAuthedDevicesInternal() = saveAuthedDevices()
@@ -492,8 +490,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal val rustContextInternal: com.sun.jna.Pointer?
         get() = rustContext
 
-    private var serverStarted = false
-    // 电池变化监听器（常驻，随 DeviceConnectionManager 生命周期）
     private var batteryReceiver: BroadcastReceiver? = null
     // 上次同步给 Rust 心跳调度器的带符号电量（正=充电，负=放电），用于防抖
     private var lastSentSignedBattery: Int = Int.MIN_VALUE
@@ -557,18 +553,28 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         localPublicKey = initPubKey
         loadAuthedDevices()
         saveRustCoreState()
-        // 尽早初始化发送队列等新特性，避免发送窗口期
-        rustContext?.let { NativeCore.initializeNewFeatures(it) }
-        // 启动统一心跳调度器：已配对设备的每设备心跳（Auto 模式）由 Rust 自动启停
+        // 统一启动核心：TCP/UDP、心跳调度、离线检测、发送队列、已知设备扫描、重连状态机、mDNS 广告与发现
         try {
             rustContext?.let { ctx ->
+                if (localPublicKey.isEmpty()) {
+                    Logger.e("死神-NotifyRelay", "本机 ECDH 公钥为空，跳过 Rust Core 启动")
+                    return@let
+                }
                 val batteryLevel = BatteryUtils.getBatteryLevel(context)
                 val battery = if (BatteryUtils.isCharging(context)) batteryLevel else -batteryLevel
                 lastSentSignedBattery = battery
-                NativeCore.startHeartbeatScheduler(ctx, uuid, getLocalDisplayName(), battery, "android", 2000L)
+                NativeCore.startCore(
+                    ctx = ctx,
+                    uuid = uuid,
+                    name = getLocalDisplayName(),
+                    battery = battery,
+                    deviceType = "android",
+                    tcpPort = listenPort.toShort(),
+                    pubkey = localPublicKey
+                )
             }
         } catch (e: Exception) {
-            Logger.e("死神-NotifyRelay", "启动心跳调度器失败", e)
+            Logger.e("死神-NotifyRelay", "启动 Rust Core 失败", e)
         }
         // 电池变化监听：电量/充电状态变化时同步到 Rust 心跳调度器，对端实时显示更新
         registerBatteryChangeReceiver()
@@ -578,15 +584,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         synchronized(deviceInfoCache) {
             deviceInfoCache[uuid] = DeviceInfo(uuid, displayName, localIp, listenPort)
         }
-        startOfflineDeviceCleaner()
         discoveryManager.registerNetworkCallback()
         // 自动重连已移交 Rust 重连状态机（loadAuthedDevices 中已登记认证设备）
-        // 启动 mDNS 广告和发现
-        startMdnsServices()
-        // 启动 Rust 已知设备扫描器（持续对认证设备做握手重连/发现）
-        try {
-            rustContext?.let { NativeCore.startKnownDeviceScanner(it) }
-        } catch (_: Exception) {}
     }
 
     // 电池变化监听：ACTION_BATTERY_CHANGED 为粘性广播，注册后立即回调一次当前状态；
@@ -622,33 +621,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         } catch (_: Exception) {}
     }
 
-    private fun startMdnsServices() {
-        try {
-            val ctx = rustContext ?: return
-            val displayName = getLocalDisplayName()
-            NativeCore.startMdnsAdvertiser(ctx, uuid, displayName, listenPort.toShort(), localPublicKey, "android", lastSentSignedBattery)
-            NativeCore.startMdnsDiscovery(ctx)
-            Logger.d("死神-NotifyRelay", "mDNS 服务已启动")
-        } catch (e: Exception) {
-            Logger.e("死神-NotifyRelay", "启动 mDNS 服务失败", e)
-        }
-    }
-
-    // 统一设备状态管理：1s 定时拉取 Rust 状态快照（在线判定/超时移除已迁移至 Rust DeviceRegistry）
-    private fun startOfflineDeviceCleaner() {
-        coroutineScope.launch {
-            while (true) {
-                delay(1000)
-                try {
-                    updateDeviceList()
-                } catch (e: Exception) {
-                    Logger.e("死神-NotifyRelay", "startOfflineDeviceCleaner定时器异常: ${e.message}")
-                }
-            }
-        }
-    }
-
-    // 统一设备状态管理：在线判定/超时移除已迁移至 Rust DeviceRegistry，此处消费状态快照
+    // 统一设备状态管理：心跳回调（on_heartbeat_udp / on_mdns_discovered / on_device_timeout）驱动
+    // refreshDevicesFromRust 消费 Rust 状态快照，无需平台侧固定轮询
     private fun updateDeviceList() {
         refreshDevicesFromRust()
     }
@@ -938,9 +912,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                     return@launch
                 }
 
-                // 新增：WLAN直连模式下增加重试次数
-                val maxRetries = if (isWifiDirectNetworkInternal()) 3 else 1
-                val result = keepAlive.performDeviceConnectionWithRetry(device, maxRetries)
+                // 重试行为由 Rust nrc_connect_device 内部固定次数控制（3次/5s超时/1s间隔）
+                val result = keepAlive.performDeviceConnectionWithRetry(device)
                 callback?.invoke(result.first, result.second)
             } catch (e: Exception) {
                 Logger.e("死神-NotifyRelay", "connectToDevice异常: ${e.message}")
@@ -994,12 +967,14 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             var pubKey = ""
                             var ip = ""
                             var deviceType = "unknown"
+                            var autoAccept = false
                             data?.let {
                                 try {
                                     val json = JSONObject(it)
                                     pubKey = json.optString("pub_key", "")
                                     ip = json.optString("ip", "")
                                     deviceType = json.optString("device_type", "unknown")
+                                    autoAccept = json.optBoolean("auto_accept", false)
                                 } catch (_: Exception) {}
                             }
                             synchronized(dm.deviceInfoCacheInternal) {
@@ -1016,6 +991,21 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             }
                             dm.registerReconnectTarget(uuid, ip)
             dm.registerKnownDevice(uuid, ip)
+                            // Rust 侧已对已配对设备自动发送 ACCEPT（auto_accept=true），
+                            // 平台侧仅做 UI 持久化/登记，无需重复发送 ACCEPT 或 REJECT
+                            if (autoAccept) {
+                                // 自动闭环分支同样清理不兼容标记并持久化 deviceType，避免标记残留
+                                synchronized(dm.incompatibleDevicesInternal) { dm.incompatibleDevicesInternal.remove(uuid) }
+                                synchronized(dm.authenticatedDevices) {
+                                    val auth = dm.authenticatedDevices[uuid]
+                                    if (auth != null && auth.deviceType != deviceType && deviceType != "unknown") {
+                                        dm.authenticatedDevices[uuid] = auth.copy(deviceType = deviceType)
+                                        dm.saveAuthedDevicesInternal()
+                                    }
+                                }
+                                Logger.d("CoreCb", "HANDSHAKE 已自动闭环(Rust auto_accept): $uuid")
+                                return
+                            }
                             val alreadyAuthed = synchronized(dm.authenticatedDevices) {
                                 dm.authenticatedDevices[uuid]?.isAccepted == true
                             }
@@ -1400,9 +1390,42 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 // 超时离线状态由 Rust DeviceRegistry 维护，此处仅重新登记重连目标
                 val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
                 if (auth != null) registerReconnectTarget(uuid, auth.lastIp ?: "")
+                // 触发快照刷新，UI 立即反映离线状态（替代原 1s 轮询的离线更新职责）
+                runCatching { updateDeviceList() }
             }
         }
         lib.nrc_set_on_device_timeout_cb(ctx, deviceTimeoutCb); rustCallbackRefs.add(deviceTimeoutCb)
+
+        // ---- on_device_connected (TCP 连接建立回调) ----
+        val deviceConnectedCb = object : NotifyRelayCore.OnDeviceConnectedCb {
+            override fun invoke(uuidPtr: Pointer?, ipPtr: Pointer?, userData: Pointer?) {
+                val dm = _callbackInstance ?: return
+                val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
+                if (uuid == dm.uuid) return
+                val ip = NotifyRelayCore.ptrToString(ipPtr) ?: ""
+                // 回填连接来源 IP 并触发快照刷新（替代原 1s 轮询的在线更新职责）
+                synchronized(dm.deviceInfoCache) {
+                    val existing = dm.deviceInfoCache[uuid]
+                    if (existing != null && ip.isNotBlank() && ip != "0.0.0.0") {
+                        dm.deviceInfoCache[uuid] = existing.copy(ip = ip)
+                    }
+                }
+                runCatching { dm.updateDeviceList() }
+            }
+        }
+        lib.nrc_set_on_device_connected_cb(ctx, deviceConnectedCb); rustCallbackRefs.add(deviceConnectedCb)
+
+        // ---- on_device_disconnected (TCP 断开回调) ----
+        // 设备主动断开 TCP 时立即刷新快照，UI 无需等 12 秒离线超时
+        val deviceDisconnectedCb = object : NotifyRelayCore.OnDeviceDisconnectedCb {
+            override fun invoke(uuidPtr: Pointer?, userData: Pointer?) {
+                val dm = _callbackInstance ?: return
+                val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
+                if (uuid == dm.uuid) return
+                runCatching { dm.updateDeviceList() }
+            }
+        }
+        lib.nrc_set_on_device_disconnected_cb(ctx, deviceDisconnectedCb); rustCallbackRefs.add(deviceDisconnectedCb)
 
         // ---- on_state_query (超级岛/媒体心跳查询回调：0=不存在 / 1=存在无变更 / 2=存在有变更) ----
         // 运行在 Rust 心跳线程且锁已释放，回调内可直接调用 nrc_push_*（isQuery=1）响应变更
@@ -1429,6 +1452,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // ---- 状态查询回调处理（运行在 Rust 心跳线程，锁已释放；回调内可直接调 push(isQuery=1)） ----
     private val mediaFeatureId = "media_global" // 与 Rust MEDIA_KEY 一致
 
+    // 状态查询轻量比较键缓存：键 = "$remoteUuid|$featureId"，值 = 轻量内容键；
+    // 心跳查询时先比较轻量键，未变化则跳过昂贵的 runBlocking/fullJson 构造与推送
+    private val stateQueryKeys = HashMap<String, String>()
+
     /** 超级岛查询：扫描活跃通知，重算 featureId（与 Rust 算法一致，iid 传空）匹配后对比推送 */
     private fun handleSuperIslandStateQuery(remoteUuid: String, featureId: String): Int {
         val listener = NotifyRelayNotificationListenerService.instance ?: return 0
@@ -1440,6 +1467,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             // 重算 featureId：与 Rust 会话 key 及发送端严格一致（sbn.key 稳定值）
             val computedId = listener.getNotificationKey(sbn, "")
             if (computedId != featureId) continue
+            // 轻量比较键（不含图片资源）：未变化时跳过昂贵的 runBlocking/fullJson 构造与推送
+            val lightKey = "$superPkg|${superData.appName}|${superData.title}|${superData.text}|${sbn.postTime}|${superData.paramV2Raw}"
+            val cacheKey = "$remoteUuid|$featureId"
+            if (stateQueryKeys[cacheKey] == lightKey) return 1 // 存在无变更，保活等待下次查询
             // 匹配：组装 full（与 sendSuperIslandData 同格式）并对比推送。
             // 该回调运行在 Rust 心跳线程且必须同步返回 0/1/2，无法异步处理；
             // 查询路径的 picMap 来自已提取的活跃通知（多为 data URI/http，无 IO），
@@ -1454,7 +1485,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                     featureId
                 )
             }
-            return compareAndPushState(remoteUuid, featureId, content, isMedia = false)
+            val result = compareAndPushState(remoteUuid, featureId, content, isMedia = false)
+            stateQueryKeys[cacheKey] = lightKey
+            return result
         }
         // 无匹配：平台上不存在该会话
         Logger.w("CoreCb", "状态查询: 超级岛会话不存在, fid=$featureId")
@@ -1485,29 +1518,23 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
             cachedMediaCoverUrl
         }
+        // 轻量比较键：仅标题/艺术家/封面变化才重新构造 fullJson 并推送（isPlaying 由 Rust 媒体心跳处理）
+        val lightKey = "$pkg|${mediaData.title}|${mediaData.artist}|$coverUrl"
+        val cacheKey = "$remoteUuid|$featureId"
+        if (stateQueryKeys[cacheKey] == lightKey) return 1 // 存在无变更，保活等待下次查询
         val content = MessageSender.buildMediaFullContent(
             context, pkg, pkg, mediaData.title, mediaData.artist, coverUrl, System.currentTimeMillis()
         )
-        return compareAndPushState(remoteUuid, featureId, content, isMedia = true)
+        val result = compareAndPushState(remoteUuid, featureId, content, isMedia = true)
+        stateQueryKeys[cacheKey] = lightKey
+        return result
     }
 
     /**
-     * 与上次推送缓存对比（仅 Rust diff 字段：title/text/param_v2_raw/pics）：
-     * 缓存缺失 → 保守"有变更"推一次建立缓存；无变更 → 也推一次(isQuery=1)发空差量保活 → 1；变更 → 更新缓存并推(isQuery=1) → 2
+     * 查询响应推送：差异计算（FULL/DELTA）与保活由 Rust 合并引擎内部完成（无变更时发空差量保活），
+     * 平台无需本地对比缓存，直接推送全量并返回 2（存在有变更）。
      */
     private fun compareAndPushState(remoteUuid: String, featureId: String, fullJson: String, isMedia: Boolean): Int {
-        val cached = MessageSender.getLastPushedState(featureId)
-        if (cached == null) {
-            MessageSender.cacheLastPushedState(featureId, fullJson)
-            pushQueryResponse(remoteUuid, featureId, fullJson, isMedia)
-            return 2
-        }
-        if (sameDiffFields(cached, fullJson)) {
-            // 无变更：仍推一次，Rust 端发空差量保活包，刷新远端卡片时间戳防止超时消失
-            pushQueryResponse(remoteUuid, featureId, fullJson, isMedia)
-            return 1
-        }
-        MessageSender.cacheLastPushedState(featureId, fullJson)
         pushQueryResponse(remoteUuid, featureId, fullJson, isMedia)
         return 2
     }
@@ -1525,20 +1552,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
-    /** 与 Rust diff 字段严格对齐（title/text/param_v2_raw/pics），避免错位导致误判 */
-    private fun sameDiffFields(a: String, b: String): Boolean {
-        return try {
-            val ja = JSONObject(a)
-            val jb = JSONObject(b)
-            ja.optString("title") == jb.optString("title") &&
-                ja.optString("text") == jb.optString("text") &&
-                ja.optString("param_v2_raw") == jb.optString("param_v2_raw") &&
-                ja.opt("pics").toString() == jb.opt("pics").toString()
-        } catch (_: Exception) {
-            false
-        }
-    }
-
     // 辅助方法：发送媒体控制响应（由回调使用）
     private fun sendMediaControlResponse(remoteUuid: String, action: String, result: String, errorMessage: String?) {
         try {
@@ -1547,28 +1560,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 ProtocolSender.sendEncrypted(this, it, "DATA_STATUS", raw)
             }
         } catch (e: Exception) { Logger.e("CoreCb", "sendMediaControlResponse", e) }
-    }
-
-    // 启动TCP服务监听，使用 Rust TCP 服务器
-    private fun startServer() {
-        coroutineScope.launch {
-            try {
-                val ctx = rustContext ?: return@launch
-                if (!serverStarted) {
-                    val result = NativeCore.startTcpServer(ctx, listenPort.toShort())
-                    if (result == 0) {
-                        Logger.i("死神-NotifyRelay", "Rust TCP 服务器已启动，端口: $listenPort")
-                        serverStarted = true
-                    } else {
-                        Logger.e("死神-NotifyRelay", "启动 Rust TCP 服务器失败")
-                    }
-                }
-                // 无论 TCP 是否已启动，总是初始化新网络特性（发送队列、离线检测、重连状态机）
-                NativeCore.initializeNewFeatures(ctx)
-            } catch (e: Exception) {
-                Logger.e("死神-NotifyRelay", "启动 Rust TCP 服务器异常", e)
-            }
-        }
     }
 
     // 保存 Rust Core 状态到持久化存储，确保重启后 device_keys 可恢复
@@ -1595,10 +1586,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         try {
             if (uuid == this.uuid) return
             val ctx = rustContext ?: return
-            if (NativeCore.reconnectStatePtr == 0L) return
             if (ip.isNullOrEmpty() || ip == "0.0.0.0") return
-            NativeCore.reconnectRemoveTarget(ctx, NativeCore.reconnectStatePtr, uuid)
-            NativeCore.reconnectAddTarget(ctx, NativeCore.reconnectStatePtr, uuid, ip)
+            NativeCore.reconnectRemoveTarget(ctx, uuid)
+            NativeCore.reconnectAddTarget(ctx, uuid, ip)
         } catch (_: Exception) {}
     }
 
@@ -1615,8 +1605,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     private fun removeReconnectTarget(uuid: String) {
         try {
             val ctx = rustContext ?: return
-            if (NativeCore.reconnectStatePtr == 0L) return
-            NativeCore.reconnectRemoveTarget(ctx, NativeCore.reconnectStatePtr, uuid)
+            NativeCore.reconnectRemoveTarget(ctx, uuid)
         } catch (_: Exception) {}
     }
 
