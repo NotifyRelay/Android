@@ -15,6 +15,7 @@ object NativeCore {
     var mediaProjection: MediaProjection? = null
 
     // 网络层新特性的内部状态（发送队列句柄由 startCore 返回）
+    @Volatile
     var senderQueuePtr: Long = 0L
         private set
 
@@ -341,8 +342,14 @@ object NativeCore {
         offlineCheckIntervalMs: Long = 5000,
         reconnectIntervalSecs: Long = 10,
         reconnectMaxRetries: Int = 5
-    ) {
+    ): Boolean {
         val queue = lib.nrc_start_core(ctx, uuid, name, battery, deviceType, tcpPort, pubkey, heartbeatIntervalMs, offlineTimeoutSec, offlineCheckIntervalMs, reconnectIntervalSecs, reconnectMaxRetries)
-        senderQueuePtr = if (queue >= 0) queue else 0L
+        if (queue <= 0L) {
+            Log.e(TAG, "nrc_start_core 启动失败，返回句柄: $queue")
+            senderQueuePtr = 0L
+            return false
+        }
+        senderQueuePtr = queue
+        return true
     }
 }

@@ -33,9 +33,11 @@ class ConnectionKeepAlive(
      * - 认证成功后更新 AuthInfo/deviceInfoCache（心跳由 Rust 调度器接管）
      * - 失败原因通过 (Boolean, String?) 形式返回
      */
-    suspend fun performDeviceConnectionWithRetry(device: DeviceInfo, maxRetries: Int): Pair<Boolean, String?> {
+    suspend fun performDeviceConnectionWithRetry(device: DeviceInfo): Pair<Boolean, String?> {
         val ctx = deviceManager.rustContextInternal
         if (ctx == null) return Pair(false, "未初始化")
+        // 无效 IP 直接快速失败，避免 Rust 侧按重试与超时消耗更长时间后才失败
+        if (device.ip.isBlank() || device.ip == "0.0.0.0") return Pair(false, "设备 IP 无效")
         val batteryLevel = BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
         val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
         val battery = if (isCharging) batteryLevel else -batteryLevel
@@ -47,7 +49,8 @@ class ConnectionKeepAlive(
             } catch (_: Exception) {}
             return Pair(true, null)
         }
+        // nrc_connect_device 约定：0=收到 ACCEPT(成功)，-1=被拒绝或重试耗尽；无其他返回码
         Logger.e("死神-NotifyRelay", "connectToDevice 连接失败: ${device.displayName}, result=$result")
-        return Pair(false, if (result < 0) "连接失败" else "连接被拒绝")
+        return Pair(false, "连接失败")
     }
 }

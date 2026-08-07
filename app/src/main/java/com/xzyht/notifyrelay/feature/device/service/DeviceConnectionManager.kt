@@ -556,6 +556,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // 统一启动核心：TCP/UDP、心跳调度、离线检测、发送队列、已知设备扫描、重连状态机、mDNS 广告与发现
         try {
             rustContext?.let { ctx ->
+                if (localPublicKey.isEmpty()) {
+                    Logger.e("死神-NotifyRelay", "本机 ECDH 公钥为空，跳过 Rust Core 启动")
+                    return@let
+                }
                 val batteryLevel = BatteryUtils.getBatteryLevel(context)
                 val battery = if (BatteryUtils.isCharging(context)) batteryLevel else -batteryLevel
                 lastSentSignedBattery = battery
@@ -908,9 +912,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                     return@launch
                 }
 
-                // 新增：WLAN直连模式下增加重试次数
-                val maxRetries = if (isWifiDirectNetworkInternal()) 3 else 1
-                val result = keepAlive.performDeviceConnectionWithRetry(device, maxRetries)
+                // 重试行为由 Rust nrc_connect_device 内部固定次数控制（3次/5s超时/1s间隔）
+                val result = keepAlive.performDeviceConnectionWithRetry(device)
                 callback?.invoke(result.first, result.second)
             } catch (e: Exception) {
                 Logger.e("死神-NotifyRelay", "connectToDevice异常: ${e.message}")
@@ -991,6 +994,15 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             // Rust 侧已对已配对设备自动发送 ACCEPT（auto_accept=true），
                             // 平台侧仅做 UI 持久化/登记，无需重复发送 ACCEPT 或 REJECT
                             if (autoAccept) {
+                                // 自动闭环分支同样清理不兼容标记并持久化 deviceType，避免标记残留
+                                synchronized(dm.incompatibleDevicesInternal) { dm.incompatibleDevicesInternal.remove(uuid) }
+                                synchronized(dm.authenticatedDevices) {
+                                    val auth = dm.authenticatedDevices[uuid]
+                                    if (auth != null && auth.deviceType != deviceType && deviceType != "unknown") {
+                                        dm.authenticatedDevices[uuid] = auth.copy(deviceType = deviceType)
+                                        dm.saveAuthedDevicesInternal()
+                                    }
+                                }
                                 Logger.d("CoreCb", "HANDSHAKE 已自动闭环(Rust auto_accept): $uuid")
                                 return
                             }
@@ -1403,6 +1415,18 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
         lib.nrc_set_on_device_connected_cb(ctx, deviceConnectedCb); rustCallbackRefs.add(deviceConnectedCb)
 
+        // ---- on_device_disconnected (TCP 断开回调) ----
+        // 设备主动断开 TCP 时立即刷新快照，UI 无需等 12 秒离线超时
+        val deviceDisconnectedCb = object : NotifyRelayCore.OnDeviceDisconnectedCb {
+            override fun invoke(uuidPtr: Pointer?, userData: Pointer?) {
+                val dm = _callbackInstance ?: return
+                val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
+                if (uuid == dm.uuid) return
+                runCatching { dm.updateDeviceList() }
+            }
+        }
+        lib.nrc_set_on_device_disconnected_cb(ctx, deviceDisconnectedCb); rustCallbackRefs.add(deviceDisconnectedCb)
+
         // ---- on_state_query (超级岛/媒体心跳查询回调：0=不存在 / 1=存在无变更 / 2=存在有变更) ----
         // 运行在 Rust 心跳线程且锁已释放，回调内可直接调用 nrc_push_*（isQuery=1）响应变更
         val stateQueryCb = object : NotifyRelayCore.OnStateQueryCb {
@@ -1428,6 +1452,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     // ---- 状态查询回调处理（运行在 Rust 心跳线程，锁已释放；回调内可直接调 push(isQuery=1)） ----
     private val mediaFeatureId = "media_global" // 与 Rust MEDIA_KEY 一致
 
+    // 状态查询轻量比较键缓存：键 = "$remoteUuid|$featureId"，值 = 轻量内容键；
+    // 心跳查询时先比较轻量键，未变化则跳过昂贵的 runBlocking/fullJson 构造与推送
+    private val stateQueryKeys = HashMap<String, String>()
+
     /** 超级岛查询：扫描活跃通知，重算 featureId（与 Rust 算法一致，iid 传空）匹配后对比推送 */
     private fun handleSuperIslandStateQuery(remoteUuid: String, featureId: String): Int {
         val listener = NotifyRelayNotificationListenerService.instance ?: return 0
@@ -1439,6 +1467,10 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             // 重算 featureId：与 Rust 会话 key 及发送端严格一致（sbn.key 稳定值）
             val computedId = listener.getNotificationKey(sbn, "")
             if (computedId != featureId) continue
+            // 轻量比较键（不含图片资源）：未变化时跳过昂贵的 runBlocking/fullJson 构造与推送
+            val lightKey = "$superPkg|${superData.appName}|${superData.title}|${superData.text}|${sbn.postTime}|${superData.paramV2Raw}"
+            val cacheKey = "$remoteUuid|$featureId"
+            if (stateQueryKeys[cacheKey] == lightKey) return 1 // 存在无变更，保活等待下次查询
             // 匹配：组装 full（与 sendSuperIslandData 同格式）并对比推送。
             // 该回调运行在 Rust 心跳线程且必须同步返回 0/1/2，无法异步处理；
             // 查询路径的 picMap 来自已提取的活跃通知（多为 data URI/http，无 IO），
@@ -1453,7 +1485,9 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                     featureId
                 )
             }
-            return compareAndPushState(remoteUuid, featureId, content, isMedia = false)
+            val result = compareAndPushState(remoteUuid, featureId, content, isMedia = false)
+            stateQueryKeys[cacheKey] = lightKey
+            return result
         }
         // 无匹配：平台上不存在该会话
         Logger.w("CoreCb", "状态查询: 超级岛会话不存在, fid=$featureId")
@@ -1484,10 +1518,16 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
             cachedMediaCoverUrl
         }
+        // 轻量比较键：仅标题/艺术家/封面变化才重新构造 fullJson 并推送（isPlaying 由 Rust 媒体心跳处理）
+        val lightKey = "$pkg|${mediaData.title}|${mediaData.artist}|$coverUrl"
+        val cacheKey = "$remoteUuid|$featureId"
+        if (stateQueryKeys[cacheKey] == lightKey) return 1 // 存在无变更，保活等待下次查询
         val content = MessageSender.buildMediaFullContent(
             context, pkg, pkg, mediaData.title, mediaData.artist, coverUrl, System.currentTimeMillis()
         )
-        return compareAndPushState(remoteUuid, featureId, content, isMedia = true)
+        val result = compareAndPushState(remoteUuid, featureId, content, isMedia = true)
+        stateQueryKeys[cacheKey] = lightKey
+        return result
     }
 
     /**
