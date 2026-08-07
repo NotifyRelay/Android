@@ -158,21 +158,21 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             } else {
                 // 超级岛：发送终止包
                 try {
-                    val pair = superIslandFeatureByKey.remove(notificationKey)
-                    if (pair != null) {
+                    val superData = try { SuperIslandManager.extractSuperIslandData(sbn, applicationContext) } catch (_: Exception) { null }
+                    if (superData != null) {
                         val deviceManager = this.deviceManager
-                        val (superPkg, featureId) = pair
+                        val superPkg = superData.sourcePackage ?: "unknown"
                         LocalSuperIslandTracker.markInactive(superPkg)
                         MessageSender.sendSuperIslandEnd(
                             applicationContext,
                             superPkg,
                             try { applicationContext.packageName } catch (_: Exception) { null },
                             System.currentTimeMillis(),
-                            try { SuperIslandManager.extractSuperIslandData(sbn, applicationContext)?.paramV2Raw } catch (_: Exception) { null },
+                            superData.paramV2Raw,
                             getNotificationTitle(sbn),
                             getNotificationText(sbn),
                             deviceManager,
-                            featureIdOverride = featureId
+                            featureIdOverride = getNotificationKey(sbn, "")
                         )
                     }
                 } catch (_: Exception) {}
@@ -268,9 +268,6 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
     // 新增：已处理通知缓存，避免重复处理 (改进版：带时间戳的LRU缓存)
     private val processedNotifications = ConcurrentHashMap<String, Long>()
-    // 记录本机转发过的超级岛特征ID，用于在移除时发送终止包
-    private val superIslandFeatureByKey = ConcurrentHashMap<String, Pair<String, String>>() // sbnKey -> (superPkg, featureId)
-
 
 
     // MediaSession 监控服务实例
@@ -417,21 +414,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                             val deviceManager = this.deviceManager
                             // 不再使用包名前缀标记；通过通道头 DATA_SUPERISLAND 区分超级岛
                             val superPkg = superData.sourcePackage ?: "unknown"
-                            // 严格以通知 sbn.key 作为会话键：一条系统通知只对应一座"岛"
-                            val sbnInstanceId = getNotificationKey(sbn, "")
-                            // 优先复用历史特征ID，避免因字段轻微变化导致"不同岛"的错判
-                            val oldId = try { superIslandFeatureByKey[sbnInstanceId]?.second } catch (_: Exception) { null }
-                            // 与 Rust 会话 feature_id 及 MessageSender 缓存 key 严格一致（iid 传空）
-                            val computedId = NativeCore.computeFeatureId(
-                                superPkg,
-                                superData.paramV2Raw ?: "",
-                                superData.title ?: "",
-                                superData.text ?: "",
-                                ""
-                            ) ?: ""
-                            val featureId = oldId ?: computedId
-                            // 初次出现时登记；后续保持不变
-                            try { if (oldId == null) superIslandFeatureByKey[sbnInstanceId] = superPkg to featureId } catch (_: Exception) {}
+                            // 严格以通知 sbn.key 作为会话键：一条系统通知只对应一座"岛"，内容变化不影响会话
+                            val featureId = getNotificationKey(sbn, "")
                             // 图片处理（本地 URI 读取/Base64）可能在 IO 线程耗时，异步发送避免阻塞监听线程；
                             // sendSuperIslandData 内部已捕获全部异常
                             CoroutineScope(Dispatchers.Default).launch {
@@ -732,7 +716,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         return NotificationRepository.getStringCompat(sbn.notification.extras, "android.text")
     }
 
-    private fun getNotificationKey(sbn: StatusBarNotification, separator: String = "|"): String {
+    internal fun getNotificationKey(sbn: StatusBarNotification, separator: String = "|"): String {
         return sbn.key ?: (sbn.id.toString() + separator + sbn.packageName)
     }
 

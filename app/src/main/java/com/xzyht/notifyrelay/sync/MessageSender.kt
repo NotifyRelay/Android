@@ -355,10 +355,8 @@ object MessageSender {
             val content = buildSuperIslandFullContent(
                 context, superPkg, appName, title, text, time, paramV2Raw, picMap, featureIdOverride
             )
-            // 缓存 key 与 Rust 会话 feature_id 严格一致（iid 传空）
-            val rustFeatureId = NativeCore.computeFeatureId(
-                superPkg, paramV2Raw ?: "", title ?: "", text ?: "", ""
-            ) ?: ""
+            // 缓存 key 与 Rust 会话 feature_id 严格一致（平台端传入的稳定 sbn.key）
+            val rustFeatureId = featureIdOverride ?: ""
 
             authenticatedDevices.forEach { device ->
                 try {
@@ -403,10 +401,8 @@ object MessageSender {
                 put("featureIdOverride", featureIdOverride ?: "")
             }.toString()
 
-            // 移除推送缓存（与 Rust 会话 feature_id 严格一致，iid 传空）
-            val rustFeatureId = NativeCore.computeFeatureId(
-                superPkg, paramV2Raw ?: "", title ?: "", text ?: "", ""
-            ) ?: ""
+            // 移除推送缓存（与 Rust 会话 feature_id 严格一致，平台端传入的稳定 sbn.key）
+            val rustFeatureId = featureIdOverride ?: ""
 
             getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {

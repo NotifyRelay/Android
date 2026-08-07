@@ -1437,10 +1437,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             if (sbn.packageName == context.packageName) continue
             val superData = try { SuperIslandManager.extractSuperIslandData(sbn, context) } catch (_: Exception) { null } ?: continue
             val superPkg = superData.sourcePackage ?: continue
-            // 重算 featureId：与 Rust 会话 key 严格一致（iid 传空）
-            val computedId = NativeCore.computeFeatureId(
-                superPkg, superData.paramV2Raw ?: "", superData.title ?: "", superData.text ?: "", ""
-            ) ?: ""
+            // 重算 featureId：与 Rust 会话 key 及发送端严格一致（sbn.key 稳定值）
+            val computedId = listener.getNotificationKey(sbn, "")
             if (computedId != featureId) continue
             // 匹配：组装 full（与 sendSuperIslandData 同格式）并对比推送。
             // 该回调运行在 Rust 心跳线程且必须同步返回 0/1/2，无法异步处理；
