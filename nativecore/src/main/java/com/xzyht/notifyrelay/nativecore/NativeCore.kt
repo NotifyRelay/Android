@@ -27,17 +27,6 @@ object NativeCore {
         _rustContext = ctx
         return ctx
     }
-    fun destroyContext(ctx: Pointer) {
-        try { stopHeartbeatScheduler(ctx) } catch (_: Exception) {}
-        lib.nrc_destroy(ctx)
-        if (_rustContext == ctx) _rustContext = null
-        senderQueuePtr = 0L
-        offlineDetectorHandle = 0L
-        reconnectStatePtr = 0L
-        stateQueryCallbackRef = null
-        audioDataCallbackRef = null
-        audioEventCallbackRef = null
-    }
 
     fun generateKeypair(ctx: Pointer): Boolean =
         lib.nrc_ecdh_generate_keypair(ctx) == 0
@@ -57,10 +46,6 @@ object NativeCore {
     fun removeDevice(ctx: Pointer, deviceUuid: String): Boolean =
         lib.nrc_remove_device(ctx, deviceUuid) == 0
 
-    // ======== Encrypt (sending data) ========
-    fun encryptMessage(ctx: Pointer, header: String, localUuid: String, localPubKey: String, remoteUuid: String, plaintext: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_encrypt_message(ctx, header, localUuid, localPubKey, remoteUuid, plaintext))
-
     // ======== State ========
     fun exportState(ctx: Pointer): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_export_state(ctx))
@@ -78,14 +63,8 @@ object NativeCore {
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_export_device_key(ctx, deviceUuid))
 
     // ======== Process ========
-    fun processLine(ctx: Pointer, line: String): Int =
-        lib.nrc_process_line(ctx, line)
-
     fun periodicBroadcast(ctx: Pointer, action: Int, uuid: String? = null, name: String? = null, battery: Int = -1, deviceType: String? = null): Int =
         lib.nrc_periodic_broadcast(ctx, action, uuid, name, battery, deviceType)
-
-    fun setUserData(ctx: Pointer, userData: Pointer) =
-        lib.nrc_set_user_data(ctx, userData)
 
     // ======== Send functions ========
     fun sendHandshake(ctx: Pointer, uuid: String, pubKey: String, localIp: String, targetIp: String, battery: Int, deviceType: String): Int =
@@ -110,12 +89,6 @@ object NativeCore {
     fun clearPairingCode(ctx: Pointer) =
         lib.nrc_clear_pairing_code(ctx)
 
-    fun validatePairingCode(ctx: Pointer, code: String): Int =
-        lib.nrc_validate_pairing_code(ctx, code)
-
-    fun sendDataMessage(ctx: Pointer, header: String, localUuid: String, localPubKey: String, remoteUuid: String, plaintext: String) =
-        lib.nrc_send_data_message(ctx, header, localUuid, localPubKey, remoteUuid, plaintext)
-
     // ======== Utility functions ========
     fun computeDedupKey(deviceUuid: String, data: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_dedup_key(deviceUuid, data))
@@ -123,17 +96,11 @@ object NativeCore {
     fun computeFeatureId(superPkg: String, paramV2Raw: String, title: String, text: String, instanceId: String): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_feature_id(superPkg, paramV2Raw, title, text, instanceId))
 
-    fun computeFeatureIdSimple(packageName: String, title: String, text: String): String? =
-        NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_feature_id_simple(packageName, title, text))
-
     // ======== Dedup engine ========
     fun dedup(ctx: Pointer, action: Int, dedupKey: String, arg1Ms: Long = 0L, arg2Ms: Long = 0L): Int =
         lib.nrc_dedup(ctx, action, dedupKey, arg1Ms, arg2Ms)
 
     // ======== Text similarity & dedup ========
-    fun textSimilarity(a: String, b: String): Double =
-        lib.nrc_text_similarity(a, b)
-
     fun shouldDeduplicate(newTitle: String, newText: String, oldTitle: String, oldText: String): Boolean =
         lib.nrc_should_deduplicate(newTitle, newText, oldTitle, oldText) != 0
 
@@ -153,21 +120,6 @@ object NativeCore {
     // ======== Network layer ========
     fun startTcpServer(ctx: Pointer, port: Short): Int =
         lib.nrc_start_tcp_server(ctx, port)
-
-    fun stopTcpServer(ctx: Pointer): Int =
-        lib.nrc_stop_tcp_server(ctx)
-
-    fun restartUdpListener(ctx: Pointer): Int =
-        lib.nrc_restart_udp_listener(ctx)
-
-    fun broadcastMessage(ctx: Pointer, message: String): Int =
-        lib.nrc_broadcast_message(ctx, message)
-
-    fun getConnectedDeviceCount(ctx: Pointer): Int =
-        lib.nrc_get_connected_device_count(ctx)
-
-    fun isDeviceConnected(ctx: Pointer, uuid: String): Boolean =
-        lib.nrc_is_device_connected(ctx, uuid) != 0
 
     fun removeDeviceSession(ctx: Pointer, uuid: String): Int =
         lib.nrc_remove_device_session(ctx, uuid)
@@ -196,9 +148,6 @@ object NativeCore {
     fun updateHeartbeatSchedulerParams(ctx: Pointer, name: String, battery: Int, deviceType: String) =
         lib.nrc_update_heartbeat_scheduler_params(ctx, name, battery, deviceType)
 
-    fun stopHeartbeatScheduler(ctx: Pointer) =
-        lib.nrc_stop_heartbeat_scheduler(ctx)
-
     // ======== Device state snapshot ========
     fun getDeviceList(ctx: Pointer, authedTimeoutMs: Long, unauthedTimeoutMs: Long): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_device_list(ctx, authedTimeoutMs, unauthedTimeoutMs))
@@ -206,9 +155,6 @@ object NativeCore {
     // ======== Offline detector ========
     fun startOfflineDetector(ctx: Pointer, timeoutSec: Long = 30, checkIntervalMs: Long = 3000): Long =
         lib.nrc_start_offline_detector(ctx, timeoutSec, checkIntervalMs)
-
-    fun stopOfflineDetector(ctx: Pointer) =
-        lib.nrc_stop_offline_detector(ctx)
 
     // ======== Sender queue ========
     fun createSenderQueue(ctx: Pointer): Long =
@@ -298,9 +244,6 @@ object NativeCore {
         lib.nrc_set_on_state_query_cb(ctx, cb)
     }
 
-    fun stopSenderQueue(ctx: Pointer, queuePtr: Long) =
-        lib.nrc_stop_sender_queue(ctx, queuePtr)
-
     // ======== Network change ========
     fun onNetworkChanged(ctx: Pointer, localIp: String?) =
         lib.nrc_on_network_changed(ctx, localIp)
@@ -332,9 +275,6 @@ object NativeCore {
     fun startKnownDeviceScanner(ctx: Pointer) =
         lib.nrc_start_known_device_scanner(ctx)
 
-    fun stopKnownDeviceScanner(ctx: Pointer) =
-        lib.nrc_stop_known_device_scanner(ctx)
-
     // ======== Reconnect ========
     fun createReconnectState(ctx: Pointer): Long =
         lib.nrc_create_reconnect_state(ctx)
@@ -347,9 +287,6 @@ object NativeCore {
 
     fun reconnectStart(ctx: Pointer, statePtr: Long, intervalSecs: Long = 10, maxRetries: Int = 5) =
         lib.nrc_reconnect_start(ctx, statePtr, intervalSecs, maxRetries)
-
-    fun reconnectStop(ctx: Pointer, statePtr: Long) =
-        lib.nrc_reconnect_stop(ctx, statePtr)
 
     // ======== Audio stream ========
     private var audioDataCallback: ((ByteArray, Int, Int) -> Unit)? = null
@@ -445,21 +382,6 @@ object NativeCore {
         if (reconnectStatePtr == 0L) {
             reconnectStatePtr = createReconnectState(ctx)
             reconnectStart(ctx, reconnectStatePtr)
-        }
-    }
-
-    fun stopNewFeatures(ctx: Pointer) {
-        if (senderQueuePtr != 0L) {
-            stopSenderQueue(ctx, senderQueuePtr)
-            senderQueuePtr = 0L
-        }
-        if (offlineDetectorHandle != 0L) {
-            stopOfflineDetector(ctx)
-            offlineDetectorHandle = 0L
-        }
-        if (reconnectStatePtr != 0L) {
-            reconnectStop(ctx, reconnectStatePtr)
-            reconnectStatePtr = 0L
         }
     }
 }
