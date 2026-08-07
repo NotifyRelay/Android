@@ -62,4 +62,6 @@ kotlin {
 dependencies {
     // JNA 用于 Rust FFI 调用（api 传递给消费模块，如 app 直接使用 Pointer/Callback）
     api(libs.jna) { artifact { type = "aar" } }
+
+    implementation(project(":base"))
 }

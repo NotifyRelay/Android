@@ -1,19 +1,30 @@
 package com.xzyht.notifyrelay.feature.device.service
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.graphics.Bitmap
+import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
+import android.util.Base64
 import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
+import com.xzyht.notifyrelay.feature.audio.AudioRelayPlayer
 import com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.servers.MediaControlUtil
+import com.xzyht.notifyrelay.servers.MediaSessionMonitorService
+import com.xzyht.notifyrelay.servers.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardProcessor
 import com.xzyht.notifyrelay.sync.AppLaunchManager
 import com.xzyht.notifyrelay.sync.AppListSyncManager
 import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
 import com.xzyht.notifyrelay.sync.IconSyncManager
+import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import com.xzyht.notifyrelay.sync.HeartbeatProcessor
 import com.xzyht.notifyrelay.sync.ftpServer
@@ -22,8 +33,9 @@ import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
 import com.xzyht.notifyrelay.sync.notification.StatusProcessor
 import com.xzyht.notifyrelay.sync.notification.SuperIslandProcessor
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
-import github.xzynine.superislandui.common.SuperIslandProtocol
+import github.xzynine.superislandui.common.SuperIslandManager
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
+import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,7 +48,6 @@ import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.core.util.BatteryUtils
-import notifyrelay.core.util.PairingCodeManager
 import notifyrelay.data.StorageManager
 import notifyrelay.data.config.AppConfig
 import notifyrelay.data.config.ScrcpyDefaults
@@ -97,21 +108,24 @@ data class AuthInfo(
 
 // =================== 设备连接管理器主类 ===================
 class DeviceConnectionManager(private val context: android.content.Context) {
-    // 单例实例
     companion object {
-        /**
-         * 获取单例实例
-         * 内部使用DeviceConnectionManagerSingleton确保全局唯一实例
-         */
-        fun getInstance(context: android.content.Context): DeviceConnectionManager {
-            return DeviceConnectionManagerSingleton.getDeviceManager(context)
-        }
+        private var stopReceiverRegistered = false
 
         // 静态引用，供 native 回调线程从 Rust 回调中调度到实例方法
         private var _callbackInstance: DeviceConnectionManager? = null
         internal fun getCallbackInstance(): DeviceConnectionManager? = _callbackInstance
+
+        /**
+         * 获取单例实例
+         */
+        fun getInstance(context: android.content.Context): DeviceConnectionManager {
+            return DeviceConnectionManagerSingleton.getDeviceManager(context)
+        }
     }
-    
+
+    private var audioRelayNotificationReceiver: BroadcastReceiver? = null
+    var onRequestMediaProjection: (() -> Unit)? = null
+
     // 用于比较在线设备缓存是否变化的变量
     private var lastOnlineDevicesCacheJson: String? = null
 
@@ -166,7 +180,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         val backfillUpdates = mutableListOf<DeviceEntity>()
         
         for (device in devices) {
-            if (device.uuid == "本机") continue
+            if (device.uuid == "本机" || device.uuid == this.uuid) continue
             
             if (device.sharedSecret.isNotEmpty()) {
                 // 尝试解析为新式 base64 AES 密钥
@@ -206,6 +220,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                         lastPort = device.lastPort
                     )
                 }
+                registerReconnectTarget(device.uuid, device.lastIp ?: "")
+                registerKnownDevice(device.uuid, device.lastIp ?: "")
             }
             
             // 恢复设备名和 IP 到缓存
@@ -394,9 +410,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal val deviceInfoCacheInternal: MutableMap<String, DeviceInfo>
         get() = deviceInfoCache
 
-    internal val deviceLastSeenInternal: MutableMap<String, Long>
-        get() = deviceLastSeen
-
     internal val rejectedDevicesInternal: MutableSet<String>
         get() = rejectedDevices
 
@@ -438,19 +451,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal val coroutineScopeInternal: CoroutineScope
         get() = coroutineScope
 
-    private val heartbeatedDevices = mutableSetOf<String>()
-
-    internal val heartbeatedDevicesInternal: MutableSet<String>
-        get() = heartbeatedDevices
-
-    internal val heartbeatJobsInternal: MutableMap<String, Long>
-        get() = heartbeatJobs
-
     internal val contextInternal: android.content.Context
         get() = context
-
-    internal val keepAliveInternal: ConnectionKeepAlive
-        get() = keepAlive
 
     internal fun localDisplayNameInternal(): String = getLocalDisplayName()
 
@@ -490,10 +492,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
     internal val rustContextInternal: com.sun.jna.Pointer?
         get() = rustContext
 
-    private val deviceLastSeen = mutableMapOf<String, Long>()
-    // 心跳定时任务
-    private val heartbeatJobs = mutableMapOf<String, Long>()
     private var serverStarted = false
+    // 电池变化监听器（常驻，随 DeviceConnectionManager 生命周期）
+    private var batteryReceiver: BroadcastReceiver? = null
+    // 上次同步给 Rust 心跳调度器的带符号电量（正=充电，负=放电），用于防抖
+    private var lastSentSignedBattery: Int = Int.MIN_VALUE
     // UI全局开关：是否启用UDP发现，使用内存缓存避免频繁数据库访问
     // 使用AppConfig管理UDP发现配置
     var udpDiscoveryEnabled: Boolean
@@ -525,6 +528,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         try {
             rustContext = NativeCore.createContext()
             BackendRemoteFilter.rustContext = rustContext
+            NativeCore.setContext(rustContext)
             val ctx = rustContext!!
             val savedStateEnc = StorageManager.getString(context, "rust_core_state")
             if (savedStateEnc.isNotEmpty()) {
@@ -555,6 +559,19 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         saveRustCoreState()
         // 尽早初始化发送队列等新特性，避免发送窗口期
         rustContext?.let { NativeCore.initializeNewFeatures(it) }
+        // 启动统一心跳调度器：已配对设备的每设备心跳（Auto 模式）由 Rust 自动启停
+        try {
+            rustContext?.let { ctx ->
+                val batteryLevel = BatteryUtils.getBatteryLevel(context)
+                val battery = if (BatteryUtils.isCharging(context)) batteryLevel else -batteryLevel
+                lastSentSignedBattery = battery
+                NativeCore.startHeartbeatScheduler(ctx, uuid, getLocalDisplayName(), battery, "android", 2000L)
+            }
+        } catch (e: Exception) {
+            Logger.e("死神-NotifyRelay", "启动心跳调度器失败", e)
+        }
+        // 电池变化监听：电量/充电状态变化时同步到 Rust 心跳调度器，对端实时显示更新
+        registerBatteryChangeReceiver()
         // 新增：初始补全本机 deviceInfoCache，便于反向 connectToDevice
         val displayName = getLocalDisplayName()
         val localIp = discoveryManager.getLocalIpAddressInternal()
@@ -563,10 +580,61 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
         startOfflineDeviceCleaner()
         discoveryManager.registerNetworkCallback()
-        startWifiDirectReconnectionChecker()
+        // 自动重连已移交 Rust 重连状态机（loadAuthedDevices 中已登记认证设备）
+        // 启动 mDNS 广告和发现
+        startMdnsServices()
+        // 启动 Rust 已知设备扫描器（持续对认证设备做握手重连/发现）
+        try {
+            rustContext?.let { NativeCore.startKnownDeviceScanner(it) }
+        } catch (_: Exception) {}
     }
 
-    // 统一设备状态管理：3秒未发现未认证设备直接移除，已认证设备置灰
+    // 电池变化监听：ACTION_BATTERY_CHANGED 为粘性广播，注册后立即回调一次当前状态；
+    // 电量或充电状态变化时调用 Rust 调度器参数更新，使心跳报文携带实时电量（正=充电，负=放电）
+    private fun registerBatteryChangeReceiver() {
+        if (batteryReceiver != null) return
+        batteryReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                if (intent?.action != Intent.ACTION_BATTERY_CHANGED) return
+                try {
+                    val level = intent.getIntExtra(BatteryManager.EXTRA_LEVEL, -1)
+                    val scale = intent.getIntExtra(BatteryManager.EXTRA_SCALE, 100)
+                    val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                    if (level < 0 || scale <= 0) return
+                    val batteryLevel = (level * 100 / scale).coerceIn(0, 100)
+                    val charging = status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                            status == BatteryManager.BATTERY_STATUS_FULL
+                    val signed = if (charging) batteryLevel else -batteryLevel
+                    if (signed == lastSentSignedBattery) return
+                    lastSentSignedBattery = signed
+                    rustContext?.let {
+                        NativeCore.updateHeartbeatSchedulerParams(it, getLocalDisplayName(), signed, "android")
+                    }
+                } catch (_: Exception) {}
+            }
+        }
+        try {
+            context.registerReceiver(
+                batteryReceiver,
+                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } catch (_: Exception) {}
+    }
+
+    private fun startMdnsServices() {
+        try {
+            val ctx = rustContext ?: return
+            val displayName = getLocalDisplayName()
+            NativeCore.startMdnsAdvertiser(ctx, uuid, displayName, listenPort.toShort(), localPublicKey, "android", lastSentSignedBattery)
+            NativeCore.startMdnsDiscovery(ctx)
+            Logger.d("死神-NotifyRelay", "mDNS 服务已启动")
+        } catch (e: Exception) {
+            Logger.e("死神-NotifyRelay", "启动 mDNS 服务失败", e)
+        }
+    }
+
+    // 统一设备状态管理：1s 定时拉取 Rust 状态快照（在线判定/超时移除已迁移至 Rust DeviceRegistry）
     private fun startOfflineDeviceCleaner() {
         coroutineScope.launch {
             while (true) {
@@ -580,70 +648,76 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
+    // 统一设备状态管理：在线判定/超时移除已迁移至 Rust DeviceRegistry，此处消费状态快照
     private fun updateDeviceList() {
-        val now = System.currentTimeMillis()
-        //Logger.d("死神-NotifyRelay", "[updateDeviceList] invoked at $now")
-        val authSnapshot = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
-        val authed = authSnapshot.keys.toSet()
-        val lastSeenSnapshot = synchronized(deviceLastSeen) { deviceLastSeen.toMap() }
-        val allUuids = (lastSeenSnapshot.keys + authed).toSet()
-        val newMap = mutableMapOf<String, Pair<DeviceInfo, Boolean>>()
-        val unauthedTimeout = 5000L // 未认证设备保留两次UDP广播周期（2*2000ms）
-        val authedHeartbeatTimeout = 12_000L // 已认证设备心跳超时阈值
-        val oldMap = _devices.value
-        // 计算旧的已认证且在线数量快照
-        val oldAuthOnlineCount = try {
-            oldMap.count { (uuid, pair) -> pair.second && (authSnapshot[uuid]?.isAccepted == true) }
-        } catch (_: Exception) { 0 }
-        for (uuid in allUuids) {
-            // 过滤掉uuid为"本机"的记录
-            if (uuid == "本机") continue
-            
-            val deviceInfo = getDeviceInfo(uuid)
-            
-            val lastSeen = lastSeenSnapshot[uuid]
-            val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
-            // 不兼容的旧版协议设备，强制离线
-            val isIncompatible = incompatibleDevicesInternal.contains(uuid)
-            if (auth != null) {
-                // 仅基于心跳包判定在线
-                val diff = if (lastSeen != null) now - lastSeen else -1L
-                val isOnline = !isIncompatible && lastSeen != null && diff <= authedHeartbeatTimeout
-                val info = deviceInfo ?: let {
-                    Logger.w("死神-NotifyRelay", "updateDeviceList: 设备 $uuid 无缓存信息, auth.lastIp=${auth.lastIp}")
-                    DeviceInfo(uuid, auth.displayName ?: "已认证设备", auth.lastIp.orEmpty(), listenPort)
+        refreshDevicesFromRust()
+    }
+
+    /**
+     * 从 Rust 拉取设备状态快照（uuid/ip/电量/在线/配对等），回填 deviceInfoCache，
+     * 生成 _devices（未认证且不在线的设备过滤 = 显示策略），并刷新在线设备缓存。
+     * 1s 定时器（startOfflineDeviceCleaner）与心跳回调共同触发。
+     */
+    private fun refreshDevicesFromRust() {
+        val ctx = rustContext ?: return
+        val json = try {
+            NativeCore.getDeviceList(ctx, 12_000L, 5_000L)
+        } catch (_: Exception) { null } ?: return
+        try {
+            val arr = org.json.JSONArray(json)
+            val authSnapshot = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
+            val newMap = mutableMapOf<String, Pair<DeviceInfo, Boolean>>()
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val uuid = obj.optString("uuid")
+                if (uuid.isEmpty() || uuid == this.uuid) continue
+                val online = obj.optBoolean("online")
+                val ip = obj.optString("ip")
+                val port = obj.optInt("port", listenPort).takeIf { it > 0 } ?: listenPort
+                val battery = obj.optInt("battery", -101)
+                val oldInfo = synchronized(deviceInfoCache) { deviceInfoCache[uuid] }
+                // 未知电量（超出 [-100,100]）沿用缓存旧值，不覆盖已显示的电量/充电状态
+                val batteryUnknown = kotlin.math.abs(battery) > 100
+                val chargingStatus = if (batteryUnknown) (oldInfo?.chargingStatus ?: '0')
+                else if (battery >= 0) '1' else '0'
+                val deviceType = obj.optString("deviceType", "unknown")
+                val isAuthed = authSnapshot[uuid]?.isAccepted == true
+                val auth = authSnapshot[uuid]
+                val displayName = obj.optString("name")
+                    .ifEmpty { oldInfo?.displayName ?: auth?.displayName ?: DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid) }
+                // 回填缓存（名称/类型以平台持久化与历史缓存为准，IP/电量来自快照）
+                synchronized(deviceInfoCache) {
+                    deviceInfoCache[uuid] = DeviceInfo(
+                        uuid = uuid,
+                        displayName = displayName,
+                        ip = ip,
+                        port = port,
+                        batteryLevel = if (batteryUnknown) (oldInfo?.batteryLevel ?: -1) else kotlin.math.abs(battery),
+                        chargingStatus = chargingStatus
+                    )
                 }
-                val oldOnline = oldMap[uuid]?.second
-                if (oldOnline != null && oldOnline != isOnline) {
-                    Logger.i("天使-死神-NotifyRelay", "[updateDeviceList] 已认证设备状态变化: uuid=$uuid, isOnline=$isOnline, lastSeen=$lastSeen, diff=$diff")
+                // 显示策略：未认证且不在线的设备过滤
+                if (!isAuthed && !online) continue
+                synchronized(deviceInfoCache) {
+                    deviceInfoCache[uuid]?.let { newMap[uuid] = it to online }
                 }
-                newMap[uuid] = info to isOnline
-            } else {
-                val diff = if (lastSeen != null) now - lastSeen else -1L
-                val isOnline = lastSeen != null && diff <= unauthedTimeout
-                val info = deviceInfo
-                val oldOnline = oldMap[uuid]?.second
-                if (oldOnline != null && oldOnline != isOnline) {
-                    Logger.i("死神-NotifyRelay", "[updateDeviceList] 未认证设备状态变化: uuid=$uuid, isOnline=$isOnline, lastSeen=$lastSeen, diff=$diff")
-                }
-                if (isOnline) {
-                    if (info != null) newMap[uuid] = info to true
-                } else {
-                    synchronized(deviceLastSeen) { deviceLastSeen.remove(uuid) }
+                // 同步已认证设备的 lastIp/deviceType 元数据
+                if (isAuthed && auth != null) {
+                    val effectiveIp = ip.takeUnless { it == "0.0.0.0" || it.isBlank() }
+                    val validType = deviceType.takeUnless { it.isBlank() || it == "unknown" }
+                    val ipChanged = effectiveIp != null && auth.lastIp != effectiveIp
+                    val typeChanged = validType != null && auth.deviceType != validType
+                    if (ipChanged || typeChanged) {
+                        synchronized(authenticatedDevices) {
+                            authenticatedDevices[uuid] = auth.copy(lastIp = effectiveIp ?: auth.lastIp, deviceType = validType ?: auth.deviceType)
+                        }
+                        saveAuthedDevices()
+                    }
                 }
             }
-        }
-        // 仅在设备列表或在线状态发生实际变化时触发回调，避免频繁刷新
-        // 计算新的已认证且在线数量快照
-        val newAuthOnlineCount = try {
-            newMap.count { (uuid, pair) -> pair.second && (authSnapshot[uuid]?.isAccepted == true) }
-        } catch (_: Exception) { 0 }
-
-        // 直接更新Flow值，UI层通过Flow订阅获取变化
-        _devices.value = newMap
-
-        // 更新在线设备缓存，供 scrcpy 模块使用
-        updateOnlineDevicesCache(newMap, authSnapshot)
+            _devices.value = newMap
+            updateOnlineDevicesCache(newMap, authSnapshot)
+        } catch (_: Exception) {}
     }
 
     private fun updateOnlineDevicesCache(
@@ -784,7 +858,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             Logger.d("死神-NotifyRelay", "取消配对: ${p.remoteUuid}")
         }
         pendingPairing = null
-        notifyrelay.core.util.PairingCodeManager.clear()
+        rustContext?.let { NativeCore.clearPairingCode(it) }
     }
 
     /**
@@ -827,6 +901,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 )
                 saveAuthedDevices()
             }
+            registerReconnectTarget(uuid, lastIp ?: "")
             saveRustCoreState()
             updateDeviceList()
             Logger.d("死神-NotifyRelay", "长期密钥配对完成: $uuid")
@@ -875,42 +950,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
-    // 使用 Rust core 加密，失败直接抛异常
-    // header 为协议头（如 DATA_NOTIFICATION），返回完整报文：$header:uuid:pubKey:encrypted
-    internal fun encryptData(input: String, uuid: String, header: String = "DATA"): String {
-        val ctx = rustContext ?: throw IllegalStateException("Rust context not initialized")
-        val keyJson = NativeCore.exportDeviceKey(ctx, uuid)
-        val keyB64 = keyJson?.let { org.json.JSONObject(it).optString("aes_key_b64", "") }
-        if (keyB64 == null || keyB64.isEmpty()) {
-            Logger.e("死神-NotifyRelay", "encryptData: 设备密钥不在Rust中 uuid=$uuid，尝试重新迁移")
-            val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
-            if (auth != null && auth.sharedSecret.isNotEmpty()) {
-                val keyBytes = try { android.util.Base64.decode(auth.sharedSecret, android.util.Base64.NO_WRAP) } catch (_: Exception) { null }
-                if (keyBytes != null && keyBytes.size == 32) {
-                    NativeCore.migrateSharedSecret(ctx, uuid, keyBytes)
-                }
-            }
-        }
-        return NativeCore.encryptMessage(ctx, header, this.uuid, this.localPublicKey, uuid, input)
-            ?: throw IllegalStateException("Rust加密失败: encryptMessage, device=$uuid")
-    }
-
-    // 发送通知数据（加密）
-    fun sendNotificationData(device: DeviceInfo, data: String) {
-        coroutineScope.launch {
-            try {
-                val auth = authenticatedDevices[device.uuid]
-                if (auth == null || !auth.isAccepted) {
-                    //Logger.d("死神-NotifyRelay", "未认证设备，禁止发送")
-                    return@launch
-                }
-                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, device, "DATA_NOTIFICATION", data, 10000L)
-            } catch (e: Exception) {
-                Logger.e("死神-NotifyRelay", "发送通知数据失败", e)
-            }
-        }
-    }
-
     /**
      * 公开API：请求远端设备的“用户应用列表”。
      */
@@ -934,457 +973,569 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
     
-    /**
-     * 公开API：发送剪贴板内容到指定设备。
-     * @param device 目标设备
-     * @param clipboardType 剪贴板类型（text/image）
-     * @param content 剪贴板内容
-     * @return 是否成功发送请求
-     */
-    fun sendClipboardToDevice(device: DeviceInfo, clipboardType: String, content: String): Boolean {
-        try {
-            val raw = org.json.JSONObject().apply {
-                put("type", "clipboard")
-                put("clipboardType", clipboardType)
-                put("content", content)
-                put("time", System.currentTimeMillis())
-            }.toString()
-            ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", raw, 10000L)
-            return true
-        } catch (_: Exception) {
-            return false
-        }
-    }
-    
-    /**
-     * 公开API：发送剪贴板内容到所有已认证的在线设备。
-     * @param clipboardType 剪贴板类型（text/image）
-     * @param content 剪贴板内容
-     * @return 是否成功发送请求
-     */
-    fun sendClipboardToAllDevices(clipboardType: String, content: String): Boolean {
-        try {
-            val devices = getAuthenticatedOnlineDevices()
-            if (devices.isEmpty()) return false
-            
-            val raw = org.json.JSONObject().apply {
-                put("type", "clipboard")
-                put("clipboardType", clipboardType)
-                put("content", content)
-                put("time", System.currentTimeMillis())
-            }.toString()
-            for (device in devices) {
-                ProtocolSender.sendEncrypted(this, device, "DATA_CLIPBOARD", raw, 10000L)
-            }
-            return true
-        } catch (_: Exception) {
-            return false
-        }
-    }
-
-    init {
-        // 启动图标同步过期请求清理协程
-        coroutineScope.launch {
-            while (true) {
-                delay(60000) // 每分钟清理一次
-                IconSyncManager.cleanupExpiredRequests()
-            }
-        }
-    }
-
-    // 注册 Rust 回调，每个 DATA_* 类型直接调用对应处理器
+    // 注册 Rust 回调，使用统一的配对和数据回调接口
     private fun setupRustCallbacks() {
         val ctx = rustContext ?: return
         val lib = NotifyRelayCore.instance()
         fun ptr2str(ptr: Pointer?) = NotifyRelayCore.ptrToString(ptr)
 
-        // 注意：Android 端 Rust 日志由 android_logger crate 直接写入 logcat（tag: NotifyRelayCore）
-        // 无需通过 FFI 日志回调，此处仅注册数据回调
-        // rustCallbackRefs 保持所有 JNA 回调对象强引用，防止 GC 回收导致 native 指针悬空
+        // ---- on_pairing (统一配对回调) ----
+        val pairingCb = object : NotifyRelayCore.OnPairingCb {
+            override fun invoke(uuidPtr: Pointer?, msgTypePtr: Pointer?, dataPtr: Pointer?, intValue: Int, extraPtr: Pointer?, userData: Pointer?) {
+                val uuid = ptr2str(uuidPtr) ?: return
+                val msgType = ptr2str(msgTypePtr) ?: return
+                val data = ptr2str(dataPtr)
+                val extra = ptr2str(extraPtr)
 
-        fun cb(setter: (NotifyRelayCore.OnDataCb?) -> Unit, tag: String, handler: (String, String) -> Unit) {
-            val cb = object : NotifyRelayCore.OnDataCb {
-                override fun invoke(localUuid: Pointer?, plaintext: Pointer?, userData: Pointer?) {
-                    val uuid = ptr2str(localUuid) ?: return
-                    val text = ptr2str(plaintext) ?: return
-                    val authed = synchronized(authenticatedDevices) {
-                        authenticatedDevices[uuid]?.isAccepted == true
-                    }
-                    android.util.Log.d("CoreCb", "$tag: uuid=$uuid, authed=$authed, text_len=${text.length}")
-                    if (!authed) return
-                    handler(uuid, text)
-                }
-            }
-            setter(cb); rustCallbackRefs.add(cb)
-        }
-
-        cb({ lib.nrc_set_on_notification_cb(ctx, it) }, "DATA_NOTIFICATION") { uuid, text ->
-            NotificationProcessor.process(context, this, coroutineScope,
-                NotificationProcessor.NotificationInput("DATA_NOTIFICATION", text, uuid),
-                notificationDataReceivedCallbacksInternal)
-        }
-        cb({ lib.nrc_set_on_media_play_cb(ctx, it) }, "DATA_MEDIAPLAY") { uuid, text ->
-            try {
-                val json = JSONObject(text)
-                resolveDeviceInfo(uuid, "", 23333)?.let {
-                    RemoteMediaSessionManager.onMediaMessageReceived(context, json, it)
-                }
-            } catch (e: Exception) { Logger.e("CoreCb", "DATA_MEDIAPLAY", e) }
-        }
-        cb({ lib.nrc_set_on_icon_request_cb(ctx, it) }, "DATA_ICON_REQUEST") { uuid, text ->
-            resolveDeviceInfo(uuid, "", 23333)?.let {
-                IconSyncManager.handleIconRequest(text, this, it, context)
-            }
-        }
-        cb({ lib.nrc_set_on_icon_response_cb(ctx, it) }, "DATA_ICON_RESPONSE") { _, text ->
-            IconSyncManager.handleIconResponse(text, context)
-        }
-        cb({ lib.nrc_set_on_app_list_request_cb(ctx, it) }, "DATA_APP_LIST_REQUEST") { uuid, text ->
-            resolveDeviceInfo(uuid, "", 23333)?.let {
-                AppListSyncManager.handleAppListRequest(text, this, it, context)
-            }
-        }
-        cb({ lib.nrc_set_on_app_list_response_cb(ctx, it) }, "DATA_APP_LIST_RESPONSE") { uuid, text ->
-            AppListSyncManager.handleAppListResponse(text, context, uuid, this)
-        }
-        cb({ lib.nrc_set_on_media_control_cb(ctx, it) }, "DATA_MEDIA_CONTROL") { uuid, text ->
-            try {
-                val json = JSONObject(text)
-                val action = json.getString("action")
-                when (action) {
-                    "playPause" -> try { MediaControlUtil.playPause(); sendMediaControlResponse(uuid, "playPause", "success", null) }
-                    catch (e: Exception) { sendMediaControlResponse(uuid, "playPause", "error", e.message) }
-                    "next" -> try { MediaControlUtil.next(); sendMediaControlResponse(uuid, "next", "success", null) }
-                    catch (e: Exception) { sendMediaControlResponse(uuid, "next", "error", e.message) }
-                    "previous" -> try { MediaControlUtil.previous(); sendMediaControlResponse(uuid, "previous", "success", null) }
-                    catch (e: Exception) { sendMediaControlResponse(uuid, "previous", "error", e.message) }
-                    "audioRequest" -> {
-                        val device = resolveDeviceInfo(uuid, "", 23333)
-                        val ok = device?.let { AudioForwardingService.startAudioForwarding(context, it.ip, ScrcpyDefaults.ADB_PORT, it.displayName) } == true
-                        val result = if (ok) "accepted" else "rejected"
-                        val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"$result\"}"
-                        device?.let { ProtocolSender.sendEncrypted(this, it, "DATA_MEDIA_CONTROL", raw) }
-                    }
-                    "audioResponse" -> {
-                        if (json.optString("result", "rejected") != "accepted") {
-                            coroutineScope.launch { notifyrelay.base.util.ToastUtils.showShortToast(context, "音频转发请求被拒绝") }
-                        }
-                    }
-                }
-            } catch (e: Exception) { Logger.e("CoreCb", "DATA_MEDIA_CONTROL", e) }
-        }
-        cb({ lib.nrc_set_on_ftp_cb(ctx, it) }, "DATA_FTP") { uuid, text ->
-            val isPc = synchronized(authenticatedDevices) {
-                authenticatedDevices[uuid]?.deviceType?.lowercase() == "pc"
-            }
-            if (!isPc) return@cb
-            coroutineScope.launch {
                 try {
-                    val json = JSONObject(text)
-                    when (json.optString("action", "")) {
-                        "start" -> {
-                            val pcUser = json.optString("username", null)
-                            val pcPass = json.optString("password", null)
-                            val result = ftpServer.start(getLocalDisplayName(), context, pcUser, pcPass)
-                            when (result.status) {
-                                StartResult.SUCCESS, StartResult.ALREADY_RUNNING -> {
-                                    result.serverInfo?.let { info ->
-                                        val raw = JSONObject().apply { put("action", "started"); put("ipAddress", info.ipAddress); put("port", info.port) }.toString()
-                                        resolveDeviceInfo(uuid, "", 23333)?.let {
-                                            ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", raw)
-                                        }
-                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
-                                            val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
-                                            intent.putExtra("fromftp", true); intent.putExtra("fromInternal", true)
-                                            IntentUtils.startActivity(context, intent, true)
-                                        }
-                                    }
-                                }
-                                else -> {
-                                    val err = when (result.status) { StartResult.PERMISSION_DENIED -> "PERMISSION_DENIED"; StartResult.PORT_IN_USE -> "PORT_IN_USE"; StartResult.CONFIG_ERROR -> "CONFIG_ERROR"; else -> "FAILED" }
-                                    val raw = JSONObject().apply { put("originalHeader", "DATA_FTP"); put("action", "start"); put("result", "error"); put("errorCode", err) }.toString()
-                                    resolveDeviceInfo(uuid, "", 23333)?.let {
-                                        ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_STATUS", raw)
-                                    }
-                                }
+                    when (msgType) {
+                        "HANDSHAKE" -> {
+                            val dm = _callbackInstance ?: return
+                            var pubKey = ""
+                            var ip = ""
+                            var deviceType = "unknown"
+                            data?.let {
+                                try {
+                                    val json = JSONObject(it)
+                                    pubKey = json.optString("pub_key", "")
+                                    ip = json.optString("ip", "")
+                                    deviceType = json.optString("device_type", "unknown")
+                                } catch (_: Exception) {}
                             }
-                        }
-                        "stop" -> { ftpServer.stop()
-                            val raw = JSONObject().apply { put("action", "stopped") }.toString()
-                            resolveDeviceInfo(uuid, "", 23333)?.let {
-                                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", raw)
+                            synchronized(dm.deviceInfoCacheInternal) {
+                                val old = dm.deviceInfoCacheInternal[uuid]
+                                val displayName = old?.displayName ?: "未知设备"
+                                dm.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, displayName, ip, old?.port ?: 23333)
                             }
-                        }
-                    }
-                } catch (e: Exception) { Logger.e("CoreCb", "DATA_FTP", e) }
-            }
-        }
-        cb({ lib.nrc_set_on_clipboard_cb(ctx, it) }, "DATA_CLIPBOARD") { _, text ->
-            ClipboardProcessor.process(context, ClipboardProcessor.ClipboardInput("DATA_CLIPBOARD", text, ""))
-        }
-        cb({ lib.nrc_set_on_status_cb(ctx, it) }, "DATA_STATUS") { uuid, text ->
-            StatusProcessor.process(context, this, coroutineScope,
-                StatusProcessor.StatusInput("DATA_STATUS", text, uuid),
-                notificationDataReceivedCallbacksInternal)
-        }
-        cb({ lib.nrc_set_on_app_launch_cb(ctx, it) }, "DATA_APP_LAUNCH") { uuid, text ->
-            resolveDeviceInfo(uuid, "", 23333)?.let {
-                AppLaunchManager.handleAppLaunchRequest(text, this, it, context)
-            }
-        }
-        cb({ lib.nrc_set_on_superisland_cb(ctx, it) }, "DATA_SUPERISLAND") { uuid, text ->
-            try { SuperIslandProcessor.process(context, this, text, uuid) } catch (e: Exception) { Logger.e("CoreCb", "DATA_SUPERISLAND", e) }
-        }
-        cb({ lib.nrc_set_on_unknown_data_cb(ctx, it) }, "DATA_UNKNOWN") { uuid, text ->
-            Logger.d("CoreCb", "未知DATA通道: uuid=$uuid, size=${text.length}")
-        }
-
-        // ==================== 非 DATA 回调注册 ====================
-
-        // ---- on_handshake ----
-        run {
-            val cb = object : NotifyRelayCore.OnHandshakeCb {
-                override fun invoke(uuid: Pointer?, pubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
-                    val dm = _callbackInstance ?: return
-                    val remoteUuid = ptr2str(uuid) ?: return
-                    val remotePubKey = ptr2str(pubKey) ?: return
-                    val remoteIp = ptr2str(ip) ?: return
-                    val remoteDeviceType = ptr2str(deviceType) ?: "unknown"
-
-                    try {
-                        synchronized(dm.deviceInfoCacheInternal) {
-                            val old = dm.deviceInfoCacheInternal[remoteUuid]
-                            val displayName = old?.displayName ?: "未知设备"
-                            dm.deviceInfoCacheInternal[remoteUuid] = DeviceInfo(remoteUuid, displayName, remoteIp, old?.port ?: 23333)
-                        }
-                        synchronized(dm.authenticatedDevices) {
-                            val auth = dm.authenticatedDevices[remoteUuid]
-                            if (auth != null) {
-                                dm.authenticatedDevices[remoteUuid] = auth.copy(lastIp = remoteIp)
-                                dm.saveAuthedDevicesInternal()
-                            }
-                        }
-                        val alreadyAuthed = synchronized(dm.authenticatedDevices) {
-                            dm.authenticatedDevices[remoteUuid]?.isAccepted == true
-                        }
-                        if (alreadyAuthed) {
                             synchronized(dm.authenticatedDevices) {
-                                val existingAuth = dm.authenticatedDevices[remoteUuid]
-                                if (existingAuth != null && existingAuth.publicKey != remotePubKey) {
-                                    NativeCore.sendReject(dm.rustContextInternal!!, dm.uuid)
-                                    Logger.w("CoreCb", "已认证设备公钥变化，要求重新配对: $remoteUuid")
-                                    return@invoke
-                                }
-                            }
-                            synchronized(dm.incompatibleDevicesInternal) { dm.incompatibleDevicesInternal.remove(remoteUuid) }
-                            val localIp = getLocalIpAddress()
-                            NativeCore.sendAccept(dm.rustContextInternal!!, dm.uuid, dm.localPublicKey, localIp, BatteryUtils.getBatteryLevel(dm.contextInternal), remoteDeviceType)
-                            synchronized(dm.authenticatedDevices) {
-                                val auth = dm.authenticatedDevices[remoteUuid]
+                                val auth = dm.authenticatedDevices[uuid]
                                 if (auth != null) {
-                                    dm.authenticatedDevices[remoteUuid] = auth.copy(deviceType = remoteDeviceType, lastIp = remoteIp)
+                                    dm.authenticatedDevices[uuid] = auth.copy(lastIp = ip)
                                     dm.saveAuthedDevicesInternal()
                                 }
                             }
-                        } else {
-                            NativeCore.sendReject(dm.rustContextInternal!!, dm.uuid)
-                        }
-                    } catch (e: Exception) {
-                        Logger.e("CoreCb", "on_handshake error: ${e.message}")
-                    }
-                }
-            }
-            lib.nrc_set_on_handshake_cb(ctx, cb); rustCallbackRefs.add(cb)
-        }
-
-        // ---- on_pairing_init ----
-        run {
-            val cb = object : NotifyRelayCore.OnPairingInitCb {
-                override fun invoke(uuid: Pointer?, spake2Pub: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
-                    val dm = _callbackInstance ?: return
-                    val remoteUuid = ptr2str(uuid) ?: return
-                    val spake2PubStr = ptr2str(spake2Pub) ?: return
-                    val remoteIp = ptr2str(ip) ?: return
-
-                    try {
-                        synchronized(dm.rejectedDevicesInternal) {
-                            if (dm.rejectedDevicesInternal.contains(remoteUuid)) {
-                                NativeCore.sendReject(dm.rustContextInternal!!, dm.uuid)
-                                return@invoke
+                            dm.registerReconnectTarget(uuid, ip)
+            dm.registerKnownDevice(uuid, ip)
+                            val alreadyAuthed = synchronized(dm.authenticatedDevices) {
+                                dm.authenticatedDevices[uuid]?.isAccepted == true
+                            }
+                            if (alreadyAuthed) {
+                                synchronized(dm.authenticatedDevices) {
+                                    val existingAuth = dm.authenticatedDevices[uuid]
+                                    if (existingAuth != null && existingAuth.publicKey != pubKey) {
+                                        val rejectCtx = dm.rustContextInternal!!
+                                        val rejectUuid = dm.uuid
+                                        dm.coroutineScopeInternal.launch { NativeCore.sendReject(rejectCtx, rejectUuid) }
+                                        Logger.w("CoreCb", "已认证设备公钥变化，要求重新配对: $uuid")
+                                        return
+                                    }
+                                }
+                                synchronized(dm.incompatibleDevicesInternal) { dm.incompatibleDevicesInternal.remove(uuid) }
+                                val localIp = getLocalIpAddress()
+                                val acceptCtx = dm.rustContextInternal!!
+                                val acceptUuid = dm.uuid
+                                val acceptPub = dm.localPublicKey
+                                val battery = BatteryUtils.getBatteryLevel(dm.contextInternal)
+                                dm.coroutineScopeInternal.launch {
+                                    NativeCore.sendAccept(acceptCtx, acceptUuid, acceptPub, localIp, battery, deviceType)
+                                }
+                                synchronized(dm.authenticatedDevices) {
+                                    val auth = dm.authenticatedDevices[uuid]
+                                    if (auth != null) {
+                                        dm.authenticatedDevices[uuid] = auth.copy(deviceType = deviceType, lastIp = ip)
+                                        dm.saveAuthedDevicesInternal()
+                                    }
+                                }
+                            } else {
+                                val rejectCtx = dm.rustContextInternal!!
+                                val rejectUuid = dm.uuid
+                                dm.coroutineScopeInternal.launch { NativeCore.sendReject(rejectCtx, rejectUuid) }
                             }
                         }
-                        val displayName: String
-                        synchronized(dm.deviceInfoCacheInternal) {
-                            displayName = dm.deviceInfoCacheInternal[remoteUuid]?.displayName ?: "未知设备"
-                            dm.deviceInfoCacheInternal[remoteUuid] = DeviceInfo(remoteUuid, displayName, remoteIp, 23333)
+                        "PAIRING_INIT" -> {
+                            val dm = _callbackInstance ?: return
+                            var spake2Pub = ""
+                            var ip = ""
+                            data?.let {
+                                try {
+                                    val json = JSONObject(it)
+                                    spake2Pub = json.optString("spake2_pub", "")
+                                    ip = json.optString("ip", "")
+                                } catch (_: Exception) {}
+                            }
+                            synchronized(dm.rejectedDevicesInternal) {
+                                if (dm.rejectedDevicesInternal.contains(uuid)) {
+                                    val rejectCtx = dm.rustContextInternal!!
+                                    val rejectUuid = dm.uuid
+                                    dm.coroutineScopeInternal.launch { NativeCore.sendReject(rejectCtx, rejectUuid) }
+                                    return
+                                }
+                            }
+                            val displayName: String
+                            synchronized(dm.deviceInfoCacheInternal) {
+                                displayName = dm.deviceInfoCacheInternal[uuid]?.displayName ?: "未知设备"
+                                dm.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, displayName, ip, 23333)
+                            }
+                            dm.pendingPairing = PendingPairing(remoteUuid = uuid, remotePubKey = spake2Pub, remoteIp = ip)
+                            val remoteDevice = DeviceInfo(uuid, displayName, ip, 23333)
+                            android.os.Handler(android.os.Looper.getMainLooper()).post {
+                                dm.handshakeRequestHandler?.onPairingInitRequest(remoteDevice, spake2Pub)
+                            }
+                            Logger.d("CoreCb", "PAIRING_INIT 已处理: $uuid")
                         }
-                        dm.pendingPairing = PendingPairing(remoteUuid = remoteUuid, remotePubKey = spake2PubStr, remoteIp = remoteIp)
-                        val remoteDevice = DeviceInfo(remoteUuid, displayName, remoteIp, 23333)
-                        android.os.Handler(android.os.Looper.getMainLooper()).post {
-                            dm.handshakeRequestHandler?.onPairingInitRequest(remoteDevice, spake2PubStr)
+                        "PAIRING_RESP" -> {
+                            Logger.w("CoreCb", "收到意外的 PAIRING_RESP: $uuid")
                         }
-                        Logger.d("CoreCb", "PAIRING_INIT 已处理: $remoteUuid")
-                    } catch (e: Exception) {
-                        Logger.e("CoreCb", "on_pairing_init error: ${e.message}")
-                    }
-                }
-            }
-            lib.nrc_set_on_pairing_init_cb(ctx, cb); rustCallbackRefs.add(cb)
-        }
-
-        // ---- on_pairing_resp ----
-        // 在新型架构中，PAIRING_RESP 由 nrc_send_pairing_init 内部处理
-        // 此处仅在异常路径（收到的 PAIRING_RESP 无对应发起方上下文）时触发
-        run {
-            val cb = object : NotifyRelayCore.OnPairingRespCb {
-                override fun invoke(uuid: Pointer?, spake2Pub: Pointer?, ltPub: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
-                    val remoteUuid = ptr2str(uuid) ?: return
-                    Logger.w("CoreCb", "收到意外的 PAIRING_RESP: $remoteUuid")
-                }
-            }
-            lib.nrc_set_on_pairing_resp_cb(ctx, cb); rustCallbackRefs.add(cb)
-        }
-
-        // ---- on_accept ----
-        run {
-            val cb = object : NotifyRelayCore.OnAcceptCb {
-                override fun invoke(uuid: Pointer?, ltPubKey: Pointer?, ip: Pointer?, battery: Int, deviceType: Pointer?, userData: Pointer?) {
-                    val dm = _callbackInstance ?: return
-                    val remoteUuid = ptr2str(uuid) ?: return
-                    val remoteLtPubKey = ptr2str(ltPubKey) ?: return
-                    val remoteIp = ptr2str(ip) ?: ""
-                    try {
-                        val ok = dm.completePairingWithLongTermKeys(remoteUuid, remoteLtPubKey, lastIp = remoteIp)
-                        dm.resolveHandshake(remoteUuid, ok)
-                        if (ok) {
-                            dm.keepAliveInternal.startHeartbeatToDevice(remoteUuid, remoteIp, 23333, "")
+                        "ACCEPT" -> {
+                            val dm = _callbackInstance ?: return
+                            var ltPubKey = ""
+                            var ip = ""
+                            data?.let {
+                                try {
+                                    val json = JSONObject(it)
+                                    ltPubKey = json.optString("lt_pub_key", "")
+                                    ip = json.optString("ip", "")
+                                } catch (_: Exception) {}
+                            }
+                            val ok = dm.completePairingWithLongTermKeys(uuid, ltPubKey, lastIp = ip)
+                            dm.resolveHandshake(uuid, ok)
+                            if (ok) {
+                                // 登记已知设备（uuid+ip），心跳由 Rust 调度器自动启动
+                                dm.registerKnownDevice(uuid, ip)
+                            }
+                            Logger.d("CoreCb", "ACCEPT 已处理: $uuid")
                         }
-                        Logger.d("CoreCb", "ACCEPT 已处理: $remoteUuid")
-                    } catch (e: Exception) {
-                        Logger.e("CoreCb", "on_accept error: ${e.message}")
-                    }
-                }
-            }
-            lib.nrc_set_on_accept_cb(ctx, cb); rustCallbackRefs.add(cb)
-        }
-
-        // ---- on_pairing_result ----
-        run {
-            val cb = object : NotifyRelayCore.OnPairingResultCb {
-                override fun invoke(uuid: Pointer?, success: Int, errorMsg: Pointer?, userData: Pointer?) {
-                    val remoteUuid = ptr2str(uuid) ?: return
-                    val err = ptr2str(errorMsg) ?: ""
-                    if (success == 0) {
-                        Logger.w("CoreCb", "配对失败: $remoteUuid, error=$err")
-                        val dm = _callbackInstance
-                        dm?.resolveHandshake(remoteUuid, false)
-                    } else {
-                        Logger.d("CoreCb", "配对成功: $remoteUuid")
-                        val dm = _callbackInstance ?: return
-                        val keyJson = dm.rustContext?.let { NativeCore.exportDeviceKey(it, remoteUuid) }
-                        if (keyJson != null) {
-                            val json = org.json.JSONObject(keyJson)
-                            val ltPub = json.optString("remote_pub_key", "")
-                            if (ltPub.isNotEmpty()) {
-                                dm.completePairingWithLongTermKeys(remoteUuid, ltPub)
+                        "REJECT" -> {
+                            val dm = _callbackInstance ?: return
+                            dm.resolveHandshake(uuid, false)
+                            synchronized(dm.rejectedDevicesInternal) {
+                                dm.rejectedDevicesInternal.add(uuid)
+                            }
+                            Logger.w("CoreCb", "REJECT 已处理: $uuid")
+                        }
+                        "RESULT" -> {
+                            val err = extra ?: ""
+                            if (intValue == 0) {
+                                Logger.w("CoreCb", "配对失败: $uuid, error=$err")
+                                _callbackInstance?.resolveHandshake(uuid, false)
+                            } else {
+                                Logger.d("CoreCb", "配对成功: $uuid")
+                                val dm = _callbackInstance ?: return
+                                val keyJson = dm.rustContext?.let { NativeCore.exportDeviceKey(it, uuid) }
+                                if (keyJson != null) {
+                                    val json = org.json.JSONObject(keyJson)
+                                    val ltPub = json.optString("remote_pub_key", "")
+                                    if (ltPub.isNotEmpty()) {
+                                        dm.completePairingWithLongTermKeys(uuid, ltPub)
+                                        // 登记已知设备（uuid+ip），心跳由 Rust 调度器自动启动
+                                        val cachedIp = synchronized(dm.deviceInfoCacheInternal) {
+                                            dm.deviceInfoCacheInternal[uuid]?.ip
+                                        }
+                                        dm.registerKnownDevice(uuid, cachedIp ?: "")
+                                    }
+                                }
+                                dm.resolveHandshake(uuid, true)
                             }
                         }
-                        dm.resolveHandshake(remoteUuid, true)
-                    }
-                }
-            }
-            lib.nrc_set_on_pairing_result_cb(ctx, cb); rustCallbackRefs.add(cb)
-        }
-
-        // ---- on_reject ----
-        run {
-            val cb = object : NotifyRelayCore.OnRejectCb {
-                override fun invoke(uuid: Pointer?, userData: Pointer?) {
-                    val dm = _callbackInstance ?: return
-                    val remoteUuid = ptr2str(uuid) ?: return
-                    try {
-                        dm.resolveHandshake(remoteUuid, false)
-                        synchronized(dm.rejectedDevicesInternal) {
-                            dm.rejectedDevicesInternal.add(remoteUuid)
+                        "HEARTBEAT_TCP" -> {
+                            val dm = _callbackInstance ?: return
+                            val remoteName = extra ?: return
+                            var deviceType = "unknown"
+                            var ip = ""
+                            data?.let {
+                                try {
+                                    val json = JSONObject(it)
+                                    deviceType = json.optString("device_type", "unknown")
+                                    ip = json.optString("ip", "")
+                                } catch (_: Exception) {}
+                            }
+                            val info = HeartbeatProcessor.HeartbeatInfo(
+                                uuid = uuid,
+                                displayName = remoteName,
+                                port = 23333,
+                                batteryLevel = kotlin.math.abs(intValue),
+                                isCharging = intValue >= 0,
+                                deviceType = deviceType,
+                                ip = ip
+                            )
+                            if (info.uuid != dm.uuid) {
+                                HeartbeatProcessor.processHeartbeat(info, dm)
+                            }
                         }
-                        Logger.w("CoreCb", "REJECT 已处理: $remoteUuid")
-                    } catch (e: Exception) {
-                        Logger.e("CoreCb", "on_reject error: ${e.message}")
                     }
+                } catch (e: Exception) {
+                    Logger.e("CoreCb", "on_pairing error: ${e.message}")
                 }
             }
-            lib.nrc_set_on_reject_cb(ctx, cb); rustCallbackRefs.add(cb)
         }
+        lib.nrc_set_on_pairing_cb(ctx, pairingCb); rustCallbackRefs.add(pairingCb)
+
+        // ---- on_data (统一数据回调) ----
+        val dataCb = object : NotifyRelayCore.OnDataCb {
+            override fun invoke(uuidPtr: Pointer?, msgTypePtr: Pointer?, plaintextPtr: Pointer?, userData: Pointer?) {
+                val uuid = ptr2str(uuidPtr) ?: return
+                val msgType = ptr2str(msgTypePtr) ?: return
+                val text = ptr2str(plaintextPtr) ?: return
+                val authed = synchronized(authenticatedDevices) {
+                    authenticatedDevices[uuid]?.isAccepted == true
+                }
+                android.util.Log.d("CoreCb", "on_data: type=$msgType, uuid=$uuid, authed=$authed, text_len=${text.length}")
+                if (!authed && msgType != "DATA_UNKNOWN") return
+
+                try {
+                    when (msgType) {
+                        "NOTIFICATION" -> {
+                            NotificationProcessor.process(context, this@DeviceConnectionManager, coroutineScope,
+                                NotificationProcessor.NotificationInput("DATA_NOTIFICATION", text, uuid),
+                                notificationDataReceivedCallbacksInternal)
+                        }
+                        "MEDIAPLAY" -> {
+                            val json = JSONObject(text)
+                            resolveDeviceInfo(uuid, "", 23333)?.let {
+                                RemoteMediaSessionManager.onMediaMessageReceived(context, json, it)
+                            }
+                        }
+                        "ICON_REQUEST" -> {
+                            resolveDeviceInfo(uuid, "", 23333)?.let {
+                                IconSyncManager.handleIconRequest(text, this@DeviceConnectionManager, it, context)
+                            }
+                        }
+                        "ICON_RESPONSE" -> {
+                            IconSyncManager.handleIconResponse(text, context)
+                        }
+                        "APP_LIST_REQUEST" -> {
+                            resolveDeviceInfo(uuid, "", 23333)?.let {
+                                AppListSyncManager.handleAppListRequest(text, this@DeviceConnectionManager, it, context)
+                            }
+                        }
+                        "APP_LIST_RESPONSE" -> {
+                            AppListSyncManager.handleAppListResponse(text, context, uuid, this@DeviceConnectionManager)
+                        }
+                        "MEDIA_CONTROL" -> {
+                            val json = JSONObject(text)
+                            val action = json.getString("action")
+                            when (action) {
+                                "playPause" -> try { MediaControlUtil.playPause(); sendMediaControlResponse(uuid, "playPause", "success", null) }
+                                catch (e: Exception) { sendMediaControlResponse(uuid, "playPause", "error", e.message) }
+                                "next" -> try { MediaControlUtil.next(); sendMediaControlResponse(uuid, "next", "success", null) }
+                                catch (e: Exception) { sendMediaControlResponse(uuid, "next", "error", e.message) }
+                                "previous" -> try { MediaControlUtil.previous(); sendMediaControlResponse(uuid, "previous", "success", null) }
+                                catch (e: Exception) { sendMediaControlResponse(uuid, "previous", "error", e.message) }
+                                "audioRequest" -> {
+                                    val relayMode = StorageManager.getInt(context, "audio_relay_mode", 0)
+                                    if (relayMode == 1) {
+                                        // 中继模式：Rust 内部自动发控制消息
+                                        val device = resolveDeviceInfo(uuid, "", 23333)
+                                        device?.let {
+                                            pendingAudioRelaySend = PendingAudioSend(it.ip, it.displayName, uuid)
+                                            onRequestMediaProjection?.invoke()
+                                        }
+                                    } else {
+                                        // scrcpy 模式：现有逻辑
+                                        val device = resolveDeviceInfo(uuid, "", 23333)
+                                        val ok = device?.let { AudioForwardingService.startAudioForwarding(context, it.ip, ScrcpyDefaults.ADB_PORT, it.displayName) } == true
+                                        val result = if (ok) "accepted" else "rejected"
+                                        val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioResponse\",\"result\":\"$result\"}"
+                                        device?.let { ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_MEDIA_CONTROL", raw) }
+                                    }
+                                }
+                                "audioResponse" -> {
+                                    if (json.optString("result", "rejected") != "accepted") {
+                                        coroutineScope.launch { notifyrelay.base.util.ToastUtils.showShortToast(context, "音频转发请求被拒绝") }
+                                    }
+                                }
+                                "audioStart" -> {
+                                    coroutineScope.launch {
+                                        val sr = json.optInt("sampleRate", 48000)
+                                        val ch = json.optInt("channels", 2)
+                                        val device = resolveDeviceInfo(uuid, "", 23333)
+                                        val ip = device?.ip ?: ""
+                                        audioRelayPlayer.start("recv", sr, ch, remoteUuid = uuid)
+                                        showAudioRelayNotification(device?.displayName ?: ip, uuid)
+                                    }
+                                }
+                                "audioStop" -> {
+                                    coroutineScope.launch {
+                                        audioRelayPlayer.stop()
+                                        cancelAudioRelayNotification()
+                                        if (json.optString("result", "").isNotEmpty()) return@launch
+                                        val device = resolveDeviceInfo(uuid, "", 23333)
+                                        if (device != null) {
+                                            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioStop\",\"result\":\"ok\"}"
+                                            try {
+                                                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, device, "DATA_MEDIA_CONTROL", raw)
+                                            } catch (_: Exception) {}
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        "FTP" -> {
+                            val isPc = synchronized(authenticatedDevices) {
+                                authenticatedDevices[uuid]?.deviceType?.lowercase() == "pc"
+                            }
+                            if (!isPc) return
+                            coroutineScope.launch {
+                                try {
+                                    val json = JSONObject(text)
+                                    when (json.optString("action", "")) {
+                                        "start" -> {
+                                            val pcUser = json.optString("username", null)
+                                            val pcPass = json.optString("password", null)
+                                            val result = ftpServer.start(getLocalDisplayName(), context, pcUser, pcPass)
+                                            when (result.status) {
+                                                StartResult.SUCCESS, StartResult.ALREADY_RUNNING -> {
+                                                    result.serverInfo?.let { info ->
+                                                        val raw = JSONObject().apply { put("action", "started"); put("ipAddress", info.ipAddress); put("port", info.port) }.toString()
+                                                        resolveDeviceInfo(uuid, "", 23333)?.let {
+                                                            ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", raw)
+                                                        }
+                                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+                                                            val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
+                                                            intent.putExtra("fromftp", true); intent.putExtra("fromInternal", true)
+                                                            IntentUtils.startActivity(context, intent, true)
+                                                        }
+                                                    }
+                                                }
+                                                else -> {
+                                                    val err = when (result.status) { StartResult.PERMISSION_DENIED -> "PERMISSION_DENIED"; StartResult.PORT_IN_USE -> "PORT_IN_USE"; StartResult.CONFIG_ERROR -> "CONFIG_ERROR"; else -> "FAILED" }
+                                                    val raw = JSONObject().apply { put("originalHeader", "DATA_FTP"); put("action", "start"); put("result", "error"); put("errorCode", err) }.toString()
+                                                    resolveDeviceInfo(uuid, "", 23333)?.let {
+                                                        ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_STATUS", raw)
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        "stop" -> { ftpServer.stop()
+                                            val raw = JSONObject().apply { put("action", "stopped") }.toString()
+                                            resolveDeviceInfo(uuid, "", 23333)?.let {
+                                                ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", raw)
+                                            }
+                                        }
+                                    }
+                                } catch (e: Exception) { Logger.e("CoreCb", "DATA_FTP", e) }
+                            }
+                        }
+                        "CLIPBOARD" -> {
+                            ClipboardProcessor.process(context, ClipboardProcessor.ClipboardInput("DATA_CLIPBOARD", text, ""))
+                        }
+                        "STATUS" -> {
+                            StatusProcessor.process(context, this@DeviceConnectionManager, coroutineScope,
+                                StatusProcessor.StatusInput("DATA_STATUS", text, uuid),
+                                notificationDataReceivedCallbacksInternal)
+                        }
+                        "APP_LAUNCH" -> {
+                            resolveDeviceInfo(uuid, "", 23333)?.let {
+                                AppLaunchManager.handleAppLaunchRequest(text, this@DeviceConnectionManager, it, context)
+                            }
+                        }
+                        "SUPERISLAND" -> {
+                            SuperIslandProcessor.process(context, this@DeviceConnectionManager, text, uuid)
+                        }
+                        else -> {
+                            Logger.d("CoreCb", "未知DATA通道: type=$msgType, uuid=$uuid, size=${text.length}")
+                        }
+                    }
+                } catch (e: Exception) {
+                    Logger.e("CoreCb", "on_data error: ${e.message}")
+                }
+            }
+        }
+        lib.nrc_set_on_data_cb(ctx, dataCb); rustCallbackRefs.add(dataCb)
 
         // ---- on_heartbeat_udp ----
-        run {
-            val cb = object : NotifyRelayCore.OnHeartbeatUdpCb {
-                override fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?) {
-                    val dm = _callbackInstance ?: return
-                    val remoteUuid = ptr2str(uuid) ?: return
-                    val remoteName = ptr2str(name) ?: return
-                    val remoteDeviceType = ptr2str(deviceType) ?: "unknown"
-                    val ip = "0.0.0.0"
-                    try {
-                        val info = HeartbeatProcessor.HeartbeatInfo(
-                            uuid = remoteUuid, displayName = remoteName,
-                            port = port.toInt(), batteryLevel = kotlin.math.abs(battery),
-                            isCharging = battery >= 0, deviceType = remoteDeviceType, ip = ip
-                        )
-                        if (info.uuid != dm.uuid) {
-                            HeartbeatProcessor.processHeartbeat(info, dm)
-                        }
-                    } catch (e: Exception) {
-                        Logger.e("CoreCb", "on_heartbeat_udp error", e)
+        val heartbeatUdpCb = object : NotifyRelayCore.OnHeartbeatUdpCb {
+            override fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?) {
+                val dm = _callbackInstance ?: return
+                val remoteUuid = ptr2str(uuid) ?: return
+                val remoteName = ptr2str(name) ?: return
+                val remoteDeviceType = ptr2str(deviceType) ?: "unknown"
+                val srcIp = ptr2str(ip)
+                val resolvedIp = if (srcIp.isNullOrBlank() || srcIp == "0.0.0.0") "0.0.0.0" else srcIp
+                try {
+                    val info = HeartbeatProcessor.HeartbeatInfo(
+                        uuid = remoteUuid, displayName = remoteName,
+                        port = port.toInt(), batteryLevel = battery,
+                        isCharging = battery > 0, deviceType = remoteDeviceType, ip = resolvedIp
+                    )
+                    if (info.uuid != dm.uuid) {
+                        HeartbeatProcessor.processHeartbeat(info, dm)
                     }
+                } catch (e: Exception) {
+                    Logger.e("CoreCb", "on_heartbeat_udp error", e)
                 }
             }
-            lib.nrc_set_on_heartbeat_udp_cb(ctx, cb); rustCallbackRefs.add(cb)
         }
+        lib.nrc_set_on_heartbeat_udp_cb(ctx, heartbeatUdpCb); rustCallbackRefs.add(heartbeatUdpCb)
 
-        // ---- on_heartbeat_tcp ----
-        run {
-            val cb = object : NotifyRelayCore.OnHeartbeatTcpCb {
-                override fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?) {
-                    val dm = _callbackInstance ?: return
-                    val remoteUuid = ptr2str(uuid) ?: return
-                    val remoteName = ptr2str(name) ?: return
-                    val remoteDeviceType = ptr2str(deviceType) ?: "unknown"
-                    val remoteIp = ptr2str(ip) ?: ""
-
-                    try {
-                        val info = HeartbeatProcessor.HeartbeatInfo(
-                            uuid = remoteUuid,
-                            displayName = remoteName,
-                            port = port.toInt(),
-                            batteryLevel = kotlin.math.abs(battery),
-                            isCharging = battery >= 0,
-                            deviceType = remoteDeviceType,
-                            ip = remoteIp
-                        )
-                        if (info.uuid != dm.uuid) {
-                            HeartbeatProcessor.processHeartbeat(info, dm)
-                        }
-                    } catch (e: Exception) {
-                        Logger.e("CoreCb", "on_heartbeat_tcp error", e)
+        // ---- on_mdns_discovered ----
+        val mdnsDiscoveredCb = object : NotifyRelayCore.OnMdnsDiscoveredCb {
+            override fun invoke(uuid: Pointer?, name: Pointer?, ip: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?) {
+                val dm = _callbackInstance ?: return
+                val remoteUuid = ptr2str(uuid) ?: return
+                val remoteName = ptr2str(name) ?: return
+                val remoteIp = ptr2str(ip) ?: "0.0.0.0"
+                val remoteDeviceType = ptr2str(deviceType) ?: "unknown"
+                try {
+                    // 广告 TXT 携带 signed 电量（正=充电，负=放电，-101=未知），充电状态由符号推断
+                    val info = HeartbeatProcessor.HeartbeatInfo(
+                        uuid = remoteUuid, displayName = remoteName,
+                        port = port.toInt(), batteryLevel = battery,
+                        isCharging = battery > 0, deviceType = remoteDeviceType, ip = remoteIp
+                    )
+                    if (info.uuid != dm.uuid) {
+                        HeartbeatProcessor.processHeartbeat(info, dm)
                     }
+                } catch (e: Exception) {
+                    Logger.e("CoreCb", "on_mdns_discovered error", e)
                 }
             }
-            lib.nrc_set_on_heartbeat_tcp_cb(ctx, cb); rustCallbackRefs.add(cb)
         }
+        lib.nrc_set_on_mdns_discovered_cb(ctx, mdnsDiscoveredCb); rustCallbackRefs.add(mdnsDiscoveredCb)
 
         // ---- on_device_timeout (设备心跳超时回调) ----
-        run {
-            val cb = object : NotifyRelayCore.OnDeviceTimeoutCb {
-                override fun invoke(uuidPtr: Pointer?, userData: Pointer?) {
-                    val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
-                    synchronized(deviceLastSeen) {
-                        // 将 lastSeen 设为过期值，updateDeviceList 下次扫描会将其标记离线
-                        deviceLastSeen[uuid] = System.currentTimeMillis() - 30_000L
-                    }
+        val deviceTimeoutCb = object : NotifyRelayCore.OnDeviceTimeoutCb {
+            override fun invoke(uuidPtr: Pointer?, userData: Pointer?) {
+                val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
+                // 超时离线状态由 Rust DeviceRegistry 维护，此处仅重新登记重连目标
+                val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
+                if (auth != null) registerReconnectTarget(uuid, auth.lastIp ?: "")
+            }
+        }
+        lib.nrc_set_on_device_timeout_cb(ctx, deviceTimeoutCb); rustCallbackRefs.add(deviceTimeoutCb)
+
+        // ---- on_state_query (超级岛/媒体心跳查询回调：0=不存在 / 1=存在无变更 / 2=存在有变更) ----
+        // 运行在 Rust 心跳线程且锁已释放，回调内可直接调用 nrc_push_*（isQuery=1）响应变更
+        val stateQueryCb = object : NotifyRelayCore.OnStateQueryCb {
+            override fun invoke(uuidPtr: Pointer?, featureIdPtr: Pointer?, isMedia: Int, userData: Pointer?): Int {
+                val remoteUuid = ptr2str(uuidPtr) ?: return 0
+                val featureId = ptr2str(featureIdPtr) ?: return 0
+                val dm = _callbackInstance ?: return 0
+                return try {
+                    if (isMedia != 0) dm.handleMediaStateQuery(remoteUuid, featureId)
+                    else dm.handleSuperIslandStateQuery(remoteUuid, featureId)
+                } catch (e: Exception) {
+                    Logger.e("CoreCb", "on_state_query error: ${e.message}")
+                    1 // 异常保守保活，等待下一次查询
                 }
             }
-            lib.nrc_set_on_device_timeout_cb(ctx, cb); rustCallbackRefs.add(cb)
+        }
+        lib.nrc_set_on_state_query_cb(ctx, stateQueryCb); rustCallbackRefs.add(stateQueryCb)
+
+        // ---- 日志回调（接入 Logger.CURRENT_LEVEL 等级控制） ----
+        NativeCore.setLogCallback(ctx)
+    }
+
+    // ---- 状态查询回调处理（运行在 Rust 心跳线程，锁已释放；回调内可直接调 push(isQuery=1)） ----
+    private val mediaFeatureId = "media_global" // 与 Rust MEDIA_KEY 一致
+
+    /** 超级岛查询：扫描活跃通知，重算 featureId（与 Rust 算法一致，iid 传空）匹配后对比推送 */
+    private fun handleSuperIslandStateQuery(remoteUuid: String, featureId: String): Int {
+        val listener = NotifyRelayNotificationListenerService.instance ?: return 0
+        val actives = listener.activeNotifications ?: return 0
+        for (sbn in actives) {
+            if (sbn.packageName == context.packageName) continue
+            val superData = try { SuperIslandManager.extractSuperIslandData(sbn, context) } catch (_: Exception) { null } ?: continue
+            val superPkg = superData.sourcePackage ?: continue
+            // 重算 featureId：与 Rust 会话 key 及发送端严格一致（sbn.key 稳定值）
+            val computedId = listener.getNotificationKey(sbn, "")
+            if (computedId != featureId) continue
+            // 匹配：组装 full（与 sendSuperIslandData 同格式）并对比推送。
+            // 该回调运行在 Rust 心跳线程且必须同步返回 0/1/2，无法异步处理；
+            // 查询路径的 picMap 来自已提取的活跃通知（多为 data URI/http，无 IO），
+            // 仅本地 file/content URI 时才会发生实际文件读取，故在此包装 runBlocking 是必要且可接受的。
+            val content = kotlinx.coroutines.runBlocking {
+                MessageSender.buildSuperIslandFullContent(
+                    context, superPkg,
+                    superData.appName ?: "超级岛",
+                    superData.title, superData.text,
+                    sbn.postTime, superData.paramV2Raw,
+                    superData.picMap ?: emptyMap(),
+                    featureId
+                )
+            }
+            return compareAndPushState(remoteUuid, featureId, content, isMedia = false)
+        }
+        // 无匹配：平台上不存在该会话
+        Logger.w("CoreCb", "状态查询: 超级岛会话不存在, fid=$featureId")
+        return 0
+    }
+
+    private var cachedMediaBitmap: Bitmap? = null
+    private var cachedMediaCoverUrl: String? = null
+    private val mediaCoverCacheLock = Any()
+
+    /** 媒体查询：读取当前媒体会话组装 full 并对比推送；无媒体会话返回 0 */
+    private fun handleMediaStateQuery(remoteUuid: String, featureId: String): Int {
+        if (featureId != mediaFeatureId) return 0
+        val monitor = MediaSessionMonitorService.instance ?: return 0
+        val primary = monitor.getPrimaryController() ?: return 0
+        val pkg = primary.packageName
+        val mediaData = NotifyRelayNotificationListenerService.getMediaSessionData(pkg)
+            ?: return 1 // 有媒体会话但数据未就绪，保守保活等待下次查询
+        val coverUrl = synchronized(mediaCoverCacheLock) {
+            val bmp = mediaData.artBitmap
+            if (bmp !== cachedMediaBitmap) {
+                cachedMediaBitmap = bmp
+                cachedMediaCoverUrl = if (bmp == null) null else try {
+                    val stream = ByteArrayOutputStream()
+                    bmp.compress(Bitmap.CompressFormat.JPEG, 80, stream)
+                    "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+                } catch (_: Exception) { null }
+            }
+            cachedMediaCoverUrl
+        }
+        val content = MessageSender.buildMediaFullContent(
+            context, pkg, pkg, mediaData.title, mediaData.artist, coverUrl, System.currentTimeMillis()
+        )
+        return compareAndPushState(remoteUuid, featureId, content, isMedia = true)
+    }
+
+    /**
+     * 与上次推送缓存对比（仅 Rust diff 字段：title/text/param_v2_raw/pics）：
+     * 缓存缺失 → 保守"有变更"推一次建立缓存；无变更 → 也推一次(isQuery=1)发空差量保活 → 1；变更 → 更新缓存并推(isQuery=1) → 2
+     */
+    private fun compareAndPushState(remoteUuid: String, featureId: String, fullJson: String, isMedia: Boolean): Int {
+        val cached = MessageSender.getLastPushedState(featureId)
+        if (cached == null) {
+            MessageSender.cacheLastPushedState(featureId, fullJson)
+            pushQueryResponse(remoteUuid, featureId, fullJson, isMedia)
+            return 2
+        }
+        if (sameDiffFields(cached, fullJson)) {
+            // 无变更：仍推一次，Rust 端发空差量保活包，刷新远端卡片时间戳防止超时消失
+            pushQueryResponse(remoteUuid, featureId, fullJson, isMedia)
+            return 1
+        }
+        MessageSender.cacheLastPushedState(featureId, fullJson)
+        pushQueryResponse(remoteUuid, featureId, fullJson, isMedia)
+        return 2
+    }
+
+    /** 查询响应推送：仅推给查询对应的远端设备（isQuery=1） */
+    private fun pushQueryResponse(remoteUuid: String, featureId: String, fullJson: String, isMedia: Boolean) {
+        try {
+            val ctx = rustContextInternal ?: return
+            val queuePtr = NativeCore.senderQueuePtr
+            if (queuePtr == 0L) return
+            if (isMedia) NativeCore.pushMediaState(ctx, queuePtr, remoteUuid, fullJson, false, true)
+            else NativeCore.pushSuperislandState(ctx, queuePtr, remoteUuid, fullJson, false, true)
+        } catch (e: Exception) {
+            Logger.w("CoreCb", "查询响应推送失败: $remoteUuid fid=$featureId", e)
+        }
+    }
+
+    /** 与 Rust diff 字段严格对齐（title/text/param_v2_raw/pics），避免错位导致误判 */
+    private fun sameDiffFields(a: String, b: String): Boolean {
+        return try {
+            val ja = JSONObject(a)
+            val jb = JSONObject(b)
+            ja.optString("title") == jb.optString("title") &&
+                ja.optString("text") == jb.optString("text") &&
+                ja.optString("param_v2_raw") == jb.optString("param_v2_raw") &&
+                ja.opt("pics").toString() == jb.opt("pics").toString()
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -1437,6 +1588,55 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         synchronized(deviceInfoCache) {
             deviceInfoCache[uuid] = deviceInfo
         }
+    }
+
+    // 将认证设备登记到 Rust 重连状态机（先移除再添加，重置重试周期）
+    private fun registerReconnectTarget(uuid: String, ip: String) {
+        try {
+            if (uuid == this.uuid) return
+            val ctx = rustContext ?: return
+            if (NativeCore.reconnectStatePtr == 0L) return
+            if (ip.isNullOrEmpty() || ip == "0.0.0.0") return
+            NativeCore.reconnectRemoveTarget(ctx, NativeCore.reconnectStatePtr, uuid)
+            NativeCore.reconnectAddTarget(ctx, NativeCore.reconnectStatePtr, uuid, ip)
+        } catch (_: Exception) {}
+    }
+
+    // 重新登记所有认证设备到 Rust 重连状态机（网络恢复后调用）
+    internal fun refreshAllReconnectTargetsInternal() {
+        val snapshot = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
+        for ((uuid, auth) in snapshot) {
+            if (uuid == "本机") continue
+            registerReconnectTarget(uuid, auth.lastIp ?: "")
+        }
+    }
+
+    // 从 Rust 重连状态机移除目标
+    private fun removeReconnectTarget(uuid: String) {
+        try {
+            val ctx = rustContext ?: return
+            if (NativeCore.reconnectStatePtr == 0L) return
+            NativeCore.reconnectRemoveTarget(ctx, NativeCore.reconnectStatePtr, uuid)
+        } catch (_: Exception) {}
+    }
+
+    // 将认证设备登记到 Rust 已知设备扫描器（known_device_scanner）
+    private fun registerKnownDevice(uuid: String, ip: String) {
+        try {
+            if (uuid == this.uuid) return
+            val ctx = rustContext ?: return
+            if (ip.isNullOrEmpty() || ip == "0.0.0.0") return
+            NativeCore.removeKnownDevice(ctx, uuid)
+            NativeCore.addKnownDevice(ctx, uuid, ip)
+        } catch (_: Exception) {}
+    }
+
+    // 从 Rust 已知设备扫描器移除
+    private fun removeKnownDevice(uuid: String) {
+        try {
+            val ctx = rustContext ?: return
+            NativeCore.removeKnownDevice(ctx, uuid)
+        } catch (_: Exception) {}
     }
 
     // 封装设备信息缓存IP更新操作（保持其他信息不变）
@@ -1520,7 +1720,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     /**
      * 公开API：移除已认证设备（线程安全）。
-     * - 取消与该设备相关的心跳任务
+     * - 从 Rust 上下文移除设备密钥（registry 状态随之清理）
+     * - 从 Rust 重连状态机与已知设备扫描器移除（心跳调度随之停止）
      * - 直接从数据库中删除设备
      * - 从内存中移除设备信息
      * - 触发 updateDeviceList() 以通知观察者
@@ -1530,26 +1731,20 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         try {
             var existed = false
             
-            // 取消心跳任务
-            try {
-                val handle = heartbeatJobs[uuid]
-                if (handle != null && rustContext != null) {
-                    NativeCore.stopHeartbeatSender(rustContext!!, handle)
-                }
-                heartbeatJobs.remove(uuid)
-            } catch (_: Exception) {}
-            
-            // 从已建立心跳集合移除
-            try { heartbeatedDevices.remove(uuid) } catch (_: Exception) {}
-
             // 从协议不兼容设备集合移除
             try { incompatibleDevicesInternal.remove(uuid) } catch (_: Exception) {}
 
-            // 从 Rust 上下文移除设备密钥
+            // 从 Rust 上下文移除设备密钥（同时清理 registry 状态）
             try {
                 rustContext?.let { NativeCore.removeDevice(it, uuid) }
                 saveRustCoreState()
             } catch (_: Exception) {}
+
+            // 从 Rust 重连状态机移除目标
+            removeReconnectTarget(uuid)
+
+            // 从 Rust 已知设备扫描器移除（调度器随之停止该设备心跳）
+            removeKnownDevice(uuid)
 
             synchronized(authenticatedDevices) {
                 if (authenticatedDevices.containsKey(uuid)) {
@@ -1569,9 +1764,6 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 }
             }
 
-            // 清理 deviceLastSeen
-            try { synchronized(deviceLastSeen) { deviceLastSeen.remove(uuid) } } catch (_: Exception) {}
-            
             // 清理 deviceInfoCache
             try {
                 synchronized(deviceInfoCache) {
@@ -1597,51 +1789,84 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
-    // 发送超级岛ACK（包含接收的hash），用于发送方确认
-    private fun sendSuperIslandAck(remoteUuid: String?, hash: String, featureKeyValue: String?, mappedPkg: String?) {
-        try {
-            if (remoteUuid.isNullOrEmpty()) return
-            val device = getDeviceInfo(remoteUuid)
-            val auth = synchronized(authenticatedDevices) { authenticatedDevices[remoteUuid] }
-            val ip = device?.ip ?: auth?.lastIp
-            val port = device?.port ?: (auth?.lastPort ?: 23333)
-            if (ip.isNullOrEmpty() || ip == "0.0.0.0") return
+    val audioRelayPlayer = AudioRelayPlayer(context)
+    private var currentAudioRelayUuid: String = ""
 
-            // 使用DATA_STATUS发送超级岛ack
-            val raw = org.json.JSONObject().apply {
-                put("originalHeader", "DATA_SUPERISLAND")
-                put("result", "success")
-                put("action", "SI_ACK")
-                put("packageName", mappedPkg ?: "superisland:ack")
-                put("hash", hash)
-                if (!featureKeyValue.isNullOrEmpty()) {
-                    put("featureKeyName", SuperIslandProtocol.FEATURE_KEY_NAME)
-                    put("featureKeyValue", featureKeyValue)
+    private data class PendingAudioSend(
+        val deviceIp: String,
+        val deviceName: String,
+        val remoteUuid: String
+    )
+    private var pendingAudioRelaySend: PendingAudioSend? = null
+
+    fun startSendTo(deviceIp: String, deviceName: String, remoteUuid: String) {
+        pendingAudioRelaySend = PendingAudioSend(deviceIp, deviceName, remoteUuid)
+        onRequestMediaProjection?.invoke()
+    }
+
+    fun startPendingAudioRelaySend() {
+        val pending = pendingAudioRelaySend ?: return
+        pendingAudioRelaySend = null
+        if (NativeCore.mediaProjection != null) {
+            startAudioRelaySend(pending.deviceIp, pending.deviceName, pending.remoteUuid)
+        }
+    }
+
+    private fun startAudioRelaySend(deviceIp: String, deviceName: String, remoteUuid: String) {
+        val projection = NativeCore.mediaProjection ?: return
+        currentAudioRelayUuid = remoteUuid
+        audioRelayPlayer.start("send", remoteUuid = remoteUuid)
+        audioRelayPlayer.startSendCapture(projection)
+        showAudioRelayNotification(deviceName, direction = "send")
+    }
+
+    private fun showAudioRelayNotification(deviceName: String, remoteUuid: String = "", direction: String = "recv") {
+        if (remoteUuid.isNotEmpty()) {
+            currentAudioRelayUuid = remoteUuid
+        }
+        registerAudioRelayStopReceiver()
+        com.xzyht.notifyrelay.servers.AudioRelayForegroundService.start(context, deviceName, direction)
+    }
+
+    private fun registerAudioRelayStopReceiver() {
+        if (audioRelayNotificationReceiver != null) return
+        audioRelayNotificationReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                if (intent?.action == com.xzyht.notifyrelay.servers.AudioRelayForegroundService.STOP_ACTION) {
+                    stopAudioRelay()
                 }
-                put("time", System.currentTimeMillis())
-            }.toString()
-            // 通过统一加密发送器发回对端
-            val deviceInfo = DeviceInfo(remoteUuid, DeviceConnectionManagerUtil.getDisplayNameByUuid(remoteUuid), ip, port)
-            ProtocolSender.sendEncrypted(this, deviceInfo, "DATA_STATUS", raw, 3000L)
-        } catch (_: Exception) {
+            }
         }
-    }
-
-    // 提供给 NotificationProcessor 的内部包装，简化 ACK 调用
-    internal fun sendSuperIslandAckInternal(
-        remoteUuid: String,
-        recvHash: String,
-        featureId: String,
-        mappedPkg: String?
-    ) {
         try {
-            sendSuperIslandAck(remoteUuid, recvHash, featureId, mappedPkg)
-        } catch (_: Exception) {
-        }
+            context.registerReceiver(
+                audioRelayNotificationReceiver,
+                IntentFilter(com.xzyht.notifyrelay.servers.AudioRelayForegroundService.STOP_ACTION),
+                Context.RECEIVER_NOT_EXPORTED
+            )
+        } catch (_: Exception) {}
     }
 
-    // 新增：WLAN直连定期重连检查器
-    private fun startWifiDirectReconnectionChecker() {
-        keepAlive.startWifiDirectReconnectionChecker()
+    fun stopAudioRelay() {
+        val uuid = currentAudioRelayUuid
+        if (uuid.isNotEmpty()) {
+            val device = resolveDeviceInfo(uuid, "", 23333)
+            if (device != null) {
+                val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioStop\"}"
+                try {
+                    ProtocolSender.sendEncrypted(this@DeviceConnectionManager, device, "DATA_MEDIA_CONTROL", raw)
+                } catch (_: Exception) {}
+            }
+        }
+        audioRelayPlayer.stop()
+        cancelAudioRelayNotification()
+    }
+
+    private fun cancelAudioRelayNotification() {
+        try {
+            audioRelayNotificationReceiver?.let { context.unregisterReceiver(it) }
+        } catch (_: Exception) {}
+        audioRelayNotificationReceiver = null
+        com.xzyht.notifyrelay.servers.AudioRelayForegroundService.stop(context)
+        com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.stop(context)
     }
 }

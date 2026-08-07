@@ -61,6 +61,12 @@ fun MusicControlPage() {
     // 胶囊歌词开关状态
     var capsuleLyricsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "capsule_lyrics_enabled")) }
     
+    // 发送媒体通知到对端
+    var sendMediaNotificationsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "send_media_notifications_enabled", true)) }
+    
+    // 音频转发方式（0: scrcpy, 1: 中继）
+    var audioRelayMode by remember { mutableStateOf(StorageManager.getInt(context, "audio_relay_mode", 0)) }
+    
 
 
     Column(
@@ -120,12 +126,19 @@ fun MusicControlPage() {
                     
                     try {
                         val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                        val success = deviceManager.requestAudioForwarding(selectedDevice)
+                        val relayMode = StorageManager.getInt(context, "audio_relay_mode", 0)
                         
-                        if (success) {
-                            ToastUtils.showShortToast(context, "已请求${selectedDevice.displayName}转发音频")
+                        if (relayMode == 1) {
+                            // 中继模式：先请求 MediaProjection 授权，再启动发送
+                            deviceManager.startSendTo(selectedDevice.ip, selectedDevice.displayName, selectedDevice.uuid)
                         } else {
-                            ToastUtils.showShortToast(context, "请求发送失败")
+                            // scrcpy 模式：发送 audioRequest（现有逻辑）
+                            val success = deviceManager.requestAudioForwarding(selectedDevice)
+                            if (success) {
+                                ToastUtils.showShortToast(context, "已请求${selectedDevice.displayName}转发音频")
+                            } else {
+                                ToastUtils.showShortToast(context, "请求发送失败")
+                            }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "请求音频转发异常", e)
@@ -146,18 +159,27 @@ fun MusicControlPage() {
                     }
                     
                     try {
-                        val adbPort = notifyrelay.data.config.ScrcpyDefaults.ADB_PORT
-                        val success = io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.startAudioForwarding(
-                            context,
-                            selectedDevice.ip,
-                            adbPort,
-                            selectedDevice.displayName
-                        )
+                        val relayMode = StorageManager.getInt(context, "audio_relay_mode", 0)
                         
-                        if (success) {
-                            ToastUtils.showShortToast(context, "正在连接${selectedDevice.displayName}...")
+                        if (relayMode == 1) {
+                            // 中继模式：Rust 内部自动发控制消息
+                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                            deviceManager.audioRelayPlayer.start("recv", remoteUuid = selectedDevice.uuid)
+                            ToastUtils.showShortToast(context, "已启动中继音频接收")
                         } else {
-                            ToastUtils.showShortToast(context, "启动失败，可能已有转发在进行中")
+                            // scrcpy 模式：启动 scrcpy 音频转发（现有逻辑）
+                            val adbPort = notifyrelay.data.config.ScrcpyDefaults.ADB_PORT
+                            val success = io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.startAudioForwarding(
+                                context,
+                                selectedDevice.ip,
+                                adbPort,
+                                selectedDevice.displayName
+                            )
+                            if (success) {
+                                ToastUtils.showShortToast(context, "正在连接${selectedDevice.displayName}...")
+                            } else {
+                                ToastUtils.showShortToast(context, "启动失败，可能已有转发在进行中")
+                            }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "播放对端音频异常", e)
@@ -174,12 +196,28 @@ fun MusicControlPage() {
         Button(
             onClick = {
                 io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.stopAudioForwarding(context)
+                DeviceConnectionManagerSingleton.getDeviceManager(context).stopAudioRelay()
                 ToastUtils.showShortToast(context, "已停止音频转发")
             },
             modifier = Modifier.fillMaxWidth()
         ) {
             Text("停止音频转发")
         }
+        
+        // 音频转发方式
+        WindowSpinnerPreference(
+            title = "音频转发方式",
+            summary = "选择音频转发方式：scrcpy（经 adb 转发）或中继（直接音频流），同时控制发送与接收",
+            items = listOf(
+                SpinnerEntry(title = "scrcpy（默认）"),
+                SpinnerEntry(title = "中继"),
+            ),
+            selectedIndex = audioRelayMode,
+            onSelectedIndexChange = { index ->
+                audioRelayMode = index
+                StorageManager.putInt(context, "audio_relay_mode", index)
+            }
+        )
         
         WindowSpinnerPreference(
             title = "接收媒体消息",
@@ -228,6 +266,33 @@ fun MusicControlPage() {
                 onCheckedChange = { enabled ->
                     capsuleLyricsEnabled = enabled
                     StorageManager.putBoolean(context, "capsule_lyrics_enabled", enabled)
+                }
+            )
+        }
+        
+        // 发送媒体通知到对端
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "发送媒体通知到它端",
+                    style = textStyles.body1,
+                    color = colorScheme.onSurface
+                )
+                Text(
+                    text = "关闭后不再发送媒体通知到对端",
+                    style = textStyles.body2,
+                    color = colorScheme.onSurfaceSecondary
+                )
+            }
+            Switch(
+                checked = sendMediaNotificationsEnabled,
+                onCheckedChange = { enabled ->
+                    sendMediaNotificationsEnabled = enabled
+                    StorageManager.putBoolean(context, "send_media_notifications_enabled", enabled)
                 }
             )
         }

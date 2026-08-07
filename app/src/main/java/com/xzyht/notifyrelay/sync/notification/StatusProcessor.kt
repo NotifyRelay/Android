@@ -103,18 +103,12 @@ object StatusProcessor {
         remoteUuid: String
     ) {
         val action = json.optString("action", "")
-        val result = json.optString("result", "")
         val hash = json.optString("hash", "")
         val featureKeyValue = json.optString("featureKeyValue", "")
 
-        Logger.d(TAG, "处理超级岛状态响应: action=$action, result=$result")
+        Logger.d(TAG, "处理超级岛状态响应: action=$action")
 
-        // 处理超级岛ACK，确保进入原有ack处理逻辑
-        if (action == "SI_ACK" && hash.isNotEmpty()) {
-            Logger.d(TAG, "处理超级岛ACK: device=$remoteUuid, feature=$featureKeyValue, hash=$hash")
-            // 调用MessageSender.onSuperIslandAck方法，让确认包正常进入原有ack处理逻辑
-            MessageSender.onSuperIslandAck(remoteUuid, featureKeyValue, hash)
-        }
+        // 注：超级岛 ACK（SI_ACK）已由 Rust 合并引擎在接收端内部消费，平台无需再处理。
 
         // 根据需要处理其他类型的超级岛状态响应
     }

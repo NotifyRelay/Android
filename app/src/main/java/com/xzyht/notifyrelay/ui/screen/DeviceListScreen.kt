@@ -62,7 +62,6 @@ import com.xzyht.notifyrelay.ui.navigation.Navigator
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.BatteryIconConverter
 import notifyrelay.core.util.BatteryUtils
-import notifyrelay.core.util.PairingCodeManager
 import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.window.WindowDialog
 import top.yukonga.miuix.kmp.basic.Button
@@ -299,8 +298,9 @@ fun DeviceListScreen(
         val isCharging = remember { mutableStateOf(device.chargingStatus) }
 
         LaunchedEffect(device.batteryLevel) {
-            if (device.batteryLevel != -1 && device.batteryLevel != batteryLevel.intValue) {
-                batteryLevel.intValue = device.batteryLevel.coerceIn(0, 100)
+            // 未知电量（超出 [-100,100]）不更新显示
+            if (kotlin.math.abs(device.batteryLevel) <= 100 && device.batteryLevel != batteryLevel.intValue) {
+                batteryLevel.intValue = device.batteryLevel
             }
         }
         

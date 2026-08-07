@@ -2,8 +2,12 @@ package com.xzyht.notifyrelay.ui.activity
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.media.projection.MediaProjection
+import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
@@ -58,6 +62,7 @@ import com.xzyht.notifyrelay.sync.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
@@ -100,23 +105,88 @@ class MainActivity : FragmentActivity() {
     internal val showAutoStartBanner = mutableStateOf(false)
     internal val bannerMessage = mutableStateOf<String?>(null)
 
-    private fun checkPermissionsAndStartServices() {
-        lifecycleScope.launch(Dispatchers.Main) {
+    // 屏幕捕获授权结果，等待本应用前台且媒体投影前台服务就绪后处理
+    private var pendingScreenCapture: Pair<Int, Intent>? = null
+
+    private fun processPendingScreenCapture() {
+        if (pendingScreenCapture == null) return
+        try {
+            com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = {
+                handleScreenCaptureReady()
+            }
+            startForegroundService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+        } catch (e: Exception) {
+            Logger.e("NotifyRelay", "屏幕捕获前台服务启动失败，带回前台重试", e)
+            bringMainActivityToFront()
+        }
+    }
+
+    private fun handleScreenCaptureReady() {
+        val pending = pendingScreenCapture ?: return
+        try {
+            val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            val projection = mpm.getMediaProjection(pending.first, pending.second)
+            if (projection != null) {
+                pendingScreenCapture = null
+                val deviceManager = DeviceConnectionManager.getInstance(this)
+                deviceManager.audioRelayPlayer.stopSendCapture()
+                NativeCore.mediaProjection?.stop()
+                NativeCore.mediaProjection = projection
+                projection.registerCallback(object : MediaProjection.Callback() {
+                    override fun onStop() {
+                        deviceManager.audioRelayPlayer.stopSendCapture()
+                        if (NativeCore.mediaProjection === projection) {
+                            NativeCore.mediaProjection = null
+                        }
+                    }
+                }, Handler(Looper.getMainLooper()))
+                deviceManager.startPendingAudioRelaySend()
+            } else {
+                pendingScreenCapture = null
+                stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+            }
+        } catch (e: Exception) {
+            Logger.e("NotifyRelay", "屏幕捕获授权后启动失败", e)
+            pendingScreenCapture = null
+            stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+        }
+    }
+
+    private fun bringMainActivityToFront() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        }
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {}
+    }
+
+    private suspend fun checkPermissionsAndStartServices() {
+        withContext(Dispatchers.Main) {
             showAutoStartBanner.value = false
             bannerMessage.value = null
+        }
 
-            if (!PermissionHelper.checkAllPermissions(this@MainActivity)) {
-                Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
+        val granted = withContext(Dispatchers.IO) {
+            PermissionHelper.checkAllPermissions(this@MainActivity)
+        }
+        if (!granted) {
+            Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
+            withContext(Dispatchers.Main) {
                 val intent = Intent(this@MainActivity, GuideActivity::class.java)
                 intent.putExtra("from", "MainActivity")
                 startActivity(intent)
                 finish()
-                return@launch
             }
+            return
+        }
 
-            val result = ServiceManager.startAllServices(this@MainActivity)
-            val serviceStarted = result.first
-            val errorMessage = result.second
+        val result = withContext(Dispatchers.IO) {
+            ServiceManager.startAllServices(this@MainActivity)
+        }
+        val serviceStarted = result.first
+        val errorMessage = result.second
+        withContext(Dispatchers.Main) {
             if (errorMessage != null) {
                 showAutoStartBanner.value = true
                 bannerMessage.value = errorMessage
@@ -131,14 +201,31 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        processPendingScreenCapture()
         // 后台执行权限检查和服务启动，避免阻塞 UI 线程
         lifecycleScope.launch(Dispatchers.Default) {
             checkPermissionsAndStartServices()
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = null
+        DeviceConnectionManager.getInstance(this).onRequestMediaProjection = null
+        pendingScreenCapture = null
+    }
+
     private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
         recreate()
+    }
+
+    private val screenCaptureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            pendingScreenCapture = result.resultCode to result.data!!
+            processPendingScreenCapture()
+        } else {
+            stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -227,6 +314,11 @@ class MainActivity : FragmentActivity() {
             intent.putExtra("from", "MainActivity")
             guideLauncher.launch(intent)
             return
+        }
+
+        DeviceConnectionManager.getInstance(this).onRequestMediaProjection = {
+            val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            screenCaptureLauncher.launch(mpm.createScreenCaptureIntent())
         }
 
         // 后台初始化，避免阻塞 UI 线程
