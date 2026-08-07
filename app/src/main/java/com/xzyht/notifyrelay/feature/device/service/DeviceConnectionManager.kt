@@ -964,12 +964,14 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             var pubKey = ""
                             var ip = ""
                             var deviceType = "unknown"
+                            var autoAccept = false
                             data?.let {
                                 try {
                                     val json = JSONObject(it)
                                     pubKey = json.optString("pub_key", "")
                                     ip = json.optString("ip", "")
                                     deviceType = json.optString("device_type", "unknown")
+                                    autoAccept = json.optBoolean("auto_accept", false)
                                 } catch (_: Exception) {}
                             }
                             synchronized(dm.deviceInfoCacheInternal) {
@@ -986,6 +988,12 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                             }
                             dm.registerReconnectTarget(uuid, ip)
             dm.registerKnownDevice(uuid, ip)
+                            // Rust 侧已对已配对设备自动发送 ACCEPT（auto_accept=true），
+                            // 平台侧仅做 UI 持久化/登记，无需重复发送 ACCEPT 或 REJECT
+                            if (autoAccept) {
+                                Logger.d("CoreCb", "HANDSHAKE 已自动闭环(Rust auto_accept): $uuid")
+                                return
+                            }
                             val alreadyAuthed = synchronized(dm.authenticatedDevices) {
                                 dm.authenticatedDevices[uuid]?.isAccepted == true
                             }

@@ -93,6 +93,8 @@ interface NotifyRelayCore : Library {
 
     // ======== Send functions ========
     fun nrc_send_handshake(ctx: Pointer, uuid: String, pubKey: String, localIp: String, targetIp: String, battery: Int, deviceType: String): Int
+
+    fun nrc_connect_device(ctx: Pointer, uuid: String, targetIp: String, battery: Int, deviceType: String): Int
     fun nrc_send_pairing_init(ctx: Pointer, localUuid: String, targetUuid: String, expectedCode: String, battery: Int, deviceType: String): Int
     fun nrc_send_pairing_resp(ctx: Pointer, uuid: String, ltPub: String, pairingCode: String, ip: String, battery: Int, deviceType: String): Int
     fun nrc_send_accept(ctx: Pointer, uuid: String, ltPubKey: String, ip: String, battery: Int, deviceType: String)

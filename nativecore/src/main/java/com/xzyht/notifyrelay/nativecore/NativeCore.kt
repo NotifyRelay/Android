@@ -66,6 +66,9 @@ object NativeCore {
     fun sendHandshake(ctx: Pointer, uuid: String, pubKey: String, localIp: String, targetIp: String, battery: Int, deviceType: String): Int =
         lib.nrc_send_handshake(ctx, uuid, pubKey, localIp, targetIp, battery, deviceType)
 
+    fun connectDevice(ctx: Pointer, uuid: String, targetIp: String, battery: Int, deviceType: String): Int =
+        lib.nrc_connect_device(ctx, uuid, targetIp, battery, deviceType)
+
     fun sendPairingInit(ctx: Pointer, localUuid: String, targetUuid: String, expectedCode: String, battery: Int, deviceType: String): Int =
         lib.nrc_send_pairing_init(ctx, localUuid, targetUuid, expectedCode, battery, deviceType)
 
