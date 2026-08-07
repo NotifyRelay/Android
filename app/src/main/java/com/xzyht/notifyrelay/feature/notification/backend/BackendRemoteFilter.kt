@@ -639,6 +639,6 @@ object RemoteFilterConfig {
     /** 检查过滤模式（含关键词匹配）— 委托给 Rust Core */
     fun checkFilterWithRust(pkg: String, title: String, text: String): Boolean {
         val ctx = BackendRemoteFilter.rustContext ?: return true
-        return NativeCore.filterNotification(ctx, pkg, title, text)
+        return NativeCore.checkFilterMode(ctx, pkg, pkg, title, text)
     }
 }

@@ -14,12 +14,8 @@ object NativeCore {
     private var _rustContext: Pointer? = null
     var mediaProjection: MediaProjection? = null
 
-    // 网络层新特性的内部状态
+    // 网络层新特性的内部状态（发送队列句柄由 startCore 返回）
     var senderQueuePtr: Long = 0L
-        private set
-    var offlineDetectorHandle: Long = 0L
-        private set
-    var reconnectStatePtr: Long = 0L
         private set
 
     fun createContext(): Pointer {
@@ -114,22 +110,9 @@ object NativeCore {
     fun checkFilterMode(ctx: Pointer, mappedPkg: String, originalPkg: String, title: String, text: String): Boolean =
         lib.nrc_check_filter_mode(ctx, mappedPkg, originalPkg, title, text) != 0
 
-    fun filterNotification(ctx: Pointer, pkg: String, title: String, text: String): Boolean =
-        lib.nrc_filter_notification(ctx, pkg, title, text) != 0
-
     // ======== Network layer ========
-    fun startTcpServer(ctx: Pointer, port: Short): Int =
-        lib.nrc_start_tcp_server(ctx, port)
-
     fun removeDeviceSession(ctx: Pointer, uuid: String): Int =
         lib.nrc_remove_device_session(ctx, uuid)
-
-    // ======== OneShot TCP (new signature) ========
-    fun oneshotSendReceive(ctx: Pointer, ip: String, port: Short, payload: String, timeoutMs: Int = 5000): Boolean =
-        lib.nrc_oneshot_send_receive(ctx, ip, port, payload, timeoutMs) == 0
-
-    fun oneshotSendOnly(ctx: Pointer, ip: String, port: Short, payload: String, timeoutMs: Int = 5000): Boolean =
-        lib.nrc_oneshot_send_only(ctx, ip, port, payload, timeoutMs) != 0
 
     // ======== FTP credential derivation ========
     fun deriveFtpCredentials(sharedSecretB64: String): String? =
@@ -141,10 +124,7 @@ object NativeCore {
     fun generateRandomPassword(): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_generate_random_password())
 
-    // ======== Heartbeat scheduler (统一心跳调度) ========
-    fun startHeartbeatScheduler(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, intervalMs: Long): Long =
-        lib.nrc_start_heartbeat_scheduler(ctx, uuid, name, battery, deviceType, intervalMs)
-
+    // ======== Heartbeat scheduler params (电量/名称变化) ========
     fun updateHeartbeatSchedulerParams(ctx: Pointer, name: String, battery: Int, deviceType: String) =
         lib.nrc_update_heartbeat_scheduler_params(ctx, name, battery, deviceType)
 
@@ -152,17 +132,7 @@ object NativeCore {
     fun getDeviceList(ctx: Pointer, authedTimeoutMs: Long, unauthedTimeoutMs: Long): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_device_list(ctx, authedTimeoutMs, unauthedTimeoutMs))
 
-    // ======== Offline detector ========
-    fun startOfflineDetector(ctx: Pointer, timeoutSec: Long = 30, checkIntervalMs: Long = 3000): Long =
-        lib.nrc_start_offline_detector(ctx, timeoutSec, checkIntervalMs)
-
     // ======== Sender queue ========
-    fun createSenderQueue(ctx: Pointer): Long =
-        lib.nrc_create_sender_queue(ctx)
-
-    fun startSenderQueue(ctx: Pointer, queuePtr: Long) =
-        lib.nrc_start_sender_queue(ctx, queuePtr)
-
     fun enqueueMessage(ctx: Pointer, queuePtr: Long, deviceUuid: String, header: String, plaintext: String, dedupKey: String? = null) =
         lib.nrc_enqueue_message(ctx, queuePtr, deviceUuid, header, plaintext, dedupKey)
 
@@ -253,14 +223,8 @@ object NativeCore {
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_local_ip())
 
     // ======== mDNS ========
-    fun startMdnsAdvertiser(ctx: Pointer, uuid: String, name: String, port: Short, pubkey: String, deviceType: String, battery: Int): Int =
-        lib.nrc_start_mdns_advertiser(ctx, uuid, name, port, pubkey, deviceType, battery)
-
     fun stopMdnsAdvertiser(ctx: Pointer): Int =
         lib.nrc_stop_mdns_advertiser(ctx)
-
-    fun startMdnsDiscovery(ctx: Pointer): Int =
-        lib.nrc_start_mdns_discovery(ctx)
 
     fun stopMdnsDiscovery(ctx: Pointer): Int =
         lib.nrc_stop_mdns_discovery(ctx)
@@ -272,21 +236,12 @@ object NativeCore {
     fun removeKnownDevice(ctx: Pointer, uuid: String) =
         lib.nrc_remove_known_device(ctx, uuid)
 
-    fun startKnownDeviceScanner(ctx: Pointer) =
-        lib.nrc_start_known_device_scanner(ctx)
-
     // ======== Reconnect ========
-    fun createReconnectState(ctx: Pointer): Long =
-        lib.nrc_create_reconnect_state(ctx)
+    fun reconnectAddTarget(ctx: Pointer, uuid: String, ip: String) =
+        lib.nrc_reconnect_add_target(ctx, uuid, ip)
 
-    fun reconnectAddTarget(ctx: Pointer, statePtr: Long, uuid: String, ip: String) =
-        lib.nrc_reconnect_add_target(ctx, statePtr, uuid, ip)
-
-    fun reconnectRemoveTarget(ctx: Pointer, statePtr: Long, uuid: String) =
-        lib.nrc_reconnect_remove_target(ctx, statePtr, uuid)
-
-    fun reconnectStart(ctx: Pointer, statePtr: Long, intervalSecs: Long = 10, maxRetries: Int = 5) =
-        lib.nrc_reconnect_start(ctx, statePtr, intervalSecs, maxRetries)
+    fun reconnectRemoveTarget(ctx: Pointer, uuid: String) =
+        lib.nrc_reconnect_remove_target(ctx, uuid)
 
     // ======== Audio stream ========
     private var audioDataCallback: ((ByteArray, Int, Int) -> Unit)? = null
@@ -369,19 +324,22 @@ object NativeCore {
     fun getGitHash(): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_git_hash())
 
-    // ======== Initialize new network features ========
-    fun initializeNewFeatures(ctx: Pointer) {
-        Log.i(TAG, "NotifyRelay Core loaded (git: ${getGitHash()})")
-        if (senderQueuePtr == 0L) {
-            senderQueuePtr = createSenderQueue(ctx)
-            startSenderQueue(ctx, senderQueuePtr)
-        }
-        if (offlineDetectorHandle == 0L) {
-            offlineDetectorHandle = startOfflineDetector(ctx)
-        }
-        if (reconnectStatePtr == 0L) {
-            reconnectStatePtr = createReconnectState(ctx)
-            reconnectStart(ctx, reconnectStatePtr)
-        }
+    // ======== Initialize core (统一启动 TCP/UDP、心跳、离线检测、发送队列、扫描、重连、mDNS) ========
+    fun startCore(
+        ctx: Pointer,
+        uuid: String,
+        name: String,
+        battery: Int,
+        deviceType: String,
+        tcpPort: Short,
+        pubkey: String,
+        heartbeatIntervalMs: Long = 2000,
+        offlineTimeoutSec: Long = 12,
+        offlineCheckIntervalMs: Long = 5000,
+        reconnectIntervalSecs: Long = 10,
+        reconnectMaxRetries: Int = 5
+    ) {
+        val queue = lib.nrc_start_core(ctx, uuid, name, battery, deviceType, tcpPort, pubkey, heartbeatIntervalMs, offlineTimeoutSec, offlineCheckIntervalMs, reconnectIntervalSecs, reconnectMaxRetries)
+        senderQueuePtr = if (queue >= 0) queue else 0L
     }
 }

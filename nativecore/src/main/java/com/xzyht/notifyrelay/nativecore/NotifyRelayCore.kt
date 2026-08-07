@@ -78,11 +78,6 @@ interface NotifyRelayCore : Library {
     fun nrc_set_filter_config(ctx: Pointer, configJson: String): Int
     fun nrc_map_local_package(ctx: Pointer, pkg: String): Pointer
     fun nrc_check_filter_mode(ctx: Pointer, mappedPkg: String, originalPkg: String, title: String, text: String): Int
-    fun nrc_filter_notification(ctx: Pointer, pkg: String, title: String, text: String): Int
-
-    // ======== OneShot TCP client (new signature: ctx param, unified timeout, returns status) ========
-    fun nrc_oneshot_send_receive(ctx: Pointer, ip: String, port: Short, payload: String, timeoutMs: Int): Int
-    fun nrc_oneshot_send_only(ctx: Pointer, ip: String, port: Short, payload: String, timeoutMs: Int): Int
 
     // ======== FTP credential derivation ========
     fun nrc_derive_ftp_credentials(sharedSecretB64: String): Pointer
@@ -123,22 +118,16 @@ interface NotifyRelayCore : Library {
     fun nrc_free_string(s: Pointer)
 
     // ======== Network layer ========
-    fun nrc_start_tcp_server(ctx: Pointer, port: Short): Int
     fun nrc_remove_device_session(ctx: Pointer, uuid: String): Int
 
-    // ======== Heartbeat scheduler (统一心跳调度, 替代 per-device sender) ========
-    fun nrc_start_heartbeat_scheduler(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, intervalMs: Long): Long
+    // ======== Core start (统一启动 TCP/UDP、心跳、离线检测、发送队列、扫描、重连、mDNS) ========
+    fun nrc_start_core(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, tcpPort: Short, pubkey: String, heartbeatIntervalMs: Long, offlineTimeoutSec: Long, offlineCheckIntervalMs: Long, reconnectIntervalSecs: Long, reconnectMaxRetries: Int): Long
     fun nrc_update_heartbeat_scheduler_params(ctx: Pointer, name: String, battery: Int, deviceType: String)
 
     // ======== Device state snapshot ========
     fun nrc_get_device_list(ctx: Pointer, authedTimeoutMs: Long, unauthedTimeoutMs: Long): Pointer
 
-    // ======== Offline detector ========
-    fun nrc_start_offline_detector(ctx: Pointer, timeoutSec: Long, checkIntervalMs: Long): Long
-
     // ======== Sender queue ========
-    fun nrc_create_sender_queue(ctx: Pointer): Long
-    fun nrc_start_sender_queue(ctx: Pointer, queuePtr: Long)
     fun nrc_enqueue_message(ctx: Pointer, queuePtr: Long, deviceUuid: String, header: String, plaintext: String, dedupKey: String?)
 
     // ======== Clipboard ========
@@ -166,13 +155,10 @@ interface NotifyRelayCore : Library {
     // ======== Discovery ========
     fun nrc_add_known_device(ctx: Pointer, uuid: String, ip: String)
     fun nrc_remove_known_device(ctx: Pointer, uuid: String)
-    fun nrc_start_known_device_scanner(ctx: Pointer)
 
     // ======== Reconnect ========
-    fun nrc_create_reconnect_state(ctx: Pointer): Long
-    fun nrc_reconnect_add_target(ctx: Pointer, statePtr: Long, uuid: String, ip: String)
-    fun nrc_reconnect_remove_target(ctx: Pointer, statePtr: Long, uuid: String)
-    fun nrc_reconnect_start(ctx: Pointer, statePtr: Long, intervalSecs: Long, maxRetries: Int)
+    fun nrc_reconnect_add_target(ctx: Pointer, uuid: String, ip: String)
+    fun nrc_reconnect_remove_target(ctx: Pointer, uuid: String)
 
     // ======== Network callbacks ========
     interface OnDeviceConnectedCb : Callback {
@@ -191,9 +177,7 @@ interface NotifyRelayCore : Library {
     fun nrc_set_on_mdns_discovered_cb(ctx: Pointer, cb: OnMdnsDiscoveredCb?)
 
     // ======== mDNS ========
-    fun nrc_start_mdns_advertiser(ctx: Pointer, uuid: String, name: String, port: Short, pubkey: String, deviceType: String, battery: Int): Int
     fun nrc_stop_mdns_advertiser(ctx: Pointer): Int
-    fun nrc_start_mdns_discovery(ctx: Pointer): Int
     fun nrc_stop_mdns_discovery(ctx: Pointer): Int
 
     companion object {

@@ -31,7 +31,7 @@ import kotlinx.coroutines.launch
  * - 通过 DeviceConnectionManager 暴露的 internal 访问器读写：
  *   - 设备缓存 deviceInfoCache、
  *   - 已认证设备表 authenticatedDevices、
- *   - 以及 startServer / updateDeviceList 等入口。
+ *   - 以及 updateDeviceList 等入口。
  *   - 心跳状态（heartbeatedDevices/deviceLastSeen）已迁移至 Rust DeviceRegistry。
  */
 class ConnectionDiscoveryManager(
@@ -227,7 +227,6 @@ class ConnectionDiscoveryManager(
 
         if (deviceManager.isWifiDirectNetworkInternal()) {
             // WLAN 直连模式下的持续重连/发现交由 Rust known_device_scanner 处理
-            deviceManager.startServerInternal()
             return
         }
         
@@ -244,6 +243,5 @@ class ConnectionDiscoveryManager(
                 }
             }
         }
-        deviceManager.startServerInternal()
     }
 }
