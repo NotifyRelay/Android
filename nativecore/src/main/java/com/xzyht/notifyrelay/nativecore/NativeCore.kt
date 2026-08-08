@@ -348,7 +348,7 @@ object NativeCore {
         reconnectMaxRetries: Int = 5
     ): Boolean {
         val queue = lib.nrc_start_core(ctx, uuid, name, battery, deviceType, tcpPort, pubkey, heartbeatIntervalMs, offlineTimeoutSec, offlineCheckIntervalMs, reconnectIntervalSecs, reconnectMaxRetries)
-        if (queue <= 0L) {
+        if (queue == -1L) {
             Log.e(TAG, "nrc_start_core 启动失败，返回句柄: $queue")
             senderQueuePtr = 0L
             return false
