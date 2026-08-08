@@ -9,6 +9,7 @@ import android.os.BatteryManager
 import android.os.Build
 import android.os.Environment
 import android.util.Base64
+import com.sun.jna.Native
 import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
@@ -982,6 +983,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // ---- on_pairing (统一配对回调) ----
         val pairingCb = object : NotifyRelayCore.OnPairingCb {
             override fun invoke(uuidPtr: Pointer?, msgTypePtr: Pointer?, dataPtr: Pointer?, intValue: Int, extraPtr: Pointer?, userData: Pointer?) {
+                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
                 val uuid = ptr2str(uuidPtr) ?: return
                 val msgType = ptr2str(msgTypePtr) ?: return
                 val data = ptr2str(dataPtr)
@@ -1190,6 +1192,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // ---- on_data (统一数据回调) ----
         val dataCb = object : NotifyRelayCore.OnDataCb {
             override fun invoke(uuidPtr: Pointer?, msgTypePtr: Pointer?, plaintextPtr: Pointer?, userData: Pointer?) {
+                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
                 val uuid = ptr2str(uuidPtr) ?: return
                 val msgType = ptr2str(msgTypePtr) ?: return
                 val text = ptr2str(plaintextPtr) ?: return
@@ -1363,6 +1366,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // ---- on_heartbeat_udp ----
         val heartbeatUdpCb = object : NotifyRelayCore.OnHeartbeatUdpCb {
             override fun invoke(uuid: Pointer?, name: Pointer?, port: Short, battery: Int, deviceType: Pointer?, ip: Pointer?, userData: Pointer?) {
+                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
                 val dm = _callbackInstance ?: return
                 val remoteUuid = ptr2str(uuid) ?: return
                 val remoteName = ptr2str(name) ?: return
@@ -1388,6 +1392,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // ---- on_mdns_discovered ----
         val mdnsDiscoveredCb = object : NotifyRelayCore.OnMdnsDiscoveredCb {
             override fun invoke(uuid: Pointer?, name: Pointer?, ip: Pointer?, port: Short, battery: Int, deviceType: Pointer?, userData: Pointer?) {
+                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
                 val dm = _callbackInstance ?: return
                 val remoteUuid = ptr2str(uuid) ?: return
                 val remoteName = ptr2str(name) ?: return
@@ -1413,6 +1418,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // ---- on_device_timeout (设备心跳超时回调) ----
         val deviceTimeoutCb = object : NotifyRelayCore.OnDeviceTimeoutCb {
             override fun invoke(uuidPtr: Pointer?, userData: Pointer?) {
+                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
                 val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
                 // 超时离线状态由 Rust DeviceRegistry 维护，此处仅重新登记重连目标
                 val auth = synchronized(authenticatedDevices) { authenticatedDevices[uuid] }
@@ -1426,6 +1432,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // ---- on_device_connected (TCP 连接建立回调) ----
         val deviceConnectedCb = object : NotifyRelayCore.OnDeviceConnectedCb {
             override fun invoke(uuidPtr: Pointer?, ipPtr: Pointer?, userData: Pointer?) {
+                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
                 val dm = _callbackInstance ?: return
                 val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
                 if (uuid == dm.uuid) return
@@ -1446,6 +1453,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // 设备主动断开 TCP 时立即刷新快照，UI 无需等 12 秒离线超时
         val deviceDisconnectedCb = object : NotifyRelayCore.OnDeviceDisconnectedCb {
             override fun invoke(uuidPtr: Pointer?, userData: Pointer?) {
+                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
                 val dm = _callbackInstance ?: return
                 val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
                 if (uuid == dm.uuid) return
@@ -1458,6 +1466,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         // 运行在 Rust 心跳线程且锁已释放，回调内可直接调用 nrc_push_*（isQuery=1）响应变更
         val stateQueryCb = object : NotifyRelayCore.OnStateQueryCb {
             override fun invoke(uuidPtr: Pointer?, featureIdPtr: Pointer?, isMedia: Int, userData: Pointer?): Int {
+                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
                 val remoteUuid = ptr2str(uuidPtr) ?: return 0
                 val featureId = ptr2str(featureIdPtr) ?: return 0
                 val dm = _callbackInstance ?: return 0
