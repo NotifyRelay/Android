@@ -585,7 +585,34 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             deviceInfoCache[uuid] = DeviceInfo(uuid, displayName, localIp, listenPort)
         }
         discoveryManager.registerNetworkCallback()
+        // 初始同步心跳模式（锁屏/WLAN直连 → TCP 备用，否则广播主用），并监听锁屏变化
+        discoveryManager.syncHeartbeatMode()
+        registerLockStateReceiver()
         // 自动重连已移交 Rust 重连状态机（loadAuthedDevices 中已登记认证设备）
+    }
+
+    // 锁屏状态变化监听：SCREEN_OFF/ON + USER_PRESENT 覆盖锁屏/解锁切换
+    private var lockStateReceiver: BroadcastReceiver? = null
+
+    private fun registerLockStateReceiver() {
+        if (lockStateReceiver != null) return
+        lockStateReceiver = object : BroadcastReceiver() {
+            override fun onReceive(ctx: Context?, intent: Intent?) {
+                when (intent?.action) {
+                    Intent.ACTION_SCREEN_OFF,
+                    Intent.ACTION_SCREEN_ON,
+                    Intent.ACTION_USER_PRESENT -> discoveryManager.syncHeartbeatMode()
+                }
+            }
+        }
+        try {
+            val filter = IntentFilter().apply {
+                addAction(Intent.ACTION_SCREEN_OFF)
+                addAction(Intent.ACTION_SCREEN_ON)
+                addAction(Intent.ACTION_USER_PRESENT)
+            }
+            context.registerReceiver(lockStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } catch (_: Exception) {}
     }
 
     // 电池变化监听：ACTION_BATTERY_CHANGED 为粘性广播，注册后立即回调一次当前状态；

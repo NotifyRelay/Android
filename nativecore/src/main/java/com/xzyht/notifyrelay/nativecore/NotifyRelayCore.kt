@@ -125,6 +125,8 @@ interface NotifyRelayCore : Library {
     // ======== Core start (统一启动 TCP/UDP、心跳、离线检测、发送队列、扫描、重连、mDNS) ========
     fun nrc_start_core(ctx: Pointer, uuid: String, name: String, battery: Int, deviceType: String, tcpPort: Short, pubkey: String, heartbeatIntervalMs: Long, offlineTimeoutSec: Long, offlineCheckIntervalMs: Long, reconnectIntervalSecs: Long, reconnectMaxRetries: Int): Long
     fun nrc_update_heartbeat_scheduler_params(ctx: Pointer, name: String, battery: Int, deviceType: String)
+    // 心跳模式切换：1=TCP 备用（锁屏/WLAN直连），0=广播主用（默认）
+    fun nrc_set_heartbeat_tcp_backup(ctx: Pointer, enabled: Int): Int
 
     // ======== Device state snapshot ========
     fun nrc_get_device_list(ctx: Pointer, authedTimeoutMs: Long, unauthedTimeoutMs: Long): Pointer

@@ -6,6 +6,7 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
@@ -195,6 +196,8 @@ class ConnectionDiscoveryManager(
         }
         stopDiscovery()
         startDiscovery()
+        // 网络类型变化（含 WLAN 直连切换）后同步心跳模式
+        syncHeartbeatMode()
 
         val hasValidNetwork = newIp != "0.0.0.0" && newIp.isNotEmpty()
         if (hasValidNetwork) {
@@ -205,6 +208,27 @@ class ConnectionDiscoveryManager(
                 deviceManager.refreshAllReconnectTargetsInternal()
             }
         }
+    }
+
+    /**
+     * 同步心跳模式（方向 B：UDP 广播兼发现+心跳为主，TCP 定向心跳严格备用）：
+     * - 锁屏 或 WLAN直连 → TCP 备用（Rust 启动每设备 TCP 定向心跳，停 UDP 广播，
+     *   发现由 known_device_scanner/reconnect 兜底）
+     * - 否则 → 广播主用（UDP 广播 2s 兼发现+心跳，Rust 停止每设备心跳）
+     */
+    internal fun syncHeartbeatMode() {
+        val ctx = deviceManager.rustContextInternal ?: return
+        try {
+            val tcpBackup = PermissionHelper.isDeviceLocked(context) || isWifiDirectNetworkInternal()
+            NativeCore.setHeartbeatTcpBackup(ctx, tcpBackup)
+            if (tcpBackup) {
+                NativeCore.periodicBroadcast(ctx, 0)
+            } else if (deviceManager.udpDiscoveryEnabled) {
+                val displayName = deviceManager.localDisplayNameInternal()
+                val battery = notifyrelay.core.util.BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+                NativeCore.periodicBroadcast(ctx, 1, deviceManager.uuid, displayName, battery, "android")
+            }
+        } catch (_: Exception) {}
     }
 
     fun stopDiscovery() {
