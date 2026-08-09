@@ -38,6 +38,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
+import top.yukonga.miuix.kmp.basic.TextFieldDefaults
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.icon.extended.More
@@ -221,7 +222,7 @@ fun UILocalFilter(
                 value = newKeyword,
                 onValueChange = { newKeyword = it },
                 label = "关键词(可空)",
-                backgroundColor = MiuixTheme.colorScheme.surfaceContainerHighest,
+                colors = TextFieldDefaults.textFieldColors(backgroundColor = MiuixTheme.colorScheme.surfaceContainerHighest),
                 textStyle = MiuixTheme.textStyles.main.copy(color = MiuixTheme.colorScheme.onSurfaceContainerHighest),
                 modifier = Modifier.fillMaxWidth(),
                 singleLine = true

@@ -5,8 +5,8 @@ import java.util.Properties
 
 plugins {
     alias(libs.plugins.android.application)
-    id("org.jetbrains.kotlin.plugin.compose") version libs.versions.kotlinPluginCompose
-    id("com.google.devtools.ksp") version "2.3.6"
+    alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.ksp)
     id("kotlin-parcelize")
 }
 
