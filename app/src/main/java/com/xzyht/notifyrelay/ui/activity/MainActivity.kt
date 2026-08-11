@@ -44,7 +44,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -99,7 +98,6 @@ import top.yukonga.miuix.kmp.icon.extended.Community
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Tune
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.MiuixPopupUtils.Companion.MiuixPopupHost
 
 class MainActivity : FragmentActivity() {
     internal val showAutoStartBanner = mutableStateOf(false)
@@ -356,8 +354,8 @@ class MainActivity : FragmentActivity() {
 fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
     val colorScheme = MiuixTheme.colorScheme
     
-    val errorColor = Color(0xFFD32F2F)
-    val onErrorColor = Color.White
+    val errorColor = MiuixTheme.colorScheme.error
+    val onErrorColor = MiuixTheme.colorScheme.onError
     
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -382,7 +380,6 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            popupHost = {},
             topBar = {
                 if (showBanner && !bannerMsg.isNullOrBlank()) {
                     Surface(
@@ -516,7 +513,6 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
                 }
             }
         }
-        MiuixPopupHost()
     }
 }
 

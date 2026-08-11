@@ -16,6 +16,8 @@ import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
 import kotlin.math.abs
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.theme.darkColorScheme
 
 /**
  * Compose浮窗容器视图，作为传统View系统与Compose之间的桥梁
@@ -232,14 +234,17 @@ class FloatingComposeContainer @JvmOverloads constructor(
         if (::floatingWindowManager.isInitialized) {
             val currentLifecycleOwner = lifecycleOwner
             val contentBlock: @Composable () -> Unit = {
-                FloatingWindowContainer(
-                    entries = floatingWindowManager.entriesList,
-                    onEntryClick = { key -> onEntryClick?.invoke(key) },
-                    onUpdateEntryHeight = { key, height ->
-                        floatingWindowManager.updateEntryHeight(key, height)
-                    },
-                    isContainerDragging = isDragging
-                )
+                // 悬浮窗为黑底深色设计，固定使用深色主题，避免Miuix组件恒取默认浅色样式
+                MiuixTheme(colors = darkColorScheme()) {
+                    FloatingWindowContainer(
+                        entries = floatingWindowManager.entriesList,
+                        onEntryClick = { key -> onEntryClick?.invoke(key) },
+                        onUpdateEntryHeight = { key, height ->
+                            floatingWindowManager.updateEntryHeight(key, height)
+                        },
+                        isContainerDragging = isDragging
+                    )
+                }
             }
 
             // 使用CompositionLocalProvider为Compose内容提供LifecycleOwner

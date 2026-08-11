@@ -36,7 +36,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -309,8 +308,8 @@ object GuideScreen {
                         title = "蓝牙连接权限 (可选)",
                         summary = if (hasBluetoothConnect) "已授权" else "用于优化设备发现速度，显示真实设备名",
                         summaryColor = BasicComponentColors(
-                            color = Color(0xFF888888),
-                            disabledColor = Color(0xFFCCCCCC)
+                            color = MiuixTheme.colorScheme.onSurfaceVariantSummary,
+                            disabledColor = MiuixTheme.colorScheme.outline
                         ),
                         checked = hasBluetoothConnect,
                         onCheckedChange = {

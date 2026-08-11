@@ -96,218 +96,216 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
             .launchIn(this)
     }
 
-    MiuixTheme {
-        val colorScheme = MiuixTheme.colorScheme
-        val textStyles = MiuixTheme.textStyles
+    val colorScheme = MiuixTheme.colorScheme
+    val textStyles = MiuixTheme.textStyles
 
-        Column(
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .verticalScroll(scrollState)
+    ) {
+        Text(
+            text = "Notify Relay",
+            style = textStyles.title1,
+            color = colorScheme.primary,
             modifier = Modifier
-                .fillMaxWidth()
-                .verticalScroll(scrollState)
-        ) {
-            Text(
-                text = "Notify Relay",
-                style = textStyles.title1,
-                color = colorScheme.primary,
-                modifier = Modifier
-                    .padding(top = 24.dp, bottom = 16.dp)
-                    .align(Alignment.CenterHorizontally)
-            )
+                .padding(top = 24.dp, bottom = 16.dp)
+                .align(Alignment.CenterHorizontally)
+        )
 
-            ArrowPreference(
-                title = "版本信息",
-                summary = "主版本: ${BuildConfig.VERSION_NAME}\n内部版本: ${BuildConfig.VERSION_CODE}",
-                onClick = {
-                    val currentTime = Date().time
-                    if (currentTime - lastClickTime < 3000) {
-                        clickCount++
-                    } else {
-                        clickCount = 1
-                    }
-                    lastClickTime = currentTime
-                    
-                    if (clickCount in 3..<5) {
-                        Toast.makeText(context, "再点击 ${5 - clickCount} 次进入开发者模式", Toast.LENGTH_SHORT).show()
-                    } else if (clickCount >= 5) {
-                        Toast.makeText(context, "开发者模式已激活", Toast.LENGTH_SHORT).show()
-                        isDeveloperModeEnabled = true
-                        StorageManager.putBoolean(context, "developer_mode_enabled", true)
-                        clickCount = 0
-                    }
-                },
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-
-            Text(
-                text = "Rust Core: ${NativeCore.getGitHash() ?: "未加载"}",
-                style = textStyles.body2,
-                color = colorScheme.onSurfaceSecondary,
-                modifier = Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 4.dp)
-            )
-
-            Spacer(modifier = Modifier.height(8.dp))
-
-            ArrowPreference(
-                title = "检测更新",
-                summary = if (isCheckingUpdate) "检查中..." else "点击检查是否有新版本",
-                onClick = {
-                    if (isCheckingUpdate) return@ArrowPreference
-                    
-                    isCheckingUpdate = true
-                    
-                    coroutineScope.launch {
-                        val rule = if (includePrerelease) VersionRule.LATEST else VersionRule.STABLE
-                        val result = checkUpdateManager.checkUpdate(
-                            owner = "NotifyRelay",
-                            repo = "Android",
-                            currentVersion = BuildConfig.VERSION_NAME,
-                            rule = rule
-                        )
-                        
-                        isCheckingUpdate = false
-                        
-                        when (result) {
-                            is UpdateResult.HasUpdate -> {
-                                Logger.i(TAG, "发现新版本: ${result.releaseInfo.version}")
-                                result.errorLog?.let { Logger.d(TAG, it) }
-                                hasUpdate = true
-                                latestReleaseInfo = result.releaseInfo
-                                allReleases = result.allReleases
-                                showUpdateDialog.value = true
-                            }
-                            is UpdateResult.NoUpdate -> {
-                                Logger.i(TAG, "当前已是最新版本，远端版本: ${result.remoteVersion}")
-                                result.errorLog?.let { Logger.d(TAG, it) }
-                                hasUpdate = false
-                                latestReleaseInfo = result.releaseInfo
-                                allReleases = result.allReleases
-                                showUpdateDialog.value = true
-                            }
-                            is UpdateResult.Error -> {
-                                Logger.e(TAG, "检查更新失败: ${result.message}")
-                                result.errorLog?.let { Logger.e(TAG, it) }
-                                result.exception?.let { Logger.e(TAG, "异常信息", it) }
-                                Toast.makeText(context, "检查失败: ${result.message}", Toast.LENGTH_SHORT).show()
-                            }
-                        }
-                    }
-                },
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            SwitchPreference(
-                title = "包含预发布版本",
-                checked = includePrerelease,
-                summary = "检测更新时包含预发布版本(极其不稳定)",
-                onCheckedChange = {
-                    includePrerelease = it
-                    StorageManager.putBoolean(context, "check_update_include_prerelease", it)
-                },
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "下载代理设置",
-                style = textStyles.main,
-                color = colorScheme.onSurfaceSecondary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-            TextField(
-                value = proxyUrl,
-                onValueChange = { proxyUrl = it },
-                label = "需完整https地址，以/结尾，如：https://gh.llkk.cc/",
-                modifier = Modifier.padding(horizontal = 16.dp),
-                singleLine = true
-            )
-
-
-
-            if (isDeveloperModeEnabled) {
-            Spacer(modifier = Modifier.height(16.dp))
-
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-                ArrowPreference(
-                    title = "开发者模式",
-                    summary = "点击进入开发者模式设置",
-                    onClick = {
-                        onDeveloperModeTriggered()
-                    },
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-            }
-
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-            Spacer(modifier = Modifier.height(8.dp))
-            Text(
-                text = "外观设置",
-                style = textStyles.main,
-                color = colorScheme.onSurfaceSecondary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-            )
-            
-            WindowDropdownPreference(
-                title = "外观模式",
-                summary = THEME_BASE_OPTIONS.find { it.second == themeBaseIndex }?.first ?: "跟随系统",
-                items = THEME_BASE_OPTIONS.map { it.first },
-                selectedIndex = themeBaseIndex.coerceIn(0, THEME_BASE_OPTIONS.lastIndex),
-                onSelectedIndexChange = { newIndex ->
-                    themeBaseIndex = newIndex
-                    ThemeSettingsManager.setThemeBaseIndex(context, newIndex)
+        ArrowPreference(
+            title = "版本信息",
+            summary = "主版本: ${BuildConfig.VERSION_NAME}\n内部版本: ${BuildConfig.VERSION_CODE}",
+            onClick = {
+                val currentTime = Date().time
+                if (currentTime - lastClickTime < 3000) {
+                    clickCount++
+                } else {
+                    clickCount = 1
                 }
-            )
+                lastClickTime = currentTime
+                
+                if (clickCount in 3..<5) {
+                    Toast.makeText(context, "再点击 ${5 - clickCount} 次进入开发者模式", Toast.LENGTH_SHORT).show()
+                } else if (clickCount >= 5) {
+                    Toast.makeText(context, "开发者模式已激活", Toast.LENGTH_SHORT).show()
+                    isDeveloperModeEnabled = true
+                    StorageManager.putBoolean(context, "developer_mode_enabled", true)
+                    clickCount = 0
+                }
+            },
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
 
-            Spacer(modifier = Modifier.height(16.dp))
-            HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+        Text(
+            text = "Rust Core: ${NativeCore.getGitHash() ?: "未加载"}",
+            style = textStyles.body2,
+            color = colorScheme.onSurfaceSecondary,
+            modifier = Modifier
+                .padding(horizontal = 16.dp)
+                .padding(top = 4.dp)
+        )
 
+        Spacer(modifier = Modifier.height(8.dp))
 
-            Text(
-                text = "© 2026 Notify Relay",
-                style = textStyles.body2,
-                color = colorScheme.onSurfaceSecondary,
-                modifier = Modifier
-                    .padding(24.dp)
-                    .align(Alignment.CenterHorizontally)
-            )
-        }
-        
-        UpdateDialog(
-            showDialog = showUpdateDialog,
-            releaseInfo = latestReleaseInfo,
-            currentVersion = BuildConfig.VERSION_NAME,
-            hasUpdate = hasUpdate,
-            allReleases = allReleases,
-            onDownload = { info ->
-                val appAbi = ApkArchMatcher.getInstalledAppAbiOrDevice(context)
-                val assetFilter = ApkArchMatcher.createAssetFilter(appAbi)
-                val downloadResult = checkUpdateManager.downloadRelease(info, proxyUrl, assetFilter)
-                when (downloadResult) {
-                    is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Success -> {
-                        Logger.i(TAG, "开始下载: ${downloadResult.fileName}")
-                        Toast.makeText(context, "开始下载 ${downloadResult.fileName}", Toast.LENGTH_SHORT).show()
-                    }
-                    is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.NoAsset -> {
-                        Logger.e(TAG, "未找到匹配的资源: ${downloadResult.message}")
-                        Toast.makeText(context, "未找到匹配的APK", Toast.LENGTH_SHORT).show()
-                    }
-                    is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Error -> {
-                        Logger.e(TAG, "下载失败: ${downloadResult.message}")
-                        downloadResult.exception?.let { Logger.e(TAG, "下载异常", it) }
-                        Toast.makeText(context, "下载失败: ${downloadResult.message}", Toast.LENGTH_SHORT).show()
+        ArrowPreference(
+            title = "检测更新",
+            summary = if (isCheckingUpdate) "检查中..." else "点击检查是否有新版本",
+            onClick = {
+                if (isCheckingUpdate) return@ArrowPreference
+                
+                isCheckingUpdate = true
+                
+                coroutineScope.launch {
+                    val rule = if (includePrerelease) VersionRule.LATEST else VersionRule.STABLE
+                    val result = checkUpdateManager.checkUpdate(
+                        owner = "NotifyRelay",
+                        repo = "Android",
+                        currentVersion = BuildConfig.VERSION_NAME,
+                        rule = rule
+                    )
+                    
+                    isCheckingUpdate = false
+                    
+                    when (result) {
+                        is UpdateResult.HasUpdate -> {
+                            Logger.i(TAG, "发现新版本: ${result.releaseInfo.version}")
+                            result.errorLog?.let { Logger.d(TAG, it) }
+                            hasUpdate = true
+                            latestReleaseInfo = result.releaseInfo
+                            allReleases = result.allReleases
+                            showUpdateDialog.value = true
+                        }
+                        is UpdateResult.NoUpdate -> {
+                            Logger.i(TAG, "当前已是最新版本，远端版本: ${result.remoteVersion}")
+                            result.errorLog?.let { Logger.d(TAG, it) }
+                            hasUpdate = false
+                            latestReleaseInfo = result.releaseInfo
+                            allReleases = result.allReleases
+                            showUpdateDialog.value = true
+                        }
+                        is UpdateResult.Error -> {
+                            Logger.e(TAG, "检查更新失败: ${result.message}")
+                            result.errorLog?.let { Logger.e(TAG, it) }
+                            result.exception?.let { Logger.e(TAG, "异常信息", it) }
+                            Toast.makeText(context, "检查失败: ${result.message}", Toast.LENGTH_SHORT).show()
+                        }
                     }
                 }
             },
-            onDismiss = {
-                showUpdateDialog.value = false
-                latestReleaseInfo = null
-                allReleases = emptyList()
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        
+        SwitchPreference(
+            title = "包含预发布版本",
+            checked = includePrerelease,
+            summary = "检测更新时包含预发布版本(极其不稳定)",
+            onCheckedChange = {
+                includePrerelease = it
+                StorageManager.putBoolean(context, "check_update_include_prerelease", it)
+            },
+            modifier = Modifier.padding(horizontal = 16.dp)
+        )
+        
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "下载代理设置",
+            style = textStyles.main,
+            color = colorScheme.onSurfaceSecondary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        )
+        TextField(
+            value = proxyUrl,
+            onValueChange = { proxyUrl = it },
+            label = "需完整https地址，以/结尾，如：https://gh.llkk.cc/",
+            modifier = Modifier.padding(horizontal = 16.dp),
+            singleLine = true
+        )
+
+
+
+        if (isDeveloperModeEnabled) {
+        Spacer(modifier = Modifier.height(16.dp))
+
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+            ArrowPreference(
+                title = "开发者模式",
+                summary = "点击进入开发者模式设置",
+                onClick = {
+                    onDeveloperModeTriggered()
+                },
+                modifier = Modifier.padding(horizontal = 16.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+        Spacer(modifier = Modifier.height(8.dp))
+        Text(
+            text = "外观设置",
+            style = textStyles.main,
+            color = colorScheme.onSurfaceSecondary,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+        )
+        
+        WindowDropdownPreference(
+            title = "外观模式",
+            summary = THEME_BASE_OPTIONS.find { it.second == themeBaseIndex }?.first ?: "跟随系统",
+            items = THEME_BASE_OPTIONS.map { it.first },
+            selectedIndex = themeBaseIndex.coerceIn(0, THEME_BASE_OPTIONS.lastIndex),
+            onSelectedIndexChange = { newIndex ->
+                themeBaseIndex = newIndex
+                ThemeSettingsManager.setThemeBaseIndex(context, newIndex)
             }
         )
+
+        Spacer(modifier = Modifier.height(16.dp))
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
+
+
+        Text(
+            text = "© 2026 Notify Relay",
+            style = textStyles.body2,
+            color = colorScheme.onSurfaceSecondary,
+            modifier = Modifier
+                .padding(24.dp)
+                .align(Alignment.CenterHorizontally)
+        )
     }
+    
+    UpdateDialog(
+        showDialog = showUpdateDialog,
+        releaseInfo = latestReleaseInfo,
+        currentVersion = BuildConfig.VERSION_NAME,
+        hasUpdate = hasUpdate,
+        allReleases = allReleases,
+        onDownload = { info ->
+            val appAbi = ApkArchMatcher.getInstalledAppAbiOrDevice(context)
+            val assetFilter = ApkArchMatcher.createAssetFilter(appAbi)
+            val downloadResult = checkUpdateManager.downloadRelease(info, proxyUrl, assetFilter)
+            when (downloadResult) {
+                is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Success -> {
+                    Logger.i(TAG, "开始下载: ${downloadResult.fileName}")
+                    Toast.makeText(context, "开始下载 ${downloadResult.fileName}", Toast.LENGTH_SHORT).show()
+                }
+                is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.NoAsset -> {
+                    Logger.e(TAG, "未找到匹配的资源: ${downloadResult.message}")
+                    Toast.makeText(context, "未找到匹配的APK", Toast.LENGTH_SHORT).show()
+                }
+                is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Error -> {
+                    Logger.e(TAG, "下载失败: ${downloadResult.message}")
+                    downloadResult.exception?.let { Logger.e(TAG, "下载异常", it) }
+                    Toast.makeText(context, "下载失败: ${downloadResult.message}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        },
+        onDismiss = {
+            showUpdateDialog.value = false
+            latestReleaseInfo = null
+            allReleases = emptyList()
+        }
+    )
 }

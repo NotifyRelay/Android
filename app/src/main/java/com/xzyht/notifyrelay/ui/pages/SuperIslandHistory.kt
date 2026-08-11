@@ -36,7 +36,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -50,7 +49,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
@@ -90,6 +88,7 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.ToolbarPosition
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
@@ -109,7 +108,7 @@ fun SuperIslandDeleteButton(onClick: () -> Unit, modifier: Modifier = Modifier) 
     IconButton(
         onClick = onClick,
         modifier = modifier.fillMaxHeight().width(80.dp),
-        backgroundColor = Color.Red,
+        backgroundColor = MiuixTheme.colorScheme.error,
         cornerRadius = 8.dp,
         minHeight = 40.dp,
         minWidth = 80.dp
@@ -157,90 +156,87 @@ fun UISuperIslandHistory() {
         }
     }
 
-    MiuixTheme {
-        val colorScheme = MiuixTheme.colorScheme
-        val textStyles = MiuixTheme.textStyles
-        val density = LocalDensity.current
-        val deleteWidthPx = with(density) { 80.dp.toPx() }
-        val deleteWidth = 80.dp
+    val colorScheme = MiuixTheme.colorScheme
+    val textStyles = MiuixTheme.textStyles
+    val density = LocalDensity.current
+    val deleteWidthPx = with(density) { 80.dp.toPx() }
+    val deleteWidth = 80.dp
 
-        Scaffold(
-            containerColor = colorScheme.background,
-            popupHost = { },
-            floatingToolbar = {
-                if (pagingItems.itemCount > 0) {
-                    FloatingToolbar(
-                        color = colorScheme.primary,
-                        cornerRadius = 20.dp,
-                        showDivider = false
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(8.dp),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            DoubleClickConfirmButton(
-                                text = "清空超级岛历史",
-                                confirmText = "确认?",
-                                onClick = {},
-                                onConfirm = clearHistory,
-                                colors = ButtonDefaults.buttonColors(color = colorScheme.onSurface),
-                                confirmColors = ButtonDefaults.buttonColors(color = Color.Red)
-                            )
-                        }
-                    }
-                }
-            },
-            floatingToolbarPosition = ToolbarPosition.BottomEnd,
-            content = { paddingValues ->
-                Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .padding(12.dp)
+    Scaffold(
+        containerColor = colorScheme.background,
+        floatingToolbar = {
+            if (pagingItems.itemCount > 0) {
+                FloatingToolbar(
+                    color = colorScheme.primary,
+                    cornerRadius = 20.dp,
+                    showDivider = false
                 ) {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.SpaceBetween
+                        modifier = Modifier.padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Text(
-                            text = "复制图片详细信息",
-                            style = textStyles.body2,
-                            color = colorScheme.onSurface
-                        )
-                        Switch(
-                            checked = includeImageDataOnCopy,
-                            onCheckedChange = {
-                                includeImageDataOnCopy = it
-                                StorageManager.putBoolean(context, "superisland_copy_image_data", it)
-                            }
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(12.dp))
-
-                    if (pagingItems.itemCount == 0) {
-                        Text("暂无超级岛历史记录", style = textStyles.body2, color = colorScheme.onSurfaceVariantSummary)
-                    } else {
-                        SuperIslandHistoryListBlock(
-                            pagingItems = pagingItems,
-                            expandedGroups = uiState.expandedGroups,
-                            includeImageDataOnCopy = includeImageDataOnCopy,
-                            onToggleGroup = { packageName -> viewModel.toggleGroupExpansion(packageName) },
-                            onDeleteGroup = { packageName -> viewModel.deleteGroup(packageName) },
-                            onDeleteEntry = { id -> viewModel.deleteEntry(id) },
-                            loadEntryDetail = { id -> viewModel.loadEntryDetail(id) },
-                            deleteWidthPx = deleteWidthPx,
-                            deleteWidth = deleteWidth
+                        DoubleClickConfirmButton(
+                            text = "清空超级岛历史",
+                            confirmText = "确认?",
+                            onClick = {},
+                            onConfirm = clearHistory,
+                            colors = ButtonDefaults.buttonColors(color = colorScheme.onSurface),
+                            confirmColors = ButtonDefaults.buttonColors(color = colorScheme.error)
                         )
                     }
                 }
             }
-        )
-    }
+        },
+        floatingToolbarPosition = ToolbarPosition.BottomEnd,
+        content = { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = "复制图片详细信息",
+                        style = textStyles.body2,
+                        color = colorScheme.onSurface
+                    )
+                    Switch(
+                        checked = includeImageDataOnCopy,
+                        onCheckedChange = {
+                            includeImageDataOnCopy = it
+                            StorageManager.putBoolean(context, "superisland_copy_image_data", it)
+                        }
+                    )
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (pagingItems.itemCount == 0) {
+                    Text("暂无超级岛历史记录", style = textStyles.body2, color = colorScheme.onSurfaceVariantSummary)
+                } else {
+                    SuperIslandHistoryListBlock(
+                        pagingItems = pagingItems,
+                        expandedGroups = uiState.expandedGroups,
+                        includeImageDataOnCopy = includeImageDataOnCopy,
+                        onToggleGroup = { packageName -> viewModel.toggleGroupExpansion(packageName) },
+                        onDeleteGroup = { packageName -> viewModel.deleteGroup(packageName) },
+                        onDeleteEntry = { id -> viewModel.deleteEntry(id) },
+                        loadEntryDetail = { id -> viewModel.loadEntryDetail(id) },
+                        deleteWidthPx = deleteWidthPx,
+                        deleteWidth = deleteWidth
+                    )
+                }
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -716,16 +712,17 @@ private fun SuperIslandHistoryStoreEntryCard(
                 overflow = TextOverflow.Ellipsis
             )
         } else {
-            TextButton(onClick = {
-                coroutineScope.launch {
-                    val full = try { loadEntryDetail(entry.id) } catch (_: Exception) { null }
-                    if (full != null) {
-                        loadedDetail = full
+            TextButton(
+                text = "加载详情",
+                onClick = {
+                    coroutineScope.launch {
+                        val full = try { loadEntryDetail(entry.id) } catch (_: Exception) { null }
+                        if (full != null) {
+                            loadedDetail = full
+                        }
                     }
                 }
-            }) {
-                Text("加载详情")
-            }
+            )
         }
     }
 }
