@@ -39,7 +39,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -380,10 +379,10 @@ fun DeviceListScreen(
                         .defaultMinSize(minHeight = buttonMinHeight, minWidth = 60.dp)
                         .heightIn(min = buttonMinHeight)
                         .widthIn(min = 60.dp),
-                    colors = ButtonDefaults.buttonColors(color = Color.Red),
-                    confirmColors = ButtonDefaults.buttonColors(color = Color(0xFFFF0000)),
-                    textColor = Color.White,
-                    confirmTextColor = Color.White
+                    colors = ButtonDefaults.buttonColors(color = colorScheme.error),
+                    confirmColors = ButtonDefaults.buttonColors(color = colorScheme.error),
+                    textColor = colorScheme.onError,
+                    confirmTextColor = colorScheme.onError
                 )
             }
         }

@@ -132,6 +132,10 @@ object NativeCore {
     fun updateHeartbeatSchedulerParams(ctx: Pointer, name: String, battery: Int, deviceType: String) =
         lib.nrc_update_heartbeat_scheduler_params(ctx, name, battery, deviceType)
 
+    // ======== Heartbeat mode (广播主用 / TCP 备用) ========
+    fun setHeartbeatTcpBackup(ctx: Pointer, enabled: Boolean) =
+        lib.nrc_set_heartbeat_tcp_backup(ctx, if (enabled) 1 else 0)
+
     // ======== Device state snapshot ========
     fun getDeviceList(ctx: Pointer, authedTimeoutMs: Long, unauthedTimeoutMs: Long): String? =
         NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_device_list(ctx, authedTimeoutMs, unauthedTimeoutMs))
@@ -344,7 +348,7 @@ object NativeCore {
         reconnectMaxRetries: Int = 5
     ): Boolean {
         val queue = lib.nrc_start_core(ctx, uuid, name, battery, deviceType, tcpPort, pubkey, heartbeatIntervalMs, offlineTimeoutSec, offlineCheckIntervalMs, reconnectIntervalSecs, reconnectMaxRetries)
-        if (queue <= 0L) {
+        if (queue == 0L) {
             Log.e(TAG, "nrc_start_core 启动失败，返回句柄: $queue")
             senderQueuePtr = 0L
             return false

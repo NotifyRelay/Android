@@ -454,7 +454,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             return
         }
 
-        if (!BackendLocalFilter.shouldForward(sbn, applicationContext, checkProcessed)) {
+        if (!BackendLocalFilter.shouldForwardBlocking(sbn, applicationContext, checkProcessed)) {
             if (Logger.ENABLE_FILTERED_NOTIFICATION_LOG) {
                 logSbnDetail("法鸡-黑影 被过滤", sbn)
             }
@@ -557,7 +557,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         foregroundJob?.cancel()
         foregroundJob = CoroutineScope(Dispatchers.Default).launch {
             while (true) {
-                delay(5000)
+                delay(30000)
                 val actives = activeNotifications
                 if (actives != null) {
 

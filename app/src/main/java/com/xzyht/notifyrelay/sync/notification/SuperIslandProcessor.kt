@@ -17,6 +17,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.data.FilterConfigDefaults
 import notifyrelay.data.StorageManager
 import notifyrelay.data.database.repository.DatabaseRepository
 import org.json.JSONObject
@@ -26,11 +27,8 @@ object SuperIslandProcessor {
     // 锁屏去重 TTL（毫秒）：同一远端岛在锁屏期间的重复包直接丢弃
     private const val SI_DEDUP_TTL_MS = 300_000L
 
-    private val DEFAULT_MIRROR_PACKAGES = listOf(
-        "com.xiaomi.bluetooth",
-        "com.miui.mishare.connectivity",
-        "com.xiaomi.mirror"
-    )
+    private val DEFAULT_MIRROR_PACKAGES: List<String>
+        get() = FilterConfigDefaults.defaultMirrorPackages
     
 
     private fun dismissBySourceId(sourceId: String) {
@@ -76,13 +74,18 @@ object SuperIslandProcessor {
 
             val mirrorFilterEnabled = StorageManager.getBoolean(context, "super_island_mirror_filter_enabled", true)
             if (mirrorFilterEnabled) {
-                val disabledDefaults = StorageManager.getString(context, "super_island_mirror_filter_disabled_defaults", "")
-                val disabledSet = disabledDefaults.split(",").filter { it.isNotBlank() }.toSet()
-                val isDefaultEnabled = DEFAULT_MIRROR_PACKAGES.contains(mappedPkg) && !disabledSet.contains(mappedPkg)
-                val isCustomEnabled = runBlocking(Dispatchers.IO) {
-                    DatabaseRepository.getInstance(context).getEnabledMirrorFilterPackages().contains(mappedPkg)
+                val isMirrorEnabled = runBlocking(Dispatchers.IO) {
+                    val repo = DatabaseRepository.getInstance(context)
+                    val all = repo.getAllMirrorFilterPackages()
+                    val entry = all.find { it.packageName == mappedPkg }
+                    when {
+                        entry != null -> entry.enabled
+                        // 默认包名：表中未初始化行时默认启用（与旧 disabled_defaults 语义一致）
+                        DEFAULT_MIRROR_PACKAGES.contains(mappedPkg) -> true
+                        else -> false
+                    }
                 }
-                if ((isDefaultEnabled || isCustomEnabled) && LocalSuperIslandTracker.isActive(mappedPkg) && !isEnd) {
+                if (isMirrorEnabled && LocalSuperIslandTracker.isActive(mappedPkg) && !isEnd) {
                     Logger.i("超级岛", "镜像应用过滤(对称)：跳过远程复刻, pkg=$mappedPkg, remoteUuid=$remoteUuid")
                     return true
                 }

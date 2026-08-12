@@ -16,7 +16,7 @@ class FloatingWindowManager {
     // 常量定义
     private val EXPANDED_DURATION_MS = 3000L // 展开态持续时间
     private val AUTO_DISMISS_DURATION_MS = 12000L // 自动移除时间（非媒体类型）
-    private val AUTO_DISMISS_DURATION_MS_MEDIA = 20000L // 媒体类型自动移除时间，比媒体会话超时时间（16秒）长一些
+    private val AUTO_DISMISS_DURATION_MS_MEDIA = 45_000L // 媒体类型自动移除时间，需长于 30s 轮询刷新周期
 
     // 用于处理延迟任务的Handler
     private val handler = Handler(Looper.getMainLooper())
@@ -143,15 +143,23 @@ class FloatingWindowManager {
             scheduleCollapse(key, EXPANDED_DURATION_MS)
         }
 
-        // 所有条目都添加自动移除任务
-        val autoDismissDuration = if (business == "media") {
-            AUTO_DISMISS_DURATION_MS_MEDIA
-        } else {
-            AUTO_DISMISS_DURATION_MS
-        }
-        scheduleRemoval(key, autoDismissDuration)
+        // 非媒体条目添加自动移除任务；
+        // 媒体条目自动移除时间拉长至 45s（大于 30s 轮询刷新周期）：正常播放中
+        // 由轮询持续刷新浮窗，长期不变的内容不再周期性"消失一下"；
+        // 数据消失且无移除事件时仍会兜底自动移除，不会永久残留
+        scheduleRemovalByBusiness(key, business)
 
         updateEntriesList()
+    }
+
+    /**
+     * 根据业务类型调度自动移除；媒体类型使用更长的移除时间（兜底）
+     */
+    private fun scheduleRemovalByBusiness(key: String, business: String?) {
+        scheduleRemoval(
+            key,
+            if (business == "media") AUTO_DISMISS_DURATION_MS_MEDIA else AUTO_DISMISS_DURATION_MS
+        )
     }
 
     /**
@@ -253,12 +261,7 @@ class FloatingWindowManager {
             }
 
             // 重新添加自动移除任务，根据business类型选择正确的自动移除时间
-            val autoDismissDuration = if (currentEntry.business == "media") {
-                AUTO_DISMISS_DURATION_MS_MEDIA
-            } else {
-                AUTO_DISMISS_DURATION_MS
-            }
-            scheduleRemoval(key, autoDismissDuration)
+            scheduleRemovalByBusiness(key, currentEntry.business)
 
             updateEntriesList()
         }
@@ -292,12 +295,7 @@ class FloatingWindowManager {
             }
 
             // 重新添加自动移除任务，根据business类型选择正确的自动移除时间
-            val autoDismissDuration = if (currentEntry.business == "media") {
-                AUTO_DISMISS_DURATION_MS_MEDIA
-            } else {
-                AUTO_DISMISS_DURATION_MS
-            }
-            scheduleRemoval(key, autoDismissDuration)
+            scheduleRemovalByBusiness(key, currentEntry.business)
 
             updateEntriesList()
         }

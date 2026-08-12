@@ -88,7 +88,10 @@ fun AnimTextInfoCompose(animTextInfo: AnimTextInfo, picMap: Map<String, String>?
                 )
             }
             if (hasTimer) {
+                // 仅计时进行中（正计时 timerType=1 / 倒计时 timerType=-1）才每秒刷新，暂停/无效类型静态显示
+                val isTimerRunning = animTextInfo.timerInfo?.timerType == 1 || animTextInfo.timerInfo?.timerType == -1
                 LaunchedEffect(animTextInfo.timerInfo) {
+                    if (!isTimerRunning) return@LaunchedEffect
                     while (true) {
                         timerState.value = formatTimerInfo(animTextInfo.timerInfo)
                         delay(1000)

@@ -76,7 +76,7 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
-        <!-- 注册通知点击广播接收�?-->
+        <!-- 注册通知点击广播接收器 -->
         <receiver
             android:name=".feature.device.receiver.RemoteNotificationClickReceiver"
             android:exported="false" />

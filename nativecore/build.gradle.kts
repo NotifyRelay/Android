@@ -48,7 +48,7 @@ android {
 
     sourceSets {
         getByName("main") {
-            jniLibs.srcDir(project.file("build/generated/rust/jniLibs"))
+            jniLibs.directories += "build/generated/rust/jniLibs"
         }
     }
 }

@@ -4,9 +4,7 @@ import android.content.Context
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
-import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -22,17 +20,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
+import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 class DeveloperModeActivity : AppCompatActivity() {
 
     companion object {
-        private const val KEY_LOG_ENABLED = "log_enabled"
         private const val KEY_LOG_LEVEL = "log_level"
         private const val KEY_DEBUG_UI_ENABLED = "debug_ui_enabled"
         private const val KEY_FILTERED_NOTIFICATION_LOG_ENABLED = "filtered_notification_log_enabled"
@@ -42,7 +39,7 @@ class DeveloperModeActivity : AppCompatActivity() {
 
         fun initLogConfig(context: Context) {
             val logLevelOrdinal = StorageManager.getInt(context, KEY_LOG_LEVEL, Logger.Level.INFO.ordinal)
-            Logger.CURRENT_LEVEL = Logger.Level.values().getOrElse(logLevelOrdinal) { Logger.Level.INFO }
+            Logger.CURRENT_LEVEL = Logger.Level.entries.getOrElse(logLevelOrdinal) { Logger.Level.INFO }
         }
 
         fun initDebugUiConfig(context: Context) {
@@ -64,13 +61,12 @@ class DeveloperModeActivity : AppCompatActivity() {
                 val isDarkTheme = isSystemInDarkTheme()
                 // 使用统一的主题
                 NotifyRelayTheme(darkTheme = isDarkTheme) {
-                    val colorScheme = MiuixTheme.colorScheme
                     // 设置系统栏外观
                     SetupSystemBars(isDarkTheme)
-                    // 根布局加 systemBarsPadding，避免内容被遮挡
-                    Box(modifier = Modifier
-                        .fillMaxSize()
-                        .background(colorScheme.background)
+                    // 使用标准 TopAppBar 页面容器（内容区 colorScheme.background）
+                    ScrollableTopAppBarPage(
+                        title = "开发者选项",
+                        onBack = { finish() }
                     ) {
                         DeveloperModeScreen()
                     }
@@ -103,20 +99,11 @@ class DeveloperModeActivity : AppCompatActivity() {
             mutableIntStateOf(logLevelOptions.indexOfFirst { it.second == logLevel.value })
         }
 
-        val textStyles = MiuixTheme.textStyles
-
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(top = 32.dp, start = 16.dp, end = 16.dp)
+                .padding(start = 16.dp, end = 16.dp)
         ) {
-            // 添加标题行
-            top.yukonga.miuix.kmp.basic.Text(
-                text = "开发者选项",
-                style = textStyles.title1,
-                modifier = Modifier.padding(bottom = 24.dp)
-            )
-
             Column(
                 modifier = Modifier
                     .fillMaxSize()
