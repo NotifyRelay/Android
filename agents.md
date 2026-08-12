@@ -10,6 +10,8 @@
 
 - 所有 Compose 组件优先使用 Miuix 主题库（如 `MiuixTheme`、`MiuixIcons`、`Button`、`Card` 等），详见[官方组件文档](https://compose-miuix-ui.github.io/miuix/zh_CN/components/)。
 - 导航使用 Miuix Navigation3 + NavigationEvent。
+- 页面根容器默认背景统一使用 `MiuixTheme.colorScheme.background`：内容区背景一律用 `background`，TopAppBar 可保留默认 `surface` 形成色差。
+- 独立页面（含子页、开发者模式等）优先复用公共组件 `ScrollableTopAppBarPage`。
 
 ### 应用 API 版本
 

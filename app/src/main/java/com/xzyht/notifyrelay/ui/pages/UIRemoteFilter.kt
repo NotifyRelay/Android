@@ -26,12 +26,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
-import com.xzyht.notifyrelay.ui.dialog.AddKeywordDialog
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.CheckboxPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -56,8 +54,10 @@ fun UIRemoteFilter() {
     var allGroupEnabled by remember { mutableStateOf<List<Boolean>>(
         RemoteFilterConfig.defaultGroupEnabled.toMutableList()
     ) }
-    var filterListText by remember { mutableStateOf("") }
     var enableLockScreenOnly by remember { mutableStateOf(false) }
+    var filterItems by remember {
+        mutableStateOf(RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) })
+    }
     
     // 在LaunchedEffect中异步加载RemoteFilterConfig，避免阻塞UI
     LaunchedEffect(Unit) {
@@ -73,7 +73,7 @@ fun UIRemoteFilter() {
         allGroups = (RemoteFilterConfig.defaultPackageGroups.map { it.toMutableList() } +
                 RemoteFilterConfig.customPackageGroups.map { it.toMutableList() }).toMutableList()
         allGroupEnabled = (RemoteFilterConfig.defaultGroupEnabled + RemoteFilterConfig.customGroupEnabled).toMutableList()
-        filterListText = RemoteFilterConfig.filterList.joinToString("\n") { it.first + (it.second?.let { k-> ","+k } ?: "") }
+        filterItems = RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) }
         enableLockScreenOnly = RemoteFilterConfig.enableLockScreenOnly
     }
 
@@ -132,76 +132,28 @@ fun UIRemoteFilter() {
             RemoteFilterConfig.enablePeerMode = (value == "peer")
             RemoteFilterConfig.save(context)
             filterMode = value
+            filterItems = RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) }
         }
     )
 
     if (filterMode == "black" || filterMode == "white") {
-        var showFilterAppPicker by remember { mutableStateOf(false) }
-        var pendingFilterPkg by remember { mutableStateOf<String?>(null) }
-        var pendingKeyword by remember { mutableStateOf("") }
-        Text(
-            "${if (filterMode=="black")"黑" else "白"}名单(每行:包名,可选关键词):",
-            style = textStyles.body2,
-            color = colorScheme.onSurface
+        // 黑白名单配置区（添加 + 手动黑名单抽屉 + 条目禁用），复用本机过滤的公共组件
+        FilterListSection(
+            manualEntries = filterItems,
+            entryEnabled = { item -> RemoteFilterConfig.isActiveEntryEnabled(item.packageName, item.keyword) },
+            onEntryEnabledChange = { item, enabled ->
+                RemoteFilterConfig.setFilterEntryEnabled(context, item.packageName, item.keyword, enabled)
+                filterItems = RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) }
+            },
+            onAddEntry = { keyword, pkg ->
+                RemoteFilterConfig.addFilterEntry(context, pkg, keyword)
+                filterItems = RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) }
+            },
+            onRemoveEntry = { item ->
+                RemoteFilterConfig.removeFilterEntry(context, item.packageName, item.keyword)
+                filterItems = RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) }
+            }
         )
-            Row(Modifier.fillMaxWidth().padding(bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-            TextField(
-                value = filterListText,
-                onValueChange = {
-                    filterListText = it
-                    RemoteFilterConfig.filterList = it.lines().filter { line -> line.isNotBlank() }.map { line ->
-                        val arr = line.split(",", limit=2)
-                        arr[0].trim() to arr.getOrNull(1)?.trim().takeIf { k->!k.isNullOrBlank() }
-                    }
-                    RemoteFilterConfig.save(context)
-                },
-                modifier = Modifier.weight(1f),
-                label = "com.a,关键字\ncom.b"
-            )
-                Button(
-                    onClick = { showFilterAppPicker = true },
-                    modifier = Modifier.padding(start = 6.dp)
-                ) {
-                    Text("添加包名")
-                }
-        }
-        if (showFilterAppPicker) {
-            AppPickerDialog(
-                visible = true,
-                onDismiss = { showFilterAppPicker = false },
-                onAppSelected = { pkg: String ->
-                    pendingFilterPkg = pkg
-                    pendingKeyword = ""
-                    showFilterAppPicker = false
-                },
-                title = "选择包名"
-            )
-        }
-        if (pendingFilterPkg != null) {
-            val showKeywordDialog = remember { mutableStateOf(true) }
-            AddKeywordDialog(
-                showDialog = showKeywordDialog,
-                packageName = pendingFilterPkg!!,
-                initialKeyword = pendingKeyword,
-                onConfirm = { keyword ->
-                    val line = if (keyword.isBlank()) pendingFilterPkg!! else pendingFilterPkg!! + "," + keyword.trim()
-                    val newFilterListText = if (filterListText.isBlank()) line else filterListText.trimEnd() + "\n" + line
-                    filterListText = newFilterListText
-                    // 更新后端状态
-                    RemoteFilterConfig.filterList = newFilterListText.lines().filter { it.isNotBlank() }.map {
-                        val arr = it.split(",", limit=2)
-                        arr[0].trim() to arr.getOrNull(1)?.trim().takeIf { k->!k.isNullOrBlank() }
-                    }
-                    RemoteFilterConfig.save(context)
-                    showKeywordDialog.value = false
-                    pendingFilterPkg = null
-                },
-                onDismiss = {
-                    showKeywordDialog.value = false
-                    pendingFilterPkg = null
-                }
-            )
-        }
     }
     // 包名等价功能总开关
     SwitchPreference(

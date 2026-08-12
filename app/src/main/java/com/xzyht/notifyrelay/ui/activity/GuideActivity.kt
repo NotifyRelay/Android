@@ -214,6 +214,7 @@ object GuideScreen {
         modifier = Modifier
             .fillMaxSize()
             .navigationBarsPadding(),
+        containerColor = MiuixTheme.colorScheme.background,
         content = { paddingValues ->
             Box(
                 modifier = Modifier

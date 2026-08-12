@@ -85,4 +85,94 @@ sealed interface Route : NavKey, Parcelable {
             override fun newArray(size: Int): Array<ScrcpyVirtualButtonOrder?> = arrayOfNulls(size)
         }
     }
+
+    /**
+     * 设置-远程过滤子页面
+     * Settings remote filter sub page
+     */
+    @Serializable
+    @SuppressLint("ParcelCreator")
+    data object SettingsRemoteFilter : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<SettingsRemoteFilter> {
+            override fun createFromParcel(parcel: Parcel): SettingsRemoteFilter = SettingsRemoteFilter
+            override fun newArray(size: Int): Array<SettingsRemoteFilter?> = arrayOfNulls(size)
+        }
+    }
+
+    /**
+     * 设置-本地过滤子页面
+     * Settings local filter sub page
+     */
+    @Serializable
+    @SuppressLint("ParcelCreator")
+    data object SettingsLocalFilter : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<SettingsLocalFilter> {
+            override fun createFromParcel(parcel: Parcel): SettingsLocalFilter = SettingsLocalFilter
+            override fun newArray(size: Int): Array<SettingsLocalFilter?> = arrayOfNulls(size)
+        }
+    }
+
+    /**
+     * 设置-超级岛子页面
+     * Settings super island sub page
+     */
+    @Serializable
+    @SuppressLint("ParcelCreator")
+    data object SettingsSuperIsland : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<SettingsSuperIsland> {
+            override fun createFromParcel(parcel: Parcel): SettingsSuperIsland = SettingsSuperIsland
+            override fun newArray(size: Int): Array<SettingsSuperIsland?> = arrayOfNulls(size)
+        }
+    }
+
+    /**
+     * 设置-屏幕镜像子页面
+     * Settings scrcpy sub page
+     */
+    @Serializable
+    @SuppressLint("ParcelCreator")
+    data object SettingsScrcpy : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<SettingsScrcpy> {
+            override fun createFromParcel(parcel: Parcel): SettingsScrcpy = SettingsScrcpy
+            override fun newArray(size: Int): Array<SettingsScrcpy?> = arrayOfNulls(size)
+        }
+    }
+
+    /**
+     * 设置-关于子页面
+     * Settings about sub page
+     */
+    @Serializable
+    @SuppressLint("ParcelCreator")
+    data object SettingsAbout : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<SettingsAbout> {
+            override fun createFromParcel(parcel: Parcel): SettingsAbout = SettingsAbout
+            override fun newArray(size: Int): Array<SettingsAbout?> = arrayOfNulls(size)
+        }
+    }
+
+    /**
+     * 设置-外观子页面
+     * Settings appearance sub page
+     */
+    @Serializable
+    @SuppressLint("ParcelCreator")
+    data object SettingsAppearance : Route {
+        override fun describeContents(): Int = 0
+        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+        object CREATOR : Parcelable.Creator<SettingsAppearance> {
+            override fun createFromParcel(parcel: Parcel): SettingsAppearance = SettingsAppearance
+            override fun newArray(size: Int): Array<SettingsAppearance?> = arrayOfNulls(size)
+        }
+    }
 }

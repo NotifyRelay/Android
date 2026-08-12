@@ -32,11 +32,6 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 private var progressCounter = 0
 
 /**
- * 发送开关状态变量，默认关闭，持久化存储
- */
-private var sendToOtherDevices = false
-
-/**
  * 根据Live Updates开关选择合适的通道显示测试弹窗
  * @param context 上下文
  * @param sourceId 源ID
@@ -56,15 +51,17 @@ fun showTestNotification(
     appName: String? = "测试应用",
     forceFullPackage: Boolean = true
 ) {
-    if (sendToOtherDevices) {
+    // 直接读取持久化值（与对话框开关 UI 同一真相源），避免重启后全局变量回退导致 UI 与实际行为不一致
+    if (StorageManager.getBoolean(context, "superisland_send_to_other_devices", false)) {
         // 发送开关开启时，仅发送通知给其他端
         try {
             // 获取设备管理器实例
             val deviceManager = DeviceConnectionManager.getInstance(context)
             
-            // 当强制发送全量包时，生成唯一的 featureIdOverride
+            // 强制发送全量包：固定 featureId（同一测试源多次点击刷新原有卡片，
+            // 对齐真实通知增量更新语义：全量重发走合并而非新建）
             val featureIdOverride = if (forceFullPackage) {
-                "${sourceId}_${System.currentTimeMillis()}"
+                sourceId
             } else {
                 null
             }
@@ -900,7 +897,6 @@ fun SuperIslandTestDialog(
                         checked = isSendEnabled,
                         onCheckedChange = {
                             isSendEnabled = it
-                            sendToOtherDevices = it
                             StorageManager.putBoolean(context, "superisland_send_to_other_devices", it)
                         },
                         modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)

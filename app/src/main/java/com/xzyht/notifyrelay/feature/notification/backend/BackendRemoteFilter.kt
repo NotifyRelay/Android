@@ -465,6 +465,10 @@ object RemoteFilterConfig {
     private const val KEY_PACKAGE_GROUPS = "package_groups"
     private const val KEY_FILTER_MODE = "filter_mode"
     private const val KEY_FILTER_LIST = "filter_list"
+    private const val KEY_BLACK_LIST = "black_list"
+    private const val KEY_WHITE_LIST = "white_list"
+    private const val KEY_BLACK_LIST_ENABLED = "black_list_enabled"
+    private const val KEY_WHITE_LIST_ENABLED = "white_list_enabled"
     private const val KEY_ENABLE_DEDUP = "enable_dedup"
     private const val KEY_ENABLE_PEER = "enable_peer"
 
@@ -498,8 +502,15 @@ object RemoteFilterConfig {
     // 黑白名单模式："none"=无，"black"=黑名单，"white"=白名单，"peer"=对等
     var filterMode: String = "none"
 
-    // 黑/白名单内容（包名或通用包名+可选文本关键词）
-    var filterList: List<Pair<String, String?>> = emptyList() // Pair<包名, 关键词?>
+    // 黑名单内容（包名或通用包名+可选文本关键词），Pair<包名, 关键词?>
+    var blackList: List<Pair<String, String?>> = emptyList()
+
+    // 白名单内容（包名或通用包名+可选文本关键词），Pair<包名, 关键词?>
+    var whiteList: List<Pair<String, String?>> = emptyList()
+
+    // 黑/白名单的启用条目（序列化字符串集合，允许禁用单条规则）
+    var blackListEnabled: Set<String> = emptySet()
+    var whiteListEnabled: Set<String> = emptySet()
 
     // 对等模式开关（仅本机存在的应用或通用应用）
     var enablePeerMode: Boolean = false
@@ -529,10 +540,25 @@ object RemoteFilterConfig {
         enableDeduplication = StorageManager.getBoolean(context, KEY_ENABLE_DEDUP, true, StorageManager.PrefsType.FILTER)
         enablePeerMode = StorageManager.getBoolean(context, KEY_ENABLE_PEER, false, StorageManager.PrefsType.FILTER)
         enableLockScreenOnly = StorageManager.getBoolean(context, "enable_lock_screen_only", true, StorageManager.PrefsType.FILTER)
-        val filterListStr = StorageManager.getStringSet(context, KEY_FILTER_LIST, emptySet(), StorageManager.PrefsType.FILTER)
-        filterList = filterListStr.map {
-            val arr = it.split("|", limit=2)
-            arr[0] to arr.getOrNull(1)?.takeIf { k->k.isNotBlank() }
+        blackList = parseFilterList(StorageManager.getStringSet(context, KEY_BLACK_LIST, emptySet(), StorageManager.PrefsType.FILTER))
+        whiteList = parseFilterList(StorageManager.getStringSet(context, KEY_WHITE_LIST, emptySet(), StorageManager.PrefsType.FILTER))
+        blackListEnabled = StorageManager.getStringSet(context, KEY_BLACK_LIST_ENABLED, emptySet(), StorageManager.PrefsType.FILTER)
+        whiteListEnabled = StorageManager.getStringSet(context, KEY_WHITE_LIST_ENABLED, emptySet(), StorageManager.PrefsType.FILTER)
+
+        // 兼容迁移：旧的共享 filter_list 数据首次迁移到当前模式对应的名单
+        val legacyListStr = StorageManager.getStringSet(context, KEY_FILTER_LIST, emptySet(), StorageManager.PrefsType.FILTER)
+        if (blackList.isEmpty() && whiteList.isEmpty() && legacyListStr.isNotEmpty()) {
+            val legacyList = parseFilterList(legacyListStr)
+            when (filterMode) {
+                "black" -> {
+                    blackList = legacyList
+                    blackListEnabled = legacyList.map { serializeFilterEntry(it.first, it.second) }.toSet()
+                }
+                "white" -> {
+                    whiteList = legacyList
+                    whiteListEnabled = legacyList.map { serializeFilterEntry(it.first, it.second) }.toSet()
+                }
+            }
         }
         isLoaded = true
     }
@@ -548,7 +574,10 @@ object RemoteFilterConfig {
             StorageManager.putBoolean(context, KEY_ENABLE_DEDUP, enableDeduplication, StorageManager.PrefsType.FILTER)
             StorageManager.putBoolean(context, KEY_ENABLE_PEER, enablePeerMode, StorageManager.PrefsType.FILTER)
             StorageManager.putBoolean(context, "enable_lock_screen_only", enableLockScreenOnly, StorageManager.PrefsType.FILTER)
-            StorageManager.putStringSet(context, KEY_FILTER_LIST, filterList.map { it.first + (it.second?.let { k->"|"+k } ?: "") }.toSet(), StorageManager.PrefsType.FILTER)
+            StorageManager.putStringSet(context, KEY_BLACK_LIST, blackList.map { serializeFilterEntry(it.first, it.second) }.toSet(), StorageManager.PrefsType.FILTER)
+            StorageManager.putStringSet(context, KEY_WHITE_LIST, whiteList.map { serializeFilterEntry(it.first, it.second) }.toSet(), StorageManager.PrefsType.FILTER)
+            StorageManager.putStringSet(context, KEY_BLACK_LIST_ENABLED, blackListEnabled, StorageManager.PrefsType.FILTER)
+            StorageManager.putStringSet(context, KEY_WHITE_LIST_ENABLED, whiteListEnabled, StorageManager.PrefsType.FILTER)
 
             // 保存后立即同步到 Rust 侧
             val ctx = BackendRemoteFilter.rustContext
@@ -576,6 +605,81 @@ object RemoteFilterConfig {
     fun syncToRust(ctx: Pointer, installedPkgs: Set<String>): Boolean {
         val json = buildRustConfigJson(installedPkgs)
         return NativeCore.setFilterConfig(ctx, json) == 0
+    }
+
+    // ---------- 黑白名单操作（按当前 filterMode 生效） ----------
+
+    private fun parseFilterList(raw: Set<String>): List<Pair<String, String?>> = raw.map {
+        val arr = it.split("|", limit = 2)
+        arr[0] to arr.getOrNull(1)?.takeIf { k -> k.isNotBlank() }
+    }
+
+    private fun serializeFilterEntry(pkg: String, keyword: String?): String =
+        pkg + (keyword?.takeIf { it.isNotBlank() }?.let { "|$it" } ?: "")
+
+    /** 当前模式对应的名单 */
+    fun getActiveFilterList(): List<Pair<String, String?>> = when (filterMode) {
+        "black" -> blackList
+        "white" -> whiteList
+        else -> emptyList()
+    }
+
+    /** 当前模式对应的启用集合 */
+    fun getActiveEnabledSet(): Set<String> = when (filterMode) {
+        "black" -> blackListEnabled
+        "white" -> whiteListEnabled
+        else -> emptySet()
+    }
+
+    /** 条目是否启用（无启用状态时默认启用） */
+    fun isActiveEntryEnabled(pkg: String, keyword: String): Boolean {
+        val ser = serializeFilterEntry(pkg, keyword)
+        return if (filterMode == "black") blackListEnabled.contains(ser)
+        else if (filterMode == "white") whiteListEnabled.contains(ser)
+        else true
+    }
+
+    /** 向当前模式的名单添加条目（默认启用） */
+    fun addFilterEntry(context: Context, pkg: String, keyword: String) {
+        val kw = keyword.takeIf { it.isNotBlank() }
+        when (filterMode) {
+            "black" -> {
+                blackList = blackList + (pkg to kw)
+                blackListEnabled = blackListEnabled + serializeFilterEntry(pkg, kw)
+            }
+            "white" -> {
+                whiteList = whiteList + (pkg to kw)
+                whiteListEnabled = whiteListEnabled + serializeFilterEntry(pkg, kw)
+            }
+            else -> return
+        }
+        save(context)
+    }
+
+    /** 从当前模式的名单移除条目 */
+    fun removeFilterEntry(context: Context, pkg: String, keyword: String) {
+        val ser = serializeFilterEntry(pkg, keyword)
+        when (filterMode) {
+            "black" -> {
+                blackList = blackList.filterNot { it.first == pkg && (it.second ?: "") == keyword }
+                blackListEnabled = blackListEnabled - ser
+            }
+            "white" -> {
+                whiteList = whiteList.filterNot { it.first == pkg && (it.second ?: "") == keyword }
+                whiteListEnabled = whiteListEnabled - ser
+            }
+        }
+        save(context)
+    }
+
+    /** 启用/禁用当前模式的条目 */
+    fun setFilterEntryEnabled(context: Context, pkg: String, keyword: String, enabled: Boolean) {
+        val ser = serializeFilterEntry(pkg, keyword)
+        when (filterMode) {
+            "black" -> blackListEnabled = if (enabled) blackListEnabled + ser else blackListEnabled - ser
+            "white" -> whiteListEnabled = if (enabled) whiteListEnabled + ser else whiteListEnabled - ser
+        }
+        save(context)
     }
 
     /** 构建 Rust nrc_set_filter_config 所需的 JSON */
@@ -621,10 +725,22 @@ object RemoteFilterConfig {
         }
         root.put("filterMode", filterModeNum)
 
-        // 黑白名单
+        // 黑白名单（当前模式对应的名单，仅包含启用条目）
+        val activeList = when (filterMode) {
+            "black" -> blackList
+            "white" -> whiteList
+            else -> emptyList()
+        }
+        val activeEnabled = when (filterMode) {
+            "black" -> blackListEnabled
+            "white" -> whiteListEnabled
+            else -> emptySet()
+        }
         val filterListArr = JSONArray()
-        for ((pkg, keyword) in filterList) {
-            filterListArr.put(if (keyword != null) "$pkg|$keyword" else pkg)
+        for ((pkg, keyword) in activeList) {
+            if (activeEnabled.contains(serializeFilterEntry(pkg, keyword))) {
+                filterListArr.put(serializeFilterEntry(pkg, keyword))
+            }
         }
         root.put("filterList", filterListArr)
 

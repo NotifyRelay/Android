@@ -36,14 +36,12 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
-import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Date
 
@@ -52,24 +50,15 @@ private const val PROXY_URL_KEY = "check_update_proxy_url"
 private const val TAG = "UIAbout"
 private const val SAVE_DEBOUNCE_MS = 500L
 
-private val THEME_BASE_OPTIONS = listOf(
-    "跟随系统" to 0,
-    "浅色模式" to 1,
-    "深色模式" to 2,
-)
-
 @OptIn(FlowPreview::class)
 @Composable
-fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
+fun UIAbout() {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
     
     var clickCount by remember { mutableIntStateOf(0) }
     var lastClickTime by remember { mutableLongStateOf(0L) }
-    var isDeveloperModeEnabled by remember {
-        mutableStateOf(StorageManager.getBoolean(context, "developer_mode_enabled", false))
-    }
     
     var isCheckingUpdate by remember { mutableStateOf(false) }
     val showUpdateDialog = remember { mutableStateOf(false) }
@@ -82,8 +71,6 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
     var proxyUrl by remember {
         mutableStateOf(StorageManager.getString(context, PROXY_URL_KEY, DEFAULT_PROXY_URL))
     }
-    
-    var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
     
     val checkUpdateManager = remember { CheckUpdateManager(context.applicationContext) }
     
@@ -129,7 +116,6 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
                     Toast.makeText(context, "再点击 ${5 - clickCount} 次进入开发者模式", Toast.LENGTH_SHORT).show()
                 } else if (clickCount >= 5) {
                     Toast.makeText(context, "开发者模式已激活", Toast.LENGTH_SHORT).show()
-                    isDeveloperModeEnabled = true
                     StorageManager.putBoolean(context, "developer_mode_enabled", true)
                     clickCount = 0
                 }
@@ -224,47 +210,8 @@ fun UIAbout(onDeveloperModeTriggered: () -> Unit = {}) {
             singleLine = true
         )
 
-
-
-        if (isDeveloperModeEnabled) {
-        Spacer(modifier = Modifier.height(16.dp))
-
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-            ArrowPreference(
-                title = "开发者模式",
-                summary = "点击进入开发者模式设置",
-                onClick = {
-                    onDeveloperModeTriggered()
-                },
-                modifier = Modifier.padding(horizontal = 16.dp)
-            )
-        }
-
         Spacer(modifier = Modifier.height(16.dp))
         HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
-        Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "外观设置",
-            style = textStyles.main,
-            color = colorScheme.onSurfaceSecondary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
-        )
-        
-        WindowDropdownPreference(
-            title = "外观模式",
-            summary = THEME_BASE_OPTIONS.find { it.second == themeBaseIndex }?.first ?: "跟随系统",
-            items = THEME_BASE_OPTIONS.map { it.first },
-            selectedIndex = themeBaseIndex.coerceIn(0, THEME_BASE_OPTIONS.lastIndex),
-            onSelectedIndexChange = { newIndex ->
-                themeBaseIndex = newIndex
-                ThemeSettingsManager.setThemeBaseIndex(context, newIndex)
-            }
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
-
 
         Text(
             text = "© 2026 Notify Relay",
