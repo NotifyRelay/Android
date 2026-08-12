@@ -73,6 +73,27 @@ interface FilterListDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertPackageGroupItems(items: List<PackageGroupItemEntity>)
 
+    /** 全量替换黑名单（clear + insert 原子执行） */
+    @Transaction
+    suspend fun replaceBlackList(entries: List<BlackListEntryEntity>) {
+        clearBlackList()
+        if (entries.isNotEmpty()) insertBlackList(entries)
+    }
+
+    /** 全量替换白名单（clear + insert 原子执行） */
+    @Transaction
+    suspend fun replaceWhiteList(entries: List<WhiteListEntryEntity>) {
+        clearWhiteList()
+        if (entries.isNotEmpty()) insertWhiteList(entries)
+    }
+
+    /** 全量替换本地过滤条目（clear + insert 原子执行） */
+    @Transaction
+    suspend fun replaceFilterEntries(entries: List<FilterEntryEntity>) {
+        clearFilterEntries()
+        if (entries.isNotEmpty()) insertFilterEntries(entries)
+    }
+
     /** 全量替换包名等价组（组 + 组内包名，itemPackages 与 groups 一一对应） */
     @Transaction
     suspend fun replacePackageGroups(groups: List<PackageGroupEntity>, itemPackages: List<List<String>>) {

@@ -361,8 +361,10 @@ abstract class AppDatabase : RoomDatabase() {
                     migratePackageGroups(database)
                     migrateMirrorFilterDefaults(database)
                 } catch (e: Exception) {
-                    Logger.e("AppDatabase", "MIGRATION_7_8 名单数据迁移失败，旧数据保留在 app_config", e)
-                    return
+                    // 抛出异常以让 Room 回滚整个迁移事务，避免版本被标记为 8 但表为空导致数据静默丢失；
+                    // 下次启动会重新尝试迁移（旧数据仍保留在 app_config 中）
+                    Logger.e("AppDatabase", "MIGRATION_7_8 名单数据迁移失败，将回滚迁移事务", e)
+                    throw e
                 }
 
                 // 3. 清理已迁移的旧 key
@@ -395,6 +397,20 @@ abstract class AppDatabase : RoomDatabase() {
                 @Suppress("UNCHECKED_CAST")
                 (Gson().fromJson(json, type) as? Set<String>) ?: emptySet()
             }.getOrDefault(emptySet())
+        }
+
+        /**
+         * 解析 JSON 数组字符串为有序 List。
+         * 与 parseJsonSet 不同：保留原始顺序，专用于自定义包名组（依赖顺序保证命名一致性）。
+         * Set 反序列化时顺序不可靠，会导致迁移后命名与 savePackageGroups 不一致。
+         */
+        private fun parseJsonList(json: String?): List<String> {
+            if (json.isNullOrBlank()) return emptyList()
+            return runCatching {
+                val type = object : TypeToken<List<String>>() {}.type
+                @Suppress("UNCHECKED_CAST")
+                (Gson().fromJson(json, type) as? List<String>) ?: emptyList()
+            }.getOrDefault(emptyList())
         }
 
         /** 黑白名单条目 "pkg|keyword" 或 "pkg" 解析为 (包名, 关键词) */
@@ -475,8 +491,8 @@ abstract class AppDatabase : RoomDatabase() {
                     )
                 }
             }
-            // 自定义组
-            val customRaw = parseJsonSet(readConfigValue(db, "filter_package_groups"))
+            // 自定义组（使用 parseJsonList 保留 JSON 数组顺序，避免 Set 反序列化导致命名错位）
+            val customRaw = parseJsonList(readConfigValue(db, "filter_package_groups"))
             val customEnabled = (readConfigValue(db, "filter_custom_group_enabled") ?: "")
                 .split(",").map { it == "1" }
             customRaw.forEachIndexed { idx, groupStr ->
@@ -485,7 +501,7 @@ abstract class AppDatabase : RoomDatabase() {
                 val enabled = customEnabled.getOrNull(idx) ?: true
                 db.execSQL(
                     "INSERT INTO package_groups (groupName, enabled, isDefault) VALUES (?, ?, 0)",
-                    arrayOf<Any?>("自定义组${idx + 1 - FilterConfigDefaults.defaultPackageGroups.size}", if (enabled) 1 else 0)
+                    arrayOf<Any?>("自定义组${idx + 1}", if (enabled) 1 else 0)
                 )
                 val groupId = lastInsertRowId(db)
                 pkgs.forEach { pkg ->

@@ -501,8 +501,7 @@ class DatabaseRepository(private val database: AppDatabase) {
     }
 
     suspend fun replaceBlackList(entries: List<BlackListEntryEntity>) {
-        filterListDao.clearBlackList()
-        if (entries.isNotEmpty()) filterListDao.insertBlackList(entries)
+        filterListDao.replaceBlackList(entries)
     }
 
     suspend fun getWhiteList(): List<WhiteListEntryEntity> {
@@ -510,8 +509,7 @@ class DatabaseRepository(private val database: AppDatabase) {
     }
 
     suspend fun replaceWhiteList(entries: List<WhiteListEntryEntity>) {
-        filterListDao.clearWhiteList()
-        if (entries.isNotEmpty()) filterListDao.insertWhiteList(entries)
+        filterListDao.replaceWhiteList(entries)
     }
 
     suspend fun getLocalFilterEntries(): List<FilterEntryEntity> {
@@ -519,8 +517,7 @@ class DatabaseRepository(private val database: AppDatabase) {
     }
 
     suspend fun replaceLocalFilterEntries(entries: List<FilterEntryEntity>) {
-        filterListDao.clearFilterEntries()
-        if (entries.isNotEmpty()) filterListDao.insertFilterEntries(entries)
+        filterListDao.replaceFilterEntries(entries)
     }
 
     suspend fun getPackageGroups(): List<PackageGroupEntity> {
