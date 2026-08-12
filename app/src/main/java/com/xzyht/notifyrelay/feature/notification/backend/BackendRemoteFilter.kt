@@ -14,6 +14,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 import org.json.JSONArray
 import org.json.JSONObject
@@ -71,13 +73,16 @@ object BackendRemoteFilter {
     /**
      * 过滤远程通知
      * 包含包名映射（Rust）、智能去重、黑白名单/对等模式（Rust）
+     *
+     * 同步契约：被消息处理链（NotificationProcessor.process，非 suspend）调用，
+     * 无法直接挂起。配置加载通过 loadBlocking 兜底（仅首次加载，后续 isLoaded 短路）。
      */
     fun filterRemoteNotification(data: String, context: Context): FilterResult {
         // 确保配置已加载（只加载一次）
         synchronized(RemoteFilterConfig) {
             if (!RemoteFilterConfig.isLoaded) {
                 try {
-                    RemoteFilterConfig.load(context)
+                    RemoteFilterConfig.loadBlocking(context)
                     RemoteFilterConfig.isLoaded = true
                     rustContext?.let { ctx ->
                         val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
@@ -499,19 +504,24 @@ object RemoteFilterConfig {
     var enableLockScreenOnly: Boolean = true
 
     // 加载设置
-    fun load(context: Context) {
-        enablePackageGroupMapping = StorageManager.getBoolean(context, "enable_package_group_mapping", true, StorageManager.PrefsType.FILTER)
-        filterMode = StorageManager.getString(context, KEY_FILTER_MODE, "none", StorageManager.PrefsType.FILTER)
-        enableDeduplication = StorageManager.getBoolean(context, KEY_ENABLE_DEDUP, true, StorageManager.PrefsType.FILTER)
-        enablePeerMode = StorageManager.getBoolean(context, KEY_ENABLE_PEER, false, StorageManager.PrefsType.FILTER)
-        enableLockScreenOnly = StorageManager.getBoolean(context, "enable_lock_screen_only", true, StorageManager.PrefsType.FILTER)
-        loadFilterLists(context)
-        loadPackageGroups(context)
-        isLoaded = true
+    suspend fun load(context: Context) {
+        withContext(Dispatchers.IO) {
+            enablePackageGroupMapping = StorageManager.getBoolean(context, "enable_package_group_mapping", true, StorageManager.PrefsType.FILTER)
+            filterMode = StorageManager.getString(context, KEY_FILTER_MODE, "none", StorageManager.PrefsType.FILTER)
+            enableDeduplication = StorageManager.getBoolean(context, KEY_ENABLE_DEDUP, true, StorageManager.PrefsType.FILTER)
+            enablePeerMode = StorageManager.getBoolean(context, KEY_ENABLE_PEER, false, StorageManager.PrefsType.FILTER)
+            enableLockScreenOnly = StorageManager.getBoolean(context, "enable_lock_screen_only", true, StorageManager.PrefsType.FILTER)
+            loadFilterLists(context)
+            loadPackageGroups(context)
+            isLoaded = true
+        }
     }
 
-    private fun loadFilterLists(context: Context) {
-        kotlinx.coroutines.runBlocking {
+    /** 同步兜底：仅供 filterRemoteNotification 等无法挂起的同步入口使用 */
+    fun loadBlocking(context: Context) = runBlocking { load(context) }
+
+    private suspend fun loadFilterLists(context: Context) {
+        withContext(Dispatchers.IO) {
             val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
             val blackRows = repo.getBlackList()
             blackList = blackRows.map { it.packageName to it.keyword.takeIf { k -> k.isNotBlank() } }
@@ -524,8 +534,8 @@ object RemoteFilterConfig {
         }
     }
 
-    private fun loadPackageGroups(context: Context) {
-        kotlinx.coroutines.runBlocking {
+    private suspend fun loadPackageGroups(context: Context) {
+        withContext(Dispatchers.IO) {
             val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
             val groups = repo.getPackageGroups()
             val items = repo.getPackageGroupItems().groupBy { it.groupId }
@@ -542,29 +552,34 @@ object RemoteFilterConfig {
     }
 
     // 保存设置（优化性能）
-    fun save(context: Context) {
-        try {
-            StorageManager.putBoolean(context, "enable_package_group_mapping", enablePackageGroupMapping, StorageManager.PrefsType.FILTER)
-            StorageManager.putString(context, KEY_FILTER_MODE, filterMode, StorageManager.PrefsType.FILTER)
-            StorageManager.putBoolean(context, KEY_ENABLE_DEDUP, enableDeduplication, StorageManager.PrefsType.FILTER)
-            StorageManager.putBoolean(context, KEY_ENABLE_PEER, enablePeerMode, StorageManager.PrefsType.FILTER)
-            StorageManager.putBoolean(context, "enable_lock_screen_only", enableLockScreenOnly, StorageManager.PrefsType.FILTER)
-            saveFilterLists(context)
-            savePackageGroups(context)
+    suspend fun save(context: Context) {
+        withContext(Dispatchers.IO) {
+            try {
+                StorageManager.putBoolean(context, "enable_package_group_mapping", enablePackageGroupMapping, StorageManager.PrefsType.FILTER)
+                StorageManager.putString(context, KEY_FILTER_MODE, filterMode, StorageManager.PrefsType.FILTER)
+                StorageManager.putBoolean(context, KEY_ENABLE_DEDUP, enableDeduplication, StorageManager.PrefsType.FILTER)
+                StorageManager.putBoolean(context, KEY_ENABLE_PEER, enablePeerMode, StorageManager.PrefsType.FILTER)
+                StorageManager.putBoolean(context, "enable_lock_screen_only", enableLockScreenOnly, StorageManager.PrefsType.FILTER)
+                saveFilterLists(context)
+                savePackageGroups(context)
 
-            // 保存后立即同步到 Rust 侧
-            val ctx = BackendRemoteFilter.rustContext
-            if (ctx != null) {
-                val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
-                syncToRust(ctx, installedPkgs)
+                // 保存后立即同步到 Rust 侧
+                val ctx = BackendRemoteFilter.rustContext
+                if (ctx != null) {
+                    val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
+                    syncToRust(ctx, installedPkgs)
+                }
+            } catch (e: Exception) {
+                Logger.e("RemoteFilterConfig", "Failed to save configuration", e)
             }
-        } catch (e: Exception) {
-            Logger.e("RemoteFilterConfig", "Failed to save configuration", e)
         }
     }
 
-    private fun saveFilterLists(context: Context) {
-        kotlinx.coroutines.runBlocking {
+    /** 同步兜底：仅供无法挂起的同步入口使用（如 UI 回调未改协程处） */
+    fun saveBlocking(context: Context) = runBlocking { save(context) }
+
+    private suspend fun saveFilterLists(context: Context) {
+        withContext(Dispatchers.IO) {
             val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
             repo.replaceBlackList(blackList.map {
                 notifyrelay.data.database.entity.BlackListEntryEntity(
@@ -583,8 +598,8 @@ object RemoteFilterConfig {
         }
     }
 
-    private fun savePackageGroups(context: Context) {
-        kotlinx.coroutines.runBlocking {
+    private suspend fun savePackageGroups(context: Context) {
+        withContext(Dispatchers.IO) {
             val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
             val groups = mutableListOf<notifyrelay.data.database.entity.PackageGroupEntity>()
             val itemPackages = mutableListOf<List<String>>()
@@ -635,7 +650,7 @@ object RemoteFilterConfig {
     }
 
     /** 向当前模式的名单添加条目（默认启用） */
-    fun addFilterEntry(context: Context, pkg: String, keyword: String) {
+    suspend fun addFilterEntry(context: Context, pkg: String, keyword: String) {
         val kw = keyword.takeIf { it.isNotBlank() }
         when (filterMode) {
             "black" -> {
@@ -652,7 +667,7 @@ object RemoteFilterConfig {
     }
 
     /** 从当前模式的名单移除条目 */
-    fun removeFilterEntry(context: Context, pkg: String, keyword: String) {
+    suspend fun removeFilterEntry(context: Context, pkg: String, keyword: String) {
         val ser = serializeFilterEntry(pkg, keyword)
         when (filterMode) {
             "black" -> {
@@ -668,7 +683,7 @@ object RemoteFilterConfig {
     }
 
     /** 启用/禁用当前模式的条目 */
-    fun setFilterEntryEnabled(context: Context, pkg: String, keyword: String, enabled: Boolean) {
+    suspend fun setFilterEntryEnabled(context: Context, pkg: String, keyword: String, enabled: Boolean) {
         val ser = serializeFilterEntry(pkg, keyword)
         when (filterMode) {
             "black" -> blackListEnabled = if (enabled) blackListEnabled + ser else blackListEnabled - ser

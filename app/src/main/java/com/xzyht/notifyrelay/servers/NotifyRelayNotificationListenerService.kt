@@ -454,7 +454,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             return
         }
 
-        if (!BackendLocalFilter.shouldForward(sbn, applicationContext, checkProcessed)) {
+        if (!BackendLocalFilter.shouldForwardBlocking(sbn, applicationContext, checkProcessed)) {
             if (Logger.ENABLE_FILTERED_NOTIFICATION_LOG) {
                 logSbnDetail("法鸡-黑影 被过滤", sbn)
             }

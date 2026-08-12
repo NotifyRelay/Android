@@ -7,15 +7,18 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.notification.backend.BackendLocalFilter
+import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Text
@@ -32,6 +35,7 @@ fun UILocalFilter(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     // 状态管理
     var filterSelf by remember { mutableStateOf(BackendLocalFilter.filterSelf) }
     var filterOngoing by remember { mutableStateOf(BackendLocalFilter.filterOngoing) }
@@ -39,11 +43,19 @@ fun UILocalFilter(
     var filterImportanceNone by remember { mutableStateOf(BackendLocalFilter.filterImportanceNone) }
 
     // 过滤条目相关状态（统一管理关键词+包名）
-    var allEntries by remember { mutableStateOf(BackendLocalFilter.getFilterEntries(context).toList()) }
-    var enabledEntries by remember { mutableStateOf(BackendLocalFilter.getEnabledFilterEntries(context)) }
+    // 组合期不再同步查库，先给空集合，由 LaunchedEffect 异步加载
+    var allEntries by remember { mutableStateOf<List<BackendLocalFilter.FilterEntry>>(emptyList()) }
+    var enabledEntries by remember { mutableStateOf<Set<BackendLocalFilter.FilterEntry>>(emptySet()) }
 
     val builtinKeywords = remember { BackendLocalFilter.getBuiltinKeywords() }
     val builtinPackages = remember { BackendLocalFilter.getDefaultPackageFilters() }
+
+    // 异步加载过滤条目
+    LaunchedEffect(Unit) {
+        allEntries = BackendLocalFilter.getFilterEntries(context).toList()
+        enabledEntries = BackendLocalFilter.getEnabledFilterEntries(context)
+    }
+
     val builtinDefaultEntries = remember(allEntries, builtinKeywords, builtinPackages) {
         allEntries.filter { entry -> (entry.keyword.isNotBlank() && builtinKeywords.contains(entry.keyword)) || (entry.packageName.isNotBlank() && builtinPackages.contains(entry.packageName)) }
     }
@@ -142,18 +154,24 @@ fun UILocalFilter(
                 manualEntries = customEntries.map { FilterEntryItem(it.keyword, it.packageName) },
                 entryEnabled = { enabledEntries.contains(BackendLocalFilter.FilterEntry(it.keyword, it.packageName)) },
                 onEntryEnabledChange = { item, enabled ->
-                    BackendLocalFilter.setFilterEntryEnabled(context, BackendLocalFilter.FilterEntry(item.keyword, item.packageName), enabled)
-                    enabledEntries = BackendLocalFilter.getEnabledFilterEntries(context)
+                    scope.launch {
+                        BackendLocalFilter.setFilterEntryEnabled(context, BackendLocalFilter.FilterEntry(item.keyword, item.packageName), enabled)
+                        enabledEntries = BackendLocalFilter.getEnabledFilterEntries(context)
+                    }
                 },
                 onAddEntry = { keyword, pkg ->
-                    BackendLocalFilter.addFilterEntry(context, keyword, pkg)
-                    allEntries = BackendLocalFilter.getFilterEntries(context).toList()
-                    enabledEntries = BackendLocalFilter.getEnabledFilterEntries(context)
+                    scope.launch {
+                        BackendLocalFilter.addFilterEntry(context, keyword, pkg)
+                        allEntries = BackendLocalFilter.getFilterEntries(context).toList()
+                        enabledEntries = BackendLocalFilter.getEnabledFilterEntries(context)
+                    }
                 },
                 onRemoveEntry = { item ->
-                    BackendLocalFilter.removeFilterEntry(context, item.keyword, item.packageName)
-                    allEntries = BackendLocalFilter.getFilterEntries(context).toList()
-                    enabledEntries = BackendLocalFilter.getEnabledFilterEntries(context)
+                    scope.launch {
+                        BackendLocalFilter.removeFilterEntry(context, item.keyword, item.packageName)
+                        allEntries = BackendLocalFilter.getFilterEntries(context).toList()
+                        enabledEntries = BackendLocalFilter.getEnabledFilterEntries(context)
+                    }
                 }
             )
         }

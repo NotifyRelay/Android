@@ -13,6 +13,10 @@ import kotlinx.coroutines.runBlocking
 /**
  * 后端本机通知过滤器
  * 处理本机产生的通知的过滤逻辑
+ *
+ * 注：本类中所有数据访问方法均为 suspend。`shouldForwardBlocking` 保留 runBlocking
+ * 兜底用于通知监听服务的同步回调（NotificationListenerService.onNotificationPosted），
+ * 其余调用方（UI/ViewModel）应使用 suspend 版本。
  */
 object BackendLocalFilter {
     // 可配置项
@@ -51,17 +55,19 @@ object BackendLocalFilter {
     // FilterEntry 表示一条复合过滤规则：keyword 可空，packageName 可空
     data class FilterEntry(val keyword: String, val packageName: String)
 
-    // 获取所有过滤条目（包含内置关键词和默认包名过滤），表为空时初始化内置条目
-    fun getFilterEntries(context: Context): Set<FilterEntry> {
-        val rows = runBlocking { DatabaseRepository.getInstance(context).getLocalFilterEntries() }
+    /**
+     * 获取所有过滤条目（包含内置关键词和默认包名过滤），表为空时初始化内置条目。
+     * 单次查询：仅在结果为空时写入内置条目并返回，避免每次调用产生 2 次查询。
+     */
+    suspend fun getFilterEntries(context: Context): Set<FilterEntry> {
+        val repo = DatabaseRepository.getInstance(context)
+        val rows = repo.getLocalFilterEntries()
         if (rows.isEmpty()) {
-            // 初始化：写入内置条目
+            // 初始化：写入内置条目（默认启用）
             val entries = builtinFilterEntries
-            runBlocking {
-                DatabaseRepository.getInstance(context).replaceLocalFilterEntries(
-                    entries.map { FilterEntryEntity(it.keyword, it.packageName, true) }
-                )
-            }
+            repo.replaceLocalFilterEntries(
+                entries.map { FilterEntryEntity(it.keyword, it.packageName, true) }
+            )
             return entries
         }
         return rows.map { FilterEntry(it.keyword, it.packageName) }.toSet()
@@ -70,97 +76,110 @@ object BackendLocalFilter {
     // 获取内置默认关键词集合（兼容旧接口）
     fun getBuiltinKeywords(): Set<String> = builtinFilterEntries.filter { it.keyword.isNotBlank() }.map { it.keyword }.toSet()
 
-    // 获取启用的过滤条目集合（内置条目恒启用）
-    fun getEnabledFilterEntries(context: Context): Set<FilterEntry> {
-        val all = getFilterEntries(context)
-        val rows = runBlocking { DatabaseRepository.getInstance(context).getLocalFilterEntries() }
-        val result = rows.filter { it.enabled }.map { FilterEntry(it.keyword, it.packageName) }.toMutableSet()
-        builtinFilterEntries.forEach { entry ->
-            if (all.contains(entry)) result.add(entry)
+    /**
+     * 获取启用的过滤条目集合。
+     * 单次查询：基于同一份 rows 派生启用集合，不再强制加回内置条目（允许用户禁用内置条目）。
+     */
+    suspend fun getEnabledFilterEntries(context: Context): Set<FilterEntry> {
+        val repo = DatabaseRepository.getInstance(context)
+        val rows = repo.getLocalFilterEntries()
+        if (rows.isEmpty()) {
+            // 表为空时初始化内置条目并返回全部启用
+            val entries = builtinFilterEntries
+            repo.replaceLocalFilterEntries(
+                entries.map { FilterEntryEntity(it.keyword, it.packageName, true) }
+            )
+            return entries
         }
-        return result
+        return rows.filter { it.enabled }.map { FilterEntry(it.keyword, it.packageName) }.toSet()
     }
 
-    fun setFilterEntryEnabled(context: Context, entry: FilterEntry, enabled: Boolean) {
-        runBlocking {
-            val repo = DatabaseRepository.getInstance(context)
-            val rows = repo.getLocalFilterEntries().toMutableList()
-            val idx = rows.indexOfFirst { it.keyword == entry.keyword && it.packageName == entry.packageName }
-            if (idx >= 0) {
-                rows[idx] = rows[idx].copy(enabled = enabled)
-            } else {
-                rows.add(FilterEntryEntity(entry.keyword, entry.packageName, enabled))
-            }
+    suspend fun setFilterEntryEnabled(context: Context, entry: FilterEntry, enabled: Boolean) {
+        val repo = DatabaseRepository.getInstance(context)
+        val rows = repo.getLocalFilterEntries().toMutableList()
+        val idx = rows.indexOfFirst { it.keyword == entry.keyword && it.packageName == entry.packageName }
+        if (idx >= 0) {
+            rows[idx] = rows[idx].copy(enabled = enabled)
+        } else {
+            rows.add(FilterEntryEntity(entry.keyword, entry.packageName, enabled))
+        }
+        repo.replaceLocalFilterEntries(rows)
+    }
+
+    suspend fun addFilterEntry(context: Context, keyword: String, packageName: String) {
+        val entry = FilterEntry(keyword.trim(), packageName.trim())
+        val repo = DatabaseRepository.getInstance(context)
+        val rows = repo.getLocalFilterEntries().toMutableList()
+        if (rows.none { it.keyword == entry.keyword && it.packageName == entry.packageName }) {
+            rows.add(FilterEntryEntity(entry.keyword, entry.packageName, true))
             repo.replaceLocalFilterEntries(rows)
         }
     }
 
-    fun addFilterEntry(context: Context, keyword: String, packageName: String) {
-        val entry = FilterEntry(keyword.trim(), packageName.trim())
-        runBlocking {
-            val repo = DatabaseRepository.getInstance(context)
-            val rows = repo.getLocalFilterEntries().toMutableList()
-            if (rows.none { it.keyword == entry.keyword && it.packageName == entry.packageName }) {
-                rows.add(FilterEntryEntity(entry.keyword, entry.packageName, true))
-                repo.replaceLocalFilterEntries(rows)
-            }
-        }
-    }
-
-    fun removeFilterEntry(context: Context, keyword: String, packageName: String) {
+    suspend fun removeFilterEntry(context: Context, keyword: String, packageName: String) {
         // 内置条目不可删除（包括内置文本关键词和默认包名）
         if ((packageName.isBlank() && builtinFilterEntries.any { it.keyword == keyword && it.keyword.isNotBlank() }) || (keyword.isBlank() && builtinFilterEntries.any { it.packageName == packageName && it.packageName.isNotBlank() })) return
-        runBlocking {
-            val repo = DatabaseRepository.getInstance(context)
-            val rows = repo.getLocalFilterEntries().filterNot { it.keyword == keyword && it.packageName == packageName }
-            repo.replaceLocalFilterEntries(rows)
-        }
+        val repo = DatabaseRepository.getInstance(context)
+        val rows = repo.getLocalFilterEntries().filterNot { it.keyword == keyword && it.packageName == packageName }
+        repo.replaceLocalFilterEntries(rows)
     }
 
     // 兼容的旧 API：返回仅 keyword（package 为空）的集合
-    fun getForegroundKeywords(context: Context): Set<String> {
+    suspend fun getForegroundKeywords(context: Context): Set<String> {
         return getFilterEntries(context).filter { it.packageName.isBlank() }.map { it.keyword }.toSet()
     }
 
     // 兼容的旧 API：返回仅 package 的集合（包含默认）
-    fun getPackageFilterList(context: Context): Set<String> {
+    suspend fun getPackageFilterList(context: Context): Set<String> {
         val pkgs = getFilterEntries(context).filter { it.keyword.isBlank() && it.packageName.isNotBlank() }.map { it.packageName }.toMutableSet()
         // 添加内置默认包名
         pkgs.addAll(builtinFilterEntries.filter { it.packageName.isNotBlank() }.map { it.packageName })
         return pkgs
     }
 
-    fun addPackageFilter(context: Context, packageName: String) {
+    suspend fun addPackageFilter(context: Context, packageName: String) {
         if (packageName.isBlank()) return
         addFilterEntry(context, "", packageName)
     }
 
-    fun removePackageFilter(context: Context, packageName: String) {
+    suspend fun removePackageFilter(context: Context, packageName: String) {
         // 默认包名不可删除
         if (builtinFilterEntries.any { it.packageName == packageName && it.packageName.isNotBlank() }) return
         removeFilterEntry(context, "", packageName)
     }
 
-    fun getEnabledPackageFilters(context: Context): Set<String> {
+    suspend fun getEnabledPackageFilters(context: Context): Set<String> {
         return getEnabledFilterEntries(context).filter { it.keyword.isBlank() && it.packageName.isNotBlank() }.map { it.packageName }.toSet()
     }
 
     // 获取默认包名过滤集合（从内置条目提取）
     fun getDefaultPackageFilters(): Set<String> = builtinFilterEntries.filter { it.packageName.isNotBlank() }.map { it.packageName }.toSet()
 
-    fun setPackageEnabled(context: Context, packageName: String, enabled: Boolean) {
+    suspend fun setPackageEnabled(context: Context, packageName: String, enabled: Boolean) {
         setFilterEntryEnabled(context, FilterEntry("", packageName), enabled)
     }
 
     /**
-     * 判断本机通知是否应该被转发
+     * 判断本机通知是否应该被转发（suspend 版本，热路径仅一次查询）。
      * @param isFromPeriodicCheck 是否来自定时检查，避免调试日志刷屏
      */
-    fun shouldForward(sbn: StatusBarNotification, context: Context, isFromPeriodicCheck: Boolean = false): Boolean {
+    suspend fun shouldForward(sbn: StatusBarNotification, context: Context, isFromPeriodicCheck: Boolean = false): Boolean {
         if (filterSelf && sbn.packageName == context.packageName) return false
 
-        // 包名过滤
-        val enabledPackageFilters = getEnabledPackageFilters(context)
+        // 单次查询：基于同一份 rows 派生 enabled 与 all，避免热路径上重复查询
+        val repo = DatabaseRepository.getInstance(context)
+        val rows = repo.getLocalFilterEntries()
+        // 表为空时初始化内置条目（与 getFilterEntries 一致）
+        if (rows.isEmpty()) {
+            repo.replaceLocalFilterEntries(
+                builtinFilterEntries.map { FilterEntryEntity(it.keyword, it.packageName, true) }
+            )
+        }
+
+        // 包名过滤：仅使用 enabled 集合
+        val enabledEntries = if (rows.isEmpty()) builtinFilterEntries
+        else rows.filter { it.enabled }.map { FilterEntry(it.keyword, it.packageName) }.toSet()
+        val enabledPackageFilters = enabledEntries.filter { it.keyword.isBlank() && it.packageName.isNotBlank() }.map { it.packageName }.toSet()
         if (enabledPackageFilters.contains(sbn.packageName)) return false
 
         val flags = sbn.notification.flags
@@ -181,7 +200,6 @@ object BackendLocalFilter {
         // - entry.keyword 非空 且 packageName 为空 -> 只匹配文本（任意应用）
         // - entry.keyword 为空 且 packageName 非空 -> 只匹配包名
         // - 两者均非空 -> 同时匹配才命中
-        val enabledEntries = getEnabledFilterEntries(context)
         // 新的匹配逻辑：支持关键字按空格分词后跨标题/内容匹配。
         // 例如 keyword = "米家 手表" 时，如果 title 包含 "米家" 且 text 包含 "手表" 也应视为命中。
         fun keywordMatchesAcrossFields(keyword: String, title: String, text: String): Boolean {
@@ -231,4 +249,12 @@ object BackendLocalFilter {
 
         return true
     }
+
+    /**
+     * 同步兜底版本：供 NotificationListenerService 的非挂起回调使用。
+     * 内部通过 runBlocking 调用 suspend 版本，保留服务回调语义不变。
+     * 注意：仅在无法改造为协程的同步入口使用，新代码应优先调用 suspend 版本。
+     */
+    fun shouldForwardBlocking(sbn: StatusBarNotification, context: Context, isFromPeriodicCheck: Boolean = false): Boolean =
+        runBlocking { shouldForward(sbn, context, isFromPeriodicCheck) }
 }
