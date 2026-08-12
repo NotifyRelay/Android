@@ -612,7 +612,13 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 addAction(Intent.ACTION_SCREEN_ON)
                 addAction(Intent.ACTION_USER_PRESENT)
             }
-            context.registerReceiver(lockStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            // 问题 1 修复：RECEIVER_NOT_EXPORTED 语义仅 API 33+ 生效，API 31/32 上等效 exported。
+            // 三参数重载 API 26+ 已存在，但显式分支可避免在低版本上误传未定义 flag。
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(lockStateReceiver, filter, Context.RECEIVER_NOT_EXPORTED)
+            } else {
+                context.registerReceiver(lockStateReceiver, filter)
+            }
         } catch (_: Exception) {}
     }
 
@@ -641,11 +647,19 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             }
         }
         try {
-            context.registerReceiver(
-                batteryReceiver,
-                IntentFilter(Intent.ACTION_BATTERY_CHANGED),
-                Context.RECEIVER_NOT_EXPORTED
-            )
+            // 问题 1 修复：同上，RECEIVER_NOT_EXPORTED 仅 API 33+ 生效。
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.registerReceiver(
+                    batteryReceiver,
+                    IntentFilter(Intent.ACTION_BATTERY_CHANGED),
+                    Context.RECEIVER_NOT_EXPORTED
+                )
+            } else {
+                context.registerReceiver(
+                    batteryReceiver,
+                    IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+                )
+            }
         } catch (_: Exception) {}
     }
 

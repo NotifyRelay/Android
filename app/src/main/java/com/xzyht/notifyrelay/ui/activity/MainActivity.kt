@@ -84,6 +84,7 @@ import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -95,6 +96,8 @@ import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.ServiceManager
 import notifyrelay.data.config.DeviceInfoManager
+import notifyrelay.data.config.ScrcpyPreferenceKeys
+import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
@@ -341,6 +344,20 @@ class MainActivity : FragmentActivity() {
                                                 uri,
                                                 Intent.FLAG_GRANT_READ_URI_PERMISSION
                                             )
+                                            // 问题 5 修复：原回调仅 takePersistableUriPermission，未写入 CUSTOM_SERVER_URI；
+                                            // 且 ScrcpyUiViewModel 是单例，只写 StorageManager 不会让 UI/连接生效。
+                                            // 双写：1) StorageManager 持久化；2) viewModel setter 更新单例状态（内部也会持久化到 mainSettings）。
+                                            val uriString = uri.toString()
+                                            StorageManager.putString(
+                                                context,
+                                                ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
+                                                uriString,
+                                                StorageManager.PrefsType.SCRCPY
+                                            )
+                                            val app = context.applicationContext as android.app.Application
+                                            ScrcpyUiViewModel.getInstance(app).customServerUri = uriString
+                                        }.onFailure { e ->
+                                            Logger.e("MainActivity", "scrcpy server URI 保存失败: uri=$uri", e)
                                         }
                                     }
                                     ScrollableTopAppBarPage(

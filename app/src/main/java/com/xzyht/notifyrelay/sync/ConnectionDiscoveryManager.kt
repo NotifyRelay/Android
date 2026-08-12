@@ -216,6 +216,17 @@ class ConnectionDiscoveryManager(
      *   发现由 known_device_scanner/reconnect 兜底）
      * - 否则 → 广播主用（UDP 广播 2s 兼发现+心跳，Rust 停止每设备心跳）
      */
+
+    /**
+     * 获取带符号电量（正=充电，负=放电），与 BatteryReceiver 约定一致。
+     * Rust 侧：battery > 0 视为充电中，battery < 0 视为放电中。
+     */
+    private fun getSignedBatteryLevel(): Int {
+        val ctx = deviceManager.contextInternal
+        val level = notifyrelay.core.util.BatteryUtils.getBatteryLevel(ctx)
+        return if (notifyrelay.core.util.BatteryUtils.isCharging(ctx)) level else -level
+    }
+
     internal fun syncHeartbeatMode() {
         val ctx = deviceManager.rustContextInternal ?: return
         try {
@@ -225,7 +236,8 @@ class ConnectionDiscoveryManager(
                 NativeCore.periodicBroadcast(ctx, 0)
             } else if (deviceManager.udpDiscoveryEnabled) {
                 val displayName = deviceManager.localDisplayNameInternal()
-                val battery = notifyrelay.core.util.BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+                // 问题 4 修复：心跳报文电量需带符号（正=充电，负=放电），否则远端会误判全部设备为充电中。
+                val battery = getSignedBatteryLevel()
                 NativeCore.periodicBroadcast(ctx, 1, deviceManager.uuid, displayName, battery, "android")
             }
         } catch (_: Exception) {}
@@ -240,12 +252,13 @@ class ConnectionDiscoveryManager(
 
     fun startDiscovery() {
         val udpEnabled = deviceManager.udpDiscoveryEnabled
-        
+
         // 启动 Rust 定时广播（Wi-Fi Direct 和普通网络都需要）
         val ctx = deviceManager.rustContextInternal
         if (ctx != null && udpEnabled) {
             val displayName = deviceManager.localDisplayNameInternal()
-            val battery = notifyrelay.core.util.BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
+            // 问题 4 修复：同 syncHeartbeatMode，广播电量需带符号。
+            val battery = getSignedBatteryLevel()
             NativeCore.periodicBroadcast(ctx, 1, deviceManager.uuid, displayName, battery, "android")
         }
 
