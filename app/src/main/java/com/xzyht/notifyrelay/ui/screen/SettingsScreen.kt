@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -34,6 +35,14 @@ fun SettingsScreen() {
     val colorScheme = MiuixTheme.colorScheme
     var isDeveloperModeEnabled by remember {
         mutableStateOf(StorageManager.getBoolean(context, "developer_mode_enabled", false))
+    }
+
+    // 问题 7 修复：开发者模式入口在"关于"子页激活后返回时不会刷新。
+    // ON_RESUME 方案在本导航架构（Navigator 为 rememberSaveable + 栈内重组，路由 push/pop
+    // 不改变 Activity lifecycle）下无效。改用 LaunchedEffect 监听 backStack.size：
+    // 从"关于"返回时栈大小变小，触发重新读取 developer_mode_enabled。
+    LaunchedEffect(navigator.backStack.size) {
+        isDeveloperModeEnabled = StorageManager.getBoolean(context, "developer_mode_enabled", false)
     }
 
     Column(
