@@ -15,6 +15,8 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlin.time.Duration.Companion.milliseconds
 import org.json.JSONArray
@@ -461,6 +463,14 @@ object RemoteFilterConfig {
     private const val KEY_ENABLE_DEDUP = "enable_dedup"
     private const val KEY_ENABLE_PEER = "enable_peer"
 
+    /**
+     * 保存串行化互斥锁：多个 UI 回调通过 scope.launch { save() } 并发触发时，
+     * 用 Mutex.withLock 让保存排队执行，避免后触发者先完成、先触发者后完成
+     * 覆盖回旧状态的竞态。注意必须用同一把跨实例锁（object 单例），
+     * 因此声明在 object 顶层而非 save() 局部。
+     */
+    private val saveLock = Mutex()
+
     // 标记配置是否已加载，避免重复加载
     var isLoaded: Boolean = false
 
@@ -553,24 +563,28 @@ object RemoteFilterConfig {
 
     // 保存设置（优化性能）
     suspend fun save(context: Context) {
-        withContext(Dispatchers.IO) {
-            try {
-                StorageManager.putBoolean(context, "enable_package_group_mapping", enablePackageGroupMapping, StorageManager.PrefsType.FILTER)
-                StorageManager.putString(context, KEY_FILTER_MODE, filterMode, StorageManager.PrefsType.FILTER)
-                StorageManager.putBoolean(context, KEY_ENABLE_DEDUP, enableDeduplication, StorageManager.PrefsType.FILTER)
-                StorageManager.putBoolean(context, KEY_ENABLE_PEER, enablePeerMode, StorageManager.PrefsType.FILTER)
-                StorageManager.putBoolean(context, "enable_lock_screen_only", enableLockScreenOnly, StorageManager.PrefsType.FILTER)
-                saveFilterLists(context)
-                savePackageGroups(context)
+        // 并发串行化：UI 回调通过 scope.launch 并发触发 save 时，用 Mutex 排队，
+        // 保证保存按触发顺序完成，最终持久化结果与最新 UI 状态一致。
+        saveLock.withLock {
+            withContext(Dispatchers.IO) {
+                try {
+                    StorageManager.putBoolean(context, "enable_package_group_mapping", enablePackageGroupMapping, StorageManager.PrefsType.FILTER)
+                    StorageManager.putString(context, KEY_FILTER_MODE, filterMode, StorageManager.PrefsType.FILTER)
+                    StorageManager.putBoolean(context, KEY_ENABLE_DEDUP, enableDeduplication, StorageManager.PrefsType.FILTER)
+                    StorageManager.putBoolean(context, KEY_ENABLE_PEER, enablePeerMode, StorageManager.PrefsType.FILTER)
+                    StorageManager.putBoolean(context, "enable_lock_screen_only", enableLockScreenOnly, StorageManager.PrefsType.FILTER)
+                    saveFilterLists(context)
+                    savePackageGroups(context)
 
-                // 保存后立即同步到 Rust 侧
-                val ctx = BackendRemoteFilter.rustContext
-                if (ctx != null) {
-                    val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
-                    syncToRust(ctx, installedPkgs)
+                    // 保存后立即同步到 Rust 侧
+                    val ctx = BackendRemoteFilter.rustContext
+                    if (ctx != null) {
+                        val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
+                        syncToRust(ctx, installedPkgs)
+                    }
+                } catch (e: Exception) {
+                    Logger.e("RemoteFilterConfig", "Failed to save configuration", e)
                 }
-            } catch (e: Exception) {
-                Logger.e("RemoteFilterConfig", "Failed to save configuration", e)
             }
         }
     }
