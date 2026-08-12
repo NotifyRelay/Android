@@ -7,12 +7,14 @@ import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
 import notifyrelay.base.util.Logger
+import notifyrelay.data.FilterConfigDefaults
 import notifyrelay.data.StorageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -88,7 +90,7 @@ object BackendRemoteFilter {
             }
         }
         try {
-            val json = org.json.JSONObject(data)
+            val json = JSONObject(data)
             val pkg = json.optString("packageName")
             val title = json.optString("title")
             val text = json.optString("text")
@@ -159,17 +161,15 @@ object BackendRemoteFilter {
 
                     // 2. 历史重复检查优化
                     try {
-                        val isHistoryReliable = checkHistorySyncReliability(context)
-                        if (!isHistoryReliable) {
-                            //Logger.d("NotifyRelay(狂鼠)", "历史同步不可靠，强制刷新")
-                            // Note: This line references a non-existent method, commenting out
-                            // com.xzyht.notifyrelay.feature.device.model.NotificationRepository.notifyHistoryChanged("本机", context)
-                        }
+                        checkHistorySyncReliability()
+                        //Logger.d("NotifyRelay(狂鼠)", "历史同步不可靠，强制刷新")
+                        // Note: This line references a non-existent method, commenting out
+                        // com.xzyht.notifyrelay.feature.device.model.NotificationRepository.notifyHistoryChanged("本机", context)
 
                         // 获取内存历史数据
                         // Note: This references non-existent classes, need to handle appropriately
                         val localList = com.xzyht.notifyrelay.feature.device.model.NotificationRepository.getNotificationsByDevice("本机")
-                        val memoryDup = checkDuplicateInMemory(localList, title, text, now)
+                        val memoryDup = checkDuplicateInMemory(localList, title, text)
 
                         // 如果内存中有重复，直接过滤
                         if (memoryDup) {
@@ -188,7 +188,7 @@ object BackendRemoteFilter {
                         //Logger.d("NotifyRelay(狂鼠)", "无历史重复，标记延迟验证")
                         return FilterResult(true, mappedPkg, title, text, data, needsDelay = true)
 
-                    } catch (e: Exception) {
+                    } catch (_: Exception) {
                         //Logger.e("智能去重", "历史检查异常", e)
                         // 异常情况下默认延迟验证
                         return FilterResult(true, mappedPkg, title, text, data, needsDelay = true)
@@ -214,7 +214,7 @@ object BackendRemoteFilter {
     /**
      * 检查内存中的重复通知 — 使用 Rust shouldDeduplicate 比较文本相似度
      */
-    private fun checkDuplicateInMemory(localList: List<NotificationRecord>, title: String, text: String, now: Long): Boolean {
+    private fun checkDuplicateInMemory(localList: List<NotificationRecord>, title: String, text: String): Boolean {
         var hasDuplicate = false
 
         for (notification in localList) {
@@ -248,17 +248,6 @@ object BackendRemoteFilter {
     fun addToDedupCache(title: String, text: String) {
         synchronized(dedupCache) {
             dedupCache.add(Triple(title, text, System.currentTimeMillis()))
-        }
-    }
-
-    /**
-     * 检查是否在去重缓存中（10秒内）- 智能去重机制的一部分
-     */
-    fun isInDedupCache(title: String, text: String): Boolean {
-        val now = System.currentTimeMillis()
-        synchronized(dedupCache) {
-            dedupCache.removeAll { now - it.third > 10_000 } // 10秒缓存
-            return dedupCache.any { it.first == title && it.second == text }
         }
     }
 
@@ -438,7 +427,7 @@ object BackendRemoteFilter {
                 }
 
                 // 避免无待处理任务时忙转（最多损失 100ms 判定精度，15s 撤回窗口不受影响）
-                delay(100)
+                delay(100.milliseconds)
             }
         }
     }
@@ -446,7 +435,7 @@ object BackendRemoteFilter {
     /**
      * 检查历史同步的可靠性
      */
-    private fun checkHistorySyncReliability(context: Context): Boolean {
+    private fun checkHistorySyncReliability(): Boolean {
         try {
             // Placeholder implementation
             return true
@@ -460,15 +449,10 @@ object BackendRemoteFilter {
 /**
  * 远程过滤配置
  * 包含包名映射、智能去重（先发送后撤回机制）、黑白名单/对等模式配置
+ * 名单类配置（黑白名单、包名组）存独立表，标量配置存 app_config
  */
 object RemoteFilterConfig {
-    private const val KEY_PACKAGE_GROUPS = "package_groups"
     private const val KEY_FILTER_MODE = "filter_mode"
-    private const val KEY_FILTER_LIST = "filter_list"
-    private const val KEY_BLACK_LIST = "black_list"
-    private const val KEY_WHITE_LIST = "white_list"
-    private const val KEY_BLACK_LIST_ENABLED = "black_list_enabled"
-    private const val KEY_WHITE_LIST_ENABLED = "white_list_enabled"
     private const val KEY_ENABLE_DEDUP = "enable_dedup"
     private const val KEY_ENABLE_PEER = "enable_peer"
 
@@ -477,11 +461,8 @@ object RemoteFilterConfig {
 
     // 包名等价功能总开关
     var enablePackageGroupMapping: Boolean = true
-    val defaultPackageGroups: List<List<String>> = listOf(
-        listOf("tv.danmaku.bilibilihd", "tv.danmaku.bili"),
-        listOf("com.sina.weibo", "com.sina.weibog3", "com.weico.international", "com.sina.weibolite", "com.hengye.share", "com.caij.see"),
-        listOf("com.tencent.mobileqq", "com.tencent.tim")
-    )
+    val defaultPackageGroups: List<List<String>>
+        get() = FilterConfigDefaults.defaultPackageGroups
     var defaultGroupEnabled: MutableList<Boolean> = mutableListOf(true, true, true)
 
     // 用户自定义包名等价组，每组为包名列表
@@ -520,64 +501,56 @@ object RemoteFilterConfig {
     // 加载设置
     fun load(context: Context) {
         enablePackageGroupMapping = StorageManager.getBoolean(context, "enable_package_group_mapping", true, StorageManager.PrefsType.FILTER)
-        val defaultEnabledStr = StorageManager.getString(context, "default_group_enabled", "1,1,1", StorageManager.PrefsType.FILTER)
-        val defaultEnabled = defaultEnabledStr.split(",").map { it == "1" }
-        defaultGroupEnabled = defaultEnabled.toMutableList().apply {
-            while (size < defaultPackageGroups.size) add(true)
-        }
-        val customGroupsStr = StorageManager.getStringSet(context, KEY_PACKAGE_GROUPS, emptySet(), StorageManager.PrefsType.FILTER)
-        val customGroups = customGroupsStr.mapNotNull {
-            it.split("|").map { s->s.trim() }.filter { s->s.isNotBlank() }.toMutableList().takeIf { set->set.isNotEmpty() }
-        }.toMutableList()
-        customPackageGroups = customGroups
-        val customEnabledStr = StorageManager.getString(context, "custom_group_enabled", "", StorageManager.PrefsType.FILTER)
-        customGroupEnabled = if (customEnabledStr.isNotEmpty()) {
-            customEnabledStr.split(",").map { it == "1" }.toMutableList().apply {
-                while (size < customGroups.size) add(true)
-            }
-        } else MutableList(customGroups.size) { true }
         filterMode = StorageManager.getString(context, KEY_FILTER_MODE, "none", StorageManager.PrefsType.FILTER)
         enableDeduplication = StorageManager.getBoolean(context, KEY_ENABLE_DEDUP, true, StorageManager.PrefsType.FILTER)
         enablePeerMode = StorageManager.getBoolean(context, KEY_ENABLE_PEER, false, StorageManager.PrefsType.FILTER)
         enableLockScreenOnly = StorageManager.getBoolean(context, "enable_lock_screen_only", true, StorageManager.PrefsType.FILTER)
-        blackList = parseFilterList(StorageManager.getStringSet(context, KEY_BLACK_LIST, emptySet(), StorageManager.PrefsType.FILTER))
-        whiteList = parseFilterList(StorageManager.getStringSet(context, KEY_WHITE_LIST, emptySet(), StorageManager.PrefsType.FILTER))
-        blackListEnabled = StorageManager.getStringSet(context, KEY_BLACK_LIST_ENABLED, emptySet(), StorageManager.PrefsType.FILTER)
-        whiteListEnabled = StorageManager.getStringSet(context, KEY_WHITE_LIST_ENABLED, emptySet(), StorageManager.PrefsType.FILTER)
-
-        // 兼容迁移：旧的共享 filter_list 数据首次迁移到当前模式对应的名单
-        val legacyListStr = StorageManager.getStringSet(context, KEY_FILTER_LIST, emptySet(), StorageManager.PrefsType.FILTER)
-        if (blackList.isEmpty() && whiteList.isEmpty() && legacyListStr.isNotEmpty()) {
-            val legacyList = parseFilterList(legacyListStr)
-            when (filterMode) {
-                "black" -> {
-                    blackList = legacyList
-                    blackListEnabled = legacyList.map { serializeFilterEntry(it.first, it.second) }.toSet()
-                }
-                "white" -> {
-                    whiteList = legacyList
-                    whiteListEnabled = legacyList.map { serializeFilterEntry(it.first, it.second) }.toSet()
-                }
-            }
-        }
+        loadFilterLists(context)
+        loadPackageGroups(context)
         isLoaded = true
+    }
+
+    private fun loadFilterLists(context: Context) {
+        kotlinx.coroutines.runBlocking {
+            val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+            val blackRows = repo.getBlackList()
+            blackList = blackRows.map { it.packageName to it.keyword.takeIf { k -> k.isNotBlank() } }
+            blackListEnabled = blackRows.filter { it.enabled }
+                .map { serializeFilterEntry(it.packageName, it.keyword) }.toSet()
+            val whiteRows = repo.getWhiteList()
+            whiteList = whiteRows.map { it.packageName to it.keyword.takeIf { k -> k.isNotBlank() } }
+            whiteListEnabled = whiteRows.filter { it.enabled }
+                .map { serializeFilterEntry(it.packageName, it.keyword) }.toSet()
+        }
+    }
+
+    private fun loadPackageGroups(context: Context) {
+        kotlinx.coroutines.runBlocking {
+            val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+            val groups = repo.getPackageGroups()
+            val items = repo.getPackageGroupItems().groupBy { it.groupId }
+                .mapValues { (_, v) -> v.map { it.packageName } }
+            val defaultRows = groups.filter { it.isDefault }.sortedBy { it.id }
+            defaultGroupEnabled = MutableList(defaultPackageGroups.size) { true }
+            defaultRows.forEachIndexed { idx, g ->
+                if (idx < defaultGroupEnabled.size) defaultGroupEnabled[idx] = g.enabled
+            }
+            val customRows = groups.filter { !it.isDefault }.sortedBy { it.id }
+            customPackageGroups = customRows.map { (items[it.id] ?: emptyList()).toMutableList() }.toMutableList()
+            customGroupEnabled = customRows.map { it.enabled }.toMutableList()
+        }
     }
 
     // 保存设置（优化性能）
     fun save(context: Context) {
         try {
             StorageManager.putBoolean(context, "enable_package_group_mapping", enablePackageGroupMapping, StorageManager.PrefsType.FILTER)
-            StorageManager.putString(context, "default_group_enabled", defaultGroupEnabled.joinToString(",") { if (it) "1" else "0" }, StorageManager.PrefsType.FILTER)
-            StorageManager.putString(context, "custom_group_enabled", customGroupEnabled.joinToString(",") { if (it) "1" else "0" }, StorageManager.PrefsType.FILTER)
-            StorageManager.putStringSet(context, KEY_PACKAGE_GROUPS, customPackageGroups.map { it.joinToString("|") }.toSet(), StorageManager.PrefsType.FILTER)
             StorageManager.putString(context, KEY_FILTER_MODE, filterMode, StorageManager.PrefsType.FILTER)
             StorageManager.putBoolean(context, KEY_ENABLE_DEDUP, enableDeduplication, StorageManager.PrefsType.FILTER)
             StorageManager.putBoolean(context, KEY_ENABLE_PEER, enablePeerMode, StorageManager.PrefsType.FILTER)
             StorageManager.putBoolean(context, "enable_lock_screen_only", enableLockScreenOnly, StorageManager.PrefsType.FILTER)
-            StorageManager.putStringSet(context, KEY_BLACK_LIST, blackList.map { serializeFilterEntry(it.first, it.second) }.toSet(), StorageManager.PrefsType.FILTER)
-            StorageManager.putStringSet(context, KEY_WHITE_LIST, whiteList.map { serializeFilterEntry(it.first, it.second) }.toSet(), StorageManager.PrefsType.FILTER)
-            StorageManager.putStringSet(context, KEY_BLACK_LIST_ENABLED, blackListEnabled, StorageManager.PrefsType.FILTER)
-            StorageManager.putStringSet(context, KEY_WHITE_LIST_ENABLED, whiteListEnabled, StorageManager.PrefsType.FILTER)
+            saveFilterLists(context)
+            savePackageGroups(context)
 
             // 保存后立即同步到 Rust 侧
             val ctx = BackendRemoteFilter.rustContext
@@ -590,14 +563,48 @@ object RemoteFilterConfig {
         }
     }
 
-    // 验证包名是否有效（能获取到应用信息）
-    private fun isValidPackage(context: Context, pkg: String): Boolean {
-        return try {
-            val pm = context.packageManager
-            pm.getApplicationInfo(pkg, 0)
-            true
-        } catch (e: Exception) {
-            false
+    private fun saveFilterLists(context: Context) {
+        kotlinx.coroutines.runBlocking {
+            val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+            repo.replaceBlackList(blackList.map {
+                notifyrelay.data.database.entity.BlackListEntryEntity(
+                    packageName = it.first,
+                    keyword = it.second ?: "",
+                    enabled = blackListEnabled.contains(serializeFilterEntry(it.first, it.second))
+                )
+            })
+            repo.replaceWhiteList(whiteList.map {
+                notifyrelay.data.database.entity.WhiteListEntryEntity(
+                    packageName = it.first,
+                    keyword = it.second ?: "",
+                    enabled = whiteListEnabled.contains(serializeFilterEntry(it.first, it.second))
+                )
+            })
+        }
+    }
+
+    private fun savePackageGroups(context: Context) {
+        kotlinx.coroutines.runBlocking {
+            val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+            val groups = mutableListOf<notifyrelay.data.database.entity.PackageGroupEntity>()
+            val itemPackages = mutableListOf<List<String>>()
+            defaultPackageGroups.forEachIndexed { idx, pkgs ->
+                groups.add(notifyrelay.data.database.entity.PackageGroupEntity(
+                    groupName = "默认组${idx + 1}",
+                    enabled = defaultGroupEnabled.getOrNull(idx) ?: true,
+                    isDefault = true
+                ))
+                itemPackages.add(pkgs)
+            }
+            customPackageGroups.forEachIndexed { idx, pkgs ->
+                groups.add(notifyrelay.data.database.entity.PackageGroupEntity(
+                    groupName = "自定义组${idx + 1}",
+                    enabled = customGroupEnabled.getOrNull(idx) ?: true,
+                    isDefault = false
+                ))
+                itemPackages.add(pkgs)
+            }
+            repo.replacePackageGroups(groups, itemPackages)
         }
     }
 
@@ -609,11 +616,6 @@ object RemoteFilterConfig {
 
     // ---------- 黑白名单操作（按当前 filterMode 生效） ----------
 
-    private fun parseFilterList(raw: Set<String>): List<Pair<String, String?>> = raw.map {
-        val arr = it.split("|", limit = 2)
-        arr[0] to arr.getOrNull(1)?.takeIf { k -> k.isNotBlank() }
-    }
-
     private fun serializeFilterEntry(pkg: String, keyword: String?): String =
         pkg + (keyword?.takeIf { it.isNotBlank() }?.let { "|$it" } ?: "")
 
@@ -622,13 +624,6 @@ object RemoteFilterConfig {
         "black" -> blackList
         "white" -> whiteList
         else -> emptyList()
-    }
-
-    /** 当前模式对应的启用集合 */
-    fun getActiveEnabledSet(): Set<String> = when (filterMode) {
-        "black" -> blackListEnabled
-        "white" -> whiteListEnabled
-        else -> emptySet()
     }
 
     /** 条目是否启用（无启用状态时默认启用） */

@@ -7,13 +7,18 @@ import notifyrelay.data.database.dao.PackageCount
 import notifyrelay.data.database.entity.AppConfigEntity
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
+import notifyrelay.data.database.entity.BlackListEntryEntity
 import notifyrelay.data.database.entity.DeviceEntity
+import notifyrelay.data.database.entity.FilterEntryEntity
 import notifyrelay.data.database.entity.NotificationRecordEntity
+import notifyrelay.data.database.entity.PackageGroupEntity
+import notifyrelay.data.database.entity.PackageGroupItemEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.entity.SuperIslandHistorySummary
 import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
 import notifyrelay.data.database.entity.SuperIslandImageEntity
 import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
+import notifyrelay.data.database.entity.WhiteListEntryEntity
 
 /**
  * 数据库仓库类
@@ -36,6 +41,8 @@ class DatabaseRepository(private val database: AppDatabase) {
     private val superIslandImageDao = database.superIslandImageDao()
     // 超级岛镜像过滤相关
     private val superIslandMirrorFilterDao = database.superIslandMirrorFilterDao()
+    // 过滤名单相关
+    private val filterListDao = database.filterListDao()
     
     /**
      * 获取应用配置值
@@ -485,6 +492,47 @@ class DatabaseRepository(private val database: AppDatabase) {
 
     suspend fun deleteMirrorFilterPackage(packageName: String) {
         superIslandMirrorFilterDao.delete(packageName)
+    }
+
+    // 过滤名单相关方法
+
+    suspend fun getBlackList(): List<BlackListEntryEntity> {
+        return filterListDao.getAllBlackList()
+    }
+
+    suspend fun replaceBlackList(entries: List<BlackListEntryEntity>) {
+        filterListDao.clearBlackList()
+        if (entries.isNotEmpty()) filterListDao.insertBlackList(entries)
+    }
+
+    suspend fun getWhiteList(): List<WhiteListEntryEntity> {
+        return filterListDao.getAllWhiteList()
+    }
+
+    suspend fun replaceWhiteList(entries: List<WhiteListEntryEntity>) {
+        filterListDao.clearWhiteList()
+        if (entries.isNotEmpty()) filterListDao.insertWhiteList(entries)
+    }
+
+    suspend fun getLocalFilterEntries(): List<FilterEntryEntity> {
+        return filterListDao.getAllFilterEntries()
+    }
+
+    suspend fun replaceLocalFilterEntries(entries: List<FilterEntryEntity>) {
+        filterListDao.clearFilterEntries()
+        if (entries.isNotEmpty()) filterListDao.insertFilterEntries(entries)
+    }
+
+    suspend fun getPackageGroups(): List<PackageGroupEntity> {
+        return filterListDao.getAllPackageGroups()
+    }
+
+    suspend fun getPackageGroupItems(): List<PackageGroupItemEntity> {
+        return filterListDao.getAllPackageGroupItems()
+    }
+
+    suspend fun replacePackageGroups(groups: List<PackageGroupEntity>, itemPackages: List<List<String>>) {
+        filterListDao.replacePackageGroups(groups, itemPackages)
     }
 
     // 应用相关方法

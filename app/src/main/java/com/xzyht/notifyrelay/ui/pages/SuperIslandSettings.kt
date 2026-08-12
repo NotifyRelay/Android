@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -36,17 +35,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.data.FilterConfigDefaults
 import notifyrelay.data.StorageManager
 import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Switch
-import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Surface
+import top.yukonga.miuix.kmp.basic.Switch
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -60,11 +59,8 @@ private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_wind
 private const val SPEC_INJECTION_MODE_KEY = "spec_injection_mode"
 private const val MIRROR_FILTER_ENABLED_KEY = "super_island_mirror_filter_enabled"
 
-private val DEFAULT_MIRROR_PACKAGES = listOf(
-    "com.xiaomi.bluetooth",
-    "com.miui.mishare.connectivity",
-    "com.xiaomi.mirror"
-)
+private val DEFAULT_MIRROR_PACKAGES: List<String>
+    get() = FilterConfigDefaults.defaultMirrorPackages
 
 // 注入方式选项
 val specInjectionOptions = listOf(
@@ -222,11 +218,7 @@ fun UISuperIslandSettings() {
                 DEFAULT_MIRROR_PACKAGES.forEach { pkg ->
                     val isInstalled = installedPkgs.contains(pkg)
                     var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-                    var disabledDefaultsPkgs by remember { mutableStateOf(
-                        StorageManager.getString(context, "super_island_mirror_filter_disabled_defaults", "")
-                            .split(",").filter { it.isNotBlank() }.toSet()
-                    ) }
-                    val isEnabled = !disabledDefaultsPkgs.contains(pkg)
+                    val isEnabled = customPackages.find { it.packageName == pkg }?.enabled ?: true
 
                     LaunchedEffect(pkg) {
                         if (iconBitmap == null) {
@@ -255,18 +247,20 @@ fun UISuperIslandSettings() {
                         Switch(
                             checked = isEnabled,
                             onCheckedChange = { v ->
-                                val current = StorageManager.getString(context, "super_island_mirror_filter_disabled_defaults", "")
-                                val disabledSet = current.split(",").filter { it.isNotBlank() }.toMutableSet()
-                                if (v) disabledSet.remove(pkg) else disabledSet.add(pkg)
-                                val newValue = disabledSet.joinToString(",")
-                                StorageManager.putString(context, "super_island_mirror_filter_disabled_defaults", newValue)
-                                disabledDefaultsPkgs = disabledSet
+                                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
+                                    DatabaseRepository.getInstance(context).upsertMirrorFilterPackage(
+                                        SuperIslandMirrorFilterEntity(pkg, enabled = v)
+                                    )
+                                    withContext(Dispatchers.Main) {
+                                        loadCustomPackages()
+                                    }
+                                }
                             }
                         )
                     }
                 }
 
-                customPackages.forEach { pkgEntity ->
+                customPackages.filter { it.packageName !in DEFAULT_MIRROR_PACKAGES }.forEach { pkgEntity ->
                     key(pkgEntity.packageName) {
                         val pkg = pkgEntity.packageName
                         val isInstalled = installedPkgs.contains(pkg)

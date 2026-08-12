@@ -1,12 +1,18 @@
 package com.xzyht.notifyrelay.ui.pages
 
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.drawable.BitmapDrawable
 import android.widget.Toast
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -20,8 +26,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.createBitmap
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.ui.dialog.UpdateDialog
@@ -35,6 +44,7 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.milliseconds
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -76,7 +86,7 @@ fun UIAbout() {
     
     LaunchedEffect(proxyUrl) {
         snapshotFlow { proxyUrl }
-            .debounce(SAVE_DEBOUNCE_MS)
+            .debounce(SAVE_DEBOUNCE_MS.milliseconds)
             .onEach { url ->
                 StorageManager.putString(context, PROXY_URL_KEY, url)
             }
@@ -86,17 +96,48 @@ fun UIAbout() {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
 
+    // 应用图标（圆角矩形显示）
+    val appIcon = remember {
+        runCatching {
+            val pm = context.packageManager
+            val drawable = pm.getApplicationIcon(context.packageName)
+            if (drawable is BitmapDrawable) {
+                drawable.bitmap.asImageBitmap()
+            } else {
+                val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 96
+                val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 96
+                val bmp = createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bmp)
+                drawable.setBounds(0, 0, width, height)
+                drawable.draw(canvas)
+                bmp.asImageBitmap()
+            }
+        }.getOrNull()
+    }
+
     Column(
         modifier = Modifier
             .fillMaxWidth()
             .verticalScroll(scrollState)
     ) {
+        appIcon?.let {
+            Image(
+                bitmap = it,
+                contentDescription = "应用图标",
+                modifier = Modifier
+                    .padding(top = 24.dp)
+                    .size(72.dp)
+                    .clip(RoundedCornerShape(16.dp))
+                    .align(Alignment.CenterHorizontally)
+            )
+        }
+
         Text(
             text = "Notify Relay",
             style = textStyles.title1,
             color = colorScheme.primary,
             modifier = Modifier
-                .padding(top = 24.dp, bottom = 16.dp)
+                .padding(top = if (appIcon != null) 16.dp else 24.dp, bottom = 16.dp)
                 .align(Alignment.CenterHorizontally)
         )
 

@@ -5,8 +5,10 @@ import android.app.NotificationManager
 import android.content.Context
 import android.service.notification.StatusBarNotification
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
+import notifyrelay.data.database.entity.FilterEntryEntity
+import notifyrelay.data.database.repository.DatabaseRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
+import kotlinx.coroutines.runBlocking
 
 /**
  * 后端本机通知过滤器
@@ -18,18 +20,6 @@ object BackendLocalFilter {
     var filterOngoing: Boolean = true // 过滤持久化
     var filterNoTitleOrText: Boolean = true // 过滤空标题内容
     var filterImportanceNone: Boolean = true // 过滤IMPORTANCE_NONE
-
-    // 关键词持久化相关
-    // 统一的过滤条目（文本 + 包名）持久化
-    private const val KEY_FILTER_ENTRIES = "filter_entries"
-    private const val KEY_ENABLED_FILTER_ENTRIES = "enabled_filter_entries"
-    // 兼容旧存储 key（用于首次迁移）
-    private const val KEY_FOREGROUND_KEYWORDS = "foreground_keywords"
-    private const val KEY_ENABLED_FOREGROUND_KEYWORDS = "enabled_foreground_keywords"
-
-    // 旧包名过滤存储 key（用于首次迁移）
-    private const val KEY_PACKAGE_FILTER_LIST = "package_filter_list"
-    private const val KEY_ENABLED_PACKAGE_FILTERS = "enabled_package_filters"
 
     // 内置过滤条目（包含文本关键词条目和默认包名条目，均为不可删除的默认黑名单）
     private val builtinFilterEntries: Set<FilterEntry> = setOf(
@@ -58,112 +48,73 @@ object BackendLocalFilter {
         FilterEntry("", "com.miui.systemAdSolution")
     )
 
-    // 序列化分隔符（很少出现在关键词/包名里）
-    private const val ENTRY_DELIM = "\u001F"
-
-    // （已整合为 builtinFilterEntries）
-
-    // 获取自定义文本关键词集合（不含服务相关关键词）
     // FilterEntry 表示一条复合过滤规则：keyword 可空，packageName 可空
     data class FilterEntry(val keyword: String, val packageName: String)
 
-    private fun serialize(entry: FilterEntry): String {
-        val k = entry.keyword.replace(ENTRY_DELIM, "\\u001F")
-        val p = entry.packageName.replace(ENTRY_DELIM, "\\u001F")
-        return "$k$ENTRY_DELIM$p"
-    }
-
-    private fun deserialize(s: String): FilterEntry {
-        val parts = s.split(ENTRY_DELIM, limit = 2)
-        val k = parts.getOrNull(0)?.replace("\\u001F", ENTRY_DELIM) ?: ""
-        val p = parts.getOrNull(1)?.replace("\\u001F", ENTRY_DELIM) ?: ""
-        return FilterEntry(k, p)
-    }
-
-    // 获取所有过滤条目（包含内置关键词和默认包名过滤），会在首次读取时从旧存储迁移
+    // 获取所有过滤条目（包含内置关键词和默认包名过滤），表为空时初始化内置条目
     fun getFilterEntries(context: Context): Set<FilterEntry> {
-        val saved = StorageManager.getStringSet(context, KEY_FILTER_ENTRIES, emptySet(), StorageManager.PrefsType.FILTER)
-        if (saved.isNotEmpty()) {
-            return saved.map { deserialize(it) }.toSet()
+        val rows = runBlocking { DatabaseRepository.getInstance(context).getLocalFilterEntries() }
+        if (rows.isEmpty()) {
+            // 初始化：写入内置条目
+            val entries = builtinFilterEntries
+            runBlocking {
+                DatabaseRepository.getInstance(context).replaceLocalFilterEntries(
+                    entries.map { FilterEntryEntity(it.keyword, it.packageName, true) }
+                )
+            }
+            return entries
         }
-
-        // 迁移旧数据：把旧的关键词和包名列表合并为统一条目
-        val keywords = StorageManager.getStringSet(context, KEY_FOREGROUND_KEYWORDS, emptySet(), StorageManager.PrefsType.FILTER).toMutableSet()
-        val packages = StorageManager.getStringSet(context, KEY_PACKAGE_FILTER_LIST, emptySet(), StorageManager.PrefsType.FILTER).toMutableSet()
-    // 包含内置关键词（从 builtinFilterEntries 中提取文本条目）
-    val builtinKeywords = builtinFilterEntries.filter { it.keyword.isNotBlank() }.map { it.keyword }
-    keywords.addAll(builtinKeywords)
-
-        val entries = mutableSetOf<FilterEntry>()
-        keywords.forEach { k -> entries.add(FilterEntry(k, "")) }
-    // 默认包名过滤（从内置条目提取）
-    builtinFilterEntries.filter { it.packageName.isNotBlank() }.forEach { pkgEntry -> entries.add(pkgEntry) }
-        packages.forEach { pkg -> entries.add(FilterEntry("", pkg)) }
-
-        // 保存迁移结果
-        val ser = entries.map { serialize(it) }.toSet()
-        StorageManager.putStringSet(context, KEY_FILTER_ENTRIES, ser, StorageManager.PrefsType.FILTER)
-        return entries
+        return rows.map { FilterEntry(it.keyword, it.packageName) }.toSet()
     }
 
     // 获取内置默认关键词集合（兼容旧接口）
     fun getBuiltinKeywords(): Set<String> = builtinFilterEntries.filter { it.keyword.isNotBlank() }.map { it.keyword }.toSet()
 
-    // 获取启用的过滤条目集合（如果无启用集则默认启用全部）
+    // 获取启用的过滤条目集合（内置条目恒启用）
     fun getEnabledFilterEntries(context: Context): Set<FilterEntry> {
-        val saved = StorageManager.getStringSet(context, KEY_ENABLED_FILTER_ENTRIES, emptySet(), StorageManager.PrefsType.FILTER).toMutableSet()
         val all = getFilterEntries(context)
-
-        if (saved.isEmpty()) {
-            // 首次：默认启用全部
-            return all
-        }
-
-        // 有启用集合：解析并确保内置关键词条目被启用
-        val enabled = saved.map { deserialize(it) }.toMutableSet()
-        // 确保所有内置条目（包含内置关键词和默认包名）都默认启用
+        val rows = runBlocking { DatabaseRepository.getInstance(context).getLocalFilterEntries() }
+        val result = rows.filter { it.enabled }.map { FilterEntry(it.keyword, it.packageName) }.toMutableSet()
         builtinFilterEntries.forEach { entry ->
-            if (!enabled.contains(entry) && all.contains(entry)) enabled.add(entry)
+            if (all.contains(entry)) result.add(entry)
         }
-
-        // 保存回已标准化的启用集合（和所有条目取交集以移除无效条目）
-        val normalized = enabled.intersect(all).map { serialize(it) }.toSet()
-        StorageManager.putStringSet(context, KEY_ENABLED_FILTER_ENTRIES, normalized, StorageManager.PrefsType.FILTER)
-        return enabled.intersect(all)
+        return result
     }
 
     fun setFilterEntryEnabled(context: Context, entry: FilterEntry, enabled: Boolean) {
-        val all = getFilterEntries(context)
-        var enabledSet = StorageManager.getStringSet(context, KEY_ENABLED_FILTER_ENTRIES, emptySet(), StorageManager.PrefsType.FILTER).toMutableSet()
-        if (enabledSet.isEmpty()) enabledSet = all.map { serialize(it) }.toMutableSet()
-        val ser = serialize(entry)
-        if (enabled) enabledSet.add(ser) else enabledSet.remove(ser)
-        StorageManager.putStringSet(context, KEY_ENABLED_FILTER_ENTRIES, enabledSet, StorageManager.PrefsType.FILTER)
+        runBlocking {
+            val repo = DatabaseRepository.getInstance(context)
+            val rows = repo.getLocalFilterEntries().toMutableList()
+            val idx = rows.indexOfFirst { it.keyword == entry.keyword && it.packageName == entry.packageName }
+            if (idx >= 0) {
+                rows[idx] = rows[idx].copy(enabled = enabled)
+            } else {
+                rows.add(FilterEntryEntity(entry.keyword, entry.packageName, enabled))
+            }
+            repo.replaceLocalFilterEntries(rows)
+        }
     }
 
     fun addFilterEntry(context: Context, keyword: String, packageName: String) {
-        val entries = StorageManager.getStringSet(context, KEY_FILTER_ENTRIES, emptySet(), StorageManager.PrefsType.FILTER).toMutableSet()
         val entry = FilterEntry(keyword.trim(), packageName.trim())
-        entries.add(serialize(entry))
-        StorageManager.putStringSet(context, KEY_FILTER_ENTRIES, entries, StorageManager.PrefsType.FILTER)
-        // 新增默认启用
-        var enabled = StorageManager.getStringSet(context, KEY_ENABLED_FILTER_ENTRIES, emptySet(), StorageManager.PrefsType.FILTER).toMutableSet()
-        if (enabled.isEmpty()) enabled = entries.toMutableSet()
-        enabled.add(serialize(entry))
-        StorageManager.putStringSet(context, KEY_ENABLED_FILTER_ENTRIES, enabled, StorageManager.PrefsType.FILTER)
+        runBlocking {
+            val repo = DatabaseRepository.getInstance(context)
+            val rows = repo.getLocalFilterEntries().toMutableList()
+            if (rows.none { it.keyword == entry.keyword && it.packageName == entry.packageName }) {
+                rows.add(FilterEntryEntity(entry.keyword, entry.packageName, true))
+                repo.replaceLocalFilterEntries(rows)
+            }
+        }
     }
 
     fun removeFilterEntry(context: Context, keyword: String, packageName: String) {
         // 内置条目不可删除（包括内置文本关键词和默认包名）
         if ((packageName.isBlank() && builtinFilterEntries.any { it.keyword == keyword && it.keyword.isNotBlank() }) || (keyword.isBlank() && builtinFilterEntries.any { it.packageName == packageName && it.packageName.isNotBlank() })) return
-        val entries = StorageManager.getStringSet(context, KEY_FILTER_ENTRIES, emptySet(), StorageManager.PrefsType.FILTER).toMutableSet()
-        val ser = serialize(FilterEntry(keyword, packageName))
-        entries.remove(ser)
-        StorageManager.putStringSet(context, KEY_FILTER_ENTRIES, entries, StorageManager.PrefsType.FILTER)
-        // 同时移除启用状态
-        val enabled = StorageManager.getStringSet(context, KEY_ENABLED_FILTER_ENTRIES, emptySet(), StorageManager.PrefsType.FILTER).toMutableSet()
-        enabled.remove(ser)
-        StorageManager.putStringSet(context, KEY_ENABLED_FILTER_ENTRIES, enabled, StorageManager.PrefsType.FILTER)
+        runBlocking {
+            val repo = DatabaseRepository.getInstance(context)
+            val rows = repo.getLocalFilterEntries().filterNot { it.keyword == keyword && it.packageName == packageName }
+            repo.replaceLocalFilterEntries(rows)
+        }
     }
 
     // 兼容的旧 API：返回仅 keyword（package 为空）的集合

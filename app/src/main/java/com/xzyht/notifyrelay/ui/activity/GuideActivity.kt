@@ -41,12 +41,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.core.view.WindowCompat
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.servers.appslist.AppListHelper
 import kotlinx.coroutines.delay
+import kotlin.time.Duration.Companion.seconds
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
@@ -132,14 +134,11 @@ object GuideScreen {
     fun GuideScreen(onContinue: () -> Unit) {
         val context = LocalContext.current
         var permissionsGranted by remember { mutableStateOf(false) }
-        var showCheck by remember { mutableStateOf(false) }
         var hasNotification by remember { mutableStateOf(false) }
-        var hasUsage by remember { mutableStateOf(false) }
         var hasPost by remember { mutableStateOf(false) }
         var canQueryApps by remember { mutableStateOf(false) }
         // 可选权限状态
         var hasFloatNotification by remember { mutableStateOf(false) }
-        var hasDevScreenShareProtectOff by remember { mutableStateOf(false) }
 
         var hasBluetoothConnect by remember { mutableStateOf(false) }
         // Android 15+ 敏感通知权限
@@ -205,7 +204,7 @@ object GuideScreen {
     // 定期检查权限状态，确保开关能正确显示当前权限状态
     LaunchedEffect(Unit) {
         while (true) {
-            delay(1000) // 每秒检查一次
+            delay(1.seconds) // 每秒检查一次
             refreshPermissions()
         }
     }
@@ -314,14 +313,10 @@ object GuideScreen {
                         ),
                         checked = hasBluetoothConnect,
                         onCheckedChange = {
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-                                (context as? Activity)?.requestPermissions(
-                                    arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1001
-                                )
-                                showToast("开启后可优化设备发现速度，并以设备实际名称而非型号作为设备名")
-                            } else {
-                                showToast("当前系统无需蓝牙连接权限")
-                            }
+                            (context as? Activity)?.requestPermissions(
+                                arrayOf(Manifest.permission.BLUETOOTH_CONNECT), 1001
+                            )
+                            showToast("开启后可优化设备发现速度，并以设备实际名称而非型号作为设备名")
                         },
                         enabled = true
                     )
@@ -343,7 +338,7 @@ object GuideScreen {
                         onClick = {
                             showToast("跳转到电池优化设置，请将应用设为无限制")
                             val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
-                            intent.data = Uri.parse("package:${context.packageName}")
+                            intent.data = "package:${context.packageName}".toUri()
                             IntentUtils.startActivity(context, intent, true)
                         },
                         enabled = true
@@ -359,10 +354,10 @@ object GuideScreen {
                                     PermissionHelper.requestOverlayPermission(act)
                                 } ?: run {
                                     val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
-                                    intent.data = Uri.parse("package:${context.packageName}")
+                                    intent.data = "package:${context.packageName}".toUri()
                                     IntentUtils.startActivity(context, intent, true)
                                 }
-                            } catch (e: Exception) {
+                            } catch (_: Exception) {
                                 showToast("无法跳转悬浮窗设置，请手动在系统设置中允许悬浮窗权限")
                             }
                         },

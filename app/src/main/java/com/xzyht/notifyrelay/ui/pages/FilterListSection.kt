@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.createBitmap
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import kotlinx.coroutines.launch
@@ -86,7 +87,7 @@ fun FilterListSection(
         } else {
             val width = drawable?.intrinsicWidth?.takeIf { it > 0 } ?: 48
             val height = drawable?.intrinsicHeight?.takeIf { it > 0 } ?: 48
-            val bmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+            val bmp = createBitmap(width, height, Bitmap.Config.ARGB_8888)
             val canvas = Canvas(bmp)
             drawable?.setBounds(0, 0, width, height)
             drawable?.draw(canvas)

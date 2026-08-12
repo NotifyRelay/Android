@@ -20,12 +20,12 @@ import com.xzyht.notifyrelay.sync.MessageSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 
 // 全局变量，用于保存递增循环的进度值
@@ -83,7 +83,7 @@ fun showTestNotification(
             }
         } catch (e: Exception) {
             // 发送失败时记录日志
-            android.util.Log.e("SuperIslandTest", "发送超级岛数据失败: ${e.message}")
+            Logger.e("超级岛测试", "发送超级岛数据失败: ${e.message}")
         }
     } else {
         // 发送开关关闭时，仅在本地显示通知

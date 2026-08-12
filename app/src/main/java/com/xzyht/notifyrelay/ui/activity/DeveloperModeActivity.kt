@@ -30,7 +30,6 @@ import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 class DeveloperModeActivity : AppCompatActivity() {
 
     companion object {
-        private const val KEY_LOG_ENABLED = "log_enabled"
         private const val KEY_LOG_LEVEL = "log_level"
         private const val KEY_DEBUG_UI_ENABLED = "debug_ui_enabled"
         private const val KEY_FILTERED_NOTIFICATION_LOG_ENABLED = "filtered_notification_log_enabled"
@@ -40,7 +39,7 @@ class DeveloperModeActivity : AppCompatActivity() {
 
         fun initLogConfig(context: Context) {
             val logLevelOrdinal = StorageManager.getInt(context, KEY_LOG_LEVEL, Logger.Level.INFO.ordinal)
-            Logger.CURRENT_LEVEL = Logger.Level.values().getOrElse(logLevelOrdinal) { Logger.Level.INFO }
+            Logger.CURRENT_LEVEL = Logger.Level.entries.getOrElse(logLevelOrdinal) { Logger.Level.INFO }
         }
 
         fun initDebugUiConfig(context: Context) {
