@@ -60,13 +60,14 @@ object RemoteMediaSessionManager {
     // 定时检查超时会话的间隔（毫秒）
     private const val CLEANUP_INTERVAL_MS = 3 * 1000L
     
-    // 用于处理延迟任务的Handler
+    // 用于处理延迟任务的Handler（所有操作都在主线程串行执行）
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
-    
+
     // 定期检查超时会话的任务
     private lateinit var cleanupRunnable: Runnable
 
     // 清理循环是否运行中（有活跃会话时才运行，无会话即停止，避免常驻空转）
+    // 访问保护：所有读写都通过 handler 串行执行
     @Volatile
     private var cleanupLoopRunning = false
     
@@ -77,14 +78,14 @@ object RemoteMediaSessionManager {
                 // 使用保存的应用上下文
                 val context = applicationContext
                 if (context != null) {
-                    cleanupTimeoutSessions(context)
+                    cleanupTimeoutSessionsOnHandler(context)
                 } else {
                     Logger.w("RemoteMediaSessionManager", "应用上下文未初始化，跳过定期检查")
                 }
             } catch (e: Exception) {
                 Logger.e("RemoteMediaSessionManager", "定期检查超时会话失败", e)
             } finally {
-                // 仍有活跃会话才继续调度，否则停止循环
+                // 仍有活跃会话才继续调度，否则停止循环（已在 handler 线程，直接读写）
                 if (cleanupLoopRunning) {
                     handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
                 }
@@ -114,22 +115,28 @@ object RemoteMediaSessionManager {
 
     /**
      * 确保超时会话清理循环在运行（有活跃媒体会话时调用）
+     * 通过 handler 串行执行，保护 cleanupLoopRunning 读写和 callback 调度
      */
     private fun ensureCleanupLoop() {
-        if (cleanupLoopRunning) {
-            return
+        handler.post {
+            if (cleanupLoopRunning) {
+                return@post
+            }
+            cleanupLoopRunning = true
+            handler.removeCallbacks(cleanupRunnable)
+            handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
         }
-        cleanupLoopRunning = true
-        handler.removeCallbacks(cleanupRunnable)
-        handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
     }
 
     /**
      * 停止超时会话清理循环（无活跃会话时）
+     * 通过 handler 串行执行，保护 cleanupLoopRunning 读写和 callback 调度
      */
     private fun stopCleanupLoop() {
-        cleanupLoopRunning = false
-        handler.removeCallbacks(cleanupRunnable)
+        handler.post {
+            cleanupLoopRunning = false
+            handler.removeCallbacks(cleanupRunnable)
+        }
     }
 
     fun isEnabled(context: Context): Boolean {
@@ -195,6 +202,17 @@ object RemoteMediaSessionManager {
         json: JSONObject,
         device: DeviceInfo
     ) {
+        // 所有入口逻辑都串行在 handler 上执行，保护会话状态读写和清理循环调度
+        handler.post {
+            processMediaMessageOnHandler(context, json, device)
+        }
+    }
+
+    private fun processMediaMessageOnHandler(
+        context: Context,
+        json: JSONObject,
+        device: DeviceInfo
+    ) {
         if (!shouldReceiveMediaMessage(context)) {
             Logger.d("RemoteMediaSessionManager", "远端媒体消息未接收或未满足音频条件，伪造结束以关闭浮窗")
             closeSessionForDevice(device, "接收条件不满足")
@@ -247,10 +265,10 @@ object RemoteMediaSessionManager {
 
             mediaFeatureIdCache[device.uuid] = currentFeatureId
             mediaLastUpdateTime[device.uuid] = System.currentTimeMillis()
-            cleanupTimeoutSessions(context)
+            cleanupTimeoutSessionsOnHandler(context)
             setupResendTask(context, device.uuid, currentSession!!, device)
-            // 有活跃会话，确保清理循环运行
-            ensureCleanupLoop()
+            // 有活跃会话，确保清理循环运行（已在 handler 线程，直接执行）
+            ensureCleanupLoopOnHandler()
 
             val currentState = buildMediaState(finalTitle, finalText, finalCoverUrl)
             applyMediaSessionState(sourceKey, currentState, appName, context)
@@ -259,6 +277,18 @@ object RemoteMediaSessionManager {
         } catch (e: Exception) {
             Logger.e("RemoteMediaSessionManager", "处理远端媒体消息失败", e)
         }
+    }
+
+    /**
+     * 确保清理循环运行（handler 线程内部调用，无需再 post）
+     */
+    private fun ensureCleanupLoopOnHandler() {
+        if (cleanupLoopRunning) {
+            return
+        }
+        cleanupLoopRunning = true
+        handler.removeCallbacks(cleanupRunnable)
+        handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
     }
 
     fun clearSession() {
@@ -341,19 +371,19 @@ object RemoteMediaSessionManager {
     }
     
     /**
-     * 检查并清理超时的媒体会话
+     * 检查并清理超时的媒体会话（handler 线程内部调用）
      */
-    private fun cleanupTimeoutSessions(context: Context) {
+    private fun cleanupTimeoutSessionsOnHandler(context: Context) {
         val currentTime = System.currentTimeMillis()
         val timeoutDevices = mutableListOf<String>()
-        
+
         // 找出超时的设备
         for ((deviceUuid, lastUpdateTime) in mediaLastUpdateTime) {
             if (currentTime - lastUpdateTime > MEDIA_SESSION_TIMEOUT_MS) {
                 timeoutDevices.add(deviceUuid)
             }
         }
-        
+
         // 清理超时会话
         for (deviceUuid in timeoutDevices) {
             val sourceKey = SOURCE_KEY_PREFIX + "_" + deviceUuid
@@ -379,9 +409,10 @@ object RemoteMediaSessionManager {
             }
         }
 
-        // 无任何活跃会话时停止清理循环，避免常驻空转
+        // 无任何活跃会话时停止清理循环，避免常驻空转（已在 handler 线程，直接执行）
         if (mediaLastUpdateTime.isEmpty()) {
-            stopCleanupLoop()
+            cleanupLoopRunning = false
+            handler.removeCallbacks(cleanupRunnable)
         }
     }
     
