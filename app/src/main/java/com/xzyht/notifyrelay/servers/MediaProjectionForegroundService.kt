@@ -10,6 +10,8 @@ import android.os.IBinder
 
 class MediaProjectionForegroundService : Service() {
 
+    private var foregroundStarted = false
+
     override fun onCreate() {
         super.onCreate()
         val channelId = "media_projection_fg"
@@ -30,12 +32,14 @@ class MediaProjectionForegroundService : Service() {
             .build()
         try {
             startForeground(1002, notification)
+            foregroundStarted = true
         } catch (_: Exception) {
             stopSelf()
         }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        if (!foregroundStarted) return START_NOT_STICKY
         // onCreate 已完成 startForeground，此时服务已注册为 mediaProjection 前台服务，
         // 通知外部逻辑可以安全调用 getMediaProjection（Android 14+ 的硬性要求）
         markReady()
