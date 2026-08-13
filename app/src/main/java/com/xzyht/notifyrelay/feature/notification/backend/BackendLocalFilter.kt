@@ -9,6 +9,8 @@ import notifyrelay.data.database.entity.FilterEntryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 /**
  * 后端本机通知过滤器
@@ -55,22 +57,17 @@ object BackendLocalFilter {
     // FilterEntry 表示一条复合过滤规则：keyword 可空，packageName 可空
     data class FilterEntry(val keyword: String, val packageName: String)
 
+    private val saveLock = Mutex()
+
+    @Volatile
+    private var cachedRows: List<FilterEntryEntity>? = null
+
     /**
      * 获取所有过滤条目（包含内置关键词和默认包名过滤），表为空时初始化内置条目。
      * 单次查询：仅在结果为空时写入内置条目并返回，避免每次调用产生 2 次查询。
      */
     suspend fun getFilterEntries(context: Context): Set<FilterEntry> {
-        val repo = DatabaseRepository.getInstance(context)
-        val rows = repo.getLocalFilterEntries()
-        if (rows.isEmpty()) {
-            // 初始化：写入内置条目（默认启用）
-            val entries = builtinFilterEntries
-            repo.replaceLocalFilterEntries(
-                entries.map { FilterEntryEntity(it.keyword, it.packageName, true) }
-            )
-            return entries
-        }
-        return rows.map { FilterEntry(it.keyword, it.packageName) }.toSet()
+        return rowsCached(context).map { FilterEntry(it.keyword, it.packageName) }.toSet()
     }
 
     // 获取内置默认关键词集合（兼容旧接口）
@@ -81,47 +78,64 @@ object BackendLocalFilter {
      * 单次查询：基于同一份 rows 派生启用集合，不再强制加回内置条目（允许用户禁用内置条目）。
      */
     suspend fun getEnabledFilterEntries(context: Context): Set<FilterEntry> {
-        val repo = DatabaseRepository.getInstance(context)
-        val rows = repo.getLocalFilterEntries()
-        if (rows.isEmpty()) {
-            // 表为空时初始化内置条目并返回全部启用
-            val entries = builtinFilterEntries
-            repo.replaceLocalFilterEntries(
-                entries.map { FilterEntryEntity(it.keyword, it.packageName, true) }
-            )
-            return entries
-        }
-        return rows.filter { it.enabled }.map { FilterEntry(it.keyword, it.packageName) }.toSet()
+        return rowsCached(context).filter { it.enabled }.map { FilterEntry(it.keyword, it.packageName) }.toSet()
     }
 
     suspend fun setFilterEntryEnabled(context: Context, entry: FilterEntry, enabled: Boolean) {
-        val repo = DatabaseRepository.getInstance(context)
-        val rows = repo.getLocalFilterEntries().toMutableList()
-        val idx = rows.indexOfFirst { it.keyword == entry.keyword && it.packageName == entry.packageName }
-        if (idx >= 0) {
-            rows[idx] = rows[idx].copy(enabled = enabled)
-        } else {
-            rows.add(FilterEntryEntity(entry.keyword, entry.packageName, enabled))
+        saveLock.withLock {
+            val repo = DatabaseRepository.getInstance(context)
+            val rows = repo.getLocalFilterEntries().toMutableList()
+            val idx = rows.indexOfFirst { it.keyword == entry.keyword && it.packageName == entry.packageName }
+            if (idx >= 0) {
+                rows[idx] = rows[idx].copy(enabled = enabled)
+            } else {
+                rows.add(FilterEntryEntity(entry.keyword, entry.packageName, enabled))
+            }
+            repo.replaceLocalFilterEntries(rows)
+            invalidateCache()
         }
-        repo.replaceLocalFilterEntries(rows)
     }
 
     suspend fun addFilterEntry(context: Context, keyword: String, packageName: String) {
-        val entry = FilterEntry(keyword.trim(), packageName.trim())
-        val repo = DatabaseRepository.getInstance(context)
-        val rows = repo.getLocalFilterEntries().toMutableList()
-        if (rows.none { it.keyword == entry.keyword && it.packageName == entry.packageName }) {
-            rows.add(FilterEntryEntity(entry.keyword, entry.packageName, true))
-            repo.replaceLocalFilterEntries(rows)
+        saveLock.withLock {
+            val entry = FilterEntry(keyword.trim(), packageName.trim())
+            val repo = DatabaseRepository.getInstance(context)
+            val rows = repo.getLocalFilterEntries().toMutableList()
+            if (rows.none { it.keyword == entry.keyword && it.packageName == entry.packageName }) {
+                rows.add(FilterEntryEntity(entry.keyword, entry.packageName, true))
+                repo.replaceLocalFilterEntries(rows)
+            }
+            invalidateCache()
         }
     }
 
     suspend fun removeFilterEntry(context: Context, keyword: String, packageName: String) {
         // 内置条目不可删除（包括内置文本关键词和默认包名）
         if ((packageName.isBlank() && builtinFilterEntries.any { it.keyword == keyword && it.keyword.isNotBlank() }) || (keyword.isBlank() && builtinFilterEntries.any { it.packageName == packageName && it.packageName.isNotBlank() })) return
+        saveLock.withLock {
+            val repo = DatabaseRepository.getInstance(context)
+            val rows = repo.getLocalFilterEntries().filterNot { it.keyword == keyword && it.packageName == packageName }
+            repo.replaceLocalFilterEntries(rows)
+            invalidateCache()
+        }
+    }
+
+    private suspend fun rowsCached(context: Context): List<FilterEntryEntity> {
+        cachedRows?.let { return it }
         val repo = DatabaseRepository.getInstance(context)
-        val rows = repo.getLocalFilterEntries().filterNot { it.keyword == keyword && it.packageName == packageName }
-        repo.replaceLocalFilterEntries(rows)
+        val rows = repo.getLocalFilterEntries()
+        if (rows.isEmpty()) {
+            val builtins = builtinFilterEntries.map { FilterEntryEntity(it.keyword, it.packageName, true) }
+            repo.replaceLocalFilterEntries(builtins)
+            builtins.also { cachedRows = it }
+            return builtins
+        }
+        rows.also { cachedRows = it }
+        return rows
+    }
+
+    private fun invalidateCache() {
+        cachedRows = null
     }
 
     // 兼容的旧 API：返回仅 keyword（package 为空）的集合
@@ -167,18 +181,10 @@ object BackendLocalFilter {
         if (filterSelf && sbn.packageName == context.packageName) return false
 
         // 单次查询：基于同一份 rows 派生 enabled 与 all，避免热路径上重复查询
-        val repo = DatabaseRepository.getInstance(context)
-        val rows = repo.getLocalFilterEntries()
-        // 表为空时初始化内置条目（与 getFilterEntries 一致）
-        if (rows.isEmpty()) {
-            repo.replaceLocalFilterEntries(
-                builtinFilterEntries.map { FilterEntryEntity(it.keyword, it.packageName, true) }
-            )
-        }
+        val rows = rowsCached(context)
 
         // 包名过滤：仅使用 enabled 集合
-        val enabledEntries = if (rows.isEmpty()) builtinFilterEntries
-        else rows.filter { it.enabled }.map { FilterEntry(it.keyword, it.packageName) }.toSet()
+        val enabledEntries = rows.filter { it.enabled }.map { FilterEntry(it.keyword, it.packageName) }.toSet()
         val enabledPackageFilters = enabledEntries.filter { it.keyword.isBlank() && it.packageName.isNotBlank() }.map { it.packageName }.toSet()
         if (enabledPackageFilters.contains(sbn.packageName)) return false
 

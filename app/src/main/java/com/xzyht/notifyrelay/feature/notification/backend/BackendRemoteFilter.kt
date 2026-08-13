@@ -655,7 +655,7 @@ object RemoteFilterConfig {
         else -> emptyList()
     }
 
-    /** 条目是否启用（无启用状态时默认启用） */
+    /** 条目是否启用（迁移后默认启用） */
     fun isActiveEntryEnabled(pkg: String, keyword: String): Boolean {
         val ser = serializeFilterEntry(pkg, keyword)
         return if (filterMode == "black") blackListEnabled.contains(ser)

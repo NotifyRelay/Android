@@ -428,12 +428,13 @@ abstract class AppDatabase : RoomDatabase() {
         private fun migrateRemoteBlackWhiteList(db: SupportSQLiteDatabase, table: String, listKey: String, enabledKey: String) {
             val list = parseJsonSet(readConfigValue(db, listKey))
             if (list.isEmpty()) return
-            val enabled = parseJsonSet(readConfigValue(db, enabledKey))
+            val enabledValue = readConfigValue(db, enabledKey)
+            val enabled = parseJsonSet(enabledValue)
             list.forEach { ser ->
                 val (pkg, kw) = parseFilterEntry(ser)
                 db.execSQL(
                     "INSERT INTO $table (packageName, keyword, enabled) VALUES (?, ?, ?)",
-                    arrayOf<Any?>(pkg, kw, if (enabled.contains(ser)) 1 else 0)
+                    arrayOf<Any?>(pkg, kw, if (enabledValue.isNullOrBlank() || enabled.contains(ser)) 1 else 0)
                 )
             }
         }
@@ -460,14 +461,15 @@ abstract class AppDatabase : RoomDatabase() {
         private fun migrateLocalFilterEntries(db: SupportSQLiteDatabase) {
             val entries = parseJsonSet(readConfigValue(db, "filter_filter_entries"))
             if (entries.isEmpty()) return
-            val enabled = parseJsonSet(readConfigValue(db, "filter_enabled_filter_entries"))
+            val enabledValue = readConfigValue(db, "filter_enabled_filter_entries")
+            val enabled = parseJsonSet(enabledValue)
             entries.forEach { ser ->
                 val parts = ser.split("\u001F", limit = 2)
                 val kw = parts.getOrNull(0)?.replace("\\u001F", "\u001F") ?: ""
                 val pkg = parts.getOrNull(1)?.replace("\\u001F", "\u001F") ?: ""
                 db.execSQL(
                     "INSERT INTO filter_entries (keyword, packageName, enabled) VALUES (?, ?, ?)",
-                    arrayOf<Any?>(kw, pkg, if (enabled.contains(ser)) 1 else 0)
+                    arrayOf<Any?>(kw, pkg, if (enabledValue.isNullOrBlank() || enabled.contains(ser)) 1 else 0)
                 )
             }
         }
@@ -494,7 +496,7 @@ abstract class AppDatabase : RoomDatabase() {
             // 自定义组（使用 parseJsonList 保留 JSON 数组顺序，避免 Set 反序列化导致命名错位）
             val customRaw = parseJsonList(readConfigValue(db, "filter_package_groups"))
             val customEnabled = (readConfigValue(db, "filter_custom_group_enabled") ?: "")
-                .split(",").map { it == "1" }
+                .split(",").filter { it.isNotBlank() }.map { it == "1" }
             customRaw.forEachIndexed { idx, groupStr ->
                 val pkgs = groupStr.split("|").map { it.trim() }.filter { it.isNotBlank() }
                 if (pkgs.isEmpty()) return@forEachIndexed
