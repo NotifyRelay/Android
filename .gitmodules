@@ -8,5 +8,5 @@
 	branch = library
 [submodule "nativecore/notify-relay-core"]
 	path = nativecore/notify-relay-core
-	url = git@github.com:NotifyRelay/core.git
+	url = https://github.com/NotifyRelay/core.git
     branch = main
