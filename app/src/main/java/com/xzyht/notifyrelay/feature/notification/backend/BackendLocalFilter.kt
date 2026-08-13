@@ -121,17 +121,19 @@ object BackendLocalFilter {
     }
 
     private suspend fun rowsCached(context: Context): List<FilterEntryEntity> {
-        cachedRows?.let { return it }
-        val repo = DatabaseRepository.getInstance(context)
-        val rows = repo.getLocalFilterEntries()
-        if (rows.isEmpty()) {
-            val builtins = builtinFilterEntries.map { FilterEntryEntity(it.keyword, it.packageName, true) }
-            repo.replaceLocalFilterEntries(builtins)
-            builtins.also { cachedRows = it }
-            return builtins
+        return saveLock.withLock {
+            cachedRows?.let { return@withLock it }
+            val repo = DatabaseRepository.getInstance(context)
+            val rows = repo.getLocalFilterEntries()
+            if (rows.isEmpty()) {
+                val builtins = builtinFilterEntries.map { FilterEntryEntity(it.keyword, it.packageName, true) }
+                repo.replaceLocalFilterEntries(builtins)
+                builtins.also { cachedRows = it }
+                return@withLock builtins
+            }
+            rows.also { cachedRows = it }
+            rows
         }
-        rows.also { cachedRows = it }
-        return rows
     }
 
     private fun invalidateCache() {
