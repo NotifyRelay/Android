@@ -156,6 +156,7 @@ class AudioRelayPlayer(private val context: Context) {
         val frameIntervalMs = 20L
         var nextFrameAt = 0L
         captureJob = CoroutineScope(Dispatchers.IO).launch {
+            val record = audioRecord ?: return@launch
             try {
                 while (isActive && isRunning) {
                     // 按实时速率节流发送（50 帧/秒），避免积压突发导致对端 UDP 缓冲溢出丢包
@@ -168,7 +169,7 @@ class AudioRelayPlayer(private val context: Context) {
                     }
                     nextFrameAt += frameIntervalMs
 
-                    val read = audioRecord?.read(buf, 0, buf.size) ?: -1
+                    val read = record.read(buf, 0, buf.size)
                     if (read < 0) {
                         Logger.w("AudioRelay", "屏幕音频捕获读取错误: $read")
                         break
@@ -182,28 +183,43 @@ class AudioRelayPlayer(private val context: Context) {
                 }
             } finally {
                 try {
-                    audioRecord?.stop()
+                    record.stop()
                 } catch (_: Exception) {}
                 try {
-                    audioRecord?.release()
+                    record.release()
                 } catch (_: Exception) {}
-                audioRecord = null
+                if (audioRecord === record) audioRecord = null
             }
         }
     }
 
     fun stopSendCapture() {
+        val record = audioRecord
+        audioRecord = null
+        try {
+            record?.stop()
+        } catch (_: Exception) {}
         captureJob?.cancel()
         captureJob = null
     }
 
     suspend fun stopSendCaptureAndJoin() {
+        val record = audioRecord
+        audioRecord = null
+        try {
+            record?.stop()
+        } catch (_: Exception) {}
         captureJob?.cancelAndJoin()
         captureJob = null
     }
 
     fun stop() {
         isRunning = false
+        val record = audioRecord
+        audioRecord = null
+        try {
+            record?.stop()
+        } catch (_: Exception) {}
         captureJob?.cancel()
         captureJob = null
         audioJob?.cancel()
