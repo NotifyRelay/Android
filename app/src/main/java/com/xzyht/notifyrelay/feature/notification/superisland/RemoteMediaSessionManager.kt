@@ -64,16 +64,17 @@ object RemoteMediaSessionManager {
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
 
     // 定期检查超时会话的任务
-    private lateinit var cleanupRunnable: Runnable
+    @Volatile
+    private var cleanupRunnable: Runnable? = null
 
     // 清理循环是否运行中（有活跃会话时才运行，无会话即停止，避免常驻空转）
     // 访问保护：所有读写都通过 handler 串行执行
     @Volatile
     private var cleanupLoopRunning = false
     
-    // 初始化定期检查任务
-    private fun initCleanupRunnable() {
-        cleanupRunnable = Runnable {
+    // 创建定期检查任务
+    private fun createCleanupRunnable(): Runnable {
+        return Runnable {
             try {
                 // 使用保存的应用上下文
                 val context = applicationContext
@@ -87,7 +88,7 @@ object RemoteMediaSessionManager {
             } finally {
                 // 仍有活跃会话才继续调度，否则停止循环（已在 handler 线程，直接读写）
                 if (cleanupLoopRunning) {
-                    handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
+                    cleanupRunnable?.let { handler.postDelayed(it, CLEANUP_INTERVAL_MS) }
                 }
             }
         }
@@ -108,9 +109,6 @@ object RemoteMediaSessionManager {
         val mode = getReceiveMode(context)
         isEnabled = mode != MediaMessageReceiveMode.Off
         Logger.i("RemoteMediaSessionManager", "远端媒体超级岛接收模式: $mode")
-        
-        // 初始化定期检查任务（惰性启动：收到媒体会话时才运行，避免常驻空转）
-        initCleanupRunnable()
     }
 
     /**
@@ -123,8 +121,9 @@ object RemoteMediaSessionManager {
                 return@post
             }
             cleanupLoopRunning = true
-            handler.removeCallbacks(cleanupRunnable)
-            handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
+            val runnable = cleanupRunnable ?: createCleanupRunnable().also { cleanupRunnable = it }
+            handler.removeCallbacks(runnable)
+            handler.postDelayed(runnable, CLEANUP_INTERVAL_MS)
         }
     }
 
@@ -135,7 +134,7 @@ object RemoteMediaSessionManager {
     private fun stopCleanupLoop() {
         handler.post {
             cleanupLoopRunning = false
-            handler.removeCallbacks(cleanupRunnable)
+            cleanupRunnable?.let { handler.removeCallbacks(it) }
         }
     }
 
@@ -287,8 +286,9 @@ object RemoteMediaSessionManager {
             return
         }
         cleanupLoopRunning = true
-        handler.removeCallbacks(cleanupRunnable)
-        handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
+        val runnable = cleanupRunnable ?: createCleanupRunnable().also { cleanupRunnable = it }
+        handler.removeCallbacks(runnable)
+        handler.postDelayed(runnable, CLEANUP_INTERVAL_MS)
     }
 
     fun clearSession() {
@@ -412,7 +412,7 @@ object RemoteMediaSessionManager {
         // 无任何活跃会话时停止清理循环，避免常驻空转（已在 handler 线程，直接执行）
         if (mediaLastUpdateTime.isEmpty()) {
             cleanupLoopRunning = false
-            handler.removeCallbacks(cleanupRunnable)
+            cleanupRunnable?.let { handler.removeCallbacks(it) }
         }
     }
     
