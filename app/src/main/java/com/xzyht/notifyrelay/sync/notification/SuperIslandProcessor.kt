@@ -27,6 +27,8 @@ object SuperIslandProcessor {
     // 锁屏去重 TTL（毫秒）：同一远端岛在锁屏期间的重复包直接丢弃
     private const val SI_DEDUP_TTL_MS = 300_000L
 
+    private val registeredDedupKeys = java.util.concurrent.ConcurrentHashMap<String, MutableSet<String>>()
+
     private val DEFAULT_MIRROR_PACKAGES: List<String>
         get() = FilterConfigDefaults.defaultMirrorPackages
     
@@ -48,6 +50,20 @@ object SuperIslandProcessor {
     private fun dedupClear(manager: DeviceConnectionManager, dedupKey: String) {
         val ctx = manager.rustContextInternal ?: return
         try { NativeCore.dedup(ctx, 2, dedupKey, 0L, 0L) } catch (_: Exception) {}
+    }
+
+    private fun clearDedupBySource(manager: DeviceConnectionManager, sourceKey: String) {
+        registeredDedupKeys.remove(sourceKey)?.forEach { dedupClear(manager, it) }
+    }
+
+    private fun clearDedupBySuffix(manager: DeviceConnectionManager, remoteUuid: String, mappedPkg: String, featureSuffix: String) {
+        val matched = registeredDedupKeys.entries.filter {
+            it.key.startsWith("$remoteUuid|$mappedPkg|") && it.key.substringAfterLast("|") == featureSuffix
+        }
+        matched.forEach {
+            it.value.forEach { key -> dedupClear(manager, key) }
+            registeredDedupKeys.remove(it.key)
+        }
     }
 
     fun process(
@@ -126,7 +142,7 @@ object SuperIslandProcessor {
                             if (explicitFeatureKey.contains("|")) {
                                 dismissBySourceId(explicitFeatureKey)
                                 SuperIslandRemoteStore.removeExact(explicitFeatureKey)
-                                dedupClear(manager, explicitFeatureKey)
+                                clearDedupBySource(manager, sourceKey)
                                 Logger.i("超级岛", "收到终止通知(显式完整 sourceId)，移除去重缓存: $dedupKey -> source=$explicitFeatureKey")
                                 return true
                             }
@@ -138,7 +154,7 @@ object SuperIslandProcessor {
                                     try { 
                                         dismissBySourceId(rid)
                                     } catch (_: Exception) {}
-                                    dedupClear(manager, "${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
+                                    clearDedupBySuffix(manager, remoteUuid, mappedPkg, rid.substringAfterLast("|"))
                                     Logger.i("超级岛", "收到终止通知(显式 featureKey 匹配)，移除并关闭通知: $rid -> featureKey=$explicitFeatureKey")
                                 }
                                 return true
@@ -155,7 +171,7 @@ object SuperIslandProcessor {
                                 dismissBySourceId(rid)
                             } catch (_: Exception) {}
                             // 同步移除去重缓存（若存在）
-                            dedupClear(manager, "${remoteUuid}|${mappedPkg}|${rid.substringAfterLast("|")}")
+                            clearDedupBySuffix(manager, remoteUuid, mappedPkg, rid.substringAfterLast("|"))
                             Logger.i("超级岛", "收到终止通知，按前缀移除并关闭通知: $rid")
                         }
                         return true
@@ -165,7 +181,7 @@ object SuperIslandProcessor {
                     try { 
                         dismissBySourceId(sourceKey)
                     } catch (_: Exception) {}
-                    dedupClear(manager, dedupKey)
+                    clearDedupBySource(manager, sourceKey)
                     Logger.i("超级岛", "收到终止通知(兜底)，尝试移除: $sourceKey")
                     return true
                 } catch (e: Exception) {
@@ -190,6 +206,7 @@ object SuperIslandProcessor {
                         Logger.i("超级岛", "锁屏重复通知去重: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
                         return true
                     } else {
+                        registeredDedupKeys.computeIfAbsent(sourceKey) { mutableSetOf() }.add(dedupKey)
                         Logger.i("超级岛", "首次处理超级岛通知，添加到去重缓存: $dedupKey, title=${mTitle ?: "无标题"}")
                     }
                 }
@@ -285,7 +302,7 @@ object SuperIslandProcessor {
             }
 
             if (merged == null && isLocked) {
-                dedupClear(manager, dedupKey)
+                clearDedupBySource(manager, sourceKey)
                 Logger.i("超级岛", "合并失败，移除去重缓存: $dedupKey")
             }
 
