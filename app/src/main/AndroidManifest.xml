@@ -75,6 +75,9 @@
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="通知监听与同步转发服务" />
         </service>
         <!-- 注册通知点击广播接收器 -->
         <receiver
@@ -121,14 +124,11 @@
         <service
             android:name=".servers.AudioRelayForegroundService"
             android:exported="false"
-            android:foregroundServiceType="mediaPlayback|specialUse" />
-
-        <!-- 剪贴板监控服务 -->
-        <service
-            android:name=".servers.ClipboardMonitorService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync"
-            android:stopWithTask="false" />
+            android:foregroundServiceType="mediaPlayback|specialUse">
+            <meta-data
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="音频中继前台服务" />
+        </service>
 
         <!-- 剪贴板同步透明Activity -->
         <activity

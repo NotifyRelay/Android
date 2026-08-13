@@ -28,40 +28,67 @@ class MediaProjectionForegroundService : Service() {
             .setContentText("正在通过屏幕捕获获取音频…")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .build()
-        startForeground(1002, notification)
+        try {
+            startForeground(1002, notification)
+        } catch (_: Exception) {
+            stopSelf()
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         // onCreate 已完成 startForeground，此时服务已注册为 mediaProjection 前台服务，
         // 通知外部逻辑可以安全调用 getMediaProjection（Android 14+ 的硬性要求）
-        isForegroundReady = true
-        onForegroundReady?.invoke()
+        markReady()
         return START_NOT_STICKY
     }
 
     override fun onDestroy() {
-        isForegroundReady = false
-        onForegroundReady = null
+        synchronized(lock) {
+            isForegroundReady = false
+            callbackInvoked = false
+            onForegroundReady = null
+        }
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     companion object {
+        private val lock = Any()
+
         @Volatile
         private var isForegroundReady = false
+
+        @Volatile
+        private var callbackInvoked = false
 
         var onForegroundReady: (() -> Unit)? = null
             set(value) {
                 field = value
-                if (value != null && isForegroundReady) {
-                    value.invoke()
+                synchronized(lock) {
+                    if (value != null && isForegroundReady && !callbackInvoked) {
+                        callbackInvoked = true
+                        value.invoke()
+                    }
                 }
             }
 
+        private fun markReady() {
+            synchronized(lock) {
+                isForegroundReady = true
+                if (!callbackInvoked) {
+                    callbackInvoked = true
+                    onForegroundReady?.invoke()
+                }
+            }
+        }
+
         fun stop(context: Context) {
-            isForegroundReady = false
-            onForegroundReady = null
+            synchronized(lock) {
+                isForegroundReady = false
+                callbackInvoked = false
+                onForegroundReady = null
+            }
             context.stopService(Intent(context, MediaProjectionForegroundService::class.java))
         }
     }

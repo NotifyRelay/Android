@@ -55,7 +55,11 @@ class AudioRelayForegroundService : Service() {
         } else {
             ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PLAYBACK
         }
-        ServiceCompat.startForeground(this, NOTIFY_ID, notification, foregroundType)
+        try {
+            ServiceCompat.startForeground(this, NOTIFY_ID, notification, foregroundType)
+        } catch (_: Exception) {
+            stopSelf()
+        }
         return START_NOT_STICKY
     }
 

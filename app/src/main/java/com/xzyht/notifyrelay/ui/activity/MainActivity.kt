@@ -117,13 +117,15 @@ class MainActivity : FragmentActivity() {
 
     // 屏幕捕获授权结果，等待本应用前台且媒体投影前台服务就绪后处理
     private var pendingScreenCapture: Pair<Int, Intent>? = null
+    private var registeredOnForegroundReady: (() -> Unit)? = null
+    private var registeredOnRequestMediaProjection: (() -> Unit)? = null
 
     private fun processPendingScreenCapture() {
         if (pendingScreenCapture == null) return
         try {
-            com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = {
-                handleScreenCaptureReady()
-            }
+            val onForegroundReady: () -> Unit = { handleScreenCaptureReady() }
+            registeredOnForegroundReady = onForegroundReady
+            com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = onForegroundReady
             startForegroundService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
         } catch (e: Exception) {
             Logger.e("NotifyRelay", "屏幕捕获前台服务启动失败，带回前台重试", e)
@@ -220,8 +222,14 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = null
-        DeviceConnectionManager.getInstance(this).onRequestMediaProjection = null
+        if (com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady === registeredOnForegroundReady) {
+            com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = null
+        }
+        registeredOnForegroundReady = null
+        if (DeviceConnectionManager.getInstance(this).onRequestMediaProjection === registeredOnRequestMediaProjection) {
+            DeviceConnectionManager.getInstance(this).onRequestMediaProjection = null
+        }
+        registeredOnRequestMediaProjection = null
         pendingScreenCapture = null
     }
 
@@ -402,10 +410,12 @@ class MainActivity : FragmentActivity() {
             return
         }
 
-        DeviceConnectionManager.getInstance(this).onRequestMediaProjection = {
+        val projectionRequestCallback: () -> Unit = {
             val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
             screenCaptureLauncher.launch(mpm.createScreenCaptureIntent())
         }
+        registeredOnRequestMediaProjection = projectionRequestCallback
+        DeviceConnectionManager.getInstance(this).onRequestMediaProjection = projectionRequestCallback
 
         // 后台初始化，避免阻塞 UI 线程
         lifecycleScope.launch(Dispatchers.Default) {

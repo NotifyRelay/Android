@@ -18,7 +18,6 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 
 class AudioRelayPlayer(private val context: Context) {
@@ -118,6 +117,10 @@ class AudioRelayPlayer(private val context: Context) {
 
     fun startSendCapture(mediaProjection: MediaProjection, sampleRate: Int = 48000, channels: Int = 2) {
         if (!isRunning) return
+        if (captureJob?.isActive == true || audioRecord != null) {
+            Logger.w("AudioRelay", "屏幕音频捕获已在运行，忽略重复启动")
+            return
+        }
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             Logger.w("AudioRelay", "缺少 RECORD_AUDIO 权限，无法启动屏幕音频捕获")
             return
@@ -190,17 +193,18 @@ class AudioRelayPlayer(private val context: Context) {
     }
 
     fun stopSendCapture() {
-        captureJob?.let {
-            runBlocking { it.cancelAndJoin() }
-        }
+        captureJob?.cancel()
+        captureJob = null
+    }
+
+    suspend fun stopSendCaptureAndJoin() {
+        captureJob?.cancelAndJoin()
         captureJob = null
     }
 
     fun stop() {
         isRunning = false
-        captureJob?.let {
-            runBlocking { it.cancelAndJoin() }
-        }
+        captureJob?.cancel()
         captureJob = null
         audioJob?.cancel()
         audioJob = null
