@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.nativecore
 
 import android.media.projection.MediaProjection
 import android.util.Log
+import com.sun.jna.Native
 import com.sun.jna.Pointer
 import notifyrelay.base.util.Logger as AppLogger
 import org.json.JSONArray
@@ -11,6 +12,7 @@ object NativeCore {
     private const val TAG = "NativeCore"
     val lib = NotifyRelayCore.instance()
 
+    @Volatile
     private var _rustContext: Pointer? = null
     var mediaProjection: MediaProjection? = null
 
@@ -282,9 +284,11 @@ object NativeCore {
     }
 
     private fun setupAudioCallbacks() {
-        if (audioDataCallbackRef != null) return
-        val dataCb = object : NotifyRelayCore.OnAudioDataCb {
+        synchronized(this) {
+            if (audioDataCallbackRef != null) return
+            val dataCb = object : NotifyRelayCore.OnAudioDataCb {
             override fun invoke(deviceUuid: Pointer?, pcmData: Pointer?, pcmLen: Int, sampleRate: Int, channels: Int, userData: Pointer?) {
+                Native.detach(false)
                 if (pcmData == null || pcmLen <= 0) return
                 val arr = pcmData.getByteArray(0, pcmLen)
                 audioDataCallback?.invoke(arr, sampleRate, channels)
@@ -292,9 +296,10 @@ object NativeCore {
         }
         val eventCb = object : NotifyRelayCore.OnAudioEventCb {
             override fun invoke(deviceUuid: Pointer?, event: Pointer?, errorMsg: Pointer?, userData: Pointer?) {
-                val evt = event?.getString(0, "UTF-8") ?: "null"
-                val err = errorMsg?.getString(0, "UTF-8") ?: ""
-                Log.d(TAG, "音频事件: $evt, 错误: $err")
+                Native.detach(false)
+                val evt = NotifyRelayCore.ptrToString(event) ?: "null"
+                val err = NotifyRelayCore.ptrToString(errorMsg) ?: ""
+                AppLogger.d(TAG, "音频事件: $evt, 错误: $err")
             }
         }
         val ctx = getContext() ?: return
@@ -302,6 +307,7 @@ object NativeCore {
         lib.nrc_register_audio_event_cb(ctx, eventCb)
         audioDataCallbackRef = dataCb
         audioEventCallbackRef = eventCb
+        }
     }
 
     fun setContext(ctx: Pointer?) { _rustContext = ctx }
