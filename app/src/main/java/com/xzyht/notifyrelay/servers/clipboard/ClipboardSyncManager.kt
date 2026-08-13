@@ -80,48 +80,6 @@ object ClipboardSyncManager {
     }
 
     /**
-     * 发送剪贴板内容到所有已认证的在线设备。
-     * 实际发送由 Rust 内部完成（去重/防循环/频率限制/2MB 阈值），平台端不再直接调用发送接口。
-     */
-    fun sendClipboardToDevices(deviceManager: DeviceConnectionManager, context: Context) {
-        // 检查是否可以进行剪贴板同步
-        val (canSync, _) = canSyncClipboard(context)
-        if (!canSync) {
-            return
-        }
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val devices = deviceManager.getAuthenticatedOnlineDevices()
-                if (devices.isEmpty()) {
-                    Logger.d(TAG, "没有可用于发送剪贴板内容的在线设备")
-                    return@launch
-                }
-
-                val clipboardData = getCurrentClipboardData(context)
-                if (clipboardData != null) {
-                    val (type, content) = clipboardData
-                    handleSendResult(
-                        context,
-                        NativeCore.clipboardOnChanged(
-                            deviceManager.rustContextInternal,
-                            NativeCore.senderQueuePtr,
-                            buildTargetsJson(devices.map { it.uuid }),
-                            if (type == CLIPBOARD_TYPE_IMAGE) MIME_IMAGE else MIME_TEXT,
-                            content,
-                            System.currentTimeMillis(),
-                            force = false
-                        ),
-                        type
-                    )
-                }
-            } catch (e: Exception) {
-                Logger.e(TAG, "发送剪贴板失败", e)
-            }
-        }
-    }
-
-    /**
      * 处理接收到的剪贴板消息。
      * Rust 解析报文、归一化类型并登记防循环时间窗，返回内容供写入系统剪贴板。
      */
