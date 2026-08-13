@@ -31,8 +31,12 @@ import github.xzynine.superislandui.common.SuperIslandManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import java.io.ByteArrayOutputStream
@@ -269,6 +273,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     // 新增：已处理通知缓存，避免重复处理 (改进版：带时间戳的LRU缓存)
     private val processedNotifications = ConcurrentHashMap<String, Long>()
 
+    // 通知发送专用作用域：串行发送
+    private val sendScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private val sendMutex = Mutex()
+
 
     // MediaSession 监控服务实例
     private lateinit var mediaSessionMonitorService: MediaSessionMonitorService
@@ -418,20 +426,22 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                             val featureId = getNotificationKey(sbn, "")
                             // 图片处理（本地 URI 读取/Base64）可能在 IO 线程耗时，异步发送避免阻塞监听线程；
                             // sendSuperIslandData 内部已捕获全部异常
-                            CoroutineScope(Dispatchers.Default).launch {
-                                MessageSender.sendSuperIslandData(
-                                    applicationContext,
-                                    superPkg,
-                                    superData.appName ?: "超级岛",
-                                    superData.title,
-                                    superData.text,
-                                    sbn.postTime,
-                                    superData.paramV2Raw,
-                                    // 尝试把 simple pic map 提取为 string map（仅支持 string/url 类值）
-                                    (superData.picMap ?: emptyMap()),
-                                    deviceManager,
-                                    featureIdOverride = featureId
-                                )
+                            sendScope.launch {
+                                sendMutex.withLock {
+                                    MessageSender.sendSuperIslandData(
+                                        applicationContext,
+                                        superPkg,
+                                        superData.appName ?: "超级岛",
+                                        superData.title,
+                                        superData.text,
+                                        sbn.postTime,
+                                        superData.paramV2Raw,
+                                        // 尝试把 simple pic map 提取为 string map（仅支持 string/url 类值）
+                                        (superData.picMap ?: emptyMap()),
+                                        deviceManager,
+                                        featureIdOverride = featureId
+                                    )
+                                }
                             }
                         } catch (e: Exception) {
                             Logger.w(TAG, "超级岛: 转发超级岛数据失败: ${e.message}")
@@ -589,6 +599,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         instance = null
         super.onDestroy()
         foregroundJob?.cancel()
+        sendScope.cancel()
         stopForeground(STOP_FOREGROUND_REMOVE)
         // 停止 MediaSession 监控服务
         mediaSessionMonitorService.stopMonitoring()

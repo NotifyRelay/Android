@@ -252,19 +252,31 @@ object MessageSender {
                             )
                         ) {
                             try {
-                                val uri = Uri.parse(v)
-                                context.contentResolver.openInputStream(uri)?.use { input ->
-                                    val bytes = input.readBytes()
-                                    val mime =
-                                        context.contentResolver.getType(uri) ?: "image/png"
-                                    val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                                    processedPics[k] = "data:$mime;base64,$b64"
-                                } ?: run {
-                                    // 无法打开则回退到原始字符串
-                                    processedPics[k] = v
+                                if (v.startsWith("/")) {
+                                    val file = java.io.File(v)
+                                    if (file.isFile) {
+                                        val bytes = file.readBytes()
+                                        val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                                        processedPics[k] = "data:image/png;base64,$b64"
+                                    } else {
+                                        processedPics[k] = v
+                                    }
+                                } else {
+                                    val uri = Uri.parse(v)
+                                    context.contentResolver.openInputStream(uri)?.use { input ->
+                                        val bytes = input.readBytes()
+                                        val mime =
+                                            context.contentResolver.getType(uri) ?: "image/png"
+                                        val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+                                        processedPics[k] = "data:$mime;base64,$b64"
+                                    } ?: run {
+                                        // 无法打开则回退到原始字符串
+                                        processedPics[k] = v
+                                    }
                                 }
                             } catch (e: Exception) {
                                 // 读取失败则保留原值
+                                Logger.w(TAG, "读取本地图片失败: $v", e)
                                 processedPics[k] = v
                             }
                         } else {

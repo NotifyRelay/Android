@@ -74,7 +74,8 @@ class ConnectionDiscoveryManager(
         val isAuthed = synchronized(deviceManager.authenticatedDevices) { 
             deviceManager.authenticatedDevices.containsKey(device.uuid) 
         }
-        if (isAuthed) {
+        val isOnline = deviceManager.devices.value[device.uuid]?.second == true
+        if (isAuthed && !isOnline) {
             deviceManager.connectToDevice(device)
         }
     }
@@ -251,16 +252,7 @@ class ConnectionDiscoveryManager(
     }
 
     fun startDiscovery() {
-        val udpEnabled = deviceManager.udpDiscoveryEnabled
-
-        // 启动 Rust 定时广播（Wi-Fi Direct 和普通网络都需要）
-        val ctx = deviceManager.rustContextInternal
-        if (ctx != null && udpEnabled) {
-            val displayName = deviceManager.localDisplayNameInternal()
-            // 问题 4 修复：同 syncHeartbeatMode，广播电量需带符号。
-            val battery = getSignedBatteryLevel()
-            NativeCore.periodicBroadcast(ctx, 1, deviceManager.uuid, displayName, battery, "android")
-        }
+        syncHeartbeatMode()
 
         if (deviceManager.isWifiDirectNetworkInternal()) {
             // WLAN 直连模式下的持续重连/发现交由 Rust known_device_scanner 处理

@@ -6,7 +6,9 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 /**
  * 连接保活与重连策略封装：
@@ -42,7 +44,9 @@ class ConnectionKeepAlive(
         val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
         val battery = if (isCharging) batteryLevel else -batteryLevel
 
-        val result = NativeCore.connectDevice(ctx, device.uuid, device.ip, battery, "android")
+        val result = withContext(Dispatchers.IO) {
+            NativeCore.connectDevice(ctx, device.uuid, device.ip, battery, "android")
+        }
         if (result == 0) {
             try {
                 scope.launch { deviceManager.updateDeviceListInternal() }

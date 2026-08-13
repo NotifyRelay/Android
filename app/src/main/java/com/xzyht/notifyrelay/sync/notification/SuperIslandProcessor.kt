@@ -111,11 +111,13 @@ object SuperIslandProcessor {
                 try { NativeCore.computeFeatureId(pkg, paramV2Raw ?: "", json.optString("title"), json.optString("text"), "") ?: "" } catch (_: Exception) { "" }
             }
             val sourceKey = listOfNotNull(remoteUuid, mappedPkg, featureId.takeIf { it.isNotBlank() }).joinToString("|")
-            val dedupKey = "${remoteUuid}|${mappedPkg}|${featureId}"
+            val contentHash = (title.orEmpty() + text.orEmpty() + (paramV2Raw ?: "")).hashCode()
+            val dedupKey = "${remoteUuid}|${mappedPkg}|${featureId}|$contentHash"
 
             // 结束包判断：存在 terminateValue 或者显式 featureKeyValue 且 terminateValue 标记
             val explicitFeatureKey = try { json.optString("featureKeyValue", "") } catch (_: Exception) { "" }
             if (isEnd) {
+                manager.removeStateQueryKey(remoteUuid, featureId)
                 try {
                     // 优先用显式的 featureKeyValue 进行 dismiss（若有）
                     if (!explicitFeatureKey.isNullOrBlank()) {
@@ -124,7 +126,7 @@ object SuperIslandProcessor {
                             if (explicitFeatureKey.contains("|")) {
                                 dismissBySourceId(explicitFeatureKey)
                                 SuperIslandRemoteStore.removeExact(explicitFeatureKey)
-                                dedupClear(manager, dedupKey)
+                                dedupClear(manager, explicitFeatureKey)
                                 Logger.i("超级岛", "收到终止通知(显式完整 sourceId)，移除去重缓存: $dedupKey -> source=$explicitFeatureKey")
                                 return true
                             }

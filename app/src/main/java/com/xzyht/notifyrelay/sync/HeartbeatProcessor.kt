@@ -5,8 +5,13 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
+import java.util.concurrent.atomic.AtomicLong
 
 object HeartbeatProcessor {
+
+    private const val REFRESH_MIN_INTERVAL_MS = 500L
+    private const val CACHE_MAX_ENTRIES = 500
+    private val lastRefreshAt = AtomicLong(0L)
 
     data class HeartbeatInfo(
         val uuid: String,
@@ -59,19 +64,29 @@ object HeartbeatProcessor {
             }
         }
 
-        synchronized(deviceManager.deviceInfoCacheInternal) {
-            val existing = deviceManager.deviceInfoCacheInternal[uuid]
-            val effectiveIp = info.ip.takeUnless { it == "0.0.0.0" || it.isBlank() } ?: existing?.ip ?: info.ip
-            // 未知电量（超出 [-100,100]）沿用缓存旧值，不覆盖已显示的电量/充电状态
-            val batteryUnknown = kotlin.math.abs(info.batteryLevel) > 100
-            val batteryLevel = if (batteryUnknown) (existing?.batteryLevel ?: -1) else kotlin.math.abs(info.batteryLevel)
-            val chargingStatus = if (batteryUnknown) (existing?.chargingStatus ?: '0') else if (info.isCharging) '1' else '0'
-            deviceManager.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, info.displayName, effectiveIp, info.port, batteryLevel, chargingStatus)
+        if (isAuthed) {
+            val displayName = deviceManager.decodeDisplayNameFromTransportInternal(info.displayName)
+            synchronized(deviceManager.deviceInfoCacheInternal) {
+                val existing = deviceManager.deviceInfoCacheInternal[uuid]
+                val effectiveIp = info.ip.takeUnless { it == "0.0.0.0" || it.isBlank() } ?: existing?.ip ?: info.ip
+                // 未知电量（超出 [-100,100]）沿用缓存旧值，不覆盖已显示的电量/充电状态
+                val batteryUnknown = kotlin.math.abs(info.batteryLevel) > 100
+                val batteryLevel = if (batteryUnknown) (existing?.batteryLevel ?: -1) else kotlin.math.abs(info.batteryLevel)
+                val chargingStatus = if (batteryUnknown) (existing?.chargingStatus ?: '0') else if (info.isCharging) '1' else '0'
+                if (deviceManager.deviceInfoCacheInternal.size > CACHE_MAX_ENTRIES) {
+                    deviceManager.deviceInfoCacheInternal.remove(deviceManager.deviceInfoCacheInternal.keys.first())
+                }
+                deviceManager.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, displayName, effectiveIp, info.port, batteryLevel, chargingStatus)
+            }
+            DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, displayName)
         }
-        DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
 
-        deviceManager.coroutineScopeInternal.launch {
-            deviceManager.updateDeviceListInternal()
+        val now = System.currentTimeMillis()
+        val prev = lastRefreshAt.get()
+        if (now - prev >= REFRESH_MIN_INTERVAL_MS && lastRefreshAt.compareAndSet(prev, now)) {
+            deviceManager.coroutineScopeInternal.launch {
+                deviceManager.updateDeviceListInternal()
+            }
         }
     }
 }
