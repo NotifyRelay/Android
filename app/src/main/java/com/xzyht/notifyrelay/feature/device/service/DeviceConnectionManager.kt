@@ -84,6 +84,9 @@ object DeviceConnectionManagerUtil {
     fun updateGlobalDeviceName(uuid: String, displayName: String) {
         synchronized(globalDeviceNameCache) {
             globalDeviceNameCache[uuid] = displayName
+            if (globalDeviceNameCache.size > 500) {
+                globalDeviceNameCache.remove(globalDeviceNameCache.keys.first())
+            }
         }
     }
     fun getDisplayNameByUuid(uuid: String?): String {
@@ -113,6 +116,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         private var stopReceiverRegistered = false
 
         // 静态引用，供 native 回调线程从 Rust 回调中调度到实例方法
+        @Volatile
         private var _callbackInstance: DeviceConnectionManager? = null
         internal fun getCallbackInstance(): DeviceConnectionManager? = _callbackInstance
 
@@ -1213,7 +1217,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 val authed = synchronized(authenticatedDevices) {
                     authenticatedDevices[uuid]?.isAccepted == true
                 }
-                android.util.Log.d("CoreCb", "on_data: type=$msgType, uuid=$uuid, authed=$authed, text_len=${text.length}")
+                Logger.d("CoreCb", "on_data: type=$msgType, authed=$authed, text_len=${text.length}")
                 if (!authed && msgType != "DATA_UNKNOWN") return
 
                 try {
@@ -1504,7 +1508,17 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     // 状态查询轻量比较键缓存：键 = "$remoteUuid|$featureId"，值 = 轻量内容键；
     // 心跳查询时先比较轻量键，未变化则跳过昂贵的 runBlocking/fullJson 构造与推送
-    private val stateQueryKeys = HashMap<String, String>()
+    private val stateQueryKeys = java.util.concurrent.ConcurrentHashMap<String, String>()
+
+    internal fun removeStateQueryKey(remoteUuid: String, featureId: String) {
+        stateQueryKeys.remove("$remoteUuid|$featureId")
+    }
+
+    private fun trimStateQueryKeys(remoteUuid: String) {
+        if (stateQueryKeys.size <= 200) return
+        stateQueryKeys.keys.removeIf { !it.startsWith("$remoteUuid|") }
+        if (stateQueryKeys.size > 200) stateQueryKeys.clear()
+    }
 
     /** 超级岛查询：扫描活跃通知，重算 featureId（与 Rust 算法一致，iid 传空）匹配后对比推送 */
     private fun handleSuperIslandStateQuery(remoteUuid: String, featureId: String): Int {
@@ -1536,6 +1550,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 )
             }
             val result = compareAndPushState(remoteUuid, featureId, content, isMedia = false)
+            trimStateQueryKeys(remoteUuid)
             stateQueryKeys[cacheKey] = lightKey
             return result
         }
@@ -1576,6 +1591,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
             context, pkg, pkg, mediaData.title, mediaData.artist, coverUrl, System.currentTimeMillis()
         )
         val result = compareAndPushState(remoteUuid, featureId, content, isMedia = true)
+        trimStateQueryKeys(remoteUuid)
         stateQueryKeys[cacheKey] = lightKey
         return result
     }
@@ -1810,6 +1826,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
                 }
             } catch (_: Exception) {}
 
+            stateQueryKeys.keys.removeIf { it.startsWith("$uuid|") }
+
             // 触发更新，确保 StateFlow 与回调被通知
             try { 
                 coroutineScope.launch { 
@@ -1828,8 +1846,8 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
     }
 
-    val audioRelayPlayer = AudioRelayPlayer(context)
-    private var currentAudioRelayUuid: String = ""
+    val audioRelayPlayer by lazy { AudioRelayPlayer(context) }
+    private var currentAudioRelayUuid: String? = null
 
     private data class PendingAudioSend(
         val deviceIp: String,
@@ -1887,7 +1905,7 @@ class DeviceConnectionManager(private val context: android.content.Context) {
 
     fun stopAudioRelay() {
         val uuid = currentAudioRelayUuid
-        if (uuid.isNotEmpty()) {
+        if (!uuid.isNullOrEmpty()) {
             val device = resolveDeviceInfo(uuid, "", 23333)
             if (device != null) {
                 val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioStop\"}"
