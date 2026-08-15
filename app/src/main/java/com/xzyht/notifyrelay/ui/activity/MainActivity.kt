@@ -14,7 +14,6 @@ import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -72,22 +71,19 @@ import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
 import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.navigation.rememberNavigator
-import com.xzyht.notifyrelay.ui.pages.UIAbout
-import com.xzyht.notifyrelay.ui.pages.UIAppearance
-import com.xzyht.notifyrelay.ui.pages.UILocalFilter
-import com.xzyht.notifyrelay.ui.pages.UIRemoteFilter
-import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
 import com.xzyht.notifyrelay.ui.screen.DeviceForwardScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreenState
 import com.xzyht.notifyrelay.ui.screen.HistoryScreen
-import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
+import com.xzyht.notifyrelay.ui.screen.SettingsAboutScreen
+import com.xzyht.notifyrelay.ui.screen.SettingsAppearanceScreen
+import com.xzyht.notifyrelay.ui.screen.SettingsLocalFilterScreen
+import com.xzyht.notifyrelay.ui.screen.SettingsRemoteFilterScreen
+import com.xzyht.notifyrelay.ui.screen.SettingsScrcpyScreen
+import com.xzyht.notifyrelay.ui.screen.SettingsSuperIslandScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -99,8 +95,6 @@ import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.ServiceManager
 import notifyrelay.data.config.DeviceInfoManager
-import notifyrelay.data.config.ScrcpyPreferenceKeys
-import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
@@ -340,80 +334,22 @@ class MainActivity : FragmentActivity() {
                                 entry<Route.ScrcpyAdvanced> { ScrcpyAdvancedScreen(navigator) }
                                 entry<Route.ScrcpyVirtualButtonOrder> { ScrcpyVirtualButtonOrderScreen(navigator) }
                                 entry<Route.SettingsRemoteFilter> {
-                                    ScrollableTopAppBarPage(
-                                        title = "远程过滤",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        UIRemoteFilter()
-                                    }
+                                    SettingsRemoteFilterScreen()
                                 }
                                 entry<Route.SettingsLocalFilter> {
-                                    ScrollableTopAppBarPage(
-                                        title = "本地过滤",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        UILocalFilter()
-                                    }
+                                    SettingsLocalFilterScreen()
                                 }
                                 entry<Route.SettingsSuperIsland> {
-                                    ScrollableTopAppBarPage(
-                                        title = "超级岛",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        UISuperIslandSettings()
-                                    }
+                                    SettingsSuperIslandScreen()
                                 }
                                 entry<Route.SettingsScrcpy> {
-                                    val context = LocalContext.current
-                                    val serverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-                                        if (uri == null) return@rememberLauncherForActivityResult
-                                        runCatching {
-                                            context.contentResolver.takePersistableUriPermission(
-                                                uri,
-                                                Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                            )
-                                            // 问题 5 修复：原回调仅 takePersistableUriPermission，未写入 CUSTOM_SERVER_URI；
-                                            // 且 ScrcpyUiViewModel 是单例，只写 StorageManager 不会让 UI/连接生效。
-                                            // 双写：1) StorageManager 持久化；2) viewModel setter 更新单例状态（内部也会持久化到 mainSettings）。
-                                            val uriString = uri.toString()
-                                            StorageManager.putString(
-                                                context,
-                                                ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
-                                                uriString,
-                                                StorageManager.PrefsType.SCRCPY
-                                            )
-                                            val app = context.applicationContext as android.app.Application
-                                            ScrcpyUiViewModel.getInstance(app).customServerUri = uriString
-                                        }.onFailure { e ->
-                                            Logger.e("MainActivity", "scrcpy server URI 保存失败: uri=$uri", e)
-                                        }
-                                    }
-                                    ScrollableTopAppBarPage(
-                                        title = "屏幕镜像",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        ScrcpyScreenHost(
-                                            startScreen = ScrcpyRootScreen.Settings,
-                                            onPickServer = { serverPicker.launch(arrayOf("application/java-archive", "application/octet-stream", "*/*")) },
-                                            onExit = { navigator.pop() },
-                                        )
-                                    }
+                                    SettingsScrcpyScreen()
                                 }
                                 entry<Route.SettingsAbout> {
-                                    ScrollableTopAppBarPage(
-                                        title = "关于",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        UIAbout()
-                                    }
+                                    SettingsAboutScreen()
                                 }
                                 entry<Route.SettingsAppearance> {
-                                    ScrollableTopAppBarPage(
-                                        title = "外观",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        UIAppearance()
-                                    }
+                                    SettingsAppearanceScreen()
                                 }
                             }
                         )

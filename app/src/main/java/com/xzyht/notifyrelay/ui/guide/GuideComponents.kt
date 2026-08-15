@@ -47,7 +47,6 @@ import androidx.core.graphics.createBitmap
 import com.xzyht.notifyrelay.R
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
-import top.yukonga.miuix.kmp.basic.RadioButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -259,44 +258,6 @@ internal fun GuideSectionLabel(title: String, description: String) {
             color = colorScheme.onSurfaceVariantSummary
         )
     }
-}
-
-@Composable
-internal fun GuideThemeOption(
-    title: String,
-    description: String,
-    selected: Boolean,
-    onClick: () -> Unit
-) {
-    val colorScheme = MiuixTheme.colorScheme
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 14.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        RadioButton(
-            selected = selected,
-            onClick = null,
-            modifier = Modifier.size(22.dp)
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                style = MiuixTheme.textStyles.body1,
-                color = colorScheme.onSurface
-            )
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = description,
-                style = MiuixTheme.textStyles.body2,
-                color = colorScheme.onSurfaceVariantSummary
-            )
-        }
-    }
-    HorizontalDivider(color = colorScheme.dividerLine, thickness = 1.dp)
 }
 
 @Composable

@@ -12,7 +12,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import notifyrelay.base.util.ThemeSettingsManager
+import com.xzyht.notifyrelay.ui.pages.UIAppearance
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -23,12 +23,6 @@ internal fun GuideBasicSettingsPage(
     onBack: () -> Unit,
     onNext: () -> Unit
 ) {
-    val themeOptions = listOf(
-        Triple(ThemeSettingsManager.THEME_FOLLOW_SYSTEM, "跟随系统", "随系统深色模式自动切换"),
-        Triple(ThemeSettingsManager.THEME_LIGHT, "浅色模式", "始终使用浅色外观"),
-        Triple(ThemeSettingsManager.THEME_DARK, "深色模式", "始终使用深色外观")
-    )
-
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -50,17 +44,14 @@ internal fun GuideBasicSettingsPage(
                 title = "外观",
                 description = "选择应用使用的明暗模式"
             )
+            // 外观设置直接复用设置页的 UIAppearance，避免重复实现；
+            // 此处外层已有滚动容器，关闭 UIAppearance 内部滚动避免嵌套滚动崩溃
             Card(modifier = Modifier.fillMaxWidth()) {
-                Column {
-                    themeOptions.forEach { (index, title, description) ->
-                        GuideThemeOption(
-                            title = title,
-                            description = description,
-                            selected = selectedThemeIndex == index,
-                            onClick = { onThemeSelected(index) }
-                        )
-                    }
-                }
+                UIAppearance(
+                    themeBaseIndex = selectedThemeIndex,
+                    onThemeSelected = onThemeSelected,
+                    scrollable = false
+                )
             }
             Spacer(modifier = Modifier.height(20.dp))
         }
