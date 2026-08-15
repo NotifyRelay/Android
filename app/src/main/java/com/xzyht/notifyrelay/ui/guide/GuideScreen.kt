@@ -1,0 +1,127 @@
+package com.xzyht.notifyrelay.ui.guide
+
+import androidx.activity.compose.BackHandler
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
+import com.xzyht.notifyrelay.ui.activity.GuideActivity
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.time.Duration.Companion.seconds
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+private enum class GuideStep {
+    WELCOME,
+    REQUIRED_PERMISSIONS,
+    OPTIONAL_PERMISSIONS,
+    AGREEMENT,
+    BASIC_SETTINGS,
+    COMPLETE
+}
+
+@Composable
+internal fun GuideScreen(
+    themeBaseIndex: Int,
+    onThemeChanged: (Int) -> Unit,
+    onContinue: () -> Unit
+) {
+    val context = LocalContext.current
+    var permissionState by remember { mutableStateOf(readGuidePermissionState(context)) }
+
+    fun refreshPermissions() {
+        permissionState = readGuidePermissionState(context)
+    }
+
+    // 页面首次进入时刷新一次，随后每秒轮询一次，确保从系统设置返回后状态能及时更新
+    LaunchedEffect(Unit) {
+        refreshPermissions()
+        while (true) {
+            delay(1.seconds)
+            refreshPermissions()
+        }
+    }
+
+    // GuideActivity.onResume 也会主动触发一次刷新
+    val resumeTrigger = GuideActivity.GuideScreen.refreshTrigger
+    LaunchedEffect(resumeTrigger) {
+        refreshPermissions()
+    }
+
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { GuideStep.entries.size })
+    val scope = rememberCoroutineScope()
+
+    fun animateTo(step: GuideStep) {
+        scope.launch {
+            pagerState.animateScrollToPage(step.ordinal)
+        }
+    }
+
+    BackHandler(enabled = pagerState.currentPage > 0) {
+        val previous = GuideStep.entries.getOrNull(pagerState.currentPage - 1)
+        if (previous != null) {
+            animateTo(previous)
+        }
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MiuixTheme.colorScheme.background)
+            .navigationBarsPadding()
+    ) {
+        HorizontalPager(
+            state = pagerState,
+            modifier = Modifier.fillMaxSize(),
+            // 引导页不开放手势滑动，避免跳过必读步骤或权限页
+            userScrollEnabled = false
+        ) { page ->
+            when (GuideStep.entries[page]) {
+                GuideStep.WELCOME -> GuideWelcomePage(
+                    onStart = { animateTo(GuideStep.REQUIRED_PERMISSIONS) }
+                )
+
+                GuideStep.REQUIRED_PERMISSIONS -> GuideRequiredPermissionPage(
+                    permissionState = permissionState,
+                    onBack = { animateTo(GuideStep.WELCOME) },
+                    onNext = { animateTo(GuideStep.OPTIONAL_PERMISSIONS) }
+                )
+
+                GuideStep.OPTIONAL_PERMISSIONS -> GuideOptionalPermissionPage(
+                    permissionState = permissionState,
+                    onBack = { animateTo(GuideStep.REQUIRED_PERMISSIONS) },
+                    onNext = { animateTo(GuideStep.AGREEMENT) }
+                )
+
+                GuideStep.AGREEMENT -> GuideAgreementPage(
+                    onBack = { animateTo(GuideStep.OPTIONAL_PERMISSIONS) },
+                    onNext = { animateTo(GuideStep.BASIC_SETTINGS) }
+                )
+
+                GuideStep.BASIC_SETTINGS -> GuideBasicSettingsPage(
+                    selectedThemeIndex = themeBaseIndex,
+                    onThemeSelected = onThemeChanged,
+                    onBack = { animateTo(GuideStep.AGREEMENT) },
+                    onNext = { animateTo(GuideStep.COMPLETE) }
+                )
+
+                GuideStep.COMPLETE -> GuideCompletePage(
+                    requiredGranted = permissionState.requiredGranted,
+                    onBackToPermissions = { animateTo(GuideStep.REQUIRED_PERMISSIONS) },
+                    onEnter = onContinue
+                )
+            }
+        }
+    }
+}
