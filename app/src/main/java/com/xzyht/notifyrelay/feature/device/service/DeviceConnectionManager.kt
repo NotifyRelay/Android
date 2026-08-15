@@ -1916,6 +1916,11 @@ class DeviceConnectionManager(private val context: android.content.Context) {
         }
         audioRelayPlayer.stop()
         cancelAudioRelayNotification()
+        // 停止并清空投影，避免下次授权时 stop 旧投影触发 onStop 回调干扰新会话
+        try {
+            NativeCore.mediaProjection?.stop()
+        } catch (_: Exception) {}
+        NativeCore.mediaProjection = null
     }
 
     private fun cancelAudioRelayNotification() {

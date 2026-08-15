@@ -1,6 +1,8 @@
 package com.xzyht.notifyrelay.ui.activity
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -48,6 +50,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
@@ -146,9 +149,11 @@ class MainActivity : FragmentActivity() {
                 NativeCore.mediaProjection = projection
                 projection.registerCallback(object : MediaProjection.Callback() {
                     override fun onStop() {
-                        deviceManager.audioRelayPlayer.stopSendCapture()
+                        // 仅当被停止的投影仍是当前投影时才清理捕获，
+                        // 避免主动 stop 旧投影时其 onStop 回调误杀新会话的捕获。
                         if (NativeCore.mediaProjection === projection) {
                             NativeCore.mediaProjection = null
+                            deviceManager.audioRelayPlayer.stopSendCapture()
                         }
                     }
                 }, Handler(Looper.getMainLooper()))
@@ -244,6 +249,21 @@ class MainActivity : FragmentActivity() {
         } else {
             stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
         }
+    }
+
+    // 屏幕声音捕获（AudioPlaybackCapture）按官方要求需持有 RECORD_AUDIO 权限，
+    // 在发起 MediaProjection 授权前一并请求，拒绝时明确提示而非静默失败。
+    private val recordAudioPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) {
+            launchScreenCapture()
+        } else {
+            ToastUtils.showShortToast(this, "缺少录音权限，无法捕获屏幕声音")
+        }
+    }
+
+    private fun launchScreenCapture() {
+        val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        screenCaptureLauncher.launch(mpm.createScreenCaptureIntent())
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -411,8 +431,11 @@ class MainActivity : FragmentActivity() {
         }
 
         val projectionRequestCallback: () -> Unit = {
-            val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            screenCaptureLauncher.launch(mpm.createScreenCaptureIntent())
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+            } else {
+                launchScreenCapture()
+            }
         }
         registeredOnRequestMediaProjection = projectionRequestCallback
         DeviceConnectionManager.getInstance(this).onRequestMediaProjection = projectionRequestCallback

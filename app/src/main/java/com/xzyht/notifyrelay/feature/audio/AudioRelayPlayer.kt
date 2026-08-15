@@ -19,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
 
 class AudioRelayPlayer(private val context: Context) {
 
@@ -123,6 +124,7 @@ class AudioRelayPlayer(private val context: Context) {
         }
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             Logger.w("AudioRelay", "缺少 RECORD_AUDIO 权限，无法启动屏幕音频捕获")
+            ToastUtils.showShortToast(context, "缺少录音权限，无法捕获屏幕声音，请在系统设置中允许")
             return
         }
         val channelConfig = if (channels == 2) AudioFormat.CHANNEL_IN_STEREO else AudioFormat.CHANNEL_IN_MONO
