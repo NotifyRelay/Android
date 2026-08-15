@@ -43,7 +43,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * 该组件负责读取/写入 RemoteFilterConfig 并提供完整的远程过滤 UI
  */
 @Composable
-fun UIRemoteFilter() {
+fun UIRemoteFilter(
+    modifier: Modifier = Modifier
+) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
 
@@ -102,7 +104,7 @@ fun UIRemoteFilter() {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
     Column(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxWidth()
             .verticalScroll(scrollState)
             .padding(top = 12.dp)

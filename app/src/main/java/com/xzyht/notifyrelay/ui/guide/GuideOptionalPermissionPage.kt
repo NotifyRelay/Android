@@ -52,7 +52,7 @@ internal fun GuideOptionalPermissionPage(
             .statusBarsPadding()
     ) {
         GuidePageHeader(
-            stepLabel = "3 / 6",
+            stepLabel = "4 / 6",
             title = "可选权限",
             subtitle = "以下权限建议开启，也可以稍后在系统设置或应用内设置中开启"
         )

@@ -29,7 +29,7 @@ class GuideActivity : ComponentActivity() {
         val fromftp = intent.getBooleanExtra("fromftp", false)
 
         // 仅冷启动且权限满足时自动跳主界面，应用内跳转（fromInternal=true）始终渲染引导页。
-        // 流程仿照 HyperCeiler：欢迎页 -> 权限设置 -> 使用须知 -> 基础设置 -> 完成页。
+        // 流程仿照 HyperCeiler：欢迎页 -> 使用须知 -> 权限设置 -> 基础设置（设置总览 + 多个设置页）-> 完成页。
         if (!fromInternal && PermissionHelper.checkAllPermissions(this) && !isFirstLaunch) {
             startActivity(Intent(this, MainActivity::class.java))
             finish()

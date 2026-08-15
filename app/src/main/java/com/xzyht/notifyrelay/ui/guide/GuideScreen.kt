@@ -22,12 +22,17 @@ import kotlinx.coroutines.launch
 import kotlin.time.Duration.Companion.seconds
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-private enum class GuideStep {
+internal enum class GuideStep {
     WELCOME,
+    AGREEMENT,
     REQUIRED_PERMISSIONS,
     OPTIONAL_PERMISSIONS,
-    AGREEMENT,
-    BASIC_SETTINGS,
+    SETTINGS,
+    APPEARANCE,
+    REMOTE_FILTER,
+    LOCAL_FILTER,
+    SUPER_ISLAND,
+    SCRCPY,
     COMPLETE
 }
 
@@ -68,8 +73,22 @@ internal fun GuideScreen(
         }
     }
 
+    fun backStepFor(current: GuideStep): GuideStep? = when (current) {
+        GuideStep.WELCOME -> null
+        GuideStep.AGREEMENT -> GuideStep.WELCOME
+        GuideStep.REQUIRED_PERMISSIONS -> GuideStep.AGREEMENT
+        GuideStep.OPTIONAL_PERMISSIONS -> GuideStep.REQUIRED_PERMISSIONS
+        GuideStep.SETTINGS -> GuideStep.OPTIONAL_PERMISSIONS
+        GuideStep.APPEARANCE,
+        GuideStep.REMOTE_FILTER,
+        GuideStep.LOCAL_FILTER,
+        GuideStep.SUPER_ISLAND,
+        GuideStep.SCRCPY -> GuideStep.SETTINGS
+        GuideStep.COMPLETE -> GuideStep.SETTINGS
+    }
+
     BackHandler(enabled = pagerState.currentPage > 0) {
-        val previous = GuideStep.entries.getOrNull(pagerState.currentPage - 1)
+        val previous = backStepFor(GuideStep.entries[pagerState.currentPage])
         if (previous != null) {
             animateTo(previous)
         }
@@ -89,31 +108,61 @@ internal fun GuideScreen(
         ) { page ->
             when (GuideStep.entries[page]) {
                 GuideStep.WELCOME -> GuideWelcomePage(
-                    onStart = { animateTo(GuideStep.REQUIRED_PERMISSIONS) }
+                    onStart = { animateTo(GuideStep.AGREEMENT) }
+                )
+
+                GuideStep.AGREEMENT -> GuideAgreementPage(
+                    onBack = { animateTo(GuideStep.WELCOME) },
+                    onNext = { animateTo(GuideStep.REQUIRED_PERMISSIONS) }
                 )
 
                 GuideStep.REQUIRED_PERMISSIONS -> GuideRequiredPermissionPage(
                     permissionState = permissionState,
-                    onBack = { animateTo(GuideStep.WELCOME) },
+                    onBack = { animateTo(GuideStep.AGREEMENT) },
                     onNext = { animateTo(GuideStep.OPTIONAL_PERMISSIONS) }
                 )
 
                 GuideStep.OPTIONAL_PERMISSIONS -> GuideOptionalPermissionPage(
                     permissionState = permissionState,
                     onBack = { animateTo(GuideStep.REQUIRED_PERMISSIONS) },
-                    onNext = { animateTo(GuideStep.AGREEMENT) }
+                    onNext = { animateTo(GuideStep.SETTINGS) }
                 )
 
-                GuideStep.AGREEMENT -> GuideAgreementPage(
+                GuideStep.SETTINGS -> GuideSettingsOverviewPage(
+                    onOpenAppearance = { animateTo(GuideStep.APPEARANCE) },
+                    onOpenRemoteFilter = { animateTo(GuideStep.REMOTE_FILTER) },
+                    onOpenLocalFilter = { animateTo(GuideStep.LOCAL_FILTER) },
+                    onOpenSuperIsland = { animateTo(GuideStep.SUPER_ISLAND) },
+                    onOpenScrcpy = { animateTo(GuideStep.SCRCPY) },
                     onBack = { animateTo(GuideStep.OPTIONAL_PERMISSIONS) },
-                    onNext = { animateTo(GuideStep.BASIC_SETTINGS) }
+                    onNext = { animateTo(GuideStep.COMPLETE) }
                 )
 
-                GuideStep.BASIC_SETTINGS -> GuideBasicSettingsPage(
+                GuideStep.APPEARANCE -> GuideAppearancePage(
                     selectedThemeIndex = themeBaseIndex,
                     onThemeSelected = onThemeChanged,
-                    onBack = { animateTo(GuideStep.AGREEMENT) },
-                    onNext = { animateTo(GuideStep.COMPLETE) }
+                    onBack = { animateTo(GuideStep.SETTINGS) },
+                    onNext = { animateTo(GuideStep.SETTINGS) }
+                )
+
+                GuideStep.REMOTE_FILTER -> GuideRemoteFilterPage(
+                    onBack = { animateTo(GuideStep.SETTINGS) },
+                    onNext = { animateTo(GuideStep.SETTINGS) }
+                )
+
+                GuideStep.LOCAL_FILTER -> GuideLocalFilterPage(
+                    onBack = { animateTo(GuideStep.SETTINGS) },
+                    onNext = { animateTo(GuideStep.SETTINGS) }
+                )
+
+                GuideStep.SUPER_ISLAND -> GuideSuperIslandPage(
+                    onBack = { animateTo(GuideStep.SETTINGS) },
+                    onNext = { animateTo(GuideStep.SETTINGS) }
+                )
+
+                GuideStep.SCRCPY -> GuideScrcpyPage(
+                    onBack = { animateTo(GuideStep.SETTINGS) },
+                    onNext = { animateTo(GuideStep.SETTINGS) }
                 )
 
                 GuideStep.COMPLETE -> GuideCompletePage(

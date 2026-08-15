@@ -128,7 +128,7 @@ internal fun GuideRequiredPermissionPage(
             .statusBarsPadding()
     ) {
         GuidePageHeader(
-            stepLabel = "2 / 6",
+            stepLabel = "3 / 6",
             title = "必要权限",
             subtitle = if (permissionState.requiredGranted) {
                 "所有必要权限已开启，可以继续下一步"

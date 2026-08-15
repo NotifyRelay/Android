@@ -243,9 +243,13 @@ internal fun GuidePermissionItem(
 }
 
 @Composable
-internal fun GuideSectionLabel(title: String, description: String) {
+internal fun GuideSectionLabel(
+    title: String,
+    description: String,
+    modifier: Modifier = Modifier
+) {
     val colorScheme = MiuixTheme.colorScheme
-    Column(modifier = Modifier.padding(top = 16.dp, bottom = 10.dp)) {
+    Column(modifier = modifier.padding(top = 16.dp, bottom = 10.dp)) {
         Text(
             text = title,
             style = MiuixTheme.textStyles.title3,

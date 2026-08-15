@@ -48,7 +48,7 @@ internal fun GuideAgreementPage(
             .statusBarsPadding()
     ) {
         GuidePageHeader(
-            stepLabel = "4 / 6",
+            stepLabel = "2 / 6",
             title = "使用须知与授权说明",
             subtitle = "请阅读以下说明，确认后继续"
         )
