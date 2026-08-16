@@ -25,21 +25,21 @@ import java.net.Inet4Address
 import java.net.NetworkInterface
 import java.util.concurrent.atomic.AtomicBoolean
 
-data class ftpServerInfo(
+data class FtpServerInfo(
     val username: String,
     val password: String,
     val ipAddress: String,
     val port: Int,
 )
 
-object ftpServer {
+object FtpServerManager {
     private const val TAG = "ftpServer"
 
     private val PORT_RANGE = 5151..5169
 
     private var ftpServer: FtpServer? = null
     private var isRunning = AtomicBoolean(false)
-    private var serverInfo: ftpServerInfo? = null
+    private var serverInfo: FtpServerInfo? = null
     private lateinit var applicationContext: Context
 
     fun setContext(context: Context) {
@@ -101,9 +101,9 @@ object ftpServer {
         FAILED, // 其他失败
     }
 
-    data class ftpStartResult(
+    data class FtpStartResult(
         val status: StartResult,
-        val serverInfo: ftpServerInfo? = null,
+        val serverInfo: FtpServerInfo? = null,
     )
 
     @Synchronized
@@ -112,11 +112,11 @@ object ftpServer {
         context: Context,
         pcUsername: String? = null,
         pcPassword: String? = null,
-    ): ftpStartResult {
+    ): FtpStartResult {
         Logger.i(TAG, "FTP 服务器启动请求，设备名称: $deviceName")
         if (isRunning.get()) {
             Logger.i(TAG, "FTP 服务器已在运行，返回当前服务器信息")
-            return ftpStartResult(StartResult.ALREADY_RUNNING, serverInfo)
+            return FtpStartResult(StartResult.ALREADY_RUNNING, serverInfo)
         }
 
         // 设置上下文
@@ -147,7 +147,7 @@ object ftpServer {
                 NativeCore
                     .generateRandomPassword()
                     ?.takeIf { it.isNotBlank() && it.length >= 8 }
-                    ?: return ftpStartResult(StartResult.CONFIG_ERROR)
+                    ?: return FtpStartResult(StartResult.CONFIG_ERROR)
             username = "ftp_" + randomPassword.take(8).lowercase()
             password = randomPassword
             Logger.d(TAG, "FTP 使用随机凭据（无 PC 端凭据）")
@@ -185,7 +185,7 @@ object ftpServer {
                 Logger.i(TAG, "FTP 服务器在端口 $port 启动成功，IP 地址: $ipAddress")
 
                 serverInfo =
-                    ftpServerInfo(
+                    FtpServerInfo(
                         username = username,
                         password = password,
                         ipAddress = ipAddress ?: "127.0.0.1",
@@ -193,7 +193,7 @@ object ftpServer {
                     )
 
                 Logger.i(TAG, "FTP server started: $ipAddress on port $port")
-                return ftpStartResult(StartResult.SUCCESS, serverInfo)
+                return FtpStartResult(StartResult.SUCCESS, serverInfo)
             } catch (e: Exception) {
                 lastException = e
                 when (e) {
@@ -220,10 +220,10 @@ object ftpServer {
         Logger.e(TAG, "所有端口尝试失败，无法启动 FTP 服务器: lastException=${lastException?.javaClass?.name}")
 
         return when {
-            seenPermDenied -> ftpStartResult(StartResult.PERMISSION_DENIED)
-            seenConfig -> ftpStartResult(StartResult.CONFIG_ERROR)
-            seenBind -> ftpStartResult(StartResult.PORT_IN_USE)
-            else -> ftpStartResult(StartResult.FAILED)
+            seenPermDenied -> FtpStartResult(StartResult.PERMISSION_DENIED)
+            seenConfig -> FtpStartResult(StartResult.CONFIG_ERROR)
+            seenBind -> FtpStartResult(StartResult.PORT_IN_USE)
+            else -> FtpStartResult(StartResult.FAILED)
         }
     }
 

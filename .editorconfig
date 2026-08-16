@@ -12,8 +12,6 @@ max_line_length = off
 ktlint_code_style = ktlint_official
 # @Composable 函数按 Jetpack Compose 惯例首字母大写，豁免函数命名规则
 ktlint_standard_function-naming = disabled
-# 单例与全局配置属性沿用项目惯例大写命名（INSTANCE、CURRENT_LEVEL 等），豁免属性命名规则
-ktlint_standard_property-naming = disabled
 # 下划线前缀私有属性为本项目内部状态惯例（无对应公有属性），豁免 backing property 命名规则
 ktlint_standard_backing-property-naming = disabled
 # Compose 代码惯用通配导入（foundation.layout.* / runtime.* 等），豁免通配导入规则
@@ -30,7 +28,3 @@ ktlint_standard_package-name = disabled
 # app 内 superisland 相关代码与 superislandui 模块同源：包名含大写（BigIsland）历史遗留，暂豁免
 [app/**/superisland/**/*.kt]
 ktlint_standard_package-name = disabled
-
-# FtpServer.kt 中类/对象名为历史小写命名（ftpServer/ftpServerInfo/ftpStartResult），改名影响多处引用
-[app/**/sync/FtpServer.kt]
-ktlint_standard_class-naming = disabled

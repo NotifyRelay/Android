@@ -118,8 +118,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         // 只补发本应用的前台服务通知（必须channelId和id都匹配）
         if (sbn.packageName == applicationContext.packageName &&
-            sbn.notification.channelId == CHANNEL_ID &&
-            sbn.id == NOTIFY_ID
+            sbn.notification.channelId == channelId &&
+            sbn.id == notifyId
         ) {
             Logger.w(TAG, "前台服务通知被移除，自动补发！")
             // 立即补发本服务前台通知
@@ -283,8 +283,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     }
 
     private var foregroundJob: Job? = null
-    private val CHANNEL_ID = "notifyrelay_foreground"
-    private val NOTIFY_ID = 1001
+    private val channelId = "notifyrelay_foreground"
+    private val notifyId = 1001
 
     // 设备连接管理器
     private lateinit var connectionManager: DeviceConnectionManager
@@ -492,7 +492,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         }
 
         if (!BackendLocalFilter.shouldForwardBlocking(sbn, applicationContext, checkProcessed)) {
-            if (Logger.ENABLE_FILTERED_NOTIFICATION_LOG) {
+            if (Logger.enableFilteredNotificationLog) {
                 logSbnDetail("法鸡-黑影 被过滤", sbn)
             }
             return
@@ -659,7 +659,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     private fun startForegroundService() {
         val channel =
             NotificationChannel(
-                CHANNEL_ID,
+                channelId,
                 "通知转发后台服务",
                 NotificationManager.IMPORTANCE_HIGH,
             )
@@ -667,13 +667,13 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         manager.createNotificationChannel(channel)
 
         val notification = buildNotification()
-        startForeground(NOTIFY_ID, notification)
+        startForeground(notifyId, notification)
     }
 
     private fun buildNotification(): Notification {
         val builder =
             NotificationCompat
-                .Builder(this, CHANNEL_ID)
+                .Builder(this, channelId)
                 .setContentTitle("通知监听/转发中")
                 .setContentText(getNotificationText())
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
@@ -753,7 +753,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     private fun updateNotification() {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val notification = buildNotification()
-        manager.notify(NOTIFY_ID, notification)
+        manager.notify(notifyId, notification)
     }
 
     // 保留通知历史，不做移除处理

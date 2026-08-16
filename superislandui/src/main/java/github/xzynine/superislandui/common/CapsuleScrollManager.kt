@@ -25,10 +25,10 @@ object CapsuleScrollManager {
     private val scrollDataMap = mutableMapOf<String, ScrollData>()
 
     // 基于视觉权重的滚动（CJK=2，西文=1）
-    private const val maxDisplayWeight = 17 // 视觉容量：约10个CJK字符或约20个西文字符
-    private const val compensationThreshold = 7 // 如果剩余权重小于此值则停止滚动（保持胶囊稳定）
+    private const val MAX_DISPLAY_WEIGHT = 17 // 视觉容量：约10个CJK字符或约20个西文字符
+    private const val COMPENSATION_THRESHOLD = 7 // 如果剩余权重小于此值则停止滚动（保持胶囊稳定）
 
-    private const val finalPauseDuration = 500L // 下一句文本前的0.5秒
+    private const val FINAL_PAUSE_DURATION = 500L // 下一句文本前的0.5秒
     private const val SCROLL_STEP_DELAY = 1800L // 滚动步长延迟
 
     // 自适应滚动速度跟踪
@@ -156,7 +156,7 @@ object CapsuleScrollManager {
         val totalWeight = calculateWeight(text)
 
         // 短文本：无需滚动
-        if (totalWeight <= maxDisplayWeight) {
+        if (totalWeight <= MAX_DISPLAY_WEIGHT) {
             scrollData.scrollState = ScrollState.DONE
             return text
         }
@@ -168,19 +168,19 @@ object CapsuleScrollManager {
                 val remainingWeight = totalWeight - scrollData.scrollOffset
 
                 // 补偿算法：如果剩余权重较小则停止滚动以保持胶囊稳定
-                if (remainingWeight <= compensationThreshold) {
+                if (remainingWeight <= COMPENSATION_THRESHOLD) {
                     // 显示所有剩余内容（即使>最大显示权重）
                     scrollData.scrollState = ScrollState.FINAL_PAUSE
                     scrollData.initialPauseStartTime = System.currentTimeMillis()
                     extractByWeight(text, scrollData.scrollOffset, remainingWeight)
-                } else if (remainingWeight <= maxDisplayWeight) {
+                } else if (remainingWeight <= MAX_DISPLAY_WEIGHT) {
                     // 最后完整片段：切换到FINAL_PAUSE
                     scrollData.scrollState = ScrollState.FINAL_PAUSE
                     scrollData.initialPauseStartTime = System.currentTimeMillis()
-                    extractByWeight(text, scrollData.scrollOffset, maxDisplayWeight)
+                    extractByWeight(text, scrollData.scrollOffset, MAX_DISPLAY_WEIGHT)
                 } else {
                     // 主动滚动
-                    val displayText = extractByWeight(text, scrollData.scrollOffset, maxDisplayWeight)
+                    val displayText = extractByWeight(text, scrollData.scrollOffset, MAX_DISPLAY_WEIGHT)
 
                     // 按智能步长增加滚动偏移量（2-3个CJK或3-4个西文字符）
                     scrollData.scrollOffset += calculateSmartShiftWeight(text, scrollData.scrollOffset)
@@ -192,10 +192,10 @@ object CapsuleScrollManager {
             ScrollState.FINAL_PAUSE -> {
                 // 显示最终片段（由于补偿可能>最大显示权重）
                 val remainingWeight = totalWeight - scrollData.scrollOffset
-                val displayText = extractByWeight(text, scrollData.scrollOffset, maxOf(remainingWeight, maxDisplayWeight))
+                val displayText = extractByWeight(text, scrollData.scrollOffset, maxOf(remainingWeight, MAX_DISPLAY_WEIGHT))
 
                 val pauseElapsed = System.currentTimeMillis() - scrollData.initialPauseStartTime
-                if (pauseElapsed >= finalPauseDuration) {
+                if (pauseElapsed >= FINAL_PAUSE_DURATION) {
                     scrollData.scrollState = ScrollState.DONE
                 }
 
@@ -205,7 +205,7 @@ object CapsuleScrollManager {
             ScrollState.DONE -> {
                 // 保持显示最终片段
                 val remainingWeight = totalWeight - scrollData.scrollOffset
-                extractByWeight(text, scrollData.scrollOffset, maxOf(remainingWeight, maxDisplayWeight))
+                extractByWeight(text, scrollData.scrollOffset, maxOf(remainingWeight, MAX_DISPLAY_WEIGHT))
             }
         }
     }

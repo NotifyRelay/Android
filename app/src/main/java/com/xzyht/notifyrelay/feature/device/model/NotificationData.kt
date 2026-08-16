@@ -104,11 +104,11 @@ class NotificationRecordStore(
 // 单例提供者
 object NotifyRelayStoreProvider {
     @Volatile
-    private var INSTANCE: NotificationRecordStore? = null
+    private var instance: NotificationRecordStore? = null
 
     fun getInstance(context: Context): NotificationRecordStore =
-        INSTANCE ?: synchronized(this) {
-            INSTANCE ?: NotificationRecordStore(context.applicationContext).also { INSTANCE = it }
+        instance ?: synchronized(this) {
+            instance ?: NotificationRecordStore(context.applicationContext).also { instance = it }
         }
 }
 

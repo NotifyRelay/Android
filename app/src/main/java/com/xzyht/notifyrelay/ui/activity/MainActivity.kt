@@ -645,7 +645,7 @@ private fun MainScreenBackHandler(
 ) {
     val activity = LocalActivity.current as? MainActivity
     var backPressedTime by remember { mutableLongStateOf(0L) }
-    val EXIT_INTERVAL = 2000L
+    val exitInterval = 2000L
     val coroutineScope = rememberCoroutineScope()
 
     val isBackHandlerEnabled by remember {
@@ -669,7 +669,7 @@ private fun MainScreenBackHandler(
                 }
             } else {
                 val currentTime = System.currentTimeMillis()
-                if (currentTime - backPressedTime < EXIT_INTERVAL) {
+                if (currentTime - backPressedTime < exitInterval) {
                     activity?.finish()
                 } else {
                     ToastUtils.showShortToast(activity ?: return@NavigationBackHandler, "再次返回以退出应用")

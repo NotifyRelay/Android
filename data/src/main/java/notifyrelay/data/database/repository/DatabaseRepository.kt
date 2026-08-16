@@ -686,14 +686,14 @@ class DatabaseRepository(
 
     companion object {
         @Volatile
-        private var INSTANCE: DatabaseRepository? = null
+        private var instance: DatabaseRepository? = null
 
         /**
          * 获取数据库仓库实例（单例模式）
          */
         fun getInstance(context: Context): DatabaseRepository =
-            INSTANCE ?: synchronized(this) {
-                INSTANCE ?: DatabaseRepository(AppDatabase.getDatabase(context)).also { INSTANCE = it }
+            instance ?: synchronized(this) {
+                instance ?: DatabaseRepository(AppDatabase.getDatabase(context)).also { instance = it }
             }
     }
 }

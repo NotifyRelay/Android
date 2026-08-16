@@ -165,14 +165,14 @@ abstract class AppDatabase : RoomDatabase() {
 
         // 单例实例
         @Volatile
-        private var INSTANCE: AppDatabase? = null
+        private var instance: AppDatabase? = null
 
         /**
          * 获取数据库实例（单例模式）
          */
         fun getDatabase(context: Context): AppDatabase =
-            INSTANCE ?: synchronized(this) {
-                INSTANCE ?: Room
+            instance ?: synchronized(this) {
+                instance ?: Room
                     .databaseBuilder(
                         context.applicationContext,
                         AppDatabase::class.java,
@@ -182,7 +182,7 @@ abstract class AppDatabase : RoomDatabase() {
                             override fun onCreate(db: SupportSQLiteDatabase) {
                                 super.onCreate(db)
                                 // 数据库创建后执行迁移逻辑
-                                INSTANCE?.let {
+                                instance?.let {
                                     CoroutineScope(Dispatchers.IO).launch {
                                         // 执行迁移逻辑
                                         migrateFromLegacyStorage(context, it)
@@ -192,7 +192,7 @@ abstract class AppDatabase : RoomDatabase() {
                         },
                     ).addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                     .build()
-                    .also { INSTANCE = it }
+                    .also { instance = it }
             }
 
         /**
