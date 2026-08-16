@@ -49,7 +49,7 @@ fun showTestNotification(
     paramV2Raw: String?,
     picMap: Map<String, String>?,
     appName: String? = "测试应用",
-    forceFullPackage: Boolean = true
+    forceFullPackage: Boolean = true,
 ) {
     // 直接读取持久化值（与对话框开关 UI 同一真相源），避免重启后全局变量回退导致 UI 与实际行为不一致
     if (StorageManager.getBoolean(context, "superisland_send_to_other_devices", false)) {
@@ -57,15 +57,16 @@ fun showTestNotification(
         try {
             // 获取设备管理器实例
             val deviceManager = DeviceConnectionManager.getInstance(context)
-            
+
             // 强制发送全量包：固定 featureId（同一测试源多次点击刷新原有卡片，
             // 对齐真实通知增量更新语义：全量重发走合并而非新建）
-            val featureIdOverride = if (forceFullPackage) {
-                sourceId
-            } else {
-                null
-            }
-            
+            val featureIdOverride =
+                if (forceFullPackage) {
+                    sourceId
+                } else {
+                    null
+                }
+
             // 发送超级岛数据给其他设备（图片处理可能在 IO 线程耗时，异步发送避免阻塞 UI 线程）
             CoroutineScope(Dispatchers.IO).launch {
                 MessageSender.sendSuperIslandData(
@@ -78,7 +79,7 @@ fun showTestNotification(
                     paramV2Raw = paramV2Raw,
                     picMap = picMap,
                     deviceManager = deviceManager,
-                    featureIdOverride = featureIdOverride
+                    featureIdOverride = featureIdOverride,
                 )
             }
         } catch (e: Exception) {
@@ -95,7 +96,7 @@ fun showTestNotification(
             paramV2Raw = paramV2Raw,
             picMap = picMap,
             isLocked = false,
-            appName = appName
+            appName = appName,
         )
     }
 }
@@ -106,22 +107,25 @@ fun showTestNotification(
  * @param fixedValue 固定进度值
  * @return 生成的进度值
  */
-private fun getProgress(isVariableProgress: Boolean, fixedValue: Int): Int {
-    return if (isVariableProgress) {
+private fun getProgress(
+    isVariableProgress: Boolean,
+    fixedValue: Int,
+): Int =
+    if (isVariableProgress) {
         // 以10为单位递增循环进度值，用于测试动画效果
         val currentProgress = progressCounter
         // 每次递增10，达到100时重置为0
-        progressCounter = if (currentProgress >= 100) {
-            0
-        } else {
-            currentProgress + 10
-        }
+        progressCounter =
+            if (currentProgress >= 100) {
+                0
+            } else {
+                currentProgress + 10
+            }
         currentProgress
     } else {
         // 固定进度值，用于测试静态效果
         fixedValue
     }
-}
 
 /**
  * 创建一个黑色块的data URL，用于测试图片显示
@@ -141,8 +145,9 @@ private fun appimgDataUrl(): String {
 
 /**
  * 测试基础文本组件
+ *
+ * TODO：数据并不符合超级岛规范
  */
-//TODO 数据并不符合超级岛规范
 private fun testBaseInfo(context: Context) {
     val paramV2Raw = """
         {
@@ -192,9 +197,10 @@ private fun testBaseInfo(context: Context) {
         title = "基础文本测试",
         text = "这是一个基础文本组件的展开态测试示例",
         paramV2Raw = paramV2Raw,
-        picMap = mapOf(
-            "base_icon" to createBlackBlockDataUrl()
-        )
+        picMap =
+            mapOf(
+                "base_icon" to createBlackBlockDataUrl(),
+            ),
     )
 }
 
@@ -249,9 +255,10 @@ private fun testChatInfo(context: Context) {
         title = "聊天测试",
         text = "这是一条聊天消息展开态测试示例",
         paramV2Raw = paramV2Raw,
-        picMap = mapOf(
-            "profile_pic" to createBlackBlockDataUrl()
-        )
+        picMap =
+            mapOf(
+                "profile_pic" to createBlackBlockDataUrl(),
+            ),
     )
 }
 
@@ -305,9 +312,10 @@ private fun testAnimTextInfo(context: Context) {
         title = "动画文本测试",
         text = "这是一个动画文本组件的展开态测试示例",
         paramV2Raw = paramV2Raw,
-        picMap = mapOf(
-            "anim_icon" to createBlackBlockDataUrl()
-        )
+        picMap =
+            mapOf(
+                "anim_icon" to createBlackBlockDataUrl(),
+            ),
     )
 }
 
@@ -362,9 +370,10 @@ private fun testHighlightInfo(context: Context) {
         title = "强调文本测试",
         text = "这是一个强调图文组件的展开态测试示例",
         paramV2Raw = paramV2Raw,
-        picMap = mapOf(
-            "highlight_pic" to createBlackBlockDataUrl()
-        )
+        picMap =
+            mapOf(
+                "highlight_pic" to createBlackBlockDataUrl(),
+            ),
     )
 }
 
@@ -411,9 +420,10 @@ private fun testPicInfo(context: Context) {
         title = "图形测试",
         text = "这是一个识别图形组件的展开态测试示例",
         paramV2Raw = paramV2Raw,
-        picMap = mapOf(
-            "test_pic" to createBlackBlockDataUrl()
-        )
+        picMap =
+            mapOf(
+                "test_pic" to createBlackBlockDataUrl(),
+            ),
     )
 }
 
@@ -461,9 +471,10 @@ private fun testHintInfo(context: Context) {
         title = "提示测试",
         text = "这是一个提示组件的展开态测试示例",
         paramV2Raw = paramV2Raw,
-        picMap = mapOf(
-            "hint_pic" to createBlackBlockDataUrl()
-        )
+        picMap =
+            mapOf(
+                "hint_pic" to createBlackBlockDataUrl(),
+            ),
     )
 }
 
@@ -511,19 +522,23 @@ private fun testTextButton(context: Context) {
         title = "文本按钮测试",
         text = "这是一个文本按钮组件的展开态测试示例",
         paramV2Raw = paramV2Raw,
-        picMap = mapOf(
-            "button_icon" to createBlackBlockDataUrl()
-        )
+        picMap =
+            mapOf(
+                "button_icon" to createBlackBlockDataUrl(),
+            ),
     )
 }
 
 /**
  * 测试线性进度组件
  */
-private fun testProgressInfo(context: Context, isVariableProgress: Boolean) {
+private fun testProgressInfo(
+    context: Context,
+    isVariableProgress: Boolean,
+) {
     // 获取进度值
     val progress = getProgress(isVariableProgress, 75)
-    
+
     val paramV2Raw = """
         {
             "baseInfo": {
@@ -574,19 +589,23 @@ private fun testProgressInfo(context: Context, isVariableProgress: Boolean) {
         title = "线性进度测试",
         text = "这是一个线性进度组件的展开态测试示例",
         paramV2Raw = paramV2Raw,
-        picMap = mapOf(
-            "progress_icon" to createBlackBlockDataUrl()
-        )
+        picMap =
+            mapOf(
+                "progress_icon" to createBlackBlockDataUrl(),
+            ),
     )
 }
 
 /**
  * 测试多节点进度组件
  */
-private fun testMultiProgressInfo(context: Context, isVariableProgress: Boolean) {
+private fun testMultiProgressInfo(
+    context: Context,
+    isVariableProgress: Boolean,
+) {
     // 获取进度值
     val progress = getProgress(isVariableProgress, 60)
-    
+
     val paramV2Raw = """
         {
             "baseInfo": {
@@ -649,30 +668,35 @@ private fun testMultiProgressInfo(context: Context, isVariableProgress: Boolean)
         title = "多节点进度测试",
         text = "这是一个多节点进度组件的展开态测试示例",
         paramV2Raw = paramV2Raw,
-        picMap = mapOf(
-            "forward_pic" to createBlackBlockDataUrl(),
-            "box_pic" to createBlackBlockDataUrl(),
-            "middle_pic" to createBlackBlockDataUrl(),
-            "middle_unselected_pic" to createBlackBlockDataUrl(),
-            "end_pic" to createBlackBlockDataUrl(),
-            "end_unselected_pic" to createBlackBlockDataUrl()
-        )
+        picMap =
+            mapOf(
+                "forward_pic" to createBlackBlockDataUrl(),
+                "box_pic" to createBlackBlockDataUrl(),
+                "middle_pic" to createBlackBlockDataUrl(),
+                "middle_unselected_pic" to createBlackBlockDataUrl(),
+                "end_pic" to createBlackBlockDataUrl(),
+                "end_unselected_pic" to createBlackBlockDataUrl(),
+            ),
     )
 }
 
 /**
  * 测试带有图标的多节点进度组件
  */
-private fun testMultiProgressWithIcons(context: Context, isVariableProgress: Boolean) {
+private fun testMultiProgressWithIcons(
+    context: Context,
+    isVariableProgress: Boolean,
+) {
     // 获取进度值
     val progress = getProgress(isVariableProgress, 75)
-    
+
     // 根据进度值动态生成配送状态文本
-    val deliveryStatus = when {
-        progress <= 50 -> "骑士正在取餐"
-        else -> "骑士正在配送"
-    }
-    
+    val deliveryStatus =
+        when {
+            progress <= 50 -> "骑士正在取餐"
+            else -> "骑士正在配送"
+        }
+
     val paramV2Raw = """
         {
             "baseInfo": {
@@ -747,26 +771,30 @@ private fun testMultiProgressWithIcons(context: Context, isVariableProgress: Boo
         title = "带图标多节点进度测试",
         text = "这是一个带有图标的多节点进度组件测试示例",
         paramV2Raw = paramV2Raw,
-        picMap = mapOf(
-            "miui.focus.pic_forward" to "https://gw.alicdn.com/imgextra/i4/O1CN01RBCiIV26Q2ysJNney_!!6000000007655-2-tps-180-141.png",
-            "miui.focus.pic_middle" to "https://gw.alicdn.com/imgextra/i4/O1CN01gVYsU51zTz4jBuPxN_!!6000000006716-2-tps-120-188.png",
-            "miui.focus.pic_middel_unselected" to "https://gw.alicdn.com/imgextra/i3/O1CN011JQ8qv1QXdgUdtx6j_!!6000000001986-2-tps-132-194.png",
-            "miui.focus.pic_end_unselected" to "https://gw.alicdn.com/imgextra/i2/O1CN013MEAhj1Q3PXgmGojQ_!!6000000001920-2-tps-120-191.png",
-            "miui.focus.pic_end" to "https://gw.alicdn.com/imgextra/i2/O1CN01BtZfit1PrxdrYJaSH_!!6000000001895-2-tps-122-190.png",
-            "miui.focus.pic_forward_wait" to "https://gw.alicdn.com/imgextra/i3/O1CN012aWbML1PqaSChXHK7_!!6000000001892-2-tps-180-141.png",
-            "miui.focus.pic_forward_box" to "https://gw.alicdn.com/imgextra/i1/O1CN01LLnS7n1xM50ZBmNL7_!!6000000006428-2-tps-180-141.png",
-            "miui.focus.pic_app_icon" to appimgDataUrl(),
-        )
+        picMap =
+            mapOf(
+                "miui.focus.pic_forward" to "https://gw.alicdn.com/imgextra/i4/O1CN01RBCiIV26Q2ysJNney_!!6000000007655-2-tps-180-141.png",
+                "miui.focus.pic_middle" to "https://gw.alicdn.com/imgextra/i4/O1CN01gVYsU51zTz4jBuPxN_!!6000000006716-2-tps-120-188.png",
+                "miui.focus.pic_middel_unselected" to "https://gw.alicdn.com/imgextra/i3/O1CN011JQ8qv1QXdgUdtx6j_!!6000000001986-2-tps-132-194.png",
+                "miui.focus.pic_end_unselected" to "https://gw.alicdn.com/imgextra/i2/O1CN013MEAhj1Q3PXgmGojQ_!!6000000001920-2-tps-120-191.png",
+                "miui.focus.pic_end" to "https://gw.alicdn.com/imgextra/i2/O1CN01BtZfit1PrxdrYJaSH_!!6000000001895-2-tps-122-190.png",
+                "miui.focus.pic_forward_wait" to "https://gw.alicdn.com/imgextra/i3/O1CN012aWbML1PqaSChXHK7_!!6000000001892-2-tps-180-141.png",
+                "miui.focus.pic_forward_box" to "https://gw.alicdn.com/imgextra/i1/O1CN01LLnS7n1xM50ZBmNL7_!!6000000006428-2-tps-180-141.png",
+                "miui.focus.pic_app_icon" to appimgDataUrl(),
+            ),
     )
 }
 
 /**
  * 测试圆形进度组件（基于真实小米互传数据）
  */
-private fun testCircularProgressInfo(context: Context, isVariableProgress: Boolean) {
+private fun testCircularProgressInfo(
+    context: Context,
+    isVariableProgress: Boolean,
+) {
     // 获取进度值
     val progress = getProgress(isVariableProgress, 56)
-    
+
     val paramV2Raw = """
         {
             "protocol": 1,
@@ -850,13 +878,14 @@ private fun testCircularProgressInfo(context: Context, isVariableProgress: Boole
         title = "圆形进度测试",
         text = "这是一个基于真实数据的圆形进度组件测试",
         paramV2Raw = paramV2Raw,
-        picMap = mapOf(
-            "miui.focus.pic_thumbnail" to createBlackBlockDataUrl(),
-            "miui.focus.pic_island" to createBlackBlockDataUrl(),
-            "miui.focus.pic_cancel" to createBlackBlockDataUrl(),
-            "miui.focus.pic_cancelDark" to createBlackBlockDataUrl(),
-            "miui.focus.pic_app_icon" to createBlackBlockDataUrl()
-        )
+        picMap =
+            mapOf(
+                "miui.focus.pic_thumbnail" to createBlackBlockDataUrl(),
+                "miui.focus.pic_island" to createBlackBlockDataUrl(),
+                "miui.focus.pic_cancel" to createBlackBlockDataUrl(),
+                "miui.focus.pic_cancelDark" to createBlackBlockDataUrl(),
+                "miui.focus.pic_app_icon" to createBlackBlockDataUrl(),
+            ),
     )
 }
 
@@ -866,7 +895,7 @@ private fun testCircularProgressInfo(context: Context, isVariableProgress: Boole
 @Composable
 fun SuperIslandTestDialog(
     show: MutableState<Boolean>,
-    context: Context
+    context: Context,
 ) {
     // 进度可变开关状态
     var isVariableProgress by remember { mutableStateOf(false) }
@@ -874,170 +903,171 @@ fun SuperIslandTestDialog(
     var isSendEnabled by remember {
         mutableStateOf(StorageManager.getBoolean(context, "superisland_send_to_other_devices", false))
     }
-    
+
     WindowDialog(show = show.value, modifier = Modifier, title = "超级岛测试", titleColor = DialogDefaults.titleColor(), summary = "点击下方按钮测试不同分支下的超级岛效果", summaryColor = DialogDefaults.summaryColor(), backgroundColor = DialogDefaults.backgroundColor(), enableWindowDim = true, onDismissRequest = { show.value = false }, onDismissFinished = null, outsideMargin = DialogDefaults.outsideMargin, insideMargin = DialogDefaults.insideMargin, defaultWindowInsetsPadding = true, content = {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp)
-                ) {
-                    // 进度可变开关
-                    SwitchPreference(
-                        title = "测试设置",
-                        summary = if (isVariableProgress) "进度可变 (测试动画效果)" else "进度固定 (测试静态效果)",
-                        checked = isVariableProgress,
-                        onCheckedChange = { isVariableProgress = it },
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(16.dp),
+        ) {
+            // 进度可变开关
+            SwitchPreference(
+                title = "测试设置",
+                summary = if (isVariableProgress) "进度可变 (测试动画效果)" else "进度固定 (测试静态效果)",
+                checked = isVariableProgress,
+                onCheckedChange = { isVariableProgress = it },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            )
 
-                    // 发送开关
-                    SwitchPreference(
-                        title = "发送设置",
-                        summary = if (isSendEnabled) "发送到其他设备" else "仅本地测试",
-                        checked = isSendEnabled,
-                        onCheckedChange = {
-                            isSendEnabled = it
-                            StorageManager.putBoolean(context, "superisland_send_to_other_devices", it)
+            // 发送开关
+            SwitchPreference(
+                title = "发送设置",
+                summary = if (isSendEnabled) "发送到其他设备" else "仅本地测试",
+                checked = isSendEnabled,
+                onCheckedChange = {
+                    isSendEnabled = it
+                    StorageManager.putBoolean(context, "superisland_send_to_other_devices", it)
+                },
+                modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
+            )
+
+            LazyColumn(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                item {
+                    // 基础文本组件
+                    Button(
+                        onClick = {
+                            testBaseInfo(context)
                         },
-                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                    )
-
-                    LazyColumn(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                    item {
-                        // 基础文本组件
-                        Button(
-                            onClick = {
-                                testBaseInfo(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("测试基础文本组件 (baseInfo)")
-                        }
+                        Text("测试基础文本组件 (baseInfo)")
                     }
+                }
 
-                    item {
-                        // IM图文组件
-                        Button(
-                            onClick = {
-                                testChatInfo(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("测试IM图文组件 (chatInfo)")
-                        }
+                item {
+                    // IM图文组件
+                    Button(
+                        onClick = {
+                            testChatInfo(context)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("测试IM图文组件 (chatInfo)")
                     }
+                }
 
-                    item {
-                        // 动画文本组件
-                        Button(
-                            onClick = {
-                                testAnimTextInfo(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("测试动画文本组件 (animTextInfo)")
-                        }
+                item {
+                    // 动画文本组件
+                    Button(
+                        onClick = {
+                            testAnimTextInfo(context)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("测试动画文本组件 (animTextInfo)")
                     }
+                }
 
-                    item {
-                        // 强调图文组件
-                        Button(
-                            onClick = {
-                                testHighlightInfo(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("测试强调图文组件 (highlightInfo)")
-                        }
+                item {
+                    // 强调图文组件
+                    Button(
+                        onClick = {
+                            testHighlightInfo(context)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("测试强调图文组件 (highlightInfo)")
                     }
+                }
 
-                    item {
-                        // 识别图形组件
-                        Button(
-                            onClick = {
-                                testPicInfo(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("测试识别图形组件 (picInfo)")
-                        }
+                item {
+                    // 识别图形组件
+                    Button(
+                        onClick = {
+                            testPicInfo(context)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("测试识别图形组件 (picInfo)")
                     }
+                }
 
-                    item {
-                        // 提示组件
-                        Button(
-                            onClick = {
-                                testHintInfo(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("测试提示组件 (hintInfo)")
-                        }
+                item {
+                    // 提示组件
+                    Button(
+                        onClick = {
+                            testHintInfo(context)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("测试提示组件 (hintInfo)")
                     }
+                }
 
-                    item {
-                        // 文本按钮组件
-                        Button(
-                            onClick = {
-                                testTextButton(context)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("测试文本按钮组件 (textButton)")
-                        }
+                item {
+                    // 文本按钮组件
+                    Button(
+                        onClick = {
+                            testTextButton(context)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("测试文本按钮组件 (textButton)")
                     }
+                }
 
-                    item {
-                        // 线性进度组件
-                        Button(
-                            onClick = {
-                                testProgressInfo(context, isVariableProgress)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("测试线性进度组件 (progressInfo)")
-                        }
+                item {
+                    // 线性进度组件
+                    Button(
+                        onClick = {
+                            testProgressInfo(context, isVariableProgress)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("测试线性进度组件 (progressInfo)")
                     }
+                }
 
-                    item {
-                        // 多节点进度组件
-                        Button(
-                            onClick = {
-                                testMultiProgressInfo(context, isVariableProgress)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("测试多节点进度组件 (multiProgressInfo)")
-                        }
+                item {
+                    // 多节点进度组件
+                    Button(
+                        onClick = {
+                            testMultiProgressInfo(context, isVariableProgress)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("测试多节点进度组件 (multiProgressInfo)")
                     }
+                }
 
-                    item {
-                        // 带有图标的多节点进度组件
-                        Button(
-                            onClick = {
-                                testMultiProgressWithIcons(context, isVariableProgress)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("测试带图标多节点进度组件")
-                        }
+                item {
+                    // 带有图标的多节点进度组件
+                    Button(
+                        onClick = {
+                            testMultiProgressWithIcons(context, isVariableProgress)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("测试带图标多节点进度组件")
                     }
+                }
 
-                    item {
-                        // 圆形进度组件
-                        Button(
-                            onClick = {
-                                testCircularProgressInfo(context, isVariableProgress)
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text("测试圆形进度组件 (circular)")
-                        }
+                item {
+                    // 圆形进度组件
+                    Button(
+                        onClick = {
+                            testCircularProgressInfo(context, isVariableProgress)
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("测试圆形进度组件 (circular)")
                     }
                 }
             }
-        })
+        }
+    })
 }

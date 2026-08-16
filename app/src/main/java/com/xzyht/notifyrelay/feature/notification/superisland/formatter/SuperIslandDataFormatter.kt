@@ -11,7 +11,7 @@ import notifyrelay.base.util.Logger
 data class FormattedSuperIslandData(
     val paramV2: ParamV2?,
     val paramV2Raw: String?,
-    val resolvedPicMap: Map<String, String>
+    val resolvedPicMap: Map<String, String>,
 )
 
 object SuperIslandDataFormatter {
@@ -20,19 +20,20 @@ object SuperIslandDataFormatter {
     suspend fun formatForDisplay(
         context: Context,
         paramV2Raw: String?,
-        picMap: Map<String, String>?
+        picMap: Map<String, String>?,
     ): FormattedSuperIslandData {
-        val paramV2 = withContext(Dispatchers.IO) {
-            parseParamV2Safe(paramV2Raw)
-        }
+        val paramV2 =
+            withContext(Dispatchers.IO) {
+                parseParamV2Safe(paramV2Raw)
+            }
         val resolvedPicMap = resolvePicMapSafe(context, picMap)
-        
+
         Logger.d(TAG, "formatForDisplay: paramV2=${paramV2 != null}, picMapSize=${resolvedPicMap.size}")
-        
+
         return FormattedSuperIslandData(
             paramV2 = paramV2,
             paramV2Raw = paramV2Raw,
-            resolvedPicMap = resolvedPicMap
+            resolvedPicMap = resolvedPicMap,
         )
     }
 
@@ -48,9 +49,9 @@ object SuperIslandDataFormatter {
 
     suspend fun resolvePicMapSafe(
         context: Context,
-        picMap: Map<String, String>?
-    ): Map<String, String> {
-        return try {
+        picMap: Map<String, String>?,
+    ): Map<String, String> =
+        try {
             if (picMap.isNullOrEmpty()) {
                 emptyMap()
             } else {
@@ -62,14 +63,13 @@ object SuperIslandDataFormatter {
             Logger.w(TAG, "解析picMap失败: ${e.message}")
             picMap ?: emptyMap()
         }
-    }
 
-    fun isMediaType(paramV2: ParamV2?, paramV2Raw: String?): Boolean {
-        return paramV2?.business == "media" || 
-               paramV2Raw?.contains("\"business\":\"media\"") == true
-    }
+    fun isMediaType(
+        paramV2: ParamV2?,
+        paramV2Raw: String?,
+    ): Boolean =
+        paramV2?.business == "media" ||
+            paramV2Raw?.contains("\"business\":\"media\"") == true
 
-    fun isProgressType(paramV2: ParamV2?): Boolean {
-        return paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
-    }
+    fun isProgressType(paramV2: ParamV2?): Boolean = paramV2?.progressInfo != null || paramV2?.multiProgressInfo != null
 }

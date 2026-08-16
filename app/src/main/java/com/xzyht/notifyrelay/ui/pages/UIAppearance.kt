@@ -16,11 +16,12 @@ import androidx.compose.ui.unit.dp
 import notifyrelay.base.util.ThemeSettingsManager
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 
-private val THEME_BASE_OPTIONS = listOf(
-    "跟随系统" to 0,
-    "浅色模式" to 1,
-    "深色模式" to 2,
-)
+private val THEME_BASE_OPTIONS =
+    listOf(
+        "跟随系统" to 0,
+        "浅色模式" to 1,
+        "深色模式" to 2,
+    )
 
 /**
  * 外观设置
@@ -32,10 +33,11 @@ fun UIAppearance() {
     var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(top = 12.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(top = 12.dp),
     ) {
         WindowDropdownPreference(
             title = "外观模式",
@@ -45,7 +47,7 @@ fun UIAppearance() {
             onSelectedIndexChange = { newIndex ->
                 themeBaseIndex = newIndex
                 ThemeSettingsManager.setThemeBaseIndex(context, newIndex)
-            }
+            },
         )
     }
 }

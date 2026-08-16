@@ -12,7 +12,10 @@ object SuperIslandRemoteStore {
     private val store = ConcurrentHashMap<String, DiffSystem.State>()
 
     @Synchronized
-    fun applyIncoming(sourceId: String, payload: JSONObject): DiffSystem.State? {
+    fun applyIncoming(
+        sourceId: String,
+        payload: JSONObject,
+    ): DiffSystem.State? {
         return try {
             // 结束包标识：存在 terminateValue 且等于约定值
             val term = payload.optString("terminateValue", "")
@@ -23,12 +26,13 @@ object SuperIslandRemoteStore {
 
             // 兼容旧设备增量(delta)报文：含 changes 字段时与现有状态合并，而非全量覆盖
             val changes = payload.optJSONObject("changes")
-            val state = if (changes != null) {
-                mergeDelta(store[sourceId], changes, payload)
-            } else {
-                // Rust 合并引擎已输出全量，直接解析存储
-                parseStateFromFull(payload)
-            }
+            val state =
+                if (changes != null) {
+                    mergeDelta(store[sourceId], changes, payload)
+                } else {
+                    // Rust 合并引擎已输出全量，直接解析存储
+                    parseStateFromFull(payload)
+                }
             store[sourceId] = state
             state
         } catch (_: Exception) {
@@ -41,8 +45,11 @@ object SuperIslandRemoteStore {
      * 用于在接收到结束包但 featureId 无法可靠重算时，清理存储并告知上层进行浮窗关闭。
      */
     @Synchronized
-    fun removeByDeviceAndPkgPrefix(deviceUuid: String, mappedPkg: String): List<String> {
-        return try {
+    fun removeByDeviceAndPkgPrefix(
+        deviceUuid: String,
+        mappedPkg: String,
+    ): List<String> =
+        try {
             val prefix = listOf(deviceUuid, mappedPkg).joinToString("|")
             val toRemove = store.keys.filter { it.startsWith(prefix) }
             toRemove.forEach { store.remove(it) }
@@ -50,15 +57,14 @@ object SuperIslandRemoteStore {
         } catch (_: Exception) {
             emptyList()
         }
-    }
 
     /**
      * 根据 featureKey（特征 ID）后缀查找并移除匹配的 sourceId，返回被移除的 sourceId 列表。
      * 兼容只传入 featureKey 的结束包（例如仅包含 featureKeyValue），用于定位完整的 sourceId。
      */
     @Synchronized
-    fun removeByFeatureKey(featureKey: String): List<String> {
-        return try {
+    fun removeByFeatureKey(featureKey: String): List<String> =
+        try {
             val suffix = "|$featureKey"
             val toRemove = store.keys.filter { it.endsWith(suffix) || it == featureKey }
             toRemove.forEach { store.remove(it) }
@@ -66,29 +72,26 @@ object SuperIslandRemoteStore {
         } catch (_: Exception) {
             emptyList()
         }
-    }
 
     /**
      * 精确移除指定的 sourceId（如果存在），返回是否成功移除。
      */
-    fun removeExact(sourceId: String): Boolean {
-        return try {
+    fun removeExact(sourceId: String): Boolean =
+        try {
             store.remove(sourceId) != null
         } catch (_: Exception) {
             false
         }
-    }
 
     /**
      * 获取指定sourceId的状态，用于外部查询当前状态
      */
-    fun getState(sourceId: String): DiffSystem.State? {
-        return try {
+    fun getState(sourceId: String): DiffSystem.State? =
+        try {
             store[sourceId]
         } catch (_: Exception) {
             null
         }
-    }
 
     private fun parseStateFromFull(obj: JSONObject): DiffSystem.State {
         val title = obj.optString("title", "").takeIf { it.isNotEmpty() }
@@ -114,18 +117,19 @@ object SuperIslandRemoteStore {
     private fun mergeDelta(
         current: DiffSystem.State?,
         changes: JSONObject,
-        payload: JSONObject
+        payload: JSONObject,
     ): DiffSystem.State {
         val base = current ?: DiffSystem.State(null, null, null, mutableMapOf())
         val title = if (changes.has("title")) changes.optString("title").takeIf { it.isNotEmpty() } else base.title
         val text = if (changes.has("text")) changes.optString("text").takeIf { it.isNotEmpty() } else base.text
-        val p2 = if (changes.has("param_v2_raw")) {
-            changes.optString("param_v2_raw").takeIf { it.isNotEmpty() }
-        } else {
-            payload.optString("raw", "").takeIf { it.isNotEmpty() }
-                ?: payload.optString("param_v2_raw", "").takeIf { it.isNotEmpty() }
-                ?: base.paramV2Raw
-        }
+        val p2 =
+            if (changes.has("param_v2_raw")) {
+                changes.optString("param_v2_raw").takeIf { it.isNotEmpty() }
+            } else {
+                payload.optString("raw", "").takeIf { it.isNotEmpty() }
+                    ?: payload.optString("param_v2_raw", "").takeIf { it.isNotEmpty() }
+                    ?: base.paramV2Raw
+            }
         val pics = base.pics.toMutableMap()
         changes.optJSONObject("pics")?.let { picsJson ->
             val it = picsJson.keys()

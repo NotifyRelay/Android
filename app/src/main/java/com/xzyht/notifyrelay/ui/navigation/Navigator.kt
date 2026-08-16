@@ -16,7 +16,9 @@ import kotlinx.coroutines.flow.SharedFlow
  * 导航器类，管理导航栈和结果传递
  * Navigator class for managing navigation stack and result delivery
  */
-class Navigator(initialKey: NavKey) {
+class Navigator(
+    initialKey: NavKey,
+) {
     val backStack: SnapshotStateList<NavKey> = mutableStateListOf(initialKey)
 
     private val resultBus = mutableMapOf<String, MutableSharedFlow<Any>>()
@@ -63,7 +65,10 @@ class Navigator(initialKey: NavKey) {
      * 导航并等待结果
      * Navigate for result
      */
-    fun navigateForResult(route: Route, requestKey: String) {
+    fun navigateForResult(
+        route: Route,
+        requestKey: String,
+    ) {
         ensureChannel(requestKey)
         push(route)
     }
@@ -72,7 +77,10 @@ class Navigator(initialKey: NavKey) {
      * 设置结果并返回
      * Set result and pop
      */
-    fun <T : Any> setResult(requestKey: String, value: T) {
+    fun <T : Any> setResult(
+        requestKey: String,
+        value: T,
+    ) {
         ensureChannel(requestKey).tryEmit(value)
         pop()
     }
@@ -82,9 +90,7 @@ class Navigator(initialKey: NavKey) {
      * Observe result
      */
     @Suppress("UNCHECKED_CAST")
-    fun <T : Any> observeResult(requestKey: String): SharedFlow<T> {
-        return ensureChannel(requestKey) as SharedFlow<T>
-    }
+    fun <T : Any> observeResult(requestKey: String): SharedFlow<T> = ensureChannel(requestKey) as SharedFlow<T>
 
     /**
      * 清除结果
@@ -107,21 +113,20 @@ class Navigator(initialKey: NavKey) {
      */
     fun backStackSize(): Int = backStack.size
 
-    private fun ensureChannel(key: String): MutableSharedFlow<Any> {
-        return resultBus.getOrPut(key) { MutableSharedFlow(replay = 1, extraBufferCapacity = 0) }
-    }
+    private fun ensureChannel(key: String): MutableSharedFlow<Any> = resultBus.getOrPut(key) { MutableSharedFlow(replay = 1, extraBufferCapacity = 0) }
 
     companion object {
-        val Saver: Saver<Navigator, Any> = listSaver(
-            save = { navigator -> navigator.backStack.toList() },
-            restore = { savedList ->
-                val initialKey = savedList.firstOrNull() ?: Route.Main
-                val navigator = Navigator(initialKey)
-                navigator.backStack.clear()
-                navigator.backStack.addAll(savedList)
-                navigator
-            }
-        )
+        val Saver: Saver<Navigator, Any> =
+            listSaver(
+                save = { navigator -> navigator.backStack.toList() },
+                restore = { savedList ->
+                    val initialKey = savedList.firstOrNull() ?: Route.Main
+                    val navigator = Navigator(initialKey)
+                    navigator.backStack.clear()
+                    navigator.backStack.addAll(savedList)
+                    navigator
+                },
+            )
     }
 }
 
@@ -130,16 +135,16 @@ class Navigator(initialKey: NavKey) {
  * Remember navigator instance
  */
 @Composable
-fun rememberNavigator(startRoute: NavKey): Navigator {
-    return rememberSaveable(startRoute, saver = Navigator.Saver) {
+fun rememberNavigator(startRoute: NavKey): Navigator =
+    rememberSaveable(startRoute, saver = Navigator.Saver) {
         Navigator(startRoute)
     }
-}
 
 /**
  * 本地导航器提供者
  * Local navigator provider
  */
-val LocalNavigator = staticCompositionLocalOf<Navigator> {
-    error("LocalNavigator not provided")
-}
+val LocalNavigator =
+    staticCompositionLocalOf<Navigator> {
+        error("LocalNavigator not provided")
+    }

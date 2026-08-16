@@ -40,7 +40,10 @@ object ClipboardSyncManager {
         return FcitxClipboardManager.isPaired
     }
 
-    fun setManualSyncMode(context: Context, enabled: Boolean) {
+    fun setManualSyncMode(
+        context: Context,
+        enabled: Boolean,
+    ) {
         isManualSyncMode = enabled
         if (enabled) {
             Logger.d(TAG, "已启用手动同步模式，将通过通知点击触发剪贴板同步")
@@ -73,8 +76,9 @@ object ClipboardSyncManager {
     private fun getClipboardManager(context: Context): ClipboardManager? {
         if (clipboardManager == null) {
             // 使用 applicationContext 避免间接持有 Activity/Service 导致无法回收
-            clipboardManager = context.applicationContext
-                .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            clipboardManager =
+                context.applicationContext
+                    .getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
         }
         return clipboardManager
     }
@@ -83,14 +87,18 @@ object ClipboardSyncManager {
      * 处理接收到的剪贴板消息。
      * Rust 解析报文、归一化类型并登记防循环时间窗，返回内容供写入系统剪贴板。
      */
-    fun handleClipboardMessage(jsonData: String, context: Context) {
+    fun handleClipboardMessage(
+        jsonData: String,
+        context: Context,
+    ) {
         try {
             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-            val resultJson = NativeCore.clipboardOnReceived(
-                deviceManager.rustContextInternal,
-                jsonData,
-                System.currentTimeMillis()
-            )
+            val resultJson =
+                NativeCore.clipboardOnReceived(
+                    deviceManager.rustContextInternal,
+                    jsonData,
+                    System.currentTimeMillis(),
+                )
             val result = JSONObject(resultJson ?: return)
             val type = result.getString("type")
             val content = result.getString("content")
@@ -129,7 +137,8 @@ object ClipboardSyncManager {
                 if (clipDescription != null && item != null) {
                     // 处理文本类型剪贴板内容
                     if (clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) ||
-                        clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)) {
+                        clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)
+                    ) {
                         try {
                             val text = item.text?.toString()
                             if (!text.isNullOrEmpty()) {
@@ -163,17 +172,18 @@ object ClipboardSyncManager {
                     if (hasImageType) {
                         try {
                             // 尝试获取Bitmap
-                            val imageBitmap: Bitmap? = item.uri?.let { uri ->
-                                try {
-                                    val inputStream = context.contentResolver.openInputStream(uri)
-                                    inputStream?.use {
-                                        BitmapFactory.decodeStream(it)
+                            val imageBitmap: Bitmap? =
+                                item.uri?.let { uri ->
+                                    try {
+                                        val inputStream = context.contentResolver.openInputStream(uri)
+                                        inputStream?.use {
+                                            BitmapFactory.decodeStream(it)
+                                        }
+                                    } catch (e: Exception) {
+                                        // 忽略异常，返回null
+                                        null
                                     }
-                                } catch (e: Exception) {
-                                    // 忽略异常，返回null
-                                    null
                                 }
-                            }
                             if (imageBitmap != null) {
                                 val dataUrl = ImageUtils.bitmapToDataUri(imageBitmap)
                                 // 从data URI中提取纯base64部分
@@ -201,7 +211,11 @@ object ClipboardSyncManager {
     /**
      * 更新本地剪贴板
      */
-    private fun updateLocalClipboardContent(type: String, content: String, context: Context) {
+    private fun updateLocalClipboardContent(
+        type: String,
+        content: String,
+        context: Context,
+    ) {
         try {
             getClipboardManager(context)?.let { cm ->
                 when (type) {
@@ -241,7 +255,10 @@ object ClipboardSyncManager {
      * 手动触发剪贴板同步（通过通知点击调用）
      * 此方法忽略前台检测，直接获取并发送当前剪贴板内容（force=true 跳过内容未变检查）
      */
-    fun manualSyncClipboard(deviceManager: DeviceConnectionManager, context: Context) {
+    fun manualSyncClipboard(
+        deviceManager: DeviceConnectionManager,
+        context: Context,
+    ) {
         Logger.d(TAG, "手动触发剪贴板同步")
 
         // 临时启用手动同步模式
@@ -277,9 +294,9 @@ object ClipboardSyncManager {
                                     if (type == CLIPBOARD_TYPE_IMAGE) MIME_IMAGE else MIME_TEXT,
                                     content,
                                     System.currentTimeMillis(),
-                                    force = true
+                                    force = true,
                                 ),
-                                type
+                                type,
                             )
                         } catch (e: Exception) {
                             Logger.e(TAG, "手动同步：发送剪贴板失败", e)
@@ -302,7 +319,11 @@ object ClipboardSyncManager {
      * 直接同步文本内容到其他设备
      * 不触发系统剪贴板读取，不检查前台状态，用于特定场景（如验证码复制）
      */
-    fun syncTextDirectly(deviceManager: DeviceConnectionManager, text: String, context: Context) {
+    fun syncTextDirectly(
+        deviceManager: DeviceConnectionManager,
+        text: String,
+        context: Context,
+    ) {
         if (text.isBlank()) return
 
         CoroutineScope(Dispatchers.IO).launch {
@@ -322,9 +343,9 @@ object ClipboardSyncManager {
                         MIME_TEXT,
                         text,
                         System.currentTimeMillis(),
-                        force = false
+                        force = false,
                     ),
-                    CLIPBOARD_TYPE_TEXT
+                    CLIPBOARD_TYPE_TEXT,
                 )
             } catch (e: Exception) {
                 Logger.e(TAG, "直接同步失败", e)
@@ -342,12 +363,17 @@ object ClipboardSyncManager {
      * 处理 Rust 返回的发送结果：file_transfer 动作在 Android 侧尚未实现文件传输通道，
      * 大内容剪贴板会被丢弃，需向用户提示同步失败。
      */
-    private fun handleSendResult(context: Context, resultJson: String?, type: String) {
-        val action = try {
-            JSONObject(resultJson ?: return).optString("action", "skipped")
-        } catch (e: Exception) {
-            return
-        }
+    private fun handleSendResult(
+        context: Context,
+        resultJson: String?,
+        type: String,
+    ) {
+        val action =
+            try {
+                JSONObject(resultJson ?: return).optString("action", "skipped")
+            } catch (e: Exception) {
+                return
+            }
         when (action) {
             "sent" -> Logger.d(TAG, "剪贴板已发送（Rust 处理）：$type")
             "skipped" -> Logger.d(TAG, "剪贴板已跳过（Rust 处理）")

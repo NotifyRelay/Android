@@ -17,5 +17,5 @@ data class DeviceEntity(
     val lastIp: String,
     val lastPort: Int,
     val createdAt: Long = System.currentTimeMillis(),
-    val updatedAt: Long = System.currentTimeMillis()
+    val updatedAt: Long = System.currentTimeMillis(),
 )

@@ -8,7 +8,6 @@ import java.io.File
 
 /** 持久化管理器。负责应用内与设备相关的数据持久化读写。*/
 object PersistenceManager {
-
     /** Gson 实例，用于对象与 JSON 间的序列化/反序列化。 */
     private val gson = Gson()
 
@@ -17,7 +16,7 @@ object PersistenceManager {
 
     /** 通知记录文件名的后缀（JSON 文件） */
     private const val NOTIFICATION_RECORDS_SUFFIX = ".json"
-    
+
     /** 设备 UUID 存储键 */
     private const val DEVICE_UUID_KEY = "device_uuid"
 
@@ -31,7 +30,10 @@ object PersistenceManager {
      * @param device 设备标识字符串
      * @return 对应的 File 对象（文件可能不存在）
      */
-    private fun getNotificationFile(context: Context, device: String): File {
+    private fun getNotificationFile(
+        context: Context,
+        device: String,
+    ): File {
         val safeDevice = if (device == "本机") "local" else device.replace(Regex("[^a-zA-Z0-9_]"), "_")
         return File(context.filesDir, "$NOTIFICATION_RECORDS_PREFIX${safeDevice}$NOTIFICATION_RECORDS_SUFFIX")
     }
@@ -47,7 +49,11 @@ object PersistenceManager {
      * @param typeToken 用于 Gson 的类型标记（示例： object : TypeToken<List<MyRecord>>() {} ）
      * @return 指定类型的记录列表，出错时返回空列表
      */
-    fun <T> readNotificationRecords(context: Context, device: String, typeToken: TypeToken<List<T>>): List<T> {
+    fun <T> readNotificationRecords(
+        context: Context,
+        device: String,
+        typeToken: TypeToken<List<T>>,
+    ): List<T> {
         val file = getNotificationFile(context, device)
         if (!file.exists()) return emptyList()
         return try {
@@ -75,19 +81,16 @@ object PersistenceManager {
      * @param context 用于访问 filesDir 的 Context
      * @return 匹配前缀/后缀的文件列表，若目录或文件不存在则返回空列表
      */
-    fun getAllNotificationFiles(context: Context): List<File> {
-        return context.filesDir.listFiles()?.filter {
+    fun getAllNotificationFiles(context: Context): List<File> =
+        context.filesDir.listFiles()?.filter {
             it.name.startsWith(NOTIFICATION_RECORDS_PREFIX) && it.name.endsWith(NOTIFICATION_RECORDS_SUFFIX)
         } ?: emptyList()
-    }
-    
+
     /**
      * 获取本地设备的 UUID。
      *
      * @param context 用于访问 StorageManager 的 Context
      * @return 本地设备的 UUID，若不存在则返回空字符串
      */
-    fun getLocalDeviceUuid(context: Context): String {
-        return StorageManager.getString(context, DEVICE_UUID_KEY, prefsType = StorageManager.PrefsType.GENERAL)
-    }
+    fun getLocalDeviceUuid(context: Context): String = StorageManager.getString(context, DEVICE_UUID_KEY, prefsType = StorageManager.PrefsType.GENERAL)
 }

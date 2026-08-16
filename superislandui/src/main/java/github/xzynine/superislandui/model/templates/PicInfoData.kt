@@ -11,18 +11,16 @@ data class PicInfo(
     val picDark: String? = null, // 深色模式图片资源key
     val actionInfo: ActionInfo? = null, // 操作信息
     val title: String? = null, // 组件文字（type=5时使用）
-    val colorTitle: String? = null // 文字颜色（type=5时使用）
+    val colorTitle: String? = null, // 文字颜色（type=5时使用）
 )
 
 // 解析图片信息组件（识别图形组件）
-fun parsePicInfo(json: JSONObject): PicInfo {
-    return PicInfo(
+fun parsePicInfo(json: JSONObject): PicInfo =
+    PicInfo(
         type = json.optInt("type", 1),
         pic = json.optString("pic", "").takeIf { it.isNotEmpty() },
         picDark = json.optString("picDark", "").takeIf { it.isNotEmpty() },
         actionInfo = json.optJSONObject("actionInfo")?.let { parseActionInfo(it) },
         title = json.optString("title", "").takeIf { it.isNotEmpty() },
-        colorTitle = json.optString("colorTitle", "").takeIf { it.isNotEmpty() }
+        colorTitle = json.optString("colorTitle", "").takeIf { it.isNotEmpty() },
     )
-}
-

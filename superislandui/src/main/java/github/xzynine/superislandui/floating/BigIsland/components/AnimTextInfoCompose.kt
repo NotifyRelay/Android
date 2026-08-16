@@ -1,6 +1,5 @@
 ﻿package github.xzynine.superislandui.floating.BigIsland.components
 
-
 import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
@@ -20,11 +19,11 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.model.components.AnimTextInfo
-import github.xzynine.superislandui.floating.common.formatTimerInfo
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
-import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.common.PreviewData
+import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.floating.common.formatTimerInfo
+import github.xzynine.superislandui.floating.common.resolveIconUrl
+import github.xzynine.superislandui.model.components.AnimTextInfo
 import kotlinx.coroutines.delay
 import notifyrelay.core.util.image.ImageUtils
 
@@ -32,7 +31,10 @@ import notifyrelay.core.util.image.ImageUtils
  * 动画文本信息Compose组件
  */
 @Composable
-fun AnimTextInfoCompose(animTextInfo: AnimTextInfo, picMap: Map<String, String>? = null) {
+fun AnimTextInfoCompose(
+    animTextInfo: AnimTextInfo,
+    picMap: Map<String, String>? = null,
+) {
     val uiMode = LocalConfiguration.current.uiMode
     val nightMask = uiMode and Configuration.UI_MODE_NIGHT_MASK
     val preferDark = nightMask == Configuration.UI_MODE_NIGHT_YES
@@ -46,8 +48,15 @@ fun AnimTextInfoCompose(animTextInfo: AnimTextInfo, picMap: Map<String, String>?
         val context = LocalContext.current
 
         // 复用图标选择和解析逻辑
-        val iconKey = if (preferDark) (animTextInfo.icon.srcDark
-            ?: animTextInfo.icon.src) else animTextInfo.icon.src
+        val iconKey =
+            if (preferDark) {
+                (
+                    animTextInfo.icon.srcDark
+                        ?: animTextInfo.icon.src
+                )
+            } else {
+                animTextInfo.icon.src
+            }
 
         // 1. 优先尝试直接用图标 key 加载，使用统一的URL解析工具
         finalIconUrl = resolveIconUrl(picMap, iconKey, context)
@@ -64,17 +73,18 @@ fun AnimTextInfoCompose(animTextInfo: AnimTextInfo, picMap: Map<String, String>?
                 Image(
                     painter = it,
                     contentDescription = null,
-                    modifier = Modifier.size(iconSize)
+                    modifier = Modifier.size(iconSize),
                 )
             }
         }
 
         // 右侧文本区
-        val textColumnModifier = if (!finalIconUrl.isNullOrEmpty()) {
-            Modifier.padding(start = 8.dp).weight(1f)
-        } else {
-            Modifier.weight(1f)
-        }
+        val textColumnModifier =
+            if (!finalIconUrl.isNullOrEmpty()) {
+                Modifier.padding(start = 8.dp).weight(1f)
+            } else {
+                Modifier.weight(1f)
+            }
 
         Column(modifier = textColumnModifier) {
             // 等价逻辑：
@@ -82,11 +92,12 @@ fun AnimTextInfoCompose(animTextInfo: AnimTextInfo, picMap: Map<String, String>?
             // secondary = content ?: (title!=null && formattedTimer!=null ? formattedTimer : null)
 
             val hasTimer = animTextInfo.timerInfo != null
-            val timerState = remember(animTextInfo.timerInfo) {
-                mutableStateOf(
-                    animTextInfo.timerInfo?.let { formatTimerInfo(it) }
-                )
-            }
+            val timerState =
+                remember(animTextInfo.timerInfo) {
+                    mutableStateOf(
+                        animTextInfo.timerInfo?.let { formatTimerInfo(it) },
+                    )
+                }
             if (hasTimer) {
                 // 仅计时进行中（正计时 timerType=1 / 倒计时 timerType=-1）才每秒刷新，暂停/无效类型静态显示
                 val isTimerRunning = animTextInfo.timerInfo?.timerType == 1 || animTextInfo.timerInfo?.timerType == -1
@@ -100,10 +111,11 @@ fun AnimTextInfoCompose(animTextInfo: AnimTextInfo, picMap: Map<String, String>?
             }
 
             val majorText = animTextInfo.title ?: timerState.value
-            val majorColor = when {
-                preferDark -> ImageUtils.parseColor(animTextInfo.colorTitleDark)
-                else -> ImageUtils.parseColor(animTextInfo.colorTitle)
-            } ?: 0xFFFFFFFF.toInt()
+            val majorColor =
+                when {
+                    preferDark -> ImageUtils.parseColor(animTextInfo.colorTitleDark)
+                    else -> ImageUtils.parseColor(animTextInfo.colorTitle)
+                } ?: 0xFFFFFFFF.toInt()
             majorText?.let { text ->
                 val isTimeLike = text.matches(Regex("[0-9: ]{2,}"))
                 Text(
@@ -111,23 +123,25 @@ fun AnimTextInfoCompose(animTextInfo: AnimTextInfo, picMap: Map<String, String>?
                     fontSize = 15.sp,
                     color = Color(majorColor),
                     maxLines = 1,
-                    fontFamily = if (isTimeLike) FontFamily.Monospace else null
+                    fontFamily = if (isTimeLike) FontFamily.Monospace else null,
                 )
             }
 
-            val secondaryText = animTextInfo.content ?: run {
-                if (!animTextInfo.title.isNullOrBlank() && timerState.value != null) timerState.value else null
-            }
-            val secondaryColor = when {
-                preferDark -> ImageUtils.parseColor(animTextInfo.colorContentDark)
-                else -> ImageUtils.parseColor(animTextInfo.colorContent)
-            } ?: 0xFFDDDDDD.toInt()
+            val secondaryText =
+                animTextInfo.content ?: run {
+                    if (!animTextInfo.title.isNullOrBlank() && timerState.value != null) timerState.value else null
+                }
+            val secondaryColor =
+                when {
+                    preferDark -> ImageUtils.parseColor(animTextInfo.colorContentDark)
+                    else -> ImageUtils.parseColor(animTextInfo.colorContent)
+                } ?: 0xFFDDDDDD.toInt()
             secondaryText?.let { text ->
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
                     fontSize = 12.sp,
                     color = Color(secondaryColor),
-                    maxLines = 1
+                    maxLines = 1,
                 )
             }
         }
@@ -139,7 +153,7 @@ fun AnimTextInfoCompose(animTextInfo: AnimTextInfo, picMap: Map<String, String>?
 fun AnimTextInfoComposePreview() {
     AnimTextInfoCompose(
         animTextInfo = PreviewData.sampleAnimTextInfo,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }
 
@@ -148,6 +162,6 @@ fun AnimTextInfoComposePreview() {
 fun AnimTextInfoComposeWithTimerPreview() {
     AnimTextInfoCompose(
         animTextInfo = PreviewData.sampleAnimTextInfoWithTimer,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }

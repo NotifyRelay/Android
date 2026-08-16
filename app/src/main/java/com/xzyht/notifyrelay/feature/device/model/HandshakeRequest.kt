@@ -8,5 +8,5 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 data class HandshakeRequest(
     val device: DeviceInfo,
     val publicKey: String?,
-    val callback: (Boolean) -> Unit
+    val callback: (Boolean) -> Unit,
 )

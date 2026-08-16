@@ -1,9 +1,9 @@
 package com.xzyht.notifyrelay.sync
 
-import notifyrelay.base.util.Logger
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import notifyrelay.base.util.Logger
 
 /**
  * 统一加密发送器
@@ -13,7 +13,6 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
  * - 返回后不保证立即发送成功
  */
 object ProtocolSender {
-
     private const val TAG = "ProtocolSender"
 
     /** 入队结果 */
@@ -25,11 +24,12 @@ object ProtocolSender {
         header: String,
         plaintext: String,
         timeoutMs: Long = 10000L,
-        dedupKey: String? = null
+        dedupKey: String? = null,
     ): EnqueueResult {
-        val auth = synchronized(deviceManager.authenticatedDevices) {
-            deviceManager.authenticatedDevices[target.uuid]
-        }
+        val auth =
+            synchronized(deviceManager.authenticatedDevices) {
+                deviceManager.authenticatedDevices[target.uuid]
+            }
         if (auth == null || !auth.isAccepted) return EnqueueResult.AUTH_FAILED
 
         val queuePtr = NativeCore.senderQueuePtr

@@ -6,13 +6,17 @@ import android.content.Intent
 import notifyrelay.base.util.Logger
 
 class RemoteNotificationClickReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        //Logger.d("NotifyRelay(狂鼠)", "RemoteNotificationClickReceiver onReceive called")
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
+        // Logger.d("NotifyRelay(狂鼠)", "RemoteNotificationClickReceiver onReceive called")
         val notifyId = intent.getIntExtra("notifyId", 0)
-        val pkg = intent.getStringExtra("pkg") ?: run {
-            Logger.e("NotifyRelay(狂鼠)", "pkg is null in broadcast")
-            return
-        }
+        val pkg =
+            intent.getStringExtra("pkg") ?: run {
+                Logger.e("NotifyRelay(狂鼠)", "pkg is null in broadcast")
+                return
+            }
         intent.getStringExtra("title") ?: ""
         intent.getStringExtra("text") ?: ""
         intent.getStringExtra("key") ?: (System.currentTimeMillis().toString() + pkg)

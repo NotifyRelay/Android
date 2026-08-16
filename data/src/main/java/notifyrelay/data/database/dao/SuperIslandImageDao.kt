@@ -22,9 +22,12 @@ interface SuperIslandImageDao {
         INNER JOIN super_island_image_bindings AS b ON b.imageId = i.id
         WHERE b.packageName = :packageName AND b.imageKey = :imageKey
         LIMIT 1
-        """
+        """,
     )
-    suspend fun getImageDataByBinding(packageName: String, imageKey: String): String?
+    suspend fun getImageDataByBinding(
+        packageName: String,
+        imageKey: String,
+    ): String?
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertImage(image: SuperIslandImageEntity): Long
@@ -33,7 +36,10 @@ interface SuperIslandImageDao {
     suspend fun upsertBinding(binding: SuperIslandImageBindingEntity)
 
     @Query("UPDATE super_island_images SET lastUpdated = :lastUpdated WHERE id = :imageId")
-    suspend fun touchImage(imageId: Long, lastUpdated: Long)
+    suspend fun touchImage(
+        imageId: Long,
+        lastUpdated: Long,
+    )
 
     @Query("DELETE FROM super_island_images WHERE lastUpdated < :cutoff")
     suspend fun deleteImagesOlderThan(cutoff: Long)
@@ -46,7 +52,7 @@ interface SuperIslandImageDao {
             ORDER BY lastUpdated DESC
             LIMIT :keepCount
         )
-        """
+        """,
     )
     suspend fun deleteImagesKeepingLatest(keepCount: Int)
 

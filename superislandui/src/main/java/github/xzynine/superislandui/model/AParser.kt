@@ -11,17 +11,23 @@ import org.json.JSONObject
  * @param picFunction 功能图标键（来自 highlightInfo.picFunction）
  * @param aodPic AOD 图片键
  */
-fun parseAComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic: String? = null): AComponent? {
+fun parseAComponent(
+    bigIsland: JSONObject?,
+    picFunction: String? = null,
+    aodPic: String? = null,
+): AComponent? {
     val left = bigIsland?.optJSONObject("imageTextInfoLeft") ?: return null
     val type = left.optInt("type", 0)
 
     return when (type) {
         1 -> {
             val textInfo = left.optJSONObject("textInfo")
-            val title = left.optString("title", "").takeIf { it.isNotBlank() }
-                ?: textInfo?.optString("title", "")?.takeIf { it.isNotBlank() }
-            val content = left.optString("content", "").takeIf { it.isNotBlank() }
-                ?: textInfo?.optString("content", "")?.takeIf { it.isNotBlank() }
+            val title =
+                left.optString("title", "").takeIf { it.isNotBlank() }
+                    ?: textInfo?.optString("title", "")?.takeIf { it.isNotBlank() }
+            val content =
+                left.optString("content", "").takeIf { it.isNotBlank() }
+                    ?: textInfo?.optString("content", "")?.takeIf { it.isNotBlank() }
             val narrowFont = textInfo?.optBoolean("narrowFont", false) ?: false
             val showHighlightColor = textInfo?.optBoolean("showHighlightColor", false) ?: false
 
@@ -43,15 +49,17 @@ fun parseAComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
                 content = content,
                 narrowFont = narrowFont,
                 showHighlightColor = showHighlightColor,
-                picKey = picKey
+                picKey = picKey,
             )
         }
         5 -> {
             val textInfo = left.optJSONObject("textInfo")
-            val title = textInfo?.optString("title", "")?.takeIf { it.isNotBlank() }
-                ?: left.optString("title", "").takeIf { it.isNotBlank() }
-            val content = textInfo?.optString("content", "")?.takeIf { it.isNotBlank() }
-                ?: left.optString("content", "").takeIf { it.isNotBlank() }
+            val title =
+                textInfo?.optString("title", "")?.takeIf { it.isNotBlank() }
+                    ?: left.optString("title", "").takeIf { it.isNotBlank() }
+            val content =
+                textInfo?.optString("content", "")?.takeIf { it.isNotBlank() }
+                    ?: left.optString("content", "").takeIf { it.isNotBlank() }
             val showHighlightColor = textInfo?.optBoolean("showHighlightColor", false) ?: false
 
             val picInfo = left.optJSONObject("picInfo")
@@ -66,7 +74,7 @@ fun parseAComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
                 title = title,
                 content = content,
                 showHighlightColor = showHighlightColor,
-                picKey = picKey
+                picKey = picKey,
             )
         }
         else -> null
@@ -80,11 +88,14 @@ fun parseAComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
  * 2. picFunction（来自 highlightInfo.picFunction）
  * 3. aodPic
  */
-private fun resolvePicKey(picRaw: String?, picFunction: String?, aodPic: String?): String? {
-    return when {
+private fun resolvePicKey(
+    picRaw: String?,
+    picFunction: String?,
+    aodPic: String?,
+): String? =
+    when {
         picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
         picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
         aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
         else -> null
     }
-}

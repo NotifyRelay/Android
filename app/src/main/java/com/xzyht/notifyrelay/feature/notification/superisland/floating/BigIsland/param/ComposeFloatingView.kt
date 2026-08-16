@@ -17,19 +17,21 @@ import top.yukonga.miuix.kmp.basic.CardDefaults
 @Composable
 fun ComposeFloatingContainer(
     modifier: Modifier = Modifier,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     Card(
-        modifier = modifier
-            .padding(8.dp),
+        modifier =
+            modifier
+                .padding(8.dp),
         cornerRadius = 16.dp,
-        colors = CardDefaults.defaultColors(
-            color = Color(0xEE000000)
-        )
+        colors =
+            CardDefaults.defaultColors(
+                color = Color(0xEE000000),
+            ),
     ) {
         Column(
             modifier = Modifier.padding(8.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             content()
         }
@@ -37,18 +39,21 @@ fun ComposeFloatingContainer(
 }
 
 // 文本样式常量
-val TitleTextStyle = TextStyle(
-    fontSize = 16.sp,
-    color = Color.White,
-    fontWeight = FontWeight.Bold
-)
+val TitleTextStyle =
+    TextStyle(
+        fontSize = 16.sp,
+        color = Color.White,
+        fontWeight = FontWeight.Bold,
+    )
 
-val ContentTextStyle = TextStyle(
-    fontSize = 14.sp,
-    color = Color.White
-)
+val ContentTextStyle =
+    TextStyle(
+        fontSize = 14.sp,
+        color = Color.White,
+    )
 
-val SubContentTextStyle = TextStyle(
-    fontSize = 12.sp,
-    color = Color(0x80FFFFFF)
-)
+val SubContentTextStyle =
+    TextStyle(
+        fontSize = 12.sp,
+        color = Color(0x80FFFFFF),
+    )

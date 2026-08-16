@@ -36,7 +36,7 @@ fun ParamIslandCompose(
     paramIsland: ParamIsland,
     modifier: Modifier = Modifier,
     actions: List<ActionInfo>? = null,
-    picMap: Map<String, String>? = null
+    picMap: Map<String, String>? = null,
 ) {
     // 调试日志
     paramIsland.bigIslandArea?.let {
@@ -44,33 +44,34 @@ fun ParamIslandCompose(
     }
 
     Column(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(8.dp)
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .padding(8.dp),
     ) {
         // SmallIslandArea渲染
         paramIsland.smallIslandArea?.let { smallArea ->
             Column(
-                modifier = Modifier.fillMaxWidth()
+                modifier = Modifier.fillMaxWidth(),
             ) {
                 smallArea.primaryText?.let {
                     Text(
                         text = it,
                         color = Color.White,
                         fontSize = 14.sp,
-                        fontWeight = FontWeight.Bold
+                        fontWeight = FontWeight.Bold,
                     )
                 }
-                
+
                 smallArea.secondaryText?.let {
                     Text(
                         text = it,
                         color = Color.Gray,
                         fontSize = 12.sp,
-                        modifier = Modifier.padding(top = 2.dp)
+                        modifier = Modifier.padding(top = 2.dp),
                     )
                 }
-                
+
                 smallArea.progressInfo?.let { progressInfo ->
                     ProgressInfoCompose(
                         progressInfo = progressInfo,
@@ -78,23 +79,23 @@ fun ParamIslandCompose(
                 }
             }
         }
-        
+
         // BigIslandArea渲染（简化版，仅显示文本信息）
         paramIsland.bigIslandArea?.let { bigArea ->
             Column(
-                modifier = Modifier.fillMaxWidth().padding(top = 8.dp)
+                modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             ) {
                 // 内容区域：图标 + 文本
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 ) {
                     // 左侧图标
                     if (!bigArea.leftImage.isNullOrBlank()) {
                         CommonImageCompose(
                             picKey = bigArea.leftImage,
                             picMap = picMap,
-                            size = 40.dp
+                            size = 40.dp,
                         )
                         Spacer(modifier = Modifier.width(12.dp))
                     }
@@ -106,24 +107,25 @@ fun ParamIslandCompose(
                                 text = it,
                                 color = Color.White,
                                 fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold
+                                fontWeight = FontWeight.Bold,
                             )
                         }
-                        
+
                         bigArea.secondaryText?.let {
                             Text(
                                 text = it,
                                 color = Color.Gray,
                                 fontSize = 12.sp,
-                                modifier = Modifier.padding(top = 2.dp)
+                                modifier = Modifier.padding(top = 2.dp),
                             )
                         }
                     }
 
                     if (bigArea.isVerificationCode) {
-                        val copyAction = actions?.find {
-                            it.actionTitle?.contains("复制") == true
-                        } ?: ActionInfo(actionTitle = "复制")
+                        val copyAction =
+                            actions?.find {
+                                it.actionTitle?.contains("复制") == true
+                            } ?: ActionInfo(actionTitle = "复制")
                         val code = bigArea.verificationCode ?: bigArea.primaryText
                         if (!code.isNullOrBlank()) {
                             Logger.d("ParamIslandCompose", "渲染验证码复制按钮: code=$code")
@@ -147,7 +149,7 @@ fun ParamIslandCompose(
                                             Toast.makeText(context, "复制失败", Toast.LENGTH_SHORT).show()
                                         }
                                     }
-                                }
+                                },
                             )
                         } else {
                             Logger.w("超级岛ParamIslandCompose", "验证码按钮未渲染: copyAction=${true}, code=${!code.isNullOrBlank()}")
@@ -160,11 +162,10 @@ fun ParamIslandCompose(
                         CommonImageCompose(
                             picKey = bigArea.rightImage,
                             picMap = picMap,
-                            size = 40.dp
+                            size = 40.dp,
                         )
                     }
                 }
-
             }
         }
     }

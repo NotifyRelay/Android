@@ -3,25 +3,25 @@ package github.xzynine.superislandui.model.core
 import github.xzynine.superislandui.floating.SmallIsland.core.parseBigIslandArea
 import github.xzynine.superislandui.model.components.ActionInfo
 import github.xzynine.superislandui.model.components.AnimTextInfo
-import github.xzynine.superislandui.model.templates.BaseInfo
-import github.xzynine.superislandui.model.templates.ChatInfo
-import github.xzynine.superislandui.model.templates.HighlightInfo
-import github.xzynine.superislandui.model.templates.HintInfo
 import github.xzynine.superislandui.model.components.MultiProgressInfo
-import github.xzynine.superislandui.model.templates.PicInfo
 import github.xzynine.superislandui.model.components.ProgressInfo
 import github.xzynine.superislandui.model.components.TextButton
 import github.xzynine.superislandui.model.components.parseActions
 import github.xzynine.superislandui.model.components.parseAnimTextInfo
+import github.xzynine.superislandui.model.components.parseMultiProgressInfo
+import github.xzynine.superislandui.model.components.parseProgressInfo
+import github.xzynine.superislandui.model.components.parseTextButton
+import github.xzynine.superislandui.model.components.toMultiProgressInfo
+import github.xzynine.superislandui.model.templates.BaseInfo
+import github.xzynine.superislandui.model.templates.ChatInfo
+import github.xzynine.superislandui.model.templates.HighlightInfo
+import github.xzynine.superislandui.model.templates.HintInfo
+import github.xzynine.superislandui.model.templates.PicInfo
 import github.xzynine.superislandui.model.templates.parseBaseInfo
 import github.xzynine.superislandui.model.templates.parseChatInfo
 import github.xzynine.superislandui.model.templates.parseHighlightInfo
 import github.xzynine.superislandui.model.templates.parseHintInfo
-import github.xzynine.superislandui.model.components.parseMultiProgressInfo
 import github.xzynine.superislandui.model.templates.parsePicInfo
-import github.xzynine.superislandui.model.components.parseProgressInfo
-import github.xzynine.superislandui.model.components.parseTextButton
-import github.xzynine.superislandui.model.components.toMultiProgressInfo
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
 
@@ -42,16 +42,16 @@ data class ParamV2(
     val paramIsland: ParamIsland? = null, // 摘要态组件
     val business: String? = null, // 可选的业务标识（例如 miui_flashlight）
     val aodPic: String? = null, // AOD图片键
-    val picFunction: String? = null // 功能图标键
+    val picFunction: String? = null, // 功能图标键
 )
 
 // 解析param_v2总容器，根据不同字段选择对应的子组件解析
-fun parseParamV2(jsonString: String): ParamV2? {
-    return try {
-        //Logger.d("超级岛", "开始解析param_v2: ${jsonString.take(200)}...")
+fun parseParamV2(jsonString: String): ParamV2? =
+    try {
+        // Logger.d("超级岛", "开始解析param_v2: ${jsonString.take(200)}...")
         val json = JSONObject(jsonString)
         val business = json.optString("business", "").takeIf { it.isNotBlank() }
-        
+
         // 逐个字段解析，确保每个字段解析失败不会影响整体解析
         var anim: AnimTextInfo? = null
         var highlight: HighlightInfo? = null
@@ -64,116 +64,125 @@ fun parseParamV2(jsonString: String): ParamV2? {
         var hintInfo: HintInfo? = null
         var textButton: TextButton? = null
         var paramIsland: ParamIsland? = null
-        
+
         // 解析各个字段，每个字段单独try-catch，避免一个字段解析失败导致整体失败
         try {
             anim = json.optJSONObject("animTextInfo")?.let { parseAnimTextInfo(it) }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析animTextInfo失败: ${e.message}")
         }
-        
+
         try {
             highlight = json.optJSONObject("highlightInfo")?.let { parseHighlightInfo(it) }
                 ?: parseHighlightFromIconText(json, null, null)
         } catch (e: Exception) {
             Logger.w("超级岛", "解析highlightInfo失败: ${e.message}")
         }
-        
+
         try {
             baseInfo = json.optJSONObject("baseInfo")?.let { parseBaseInfo(it) }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析baseInfo失败: ${e.message}")
         }
-        
+
         try {
             chatInfo = json.optJSONObject("chatInfo")?.let { parseChatInfo(it) }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析chatInfo失败: ${e.message}")
         }
-        
+
         try {
             picInfo = json.optJSONObject("picInfo")?.let { parsePicInfo(it) }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析picInfo失败: ${e.message}")
         }
-        
+
         try {
             progressInfo = json.optJSONObject("progressInfo")?.let { parseProgressInfo(it) }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析progressInfo失败: ${e.message}")
         }
-        
+
         try {
-            multiProgressInfo = json.optJSONObject("multiProgressInfo")?.let {
-                parseMultiProgressInfo(
-                    it
-                )
-            }
+            multiProgressInfo =
+                json.optJSONObject("multiProgressInfo")?.let {
+                    parseMultiProgressInfo(
+                        it,
+                    )
+                }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析multiProgressInfo失败: ${e.message}")
         }
-        
+
         try {
             actions = json.optJSONArray("actions")?.let { parseActions(it) }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析actions失败: ${e.message}")
         }
-        
+
         try {
             hintInfo = json.optJSONObject("hintInfo")?.let { parseHintInfo(it) }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析hintInfo失败: ${e.message}")
         }
-        
+
         try {
             textButton = json.optJSONObject("textButton")?.let { parseTextButton(it) }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析textButton失败: ${e.message}")
         }
-        
+
         // 提取 aodPic 和 picFunction 用于解析 A/B 区组件
         val aodPic = json.optString("aodPic", "").takeIf { it.isNotBlank() }
-        val picFunction = highlight?.picFunction ?: json.optJSONObject("highlightInfo")
-            ?.optString("picFunction", "")?.takeIf { it.isNotBlank() }
-        
+        val picFunction =
+            highlight?.picFunction ?: json
+                .optJSONObject("highlightInfo")
+                ?.optString("picFunction", "")
+                ?.takeIf { it.isNotBlank() }
+
         try {
-            paramIsland = (json.optJSONObject("param_island")
-                ?: json.optJSONObject("paramIsland")
-                ?: json.optJSONObject("islandParam"))?.let { parseParamIsland(it, picFunction, aodPic) }
+            paramIsland =
+                (
+                    json.optJSONObject("param_island")
+                        ?: json.optJSONObject("paramIsland")
+                        ?: json.optJSONObject("islandParam")
+                )?.let { parseParamIsland(it, picFunction, aodPic) }
         } catch (e: Exception) {
             Logger.w("超级岛", "解析paramIsland失败: ${e.message}")
         }
-        
+
         // 如果multiProgressInfo为空，但progressInfo包含节点资源，则转换为multiProgressInfo
-    val finalMultiProgressInfo = multiProgressInfo ?: run {
-        val title = baseInfo?.title?.takeIf { it.isNotBlank() }
-        progressInfo?.toMultiProgressInfo(title)
-    }
+        val finalMultiProgressInfo =
+            multiProgressInfo ?: run {
+                val title = baseInfo?.title?.takeIf { it.isNotBlank() }
+                progressInfo?.toMultiProgressInfo(title)
+            }
 
-    val paramV2 = ParamV2(
-        business = business,
-        baseInfo = baseInfo,
-        chatInfo = chatInfo,
-        highlightInfo = highlight,
-        animTextInfo = anim,
-        picInfo = picInfo,
-        progressInfo = progressInfo,
-        multiProgressInfo = finalMultiProgressInfo,
-        actions = actions,
-        hintInfo = hintInfo,
-        textButton = textButton,
-        paramIsland = paramIsland,
-        aodPic = aodPic,
-        picFunction = highlight?.picFunction ?: picFunction
-    )
-    
-    Logger.d("超级岛", "ParamV2解析结果: paramIsland=${paramIsland != null}, highlight=${highlight != null}, baseInfo=${baseInfo != null}, actions=${actions?.size}")
-    if (paramIsland != null) {
-        Logger.d("超级岛", "paramIsland详情: verCode=${paramIsland.bigIslandArea?.verificationCode}, isVerCode=${paramIsland.bigIslandArea?.isVerificationCode}")
-    }
+        val paramV2 =
+            ParamV2(
+                business = business,
+                baseInfo = baseInfo,
+                chatInfo = chatInfo,
+                highlightInfo = highlight,
+                animTextInfo = anim,
+                picInfo = picInfo,
+                progressInfo = progressInfo,
+                multiProgressInfo = finalMultiProgressInfo,
+                actions = actions,
+                hintInfo = hintInfo,
+                textButton = textButton,
+                paramIsland = paramIsland,
+                aodPic = aodPic,
+                picFunction = highlight?.picFunction ?: picFunction,
+            )
 
-    //Logger.d("超级岛", "解析param_v2成功: business=$business, baseInfo=${paramV2.baseInfo != null}")
-    paramV2
+        Logger.d("超级岛", "ParamV2解析结果: paramIsland=${paramIsland != null}, highlight=${highlight != null}, baseInfo=${baseInfo != null}, actions=${actions?.size}")
+        if (paramIsland != null) {
+            Logger.d("超级岛", "paramIsland详情: verCode=${paramIsland.bigIslandArea?.verificationCode}, isVerCode=${paramIsland.bigIslandArea?.isVerificationCode}")
+        }
+
+        // Logger.d("超级岛", "解析param_v2成功: business=$business, baseInfo=${paramV2.baseInfo != null}")
+        paramV2
     } catch (e: Exception) {
         run {
             Logger.w("超级岛", "解析param_v2失败: ${e.message}")
@@ -182,31 +191,38 @@ fun parseParamV2(jsonString: String): ParamV2? {
         }
         null
     }
-}
 
-private fun parseHighlightFromIconText(root: JSONObject, picFunction: String?, aodPic: String?): HighlightInfo? {
+private fun parseHighlightFromIconText(
+    root: JSONObject,
+    picFunction: String?,
+    aodPic: String?,
+): HighlightInfo? {
     val iconText = root.optJSONObject("iconTextInfo") ?: return null
     val title = iconText.optString("title", "").takeIf { it.isNotBlank() }
     val content = iconText.optString("content", "").takeIf { it.isNotBlank() }
-    val sub = sequenceOf("subTitle", "tip", "desc", "description")
-        .map { key -> iconText.optString(key, "") }
-        .firstOrNull { it.isNotBlank() }
+    val sub =
+        sequenceOf("subTitle", "tip", "desc", "description")
+            .map { key -> iconText.optString(key, "") }
+            .firstOrNull { it.isNotBlank() }
     if (title == null && content == null && sub == null) return null
 
     val animIcon = iconText.optJSONObject("animIconInfo")
     val iconKey = animIcon?.optString("src", "")?.takeIf { it.isNotBlank() }
     val iconKeyDark = animIcon?.optString("srcDark", "")?.takeIf { it.isNotBlank() }
 
-    val paramIsland = (root.optJSONObject("param_island")
-        ?: root.optJSONObject("paramIsland")
-        ?: root.optJSONObject("islandParam"))
-    val big = parseBigIslandArea(
-        paramIsland?.optJSONObject("bigIslandArea") ?: paramIsland?.optJSONObject(
-            "bigIsland"
-        ),
-        picFunction,
-        aodPic
+    val paramIsland = (
+        root.optJSONObject("param_island")
+            ?: root.optJSONObject("paramIsland")
+            ?: root.optJSONObject("islandParam")
     )
+    val big =
+        parseBigIslandArea(
+            paramIsland?.optJSONObject("bigIslandArea") ?: paramIsland?.optJSONObject(
+                "bigIsland",
+            ),
+            picFunction,
+            aodPic,
+        )
     val leftPic = big?.leftImage
     val rightPic = big?.rightImage
 
@@ -221,6 +237,6 @@ private fun parseHighlightFromIconText(root: JSONObject, picFunction: String?, a
         colorSubContent = iconText.optString("subtitleColor", "").takeIf { it.isNotBlank() },
         bigImageLeft = leftPic,
         bigImageRight = rightPic,
-        iconOnly = true
+        iconOnly = true,
     )
 }

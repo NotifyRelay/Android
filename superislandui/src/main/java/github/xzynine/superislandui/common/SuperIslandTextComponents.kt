@@ -43,7 +43,7 @@ fun AutoFitText(
     text: String,
     style: TextStyle,
     color: Color,
-    minTextSize: Float = 10f
+    minTextSize: Float = 10f,
 ) {
     val initialSize = if (style.fontSize.isUnspecified) 14.sp else style.fontSize
     var currentSize by remember { mutableStateOf(initialSize) }
@@ -64,7 +64,7 @@ fun AutoFitText(
                     currentSize = newSizeSp.sp
                 }
             }
-        }
+        },
     )
 }
 
@@ -88,7 +88,7 @@ fun AutoScrollText(
     color: Color,
     baseSpeedPxPerSec: Float = 100f,
     pauseMillis: Int = 0,
-    maxWidth: Int? = null
+    maxWidth: Int? = null,
 ) {
     // 预览模式下禁用动画，直接显示静态文本
     if (LocalInspectionMode.current) {
@@ -97,7 +97,7 @@ fun AutoScrollText(
             color = color,
             style = style,
             maxLines = 1,
-            overflow = TextOverflow.Ellipsis
+            overflow = TextOverflow.Ellipsis,
         )
         return
     }
@@ -113,40 +113,44 @@ fun AutoScrollText(
     val canScroll = actualMaxWidth > 0 && intrinsicWidth > actualMaxWidth
     val scrollRange = (intrinsicWidth - actualMaxWidth).coerceAtLeast(0)
     val speed = baseSpeedPxPerSec + (intrinsicWidth / 10f)
-    val duration = if (canScroll) {
-        (((scrollRange + actualMaxWidth) / speed) * 1000).toInt().coerceAtLeast(400)
-    } else 0
+    val duration =
+        if (canScroll) {
+            (((scrollRange + actualMaxWidth) / speed) * 1000).toInt().coerceAtLeast(400)
+        } else {
+            0
+        }
 
     val intrinsicWidthDp = with(LocalDensity.current) { intrinsicWidth.toDp() }
 
     Box(
-        modifier = if (canScroll) {
-            Modifier
-                .onGloballyPositioned { coordinates ->
-                    if (maxWidth == null) {
-                        parentWidth = coordinates.size.width
+        modifier =
+            if (canScroll) {
+                Modifier
+                    .onGloballyPositioned { coordinates ->
+                        if (maxWidth == null) {
+                            parentWidth = coordinates.size.width
+                        }
+                    }.clipToBounds()
+            } else {
+                Modifier
+                    .onGloballyPositioned { coordinates ->
+                        if (maxWidth == null) {
+                            parentWidth = coordinates.size.width
+                        }
                     }
-                }
-                .clipToBounds()
-        } else {
-            Modifier
-                .onGloballyPositioned { coordinates ->
-                    if (maxWidth == null) {
-                        parentWidth = coordinates.size.width
-                    }
-                }
-        }
+            },
     ) {
-        val textModifier = if (canScroll) {
-            Modifier
-                .width(intrinsicWidthDp)
-                .graphicsLayer {
-                    translationX = offset.value
-                }
-        } else {
-            Modifier
-        }
-        
+        val textModifier =
+            if (canScroll) {
+                Modifier
+                    .width(intrinsicWidthDp)
+                    .graphicsLayer {
+                        translationX = offset.value
+                    }
+            } else {
+                Modifier
+            }
+
         Text(
             text = text,
             color = color,
@@ -154,19 +158,19 @@ fun AutoScrollText(
             maxLines = 1,
             softWrap = false,
             overflow = if (canScroll) TextOverflow.Visible else TextOverflow.Ellipsis,
-            modifier = textModifier
+            modifier = textModifier,
         )
     }
 
     LaunchedEffect(canScroll, intrinsicWidth, actualMaxWidth, duration, pauseMillis) {
         offset.snapTo(0f)
         if (!canScroll) return@LaunchedEffect
-        
+
         while (true) {
             delay(pauseMillis.toLong())
             offset.animateTo(
                 -scrollRange.toFloat(),
-                animationSpec = tween(durationMillis = duration, easing = LinearEasing)
+                animationSpec = tween(durationMillis = duration, easing = LinearEasing),
             )
             offset.snapTo(0f)
             delay(300)

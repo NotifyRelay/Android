@@ -18,7 +18,10 @@ interface SuperIslandMirrorFilterDao {
     suspend fun upsert(pkg: SuperIslandMirrorFilterEntity)
 
     @Query("UPDATE super_island_mirror_filters SET enabled = :enabled WHERE packageName = :packageName")
-    suspend fun setEnabled(packageName: String, enabled: Boolean)
+    suspend fun setEnabled(
+        packageName: String,
+        enabled: Boolean,
+    )
 
     @Query("DELETE FROM super_island_mirror_filters WHERE packageName = :packageName")
     suspend fun delete(packageName: String)

@@ -26,7 +26,7 @@ import notifyrelay.data.database.repository.DatabaseRepository
 
 class NotificationHistoryViewModel(
     private val application: Application,
-    private val repository: DatabaseRepository
+    private val repository: DatabaseRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(NotificationHistoryUiState())
     val uiState: StateFlow<NotificationHistoryUiState> = _uiState.asStateFlow()
@@ -42,23 +42,24 @@ class NotificationHistoryViewModel(
     private val iconLoading = mutableSetOf<String>()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val groupedPagingFlow: Flow<PagingData<GroupedNotifications>> = combine(
-        deviceFlow,
-        refreshSignal,
-        installedPackages
-    ) { device, _, packages ->
-        device to packages
-    }.flatMapLatest { (device, packages) ->
-        Pager(
-            config = PagingConfig(pageSize = 20, enablePlaceholders = false)
-        ) {
-            NotificationPagingSource(
-                repository = repository,
-                deviceUuid = device,
-                installedPackages = packages
-            )
-        }.flow
-    }.cachedIn(viewModelScope)
+    val groupedPagingFlow: Flow<PagingData<GroupedNotifications>> =
+        combine(
+            deviceFlow,
+            refreshSignal,
+            installedPackages,
+        ) { device, _, packages ->
+            device to packages
+        }.flatMapLatest { (device, packages) ->
+            Pager(
+                config = PagingConfig(pageSize = 20, enablePlaceholders = false),
+            ) {
+                NotificationPagingSource(
+                    repository = repository,
+                    deviceUuid = device,
+                    installedPackages = packages,
+                )
+            }.flow
+        }.cachedIn(viewModelScope)
 
     init {
         viewModelScope.launch(Dispatchers.IO) {
@@ -154,14 +155,16 @@ class NotificationHistoryViewModel(
         val targets = packageNames.filter { it.isNotBlank() }
         if (targets.isEmpty()) return
 
-        val toLoad = synchronized(iconLoading) {
-            val cache = _appIconCache.value
-            val loadTargets = targets.filter { pkg ->
-                !iconLoading.contains(pkg) && cache[pkg] == null
+        val toLoad =
+            synchronized(iconLoading) {
+                val cache = _appIconCache.value
+                val loadTargets =
+                    targets.filter { pkg ->
+                        !iconLoading.contains(pkg) && cache[pkg] == null
+                    }
+                iconLoading.addAll(loadTargets)
+                loadTargets
             }
-            iconLoading.addAll(loadTargets)
-            loadTargets
-        }
 
         if (toLoad.isEmpty()) return
 
@@ -190,9 +193,10 @@ class NotificationHistoryViewModel(
 
     private suspend fun loadInstalledPackages() {
         val cached = AppRepository.getInstalledPackageNames(application)
-        installedPackages.value = cached.ifEmpty {
-            AppRepository.getInstalledPackageNamesAsync(application)
-        }
+        installedPackages.value =
+            cached.ifEmpty {
+                AppRepository.getInstalledPackageNamesAsync(application)
+            }
     }
 
     private suspend fun getAppNameAndIcon(packageName: String): Pair<String, Bitmap?> {
@@ -204,15 +208,18 @@ class NotificationHistoryViewModel(
         } catch (_: Exception) {
             name = packageName
         }
-        val icon: Bitmap? = try {
-            AppRepository.getAppIconWithAutoRequest(application, packageName)
-        } catch (_: Exception) {
-            null
-        }
+        val icon: Bitmap? =
+            try {
+                AppRepository.getAppIconWithAutoRequest(application, packageName)
+            } catch (_: Exception) {
+                null
+            }
         return name to icon
     }
 
-    class Factory(private val application: Application) : ViewModelProvider.Factory {
+    class Factory(
+        private val application: Application,
+    ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(NotificationHistoryViewModel::class.java)) {
                 val repository = DatabaseRepository.getInstance(application)

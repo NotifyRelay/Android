@@ -21,12 +21,12 @@ data class HighlightInfo(
     val colorSubContentDark: String? = null, // 深色模式辅助文本2颜色
     val bigImageLeft: String? = null, // 大岛区域左侧图片
     val bigImageRight: String? = null, // 大岛区域右侧图片
-    val iconOnly: Boolean = false // 是否仅展示图标
+    val iconOnly: Boolean = false, // 是否仅展示图标
 )
 
 // 解析高亮信息组件（强调图文组件）
-fun parseHighlightInfo(json: JSONObject): HighlightInfo {
-    return HighlightInfo(
+fun parseHighlightInfo(json: JSONObject): HighlightInfo =
+    HighlightInfo(
         title = json.optString("title", "").takeIf { it.isNotEmpty() },
         timerInfo = json.optJSONObject("timerInfo")?.let { parseTimerInfo(it) },
         content = json.optString("content", "").takeIf { it.isNotEmpty() },
@@ -42,7 +42,5 @@ fun parseHighlightInfo(json: JSONObject): HighlightInfo {
         colorSubContentDark = json.optString("colorSubContentDark", "").takeIf { it.isNotEmpty() },
         bigImageLeft = json.optString("bigImageLeft", "").takeIf { it.isNotEmpty() },
         bigImageRight = json.optString("bigImageRight", "").takeIf { it.isNotEmpty() },
-        iconOnly = json.optBoolean("iconOnly", false)
+        iconOnly = json.optBoolean("iconOnly", false),
     )
-}
-

@@ -31,10 +31,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import github.xzynine.superislandui.floating.common.CommonImageCompose
-import notifyrelay.core.util.image.ImageUtils
-import github.xzynine.superislandui.model.components.MultiProgressInfo
 import github.xzynine.superislandui.common.PreviewData
+import github.xzynine.superislandui.floating.common.CommonImageCompose
+import github.xzynine.superislandui.model.components.MultiProgressInfo
+import notifyrelay.core.util.image.ImageUtils
 import kotlin.math.max
 
 private const val DEFAULT_PRIMARY_COLOR = 0xFF0ABAFF
@@ -55,7 +55,7 @@ fun MultiProgressCompose(
     multiProgressInfo: MultiProgressInfo,
     modifier: Modifier = Modifier,
     picMap: Map<String, String>? = null,
-    business: String? = null
+    business: String? = null,
 ) {
     val colorValue: Int =
         ImageUtils.parseColor(multiProgressInfo.color) ?: DEFAULT_PRIMARY_COLOR.toInt()
@@ -78,64 +78,70 @@ fun MultiProgressCompose(
     }
 
     Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .widthIn(max = MAX_WIDTH_DP.dp) // 最长宽度366dp
-            .height(NODE_SIZE_DP.dp + if (multiProgressInfo.title.isNotEmpty()) TITLE_PADDING_DP.dp else 0.dp) // 增加高度容纳标题
-            .onSizeChanged { updateContainerWidth(it.width) }
+        modifier =
+            modifier
+                .fillMaxWidth()
+                .widthIn(max = MAX_WIDTH_DP.dp) // 最长宽度366dp
+                .height(NODE_SIZE_DP.dp + if (multiProgressInfo.title.isNotEmpty()) TITLE_PADDING_DP.dp else 0.dp) // 增加高度容纳标题
+                .onSizeChanged { updateContainerWidth(it.width) },
         // 移除clipToBounds修饰符，默认不裁剪子组件
     ) {
         // 标题显示
         if (multiProgressInfo.title.isNotEmpty()) {
             Text(
                 text = multiProgressInfo.title,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .widthIn(min = TITLE_MIN_WIDTH_DP.dp) // 标题最小压缩宽度72dp
-                    .padding(bottom = (TITLE_PADDING_DP / 2).dp),
-                style = TextStyle(
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Normal,
-                    color = Color.Black
-                ),
+                modifier =
+                    Modifier
+                        .align(Alignment.TopStart)
+                        .widthIn(min = TITLE_MIN_WIDTH_DP.dp) // 标题最小压缩宽度72dp
+                        .padding(bottom = (TITLE_PADDING_DP / 2).dp),
+                style =
+                    TextStyle(
+                        fontSize = 14.sp,
+                        fontWeight = FontWeight.Normal,
+                        color = Color.Black,
+                    ),
                 maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
         }
         // 进度条背景层
         Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(PROGRESS_BAR_HEIGHT_DP.dp)
-                .align(Alignment.BottomCenter)
-                .background(
-                    color = primaryColor.copy(alpha = 0.2f),
-                    shape = RoundedCornerShape(PROGRESS_BAR_HEIGHT_DP.dp / 2)
-                )
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(PROGRESS_BAR_HEIGHT_DP.dp)
+                    .align(Alignment.BottomCenter)
+                    .background(
+                        color = primaryColor.copy(alpha = 0.2f),
+                        shape = RoundedCornerShape(PROGRESS_BAR_HEIGHT_DP.dp / 2),
+                    ),
         )
 
         // 进度条前景层
         Box(
-            modifier = Modifier
-                .fillMaxWidth(fraction = progressValue / 100f)
-                .height(PROGRESS_BAR_HEIGHT_DP.dp)
-                .align(Alignment.BottomStart)
-                .background(
-                    color = primaryColor,
-                    shape = RoundedCornerShape(PROGRESS_BAR_HEIGHT_DP.dp / 2)
-                )
+            modifier =
+                Modifier
+                    .fillMaxWidth(fraction = progressValue / 100f)
+                    .height(PROGRESS_BAR_HEIGHT_DP.dp)
+                    .align(Alignment.BottomStart)
+                    .background(
+                        color = primaryColor,
+                        shape = RoundedCornerShape(PROGRESS_BAR_HEIGHT_DP.dp / 2),
+                    ),
         )
 
         // 节点行（等距，底部对齐）
         if (nodeCount > 0) { // 只有当节点数量大于0时才显示节点
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(NODE_SIZE_DP.dp)
-                    .align(Alignment.BottomCenter)
-                    // 节点层级低于指针，满足“forward_pic 最上层”的需求
-                    .zIndex(6f),
-                verticalAlignment = Alignment.Bottom
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .height(NODE_SIZE_DP.dp)
+                        .align(Alignment.BottomCenter)
+                        // 节点层级低于指针，满足“forward_pic 最上层”的需求
+                        .zIndex(6f),
+                verticalAlignment = Alignment.Bottom,
             ) {
                 for (index in 0 until nodeCount) {
                     val isLast = index == nodeCount - 1
@@ -145,25 +151,31 @@ fun MultiProgressCompose(
                     val nodeAlpha = if (isFirst && business == "food_delivery") 0f else 1f
 
                     // 根据节点状态选择不同的图标
-                    val baseIconKey = when {
-                        isLast && isCompleted -> multiProgressInfo.picEnd
-                            ?: multiProgressInfo.picMiddle
+                    val baseIconKey =
+                        when {
+                            isLast && isCompleted ->
+                                multiProgressInfo.picEnd
+                                    ?: multiProgressInfo.picMiddle
 
-                        isLast -> multiProgressInfo.picEndUnselected
-                            ?: multiProgressInfo.picMiddleUnselected
+                            isLast ->
+                                multiProgressInfo.picEndUnselected
+                                    ?: multiProgressInfo.picMiddleUnselected
 
-                        isCompleted -> multiProgressInfo.picMiddle
-                            ?: multiProgressInfo.picForwardBox
+                            isCompleted ->
+                                multiProgressInfo.picMiddle
+                                    ?: multiProgressInfo.picForwardBox
 
-                        else -> multiProgressInfo.picMiddleUnselected
-                            ?: multiProgressInfo.picForwardBox
-                    }
+                            else ->
+                                multiProgressInfo.picMiddleUnselected
+                                    ?: multiProgressInfo.picForwardBox
+                        }
 
                     Box(
-                        modifier = Modifier
-                            .size(NODE_SIZE_DP.dp)
-                            .alpha(nodeAlpha),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .size(NODE_SIZE_DP.dp)
+                                .alpha(nodeAlpha),
+                        contentAlignment = Alignment.Center,
                     ) {
                         // 先尝试加载图片
                         val hasIcon = !baseIconKey.isNullOrEmpty()
@@ -173,21 +185,27 @@ fun MultiProgressCompose(
                                 picMap = picMap,
                                 size = NODE_SIZE_DP.dp,
                                 isFocusIcon = false,
-                                contentDescription = null
+                                contentDescription = null,
                             )
                         }
 
                         // 如果没有图片或图片加载失败，显示默认的圆形指示器
                         if (baseIconKey.isNullOrEmpty()) {
                             Box(
-                                modifier = Modifier
-                                    .size(NODE_SIZE_DP.dp / 2)
-                                    .background(
-                                        color = if (isCompleted) primaryColor else primaryColor.copy(
-                                            alpha = 0.3f
+                                modifier =
+                                    Modifier
+                                        .size(NODE_SIZE_DP.dp / 2)
+                                        .background(
+                                            color =
+                                                if (isCompleted) {
+                                                    primaryColor
+                                                } else {
+                                                    primaryColor.copy(
+                                                        alpha = 0.3f,
+                                                    )
+                                                },
+                                            shape = CircleShape,
                                         ),
-                                        shape = CircleShape
-                                    )
                             )
                         }
                     }
@@ -221,13 +239,14 @@ fun MultiProgressCompose(
 
                 // 指针图应该悬浮在最上面，使用zIndex提升层级
                 Box(
-                    modifier = Modifier
-                        .size(pointerSize)
-                        .align(Alignment.BottomStart)
-                        // 仅水平偏移，垂直保持贴底，避免超出容器被父视图裁剪
-                        .offset(x = pointerLeftDp)
-                        // 指针层级最高，确保覆盖节点
-                        .zIndex(11f)
+                    modifier =
+                        Modifier
+                            .size(pointerSize)
+                            .align(Alignment.BottomStart)
+                            // 仅水平偏移，垂直保持贴底，避免超出容器被父视图裁剪
+                            .offset(x = pointerLeftDp)
+                            // 指针层级最高，确保覆盖节点
+                            .zIndex(11f),
                 ) {
                     // 先尝试加载指针图片
                     val hasPointerIcon = !pointerKey.isNullOrEmpty()
@@ -237,19 +256,20 @@ fun MultiProgressCompose(
                             picMap = picMap,
                             size = pointerSize,
                             isFocusIcon = false,
-                            contentDescription = null
+                            contentDescription = null,
                         )
                     }
 
                     // 如果没有指针图片或图片加载失败，显示默认的指示点
                     if (pointerKey.isNullOrEmpty()) {
                         Box(
-                            modifier = Modifier
-                                .size(pointerSize)
-                                .background(
-                                    color = primaryColor,
-                                    shape = CircleShape
-                                )
+                            modifier =
+                                Modifier
+                                    .size(pointerSize)
+                                    .background(
+                                        color = primaryColor,
+                                        shape = CircleShape,
+                                    ),
                         )
                     }
                 }
@@ -263,7 +283,7 @@ fun MultiProgressCompose(
 fun MultiProgressComposePreview() {
     MultiProgressCompose(
         multiProgressInfo = PreviewData.sampleMultiProgressInfo,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }
 
@@ -272,6 +292,6 @@ fun MultiProgressComposePreview() {
 fun MultiProgressComposeCompletePreview() {
     MultiProgressCompose(
         multiProgressInfo = PreviewData.sampleMultiProgressInfoComplete,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }

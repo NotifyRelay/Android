@@ -5,8 +5,6 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import notifyrelay.base.util.Logger
-import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
@@ -15,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.PermissionHelper
 
 /**
  * 负责「网络环境」与「设备发现」的整体协调：
@@ -37,7 +36,7 @@ import kotlinx.coroutines.launch
  */
 class ConnectionDiscoveryManager(
     private val deviceManager: DeviceConnectionManager,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
 ) {
     private val context get() = deviceManager.contextInternal
     private val connectivityManager: ConnectivityManager
@@ -53,7 +52,7 @@ class ConnectionDiscoveryManager(
         synchronized(deviceManager.deviceInfoCacheInternal) {
             deviceManager.deviceInfoCacheInternal[device.uuid] = device
         }
-        
+
         // 同时更新已认证设备表中的设备名称
         synchronized(deviceManager.authenticatedDevices) {
             val auth = deviceManager.authenticatedDevices[device.uuid]
@@ -62,33 +61,33 @@ class ConnectionDiscoveryManager(
                 deviceManager.saveAuthedDevicesInternal()
             }
         }
-        
+
         DeviceConnectionManagerUtil.updateGlobalDeviceName(device.uuid, device.displayName)
         scope.launch { deviceManager.updateDeviceListInternal() }
     }
-    
+
     /**
      * 连接到已认证设备
      */
     private fun connectToAuthedDevice(device: DeviceInfo) {
-        val isAuthed = synchronized(deviceManager.authenticatedDevices) { 
-            deviceManager.authenticatedDevices.containsKey(device.uuid) 
-        }
+        val isAuthed =
+            synchronized(deviceManager.authenticatedDevices) {
+                deviceManager.authenticatedDevices.containsKey(device.uuid)
+            }
         val isOnline = deviceManager.devices.value[device.uuid]?.second == true
         if (isAuthed && !isOnline) {
             deviceManager.connectToDevice(device)
         }
     }
-    
+
     enum class NetworkType {
         REGULAR,
         HOTSPOT,
-        WIFI_DIRECT
+        WIFI_DIRECT,
     }
 
-    internal fun getLocalIpAddressInternal(): String {
-        return NativeCore.getLocalIp() ?: "0.0.0.0"
-    }
+    internal fun getLocalIpAddressInternal(): String = NativeCore.getLocalIp() ?: "0.0.0.0"
+
     private fun getCurrentNetworkType(): NetworkType {
         try {
             val cm = connectivityManager
@@ -96,8 +95,8 @@ class ConnectionDiscoveryManager(
             val capabilities = cm.getNetworkCapabilities(network)
 
             if (capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true &&
-                !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)) {
-
+                !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            ) {
                 return if (capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_WIFI_P2P)) {
                     NetworkType.WIFI_DIRECT
                 } else {
@@ -109,9 +108,7 @@ class ConnectionDiscoveryManager(
         return NetworkType.REGULAR
     }
 
-    internal fun isWifiDirectNetworkInternal(): Boolean {
-        return getCurrentNetworkType() == NetworkType.WIFI_DIRECT
-    }
+    internal fun isWifiDirectNetworkInternal(): Boolean = getCurrentNetworkType() == NetworkType.WIFI_DIRECT
 
     // 获取WLAN直连下的设备IP范围（通常是192.168.49.x或类似）
     internal fun getWifiDirectIpRangeInternal(): List<String> {
@@ -129,57 +126,60 @@ class ConnectionDiscoveryManager(
      * 解码并清洗从网络接收到的名称：
      * - Base64 解码后再走 sanitizeDisplayNameInternal，保证入库/展示口径一致。
      */
-    internal fun decodeDisplayNameFromTransportInternal(encoded: String): String {
-        return try {
+    internal fun decodeDisplayNameFromTransportInternal(encoded: String): String =
+        try {
             deviceManager.decodeDisplayNameFromTransportInternal(encoded)
         } catch (_: Exception) {
             encoded
         }
-    }
-
-
 
     fun registerNetworkCallback() {
         val cm = connectivityManager
-        networkCallback = object : ConnectivityManager.NetworkCallback() {
-            private var wasLanNetwork = false
+        networkCallback =
+            object : ConnectivityManager.NetworkCallback() {
+                private var wasLanNetwork = false
 
-            override fun onAvailable(network: Network) {
-                val capabilities = cm.getNetworkCapabilities(network)
-                val isLanNetwork = capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true ||
-                        capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true ||
-                        capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_WIFI_P2P) == true
+                override fun onAvailable(network: Network) {
+                    val capabilities = cm.getNetworkCapabilities(network)
+                    val isLanNetwork =
+                        capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) == true ||
+                            capabilities?.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) == true ||
+                            capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_WIFI_P2P) == true
 
-                //Logger.d("死神-NotifyRelay", "网络可用，类型: ${if (isLanNetwork) "局域网/WLAN直连" else "非局域网"}")
+                    // Logger.d("死神-NotifyRelay", "网络可用，类型: ${if (isLanNetwork) "局域网/WLAN直连" else "非局域网"}")
 
-                if (isLanNetwork && !wasLanNetwork) {
-                    //Logger.d("死神-NotifyRelay", "检测到从非局域网切换到局域网/WLAN直连，主动重新连接设备")
-                    updateLocalIpAndRestartDiscovery()
-                } else {
-                    updateLocalIpAndRestartDiscovery()
+                    if (isLanNetwork && !wasLanNetwork) {
+                        // Logger.d("死神-NotifyRelay", "检测到从非局域网切换到局域网/WLAN直连，主动重新连接设备")
+                        updateLocalIpAndRestartDiscovery()
+                    } else {
+                        updateLocalIpAndRestartDiscovery()
+                    }
+
+                    wasLanNetwork = isLanNetwork
                 }
 
-                wasLanNetwork = isLanNetwork
-            }
-
-            override fun onLost(network: Network) {
-                //Logger.d("死神-NotifyRelay", "网络丢失")
-                wasLanNetwork = false
-            }
-
-            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                val isLanNetwork = networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
-                        networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
-                        networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_WIFI_P2P)
-
-                if (isLanNetwork && !wasLanNetwork) {
-                    //Logger.d("死神-NotifyRelay", "网络能力变化，检测到切换到局域网/WLAN直连，主动重新连接设备")
-                    updateLocalIpAndRestartDiscovery()
+                override fun onLost(network: Network) {
+                    // Logger.d("死神-NotifyRelay", "网络丢失")
+                    wasLanNetwork = false
                 }
 
-                wasLanNetwork = isLanNetwork
+                override fun onCapabilitiesChanged(
+                    network: Network,
+                    networkCapabilities: NetworkCapabilities,
+                ) {
+                    val isLanNetwork =
+                        networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                            networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET) ||
+                            networkCapabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_WIFI_P2P)
+
+                    if (isLanNetwork && !wasLanNetwork) {
+                        // Logger.d("死神-NotifyRelay", "网络能力变化，检测到切换到局域网/WLAN直连，主动重新连接设备")
+                        updateLocalIpAndRestartDiscovery()
+                    }
+
+                    wasLanNetwork = isLanNetwork
+                }
             }
-        }
         cm.registerNetworkCallback(NetworkRequest.Builder().build(), networkCallback!!)
     }
 
@@ -189,7 +189,7 @@ class ConnectionDiscoveryManager(
         synchronized(deviceManager.deviceInfoCacheInternal) {
             deviceManager.deviceInfoCacheInternal[deviceManager.uuid] = DeviceInfo(deviceManager.uuid, displayName, newIp, deviceManager.listenPort)
         }
-        //Logger.d("死神-NotifyRelay", "本地IP更新为: $newIp")
+        // Logger.d("死神-NotifyRelay", "本地IP更新为: $newIp")
         // 通知 Rust core 网络变化
         val ctx = deviceManager.rustContextInternal
         if (ctx != null) {
@@ -204,18 +204,19 @@ class ConnectionDiscoveryManager(
         if (hasValidNetwork) {
             // 网络恢复后的自动重连交由 Rust 重连状态机处理：重新登记所有认证设备，重置重试周期
             reconnectRefreshJob?.cancel()
-            reconnectRefreshJob = scope.launch {
-                delay(1000)
-                deviceManager.refreshAllReconnectTargetsInternal()
-            }
+            reconnectRefreshJob =
+                scope.launch {
+                    delay(1000)
+                    deviceManager.refreshAllReconnectTargetsInternal()
+                }
         }
     }
 
-    /**
-     * 同步心跳模式（方向 B：UDP 广播兼发现+心跳为主，TCP 定向心跳严格备用）：
-     * - 锁屏 或 WLAN直连 → TCP 备用（Rust 启动每设备 TCP 定向心跳，停 UDP 广播，
-     *   发现由 known_device_scanner/reconnect 兜底）
-     * - 否则 → 广播主用（UDP 广播 2s 兼发现+心跳，Rust 停止每设备心跳）
+    /*
+     * 同步连接模式说明：模式 B，UDP 广播发送 + 定时为 TCP 的详细说明。
+     * - 模式：WLAN直连，TCP 连接（Rust 层为每台设备 TCP 连接）并停止 UDP 广播。
+     *   处理见 known_device_scanner/reconnect 协议。
+     * - 模式：广播模式，UDP 广播 2s 周期发送 + 定期 Rust 停止每台设备连接。
      */
 
     /**
@@ -224,8 +225,16 @@ class ConnectionDiscoveryManager(
      */
     private fun getSignedBatteryLevel(): Int {
         val ctx = deviceManager.contextInternal
-        val level = notifyrelay.core.util.BatteryUtils.getBatteryLevel(ctx)
-        return if (notifyrelay.core.util.BatteryUtils.isCharging(ctx)) level else -level
+        val level =
+            notifyrelay.core.util.BatteryUtils
+                .getBatteryLevel(ctx)
+        return if (notifyrelay.core.util.BatteryUtils
+                .isCharging(ctx)
+        ) {
+            level
+        } else {
+            -level
+        }
     }
 
     internal fun syncHeartbeatMode() {
@@ -241,7 +250,8 @@ class ConnectionDiscoveryManager(
                 val battery = getSignedBatteryLevel()
                 NativeCore.periodicBroadcast(ctx, 1, deviceManager.uuid, displayName, battery, "android")
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
     }
 
     fun stopDiscovery() {
@@ -258,7 +268,7 @@ class ConnectionDiscoveryManager(
             // WLAN 直连模式下的持续重连/发现交由 Rust known_device_scanner 处理
             return
         }
-        
+
         // 连接到已认证设备
         scope.launch {
             val authed = synchronized(deviceManager.authenticatedDevices) { deviceManager.authenticatedDevices.toMap() }

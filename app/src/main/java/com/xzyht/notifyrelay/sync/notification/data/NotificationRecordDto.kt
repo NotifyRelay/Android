@@ -8,5 +8,5 @@ data class NotificationRecordDto(
     val title: String?,
     val text: String?,
     val time: Long,
-    val device: String = "本机"
+    val device: String = "本机",
 )

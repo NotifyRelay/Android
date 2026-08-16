@@ -29,7 +29,6 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
-import notifyrelay.base.util.Logger
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.layout.DialogDefaults
@@ -46,7 +45,7 @@ fun PairingCodeDialog(
     pairingCode: String = "",
     show: Boolean,
     onDismiss: () -> Unit,
-    onPairingComplete: (success: Boolean, message: String) -> Unit = { _, _ -> }
+    onPairingComplete: (success: Boolean, message: String) -> Unit = { _, _ -> },
 ) {
     if (!show) return
 
@@ -55,9 +54,10 @@ fun PairingCodeDialog(
     if (mode == PairingMode.CLIENT_MODE) {
         val clipboardManager = LocalClipboardManager.current
         val scope = rememberCoroutineScope()
-        val displayCode = remember {
-            deviceManager.rustContextInternal?.let { NativeCore.generatePairingCode(it) }
-        }
+        val displayCode =
+            remember {
+                deviceManager.rustContextInternal?.let { NativeCore.generatePairingCode(it) }
+            }
 
         LaunchedEffect(show) {
             if (show && targetDevice != null) {
@@ -69,25 +69,31 @@ fun PairingCodeDialog(
                 delay(500)
                 val handshakeDeferred = deviceManager.registerHandshakeWaiter(targetDevice.uuid)
                 try {
-                    val initSuccess = withContext(Dispatchers.IO) {
-                        val ctx = deviceManager.rustContextInternal
-                        if (ctx == null) {
-                            false
-                        } else {
-                            val batteryLevel = notifyrelay.core.util.BatteryUtils.getBatteryLevel(deviceManager.contextInternal)
-                            val isCharging = notifyrelay.core.util.BatteryUtils.isCharging(deviceManager.contextInternal)
-                            val battery = if (isCharging) batteryLevel else -batteryLevel
-                            NativeCore.sendPairingInit(ctx, deviceManager.uuid, targetDevice!!.uuid, displayCode, battery, "android") == 0
+                    val initSuccess =
+                        withContext(Dispatchers.IO) {
+                            val ctx = deviceManager.rustContextInternal
+                            if (ctx == null) {
+                                false
+                            } else {
+                                val batteryLevel =
+                                    notifyrelay.core.util.BatteryUtils
+                                        .getBatteryLevel(deviceManager.contextInternal)
+                                val isCharging =
+                                    notifyrelay.core.util.BatteryUtils
+                                        .isCharging(deviceManager.contextInternal)
+                                val battery = if (isCharging) batteryLevel else -batteryLevel
+                                NativeCore.sendPairingInit(ctx, deviceManager.uuid, targetDevice!!.uuid, displayCode, battery, "android") == 0
+                            }
                         }
-                    }
                     if (!initSuccess) {
                         onPairingComplete(false, "配对初始化失败")
                         onDismiss()
                         return@LaunchedEffect
                     }
-                    val result = withTimeoutOrNull(90_000L) {
-                        handshakeDeferred.await()
-                    }
+                    val result =
+                        withTimeoutOrNull(90_000L) {
+                            handshakeDeferred.await()
+                        }
                     withContext(Dispatchers.Main) {
                         if (result == true) {
                             onPairingComplete(true, "配对成功")
@@ -121,7 +127,7 @@ fun PairingCodeDialog(
             content = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
@@ -129,7 +135,7 @@ fun PairingCodeDialog(
                         fontSize = 36.sp,
                         color = colorScheme.primary,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -137,14 +143,14 @@ fun PairingCodeDialog(
                         style = MiuixTheme.textStyles.body2,
                         color = colorScheme.onSurface,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     TextButton(
                         text = "点击复制",
                         onClick = {
                             displayCode?.let { clipboardManager.setText(AnnotatedString(it)) }
-                        }
+                        },
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
@@ -152,7 +158,7 @@ fun PairingCodeDialog(
                         style = MiuixTheme.textStyles.body2,
                         color = colorScheme.onSurface,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     TextButton(
@@ -160,10 +166,10 @@ fun PairingCodeDialog(
                         onClick = {
                             deviceManager.rustContextInternal?.let { NativeCore.clearPairingCode(it) }
                             onDismiss()
-                        }
+                        },
                     )
                 }
-            }
+            },
         )
     } else {
         val serverScope = rememberCoroutineScope()
@@ -172,12 +178,14 @@ fun PairingCodeDialog(
         var errorMsg by remember { mutableStateOf<String?>(null) }
 
         val pending = deviceManager.pendingPairing
-        val remoteIp = remember {
-            pending?.remoteIp ?: targetDevice?.ip ?: ""
-        }
-        val remoteUuid = remember {
-            pending?.remoteUuid ?: targetDevice?.uuid ?: ""
-        }
+        val remoteIp =
+            remember {
+                pending?.remoteIp ?: targetDevice?.ip ?: ""
+            }
+        val remoteUuid =
+            remember {
+                pending?.remoteUuid ?: targetDevice?.uuid ?: ""
+            }
 
         WindowDialog(
             show = show,
@@ -193,7 +201,7 @@ fun PairingCodeDialog(
             content = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
@@ -201,7 +209,7 @@ fun PairingCodeDialog(
                         style = MiuixTheme.textStyles.body2,
                         color = colorScheme.onSurface,
                         textAlign = TextAlign.Center,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     )
                     Spacer(modifier = Modifier.height(12.dp))
 
@@ -212,19 +220,19 @@ fun PairingCodeDialog(
                             errorMsg = null
                         },
                         errorMsg = errorMsg,
-                        enabled = !isPairing
+                        enabled = !isPairing,
                     )
 
                     Spacer(modifier = Modifier.height(16.dp))
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
+                        horizontalArrangement = Arrangement.End,
                     ) {
                         TextButton(
                             text = "取消",
                             enabled = !isPairing,
-                            onClick = onDismiss
+                            onClick = onDismiss,
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         TextButton(
@@ -238,25 +246,31 @@ fun PairingCodeDialog(
                                 isPairing = true
 
                                 serverScope.launch {
-                                                    val handshakeDeferred = deviceManager.registerHandshakeWaiter(remoteUuid)
-                                                    try {
-                                                        val result = withContext(Dispatchers.IO) {
-                                                            try {
-                                                                val ctx = deviceManager.rustContextInternal
-                                                                if (ctx == null) return@withContext "配对失败：未初始化"
-                                                                val ltPubKey = deviceManager.localPublicKey
-                                                                val sendOk = NativeCore.sendPairingResp(ctx, remoteUuid, ltPubKey, code, remoteIp, 50, "android")
-                                                                if (sendOk != 0) return@withContext "配对失败：发送响应失败"
-                                                                val success = withTimeoutOrNull(30_000L) {
-                                                                    handshakeDeferred.await()
-                                                                }
-                                                                if (success == true) "配对成功"
-                                                                else if (success == false) "配对失败：对方拒绝了配对"
-                                                                else "配对超时"
-                                                            } catch (e: Exception) {
-                                                                "配对失败: ${e.message}"
-                                                            }
+                                    val handshakeDeferred = deviceManager.registerHandshakeWaiter(remoteUuid)
+                                    try {
+                                        val result =
+                                            withContext(Dispatchers.IO) {
+                                                try {
+                                                    val ctx = deviceManager.rustContextInternal
+                                                    if (ctx == null) return@withContext "配对失败：未初始化"
+                                                    val ltPubKey = deviceManager.localPublicKey
+                                                    val sendOk = NativeCore.sendPairingResp(ctx, remoteUuid, ltPubKey, code, remoteIp, 50, "android")
+                                                    if (sendOk != 0) return@withContext "配对失败：发送响应失败"
+                                                    val success =
+                                                        withTimeoutOrNull(30_000L) {
+                                                            handshakeDeferred.await()
                                                         }
+                                                    if (success == true) {
+                                                        "配对成功"
+                                                    } else if (success == false) {
+                                                        "配对失败：对方拒绝了配对"
+                                                    } else {
+                                                        "配对超时"
+                                                    }
+                                                } catch (e: Exception) {
+                                                    "配对失败: ${e.message}"
+                                                }
+                                            }
                                         if (result == "配对成功") {
                                             onPairingComplete(true, "配对成功")
                                             onDismiss()
@@ -268,11 +282,11 @@ fun PairingCodeDialog(
                                         deviceManager.cancelHandshakeWaiter(remoteUuid, handshakeDeferred)
                                     }
                                 }
-                            }
+                            },
                         )
                     }
                 }
-            }
+            },
         )
     }
 }

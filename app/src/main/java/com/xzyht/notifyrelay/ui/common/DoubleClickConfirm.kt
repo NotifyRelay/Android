@@ -37,11 +37,12 @@ interface DoubleClickConfirmState {
 @Composable
 fun rememberDoubleClickConfirm(): DoubleClickConfirmState {
     // 创建并保存状态实例
-    val state = remember {
-        object : DoubleClickConfirmState {
-            override var isConfirming by mutableStateOf(false)
+    val state =
+        remember {
+            object : DoubleClickConfirmState {
+                override var isConfirming by mutableStateOf(false)
+            }
         }
-    }
 
     // 监听确认状态变化，2秒后自动清除确认状态
     LaunchedEffect(state.isConfirming) {
@@ -78,7 +79,7 @@ fun DoubleClickConfirmButton(
     colors: ButtonColors = ButtonDefaults.buttonColors(),
     confirmColors: ButtonColors = ButtonDefaults.buttonColors(color = Color.Companion.Red),
     textColor: Color? = null,
-    confirmTextColor: Color? = null
+    confirmTextColor: Color? = null,
 ) {
     val state = rememberDoubleClickConfirm()
     val context = LocalContext.current
@@ -99,16 +100,17 @@ fun DoubleClickConfirmButton(
         },
         modifier = modifier,
         insideMargin = PaddingValues(horizontal = 12.dp, vertical = 6.dp),
-        colors = if (state.isConfirming) confirmColors else colors
+        colors = if (state.isConfirming) confirmColors else colors,
     ) {
         Text(
             text = if (state.isConfirming) confirmText else text,
-            color = if (state.isConfirming) {
-                confirmTextColor ?: Color.Companion.White
-            } else {
-                textColor ?: Color.Companion.White
-            },
-            style = MiuixTheme.textStyles.body2
+            color =
+                if (state.isConfirming) {
+                    confirmTextColor ?: Color.Companion.White
+                } else {
+                    textColor ?: Color.Companion.White
+                },
+            style = MiuixTheme.textStyles.body2,
         )
     }
 }

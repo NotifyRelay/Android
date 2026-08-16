@@ -1,13 +1,10 @@
 package com.xzyht.notifyrelay.feature.notification.superisland
 
-import notifyrelay.base.util.Logger
-
 /**
  * 超级岛通知列表管理器。
  * 在平板列表模式下维护所有待切换的通知条目，管理激活切换和 media 优先级。
  */
 object SuperislandListManager {
-
     data class ListEntry(
         val sourceId: String,
         val title: String?,
@@ -17,7 +14,7 @@ object SuperislandListManager {
         val appName: String?,
         val isLocked: Boolean,
         val isMedia: Boolean,
-        val timestamp: Long = System.currentTimeMillis()
+        val timestamp: Long = System.currentTimeMillis(),
     )
 
     /** 有序列表。media 条目在前，普通条目在后 */
@@ -55,12 +52,13 @@ object SuperislandListManager {
     }
 
     private fun insertSorted(entry: ListEntry) {
-        val insertIdx = if (entry.isMedia) {
-            val firstNonMedia = entries.indexOfFirst { !it.isMedia }
-            if (firstNonMedia < 0) entries.size else firstNonMedia
-        } else {
-            entries.size
-        }
+        val insertIdx =
+            if (entry.isMedia) {
+                val firstNonMedia = entries.indexOfFirst { !it.isMedia }
+                if (firstNonMedia < 0) entries.size else firstNonMedia
+            } else {
+                entries.size
+            }
         entries.add(insertIdx, entry)
         if (activeIndex < 0) {
             activeIndex = insertIdx
@@ -73,10 +71,16 @@ object SuperislandListManager {
         }
     }
 
-    private fun reorderAndUpdateActive(oldIndex: Int, entry: ListEntry) {
+    private fun reorderAndUpdateActive(
+        oldIndex: Int,
+        entry: ListEntry,
+    ) {
         entries.removeAt(oldIndex)
-        if (oldIndex < activeIndex) activeIndex--
-        else if (oldIndex == activeIndex) activeIndex = -1
+        if (oldIndex < activeIndex) {
+            activeIndex--
+        } else if (oldIndex == activeIndex) {
+            activeIndex = -1
+        }
         insertSorted(entry)
     }
 
@@ -95,8 +99,11 @@ object SuperislandListManager {
 
         val wasActive = idx == activeIndex
         entries.removeAt(idx)
-        if (idx < activeIndex) activeIndex--
-        else if (wasActive) activeIndex = if (entries.isEmpty()) -1 else activeIndex.coerceAtMost(entries.size - 1)
+        if (idx < activeIndex) {
+            activeIndex--
+        } else if (wasActive) {
+            activeIndex = if (entries.isEmpty()) -1 else activeIndex.coerceAtMost(entries.size - 1)
+        }
 
         if (entries.isEmpty()) {
             manuallyChanged = false
@@ -130,9 +137,7 @@ object SuperislandListManager {
 
     /** 获取当前激活条目 */
     @Synchronized
-    fun getActive(): ListEntry? {
-        return if (activeIndex in entries.indices) entries[activeIndex] else null
-    }
+    fun getActive(): ListEntry? = if (activeIndex in entries.indices) entries[activeIndex] else null
 
     /** 重置手动切换标记 */
     @Synchronized

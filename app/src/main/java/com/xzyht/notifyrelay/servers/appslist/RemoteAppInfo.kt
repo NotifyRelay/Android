@@ -37,7 +37,7 @@ data class RemoteAppsState(
             if (searchQuery.isBlank()) return apps
             return apps.filter {
                 it.appName.contains(searchQuery, ignoreCase = true) ||
-                it.packageName.contains(searchQuery, ignoreCase = true)
+                    it.packageName.contains(searchQuery, ignoreCase = true)
             }
         }
 

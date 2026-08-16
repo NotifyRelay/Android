@@ -29,7 +29,7 @@ fun DefaultCompose(modifier: Modifier = Modifier) {
         text = "未支持的模板",
         color = Color.White,
         fontSize = 14.sp,
-        modifier = modifier.padding(16.dp)
+        modifier = modifier.padding(16.dp),
     )
 }
 
@@ -40,42 +40,45 @@ fun DefaultCompose(modifier: Modifier = Modifier) {
 fun DefaultCompose(
     title: String?,
     content: String?,
-    image: Bitmap?
+    image: Bitmap?,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         if (image != null) {
             Image(
                 bitmap = image.asImageBitmap(),
                 contentDescription = "icon",
-                modifier = Modifier
-                    .size(56.dp)
-                    .clip(CircleShape),
-                contentScale = ContentScale.Crop
+                modifier =
+                    Modifier
+                        .size(56.dp)
+                        .clip(CircleShape),
+                contentScale = ContentScale.Crop,
             )
         }
-        
+
         Column(
-            modifier = Modifier
-                .padding(start = if (image != null) 8.dp else 0.dp)
-                .weight(1f)
+            modifier =
+                Modifier
+                    .padding(start = if (image != null) 8.dp else 0.dp)
+                    .weight(1f),
         ) {
             Text(
                 text = title ?: "(无标题)",
                 color = Color.White,
                 fontSize = 14.sp,
                 modifier = Modifier.padding(bottom = 4.dp),
-                maxLines = 1
+                maxLines = 1,
             )
             Text(
                 text = content ?: "(无内容)",
                 color = Color(0xFFDDDDDD),
                 fontSize = 12.sp,
-                maxLines = 2
+                maxLines = 2,
             )
         }
     }
@@ -93,6 +96,6 @@ fun DefaultComposeWithDataPreview() {
     DefaultCompose(
         title = "通知标题",
         content = "这是通知内容的详细描述信息",
-        image = null
+        image = null,
     )
 }

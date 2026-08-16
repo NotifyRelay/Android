@@ -16,21 +16,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.SmallIsland.left.AComponent
 import github.xzynine.superislandui.floating.SmallIsland.left.AImageText1
-import github.xzynine.superislandui.floating.SmallIsland.left.AImageText5
 import github.xzynine.superislandui.floating.SmallIsland.right.BComponent
 import github.xzynine.superislandui.floating.SmallIsland.right.BEmpty
-import github.xzynine.superislandui.floating.SmallIsland.right.BFixedWidthDigitInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText2
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText3
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText6
-import github.xzynine.superislandui.floating.SmallIsland.right.BPicInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BProgressTextInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BSameWidthDigitInfo
 import github.xzynine.superislandui.floating.SmallIsland.right.BTextInfo
 import github.xzynine.superislandui.model.parseAComponent
 import github.xzynine.superislandui.model.parseBComponent
@@ -48,82 +38,83 @@ fun BigIslandCollapsedCompose(
     fallbackContent: String? = null,
     isOverlapping: Boolean = false,
     picFunction: String? = null,
-    aodPic: String? = null
+    aodPic: String? = null,
 ) {
     // 使用真正的圆角形状
     val cornerRadius = 999.dp
     val roundedShape = RoundedCornerShape(cornerRadius)
-    
+
     // 根据重叠状态选择背景色
-    val backgroundColor = if (isOverlapping) {
-        Color(0xEEFF0000.toInt()) // 半透明红色
-    } else {
-        Color(0xCC000000.toInt()) // 半透明黑
-    }
-    
+    val backgroundColor =
+        if (isOverlapping) {
+            Color(0xEEFF0000.toInt()) // 半透明红色
+        } else {
+            Color(0xCC000000.toInt()) // 半透明黑
+        }
+
     // 解析A区和B区组件，传入 picFunction 和 aodPic 作为 fallback
     var aComp = parseAComponent(bigIsland, picFunction, aodPic)
     var bComp = parseBComponent(bigIsland, picFunction, aodPic)
-    
+
     // 如果A区组件为空，创建一个默认的AImageText1对象来显示兜底应用图标
     if (aComp == null) {
         aComp = AImageText1(picKey = null)
     }
-    
+
     // 如果 B 为空且存在兜底文本，则用兜底文本填充 B
     val bIsEmptyInitial = (bComp is BEmpty)
     if (bIsEmptyInitial) {
         val titleOrNull = fallbackTitle?.takeIf { it.isNotBlank() }
         val contentOrNull = fallbackContent?.takeIf { it.isNotBlank() }
         if (titleOrNull != null || contentOrNull != null) {
-            bComp = BTextInfo(
-                title = titleOrNull ?: contentOrNull.orEmpty(),
-                content = if (titleOrNull != null) contentOrNull else null
-            )
+            bComp =
+                BTextInfo(
+                    title = titleOrNull ?: contentOrNull.orEmpty(),
+                    content = if (titleOrNull != null) contentOrNull else null,
+                )
         }
     }
-    
+
     // 主布局：保证长侧显示完全，加宽侧与链接处的空隙宽度
     Box(
-        modifier = Modifier
-            .shadow(elevation = 6.dp, shape = roundedShape)
-            .background(
-                color = backgroundColor,
-                shape = roundedShape
-            )
-            .border(
-                width = 1.dp,
-                color = Color(0x80FFFFFF), // 半透明白色边框
-                shape = roundedShape
-            )
-            .clip(roundedShape)
-            .padding(horizontal = 10.dp, vertical = 6.dp)
-            .wrapContentWidth()
+        modifier =
+            Modifier
+                .shadow(elevation = 6.dp, shape = roundedShape)
+                .background(
+                    color = backgroundColor,
+                    shape = roundedShape,
+                ).border(
+                    width = 1.dp,
+                    color = Color(0x80FFFFFF), // 半透明白色边框
+                    shape = roundedShape,
+                ).clip(roundedShape)
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .wrapContentWidth(),
     ) {
         // 主布局：使用Row实现保证长侧显示完全，加宽侧与链接处的空隙宽度
         Row(
             modifier = Modifier.wrapContentWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
+            horizontalArrangement = Arrangement.Start,
         ) {
             // 左侧：A区内容，保证显示完全
             Box(
                 modifier = Modifier.wrapContentWidth(),
-                contentAlignment = Alignment.CenterStart
+                contentAlignment = Alignment.CenterStart,
             ) {
                 ACompose(aComp, picMap)
             }
-            
+
             // 只有当B区存在内容时，才显示中间间距和B区
             if (bComp != null && bComp !is BEmpty) {
                 // 动态中间间距：根据两侧内容宽度调整
                 val dynamicSpacing = 48.dp // 加宽侧与链接处的空隙宽度
                 Spacer(modifier = Modifier.width(dynamicSpacing))
-                
+
                 // 右侧：B区内容，保证显示完全
                 Box(
                     modifier = Modifier.wrapContentWidth(),
-                    contentAlignment = Alignment.CenterEnd
+                    contentAlignment = Alignment.CenterEnd,
                 ) {
                     BCompose(bComp, picMap)
                 }
@@ -140,52 +131,52 @@ fun BigIslandCollapsedFromComponents(
     aComp: AComponent?,
     bComp: BComponent?,
     picMap: Map<String, String>? = null,
-    isOverlapping: Boolean = false
+    isOverlapping: Boolean = false,
 ) {
     val cornerRadius = 999.dp
     val roundedShape = RoundedCornerShape(cornerRadius)
-    
-    val backgroundColor = if (isOverlapping) {
-        Color(0xEEFF0000.toInt())
-    } else {
-        Color(0xCC000000.toInt())
-    }
-    
+
+    val backgroundColor =
+        if (isOverlapping) {
+            Color(0xEEFF0000.toInt())
+        } else {
+            Color(0xCC000000.toInt())
+        }
+
     Box(
-        modifier = Modifier
-            .shadow(elevation = 6.dp, shape = roundedShape)
-            .background(
-                color = backgroundColor,
-                shape = roundedShape
-            )
-            .border(
-                width = 1.dp,
-                color = Color(0x80FFFFFF),
-                shape = roundedShape
-            )
-            .clip(roundedShape)
-            .padding(horizontal = 10.dp, vertical = 6.dp)
-            .wrapContentWidth()
+        modifier =
+            Modifier
+                .shadow(elevation = 6.dp, shape = roundedShape)
+                .background(
+                    color = backgroundColor,
+                    shape = roundedShape,
+                ).border(
+                    width = 1.dp,
+                    color = Color(0x80FFFFFF),
+                    shape = roundedShape,
+                ).clip(roundedShape)
+                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .wrapContentWidth(),
     ) {
         Row(
             modifier = Modifier.wrapContentWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.Start
+            horizontalArrangement = Arrangement.Start,
         ) {
             Box(
                 modifier = Modifier.wrapContentWidth(),
-                contentAlignment = Alignment.CenterStart
+                contentAlignment = Alignment.CenterStart,
             ) {
                 ACompose(aComp, picMap)
             }
-            
+
             if (bComp != null && bComp !is BEmpty) {
                 val dynamicSpacing = 48.dp
                 Spacer(modifier = Modifier.width(dynamicSpacing))
-                
+
                 Box(
                     modifier = Modifier.wrapContentWidth(),
-                    contentAlignment = Alignment.CenterEnd
+                    contentAlignment = Alignment.CenterEnd,
                 ) {
                     BCompose(bComp, picMap)
                 }

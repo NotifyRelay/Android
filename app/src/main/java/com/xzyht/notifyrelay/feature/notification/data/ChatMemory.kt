@@ -24,7 +24,10 @@ object ChatMemory {
     /**
      * 添加聊天记录
      */
-    fun append(context: Context, msg: String) {
+    fun append(
+        context: Context,
+        msg: String,
+    ) {
         val list = getChatHistory(context).toMutableList()
         list.add(msg)
         // 限制历史记录数量，避免内存占用过大

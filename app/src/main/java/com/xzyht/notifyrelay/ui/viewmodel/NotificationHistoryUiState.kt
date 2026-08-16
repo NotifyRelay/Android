@@ -10,7 +10,7 @@ data class NotificationHistoryUiState(
     val deviceList: List<String> = listOf("本机"),
     val expandedGroups: Set<String> = emptySet(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
 )
 
 /**
@@ -21,5 +21,5 @@ data class GroupedNotifications(
     val appName: String,
     val latestTime: Long,
     val notifications: List<NotificationRecord>,
-    val isExpanded: Boolean = false
+    val isExpanded: Boolean = false,
 )

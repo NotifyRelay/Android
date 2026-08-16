@@ -19,21 +19,29 @@ data class BigIslandArea(
     val verificationCode: String? = null,
     val isVerificationCode: Boolean = false,
     val aComponent: AComponent? = null,
-    val bComponent: BComponent? = null
+    val bComponent: BComponent? = null,
 )
 
-fun parseBigIslandArea(json: JSONObject?, picFunction: String?, aodPic: String?): BigIslandArea? {
+fun parseBigIslandArea(
+    json: JSONObject?,
+    picFunction: String?,
+    aodPic: String?,
+): BigIslandArea? {
     if (json == null) return null
 
-    val leftPic = json.optJSONObject("imageTextInfoLeft")
-        ?.optJSONObject("picInfo")
-        ?.optString("pic", "")
-        ?.takeIf { it.isNotBlank() }
+    val leftPic =
+        json
+            .optJSONObject("imageTextInfoLeft")
+            ?.optJSONObject("picInfo")
+            ?.optString("pic", "")
+            ?.takeIf { it.isNotBlank() }
 
-    val rightPic = json.optJSONObject("imageTextInfoRight")
-        ?.optJSONObject("picInfo")
-        ?.optString("pic", "")
-        ?.takeIf { it.isNotBlank() }
+    val rightPic =
+        json
+            .optJSONObject("imageTextInfoRight")
+            ?.optJSONObject("picInfo")
+            ?.optString("pic", "")
+            ?.takeIf { it.isNotBlank() }
 
     // 解析验证码逻辑
     var isVerCode = false
@@ -54,25 +62,33 @@ fun parseBigIslandArea(json: JSONObject?, picFunction: String?, aodPic: String?)
         Logger.d("BigIslandArea", "imageTextInfoLeft 或 textInfo 为空")
     }
 
-    val primary = firstString(json, arrayOf(
-        "title",
-        "primaryText",
-        "frontTitle",
-        "mainText",
-        "mainTitle",
-        "largeText",
-        "bigText",
-        "text"
-    ))
+    val primary =
+        firstString(
+            json,
+            arrayOf(
+                "title",
+                "primaryText",
+                "frontTitle",
+                "mainText",
+                "mainTitle",
+                "largeText",
+                "bigText",
+                "text",
+            ),
+        )
 
-    val secondary = firstString(json, arrayOf(
-        "content",
-        "secondaryText",
-        "subTitle",
-        "subContent",
-        "afterText",
-        "tailText"
-    ))
+    val secondary =
+        firstString(
+            json,
+            arrayOf(
+                "content",
+                "secondaryText",
+                "subTitle",
+                "subContent",
+                "afterText",
+                "tailText",
+            ),
+        )
 
     // 如果 primary/secondary 为 null，尝试在嵌套对象或数组里查找（有限的递归深度，避免复杂依赖）
     val finalPrimary = primary ?: nestedFirstString(json, arrayOf("textInfo", "iconTextInfo", "imageTextInfoLeft", "imageTextInfoRight"))
@@ -95,11 +111,14 @@ fun parseBigIslandArea(json: JSONObject?, picFunction: String?, aodPic: String?)
         verificationCode = verCode,
         isVerificationCode = isVerCode,
         aComponent = aComponent,
-        bComponent = bComponent
+        bComponent = bComponent,
     )
 }
 
-private fun firstString(obj: JSONObject, keys: Array<String>): String? {
+private fun firstString(
+    obj: JSONObject,
+    keys: Array<String>,
+): String? {
     for (key in keys) {
         val value = runCatching { obj.getString(key) }.getOrNull()
         if (!value.isNullOrBlank()) return value
@@ -107,7 +126,10 @@ private fun firstString(obj: JSONObject, keys: Array<String>): String? {
     return null
 }
 
-private fun nestedFirstString(obj: JSONObject, keys: Array<String>): String? {
+private fun nestedFirstString(
+    obj: JSONObject,
+    keys: Array<String>,
+): String? {
     for (key in keys) {
         val nested = obj.optJSONObject(key) ?: continue
         val direct = firstString(nested, arrayOf("title", "text", "content", "primaryText", "secondaryText"))

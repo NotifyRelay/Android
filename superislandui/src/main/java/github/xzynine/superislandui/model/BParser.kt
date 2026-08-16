@@ -20,7 +20,11 @@ import org.json.JSONObject
  * @param picFunction 功能图标键（来自 highlightInfo.picFunction）
  * @param aodPic AOD 图片键
  */
-fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic: String? = null): BComponent? {
+fun parseBComponent(
+    bigIsland: JSONObject?,
+    picFunction: String? = null,
+    aodPic: String? = null,
+): BComponent? {
     val right = bigIsland?.optJSONObject("imageTextInfoRight")
     if (right != null) {
         val type = right.optInt("type", 0)
@@ -48,7 +52,7 @@ fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
                     content = contentText,
                     narrowFont = narrowFont,
                     showHighlightColor = showHighlightColor,
-                    picKey = picKey
+                    picKey = picKey,
                 )
             }
             3 -> {
@@ -58,7 +62,7 @@ fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
                     title = title,
                     narrowFont = narrowFont,
                     showHighlightColor = showHighlightColor,
-                    picKey = picKey
+                    picKey = picKey,
                 )
             }
             // 组件4为系统侧（充电/省电）专用，不走通知数据；本项目不复刻，直接视为空
@@ -72,7 +76,7 @@ fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
                     title = title,
                     narrowFont = narrowFont,
                     showHighlightColor = showHighlightColor,
-                    picKey = picKey
+                    picKey = picKey,
                 )
             }
             else -> BEmpty
@@ -90,45 +94,50 @@ fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
             title = title,
             content = content,
             narrowFont = narrowFont,
-            showHighlightColor = showHighlightColor
+            showHighlightColor = showHighlightColor,
         )
     }
 
     bigIsland?.optJSONObject("fixedWidthDigitInfo")?.let { fi ->
-        val digit = fi.optString("digit", "").takeIf { it.isNotBlank() }
-            ?: fi.optString("text", "").takeIf { it.isNotBlank() } // 兼容旧字段名
+        val digit =
+            fi.optString("digit", "").takeIf { it.isNotBlank() }
+                ?: fi.optString("text", "").takeIf { it.isNotBlank() } // 兼容旧字段名
         digit ?: return@let
         val content = fi.optString("content", "").takeIf { it.isNotBlank() }
         val showHighlightColor = fi.optBoolean("showHighlightColor", false)
         return BFixedWidthDigitInfo(
             digit = digit,
             content = content,
-            showHighlightColor = showHighlightColor
+            showHighlightColor = showHighlightColor,
         )
     }
 
     bigIsland?.optJSONObject("sameWidthDigitInfo")?.let { si ->
         // 先尝试解析 timerInfo
         val timerObj = si.optJSONObject("timerInfo")
-        val timer = timerObj?.let { to ->
-            val typeExists = to.has("timerType")
-            if (!typeExists) null else {
-                val timerType = to.optInt("timerType")
-                val timerWhen = to.optLong("timerWhen", 0)
-                val timerTotal = to.optLong("timerTotal", 0)
-                val timerSystemCurrent = to.optLong("timerSystemCurrent", 0)
-                TimerInfo(
-                    timerType = timerType,
-                    timerWhen = timerWhen,
-                    timerTotal = timerTotal,
-                    timerSystemCurrent = timerSystemCurrent
-                )
+        val timer =
+            timerObj?.let { to ->
+                val typeExists = to.has("timerType")
+                if (!typeExists) {
+                    null
+                } else {
+                    val timerType = to.optInt("timerType")
+                    val timerWhen = to.optLong("timerWhen", 0)
+                    val timerTotal = to.optLong("timerTotal", 0)
+                    val timerSystemCurrent = to.optLong("timerSystemCurrent", 0)
+                    TimerInfo(
+                        timerType = timerType,
+                        timerWhen = timerWhen,
+                        timerTotal = timerTotal,
+                        timerSystemCurrent = timerSystemCurrent,
+                    )
+                }
             }
-        }
 
         // 若无 timerInfo 或不合法，则回退到 digit/text
-        val digit = si.optString("digit", "").takeIf { it.isNotBlank() }
-            ?: si.optString("text", "").takeIf { it.isNotBlank() }
+        val digit =
+            si.optString("digit", "").takeIf { it.isNotBlank() }
+                ?: si.optString("text", "").takeIf { it.isNotBlank() }
 
         // 二选一：timer 或 digit 至少一个存在
         if (timer == null && digit == null) return@let
@@ -139,7 +148,7 @@ fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
             digit = digit,
             timer = timer,
             content = content,
-            showHighlightColor = showHighlightColor
+            showHighlightColor = showHighlightColor,
         )
     }
 
@@ -162,11 +171,12 @@ fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
 
         // picInfo (optional but if present must be type=1 & pic required)
         val picObj = root.optJSONObject("picInfo")
-        val picRaw = picObj?.let { po ->
-            val typeOk = po.optInt("type", 0) == 1
-            val key = po.optString("pic", "").takeIf { it.isNotBlank() }
-            if (typeOk) key else null
-        }
+        val picRaw =
+            picObj?.let { po ->
+                val typeOk = po.optInt("type", 0) == 1
+                val key = po.optString("pic", "").takeIf { it.isNotBlank() }
+                if (typeOk) key else null
+            }
         val picKey: String? = resolvePicKey(picRaw, picFunction, aodPic)
 
         return BProgressTextInfo(
@@ -179,7 +189,7 @@ fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
             colorReach = colorReach,
             colorUnReach = colorUnReach,
             isCCW = isCCW,
-            picKey = picKey
+            picKey = picKey,
         )
     }
 
@@ -206,11 +216,15 @@ fun parseBComponent(bigIsland: JSONObject?, picFunction: String? = null, aodPic:
  * 3. aodPic
  * @param default 如果没有匹配的前缀，返回的默认值
  */
-private fun resolvePicKey(picRaw: String?, picFunction: String?, aodPic: String?, default: String? = null): String? {
-    return when {
+private fun resolvePicKey(
+    picRaw: String?,
+    picFunction: String?,
+    aodPic: String?,
+    default: String? = null,
+): String? =
+    when {
         picRaw != null && picRaw.startsWith("miui.focus.pic_") -> picRaw
         picFunction != null && picFunction.startsWith("miui.focus.pic_") -> picFunction
         aodPic != null && aodPic.startsWith("miui.focus.pic_") -> aodPic
         else -> default
     }
-}

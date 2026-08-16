@@ -29,12 +29,11 @@ data class ftpServerInfo(
     val username: String,
     val password: String,
     val ipAddress: String,
-    val port: Int
+    val port: Int,
 )
 
 object ftpServer {
     private const val TAG = "ftpServer"
-
 
     private val PORT_RANGE = 5151..5169
 
@@ -42,41 +41,45 @@ object ftpServer {
     private var isRunning = AtomicBoolean(false)
     private var serverInfo: ftpServerInfo? = null
     private lateinit var applicationContext: Context
-    
+
     fun setContext(context: Context) {
         this.applicationContext = context.applicationContext
     }
 
-    private fun createTemporaryUserManager(username: String, password: String, context: Context): UserManager {
+    private fun createTemporaryUserManager(
+        username: String,
+        password: String,
+        context: Context,
+    ): UserManager {
         try {
             // 创建临时用户管理器
             val userManagerFactory = PropertiesUserManagerFactory()
-            
+
             // 设置临时属性文件
             val tempFile = File.createTempFile("ftpusers", ".properties", context.cacheDir)
             tempFile.deleteOnExit()
-            
+
             // 确保文件存在
             FileOutputStream(tempFile).use { it.write("# FTPServer Users\n".toByteArray()) }
-            
+
             userManagerFactory.file = tempFile
-            
+
             val userManager = userManagerFactory.createUserManager()
-            
+
             // 创建用户
             val user = BaseUser()
             user.name = username
             user.password = password
             user.homeDirectory = "/storage/emulated/0/"
-            
+
             // 设置权限
             val authorities = mutableListOf<Authority>()
             authorities.add(WritePermission())
             user.authorities = authorities
-            
+
             // 添加用户
             userManager.save(user)
-            
+
             return userManager
         } catch (e: Exception) {
             Logger.e(TAG, "Failed to create user manager", e)
@@ -90,21 +93,26 @@ object ftpServer {
 
     // 定义FTP启动结果状态（保持与原ftp相同的枚举名称）
     enum class StartResult {
-        SUCCESS,         // 启动成功
+        SUCCESS, // 启动成功
         ALREADY_RUNNING, // 已在运行
         PERMISSION_DENIED, // 权限不足
-        PORT_IN_USE,     // 端口被占用
-        CONFIG_ERROR,    // 配置错误
-        FAILED           // 其他失败
+        PORT_IN_USE, // 端口被占用
+        CONFIG_ERROR, // 配置错误
+        FAILED, // 其他失败
     }
-    
+
     data class ftpStartResult(
         val status: StartResult,
-        val serverInfo: ftpServerInfo? = null
+        val serverInfo: ftpServerInfo? = null,
     )
-    
+
     @Synchronized
-    fun start(deviceName: String, context: Context, pcUsername: String? = null, pcPassword: String? = null): ftpStartResult {
+    fun start(
+        deviceName: String,
+        context: Context,
+        pcUsername: String? = null,
+        pcPassword: String? = null,
+    ): ftpStartResult {
         Logger.i(TAG, "FTP 服务器启动请求，设备名称: $deviceName")
         if (isRunning.get()) {
             Logger.i(TAG, "FTP 服务器已在运行，返回当前服务器信息")
@@ -135,9 +143,11 @@ object ftpServer {
             Logger.d(TAG, "FTP 使用 PC 端派发的凭据: username=$username")
         } else {
             // 回退：使用 Rust Core 生成随机凭据
-            val randomPassword = NativeCore.generateRandomPassword()
-                ?.takeIf { it.isNotBlank() && it.length >= 8 }
-                ?: return ftpStartResult(StartResult.CONFIG_ERROR)
+            val randomPassword =
+                NativeCore
+                    .generateRandomPassword()
+                    ?.takeIf { it.isNotBlank() && it.length >= 8 }
+                    ?: return ftpStartResult(StartResult.CONFIG_ERROR)
             username = "ftp_" + randomPassword.take(8).lowercase()
             password = randomPassword
             Logger.d(TAG, "FTP 使用随机凭据（无 PC 端凭据）")
@@ -156,16 +166,16 @@ object ftpServer {
 
                 // 创建FTP服务器工厂
                 val serverFactory = FtpServerFactory()
-                
+
                 // 创建监听器
                 val listenerFactory = ListenerFactory()
                 listenerFactory.port = port
                 serverFactory.addListener("default", listenerFactory.createListener())
-                
+
                 // 创建用户管理器
                 val userManager = createTemporaryUserManager(username, password, context)
                 serverFactory.userManager = userManager
-                
+
                 // 启动服务器
                 ftpServer = serverFactory.createServer()
                 ftpServer?.start()
@@ -174,12 +184,13 @@ object ftpServer {
                 val ipAddress = getDeviceIpAddress()
                 Logger.i(TAG, "FTP 服务器在端口 $port 启动成功，IP 地址: $ipAddress")
 
-                serverInfo = ftpServerInfo(
-                    username = username,
-                    password = password,
-                    ipAddress = ipAddress ?: "127.0.0.1",
-                    port = port
-                )
+                serverInfo =
+                    ftpServerInfo(
+                        username = username,
+                        password = password,
+                        ipAddress = ipAddress ?: "127.0.0.1",
+                        port = port,
+                    )
 
                 Logger.i(TAG, "FTP server started: $ipAddress on port $port")
                 return ftpStartResult(StartResult.SUCCESS, serverInfo)

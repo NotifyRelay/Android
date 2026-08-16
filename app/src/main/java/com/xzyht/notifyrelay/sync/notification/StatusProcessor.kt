@@ -4,7 +4,6 @@ import android.content.Context
 import android.os.Handler
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import notifyrelay.base.util.Logger
@@ -17,7 +16,6 @@ import org.json.JSONObject
  * 响应消息用作tos是默认行为
  */
 object StatusProcessor {
-
     private const val TAG = "StatusProcessor"
 
     /**
@@ -26,7 +24,7 @@ object StatusProcessor {
     data class StatusInput(
         val header: String,
         val rawData: String,
-        val remoteUuid: String
+        val remoteUuid: String,
     )
 
     /**
@@ -37,13 +35,13 @@ object StatusProcessor {
         deviceManager: DeviceConnectionManager,
         coroutineScope: CoroutineScope,
         input: StatusInput,
-        callbacks: Collection<(String) -> Unit>
+        callbacks: Collection<(String) -> Unit>,
     ) {
         try {
             Logger.d(TAG, "接收到DATA_STATUS消息: ${input.rawData}")
 
             val json = JSONObject(input.rawData)
-            
+
             // 提取关键信息
             val originalHeader = json.optString("originalHeader", "")
             val requestId = json.optString("requestId", "")
@@ -74,7 +72,7 @@ object StatusProcessor {
             callbacks.forEach {
                 it(input.rawData)
             }
-            
+
             val isSuperIslandAck = action == "SI_ACK"
             if (!isSuperIslandAck) {
                 // 无论是错误还是正确，都显示响应中的消息信息
@@ -88,7 +86,6 @@ object StatusProcessor {
                     }
                 }
             }
-
         } catch (e: Exception) {
             Logger.e(TAG, "处理DATA_STATUS消息失败", e)
         }
@@ -100,7 +97,7 @@ object StatusProcessor {
     private fun handleSuperIslandStatusResponse(
         json: JSONObject,
         deviceManager: DeviceConnectionManager,
-        remoteUuid: String
+        remoteUuid: String,
     ) {
         val action = json.optString("action", "")
         val hash = json.optString("hash", "")
@@ -123,27 +120,29 @@ object StatusProcessor {
         result: String,
         errorCode: String = "",
         errorMessage: String = "",
-        requestId: String = ""
+        requestId: String = "",
     ) {
         try {
-            val raw = JSONObject().apply {
-                put("originalHeader", originalHeader)
-                put("result", result)
-                if (errorCode.isNotEmpty()) {
-                    put("errorCode", errorCode)
-                }
-                if (errorMessage.isNotEmpty()) {
-                    put("errorMessage", errorMessage)
-                }
-                if (requestId.isNotEmpty()) {
-                    put("requestId", requestId)
-                }
-            }.toString()
+            val raw =
+                JSONObject()
+                    .apply {
+                        put("originalHeader", originalHeader)
+                        put("result", result)
+                        if (errorCode.isNotEmpty()) {
+                            put("errorCode", errorCode)
+                        }
+                        if (errorMessage.isNotEmpty()) {
+                            put("errorMessage", errorMessage)
+                        }
+                        if (requestId.isNotEmpty()) {
+                            put("requestId", requestId)
+                        }
+                    }.toString()
             ProtocolSender.sendEncrypted(
                 deviceManager,
                 deviceInfo,
                 "DATA_STATUS",
-                raw
+                raw,
             )
 
             Logger.d(TAG, "发送DATA_STATUS响应: originalHeader=$originalHeader, result=$result")

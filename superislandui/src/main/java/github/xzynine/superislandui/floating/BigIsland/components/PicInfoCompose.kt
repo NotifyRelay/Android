@@ -13,23 +13,26 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.model.templates.PicInfo
+import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.model.templates.PicInfo
 import notifyrelay.core.util.image.ImageUtils
-import github.xzynine.superislandui.common.PreviewData
-
 
 /**
  * 图片信息Compose组件
  */
 @Composable
-fun PicInfoCompose(picInfo: PicInfo, picMap: Map<String, String>?) {
+fun PicInfoCompose(
+    picInfo: PicInfo,
+    picMap: Map<String, String>?,
+) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(16.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         // 图片
         val picKey = picInfo.pic
@@ -38,16 +41,16 @@ fun PicInfoCompose(picInfo: PicInfo, picMap: Map<String, String>?) {
             picMap = picMap,
             size = 48.dp,
             isFocusIcon = false,
-            contentDescription = null
+            contentDescription = null,
         )
-        
+
         // 标题
         picInfo.title?.let {
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
                 color = Color(ImageUtils.parseColor(picInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
-                fontSize = 14.sp
+                fontSize = 14.sp,
             )
         }
     }
@@ -58,7 +61,7 @@ fun PicInfoCompose(picInfo: PicInfo, picMap: Map<String, String>?) {
 fun PicInfoComposeType1Preview() {
     PicInfoCompose(
         picInfo = PreviewData.samplePicInfo,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }
 
@@ -67,6 +70,6 @@ fun PicInfoComposeType1Preview() {
 fun PicInfoComposeType2Preview() {
     PicInfoCompose(
         picInfo = PreviewData.samplePicInfoType2,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }

@@ -27,7 +27,6 @@ import org.json.JSONObject
  * - 响应：{"type":"APP_LIST_RESPONSE","scope":"user","apps":[{"packageName":"...","appName":"..."},...],"total":N,"time":<ms>}
  */
 object AppListSyncManager {
-
     private const val TAG = "AppListSyncManager"
     private const val REQ_TIMEOUT = 15000L
 
@@ -38,11 +37,12 @@ object AppListSyncManager {
         context: Context,
         deviceManager: DeviceConnectionManager,
         targetDevice: DeviceInfo,
-        scope: String = "user"
+        scope: String = "user",
     ) {
         context.hashCode()
-        val raw = NativeCore.appSyncBuildApplistRequest(scope, System.currentTimeMillis())
-            ?: return
+        val raw =
+            NativeCore.appSyncBuildApplistRequest(scope, System.currentTimeMillis())
+                ?: return
         ProtocolSender.sendEncrypted(deviceManager, targetDevice, "DATA_APP_LIST_REQUEST", raw, REQ_TIMEOUT)
     }
 
@@ -54,7 +54,7 @@ object AppListSyncManager {
         requestData: String,
         deviceManager: DeviceConnectionManager,
         sourceDevice: DeviceInfo,
-        context: Context
+        context: Context,
     ) {
         try {
             val json = JSONObject(requestData)
@@ -64,30 +64,39 @@ object AppListSyncManager {
             val scope = json.optString("scope", "user")
 
             val apps = AppListHelper.getInstalledApplications(context)
-            val userApps = when (scope) {
-                "user" -> apps // AppListHelper 已过滤系统/自身
-                else -> apps
-            }
+            val userApps =
+                when (scope) {
+                    "user" -> apps // AppListHelper 已过滤系统/自身
+                    else -> apps
+                }
 
             val appArray = JSONArray()
             val pm = context.packageManager
             for (ai in userApps) {
                 try {
-                    val appName = try { pm.getApplicationLabel(ai).toString() } catch (_: Exception) { ai.packageName }
+                    val appName =
+                        try {
+                            pm.getApplicationLabel(ai).toString()
+                        } catch (_: Exception) {
+                            ai.packageName
+                        }
                     val item = JSONObject()
                     item.put("packageName", ai.packageName)
                     item.put("appName", appName)
                     appArray.put(item)
-                } catch (_: Exception) {}
+                } catch (_: Exception) {
+                }
             }
 
-            val raw = JSONObject().apply {
-                put("type", "APP_LIST_RESPONSE")
-                put("scope", scope)
-                put("total", appArray.length())
-                put("apps", appArray)
-                put("time", System.currentTimeMillis())
-            }.toString()
+            val raw =
+                JSONObject()
+                    .apply {
+                        put("type", "APP_LIST_RESPONSE")
+                        put("scope", scope)
+                        put("total", appArray.length())
+                        put("apps", appArray)
+                        put("time", System.currentTimeMillis())
+                    }.toString()
             sendAppListResponse(deviceManager, sourceDevice, raw)
             Logger.d(TAG, "已响应应用列表：${sourceDevice.displayName}，共${appArray.length()}项")
         } catch (e: Exception) {
@@ -98,7 +107,7 @@ object AppListSyncManager {
     private fun sendAppListResponse(
         deviceManager: DeviceConnectionManager,
         target: DeviceInfo,
-        responseData: String
+        responseData: String,
     ) {
         ProtocolSender.sendEncrypted(deviceManager, target, "DATA_APP_LIST_RESPONSE", responseData, REQ_TIMEOUT)
     }
@@ -109,14 +118,19 @@ object AppListSyncManager {
      * 2. 将应用包名与来源设备关联
      * 3. 检查并批量请求缺失的图标
      */
-    fun handleAppListResponse(responseData: String, context: Context, deviceUuid: String, deviceManager: DeviceConnectionManager) {
+    fun handleAppListResponse(
+        responseData: String,
+        context: Context,
+        deviceUuid: String,
+        deviceManager: DeviceConnectionManager,
+    ) {
         try {
             // 解析由 Rust 完成
             val parsed = NativeCore.appSyncParseApplistResponse(responseData) ?: return
             val json = JSONObject(parsed)
             val total = json.optInt("total", -1)
             Logger.d(TAG, "收到应用列表响应，共 $total 项，来源设备：$deviceUuid")
-            
+
             // 解析应用列表
             val appsArray = json.optJSONArray("apps") ?: return
             val appsMap = mutableMapOf<String, String>()
@@ -130,22 +144,23 @@ object AppListSyncManager {
                     packageNames.add(packageName)
                 }
             }
-            
+
             // 缓存到 AppRepository
             deviceManager.coroutineScopeInternal.launch {
                 AppRepository.cacheRemoteAppList(context, appsMap, deviceUuid)
-                
+
                 // 关联应用包名与设备（替代原 associateAppsWithDevice 方法）
                 val databaseRepository = DatabaseRepository.getInstance(context)
-                val appDeviceEntities = packageNames.map {
-                    AppDeviceEntity(
-                        packageName = it,
-                        sourceDevice = deviceUuid,
-                        lastUpdated = System.currentTimeMillis()
-                    )
-                }
+                val appDeviceEntities =
+                    packageNames.map {
+                        AppDeviceEntity(
+                            packageName = it,
+                            sourceDevice = deviceUuid,
+                            lastUpdated = System.currentTimeMillis(),
+                        )
+                    }
                 databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
-                
+
                 // 请求缺失的图标
                 val sourceDevice = deviceManager.resolveDeviceInfo(deviceUuid, null, 23333)
                 sourceDevice?.let { checkAndRequestMissingIcons(context, packageNames, deviceManager, it) }
@@ -154,10 +169,10 @@ object AppListSyncManager {
             Logger.e(TAG, "处理应用列表响应失败", e)
         }
     }
-    
+
     /**
      * 检查并批量请求缺失的图标。
-     * 
+     *
      * @param context 上下文
      * @param packageNames 要检查的包名列表
      * @param deviceManager 设备连接管理器
@@ -167,32 +182,33 @@ object AppListSyncManager {
         context: Context,
         packageNames: List<String>,
         deviceManager: DeviceConnectionManager,
-        sourceDevice: DeviceInfo
+        sourceDevice: DeviceInfo,
     ) {
         deviceManager.coroutineScopeInternal.launch {
             // 检查缺失的图标（替代原 getMissingIconsForPackages 方法）
             val databaseRepository = DatabaseRepository.getInstance(context)
-            val missingIcons = packageNames.filter { pkg ->
-                val app = databaseRepository.getAppByPackageName(pkg)
-                app?.isIconMissing ?: true
-            }
+            val missingIcons =
+                packageNames.filter { pkg ->
+                    val app = databaseRepository.getAppByPackageName(pkg)
+                    app?.isIconMissing ?: true
+                }
             if (missingIcons.isEmpty()) {
-                //Logger.d(TAG, "所有图标已缓存，无需请求")
+                // Logger.d(TAG, "所有图标已缓存，无需请求")
                 return@launch
             }
-            
+
             // 过滤掉本机已安装的应用（本机已安装的应用图标可直接获取，无需请求）
             val installedPackages = AppRepository.getInstalledPackageNames(context)
             val needRequestIcons = missingIcons.filter { !installedPackages.contains(it) }
-            
+
             if (needRequestIcons.isEmpty()) {
-                //Logger.d(TAG, "所有缺失图标为本机已安装应用，无需请求")
+                // Logger.d(TAG, "所有缺失图标为本机已安装应用，无需请求")
                 return@launch
             }
-            
+
             // 批量请求缺失的图标
             IconSyncManager.requestIconsBatch(context, needRequestIcons, deviceManager, sourceDevice)
-            //Logger.d(TAG, "批量请求缺失图标：${needRequestIcons.size} 个")
+            // Logger.d(TAG, "批量请求缺失图标：${needRequestIcons.size} 个")
         }
     }
 }

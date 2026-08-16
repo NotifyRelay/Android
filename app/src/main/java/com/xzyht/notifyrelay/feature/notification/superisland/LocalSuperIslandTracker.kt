@@ -13,7 +13,5 @@ object LocalSuperIslandTracker {
         activePackages.remove(packageName)
     }
 
-    fun isActive(packageName: String): Boolean {
-        return activePackages.containsKey(packageName)
-    }
+    fun isActive(packageName: String): Boolean = activePackages.containsKey(packageName)
 }

@@ -14,5 +14,5 @@ data class AppEntity(
     val isSystemApp: Boolean,
     val iconBytes: ByteArray?,
     val isIconMissing: Boolean,
-    val lastUpdated: Long
+    val lastUpdated: Long,
 )

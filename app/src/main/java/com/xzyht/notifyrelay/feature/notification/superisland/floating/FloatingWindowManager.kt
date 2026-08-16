@@ -12,7 +12,6 @@ import java.util.concurrent.ConcurrentHashMap
  */
 @Stable
 class FloatingWindowManager {
-
     // 常量定义
     private val EXPANDED_DURATION_MS = 3000L // 展开态持续时间
     private val AUTO_DISMISS_DURATION_MS = 12000L // 自动移除时间（非媒体类型）
@@ -29,7 +28,7 @@ class FloatingWindowManager {
 
     // 条目数量变化回调，当条目数量变为0时调用
     var onEntriesEmpty: (() -> Unit)? = null
-    
+
     // 条目移除回调，当单个条目被移除时调用，包含移除原因
     var onEntryRemoved: ((String, RemovalReason) -> Unit)? = null
 
@@ -38,10 +37,10 @@ class FloatingWindowManager {
      */
     enum class RemovalReason {
         TIMEOUT, // 超时自动移除
-        MANUAL,  // 用户手动移除（划掉通知等）
-        REMOTE,  // 远端指令移除
-        HIDDEN,  // 用户点击通知隐藏（可恢复）
-        OTHER    // 其他原因
+        MANUAL, // 用户手动移除（划掉通知等）
+        REMOTE, // 远端指令移除
+        HIDDEN, // 用户点击通知隐藏（可恢复）
+        OTHER, // 其他原因
     }
 
     // 记录条目的内部数据类
@@ -50,13 +49,11 @@ class FloatingWindowManager {
         val initialTimestamp: Long, // 初始创建时间，仅在首次添加时设置
         val timestamp: Long, // 更新时间，用于自动移除等逻辑
         var collapseRunnable: Runnable? = null,
-        var removalRunnable: Runnable? = null
+        var removalRunnable: Runnable? = null,
     )
 
     // 获取条目
-    fun getEntry(key: String): FloatingEntry? {
-        return entriesMap[key]?.entry
-    }
+    fun getEntry(key: String): FloatingEntry? = entriesMap[key]?.entry
 
     /**
      * 添加或更新浮窗条目
@@ -71,43 +68,45 @@ class FloatingWindowManager {
         business: String?,
         title: String? = null,
         text: String? = null,
-        appName: String? = null
+        appName: String? = null,
     ) {
         // 保留原有条目的isExpanded、isOverlapping和height状态，其他属性使用新传入的值
         // 如果是摘要态，强制设为非展开状态
         val existingEntry = entriesMap[key]?.entry
-        val finalIsExpanded = if (summaryOnly) {
-            // 如果是摘要态，强制设为非展开状态
-            false
-        } else if (existingEntry != null) {
-            // 如果条目已存在，保留原有展开状态
-            existingEntry.isExpanded
-        } else {
-            // 新条目使用传入的状态
-            isExpanded
-        }
+        val finalIsExpanded =
+            if (summaryOnly) {
+                // 如果是摘要态，强制设为非展开状态
+                false
+            } else if (existingEntry != null) {
+                // 如果条目已存在，保留原有展开状态
+                existingEntry.isExpanded
+            } else {
+                // 新条目使用传入的状态
+                isExpanded
+            }
 
         // 重叠状态不应该被保留，应该始终重新计算
         val finalIsOverlapping = false
-        
+
         // 保留原有条目的高度信息
         val finalHeight = existingEntry?.height ?: 0
 
         // 创建新的FloatingEntry，确保所有属性都使用新传入的值，除了isExpanded状态
-        val entry = FloatingEntry(
-            key = key,
-            paramV2 = paramV2,
-            paramV2Raw = paramV2Raw,
-            picMap = picMap,
-            isExpanded = finalIsExpanded,
-            summaryOnly = summaryOnly,
-            business = business,
-            title = title,
-            text = text,
-            appName = appName,
-            isOverlapping = finalIsOverlapping,
-            height = finalHeight
-        )
+        val entry =
+            FloatingEntry(
+                key = key,
+                paramV2 = paramV2,
+                paramV2Raw = paramV2Raw,
+                picMap = picMap,
+                isExpanded = finalIsExpanded,
+                summaryOnly = summaryOnly,
+                business = business,
+                title = title,
+                text = text,
+                appName = appName,
+                isOverlapping = finalIsOverlapping,
+                height = finalHeight,
+            )
 
         // 取消之前的任务
         cancelAllTasks(key)
@@ -117,25 +116,26 @@ class FloatingWindowManager {
 
         // 记录添加/更新时间
         val existingWithTimestamp = entriesMap[key]
-        val entryWithTimestamp = if (existingWithTimestamp != null) {
-            // 条目已存在，保留原有初始时间戳，只更新timestamp
-            EntryWithTimestamp(
-                entry = entry,
-                initialTimestamp = existingWithTimestamp.initialTimestamp,
-                timestamp = currentTime,
-                collapseRunnable = null,
-                removalRunnable = null
-            )
-        } else {
-            // 新条目，初始时间戳和timestamp都设置为当前时间
-            EntryWithTimestamp(
-                entry = entry,
-                initialTimestamp = currentTime,
-                timestamp = currentTime,
-                collapseRunnable = null,
-                removalRunnable = null
-            )
-        }
+        val entryWithTimestamp =
+            if (existingWithTimestamp != null) {
+                // 条目已存在，保留原有初始时间戳，只更新timestamp
+                EntryWithTimestamp(
+                    entry = entry,
+                    initialTimestamp = existingWithTimestamp.initialTimestamp,
+                    timestamp = currentTime,
+                    collapseRunnable = null,
+                    removalRunnable = null,
+                )
+            } else {
+                // 新条目，初始时间戳和timestamp都设置为当前时间
+                EntryWithTimestamp(
+                    entry = entry,
+                    initialTimestamp = currentTime,
+                    timestamp = currentTime,
+                    collapseRunnable = null,
+                    removalRunnable = null,
+                )
+            }
         entriesMap[key] = entryWithTimestamp
 
         // 如果不是摘要态且处于展开状态，添加自动收起和自动移除任务
@@ -155,26 +155,33 @@ class FloatingWindowManager {
     /**
      * 根据业务类型调度自动移除；媒体类型使用更长的移除时间（兜底）
      */
-    private fun scheduleRemovalByBusiness(key: String, business: String?) {
+    private fun scheduleRemovalByBusiness(
+        key: String,
+        business: String?,
+    ) {
         scheduleRemoval(
             key,
-            if (business == "media") AUTO_DISMISS_DURATION_MS_MEDIA else AUTO_DISMISS_DURATION_MS
+            if (business == "media") AUTO_DISMISS_DURATION_MS_MEDIA else AUTO_DISMISS_DURATION_MS,
         )
     }
 
     /**
      * 安排自动收起任务
      */
-    private fun scheduleCollapse(key: String, delayMs: Long) {
+    private fun scheduleCollapse(
+        key: String,
+        delayMs: Long,
+    ) {
         val entryWithTimestamp = entriesMap[key] ?: return
 
-        val runnable = Runnable {
-            val currentEntry = entriesMap[key]?.entry
-            if (currentEntry != null && !currentEntry.summaryOnly && currentEntry.isExpanded) {
-                // 切换到收起状态
-                setEntryExpanded(key, false)
+        val runnable =
+            Runnable {
+                val currentEntry = entriesMap[key]?.entry
+                if (currentEntry != null && !currentEntry.summaryOnly && currentEntry.isExpanded) {
+                    // 切换到收起状态
+                    setEntryExpanded(key, false)
+                }
             }
-        }
 
         entryWithTimestamp.collapseRunnable = runnable
         handler.postDelayed(runnable, delayMs)
@@ -183,12 +190,16 @@ class FloatingWindowManager {
     /**
      * 安排自动移除任务
      */
-    private fun scheduleRemoval(key: String, delayMs: Long) {
+    private fun scheduleRemoval(
+        key: String,
+        delayMs: Long,
+    ) {
         val entryWithTimestamp = entriesMap[key] ?: return
 
-        val runnable = Runnable {
-            removeEntry(key, RemovalReason.TIMEOUT)
-        }
+        val runnable =
+            Runnable {
+                removeEntry(key, RemovalReason.TIMEOUT)
+            }
 
         entryWithTimestamp.removalRunnable = runnable
         handler.postDelayed(runnable, delayMs)
@@ -216,11 +227,14 @@ class FloatingWindowManager {
     /**
      * 移除浮窗条目
      */
-    fun removeEntry(key: String, reason: RemovalReason = RemovalReason.OTHER) {
+    fun removeEntry(
+        key: String,
+        reason: RemovalReason = RemovalReason.OTHER,
+    ) {
         // 取消所有相关任务
         cancelAllTasks(key)
         entriesMap.remove(key)
-        
+
         // 调用条目移除回调
         // 注意：必须在updateEntriesList之前调用，因为updateEntriesList可能会导致Overlay被移除（当条目为空时），
         // 从而导致onEntryRemoved回调中无法获取Context来执行清理操作（如移除通知）
@@ -249,10 +263,11 @@ class FloatingWindowManager {
 
             val updatedEntry = currentEntry.copy(isExpanded = isExpanded)
             // 保留初始时间戳，只更新entry和timestamp
-            val updatedWithTimestamp = entryWithTimestamp.copy(
-                entry = updatedEntry,
-                timestamp = System.currentTimeMillis()
-            )
+            val updatedWithTimestamp =
+                entryWithTimestamp.copy(
+                    entry = updatedEntry,
+                    timestamp = System.currentTimeMillis(),
+                )
             entriesMap[key] = updatedWithTimestamp
 
             // 如果切换到展开状态，添加自动收起和自动移除任务
@@ -270,7 +285,10 @@ class FloatingWindowManager {
     /**
      * 设置条目展开状态
      */
-    fun setEntryExpanded(key: String, isExpanded: Boolean) {
+    fun setEntryExpanded(
+        key: String,
+        isExpanded: Boolean,
+    ) {
         val entryWithTimestamp = entriesMap[key]
         if (entryWithTimestamp != null) {
             val currentEntry = entryWithTimestamp.entry
@@ -283,10 +301,11 @@ class FloatingWindowManager {
 
             val updatedEntry = currentEntry.copy(isExpanded = finalIsExpanded)
             // 保留初始时间戳，只更新entry和timestamp
-            val updatedWithTimestamp = entryWithTimestamp.copy(
-                entry = updatedEntry,
-                timestamp = System.currentTimeMillis()
-            )
+            val updatedWithTimestamp =
+                entryWithTimestamp.copy(
+                    entry = updatedEntry,
+                    timestamp = System.currentTimeMillis(),
+                )
             entriesMap[key] = updatedWithTimestamp
 
             // 如果切换到展开状态，添加自动收起任务
@@ -304,7 +323,10 @@ class FloatingWindowManager {
     /**
      * 设置条目重叠状态
      */
-    fun setEntryOverlapping(key: String, isOverlapping: Boolean) {
+    fun setEntryOverlapping(
+        key: String,
+        isOverlapping: Boolean,
+    ) {
         val entryWithTimestamp = entriesMap[key]
         if (entryWithTimestamp != null) {
             val currentEntry = entryWithTimestamp.entry
@@ -316,10 +338,11 @@ class FloatingWindowManager {
 
             val updatedEntry = currentEntry.copy(isOverlapping = isOverlapping)
             // 保留初始时间戳，只更新entry和timestamp
-            val updatedWithTimestamp = entryWithTimestamp.copy(
-                entry = updatedEntry,
-                timestamp = System.currentTimeMillis()
-            )
+            val updatedWithTimestamp =
+                entryWithTimestamp.copy(
+                    entry = updatedEntry,
+                    timestamp = System.currentTimeMillis(),
+                )
             entriesMap[key] = updatedWithTimestamp
 
             updateEntriesList()
@@ -330,47 +353,50 @@ class FloatingWindowManager {
      * 清除所有条目的重叠状态
      */
     fun clearAllEntriesOverlapping() {
-        val updatedEntriesMap = entriesMap.mapValues { (_, entryWithTimestamp) ->
-            val currentEntry = entryWithTimestamp.entry
-            if (currentEntry.isOverlapping) {
-                val updatedEntry = currentEntry.copy(isOverlapping = false)
-                entryWithTimestamp.copy(
-                    entry = updatedEntry,
-                    timestamp = System.currentTimeMillis()
-                )
-            } else {
-                entryWithTimestamp
+        val updatedEntriesMap =
+            entriesMap.mapValues { (_, entryWithTimestamp) ->
+                val currentEntry = entryWithTimestamp.entry
+                if (currentEntry.isOverlapping) {
+                    val updatedEntry = currentEntry.copy(isOverlapping = false)
+                    entryWithTimestamp.copy(
+                        entry = updatedEntry,
+                        timestamp = System.currentTimeMillis(),
+                    )
+                } else {
+                    entryWithTimestamp
+                }
             }
-        }
         entriesMap.clear()
         entriesMap.putAll(updatedEntriesMap)
         updateEntriesList()
     }
-    
+
     /**
      * 更新条目的实际高度
      */
-    fun updateEntryHeight(key: String, height: Int) {
+    fun updateEntryHeight(
+        key: String,
+        height: Int,
+    ) {
         val entryWithTimestamp = entriesMap[key]
         if (entryWithTimestamp != null) {
             val currentEntry = entryWithTimestamp.entry
-            
+
             // 如果高度没有变化，直接返回
             if (currentEntry.height == height) {
                 return
             }
-            
+
             val updatedEntry = currentEntry.copy(height = height)
-            val updatedWithTimestamp = entryWithTimestamp.copy(
-                entry = updatedEntry,
-                timestamp = System.currentTimeMillis()
-            )
+            val updatedWithTimestamp =
+                entryWithTimestamp.copy(
+                    entry = updatedEntry,
+                    timestamp = System.currentTimeMillis(),
+                )
             entriesMap[key] = updatedWithTimestamp
             updateEntriesList()
         }
     }
-
-
 
     /**
      * 更新条目列表，确保顺序正确（最新的在底部）
@@ -382,9 +408,10 @@ class FloatingWindowManager {
         // 清空列表
         entriesList.clear()
         // 按初始时间戳升序排序，最新的在底部
-        val sortedEntries = entriesMap.values
-            .sortedBy { it.initialTimestamp }
-            .map { it.entry }
+        val sortedEntries =
+            entriesMap.values
+                .sortedBy { it.initialTimestamp }
+                .map { it.entry }
         // 添加到列表
         entriesList.addAll(sortedEntries)
 
@@ -399,9 +426,7 @@ class FloatingWindowManager {
     /**
      * 获取条目数量
      */
-    fun getEntryCount(): Int {
-        return entriesMap.size
-    }
+    fun getEntryCount(): Int = entriesMap.size
 
     /**
      * 清空所有条目
@@ -409,14 +434,14 @@ class FloatingWindowManager {
     fun clearAllEntries() {
         // 保存之前的条目数量
         val previousSize = entriesMap.size
-        
+
         // 取消所有任务
         entriesMap.keys.forEach {
             cancelAllTasks(it)
         }
         entriesMap.clear()
         entriesList.clear()
-        
+
         // 如果之前有条目，现在变为空，调用回调
         if (previousSize > 0) {
             onEntriesEmpty?.invoke()

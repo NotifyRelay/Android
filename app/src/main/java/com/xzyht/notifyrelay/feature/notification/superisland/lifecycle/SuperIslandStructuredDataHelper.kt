@@ -30,7 +30,7 @@ object SuperIslandStructuredDataHelper {
         picMap: Map<String, String>?,
         title: String?,
         text: String?,
-        isSuperIslandSpecInjectionEnabled: Boolean = true
+        isSuperIslandSpecInjectionEnabled: Boolean = true,
     ) {
         try {
             // 获取通知的extras，用于添加结构化数据
@@ -50,22 +50,23 @@ object SuperIslandStructuredDataHelper {
                         val tickerValue = baseInfoJson?.optString("title", "") ?: ""
                         val contentValue = baseInfoJson?.optString("content", "") ?: ""
 
-                        val fullFocusParam = JSONObject().apply {
-                            put("protocol", 1)
-                            put("scene", paramV2Json.optString("business", "default"))
-                            put("ticker", tickerValue)
-                            put("content", contentValue)
-                            put("timerType", 0)
-                            put("timerWhen", 0)
-                            put("timerSystemCurrent", 0)
-                            put("enableFloat", false)
-                            put("updatable", true)
-                            put("reopen", paramV2Json.optString("reopen", "close"))
-                            put("timeout", paramV2Json.optInt("timeout", 720))
-                            put("filterWhenNoPermission", paramV2Json.optBoolean("filterWhenNoPermission", false))
-                            put("islandFirstFloat", paramV2Json.optBoolean("islandFirstFloat", false))
-                            put("param_v2", paramV2Json) // 将原始paramV2作为嵌套字段
-                        }
+                        val fullFocusParam =
+                            JSONObject().apply {
+                                put("protocol", 1)
+                                put("scene", paramV2Json.optString("business", "default"))
+                                put("ticker", tickerValue)
+                                put("content", contentValue)
+                                put("timerType", 0)
+                                put("timerWhen", 0)
+                                put("timerSystemCurrent", 0)
+                                put("enableFloat", false)
+                                put("updatable", true)
+                                put("reopen", paramV2Json.optString("reopen", "close"))
+                                put("timeout", paramV2Json.optInt("timeout", 720))
+                                put("filterWhenNoPermission", paramV2Json.optBoolean("filterWhenNoPermission", false))
+                                put("islandFirstFloat", paramV2Json.optBoolean("islandFirstFloat", false))
+                                put("param_v2", paramV2Json) // 将原始paramV2作为嵌套字段
+                            }
 
                         extras.putString("miui.focus.param", fullFocusParam.toString())
                         Logger.i(TAG, "添加miui.focus.param成功")
@@ -121,50 +122,58 @@ object SuperIslandStructuredDataHelper {
         context: Context,
         title: String?,
         text: String?,
-        picMap: Map<String, String>?
+        picMap: Map<String, String>?,
     ) {
         try {
             val extras = builder.extras
 
             // 构建符合HyperIslandApi标准的媒体类型miui.focus.param，优化数据结构
-            val fullFocusParam = JSONObject().apply {
-                put("protocol", 1)
-                put("scene", "music") // 媒体类型固定使用music场景
-                put("ticker", title ?: "")
-                put("content", text ?: "")
-                put("enableFloat", false)
-                put("updatable", true)
-                put("reopen", "close")
-
-                // 媒体类型需要的animTextInfo字段
-                put("animTextInfo", JSONObject().apply {
-                    put("title", title ?: "")
-                    put("content", text ?: "")
-                })
-
-                // 优化媒体类型param_v2结构，符合小米官方标准
-                val paramV2Json = JSONObject().apply {
-                    put("business", "music")
+            val fullFocusParam =
+                JSONObject().apply {
                     put("protocol", 1)
-                    put("scene", "music")
+                    put("scene", "music") // 媒体类型固定使用music场景
                     put("ticker", title ?: "")
                     put("content", text ?: "")
                     put("enableFloat", false)
                     put("updatable", true)
                     put("reopen", "close")
-                    put("timerType", 0)
-                    put("timerWhen", 0)
-                    put("timerSystemCurrent", 0)
 
-                    // 媒体类型必须包含的baseInfo字段
-                    put("baseInfo", JSONObject().apply {
-                        put("title", title ?: "")
-                        put("content", text ?: "")
-                    })
+                    // 媒体类型需要的animTextInfo字段
+                    put(
+                        "animTextInfo",
+                        JSONObject().apply {
+                            put("title", title ?: "")
+                            put("content", text ?: "")
+                        },
+                    )
+
+                    // 优化媒体类型param_v2结构，符合小米官方标准
+                    val paramV2Json =
+                        JSONObject().apply {
+                            put("business", "music")
+                            put("protocol", 1)
+                            put("scene", "music")
+                            put("ticker", title ?: "")
+                            put("content", text ?: "")
+                            put("enableFloat", false)
+                            put("updatable", true)
+                            put("reopen", "close")
+                            put("timerType", 0)
+                            put("timerWhen", 0)
+                            put("timerSystemCurrent", 0)
+
+                            // 媒体类型必须包含的baseInfo字段
+                            put(
+                                "baseInfo",
+                                JSONObject().apply {
+                                    put("title", title ?: "")
+                                    put("content", text ?: "")
+                                },
+                            )
+                        }
+
+                    put("param_v2", paramV2Json)
                 }
-
-                put("param_v2", paramV2Json)
-            }
 
             extras.putString("miui.focus.param", fullFocusParam.toString())
 
@@ -202,7 +211,7 @@ object SuperIslandStructuredDataHelper {
         title: String?,
         text: String?,
         bTitle: String? = null,
-        bContent: String? = null
+        bContent: String? = null,
     ) {
         try {
             val extras = builder.extras
@@ -232,18 +241,19 @@ object SuperIslandStructuredDataHelper {
                     }
 
                     // 构建完整的焦点通知参数结构，包含外层scene、ticker等字段
-                    val fullFocusParam = JSONObject().apply {
-                        put("protocol", 1)
-                        put("scene", paramV2Json.optString("business", "default"))
-                        put("ticker", title ?: "")
-                        put("content", text ?: "")
-                        put("timerType", 0)
-                        put("timerWhen", 0)
-                        put("timerSystemCurrent", 0)
-                        put("enableFloat", false)
-                        put("updatable", true)
-                        put("param_v2", paramV2Json) // 将更新后的paramV2作为嵌套字段
-                    }
+                    val fullFocusParam =
+                        JSONObject().apply {
+                            put("protocol", 1)
+                            put("scene", paramV2Json.optString("business", "default"))
+                            put("ticker", title ?: "")
+                            put("content", text ?: "")
+                            put("timerType", 0)
+                            put("timerWhen", 0)
+                            put("timerSystemCurrent", 0)
+                            put("enableFloat", false)
+                            put("updatable", true)
+                            put("param_v2", paramV2Json) // 将更新后的paramV2作为嵌套字段
+                        }
 
                     extras.putString("miui.focus.param", fullFocusParam.toString())
                 } catch (e: Exception) {
@@ -271,7 +281,10 @@ object SuperIslandStructuredDataHelper {
         }
     }
 
-    private fun addPicMapToExtras(extras: Bundle, picMap: Map<String, String>?) {
+    private fun addPicMapToExtras(
+        extras: Bundle,
+        picMap: Map<String, String>?,
+    ) {
         picMap?.let { map ->
             map.forEach { (picKey, picUrl) ->
                 if (picKey.startsWith("miui.focus.pic_")) {

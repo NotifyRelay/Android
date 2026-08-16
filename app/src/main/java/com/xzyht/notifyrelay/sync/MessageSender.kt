@@ -8,14 +8,14 @@ import android.graphics.Color
 import android.net.Uri
 import android.os.Handler
 import android.util.Base64
-import notifyrelay.base.util.Logger
-import notifyrelay.base.util.PermissionHelper
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import org.json.JSONObject
 
 /**
@@ -24,7 +24,6 @@ import org.json.JSONObject
  * 发送队列、限流、重试与去重均由 Rust core 发送队列统一处理
  */
 object MessageSender {
-
     private const val TAG = "MessageSender"
 
     /**
@@ -38,19 +37,20 @@ object MessageSender {
         text: String?,
         coverUrl: String?,
         time: Long,
-        isPlaying: Boolean = true
+        isPlaying: Boolean = true,
     ): String {
         val isLocked = PermissionHelper.isDeviceLocked(context)
-        return JSONObject().apply {
-            put("packageName", packageName)
-            put("appName", appName ?: packageName)
-            put("title", title ?: "")
-            put("text", text ?: "")
-            put("coverUrl", coverUrl ?: "")
-            put("time", time)
-            put("isLocked", isLocked)
-            put("isPlaying", isPlaying)
-        }.toString()
+        return JSONObject()
+            .apply {
+                put("packageName", packageName)
+                put("appName", appName ?: packageName)
+                put("title", title ?: "")
+                put("text", text ?: "")
+                put("coverUrl", coverUrl ?: "")
+                put("time", time)
+                put("isLocked", isLocked)
+                put("isPlaying", isPlaying)
+            }.toString()
     }
 
     /**
@@ -59,10 +59,16 @@ object MessageSender {
      * @param message 消息内容
      * @param deviceManager 设备管理器
      */
-    fun sendChatMessage(context: Context, message: String, deviceManager: DeviceConnectionManager) {
+    fun sendChatMessage(
+        context: Context,
+        message: String,
+        deviceManager: DeviceConnectionManager,
+    ) {
         try {
             // 获取所有已认证设备
-            val allDevices = deviceManager.devices.value.values.map { it.first }
+            val allDevices =
+                deviceManager.devices.value.values
+                    .map { it.first }
             val sentAny = allDevices.isNotEmpty() && message.isNotBlank()
 
             if (!sentAny) {
@@ -72,13 +78,15 @@ object MessageSender {
 
             // 构建标准 JSON 格式的消息
             val pkgName: String = context.packageName
-            val raw = JSONObject().apply {
-                put("packageName", pkgName)
-                put("appName", "NotifyRelay")
-                put("title", "聊天测试")
-                put("text", message)
-                put("time", System.currentTimeMillis())
-            }.toString()
+            val raw =
+                JSONObject()
+                    .apply {
+                        put("packageName", pkgName)
+                        put("appName", "NotifyRelay")
+                        put("title", "聊天测试")
+                        put("text", message)
+                        put("time", System.currentTimeMillis())
+                    }.toString()
             allDevices.forEach { device ->
                 enqueueNotification(device, raw, deviceManager, "聊天")
             }
@@ -106,7 +114,7 @@ object MessageSender {
         text: String?,
         coverUrl: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager
+        deviceManager: DeviceConnectionManager,
     ) {
         try {
             // 推送「全量」媒体状态：差异计算（FULL/DELTA）、合并与 ACK 均由 Rust 合并引擎负责。
@@ -114,9 +122,17 @@ object MessageSender {
             val queuePtr = NativeCore.senderQueuePtr
             if (queuePtr == 0L) return
 
-            val content = buildMediaFullContent(
-                context, packageName, appName, title, text, coverUrl, time, isPlaying = true
-            )
+            val content =
+                buildMediaFullContent(
+                    context,
+                    packageName,
+                    appName,
+                    title,
+                    text,
+                    coverUrl,
+                    time,
+                    isPlaying = true,
+                )
 
             getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
@@ -129,12 +145,15 @@ object MessageSender {
             Logger.e(TAG, "发送媒体播放通知失败", e)
         }
     }
-    
+
     /**
      * 将通知 JSON 入队发送（经 Rust 发送队列：加密、限流、重试、去重由 Rust 统一处理）
      */
     private fun enqueueNotification(
-        deviceInfo: DeviceInfo, json: String, deviceManager: DeviceConnectionManager, tag: String = ""
+        deviceInfo: DeviceInfo,
+        json: String,
+        deviceManager: DeviceConnectionManager,
+        tag: String = "",
     ): Boolean {
         val ctx = deviceManager.rustContextInternal
         if (ctx == null) {
@@ -142,9 +161,14 @@ object MessageSender {
             return false
         }
         val dedupKey = NativeCore.computeDedupKey(deviceInfo.uuid, json) ?: return false
-        val result = ProtocolSender.sendEncrypted(
-            deviceManager, deviceInfo, "DATA_NOTIFICATION", json, dedupKey = dedupKey
-        )
+        val result =
+            ProtocolSender.sendEncrypted(
+                deviceManager,
+                deviceInfo,
+                "DATA_NOTIFICATION",
+                json,
+                dedupKey = dedupKey,
+            )
         if (result != ProtocolSender.EnqueueResult.SUCCESS) {
             Logger.w(TAG, "加入${tag}发送队列失败: ${deviceInfo.displayName}, result=$result")
             return false
@@ -157,7 +181,7 @@ object MessageSender {
         packageName: String,
         appName: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager
+        deviceManager: DeviceConnectionManager,
     ) {
         try {
             // 推送结束标记：Rust 合并引擎会回传 terminateValue="__END__" 全量，接收端据此移除媒体卡片。
@@ -176,6 +200,7 @@ object MessageSender {
             Logger.e(TAG, "发送媒体播放结束通知失败", e)
         }
     }
+
     /**
      * 发送普通通知转发消息
      * @param context 上下文
@@ -193,7 +218,7 @@ object MessageSender {
         title: String?,
         text: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager
+        deviceManager: DeviceConnectionManager,
     ) {
         try {
             val authenticatedDevices = getAuthenticatedDevices(deviceManager)
@@ -207,14 +232,16 @@ object MessageSender {
             val isLocked = PermissionHelper.isDeviceLocked(context)
 
             // 构建标准 JSON 格式的通知数据
-            val raw = JSONObject().apply {
-                put("packageName", packageName)
-                put("appName", appName ?: packageName)
-                put("title", title ?: "")
-                put("text", text ?: "")
-                put("time", time)
-                put("isLocked", isLocked)
-            }.toString()
+            val raw =
+                JSONObject()
+                    .apply {
+                        put("packageName", packageName)
+                        put("appName", appName ?: packageName)
+                        put("title", title ?: "")
+                        put("text", text ?: "")
+                        put("time", time)
+                        put("isLocked", isLocked)
+                    }.toString()
             authenticatedDevices.forEach { deviceInfo ->
                 enqueueNotification(deviceInfo, raw, deviceManager, "通知")
             }
@@ -238,7 +265,7 @@ object MessageSender {
         time: Long,
         paramV2Raw: String?,
         picMap: Map<String, String>?,
-        featureIdOverride: String?
+        featureIdOverride: String?,
     ): String {
         // 处理图片：若 picMap 中是本地 URI/file 路径则读取并编码为 base64 data URI，http(s) 地址或其他字符串保持不变
         val processedPics = mutableMapOf<String, String>()
@@ -247,8 +274,10 @@ object MessageSender {
                 picMap.forEach { (k, v) ->
                     try {
                         val lower = v.lowercase()
-                        if (lower.startsWith("content://") || lower.startsWith("file://") || v.startsWith(
-                                "/"
+                        if (lower.startsWith("content://") ||
+                            lower.startsWith("file://") ||
+                            v.startsWith(
+                                "/",
                             )
                         ) {
                             try {
@@ -293,17 +322,18 @@ object MessageSender {
         val finalPics: Map<String, String> = if (processedPics.isNotEmpty()) processedPics.toMap() else (picMap?.toMap() ?: emptyMap())
         val isLocked = PermissionHelper.isDeviceLocked(context)
 
-        return JSONObject().apply {
-            put("packageName", superPkg)
-            put("appName", appName ?: superPkg)
-            put("title", title ?: "")
-            put("text", text ?: "")
-            put("param_v2_raw", paramV2Raw ?: "")
-            put("time", time)
-            put("isLocked", isLocked)
-            put("featureIdOverride", featureIdOverride ?: "")
-            put("pics", JSONObject(finalPics))
-        }.toString()
+        return JSONObject()
+            .apply {
+                put("packageName", superPkg)
+                put("appName", appName ?: superPkg)
+                put("title", title ?: "")
+                put("text", text ?: "")
+                put("param_v2_raw", paramV2Raw ?: "")
+                put("time", time)
+                put("isLocked", isLocked)
+                put("featureIdOverride", featureIdOverride ?: "")
+                put("pics", JSONObject(finalPics))
+            }.toString()
     }
 
     /**
@@ -319,7 +349,7 @@ object MessageSender {
         paramV2Raw: String?,
         picMap: Map<String, String>?,
         deviceManager: DeviceConnectionManager,
-        featureIdOverride: String? = null
+        featureIdOverride: String? = null,
     ) {
         try {
             val authenticatedDevices = getAuthenticatedDevices(deviceManager)
@@ -333,9 +363,18 @@ object MessageSender {
             if (queuePtr == 0L) return
 
             // 组装「全量」超级岛状态：差异计算（FULL/DELTA）、合并、ACK 与心跳均由 Rust 合并引擎负责。
-            val content = buildSuperIslandFullContent(
-                context, superPkg, appName, title, text, time, paramV2Raw, picMap, featureIdOverride
-            )
+            val content =
+                buildSuperIslandFullContent(
+                    context,
+                    superPkg,
+                    appName,
+                    title,
+                    text,
+                    time,
+                    paramV2Raw,
+                    picMap,
+                    featureIdOverride,
+                )
 
             authenticatedDevices.forEach { device ->
                 try {
@@ -361,7 +400,7 @@ object MessageSender {
         title: String?,
         text: String?,
         deviceManager: DeviceConnectionManager,
-        featureIdOverride: String? = null
+        featureIdOverride: String? = null,
     ) {
         try {
             // 推送结束标记：Rust 合并引擎会回传 terminateValue="__END__" 全量，接收端据此移除该超级岛卡片。
@@ -369,15 +408,17 @@ object MessageSender {
             val queuePtr = NativeCore.senderQueuePtr
             if (queuePtr == 0L) return
 
-            val content = JSONObject().apply {
-                put("packageName", superPkg)
-                put("appName", appName ?: superPkg)
-                put("title", title ?: "")
-                put("text", text ?: "")
-                put("param_v2_raw", paramV2Raw ?: "")
-                put("time", time)
-                put("featureIdOverride", featureIdOverride ?: "")
-            }.toString()
+            val content =
+                JSONObject()
+                    .apply {
+                        put("packageName", superPkg)
+                        put("appName", appName ?: superPkg)
+                        put("title", title ?: "")
+                        put("text", text ?: "")
+                        put("param_v2_raw", paramV2Raw ?: "")
+                        put("time", time)
+                        put("featureIdOverride", featureIdOverride ?: "")
+                    }.toString()
 
             getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
@@ -397,37 +438,43 @@ object MessageSender {
      * @param title 通知标题
      * @param text 通知内容
      */
-    fun sendHighPriorityNotification(context: Context, title: String?, text: String?) {
+    fun sendHighPriorityNotification(
+        context: Context,
+        title: String?,
+        text: String?,
+    ) {
         try {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             val channelId = "notifyrelay_temp"
 
             // 创建通知渠道（如果不存在）
             if (notificationManager.getNotificationChannel(channelId) == null) {
-                val channel = NotificationChannel(channelId, "跳转通知", NotificationManager.IMPORTANCE_HIGH).apply {
-                    description = "应用内跳转指示通知"
-                    enableLights(true)
-                    lightColor = Color.BLUE
-                    enableVibration(false)
-                    setSound(null, null)
-                    lockscreenVisibility = Notification.VISIBILITY_PUBLIC
-                    setShowBadge(false)
-                    importance = NotificationManager.IMPORTANCE_HIGH
-                    setBypassDnd(true)
-                }
+                val channel =
+                    NotificationChannel(channelId, "跳转通知", NotificationManager.IMPORTANCE_HIGH).apply {
+                        description = "应用内跳转指示通知"
+                        enableLights(true)
+                        lightColor = Color.BLUE
+                        enableVibration(false)
+                        setSound(null, null)
+                        lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+                        setShowBadge(false)
+                        importance = NotificationManager.IMPORTANCE_HIGH
+                        setBypassDnd(true)
+                    }
                 notificationManager.createNotificationChannel(channel)
             }
 
             // 构建通知
-            val builder = Notification.Builder(context, channelId).apply {
-                setContentTitle(title ?: "(无标题)")
-                setContentText(text ?: "(无内容)")
-                setSmallIcon(android.R.drawable.ic_dialog_info)
-                setCategory(Notification.CATEGORY_MESSAGE)
-                setAutoCancel(true)
-                setVisibility(Notification.VISIBILITY_PUBLIC)
-                setOngoing(false)
-            }
+            val builder =
+                Notification.Builder(context, channelId).apply {
+                    setContentTitle(title ?: "(无标题)")
+                    setContentText(text ?: "(无内容)")
+                    setSmallIcon(android.R.drawable.ic_dialog_info)
+                    setCategory(Notification.CATEGORY_MESSAGE)
+                    setAutoCancel(true)
+                    setVisibility(Notification.VISIBILITY_PUBLIC)
+                    setOngoing(false)
+                }
 
             // 发送通知，使用当前时间戳作为ID
             val notifyId = (System.currentTimeMillis() % Int.MAX_VALUE).toInt()
@@ -438,7 +485,7 @@ object MessageSender {
                 notificationManager.cancel(notifyId)
             }, 5000)
 
-            //Logger.d(TAG, "高优先级悬浮通知已发送: $title")
+            // Logger.d(TAG, "高优先级悬浮通知已发送: $title")
         } catch (e: Exception) {
             Logger.e(TAG, "发送高优先级通知失败", e)
         }
@@ -487,17 +534,12 @@ object MessageSender {
      * @param deviceManager 设备管理器
      * @return 是否有可用的设备
      */
-    fun hasAvailableDevices(deviceManager: DeviceConnectionManager): Boolean {
-        return deviceManager.devices.value.isNotEmpty()
-    }
+    fun hasAvailableDevices(deviceManager: DeviceConnectionManager): Boolean = deviceManager.devices.value.isNotEmpty()
 
     /**
      * 检查消息是否有效
      * @param message 消息内容
      * @return 消息是否有效
      */
-    fun isValidMessage(message: String?): Boolean {
-        return !message.isNullOrBlank()
-    }
-
+    fun isValidMessage(message: String?): Boolean = !message.isNullOrBlank()
 }

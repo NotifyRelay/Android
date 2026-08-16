@@ -14,8 +14,8 @@ import androidx.room.PrimaryKey
         Index(value = ["deviceUuid"]),
         Index(value = ["time"]),
         Index(value = ["packageName"]),
-        Index(value = ["deviceUuid", "packageName", "time"])
-    ]
+        Index(value = ["deviceUuid", "packageName", "time"]),
+    ],
 )
 data class NotificationRecordEntity(
     @PrimaryKey val key: String,
@@ -25,5 +25,5 @@ data class NotificationRecordEntity(
     val title: String?,
     val text: String?,
     val time: Long,
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
 )

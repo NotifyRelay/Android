@@ -3,9 +3,9 @@ package notifyrelay.data
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
-import kotlinx.coroutines.runBlocking
 import kotlin.collections.iterator
 
 /**
@@ -16,7 +16,6 @@ import kotlin.collections.iterator
  * 所有方法内部均包含异常保护，避免因异常导致应用崩溃。
  */
 object StorageManager {
-    
     /**
      * 根据 [PrefsType] 为键名添加前缀，避免不同类型的偏好键名冲突。
      *
@@ -24,14 +23,16 @@ object StorageManager {
      * @param prefsType 偏好集合类型。
      * @return 添加前缀后的键名。
      */
-    private fun getPrefixedKey(key: String, prefsType: PrefsType): String {
-        return when (prefsType) {
+    private fun getPrefixedKey(
+        key: String,
+        prefsType: PrefsType,
+    ): String =
+        when (prefsType) {
             PrefsType.GENERAL -> "general_$key"
             PrefsType.DEVICE -> "device_$key"
             PrefsType.FILTER -> "filter_$key"
             PrefsType.SCRCPY -> "scrcpy_$key"
         }
-    }
 
     /**
      * 从Room数据库中读取字符串值，带异常保护。
@@ -42,8 +43,13 @@ object StorageManager {
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      * @return 存储的字符串，若出现异常或值为 null 则返回 [default]。
      */
-    fun getString(context: Context, key: String, default: String = "", prefsType: PrefsType = PrefsType.GENERAL): String {
-        return try {
+    fun getString(
+        context: Context,
+        key: String,
+        default: String = "",
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ): String =
+        try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
             runBlocking {
@@ -59,7 +65,6 @@ object StorageManager {
             Logger.w("StorageManager", "获取字符串失败，键: $key", e)
             default
         }
-    }
 
     /**
      * 将字符串写入Room数据库，带异常保护。
@@ -69,7 +74,12 @@ object StorageManager {
      * @param value 要写入的字符串值。
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      */
-    fun putString(context: Context, key: String, value: String, prefsType: PrefsType = PrefsType.GENERAL) {
+    fun putString(
+        context: Context,
+        key: String,
+        value: String,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
@@ -95,8 +105,13 @@ object StorageManager {
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      * @return 存储的布尔值，若出现异常则返回 [default]。
      */
-    fun getBoolean(context: Context, key: String, default: Boolean = false, prefsType: PrefsType = PrefsType.GENERAL): Boolean {
-        return try {
+    fun getBoolean(
+        context: Context,
+        key: String,
+        default: Boolean = false,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ): Boolean =
+        try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
             runBlocking {
@@ -112,7 +127,6 @@ object StorageManager {
             Logger.w("StorageManager", "获取布尔值失败，键: $key", e)
             default
         }
-    }
 
     /**
      * 将布尔值写入Room数据库，带异常保护。
@@ -122,7 +136,12 @@ object StorageManager {
      * @param value 要写入的布尔值。
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      */
-    fun putBoolean(context: Context, key: String, value: Boolean, prefsType: PrefsType = PrefsType.GENERAL) {
+    fun putBoolean(
+        context: Context,
+        key: String,
+        value: Boolean,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
@@ -141,7 +160,11 @@ object StorageManager {
      * @param values 要写入的键值对集合。
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      */
-    fun putBooleans(context: Context, values: Map<String, Boolean>, prefsType: PrefsType = PrefsType.GENERAL) {
+    fun putBooleans(
+        context: Context,
+        values: Map<String, Boolean>,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ) {
         try {
             val repository = DatabaseRepository.Companion.getInstance(context)
             runBlocking {
@@ -169,8 +192,13 @@ object StorageManager {
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      * @return 存储的整数，若出现异常则返回 [default]。
      */
-    fun getInt(context: Context, key: String, default: Int = 0, prefsType: PrefsType = PrefsType.GENERAL): Int {
-        return try {
+    fun getInt(
+        context: Context,
+        key: String,
+        default: Int = 0,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ): Int =
+        try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
             runBlocking {
@@ -186,7 +214,6 @@ object StorageManager {
             Logger.w("StorageManager", "获取整数失败，键: $key", e)
             default
         }
-    }
 
     /**
      * 将整数写入Room数据库，带异常保护。
@@ -196,7 +223,12 @@ object StorageManager {
      * @param value 要写入的整数值。
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      */
-    fun putInt(context: Context, key: String, value: Int, prefsType: PrefsType = PrefsType.GENERAL) {
+    fun putInt(
+        context: Context,
+        key: String,
+        value: Int,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
@@ -222,8 +254,13 @@ object StorageManager {
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      * @return 存储的浮点数，若出现异常则返回 [default]。
      */
-    fun getFloat(context: Context, key: String, default: Float = 0f, prefsType: PrefsType = PrefsType.GENERAL): Float {
-        return try {
+    fun getFloat(
+        context: Context,
+        key: String,
+        default: Float = 0f,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ): Float =
+        try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
             runBlocking {
@@ -237,7 +274,6 @@ object StorageManager {
             Logger.w("StorageManager", "获取浮点数失败，键: $key", e)
             default
         }
-    }
 
     /**
      * 将浮点数（Float）写入Room数据库，带异常保护。
@@ -247,7 +283,12 @@ object StorageManager {
      * @param value 要写入的浮点数值。
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      */
-    fun putFloat(context: Context, key: String, value: Float, prefsType: PrefsType = PrefsType.GENERAL) {
+    fun putFloat(
+        context: Context,
+        key: String,
+        value: Float,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
@@ -271,8 +312,13 @@ object StorageManager {
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      * @return 存储的长整数，若出现异常则返回 [default]。
      */
-    fun getLong(context: Context, key: String, default: Long = 0L, prefsType: PrefsType = PrefsType.GENERAL): Long {
-        return try {
+    fun getLong(
+        context: Context,
+        key: String,
+        default: Long = 0L,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ): Long =
+        try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
             runBlocking {
@@ -288,7 +334,6 @@ object StorageManager {
             Logger.w("StorageManager", "获取长整数失败，键: $key", e)
             default
         }
-    }
 
     /**
      * 将长整数（Long）写入Room数据库，带异常保护。
@@ -298,7 +343,12 @@ object StorageManager {
      * @param value 要写入的长整数值。
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      */
-    fun putLong(context: Context, key: String, value: Long, prefsType: PrefsType = PrefsType.GENERAL) {
+    fun putLong(
+        context: Context,
+        key: String,
+        value: Long,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
@@ -322,7 +372,11 @@ object StorageManager {
      * @param values 要写入的字符串键值对集合。
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      */
-    fun putStrings(context: Context, values: Map<String, String>, prefsType: PrefsType = PrefsType.GENERAL) {
+    fun putStrings(
+        context: Context,
+        values: Map<String, String>,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ) {
         try {
             val repository = DatabaseRepository.Companion.getInstance(context)
             runBlocking {
@@ -348,7 +402,11 @@ object StorageManager {
      * @param values 要写入的整数键值对集合。
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      */
-    fun putInts(context: Context, values: Map<String, Int>, prefsType: PrefsType = PrefsType.GENERAL) {
+    fun putInts(
+        context: Context,
+        values: Map<String, Int>,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ) {
         try {
             val repository = DatabaseRepository.Companion.getInstance(context)
             runBlocking {
@@ -376,13 +434,19 @@ object StorageManager {
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      * @return 存储的字符串集合，若出现异常或为 null 则返回 [default]。
      */
-    fun getStringSet(context: Context, key: String, default: Set<String> = emptySet(), prefsType: PrefsType = PrefsType.GENERAL): Set<String> {
-        return try {
+    fun getStringSet(
+        context: Context,
+        key: String,
+        default: Set<String> = emptySet(),
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ): Set<String> =
+        try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
-            val json = runBlocking {
-                repository.getConfig(prefixedKey, "[]")
-            }
+            val json =
+                runBlocking {
+                    repository.getConfig(prefixedKey, "[]")
+                }
             val gson = Gson()
             val type = TypeToken.getParameterized(Set::class.java, String::class.java).type
             gson.fromJson(json, type) ?: default
@@ -396,7 +460,6 @@ object StorageManager {
             Logger.w("StorageManager", "获取字符串集合失败，键: $key", e)
             default
         }
-    }
 
     /**
      * 将字符串集合写入Room数据库，带异常保护。
@@ -406,7 +469,12 @@ object StorageManager {
      * @param value 要写入的字符串集合。
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      */
-    fun putStringSet(context: Context, key: String, value: Set<String>, prefsType: PrefsType = PrefsType.GENERAL) {
+    fun putStringSet(
+        context: Context,
+        key: String,
+        value: Set<String>,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val gson = Gson()
@@ -432,7 +500,11 @@ object StorageManager {
      * @param key 要移除的键名。
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      */
-    fun remove(context: Context, key: String, prefsType: PrefsType = PrefsType.GENERAL) {
+    fun remove(
+        context: Context,
+        key: String,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val repository = DatabaseRepository.Companion.getInstance(context)
@@ -456,7 +528,10 @@ object StorageManager {
      * @param context 任意 Context 实例。
      * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
      */
-    fun clear(context: Context, prefsType: PrefsType = PrefsType.GENERAL) {
+    fun clear(
+        context: Context,
+        prefsType: PrefsType = PrefsType.GENERAL,
+    ) {
         try {
             // 目前不支持清空整个集合，因为Room中没有批量删除的方法
             Logger.w("StorageManager", "clear方法目前不支持，因为Room中没有批量删除的方法")
@@ -476,16 +551,21 @@ object StorageManager {
      * @param toVersion 目标版本号，迁移完成后会写入到偏好中作为当前版本。
      */
     @Suppress("UNUSED_PARAMETER")
-    fun migrateData(context: Context, fromVersion: Int, toVersion: Int) {
+    fun migrateData(
+        context: Context,
+        fromVersion: Int,
+        toVersion: Int,
+    ) {
         try {
             // 使用 fromVersion 参数以避免编译时的未使用参数警告，并记录调用意图
             fromVersion // 显式读取参数，确保不会被诊断为未使用
-            //Logger.d("StorageManager", "migrateData 被调用: fromVersion=${_from}, toVersion=$toVersion")
-            
+            // Logger.d("StorageManager", "migrateData 被调用: fromVersion=${_from}, toVersion=$toVersion")
+
             val repository = DatabaseRepository.Companion.getInstance(context)
-            val currentVersion = runBlocking {
-                repository.getConfig("general_data_version", "0").toInt()
-            }
+            val currentVersion =
+                runBlocking {
+                    repository.getConfig("general_data_version", "0").toInt()
+                }
 
             if (currentVersion < toVersion) {
                 // 执行数据迁移逻辑
@@ -531,6 +611,6 @@ object StorageManager {
         FILTER,
 
         /** Scrcpy 模块偏好 */
-        SCRCPY
+        SCRCPY,
     }
 }

@@ -11,28 +11,31 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.model.components.TextButton
 import github.xzynine.superislandui.common.PreviewData
+import github.xzynine.superislandui.model.components.TextButton
 
 /**
  * 文本按钮Compose组件
  */
 @Composable
-fun TextButtonCompose(textButton: TextButton, picMap: Map<String, String>? = null) {
+fun TextButtonCompose(
+    textButton: TextButton,
+    picMap: Map<String, String>? = null,
+) {
     Column(modifier = Modifier.padding(16.dp)) {
         // 按钮列表
         textButton.actions.forEach { action ->
             Row(
-                modifier = Modifier
-                    .clickable {
-                        // TODO: handle action (action.actionIntent / action.action)
-                    }
-                    .padding(vertical = 8.dp)
+                modifier =
+                    Modifier
+                        .clickable {
+                            // TODO: handle action (action.actionIntent / action.action)
+                        }.padding(vertical = 8.dp),
             ) {
                 Text(
                     text = action.actionTitle ?: "",
                     fontSize = 14.sp,
-                    color = Color(0xFF4A90E2)
+                    color = Color(0xFF4A90E2),
                 )
             }
         }
@@ -44,6 +47,6 @@ fun TextButtonCompose(textButton: TextButton, picMap: Map<String, String>? = nul
 fun TextButtonComposePreview() {
     TextButtonCompose(
         textButton = PreviewData.sampleTextButton,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }

@@ -17,15 +17,11 @@ object FloatingReplicaManager {
         return !isGreater
     }
 
-    private fun isFloatingWindowEnabled(context: Context): Boolean {
-        return SuperIslandConfigUtils.isFloatingWindowEnabled(context)
-    }
+    private fun isFloatingWindowEnabled(context: Context): Boolean = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
 
     fun getAppContext(): Context? = appContext
 
-    fun isSourceRecentlyClosed(sourceId: String): Boolean {
-        return FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)
-    }
+    fun isSourceRecentlyClosed(sourceId: String): Boolean = FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)
 
     fun showFloating(
         context: Context,
@@ -35,7 +31,7 @@ object FloatingReplicaManager {
         paramV2Raw: String? = null,
         picMap: Map<String, String>? = null,
         appName: String? = null,
-        isLocked: Boolean = false
+        isLocked: Boolean = false,
     ) {
         appContext = context.applicationContext
         FloatingReplicaMappingManager.setAppContext(appContext)
@@ -69,7 +65,7 @@ object FloatingReplicaManager {
         text: String?,
         paramV2Raw: String? = null,
         picMap: Map<String, String>? = null,
-        appName: String? = null
+        appName: String? = null,
     ) {
         FloatingReplicaWindowManager.toggleFloating(context, sourceId, title, text, paramV2Raw, picMap, appName)
     }
@@ -91,7 +87,10 @@ object FloatingReplicaManager {
         FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.REMOTE)
     }
 
-    private inline fun runWithErrorHandling(actionName: String, crossinline block: () -> Unit) {
+    private inline fun runWithErrorHandling(
+        actionName: String,
+        crossinline block: () -> Unit,
+    ) {
         try {
             block()
         } catch (e: Exception) {

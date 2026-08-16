@@ -8,7 +8,7 @@ import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
 /**
  * 提供 NavigationEvent Dispatcher Owner
  * 此组件用于需要独立 NavigationEvent 调度器的场景
- * 
+ *
  * Provide NavigationEvent Dispatcher Owner
  * This component is used for scenarios requiring an independent NavigationEvent dispatcher
  */
