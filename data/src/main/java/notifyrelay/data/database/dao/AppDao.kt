@@ -19,61 +19,68 @@ interface AppDao {
      */
     @Query("SELECT * FROM apps")
     fun getAll(): Flow<List<AppEntity>>
-    
+
     /**
      * 根据包名获取应用
      */
     @Query("SELECT * FROM apps WHERE packageName = :packageName")
     suspend fun getByPackageName(packageName: String): AppEntity?
-    
+
     /**
      * 批量根据包名获取应用
      */
     @Query("SELECT * FROM apps WHERE packageName IN (:packageNames)")
     suspend fun getByPackageNames(packageNames: List<String>): List<AppEntity>
-    
+
     /**
      * 插入或更新应用
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(app: AppEntity)
-    
+
     /**
      * 批量插入或更新应用
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(apps: List<AppEntity>)
-    
+
     /**
      * 删除应用
      */
     @Delete
     suspend fun delete(app: AppEntity)
-    
+
     /**
      * 根据包名删除应用
      */
     @Query("DELETE FROM apps WHERE packageName = :packageName")
     suspend fun deleteByPackageName(packageName: String)
-    
+
     /**
      * 获取缺失图标的应用
      */
     @Query("SELECT * FROM apps WHERE isIconMissing = 1")
     fun getIconMissingApps(): Flow<List<AppEntity>>
-    
+
     /**
      * 更新图标
      */
     @Query("UPDATE apps SET iconBytes = :iconBytes, isIconMissing = 0, lastUpdated = :lastUpdated WHERE packageName = :packageName")
-    suspend fun updateIcon(packageName: String, iconBytes: ByteArray, lastUpdated: Long)
-    
+    suspend fun updateIcon(
+        packageName: String,
+        iconBytes: ByteArray,
+        lastUpdated: Long,
+    )
+
     /**
      * 标记图标为缺失
      */
     @Query("UPDATE apps SET isIconMissing = 1, lastUpdated = :lastUpdated WHERE packageName = :packageName")
-    suspend fun markIconAsMissing(packageName: String, lastUpdated: Long)
-    
+    suspend fun markIconAsMissing(
+        packageName: String,
+        lastUpdated: Long,
+    )
+
     /**
      * 获取过期的应用数据
      */

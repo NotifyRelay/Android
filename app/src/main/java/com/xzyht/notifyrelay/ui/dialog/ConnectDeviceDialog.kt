@@ -20,26 +20,25 @@ fun ConnectDeviceDialog(
     showDialog: MutableState<Boolean>,
     device: DeviceInfo?,
     onConnect: (DeviceInfo) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     if (device == null) return
 
-
     WindowDialog(show = showDialog.value, modifier = Modifier, title = "连接设备", titleColor = DialogDefaults.titleColor(), summary = "是否连接设备：${device.displayName} \n(${device.uuid})？\n对方将收到认证请求。", summaryColor = DialogDefaults.summaryColor(), backgroundColor = DialogDefaults.backgroundColor(), enableWindowDim = true, onDismissRequest = onDismiss, onDismissFinished = null, outsideMargin = DialogDefaults.outsideMargin, insideMargin = DialogDefaults.insideMargin, defaultWindowInsetsPadding = true, content = {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End
-            ) {
-                TextButton(
-                    text = "连接",
-                    onClick = {
-                        onConnect(device)
-                    }
-                )
-                TextButton(
-                    text = "取消",
-                    onClick = onDismiss
-                )
-            }
-        })
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.End,
+        ) {
+            TextButton(
+                text = "连接",
+                onClick = {
+                    onConnect(device)
+                },
+            )
+            TextButton(
+                text = "取消",
+                onClick = onDismiss,
+            )
+        }
+    })
 }

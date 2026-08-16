@@ -18,31 +18,31 @@ interface DeviceDao {
      */
     @Query("SELECT * FROM devices")
     suspend fun getAll(): List<DeviceEntity>
-    
+
     /**
      * 根据UUID获取设备
      */
     @Query("SELECT * FROM devices WHERE uuid = :uuid")
     suspend fun getByUuid(uuid: String): DeviceEntity?
-    
+
     /**
      * 插入或更新设备
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(device: DeviceEntity)
-    
+
     /**
      * 批量插入或更新设备
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(devices: List<DeviceEntity>)
-    
+
     /**
      * 删除设备
      */
     @Delete
     suspend fun delete(device: DeviceEntity)
-    
+
     /**
      * 根据UUID删除设备
      */

@@ -10,5 +10,5 @@ data class NotificationRecord(
     val time: Long,
     val device: String = "本机",
     val actions: List<NotificationAction> = emptyList(),
-    val smallIconResId: Int? = null
+    val smallIconResId: Int? = null,
 )

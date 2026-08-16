@@ -12,16 +12,19 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.model.components.TimerInfo
-import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.common.PreviewData
+import github.xzynine.superislandui.floating.common.formatTimerInfo
+import github.xzynine.superislandui.model.components.TimerInfo
 import kotlinx.coroutines.delay
 
 /**
  * 计时器信息Compose组件（简化）
  */
 @Composable
-fun TimerInfoCompose(timerInfo: TimerInfo, picMap: Map<String, String>? = null) {
+fun TimerInfoCompose(
+    timerInfo: TimerInfo,
+    picMap: Map<String, String>? = null,
+) {
     val displayState = remember(timerInfo) { mutableStateOf(formatTimerInfo(timerInfo)) }
 
     // 仅计时进行中（正计时 timerType=1 / 倒计时 timerType=-1）才每秒刷新，暂停/无效类型静态显示
@@ -38,7 +41,7 @@ fun TimerInfoCompose(timerInfo: TimerInfo, picMap: Map<String, String>? = null) 
         Text(
             text = displayState.value,
             fontSize = 18.sp,
-            color = Color.White
+            color = Color.White,
         )
     }
 }
@@ -48,7 +51,7 @@ fun TimerInfoCompose(timerInfo: TimerInfo, picMap: Map<String, String>? = null) 
 fun TimerInfoComposePreview() {
     TimerInfoCompose(
         timerInfo = PreviewData.sampleTimerInfo,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }
 
@@ -57,6 +60,6 @@ fun TimerInfoComposePreview() {
 fun TimerInfoComposeCountdownPreview() {
     TimerInfoCompose(
         timerInfo = PreviewData.sampleTimerInfoCountdown,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }

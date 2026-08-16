@@ -12,7 +12,7 @@ import notifyrelay.data.database.repository.DatabaseRepository
 
 class SuperIslandPagingSource(
     private val repository: DatabaseRepository,
-    private val context: Context
+    private val context: Context,
 ) : PagingSource<Int, GroupedSuperIslandHistory>() {
     private val gson = Gson()
     private val stringStringMapType = object : TypeToken<Map<String, String>>() {}.type
@@ -21,39 +21,44 @@ class SuperIslandPagingSource(
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, GroupedSuperIslandHistory> {
         return try {
             val offset = params.key ?: 0
-            val groups = cachedGroups ?: run {
-                val packageCounts = repository.getSuperIslandPackageCount()
-                val groupedPackages = packageCounts.map { count ->
-                    PackageGroup(
-                        packageName = count.packageName,
-                        count = count.count,
-                        latestTime = count.latestTime
-                    )
+            val groups =
+                cachedGroups ?: run {
+                    val packageCounts = repository.getSuperIslandPackageCount()
+                    val groupedPackages =
+                        packageCounts.map { count ->
+                            PackageGroup(
+                                packageName = count.packageName,
+                                count = count.count,
+                                latestTime = count.latestTime,
+                            )
+                        }
+                    cachedGroups = groupedPackages
+                    groupedPackages
                 }
-                cachedGroups = groupedPackages
-                groupedPackages
-            }
 
             if (groups.isEmpty()) {
                 return LoadResult.Page(emptyList(), prevKey = null, nextKey = null)
             }
 
             val pageGroups = groups.drop(offset).take(params.loadSize)
-            val data = pageGroups.map { group ->
-                val entities = repository.getSuperIslandHistoryByPackage(
-                    if (group.packageName == "(未知应用)") null else group.packageName
-                )
-                val entries = entities.map { it.toSuperIslandHistoryStoreEntry(context) }
-                val appName = entries.firstOrNull()?.appName?.takeIf { it.isNotBlank() }
-                    ?: group.packageName
+            val data =
+                pageGroups.map { group ->
+                    val entities =
+                        repository.getSuperIslandHistoryByPackage(
+                            if (group.packageName == "(未知应用)") null else group.packageName,
+                        )
+                    val entries = entities.map { it.toSuperIslandHistoryStoreEntry(context) }
+                    val appName =
+                        entries.firstOrNull()?.appName?.takeIf { it.isNotBlank() }
+                            ?: group.packageName
 
-                GroupedSuperIslandHistory(
-                    packageName = group.packageName,
-                    appName = appName,
-                    latestTime = group.latestTime,
-                    entries = entries
-                )
-            }
+                    GroupedSuperIslandHistory(
+                        packageName = group.packageName,
+                        appName = appName,
+                        latestTime = group.latestTime,
+                        entries = entries,
+                    )
+                }
 
             val nextKey = if (offset + pageGroups.size >= groups.size) null else offset + pageGroups.size
             val prevKey = if (offset == 0) null else maxOf(offset - params.loadSize, 0)
@@ -61,7 +66,7 @@ class SuperIslandPagingSource(
             LoadResult.Page(
                 data = data,
                 prevKey = prevKey,
-                nextKey = nextKey
+                nextKey = nextKey,
             )
         } catch (e: Exception) {
             LoadResult.Error(e)
@@ -75,18 +80,20 @@ class SuperIslandPagingSource(
     }
 
     private suspend fun SuperIslandHistoryEntity.toSuperIslandHistoryStoreEntry(
-        context: Context
+        context: Context,
     ): SuperIslandHistoryStoreEntry {
-        val rawMap: Map<String, String> = try {
-            gson.fromJson(picMap, stringStringMapType) ?: emptyMap()
-        } catch (_: Exception) {
-            emptyMap()
-        }
-        val resolvedMap = try {
-            SuperIslandImageStore.resolvePicMap(context, rawMap)
-        } catch (_: Exception) {
-            rawMap
-        }
+        val rawMap: Map<String, String> =
+            try {
+                gson.fromJson(picMap, stringStringMapType) ?: emptyMap()
+            } catch (_: Exception) {
+                emptyMap()
+            }
+        val resolvedMap =
+            try {
+                SuperIslandImageStore.resolvePicMap(context, rawMap)
+            } catch (_: Exception) {
+                rawMap
+            }
         return SuperIslandHistoryStoreEntry(
             id = id,
             sourceDeviceUuid = sourceDeviceUuid,
@@ -98,13 +105,13 @@ class SuperIslandPagingSource(
             paramV2Raw = paramV2Raw,
             picMap = resolvedMap,
             rawPayload = rawPayload,
-            featureId = featureId
+            featureId = featureId,
         )
     }
 
     private data class PackageGroup(
         val packageName: String,
         val count: Int,
-        val latestTime: Long
+        val latestTime: Long,
     )
 }

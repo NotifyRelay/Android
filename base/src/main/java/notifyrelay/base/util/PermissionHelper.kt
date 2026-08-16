@@ -15,14 +15,12 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
 
-
 /**
  * 权限辅助工具类
  *
  * 提供一组用于检查与请求应用在运行时常用权限的静态方法，包含通知监听、应用列表访问、通知发送、使用情况访问、蓝牙连接、悬浮窗与电池优化等权限的检查与请求逻辑。
  */
 object PermissionHelper {
-
     /**
      * 检查所有必要权限是否已授权。
      *
@@ -36,10 +34,11 @@ object PermissionHelper {
      */
     @SuppressLint("QueryPermissionsNeeded")
     fun checkAllPermissions(context: Context): Boolean {
-        val enabledListeners = Settings.Secure.getString(
-            context.contentResolver,
-            "enabled_notification_listeners"
-        ) ?: ""
+        val enabledListeners =
+            Settings.Secure.getString(
+                context.contentResolver,
+                "enabled_notification_listeners",
+            ) ?: ""
         val hasNotification = enabledListeners.contains(context.packageName)
 
         // 判断是否为 MIUI/澎湃系统（厂商或系统包识别）
@@ -59,10 +58,13 @@ object PermissionHelper {
         }
 
         // 检查通知发送权限
-        val hasPost = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
-        } else true
-        
+        val hasPost =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                context.checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+
         return hasNotification && canQueryApps && hasPost
     }
 
@@ -113,13 +115,12 @@ object PermissionHelper {
      * @param context 用于执行权限检查的上下文。
      * @return 在 API 35 及以上，返回是否拥有 `RECEIVE_SENSITIVE_NOTIFICATIONS` 权限；在较低版本返回 true（视为不需要该权限）。
      */
-    fun checkSensitiveNotificationPermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= 35) {
+    fun checkSensitiveNotificationPermission(context: Context): Boolean =
+        if (Build.VERSION.SDK_INT >= 35) {
             context.checkSelfPermission("android.permission.RECEIVE_SENSITIVE_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED
         } else {
             true // 低版本默认有权限
         }
-    }
 
     /**
      * 请求敏感通知权限（Android 15+）。
@@ -166,14 +167,14 @@ object PermissionHelper {
             appOps.unsafeCheckOpNoThrow(
                 android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
                 android.os.Process.myUid(),
-                context.packageName
+                context.packageName,
             ) == android.app.AppOpsManager.MODE_ALLOWED
         } else {
             @Suppress("DEPRECATION")
             appOps.unsafeCheckOpNoThrow(
                 "android:get_usage_stats",
                 android.os.Process.myUid(),
-                context.packageName
+                context.packageName,
             ) == android.app.AppOpsManager.MODE_ALLOWED
         }
     }
@@ -184,13 +185,12 @@ object PermissionHelper {
      * @param context 用于检查权限的上下文。
      * @return 在 API 31+（Android 12）时检查 `BLUETOOTH_CONNECT` 是否已授予，低版本始终返回 true。
      */
-    fun checkBluetoothConnectPermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+    fun checkBluetoothConnectPermission(context: Context): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             context.checkSelfPermission(Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
         } else {
             true
         }
-    }
 
     /**
      * 请求蓝牙连接权限（Android 12+）。
@@ -209,13 +209,12 @@ object PermissionHelper {
      * @param context 用于调用 Settings.canDrawOverlays 的上下文。
      * @return 如果系统允许应用在其他应用上层显示窗口则返回 true，异常时返回 false。
      */
-    fun checkOverlayPermission(context: Context): Boolean {
-        return try {
+    fun checkOverlayPermission(context: Context): Boolean =
+        try {
             Settings.canDrawOverlays(context)
         } catch (_: Exception) {
             false
         }
-    }
 
     /**
      * 请求悬浮窗（覆盖层）权限。
@@ -248,10 +247,11 @@ object PermissionHelper {
      * @return 当系统已启用通知监听器并包含当前应用包名时返回 true，否则返回 false。
      */
     fun checkNotificationListenerServiceCanStart(context: Context): Boolean {
-        val enabledListeners = Settings.Secure.getString(
-            context.contentResolver,
-            "enabled_notification_listeners"
-        )
+        val enabledListeners =
+            Settings.Secure.getString(
+                context.contentResolver,
+                "enabled_notification_listeners",
+            )
         return enabledListeners?.contains(context.packageName) == true
     }
 
@@ -261,27 +261,27 @@ object PermissionHelper {
      * @param context 用于读取 Settings.Global 的上下文。
      * @return 如果停用屏幕共享保护已开启则返回 true，否则返回 false。
      */
-    fun checkDevScreenShareProtectOff(context: Context): Boolean {
-        return try {
+    fun checkDevScreenShareProtectOff(context: Context): Boolean =
+        try {
             val value = Settings.Global.getInt(context.contentResolver, "disable_screen_sharing_protection", 0)
             value == 1
-        } catch (_: Exception) { false }
-    }
-    
+        } catch (_: Exception) {
+            false
+        }
+
     /**
      * 检查文件管理权限（MANAGE_EXTERNAL_STORAGE）。
      *
      * @param context 用于检查权限的上下文。
      * @return 在 API 30+（Android 11）时检查是否具有文件管理权限，低版本始终返回 true。
      */
-    fun checkManageExternalStoragePermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+    fun checkManageExternalStoragePermission(context: Context): Boolean =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             android.os.Environment.isExternalStorageManager()
         } else {
             true // 低版本默认有权限
         }
-    }
-    
+
     /**
      * 请求文件管理权限（MANAGE_EXTERNAL_STORAGE）。
      *
@@ -307,20 +307,21 @@ object PermissionHelper {
             // 例如：OS3.0.300.4.WNACNXM
             val osPattern = Regex("OS\\d+(\\.\\d+)*[\\w.]*")
             val matchResult = osPattern.find(fingerprint)
-            
+
             if (matchResult != null) {
                 var osVersion = matchResult.value
-                
+
                 // 清理结果，确保不包含多余字符
-                osVersion = osVersion
-                    .trim()
-                    .trim('/')
-                    .trim(':')
-                    .trim()
-                
+                osVersion =
+                    osVersion
+                        .trim()
+                        .trim('/')
+                        .trim(':')
+                        .trim()
+
                 return osVersion
             }
-            
+
             null
         } catch (e: Exception) {
             null
@@ -334,27 +335,30 @@ object PermissionHelper {
      * @param target 目标版本号，例如 "OS3.0.200"
      * @return 如果当前版本大于目标版本返回 true，否则返回 false
      */
-    fun isVersionGreaterThan(version: String?, target: String?): Boolean {
+    fun isVersionGreaterThan(
+        version: String?,
+        target: String?,
+    ): Boolean {
         if (version == null || target == null) return false
-        
+
         try {
             // 去除OS前缀
             val versionNum = version.replace("OS", "")
             val targetNum = target.replace("OS", "")
-            
+
             // 分割版本号
             val versionParts = versionNum.split(".").mapNotNull { it.toIntOrNull() }
             val targetParts = targetNum.split(".").mapNotNull { it.toIntOrNull() }
-            
+
             // 比较版本号
             for (i in 0 until Math.max(versionParts.size, targetParts.size)) {
                 val versionPart = versionParts.getOrElse(i) { 0 }
                 val targetPart = targetParts.getOrElse(i) { 0 }
-                
+
                 if (versionPart > targetPart) return true
                 if (versionPart < targetPart) return false
             }
-            
+
             return false // 版本相同
         } catch (e: Exception) {
             return false
@@ -369,9 +373,10 @@ object PermissionHelper {
      */
     private fun detectMiuiOrPengpai(context: Context): Boolean {
         if (Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)) return true
-        return kotlin.runCatching {
-            context.packageManager.getPermissionInfo("com.android.permission.GET_INSTALLED_APPS", 0).packageName == "com.lbe.security.miui"
-        }.getOrElse { false }
+        return kotlin
+            .runCatching {
+                context.packageManager.getPermissionInfo("com.android.permission.GET_INSTALLED_APPS", 0).packageName == "com.lbe.security.miui"
+            }.getOrElse { false }
     }
 
     /**
@@ -380,14 +385,13 @@ object PermissionHelper {
      * @param context 用于获取 KeyguardManager 服务的上下文。
      * @return 如果设备处于锁屏状态返回 true，否则返回 false。
      */
-    fun isDeviceLocked(context: Context): Boolean {
-        return try {
+    fun isDeviceLocked(context: Context): Boolean =
+        try {
             val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as android.app.KeyguardManager
             keyguardManager.isKeyguardLocked
         } catch (_: Exception) {
             false
         }
-    }
 
     /**
      * 检查指定的无障碍服务是否已启用。
@@ -396,12 +400,16 @@ object PermissionHelper {
      * @param accessibilityServiceName 无障碍服务的完整名称，格式为 "包名/服务类全限定名"。
      * @return 如果该无障碍服务已在系统设置中启用则返回 true，否则返回 false。
      */
-    fun isAccessibilityServiceEnabled(context: Context, accessibilityServiceName: String?): Boolean {
+    fun isAccessibilityServiceEnabled(
+        context: Context,
+        accessibilityServiceName: String?,
+    ): Boolean {
         if (accessibilityServiceName.isNullOrEmpty()) return false
-        val enabledServices = Settings.Secure.getString(
-            context.contentResolver,
-            Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
-        )
+        val enabledServices =
+            Settings.Secure.getString(
+                context.contentResolver,
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
+            )
         return enabledServices?.contains(accessibilityServiceName) == true
     }
 
@@ -414,9 +422,8 @@ object PermissionHelper {
      * @param context 用于注册 ActivityLifecycleCallbacks 的上下文。
      * @return 如果应用处于前台则返回 true，否则返回 false。
      */
-    fun isAppInForeground(context: Context): Boolean {
-        return AppForegroundDetector.isForeground()
-    }
+    fun isAppInForeground(context: Context): Boolean = AppForegroundDetector.isForeground()
+
     /**
      * 应用前后台检测器
      */
@@ -432,17 +439,19 @@ object PermissionHelper {
             isInitialized = true
 
             try {
-                ProcessLifecycleOwner.get().lifecycle.addObserver(object : DefaultLifecycleObserver {
-                    override fun onStart(owner: LifecycleOwner) {
-                        isForeground = true
-                        notifyListeners(true)
-                    }
+                ProcessLifecycleOwner.get().lifecycle.addObserver(
+                    object : DefaultLifecycleObserver {
+                        override fun onStart(owner: LifecycleOwner) {
+                            isForeground = true
+                            notifyListeners(true)
+                        }
 
-                    override fun onStop(owner: LifecycleOwner) {
-                        isForeground = false
-                        notifyListeners(false)
-                    }
-                })
+                        override fun onStop(owner: LifecycleOwner) {
+                            isForeground = false
+                            notifyListeners(false)
+                        }
+                    },
+                )
             } catch (e: Exception) {
                 Logger.e("AppForegroundDetector", "初始化失败", e)
             }

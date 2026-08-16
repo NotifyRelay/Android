@@ -16,7 +16,7 @@ object ClipboardProcessor {
     data class ClipboardInput(
         val header: String,
         val rawData: String,
-        val remoteUuid: String
+        val remoteUuid: String,
     )
 
     /**
@@ -28,7 +28,7 @@ object ClipboardProcessor {
      */
     fun process(
         context: Context,
-        input: ClipboardInput
+        input: ClipboardInput,
     ): Boolean {
         try {
             Logger.d(TAG, "Processing clipboard message: ${input.header}")

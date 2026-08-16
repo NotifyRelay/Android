@@ -79,25 +79,30 @@ fun FilterListSection(
     var showAppPickerDialog by remember { mutableStateOf(false) }
 
     val pm = context.packageManager
-    val defaultAppIconBitmap = remember {
-        val drawable = try { pm.defaultActivityIcon
-        } catch (_: Exception) { null }
-        if (drawable is BitmapDrawable) {
-            drawable.bitmap.asImageBitmap()
-        } else {
-            val width = drawable?.intrinsicWidth?.takeIf { it > 0 } ?: 48
-            val height = drawable?.intrinsicHeight?.takeIf { it > 0 } ?: 48
-            val bmp = createBitmap(width, height, Bitmap.Config.ARGB_8888)
-            val canvas = Canvas(bmp)
-            drawable?.setBounds(0, 0, width, height)
-            drawable?.draw(canvas)
-            bmp.asImageBitmap()
+    val defaultAppIconBitmap =
+        remember {
+            val drawable =
+                try {
+                    pm.defaultActivityIcon
+                } catch (_: Exception) {
+                    null
+                }
+            if (drawable is BitmapDrawable) {
+                drawable.bitmap.asImageBitmap()
+            } else {
+                val width = drawable?.intrinsicWidth?.takeIf { it > 0 } ?: 48
+                val height = drawable?.intrinsicHeight?.takeIf { it > 0 } ?: 48
+                val bmp = createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                val canvas = Canvas(bmp)
+                drawable?.setBounds(0, 0, width, height)
+                drawable?.draw(canvas)
+                bmp.asImageBitmap()
+            }
         }
-    }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // 文本输入独占一行，避免被按钮压缩
         TextField(
@@ -107,18 +112,18 @@ fun FilterListSection(
             colors = TextFieldDefaults.textFieldColors(backgroundColor = MiuixTheme.colorScheme.surfaceContainerHighest),
             textStyle = MiuixTheme.textStyles.main.copy(color = MiuixTheme.colorScheme.onSurfaceContainerHighest),
             modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+            singleLine = true,
         )
 
         // 按钮行：选择应用与添加
         Row(
             modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             Button(
                 onClick = { showAppPickerDialog = true },
-                colors = ButtonDefaults.buttonColors()
+                colors = ButtonDefaults.buttonColors(),
             ) {
                 if (newPackage.isBlank()) {
                     Text("选择应用(可空)")
@@ -127,7 +132,7 @@ fun FilterListSection(
                         Image(
                             bitmap = bmp,
                             contentDescription = "已选应用图标",
-                            modifier = Modifier.size(24.dp)
+                            modifier = Modifier.size(24.dp),
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                     }
@@ -143,7 +148,7 @@ fun FilterListSection(
                     newPackageIcon = null
                 },
                 enabled = newKeyword.isNotBlank() || newPackage.isNotBlank(),
-                colors = if (newKeyword.isNotBlank() || newPackage.isNotBlank()) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors()
+                colors = if (newKeyword.isNotBlank() || newPackage.isNotBlank()) ButtonDefaults.buttonColorsPrimary() else ButtonDefaults.buttonColors(),
             ) {
                 Text("添加")
             }
@@ -154,7 +159,7 @@ fun FilterListSection(
             ArrowPreference(
                 title = "默认黑名单",
                 summary = "共 ${defaultEntries.size} 项",
-                onClick = { showBuiltinSheet = true }
+                onClick = { showBuiltinSheet = true },
             )
         }
 
@@ -163,7 +168,7 @@ fun FilterListSection(
             ArrowPreference(
                 title = "手动黑名单",
                 summary = "共 ${manualEntries.size} 项",
-                onClick = { showCustomSheet = true }
+                onClick = { showCustomSheet = true },
             )
         }
     }
@@ -184,19 +189,20 @@ fun FilterListSection(
                 }
             }
         },
-        title = "选择要过滤的应用"
+        title = "选择要过滤的应用",
     )
 
     // 默认黑名单底部抽屉
     WindowBottomSheet(
         show = showBuiltinSheet,
         title = "默认黑名单",
-        onDismissRequest = { showBuiltinSheet = false }
+        onDismissRequest = { showBuiltinSheet = false },
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
         ) {
             defaultEntries.forEach { entry ->
                 key(entry) {
@@ -216,13 +222,13 @@ fun FilterListSection(
                                     Image(
                                         bitmap = it,
                                         contentDescription = null,
-                                        modifier = Modifier.size(24.dp)
+                                        modifier = Modifier.size(24.dp),
                                     )
                                 }
                             }
                         },
                         checked = entryEnabled(entry),
-                        onCheckedChange = { enabled -> onEntryEnabledChange?.invoke(entry, enabled) }
+                        onCheckedChange = { enabled -> onEntryEnabledChange?.invoke(entry, enabled) },
                     )
                 }
             }
@@ -233,12 +239,13 @@ fun FilterListSection(
     WindowBottomSheet(
         show = showCustomSheet,
         title = "手动黑名单",
-        onDismissRequest = { showCustomSheet = false }
+        onDismissRequest = { showCustomSheet = false },
     ) {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp),
         ) {
             manualEntries.forEach { entry ->
                 key(entry) {
@@ -252,7 +259,7 @@ fun FilterListSection(
                     }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         SwitchPreference(
                             title = entryLabel(entry),
@@ -262,17 +269,17 @@ fun FilterListSection(
                                         Image(
                                             bitmap = it,
                                             contentDescription = null,
-                                            modifier = Modifier.size(24.dp)
+                                            modifier = Modifier.size(24.dp),
                                         )
                                     }
                                 }
                             },
                             checked = entryEnabled(entry),
                             onCheckedChange = { enabled -> onEntryEnabledChange?.invoke(entry, enabled) },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                         IconButton(
-                            onClick = { onRemoveEntry(entry) }
+                            onClick = { onRemoveEntry(entry) },
                         ) {
                             Text("删除", color = MiuixTheme.colorScheme.onBackground)
                         }
@@ -283,10 +290,11 @@ fun FilterListSection(
     }
 }
 
-private fun entryLabel(item: FilterEntryItem): String = buildString {
-    if (item.keyword.isNotBlank()) {
-        append(item.keyword)
-        if (item.packageName.isNotBlank()) append(" / ")
+private fun entryLabel(item: FilterEntryItem): String =
+    buildString {
+        if (item.keyword.isNotBlank()) {
+            append(item.keyword)
+            if (item.packageName.isNotBlank()) append(" / ")
+        }
+        if (item.packageName.isNotBlank()) append(item.packageName)
     }
-    if (item.packageName.isNotBlank()) append(item.packageName)
-}

@@ -5,19 +5,19 @@ import org.json.JSONObject
 import java.security.MessageDigest
 
 object DiffSystem {
-
     data class State(
         val title: String?,
         val text: String?,
         val paramV2Raw: String?,
-        val pics: Map<String, String>
+        val pics: Map<String, String>,
     ) {
-        fun toJson(): JSONObject = JSONObject().apply {
-            if (!title.isNullOrBlank()) put("title", title)
-            if (!text.isNullOrBlank()) put("text", text)
-            if (!paramV2Raw.isNullOrBlank()) put("param_v2_raw", paramV2Raw)
-            if (pics.isNotEmpty()) put("pics", JSONObject(pics))
-        }
+        fun toJson(): JSONObject =
+            JSONObject().apply {
+                if (!title.isNullOrBlank()) put("title", title)
+                if (!text.isNullOrBlank()) put("text", text)
+                if (!paramV2Raw.isNullOrBlank()) put("param_v2_raw", paramV2Raw)
+                if (pics.isNotEmpty()) put("pics", JSONObject(pics))
+            }
     }
 
     data class Diff(
@@ -25,27 +25,32 @@ object DiffSystem {
         val text: String? = null,
         val paramV2Raw: String? = null,
         val picsChanged: Map<String, String> = emptyMap(),
-        val picsRemoved: List<String> = emptyList()
+        val picsRemoved: List<String> = emptyList(),
     ) {
-        fun isEmpty(): Boolean =
-            title == null && text == null && paramV2Raw == null && picsChanged.isEmpty() && picsRemoved.isEmpty()
+        fun isEmpty(): Boolean = title == null && text == null && paramV2Raw == null && picsChanged.isEmpty() && picsRemoved.isEmpty()
 
-        fun toJson(): JSONObject = JSONObject().apply {
-            if (title != null) put("title", title)
-            if (text != null) put("text", text)
-            if (paramV2Raw != null) put("param_v2_raw", paramV2Raw)
-            if (picsChanged.isNotEmpty()) put("pics", JSONObject(picsChanged))
-            if (picsRemoved.isNotEmpty()) put("pics_removed", JSONArray(picsRemoved))
-        }
+        fun toJson(): JSONObject =
+            JSONObject().apply {
+                if (title != null) put("title", title)
+                if (text != null) put("text", text)
+                if (paramV2Raw != null) put("param_v2_raw", paramV2Raw)
+                if (picsChanged.isNotEmpty()) put("pics", JSONObject(picsChanged))
+                if (picsRemoved.isNotEmpty()) put("pics_removed", JSONArray(picsRemoved))
+            }
     }
 
-    fun diff(old: State?, new: State): Diff {
-        if (old == null) return Diff(
-            title = new.title,
-            text = new.text,
-            paramV2Raw = new.paramV2Raw,
-            picsChanged = new.pics
-        )
+    fun diff(
+        old: State?,
+        new: State,
+    ): Diff {
+        if (old == null) {
+            return Diff(
+                title = new.title,
+                text = new.text,
+                paramV2Raw = new.paramV2Raw,
+                picsChanged = new.pics,
+            )
+        }
         var t: String? = null
         var c: String? = null
         var p2: String? = null

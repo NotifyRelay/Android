@@ -23,20 +23,25 @@ object SecureKeyStorage {
             keyStore.getKey(MASTER_KEY_ALIAS, null) as SecretKey
         } else {
             val keyGenerator = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, ANDROID_KEY_STORE)
-            val spec = KeyGenParameterSpec.Builder(
-                MASTER_KEY_ALIAS,
-                KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT
-            )
-                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
-                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
-                .setKeySize(256)
-                .build()
+            val spec =
+                KeyGenParameterSpec
+                    .Builder(
+                        MASTER_KEY_ALIAS,
+                        KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT,
+                    ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                    .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                    .setKeySize(256)
+                    .build()
             keyGenerator.init(spec)
             keyGenerator.generateKey()
         }
     }
 
-    fun encryptAndStore(context: Context, keyAlias: String, plainData: String) {
+    fun encryptAndStore(
+        context: Context,
+        keyAlias: String,
+        plainData: String,
+    ) {
         val masterKey = getOrCreateMasterKey()
         val cipher = Cipher.getInstance(TRANSFORMATION)
         cipher.init(Cipher.ENCRYPT_MODE, masterKey)
@@ -47,15 +52,21 @@ object SecureKeyStorage {
         System.arraycopy(iv, 0, out, 1, iv.size)
         System.arraycopy(encryptedBytes, 0, out, 1 + iv.size, encryptedBytes.size)
         val encoded = Base64.encodeToString(out, Base64.NO_WRAP)
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+        context
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
             .edit()
             .putString(keyAlias, encoded)
             .apply()
     }
 
-    fun retrieveAndDecrypt(context: Context, keyAlias: String): String? {
-        val encoded = context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
-            .getString(keyAlias, null) ?: return null
+    fun retrieveAndDecrypt(
+        context: Context,
+        keyAlias: String,
+    ): String? {
+        val encoded =
+            context
+                .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+                .getString(keyAlias, null) ?: return null
         return try {
             val masterKey = getOrCreateMasterKey()
             val data = Base64.decode(encoded, Base64.NO_WRAP)
@@ -72,8 +83,12 @@ object SecureKeyStorage {
         }
     }
 
-    fun removeKey(context: Context, keyAlias: String) {
-        context.getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
+    fun removeKey(
+        context: Context,
+        keyAlias: String,
+    ) {
+        context
+            .getSharedPreferences(PREF_NAME, Context.MODE_PRIVATE)
             .edit()
             .remove(keyAlias)
             .apply()

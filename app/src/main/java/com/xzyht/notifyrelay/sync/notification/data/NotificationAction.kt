@@ -8,5 +8,5 @@ data class NotificationAction(
     val icon: Icon? = null,
     val svgResId: Int? = null,
     val title: String?,
-    val intent: PendingIntent?
+    val intent: PendingIntent?,
 )

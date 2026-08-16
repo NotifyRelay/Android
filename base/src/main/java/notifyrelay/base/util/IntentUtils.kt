@@ -4,21 +4,23 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Parcelable
-import android.provider.Settings
 import java.io.Serializable
 
 /**
  * Intent工具类，提供通用的Intent处理方法
  */
 object IntentUtils {
-
     /**
      * 启动Activity
      * @param context 上下文
      * @param intent Intent对象
      * @param addNewTaskFlag 是否添加FLAG_ACTIVITY_NEW_TASK标志
      */
-    fun startActivity(context: Context, intent: Intent, addNewTaskFlag: Boolean = false) {
+    fun startActivity(
+        context: Context,
+        intent: Intent,
+        addNewTaskFlag: Boolean = false,
+    ) {
         if (addNewTaskFlag) {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
@@ -32,7 +34,12 @@ object IntentUtils {
      * @param data 数据URI
      * @param addNewTaskFlag 是否添加FLAG_ACTIVITY_NEW_TASK标志
      */
-    fun startActivity(context: Context, action: String, data: Uri? = null, addNewTaskFlag: Boolean = false) {
+    fun startActivity(
+        context: Context,
+        action: String,
+        data: Uri? = null,
+        addNewTaskFlag: Boolean = false,
+    ) {
         val intent = Intent(action)
         if (data != null) {
             intent.data = data
@@ -49,9 +56,10 @@ object IntentUtils {
      * @param cls 目标Activity类
      * @return Intent对象
      */
-    fun <T> createIntent(context: Context, cls: Class<T>): Intent {
-        return Intent(context, cls)
-    }
+    fun <T> createIntent(
+        context: Context,
+        cls: Class<T>,
+    ): Intent = Intent(context, cls)
 
     /**
      * 创建带额外数据的显式Intent
@@ -60,7 +68,11 @@ object IntentUtils {
      * @param extras 额外数据
      * @return Intent对象
      */
-    fun <T> createIntentWithExtras(context: Context, cls: Class<T>, extras: Map<String, Any>): Intent {
+    fun <T> createIntentWithExtras(
+        context: Context,
+        cls: Class<T>,
+        extras: Map<String, Any>,
+    ): Intent {
         val intent = Intent(context, cls)
         extras.forEach { (key, value) ->
             when (value) {
@@ -82,9 +94,7 @@ object IntentUtils {
      * @param action Intent action
      * @return Intent对象
      */
-    fun createImplicitIntent(action: String): Intent {
-        return Intent(action)
-    }
+    fun createImplicitIntent(action: String): Intent = Intent(action)
 
     /**
      * 创建带数据的隐式Intent
@@ -92,9 +102,10 @@ object IntentUtils {
      * @param uri 数据URI
      * @return Intent对象
      */
-    fun createImplicitIntentWithData(action: String, uri: Uri): Intent {
-        return Intent(action).apply { data = uri }
-    }
+    fun createImplicitIntentWithData(
+        action: String,
+        uri: Uri,
+    ): Intent = Intent(action).apply { data = uri }
 
     /**
      * 添加常用标志到Intent
@@ -102,7 +113,10 @@ object IntentUtils {
      * @param flags 标志列表
      * @return 添加标志后的Intent
      */
-    fun addFlags(intent: Intent, vararg flags: Int): Intent {
+    fun addFlags(
+        intent: Intent,
+        vararg flags: Int,
+    ): Intent {
         flags.forEach { intent.addFlags(it) }
         return intent
     }
@@ -113,7 +127,10 @@ object IntentUtils {
      * @param uri 数据URI
      * @return 设置数据后的Intent
      */
-    fun setData(intent: Intent, uri: Uri): Intent {
+    fun setData(
+        intent: Intent,
+        uri: Uri,
+    ): Intent {
         intent.data = uri
         return intent
     }

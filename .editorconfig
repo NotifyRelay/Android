@@ -1,0 +1,30 @@
+root = true
+
+[*]
+charset = utf-8
+end_of_line = crlf
+insert_final_newline = true
+
+[*.{kt,kts}]
+indent_size = 4
+indent_style = space
+max_line_length = off
+ktlint_code_style = ktlint_official
+# @Composable 函数按 Jetpack Compose 惯例首字母大写，豁免函数命名规则
+ktlint_standard_function-naming = disabled
+# 下划线前缀私有属性为本项目内部状态惯例（无对应公有属性），豁免 backing property 命名规则
+ktlint_standard_backing-property-naming = disabled
+# Compose 代码惯用通配导入（foundation.layout.* / runtime.* 等），豁免通配导入规则
+ktlint_standard_no-wildcard-imports = disabled
+
+# nativecore 为 Rust/JNI 绑定模块：函数名须匹配原生符号（snake_case）
+[nativecore/**/*.kt]
+ktlint_standard_package-name = disabled
+
+# superislandui 为项目自有模块：包名含大写（BigIsland）为历史遗留，暂豁免
+[superislandui/**/*.kt]
+ktlint_standard_package-name = disabled
+
+# app 内 superisland 相关代码与 superislandui 模块同源：包名含大写（BigIsland）历史遗留，暂豁免
+[app/**/superisland/**/*.kt]
+ktlint_standard_package-name = disabled

@@ -1,0 +1,9 @@
+# 统一行尾：仓库存储 LF，各平台检出统一为 CRLF（与本地 Windows 开发一致）
+* text=auto
+*.kt text eol=crlf
+*.kts text eol=crlf
+*.properties text eol=crlf
+*.yml text eol=crlf
+*.yaml text eol=crlf
+*.toml text eol=crlf
+*.md text eol=crlf

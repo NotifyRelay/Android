@@ -16,24 +16,24 @@ object AppLaunchManager {
         decrypted: String,
         deviceManager: DeviceConnectionManager,
         source: DeviceInfo,
-        context: Context
+        context: Context,
     ) {
         try {
             val json = JSONObject(decrypted)
             val action = json.optString("action", "")
-            
+
             when (action) {
                 "launchApp" -> {
                     val targetPackageName = json.getString("packageName")
                     val displayId = json.optInt("displayId", -1)
-                    
+
                     Logger.i(TAG, "收到启动应用请求: $targetPackageName, displayId: $displayId")
-                    
+
                     try {
                         val launchIntent = context.packageManager.getLaunchIntentForPackage(targetPackageName)
                         if (launchIntent != null) {
                             launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                            
+
                             if (displayId > 0 && Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                                 val options = ActivityOptions.makeBasic()
                                 options.launchDisplayId = displayId
@@ -64,16 +64,18 @@ object AppLaunchManager {
         deviceManager: DeviceConnectionManager,
         target: DeviceInfo,
         packageName: String,
-        displayId: Int = -1
+        displayId: Int = -1,
     ) {
         try {
-            val raw = JSONObject().apply {
-                put("action", "launchApp")
-                put("packageName", packageName)
-                if (displayId > 0) {
-                    put("displayId", displayId)
-                }
-            }.toString()
+            val raw =
+                JSONObject()
+                    .apply {
+                        put("action", "launchApp")
+                        put("packageName", packageName)
+                        if (displayId > 0) {
+                            put("displayId", displayId)
+                        }
+                    }.toString()
             Logger.d(TAG, "发送应用启动请求: $packageName, displayId: $displayId")
             ProtocolSender.sendEncrypted(deviceManager, target, "DATA_APP_LAUNCH", raw)
         } catch (e: Exception) {

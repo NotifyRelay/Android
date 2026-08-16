@@ -1,18 +1,19 @@
 package com.xzyht.notifyrelay.feature.notification.superisland
 
-import android.content.Context
 import android.app.NotificationManager
+import android.content.Context
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.NotificationGenerator
-import notifyrelay.base.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.Logger
+
 object FloatingReplicaNotificationManager {
     private const val TAG = "超级岛通知管理"
 
@@ -24,15 +25,16 @@ object FloatingReplicaNotificationManager {
         paramV2Raw: String?,
         picMap: Map<String, String>?,
         appName: String?,
-        isLocked: Boolean = false
+        isLocked: Boolean = false,
     ) {
         CoroutineScope(Dispatchers.Main).launch {
             runWithErrorHandlingSuspend("发送通知") {
                 val taskVersion = FloatingReplicaMappingManager.nextVersion(sourceId)
 
-                val internedPicMap = withContext(Dispatchers.IO) {
-                    SuperIslandImageStore.internAll(context, sourceId, picMap)
-                }
+                val internedPicMap =
+                    withContext(Dispatchers.IO) {
+                        SuperIslandImageStore.internAll(context, sourceId, picMap)
+                    }
 
                 if (!FloatingReplicaMappingManager.isLatestVersion(sourceId, taskVersion)) {
                     return@runWithErrorHandlingSuspend
@@ -41,13 +43,15 @@ object FloatingReplicaNotificationManager {
                 val formattedData = SuperIslandDataFormatter.formatForDisplay(context, paramV2Raw, internedPicMap)
                 val paramV2 = formattedData.paramV2
 
-                val displayTitle = title?.takeIf { it.isNotBlank() }
-                    ?: paramV2?.highlightInfo?.title?.takeIf { it.isNotBlank() }
-                    ?: paramV2?.baseInfo?.title?.takeIf { it.isNotBlank() }
+                val displayTitle =
+                    title?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.highlightInfo?.title?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.baseInfo?.title?.takeIf { it.isNotBlank() }
 
-                val displayText = text?.takeIf { it.isNotBlank() }
-                    ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
-                    ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
+                val displayText =
+                    text?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
+                        ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
 
                 val entryKey = sourceId
 
@@ -59,7 +63,11 @@ object FloatingReplicaNotificationManager {
                     runWithErrorHandlingSuspend("发送Live Updates复合通知") {
                         LiveUpdatesNotificationManager.initialize(context)
                         LiveUpdatesNotificationManager.showLiveUpdate(
-                            sourceId, displayTitle, displayText, appName, formattedData
+                            sourceId,
+                            displayTitle,
+                            displayText,
+                            appName,
+                            formattedData,
                         )
                         val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
                         FloatingReplicaMappingManager.putNotificationId(entryKey, liveUpdateNotificationId)
@@ -79,14 +87,15 @@ object FloatingReplicaNotificationManager {
                 FloatingReplicaMappingManager.cancelTimeoutJob(sourceId)
                 Logger.i(TAG, "超级岛: 取消现有的超时任务（如果存在）, sourceId=$sourceId")
 
-                val timeoutJob = CoroutineScope(Dispatchers.Main).launch {
-                    delay(timeoutMs)
-                    runWithErrorHandling("超时自动移除通知") {
-                        Logger.i(TAG, "超级岛: 超时任务触发，准备移除通知, sourceId=$sourceId, timeoutMs=$timeoutMs")
-                        FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
-                        Logger.i(TAG, "超级岛: 通知超时自动移除, sourceId=$sourceId")
+                val timeoutJob =
+                    CoroutineScope(Dispatchers.Main).launch {
+                        delay(timeoutMs)
+                        runWithErrorHandling("超时自动移除通知") {
+                            Logger.i(TAG, "超级岛: 超时任务触发，准备移除通知, sourceId=$sourceId, timeoutMs=$timeoutMs")
+                            FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
+                            Logger.i(TAG, "超级岛: 通知超时自动移除, sourceId=$sourceId")
+                        }
                     }
-                }
                 FloatingReplicaMappingManager.setTimeoutJob(sourceId, timeoutJob)
                 Logger.i(TAG, "超级岛: 已启动新的超时任务, sourceId=$sourceId, timeoutMs=$timeoutMs")
             }
@@ -98,7 +107,7 @@ object FloatingReplicaNotificationManager {
         reason: FloatingWindowManager.RemovalReason,
         notificationIdsBefore: List<Int>?,
         entryKeys: List<String>?,
-        context: Context?
+        context: Context?,
     ) {
         if (context != null) {
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.BAKLAVA) {
@@ -175,7 +184,10 @@ object FloatingReplicaNotificationManager {
         }
     }
 
-    fun closeNotificationByNotificationId(context: Context, notificationId: Int) {
+    fun closeNotificationByNotificationId(
+        context: Context,
+        notificationId: Int,
+    ) {
         val sourceIdToStop = FloatingReplicaMappingManager.findSourceIdByNotificationId(notificationId)
 
         val isFloatingEnabled = FloatingReplicaWindowManager.isFloatingWindowEnabled(context)
@@ -212,7 +224,10 @@ object FloatingReplicaNotificationManager {
         }
     }
 
-    private inline fun runWithErrorHandling(actionName: String, crossinline block: () -> Unit) {
+    private inline fun runWithErrorHandling(
+        actionName: String,
+        crossinline block: () -> Unit,
+    ) {
         try {
             block()
         } catch (e: Exception) {
@@ -220,7 +235,10 @@ object FloatingReplicaNotificationManager {
         }
     }
 
-    private suspend inline fun runWithErrorHandlingSuspend(actionName: String, crossinline block: suspend () -> Unit) {
+    private suspend inline fun runWithErrorHandlingSuspend(
+        actionName: String,
+        crossinline block: suspend () -> Unit,
+    ) {
         try {
             block()
         } catch (e: Exception) {

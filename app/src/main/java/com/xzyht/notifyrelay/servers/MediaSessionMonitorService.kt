@@ -12,8 +12,9 @@ import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import notifyrelay.base.util.Logger
 
-class MediaSessionMonitorService(private val service: NotificationListenerService) {
-
+class MediaSessionMonitorService(
+    private val service: NotificationListenerService,
+) {
     companion object {
         private const val TAG = "MediaSessionMonitorService"
         var instance: MediaSessionMonitorService? = null
@@ -27,6 +28,7 @@ class MediaSessionMonitorService(private val service: NotificationListenerServic
 
     // 存储当前活跃的媒体控制器
     private val activeControllers = mutableListOf<MediaController>()
+
     // 存储控制器的回调，用于后续注销
     private val controllerCallbacks = mutableMapOf<MediaController, MediaController.Callback>()
 
@@ -40,65 +42,69 @@ class MediaSessionMonitorService(private val service: NotificationListenerServic
     // 去重：跟踪最后一个控制器签名
     private var lastControllerSignatures: String = ""
 
-    private val sessionsChangedListener = MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
-        handler.removeCallbacksAndMessages(updateToken)
-        val r = Runnable { updateControllers(controllers) }
-        handler.postAtTime(r, updateToken, SystemClock.uptimeMillis())
-    }
+    private val sessionsChangedListener =
+        MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
+            handler.removeCallbacksAndMessages(updateToken)
+            val r = Runnable { updateControllers(controllers) }
+            handler.postAtTime(r, updateToken, SystemClock.uptimeMillis())
+        }
 
     private val handler = Handler(Looper.getMainLooper())
 
     // 健康检查机制
-    private val healthCheckRunnable = object : Runnable {
-        override fun run() {
-            // 验证连接是否仍然有效
-            if (isConnected && mediaSessionManager != null && componentName != null) {
-                try {
-                    // 测试访问 - 如果权限被撤销，这将抛出异常
-                    mediaSessionManager?.getActiveSessions(componentName)
-                    Logger.i(TAG, "Health Check: OK")
-                } catch (e: SecurityException) {
-                    Logger.w(TAG, "Health Check: FAILED - Permission lost")
-                    isConnected = false
-                    // 权限丢失，等待系统重新绑定
+    private val healthCheckRunnable =
+        object : Runnable {
+            override fun run() {
+                // 验证连接是否仍然有效
+                if (isConnected && mediaSessionManager != null && componentName != null) {
+                    try {
+                        // 测试访问 - 如果权限被撤销，这将抛出异常
+                        mediaSessionManager?.getActiveSessions(componentName)
+                        Logger.i(TAG, "Health Check: OK")
+                    } catch (e: SecurityException) {
+                        Logger.w(TAG, "Health Check: FAILED - Permission lost")
+                        isConnected = false
+                        // 权限丢失，等待系统重新绑定
+                    }
                 }
+                // 安排下一次检查
+                handler.postDelayed(this, 30000)
             }
-            // 安排下一次检查
-            handler.postDelayed(this, 30000)
         }
-    }
 
     // 启动重试机制
-    private val startupRetryRunnable = object : Runnable {
-        override fun run() {
-            if (!isConnected) return
-            
-            try {
-                val controllers = mediaSessionManager?.getActiveSessions(componentName)
-                Logger.i(TAG, "Successfully retrieved ${controllers?.size ?: 0} active sessions")
-                updateControllers(controllers)
-            } catch (e: SecurityException) {
-                Logger.w(TAG, "Security Error on initial check: ${e.message}")
-                // 200ms 后重试一次，以防权限仍在授予中
-                handler.postDelayed(retryRunnable, 200)
+    private val startupRetryRunnable =
+        object : Runnable {
+            override fun run() {
+                if (!isConnected) return
+
+                try {
+                    val controllers = mediaSessionManager?.getActiveSessions(componentName)
+                    Logger.i(TAG, "Successfully retrieved ${controllers?.size ?: 0} active sessions")
+                    updateControllers(controllers)
+                } catch (e: SecurityException) {
+                    Logger.w(TAG, "Security Error on initial check: ${e.message}")
+                    // 200ms 后重试一次，以防权限仍在授予中
+                    handler.postDelayed(retryRunnable, 200)
+                }
             }
         }
-    }
 
     // 200ms 重试机制
-    private val retryRunnable = object : Runnable {
-        override fun run() {
-            if (!isConnected) return
-            
-            try {
-                val controllers = mediaSessionManager?.getActiveSessions(componentName)
-                Logger.i(TAG, "Retry successful: ${controllers?.size ?: 0} sessions")
-                updateControllers(controllers)
-            } catch (e2: SecurityException) {
-                Logger.e(TAG, "Retry failed: ${e2.message} - Permission may need manual grant")
+    private val retryRunnable =
+        object : Runnable {
+            override fun run() {
+                if (!isConnected) return
+
+                try {
+                    val controllers = mediaSessionManager?.getActiveSessions(componentName)
+                    Logger.i(TAG, "Retry successful: ${controllers?.size ?: 0} sessions")
+                    updateControllers(controllers)
+                } catch (e2: SecurityException) {
+                    Logger.e(TAG, "Retry failed: ${e2.message} - Permission may need manual grant")
+                }
             }
         }
-    }
 
     // 初始化方法
     fun initialize() {
@@ -186,46 +192,47 @@ class MediaSessionMonitorService(private val service: NotificationListenerServic
             if (controllers != null) {
                 controllers.forEach { controller ->
                     try {
-                        val callback = object : MediaController.Callback() {
-                            override fun onPlaybackStateChanged(state: PlaybackState?) {
-                                // 优先级可能已更改
-                                val primary = getPrimaryController()
-                                if (primary != null && primary.packageName == controller.packageName) {
-                                    // 有问题的应用程序并不总是触发 onMetadataChanged
-                                    // 我们在这里手动计算未解析的哈希值
-                                    val meta = primary.metadata
-                                    if (meta != null) {
-                                        val artHash = (meta.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: meta.getBitmap(MediaMetadata.METADATA_KEY_ART))?.hashCode() ?: 0
-                                        val currentHash = java.util.Objects.hash(
-                                            meta.getString(MediaMetadata.METADATA_KEY_TITLE),
-                                            meta.getString(MediaMetadata.METADATA_KEY_ARTIST),
-                                            primary.packageName,
-                                            meta.getLong(MediaMetadata.METADATA_KEY_DURATION),
-                                            artHash
-                                        )
-                                        if (currentHash != lastMetadataHash) {
-                                            Logger.d(TAG, "Caught unannounced metadata change via playback state!")
-                                            updateMetadataIfPrimary(primary)
+                        val callback =
+                            object : MediaController.Callback() {
+                                override fun onPlaybackStateChanged(state: PlaybackState?) {
+                                    // 优先级可能已更改
+                                    val primary = getPrimaryController()
+                                    if (primary != null && primary.packageName == controller.packageName) {
+                                        // 有问题的应用程序并不总是触发 onMetadataChanged
+                                        // 我们在这里手动计算未解析的哈希值
+                                        val meta = primary.metadata
+                                        if (meta != null) {
+                                            val artHash = (meta.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: meta.getBitmap(MediaMetadata.METADATA_KEY_ART))?.hashCode() ?: 0
+                                            val currentHash =
+                                                java.util.Objects.hash(
+                                                    meta.getString(MediaMetadata.METADATA_KEY_TITLE),
+                                                    meta.getString(MediaMetadata.METADATA_KEY_ARTIST),
+                                                    primary.packageName,
+                                                    meta.getLong(MediaMetadata.METADATA_KEY_DURATION),
+                                                    artHash,
+                                                )
+                                            if (currentHash != lastMetadataHash) {
+                                                Logger.d(TAG, "Caught unannounced metadata change via playback state!")
+                                                updateMetadataIfPrimary(primary)
+                                            }
                                         }
+                                    }
+                                }
+
+                                override fun onMetadataChanged(metadata: MediaMetadata?) {
+                                    updateMetadataIfPrimary(controller)
+                                }
+
+                                override fun onSessionDestroyed() {
+                                    handler.post {
+                                        recheckSessions() // 强制完全刷新
                                     }
                                 }
                             }
 
-                            override fun onMetadataChanged(metadata: MediaMetadata?) {
-                                updateMetadataIfPrimary(controller)
-                            }
-
-                            override fun onSessionDestroyed() {
-                                handler.post {
-                                    recheckSessions() // 强制完全刷新
-                                }
-                            }
-                        }
-
                         controller.registerCallback(callback)
                         controllerCallbacks[controller] = callback
                         activeControllers.add(controller)
-
                     } catch (e: Exception) {
                         Logger.e(TAG, "Failed to hook controller: ${controller.packageName}", e)
                     }
@@ -258,16 +265,17 @@ class MediaSessionMonitorService(private val service: NotificationListenerServic
     fun getPrimaryController(): MediaController? {
         synchronized(activeControllers) {
             // 优先级 1：正在播放/缓冲/跳过的控制器
-            val playingController = activeControllers.firstOrNull { 
-                val st = it.playbackState?.state
-                st == PlaybackState.STATE_PLAYING || 
-                st == PlaybackState.STATE_BUFFERING ||
-                st == PlaybackState.STATE_CONNECTING ||
-                st == PlaybackState.STATE_SKIPPING_TO_NEXT ||
-                st == PlaybackState.STATE_SKIPPING_TO_PREVIOUS ||
-                st == PlaybackState.STATE_FAST_FORWARDING ||
-                st == PlaybackState.STATE_REWINDING
-            }
+            val playingController =
+                activeControllers.firstOrNull {
+                    val st = it.playbackState?.state
+                    st == PlaybackState.STATE_PLAYING ||
+                        st == PlaybackState.STATE_BUFFERING ||
+                        st == PlaybackState.STATE_CONNECTING ||
+                        st == PlaybackState.STATE_SKIPPING_TO_NEXT ||
+                        st == PlaybackState.STATE_SKIPPING_TO_PREVIOUS ||
+                        st == PlaybackState.STATE_FAST_FORWARDING ||
+                        st == PlaybackState.STATE_REWINDING
+                }
             if (playingController != null) {
                 return playingController
             }
@@ -290,8 +298,9 @@ class MediaSessionMonitorService(private val service: NotificationListenerServic
         // 只有当这是主控制器时才处理
         if (controller !== primary) return
 
-        val artBitmap = metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) 
-                        ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ART)
+        val artBitmap =
+            metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+                ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ART)
         val artHash = artBitmap?.hashCode() ?: 0
 
         val metadataHash = java.util.Objects.hash(rawTitle, rawArtist, pkg, duration, artHash)
@@ -309,8 +318,7 @@ class MediaSessionMonitorService(private val service: NotificationListenerServic
             rawTitle ?: "",
             rawArtist ?: "",
             duration,
-            artBitmap
+            artBitmap,
         )
     }
-
 }

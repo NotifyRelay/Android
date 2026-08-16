@@ -21,29 +21,38 @@ object SuperIslandProtocol {
         val subtypeField: String? = null,
         val subtypeValue: String? = null,
         val extraFields: Map<String, String> = emptyMap(),
-        val enableAck: Boolean = true
+        val enableAck: Boolean = true,
     ) {
         companion object {
             val SUPER_ISLAND = PayloadOptions()
-            val MEDIA_FULL = PayloadOptions(
-                routingField = "type", routingValue = "MEDIA_PLAY",
-                routingIdValue = "media_global",
-                subtypeField = "mediaType", subtypeValue = "FULL",
-                enableAck = false
-            )
-            val MEDIA_DELTA = PayloadOptions(
-                routingField = "type", routingValue = "MEDIA_PLAY",
-                routingIdValue = "media_global",
-                subtypeField = "mediaType", subtypeValue = "DELTA",
-                enableAck = false
-            )
-            val MEDIA_END = PayloadOptions(
-                routingField = "type", routingValue = "MEDIA_PLAY",
-                routingIdValue = "media_global",
-                subtypeField = "mediaType", subtypeValue = "END",
-                extraFields = mapOf("terminateValue" to TERMINATE_VALUE),
-                enableAck = false
-            )
+            val MEDIA_FULL =
+                PayloadOptions(
+                    routingField = "type",
+                    routingValue = "MEDIA_PLAY",
+                    routingIdValue = "media_global",
+                    subtypeField = "mediaType",
+                    subtypeValue = "FULL",
+                    enableAck = false,
+                )
+            val MEDIA_DELTA =
+                PayloadOptions(
+                    routingField = "type",
+                    routingValue = "MEDIA_PLAY",
+                    routingIdValue = "media_global",
+                    subtypeField = "mediaType",
+                    subtypeValue = "DELTA",
+                    enableAck = false,
+                )
+            val MEDIA_END =
+                PayloadOptions(
+                    routingField = "type",
+                    routingValue = "MEDIA_PLAY",
+                    routingIdValue = "media_global",
+                    subtypeField = "mediaType",
+                    subtypeValue = "END",
+                    extraFields = mapOf("terminateValue" to TERMINATE_VALUE),
+                    enableAck = false,
+                )
         }
     }
 
@@ -53,22 +62,23 @@ object SuperIslandProtocol {
         time: Long,
         isLocked: Boolean,
         content: JSONObject,
-        options: PayloadOptions
+        options: PayloadOptions,
     ): JSONObject {
-        val obj = JSONObject().apply {
-            put("packageName", pkg)
-            put("appName", appName ?: pkg)
-            put("time", time)
-            put("isLocked", isLocked)
-            put(options.routingField, options.routingValue)
-            if (options.routingIdValue.isNotEmpty()) {
-                put(options.routingIdField, options.routingIdValue)
+        val obj =
+            JSONObject().apply {
+                put("packageName", pkg)
+                put("appName", appName ?: pkg)
+                put("time", time)
+                put("isLocked", isLocked)
+                put(options.routingField, options.routingValue)
+                if (options.routingIdValue.isNotEmpty()) {
+                    put(options.routingIdField, options.routingIdValue)
+                }
+                options.subtypeField?.let { f ->
+                    options.subtypeValue?.let { v -> put(f, v) }
+                }
+                for ((k, v) in options.extraFields) put(k, v)
             }
-            options.subtypeField?.let { f ->
-                options.subtypeValue?.let { v -> put(f, v) }
-            }
-            for ((k, v) in options.extraFields) put(k, v)
-        }
         for (k in content.keys()) {
             obj.put(k, content.get(k))
         }
@@ -83,11 +93,16 @@ object SuperIslandProtocol {
         isLocked: Boolean,
         featureId: String,
         state: DiffSystem.State,
-        enableAck: Boolean = true
-    ): JSONObject = buildPayload(
-        superPkg, appName, time, isLocked, state.toJson(),
-        PayloadOptions(routingIdValue = featureId, enableAck = enableAck)
-    )
+        enableAck: Boolean = true,
+    ): JSONObject =
+        buildPayload(
+            superPkg,
+            appName,
+            time,
+            isLocked,
+            state.toJson(),
+            PayloadOptions(routingIdValue = featureId, enableAck = enableAck),
+        )
 
     fun buildDeltaPayload(
         superPkg: String,
@@ -96,12 +111,16 @@ object SuperIslandProtocol {
         isLocked: Boolean,
         featureId: String,
         diff: DiffSystem.Diff,
-        enableAck: Boolean = true
-    ): JSONObject = buildPayload(
-        superPkg, appName, time, isLocked,
-        JSONObject().apply { put("changes", diff.toJson()) },
-        PayloadOptions(routingIdValue = featureId, enableAck = enableAck)
-    )
+        enableAck: Boolean = true,
+    ): JSONObject =
+        buildPayload(
+            superPkg,
+            appName,
+            time,
+            isLocked,
+            JSONObject().apply { put("changes", diff.toJson()) },
+            PayloadOptions(routingIdValue = featureId, enableAck = enableAck),
+        )
 
     fun buildEndPayload(
         superPkg: String,
@@ -109,12 +128,18 @@ object SuperIslandProtocol {
         time: Long,
         isLocked: Boolean,
         featureId: String,
-        enableAck: Boolean = true
-    ): JSONObject = buildPayload(
-        superPkg, appName, time, isLocked, JSONObject(),
-        PayloadOptions(
-            routingIdValue = featureId, enableAck = enableAck,
-            extraFields = mapOf("terminateValue" to TERMINATE_VALUE)
+        enableAck: Boolean = true,
+    ): JSONObject =
+        buildPayload(
+            superPkg,
+            appName,
+            time,
+            isLocked,
+            JSONObject(),
+            PayloadOptions(
+                routingIdValue = featureId,
+                enableAck = enableAck,
+                extraFields = mapOf("terminateValue" to TERMINATE_VALUE),
+            ),
         )
-    )
 }

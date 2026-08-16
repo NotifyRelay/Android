@@ -43,23 +43,25 @@ internal fun GuideSettingsPage(
     onBack: () -> Unit,
     onNext: () -> Unit,
     nextText: String = "下一步",
-    content: @Composable BoxScope.() -> Unit
+    content: @Composable BoxScope.() -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
     ) {
         GuidePageHeader(
             stepLabel = stepLabel,
             title = title,
-            subtitle = subtitle
+            subtitle = subtitle,
         )
 
         Box(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth(),
         ) {
             content()
         }
@@ -69,7 +71,7 @@ internal fun GuideSettingsPage(
             nextText = nextText,
             nextEnabled = true,
             onBack = onBack,
-            onNext = onNext
+            onNext = onNext,
         )
     }
 }
@@ -86,64 +88,66 @@ internal fun GuideSettingsOverviewPage(
     onOpenSuperIsland: () -> Unit,
     onOpenScrcpy: () -> Unit,
     onBack: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
     ) {
         GuidePageHeader(
             stepLabel = "5 / 6",
             title = "基础设置",
-            subtitle = "按你的偏好调整以下设置，进入应用后仍可随时修改"
+            subtitle = "按你的偏好调整以下设置，进入应用后仍可随时修改",
         )
 
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState()),
         ) {
             GuideSectionLabel(
                 title = "设置项",
                 description = "选择需要调整的设置，也可以直接下一步继续",
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
 
             ArrowPreference(
                 title = "远程过滤",
                 summary = "远程通知过滤与黑白名单",
                 onClick = onOpenRemoteFilter,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
             ArrowPreference(
                 title = "本地过滤",
                 summary = "本机通知过滤设置",
                 onClick = onOpenLocalFilter,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
             ArrowPreference(
                 title = "超级岛",
                 summary = "超级岛读取、显示与镜像过滤",
                 onClick = onOpenSuperIsland,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
             ArrowPreference(
                 title = "屏幕镜像",
                 summary = "Scrcpy 屏幕镜像设置",
                 onClick = onOpenScrcpy,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
             HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
             ArrowPreference(
                 title = "外观",
                 summary = "外观模式设置",
                 onClick = onOpenAppearance,
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
         }
 
@@ -152,7 +156,7 @@ internal fun GuideSettingsOverviewPage(
             nextText = "下一步",
             nextEnabled = true,
             onBack = onBack,
-            onNext = onNext
+            onNext = onNext,
         )
     }
 }
@@ -162,24 +166,25 @@ internal fun GuideAppearancePage(
     selectedThemeIndex: Int,
     onThemeSelected: (Int) -> Unit,
     onBack: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
 ) {
     GuideSettingsPage(
         stepLabel = "5 / 6",
         title = "外观",
         subtitle = "选择应用使用的明暗模式",
         onBack = onBack,
-        onNext = onNext
+        onNext = onNext,
     ) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 20.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp),
         ) {
             UIAppearance(
                 themeBaseIndex = selectedThemeIndex,
                 onThemeSelected = onThemeSelected,
-                scrollable = false
+                scrollable = false,
             )
         }
     }
@@ -188,14 +193,14 @@ internal fun GuideAppearancePage(
 @Composable
 internal fun GuideRemoteFilterPage(
     onBack: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
 ) {
     GuideSettingsPage(
         stepLabel = "5 / 6",
         title = "远程过滤",
         subtitle = "远程通知过滤与黑白名单",
         onBack = onBack,
-        onNext = onNext
+        onNext = onNext,
     ) {
         UIRemoteFilter(modifier = Modifier.fillMaxSize())
     }
@@ -204,14 +209,14 @@ internal fun GuideRemoteFilterPage(
 @Composable
 internal fun GuideLocalFilterPage(
     onBack: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
 ) {
     GuideSettingsPage(
         stepLabel = "5 / 6",
         title = "本地过滤",
         subtitle = "本机通知过滤设置",
         onBack = onBack,
-        onNext = onNext
+        onNext = onNext,
     ) {
         UILocalFilter(modifier = Modifier.fillMaxSize())
     }
@@ -220,14 +225,14 @@ internal fun GuideLocalFilterPage(
 @Composable
 internal fun GuideSuperIslandPage(
     onBack: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
 ) {
     GuideSettingsPage(
         stepLabel = "5 / 6",
         title = "超级岛",
         subtitle = "超级岛读取、显示与镜像过滤",
         onBack = onBack,
-        onNext = onNext
+        onNext = onNext,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             UISuperIslandSettings()
@@ -238,42 +243,43 @@ internal fun GuideSuperIslandPage(
 @Composable
 internal fun GuideScrcpyPage(
     onBack: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
 ) {
     val context = LocalContext.current
-    val serverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-        if (uri == null) return@rememberLauncherForActivityResult
-        runCatching {
-            context.contentResolver.takePersistableUriPermission(
-                uri,
-                Intent.FLAG_GRANT_READ_URI_PERMISSION
-            )
-            val uriString = uri.toString()
-            StorageManager.putString(
-                context,
-                ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
-                uriString,
-                StorageManager.PrefsType.SCRCPY
-            )
-            val app = context.applicationContext as android.app.Application
-            ScrcpyUiViewModel.getInstance(app).customServerUri = uriString
-        }.onFailure { e ->
-            Logger.e("GuideScrcpyPage", "scrcpy server URI 保存失败: uri=$uri", e)
+    val serverPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+                val uriString = uri.toString()
+                StorageManager.putString(
+                    context,
+                    ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
+                    uriString,
+                    StorageManager.PrefsType.SCRCPY,
+                )
+                val app = context.applicationContext as android.app.Application
+                ScrcpyUiViewModel.getInstance(app).customServerUri = uriString
+            }.onFailure { e ->
+                Logger.e("GuideScrcpyPage", "scrcpy server URI 保存失败: uri=$uri", e)
+            }
         }
-    }
 
     GuideSettingsPage(
         stepLabel = "5 / 6",
         title = "屏幕镜像",
         subtitle = "Scrcpy 屏幕镜像设置",
         onBack = onBack,
-        onNext = onNext
+        onNext = onNext,
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             ScrcpyScreenHost(
                 startScreen = ScrcpyRootScreen.Settings,
                 onPickServer = { serverPicker.launch(arrayOf("application/java-archive", "application/octet-stream", "*/*")) },
-                onExit = onBack
+                onExit = onBack,
             )
         }
     }

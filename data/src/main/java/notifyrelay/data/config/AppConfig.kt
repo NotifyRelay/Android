@@ -11,14 +11,15 @@ object AppConfig {
     /**
      * 是否启用UDP发现
      */
-    fun getUdpDiscoveryEnabled(context: Context): Boolean {
-        return StorageManager.getBoolean(context, "udp_discovery_enabled", true)
-    }
+    fun getUdpDiscoveryEnabled(context: Context): Boolean = StorageManager.getBoolean(context, "udp_discovery_enabled", true)
 
     /**
      * 设置是否启用UDP发现
      */
-    fun setUdpDiscoveryEnabled(context: Context, enabled: Boolean) {
+    fun setUdpDiscoveryEnabled(
+        context: Context,
+        enabled: Boolean,
+    ) {
         StorageManager.putBoolean(context, "udp_discovery_enabled", enabled)
     }
 }

@@ -3,12 +3,9 @@ package com.xzyht.notifyrelay.feature.notification.backend
 import android.content.Context
 import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
-import notifyrelay.base.util.Logger
-import notifyrelay.data.FilterConfigDefaults
-import notifyrelay.data.StorageManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -18,9 +15,12 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
-import kotlin.time.Duration.Companion.milliseconds
+import notifyrelay.base.util.Logger
+import notifyrelay.data.FilterConfigDefaults
+import notifyrelay.data.StorageManager
 import org.json.JSONArray
 import org.json.JSONObject
+import kotlin.time.Duration.Companion.milliseconds
 
 /**
  * 后端接收通知过滤器
@@ -28,7 +28,6 @@ import org.json.JSONObject
  * 过滤决策委托给 Rust NativeCore
  */
 object BackendRemoteFilter {
-
     /** Rust 上下文指针，由 DeviceConnectionManager 创建时设置 */
     var rustContext: Pointer? = null
 
@@ -40,6 +39,7 @@ object BackendRemoteFilter {
 
     // 待监控的通知撤回队列
     private val pendingNotifications = mutableListOf<PendingNotification>()
+
     // 延迟复刻占位队列（用于锁屏延迟复刻的占位，15s 可被本机入队取消）
     private val pendingPlaceholders = mutableListOf<Placeholder>()
 
@@ -48,7 +48,7 @@ object BackendRemoteFilter {
         val text: String,
         val packageName: String,
         val createTime: Long,
-        val ttl: Long
+        val ttl: Long,
     )
 
     data class PendingNotification(
@@ -57,7 +57,7 @@ object BackendRemoteFilter {
         val text: String,
         val packageName: String,
         val sendTime: Long,
-        val context: Context
+        val context: Context,
     )
 
     /**
@@ -69,7 +69,7 @@ object BackendRemoteFilter {
         val title: String,
         val text: String,
         val rawData: String,
-        val needsDelay: Boolean = false // 是否需要延迟验证（先发送后监控）
+        val needsDelay: Boolean = false, // 是否需要延迟验证（先发送后监控）
     )
 
     /**
@@ -79,7 +79,10 @@ object BackendRemoteFilter {
      * 同步契约：被消息处理链（NotificationProcessor.process，非 suspend）调用，
      * 无法直接挂起。配置加载通过 loadBlocking 兜底（仅首次加载，后续 isLoaded 短路）。
      */
-    fun filterRemoteNotification(data: String, context: Context): FilterResult {
+    fun filterRemoteNotification(
+        data: String,
+        context: Context,
+    ): FilterResult {
         // 确保配置已加载（只加载一次）
         synchronized(RemoteFilterConfig) {
             if (!RemoteFilterConfig.isLoaded) {
@@ -124,7 +127,7 @@ object BackendRemoteFilter {
 
             // 锁屏通知过滤
             if (RemoteFilterConfig.enableLockScreenOnly && !isLocked) {
-                //Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 锁屏过滤开启 - 非锁屏通知被过滤")
+                // Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 锁屏过滤开启 - 非锁屏通知被过滤")
                 return FilterResult(false, mappedPkg, title, text, data)
             }
 
@@ -137,23 +140,24 @@ object BackendRemoteFilter {
                 //  - 远端包名不属于任何等价组
                 //  - 且映射到的本地包未安装
                 // 对于本机已安装映射包（包括 mappedPkg == pkg 的同包名场景）仍然执行去重。
-                val pkgInGroups = if (RemoteFilterConfig.enablePackageGroupMapping) {
-                    RemoteFilterConfig.packageGroups.any { pkg in it }
-                } else {
-                    true
-                }
+                val pkgInGroups =
+                    if (RemoteFilterConfig.enablePackageGroupMapping) {
+                        RemoteFilterConfig.packageGroups.any { pkg in it }
+                    } else {
+                        true
+                    }
 
                 val shouldSkipDedup = RemoteFilterConfig.enablePackageGroupMapping && !pkgInGroups && (mappedPkg !in installedPkgs)
 
                 if (shouldSkipDedup) {
-                    //Logger.d("智能去重", "跳过去重：包名不属于等价组且本机未安装映射包，包名=$pkg, mappedPkg=$mappedPkg")
+                    // Logger.d("智能去重", "跳过去重：包名不属于等价组且本机未安装映射包，包名=$pkg, mappedPkg=$mappedPkg")
                     // 跳过去重，继续走后续流程（如锁屏过滤和最终通过）
                 } else {
                     // 1. 快速缓存检查（10秒内）
                     synchronized(dedupCache) {
                         dedupCache.removeAll { now - it.third > 10_000 } // 清理过期缓存
                         val cacheDup = dedupCache.any { it.first == title && it.second == text }
-                        //Logger.d("智能去重", "缓存检查 - 缓存大小:${dedupCache.size}, 是否重复:$cacheDup")
+                        // Logger.d("智能去重", "缓存检查 - 缓存大小:${dedupCache.size}, 是否重复:$cacheDup")
                         if (cacheDup) {
                             // 撤回匹配的待监控通知
                             synchronized(pendingNotifications) {
@@ -161,7 +165,7 @@ object BackendRemoteFilter {
                                 toCancel.forEach { cancelNotification(it.notifyId, context) }
                                 pendingNotifications.removeAll(toCancel)
                             }
-                            //Logger.d("智能去重", "命中10秒缓存并撤回之前的通知 - 包名:$pkg, 标题:$title, 内容:$text")
+                            // Logger.d("智能去重", "命中10秒缓存并撤回之前的通知 - 包名:$pkg, 标题:$title, 内容:$text")
                             return FilterResult(false, mappedPkg, title, text, data)
                         }
                     }
@@ -169,18 +173,20 @@ object BackendRemoteFilter {
                     // 2. 历史重复检查优化
                     try {
                         checkHistorySyncReliability()
-                        //Logger.d("NotifyRelay(狂鼠)", "历史同步不可靠，强制刷新")
+                        // Logger.d("NotifyRelay(狂鼠)", "历史同步不可靠，强制刷新")
                         // Note: This line references a non-existent method, commenting out
                         // com.xzyht.notifyrelay.feature.device.model.NotificationRepository.notifyHistoryChanged("本机", context)
 
                         // 获取内存历史数据
                         // Note: This references non-existent classes, need to handle appropriately
-                        val localList = com.xzyht.notifyrelay.feature.device.model.NotificationRepository.getNotificationsByDevice("本机")
+                        val localList =
+                            com.xzyht.notifyrelay.feature.device.model.NotificationRepository
+                                .getNotificationsByDevice("本机")
                         val memoryDup = checkDuplicateInMemory(localList, title, text)
 
                         // 如果内存中有重复，直接过滤
                         if (memoryDup) {
-                            //Logger.d("智能去重", "命中内存历史重复")
+                            // Logger.d("智能去重", "命中内存历史重复")
                             return FilterResult(false, mappedPkg, title, text, data)
                         }
 
@@ -188,15 +194,14 @@ object BackendRemoteFilter {
                         // 但如果该远端通知接受到时本机锁屏，则避免先发送再撤回，改为不立即展示，
                         // 由上层在超期后再次检查并决定是否复刻（见 DeviceConnectionManager 的处理）。
                         if (isLocked) {
-                            //Logger.d("NotifyRelay(狂鼠)", "本机锁屏：内存无重复，改为不立即展示，等待超期后再复刻")
+                            // Logger.d("NotifyRelay(狂鼠)", "本机锁屏：内存无重复，改为不立即展示，等待超期后再复刻")
                             return FilterResult(false, mappedPkg, title, text, data, needsDelay = false)
                         }
 
-                        //Logger.d("NotifyRelay(狂鼠)", "无历史重复，标记延迟验证")
+                        // Logger.d("NotifyRelay(狂鼠)", "无历史重复，标记延迟验证")
                         return FilterResult(true, mappedPkg, title, text, data, needsDelay = true)
-
                     } catch (_: Exception) {
-                        //Logger.e("智能去重", "历史检查异常", e)
+                        // Logger.e("智能去重", "历史检查异常", e)
                         // 异常情况下默认延迟验证
                         return FilterResult(true, mappedPkg, title, text, data, needsDelay = true)
                     }
@@ -205,13 +210,12 @@ object BackendRemoteFilter {
 
             // 锁屏通知过滤
             if (RemoteFilterConfig.enableLockScreenOnly && !isLocked) {
-                //Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 锁屏过滤 - 非锁屏通知被过滤")
+                // Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 锁屏过滤 - 非锁屏通知被过滤")
                 return FilterResult(false, mappedPkg, title, text, data)
             }
 
-            //Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 直接通过 - mappedPkg=$mappedPkg title=$title text=$text")
+            // Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 直接通过 - mappedPkg=$mappedPkg title=$title text=$text")
             return FilterResult(true, mappedPkg, title, text, data)
-
         } catch (e: Exception) {
             Logger.e("NotifyRelay(狂鼠)", "filterRemoteNotification: 解析异常 - data=$data", e)
             return FilterResult(true, "", "", "", data)
@@ -221,7 +225,11 @@ object BackendRemoteFilter {
     /**
      * 检查内存中的重复通知 — 使用 Rust shouldDeduplicate 比较文本相似度
      */
-    private fun checkDuplicateInMemory(localList: List<NotificationRecord>, title: String, text: String): Boolean {
+    private fun checkDuplicateInMemory(
+        localList: List<NotificationRecord>,
+        title: String,
+        text: String,
+    ): Boolean {
         var hasDuplicate = false
 
         for (notification in localList) {
@@ -252,7 +260,10 @@ object BackendRemoteFilter {
     /**
      * 添加到去重缓存
      */
-    fun addToDedupCache(title: String, text: String) {
+    fun addToDedupCache(
+        title: String,
+        text: String,
+    ) {
         synchronized(dedupCache) {
             dedupCache.add(Triple(title, text, System.currentTimeMillis()))
         }
@@ -261,26 +272,35 @@ object BackendRemoteFilter {
     /**
      * 添加占位（用于锁屏延迟复刻场景）。
      */
-    fun addPlaceholder(title: String, text: String, packageName: String, ttl: Long = 15_000L) {
+    fun addPlaceholder(
+        title: String,
+        text: String,
+        packageName: String,
+        ttl: Long = 15_000L,
+    ) {
         if (!RemoteFilterConfig.enableDeduplication) return
         val ph = Placeholder(title = title, text = text, packageName = packageName, createTime = System.currentTimeMillis(), ttl = ttl)
         synchronized(pendingPlaceholders) {
             pendingPlaceholders.add(ph)
         }
-        //Logger.d("智能去重", "添加延迟复刻占位 - 标题:$title, 包名:$packageName, ttl=${ttl}ms")
+        // Logger.d("智能去重", "添加延迟复刻占位 - 标题:$title, 包名:$packageName, ttl=${ttl}ms")
     }
 
     /**
      * 移除匹配的占位（通常由本机入队触发），返回是否有移除项
      */
-    fun removePlaceholderMatching(title: String?, text: String?, packageName: String): Boolean {
+    fun removePlaceholderMatching(
+        title: String?,
+        text: String?,
+        packageName: String,
+    ): Boolean {
         val normalizedTitle = normalizeTitle(title ?: "")
         val pendingText = text ?: ""
         synchronized(pendingPlaceholders) {
             val matches = pendingPlaceholders.filter { ph -> normalizeTitle(ph.title) == normalizedTitle && ph.text == pendingText && ph.packageName == packageName }
             if (matches.isNotEmpty()) {
                 pendingPlaceholders.removeAll(matches)
-                //Logger.d("智能去重", "移除占位 - 标题:${title}, 包名:$packageName, 数量:${matches.size}")
+                // Logger.d("智能去重", "移除占位 - 标题:${title}, 包名:$packageName, 数量:${matches.size}")
                 return true
             }
         }
@@ -290,7 +310,11 @@ object BackendRemoteFilter {
     /**
      * 检查占位是否仍然存在（并清理过期项）
      */
-    fun isPlaceholderPresent(title: String?, text: String?, packageName: String): Boolean {
+    fun isPlaceholderPresent(
+        title: String?,
+        text: String?,
+        packageName: String,
+    ): Boolean {
         val now = System.currentTimeMillis()
         val normalizedTitle = normalizeTitle(title ?: "")
         val pendingText = text ?: ""
@@ -306,24 +330,31 @@ object BackendRemoteFilter {
      * 如果与待撤回队列命中，则立即撤回对应通知并移除待监控项，进入被动撤回模式，减少轮询与IO。
      */
     @Suppress("UNUSED_PARAMETER")
-    fun onLocalNotificationEnqueued(title: String?, text: String?, packageName: String, time: Long, context: Context) {
+    fun onLocalNotificationEnqueued(
+        title: String?,
+        text: String?,
+        packageName: String,
+        time: Long,
+        context: Context,
+    ) {
         if (!RemoteFilterConfig.enableDeduplication) return
         val normalizedPendingTitle = normalizeTitle(title ?: "")
         val pendingText = text ?: ""
         // 先处理占位匹配（用于延迟复刻的占位）——在单独的锁上操作以避免并发问题
         synchronized(pendingPlaceholders) {
-            val placeholderMatches = pendingPlaceholders.filter { ph ->
-                normalizeTitle(ph.title) == normalizedPendingTitle && ph.text == pendingText && ph.packageName == packageName
-            }
+            val placeholderMatches =
+                pendingPlaceholders.filter { ph ->
+                    normalizeTitle(ph.title) == normalizedPendingTitle && ph.text == pendingText && ph.packageName == packageName
+                }
             if (placeholderMatches.isNotEmpty()) {
-                //Logger.d("智能去重", "被动命中占位（阻止延迟复刻） - 标题:${title}, 内容:${text}, 匹配数量:${placeholderMatches.size}")
+                // Logger.d("智能去重", "被动命中占位（阻止延迟复刻） - 标题:${title}, 内容:${text}, 匹配数量:${placeholderMatches.size}")
             }
             // 移除命中的占位并将其写入去重缓存
             placeholderMatches.forEach { ph ->
                 try {
                     pendingPlaceholders.remove(ph)
                     addToDedupCache(ph.title, ph.text)
-                    //Logger.d("智能去重", "占位已取消 - 标题:${ph.title}")
+                    // Logger.d("智能去重", "占位已取消 - 标题:${ph.title}")
                 } catch (e: Exception) {
                     Logger.e("智能去重", "取消占位失败 - 标题:${ph.title}", e)
                 }
@@ -332,17 +363,18 @@ object BackendRemoteFilter {
 
         // 再处理已发送但在可撤回期的通知
         synchronized(pendingNotifications) {
-            val matches = pendingNotifications.filter { pending ->
-                normalizeTitle(pending.title) == normalizedPendingTitle && pending.text == pendingText && pending.packageName == packageName
-            }
+            val matches =
+                pendingNotifications.filter { pending ->
+                    normalizeTitle(pending.title) == normalizedPendingTitle && pending.text == pendingText && pending.packageName == packageName
+                }
             if (matches.isNotEmpty() && DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
                 val titlePreview = if ((title?.length ?: 0) > 10) "${title?.take(10)}..." else (title ?: "")
-                Logger.d("智能去重", "被动命中待撤回通知 - 包名:${packageName}, 标题预览:${titlePreview}, 匹配数量:${matches.size}")
+                Logger.d("智能去重", "被动命中待撤回通知 - 包名:$packageName, 标题预览:$titlePreview, 匹配数量:${matches.size}")
             }
             matches.forEach { matched ->
                 try {
                     cancelNotification(matched.notifyId, matched.context)
-                    //Logger.d("智能去重", "被动撤回成功 - 通知ID:${matched.notifyId}, 标题:${matched.title}")
+                    // Logger.d("智能去重", "被动撤回成功 - 通知ID:${matched.notifyId}, 标题:${matched.title}")
                 } catch (e: Exception) {
                     Logger.e("智能去重", "被动撤回失败 - 通知ID:${matched.notifyId}", e)
                 }
@@ -358,23 +390,31 @@ object BackendRemoteFilter {
     /**
      * 添加待监控的通知
      */
-    fun addPendingNotification(notifyId: Int, title: String, text: String, packageName: String, context: Context) {
+    fun addPendingNotification(
+        notifyId: Int,
+        title: String,
+        text: String,
+        packageName: String,
+        context: Context,
+    ) {
         // 只有在去重开关开启时才添加监控
         if (!RemoteFilterConfig.enableDeduplication) {
             return
         }
 
         synchronized(pendingNotifications) {
-            pendingNotifications.add(PendingNotification(
-                notifyId = notifyId,
-                title = title,
-                text = text,
-                packageName = packageName,
-                sendTime = System.currentTimeMillis(),
-                context = context
-            ))
+            pendingNotifications.add(
+                PendingNotification(
+                    notifyId = notifyId,
+                    title = title,
+                    text = text,
+                    packageName = packageName,
+                    sendTime = System.currentTimeMillis(),
+                    context = context,
+                ),
+            )
         }
-        //Logger.d("智能去重", "添加待监控通知 - 进入可撤回期(15s) 包名:$packageName, 标题:$title, 通知ID:$notifyId")
+        // Logger.d("智能去重", "添加待监控通知 - 进入可撤回期(15s) 包名:$packageName, 标题:$title, 通知ID:$notifyId")
         // 启动监控协程
         startNotificationMonitoring()
     }
@@ -382,11 +422,14 @@ object BackendRemoteFilter {
     /**
      * 撤回通知
      */
-    private fun cancelNotification(notifyId: Int, context: Context) {
+    private fun cancelNotification(
+        notifyId: Int,
+        context: Context,
+    ) {
         try {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager
             notificationManager.cancel(notifyId)
-            //Logger.d("智能去重", "已撤回通知 - 通知ID:$notifyId")
+            // Logger.d("智能去重", "已撤回通知 - 通知ID:$notifyId")
         } catch (e: Exception) {
             Logger.e("智能去重", "撤回通知失败 - 通知ID:$notifyId, 错误:${e.message}")
         }
@@ -396,20 +439,20 @@ object BackendRemoteFilter {
      * 启动通知监控协程
      */
     private fun startNotificationMonitoring() {
-        //Logger.d("智能去重", "启动通知监控协程（仅处理超时） - 当前待监控通知数量:${pendingNotifications.size}")
+        // Logger.d("智能去重", "启动通知监控协程（仅处理超时） - 当前待监控通知数量:${pendingNotifications.size}")
         scope.launch {
             while (true) {
                 val now = System.currentTimeMillis()
                 val toRemove = mutableListOf<PendingNotification>()
 
                 synchronized(pendingNotifications) {
-                        for (pending in pendingNotifications) {
-                            // 仅处理监控超时逻辑：我们改为被动匹配（由本机历史入队触发匹配），减少频繁IO读取历史
-                            if (now - pending.sendTime > 15_000) {
-                                //Logger.d("智能去重", "监控超时移除 - 包名:${pending.packageName}, 标题:${pending.title}, 通知ID:${pending.notifyId}, 监控时长:${now - pending.sendTime}ms")
-                                toRemove.add(pending)
-                            }
+                    for (pending in pendingNotifications) {
+                        // 仅处理监控超时逻辑：我们改为被动匹配（由本机历史入队触发匹配），减少频繁IO读取历史
+                        if (now - pending.sendTime > 15_000) {
+                            // Logger.d("智能去重", "监控超时移除 - 包名:${pending.packageName}, 标题:${pending.title}, 通知ID:${pending.notifyId}, 监控时长:${now - pending.sendTime}ms")
+                            toRemove.add(pending)
                         }
+                    }
 
                     // 移除已处理的待监控通知
                     pendingNotifications.removeAll(toRemove)
@@ -417,7 +460,7 @@ object BackendRemoteFilter {
                     // 为超时移除的通知添加去重缓存
                     toRemove.filter { now - it.sendTime > 15_000 }.forEach { timedOut ->
                         addToDedupCache(timedOut.title, timedOut.text)
-                        //Logger.d("智能去重", "超时通知添加到缓存 - 标题:${timedOut.title}, 内容:${timedOut.text}")
+                        // Logger.d("智能去重", "超时通知添加到缓存 - 标题:${timedOut.title}, 内容:${timedOut.text}")
                     }
                 }
 
@@ -429,7 +472,7 @@ object BackendRemoteFilter {
                 }
 
                 if (pendingNotifications.isEmpty()) {
-                    //Logger.d("智能去重", "监控协程结束 - 所有通知已处理完成")
+                    // Logger.d("智能去重", "监控协程结束 - 所有通知已处理完成")
                     break
                 }
 
@@ -488,9 +531,13 @@ object RemoteFilterConfig {
 
     // 合并后的包名等价组
     val packageGroups: List<Set<String>>
-        get() = if (!enablePackageGroupMapping) emptyList()
-        else defaultPackageGroups.withIndex().filter { defaultGroupEnabled.getOrNull(it.index) == true }.map { it.value.toSet() } +
-                customPackageGroups.withIndex().filter { customGroupEnabled.getOrNull(it.index) == true }.map { it.value.toSet() }
+        get() =
+            if (!enablePackageGroupMapping) {
+                emptyList()
+            } else {
+                defaultPackageGroups.withIndex().filter { defaultGroupEnabled.getOrNull(it.index) == true }.map { it.value.toSet() } +
+                    customPackageGroups.withIndex().filter { customGroupEnabled.getOrNull(it.index) == true }.map { it.value.toSet() }
+            }
 
     // 智能去重开关（先发送后撤回机制）
     var enableDeduplication: Boolean = true
@@ -510,6 +557,7 @@ object RemoteFilterConfig {
 
     // 对等模式开关（仅本机存在的应用或通用应用）
     var enablePeerMode: Boolean = false
+
     // 锁屏通知过滤开关
     var enableLockScreenOnly: Boolean = true
 
@@ -532,24 +580,37 @@ object RemoteFilterConfig {
 
     private suspend fun loadFilterLists(context: Context) {
         withContext(Dispatchers.IO) {
-            val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+            val repo =
+                notifyrelay.data.database.repository.DatabaseRepository
+                    .getInstance(context)
             val blackRows = repo.getBlackList()
             blackList = blackRows.map { it.packageName to it.keyword.takeIf { k -> k.isNotBlank() } }
-            blackListEnabled = blackRows.filter { it.enabled }
-                .map { serializeFilterEntry(it.packageName, it.keyword) }.toSet()
+            blackListEnabled =
+                blackRows
+                    .filter { it.enabled }
+                    .map { serializeFilterEntry(it.packageName, it.keyword) }
+                    .toSet()
             val whiteRows = repo.getWhiteList()
             whiteList = whiteRows.map { it.packageName to it.keyword.takeIf { k -> k.isNotBlank() } }
-            whiteListEnabled = whiteRows.filter { it.enabled }
-                .map { serializeFilterEntry(it.packageName, it.keyword) }.toSet()
+            whiteListEnabled =
+                whiteRows
+                    .filter { it.enabled }
+                    .map { serializeFilterEntry(it.packageName, it.keyword) }
+                    .toSet()
         }
     }
 
     private suspend fun loadPackageGroups(context: Context) {
         withContext(Dispatchers.IO) {
-            val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+            val repo =
+                notifyrelay.data.database.repository.DatabaseRepository
+                    .getInstance(context)
             val groups = repo.getPackageGroups()
-            val items = repo.getPackageGroupItems().groupBy { it.groupId }
-                .mapValues { (_, v) -> v.map { it.packageName } }
+            val items =
+                repo
+                    .getPackageGroupItems()
+                    .groupBy { it.groupId }
+                    .mapValues { (_, v) -> v.map { it.packageName } }
             val defaultRows = groups.filter { it.isDefault }.sortedBy { it.id }
             defaultGroupEnabled = MutableList(defaultPackageGroups.size) { true }
             defaultRows.forEachIndexed { idx, g ->
@@ -594,43 +655,55 @@ object RemoteFilterConfig {
 
     private suspend fun saveFilterLists(context: Context) {
         withContext(Dispatchers.IO) {
-            val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
-            repo.replaceBlackList(blackList.map {
-                notifyrelay.data.database.entity.BlackListEntryEntity(
-                    packageName = it.first,
-                    keyword = it.second ?: "",
-                    enabled = blackListEnabled.contains(serializeFilterEntry(it.first, it.second))
-                )
-            })
-            repo.replaceWhiteList(whiteList.map {
-                notifyrelay.data.database.entity.WhiteListEntryEntity(
-                    packageName = it.first,
-                    keyword = it.second ?: "",
-                    enabled = whiteListEnabled.contains(serializeFilterEntry(it.first, it.second))
-                )
-            })
+            val repo =
+                notifyrelay.data.database.repository.DatabaseRepository
+                    .getInstance(context)
+            repo.replaceBlackList(
+                blackList.map {
+                    notifyrelay.data.database.entity.BlackListEntryEntity(
+                        packageName = it.first,
+                        keyword = it.second ?: "",
+                        enabled = blackListEnabled.contains(serializeFilterEntry(it.first, it.second)),
+                    )
+                },
+            )
+            repo.replaceWhiteList(
+                whiteList.map {
+                    notifyrelay.data.database.entity.WhiteListEntryEntity(
+                        packageName = it.first,
+                        keyword = it.second ?: "",
+                        enabled = whiteListEnabled.contains(serializeFilterEntry(it.first, it.second)),
+                    )
+                },
+            )
         }
     }
 
     private suspend fun savePackageGroups(context: Context) {
         withContext(Dispatchers.IO) {
-            val repo = notifyrelay.data.database.repository.DatabaseRepository.getInstance(context)
+            val repo =
+                notifyrelay.data.database.repository.DatabaseRepository
+                    .getInstance(context)
             val groups = mutableListOf<notifyrelay.data.database.entity.PackageGroupEntity>()
             val itemPackages = mutableListOf<List<String>>()
             defaultPackageGroups.forEachIndexed { idx, pkgs ->
-                groups.add(notifyrelay.data.database.entity.PackageGroupEntity(
-                    groupName = "默认组${idx + 1}",
-                    enabled = defaultGroupEnabled.getOrNull(idx) ?: true,
-                    isDefault = true
-                ))
+                groups.add(
+                    notifyrelay.data.database.entity.PackageGroupEntity(
+                        groupName = "默认组${idx + 1}",
+                        enabled = defaultGroupEnabled.getOrNull(idx) ?: true,
+                        isDefault = true,
+                    ),
+                )
                 itemPackages.add(pkgs)
             }
             customPackageGroups.forEachIndexed { idx, pkgs ->
-                groups.add(notifyrelay.data.database.entity.PackageGroupEntity(
-                    groupName = "自定义组${idx + 1}",
-                    enabled = customGroupEnabled.getOrNull(idx) ?: true,
-                    isDefault = false
-                ))
+                groups.add(
+                    notifyrelay.data.database.entity.PackageGroupEntity(
+                        groupName = "自定义组${idx + 1}",
+                        enabled = customGroupEnabled.getOrNull(idx) ?: true,
+                        isDefault = false,
+                    ),
+                )
                 itemPackages.add(pkgs)
             }
             repo.replacePackageGroups(groups, itemPackages)
@@ -638,33 +711,50 @@ object RemoteFilterConfig {
     }
 
     /** 将当前配置同步到 Rust Core */
-    fun syncToRust(ctx: Pointer, installedPkgs: Set<String>): Boolean {
+    fun syncToRust(
+        ctx: Pointer,
+        installedPkgs: Set<String>,
+    ): Boolean {
         val json = buildRustConfigJson(installedPkgs)
         return NativeCore.setFilterConfig(ctx, json) == 0
     }
 
     // ---------- 黑白名单操作（按当前 filterMode 生效） ----------
 
-    private fun serializeFilterEntry(pkg: String, keyword: String?): String =
-        pkg + (keyword?.takeIf { it.isNotBlank() }?.let { "|$it" } ?: "")
+    private fun serializeFilterEntry(
+        pkg: String,
+        keyword: String?,
+    ): String = pkg + (keyword?.takeIf { it.isNotBlank() }?.let { "|$it" } ?: "")
 
     /** 当前模式对应的名单 */
-    fun getActiveFilterList(): List<Pair<String, String?>> = when (filterMode) {
-        "black" -> blackList
-        "white" -> whiteList
-        else -> emptyList()
-    }
+    fun getActiveFilterList(): List<Pair<String, String?>> =
+        when (filterMode) {
+            "black" -> blackList
+            "white" -> whiteList
+            else -> emptyList()
+        }
 
     /** 条目是否启用（迁移后默认启用） */
-    fun isActiveEntryEnabled(pkg: String, keyword: String): Boolean {
+    fun isActiveEntryEnabled(
+        pkg: String,
+        keyword: String,
+    ): Boolean {
         val ser = serializeFilterEntry(pkg, keyword)
-        return if (filterMode == "black") blackListEnabled.contains(ser)
-        else if (filterMode == "white") whiteListEnabled.contains(ser)
-        else true
+        return if (filterMode == "black") {
+            blackListEnabled.contains(ser)
+        } else if (filterMode == "white") {
+            whiteListEnabled.contains(ser)
+        } else {
+            true
+        }
     }
 
     /** 向当前模式的名单添加条目（默认启用） */
-    suspend fun addFilterEntry(context: Context, pkg: String, keyword: String) {
+    suspend fun addFilterEntry(
+        context: Context,
+        pkg: String,
+        keyword: String,
+    ) {
         val kw = keyword.takeIf { it.isNotBlank() }
         when (filterMode) {
             "black" -> {
@@ -681,7 +771,11 @@ object RemoteFilterConfig {
     }
 
     /** 从当前模式的名单移除条目 */
-    suspend fun removeFilterEntry(context: Context, pkg: String, keyword: String) {
+    suspend fun removeFilterEntry(
+        context: Context,
+        pkg: String,
+        keyword: String,
+    ) {
         val ser = serializeFilterEntry(pkg, keyword)
         when (filterMode) {
             "black" -> {
@@ -697,7 +791,12 @@ object RemoteFilterConfig {
     }
 
     /** 启用/禁用当前模式的条目 */
-    suspend fun setFilterEntryEnabled(context: Context, pkg: String, keyword: String, enabled: Boolean) {
+    suspend fun setFilterEntryEnabled(
+        context: Context,
+        pkg: String,
+        keyword: String,
+        enabled: Boolean,
+    ) {
         val ser = serializeFilterEntry(pkg, keyword)
         when (filterMode) {
             "black" -> blackListEnabled = if (enabled) blackListEnabled + ser else blackListEnabled - ser
@@ -742,24 +841,27 @@ object RemoteFilterConfig {
         root.put("groupEnabled", enabledMap)
 
         // 过滤模式
-        val filterModeNum = when (filterMode) {
-            "white" -> 1
-            "black" -> 2
-            else -> 0
-        }
+        val filterModeNum =
+            when (filterMode) {
+                "white" -> 1
+                "black" -> 2
+                else -> 0
+            }
         root.put("filterMode", filterModeNum)
 
         // 黑白名单（当前模式对应的名单，仅包含启用条目）
-        val activeList = when (filterMode) {
-            "black" -> blackList
-            "white" -> whiteList
-            else -> emptyList()
-        }
-        val activeEnabled = when (filterMode) {
-            "black" -> blackListEnabled
-            "white" -> whiteListEnabled
-            else -> emptySet()
-        }
+        val activeList =
+            when (filterMode) {
+                "black" -> blackList
+                "white" -> whiteList
+                else -> emptyList()
+            }
+        val activeEnabled =
+            when (filterMode) {
+                "black" -> blackListEnabled
+                "white" -> whiteListEnabled
+                else -> emptySet()
+            }
         val filterListArr = JSONArray()
         for ((pkg, keyword) in activeList) {
             if (activeEnabled.contains(serializeFilterEntry(pkg, keyword))) {
@@ -775,13 +877,20 @@ object RemoteFilterConfig {
     }
 
     /** 包名映射 — 委托给 Rust Core */
-    fun mapToLocalPackage(pkg: String, installedPkgs: Set<String>): String {
+    fun mapToLocalPackage(
+        pkg: String,
+        installedPkgs: Set<String>,
+    ): String {
         val ctx = BackendRemoteFilter.rustContext ?: return pkg
         return NativeCore.mapLocalPackage(ctx, pkg) ?: pkg
     }
 
     /** 检查过滤模式（含关键词匹配）— 委托给 Rust Core */
-    fun checkFilterWithRust(pkg: String, title: String, text: String): Boolean {
+    fun checkFilterWithRust(
+        pkg: String,
+        title: String,
+        text: String,
+    ): Boolean {
         val ctx = BackendRemoteFilter.rustContext ?: return true
         return NativeCore.checkFilterMode(ctx, pkg, pkg, title, text)
     }

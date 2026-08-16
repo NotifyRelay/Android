@@ -47,11 +47,12 @@ class GuideActivity : ComponentActivity() {
                 var themeBaseIndex by remember {
                     mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(appContext))
                 }
-                val isDarkTheme = when (themeBaseIndex) {
-                    ThemeSettingsManager.THEME_LIGHT -> false
-                    ThemeSettingsManager.THEME_DARK -> true
-                    else -> systemDarkTheme
-                }
+                val isDarkTheme =
+                    when (themeBaseIndex) {
+                        ThemeSettingsManager.THEME_LIGHT -> false
+                        ThemeSettingsManager.THEME_DARK -> true
+                        else -> systemDarkTheme
+                    }
 
                 NotifyRelayTheme(darkTheme = isDarkTheme) {
                     SetupSystemBars(isDarkTheme)
@@ -72,7 +73,7 @@ class GuideActivity : ComponentActivity() {
 
                             startActivity(Intent(this@GuideActivity, MainActivity::class.java))
                             finish()
-                        }
+                        },
                     )
                 }
             }

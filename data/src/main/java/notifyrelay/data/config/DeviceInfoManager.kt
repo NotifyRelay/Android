@@ -1,8 +1,8 @@
 package notifyrelay.data.config
 
 import android.content.Context
-import notifyrelay.data.PersistenceManager
 import notifyrelay.base.util.Logger
+import notifyrelay.data.PersistenceManager
 import java.io.File
 
 object DeviceInfoManager {

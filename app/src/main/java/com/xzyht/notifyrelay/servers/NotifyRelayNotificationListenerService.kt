@@ -23,7 +23,6 @@ import com.xzyht.notifyrelay.feature.notification.backend.BackendLocalFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.LocalSuperIslandTracker
 import com.xzyht.notifyrelay.feature.notification.superisland.MediaCapsulePresenter
-import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.sync.MessageSender
@@ -47,17 +46,21 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         private const val TAG = "NotifyRelayNotificationListenerService"
         private const val MAX_CACHE_SIZE = 2000
         private const val CACHE_CLEANUP_THRESHOLD = 1500
-        private const val CACHE_ENTRY_TTL = 24 * 60 * 60 * 1000L // 24小时TTL
+        private const val CACHE_ENTRY_TTL = 24 * 60 * 60 * 1000L
+
+        // 24小时TTL
+
         // 最新的媒体播放通知（用于被外部工具查询并触发其 action）
         @Volatile
         var latestMediaSbn: StatusBarNotification? = null
+
         // 服务实例，用于在静态方法中访问实例方法
         @Volatile
         var instance: NotifyRelayNotificationListenerService? = null
-        
+
         // 媒体会话数据缓存
         private val mediaSessionDataCache = ConcurrentHashMap<String, MediaSessionData>()
-        
+
         // 接收来自 MediaSessionMonitorService 的媒体会话数据
         @JvmStatic
         fun onMediaSessionUpdated(
@@ -65,28 +68,30 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             title: String,
             artist: String,
             duration: Long,
-            artBitmap: Any?
+            artBitmap: Any?,
         ) {
             Logger.i(TAG, "Received MediaSession update: $packageName - $title")
-            
+
             // 缓存媒体会话数据
-            val mediaSessionData = MediaSessionData(
-                packageName = packageName,
-                title = title,
-                artist = artist,
-                duration = duration,
-                artBitmap = artBitmap as? Bitmap,
-                timestamp = System.currentTimeMillis()
-            )
+            val mediaSessionData =
+                MediaSessionData(
+                    packageName = packageName,
+                    title = title,
+                    artist = artist,
+                    duration = duration,
+                    artBitmap = artBitmap as? Bitmap,
+                    timestamp = System.currentTimeMillis(),
+                )
             mediaSessionDataCache[packageName] = mediaSessionData
-            
+
             // 立即处理媒体会话数据，确保歌词获取与通知获取同步
             // 查找对应的媒体通知并处理
             val activeNotifications = instance?.activeNotifications
             if (activeNotifications != null) {
-                val mediaSbn = activeNotifications.firstOrNull { 
-                    it.packageName == packageName && it.notification.category == Notification.CATEGORY_TRANSPORT 
-                }
+                val mediaSbn =
+                    activeNotifications.firstOrNull {
+                        it.packageName == packageName && it.notification.category == Notification.CATEGORY_TRANSPORT
+                    }
                 for (sbn in activeNotifications) {
                     if (sbn.packageName == packageName && sbn.notification.category == Notification.CATEGORY_TRANSPORT) {
                         instance?.processMediaNotification(sbn)
@@ -95,12 +100,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 }
             }
         }
-        
+
         // 获取指定包名的媒体会话数据
-    fun getMediaSessionData(packageName: String): MediaSessionData? {
-        return mediaSessionDataCache[packageName]
-    }
-        
+        fun getMediaSessionData(packageName: String): MediaSessionData? = mediaSessionDataCache[packageName]
+
         // 媒体会话数据类
         data class MediaSessionData(
             val packageName: String,
@@ -108,14 +111,16 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             val artist: String,
             val duration: Long,
             val artBitmap: Bitmap?,
-            val timestamp: Long
+            val timestamp: Long,
         )
     }
+
     override fun onNotificationRemoved(sbn: StatusBarNotification) {
         // 只补发本应用的前台服务通知（必须channelId和id都匹配）
-        if (sbn.packageName == applicationContext.packageName
-            && sbn.notification.channelId == CHANNEL_ID
-            && sbn.id == NOTIFY_ID) {
+        if (sbn.packageName == applicationContext.packageName &&
+            sbn.notification.channelId == channelId &&
+            sbn.id == notifyId
+        ) {
             Logger.w(TAG, "前台服务通知被移除，自动补发！")
             // 立即补发本服务前台通知
             startForegroundService()
@@ -146,7 +151,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                         sbn.packageName,
                         appName,
                         System.currentTimeMillis(),
-                        deviceManager
+                        deviceManager,
                     )
                     // 更新全局最新媒体通知
                     if (latestMediaSbn?.key == sbn.key) {
@@ -162,7 +167,12 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             } else {
                 // 超级岛：发送终止包
                 try {
-                    val superData = try { SuperIslandManager.extractSuperIslandData(sbn, applicationContext) } catch (_: Exception) { null }
+                    val superData =
+                        try {
+                            SuperIslandManager.extractSuperIslandData(sbn, applicationContext)
+                        } catch (_: Exception) {
+                            null
+                        }
                     if (superData != null) {
                         val deviceManager = this.deviceManager
                         val superPkg = superData.sourcePackage ?: "unknown"
@@ -170,19 +180,25 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                         MessageSender.sendSuperIslandEnd(
                             applicationContext,
                             superPkg,
-                            try { applicationContext.packageName } catch (_: Exception) { null },
+                            try {
+                                applicationContext.packageName
+                            } catch (_: Exception) {
+                                null
+                            },
                             System.currentTimeMillis(),
                             superData.paramV2Raw,
                             getNotificationTitle(sbn),
                             getNotificationText(sbn),
                             deviceManager,
-                            featureIdOverride = getNotificationKey(sbn, "")
+                            featureIdOverride = getNotificationKey(sbn, ""),
                         )
                     }
-                } catch (_: Exception) {}
+                } catch (_: Exception) {
+                }
             }
         }
     }
+
     override fun onTaskRemoved(rootIntent: Intent?) {
         Logger.i(TAG, "[NotifyListener] onTaskRemoved called, rootIntent=$rootIntent")
         super.onTaskRemoved(rootIntent)
@@ -191,6 +207,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             Intent(applicationContext, NotifyRelayNotificationListenerService::class.java)
         applicationContext.startForegroundService(restartIntent)
     }
+
     override fun onCreate() {
         Logger.i(TAG, "[NotifyListener] onCreate called")
         // 初始化服务实例
@@ -221,7 +238,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             val startMethod = discovery.javaClass.getDeclaredMethod("startDiscovery")
             startMethod.isAccessible = true
             startMethod.invoke(discovery)
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
 
         // 初始化 MediaSession 监控服务
         mediaSessionMonitorService = MediaSessionMonitorService(this)
@@ -237,19 +255,23 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
         // 监听网络状态变化，更新通知
         val connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
-        networkCallback = object : ConnectivityManager.NetworkCallback() {
-            override fun onAvailable(network: Network) {
-                updateNotification()
-            }
+        networkCallback =
+            object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    updateNotification()
+                }
 
-            override fun onLost(network: Network) {
-                updateNotification()
-            }
+                override fun onLost(network: Network) {
+                    updateNotification()
+                }
 
-            override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
-                updateNotification()
+                override fun onCapabilitiesChanged(
+                    network: Network,
+                    networkCapabilities: NetworkCapabilities,
+                ) {
+                    updateNotification()
+                }
             }
-        }
         connectivityManager.registerDefaultNetworkCallback(networkCallback!!)
 
         super.onCreate()
@@ -259,9 +281,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         Logger.i(TAG, "[NotifyListener] onBind called, intent=$intent")
         return super.onBind(intent)
     }
+
     private var foregroundJob: Job? = null
-    private val CHANNEL_ID = "notifyrelay_foreground"
-    private val NOTIFY_ID = 1001
+    private val channelId = "notifyrelay_foreground"
+    private val notifyId = 1001
 
     // 设备连接管理器
     private lateinit var connectionManager: DeviceConnectionManager
@@ -277,13 +300,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     private val sendScope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val sendMutex = Mutex()
 
-
     // MediaSession 监控服务实例
     private lateinit var mediaSessionMonitorService: MediaSessionMonitorService
 
     // 使用通用工具将 Drawable 转换为 Bitmap（参照项目中其他模块的实现）
-
-
 
     /**
      * 处理媒体播放通知
@@ -293,7 +313,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         // 更新全局持有的最新媒体通知，方便外部通过工具类触发操作
         try {
             latestMediaSbn = sbn
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
 
         // 初始化变量
         var finalTitle: String
@@ -307,7 +328,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             // 使用 MediaSession 数据
             finalTitle = mediaSessionData.title
             finalText = mediaSessionData.artist
-            
+
             // 从 MediaSession 获取封面
             if (mediaSessionData.artBitmap != null) {
                 try {
@@ -333,13 +354,13 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         if (capsuleLyricsEnabled) {
             try {
                 Logger.i(TAG, "胶囊歌词开关开启，在本机内生成浮窗和通知: title='$finalTitle', text='$finalText'")
-                
+
                 val picMap = mutableMapOf<String, String>()
                 if (!finalCoverUrl.isNullOrBlank()) {
                     picMap["miui.focus.pic_cover"] = finalCoverUrl
                     picMap["miui.focus.pic_app_icon"] = finalCoverUrl
                 }
-                
+
                 val appName = getAppName(sbn.packageName)
                 MediaCapsulePresenter.show(
                     context = applicationContext,
@@ -347,7 +368,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     title = finalTitle,
                     text = finalText,
                     appName = appName,
-                    picMap = picMap
+                    picMap = picMap,
                 )
             } catch (e: Exception) {
                 Logger.e(TAG, "在本机内生成浮窗和通知失败", e)
@@ -366,7 +387,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 finalText,
                 finalCoverUrl,
                 sbn.postTime,
-                deviceManager
+                deviceManager,
             )
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放消息失败", e)
@@ -376,9 +397,11 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     private fun cleanupExpiredCacheEntries(currentTime: Long) {
         if (processedNotifications.size <= CACHE_CLEANUP_THRESHOLD) return
 
-        val expiredKeys = processedNotifications.filter { (_, timestamp) ->
-            currentTime - timestamp > CACHE_ENTRY_TTL
-        }.keys
+        val expiredKeys =
+            processedNotifications
+                .filter { (_, timestamp) ->
+                    currentTime - timestamp > CACHE_ENTRY_TTL
+                }.keys
 
         if (expiredKeys.isNotEmpty()) {
             processedNotifications.keys.removeAll(expiredKeys)
@@ -395,7 +418,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         }
     }
 
-    private fun processNotification(sbn: StatusBarNotification, checkProcessed: Boolean = false) {
+    private fun processNotification(
+        sbn: StatusBarNotification,
+        checkProcessed: Boolean = false,
+    ) {
         // 读取超级岛设置开关，决定是否按超级岛专用逻辑处理
         val superIslandEnabled = getStorageBoolean("superisland_enabled", true)
 
@@ -409,54 +435,55 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
         // 在本机本地过滤前，尝试读取超级岛信息并单独转发
         // 当开关开启且检测到超级岛数据时，只发送超级岛分支，不再走普通通知转发
-        val superIslandHandledAndStop: Boolean = if (superIslandEnabled) {
-            try {
-                if (sbn.packageName == applicationContext.packageName) {
-                    false
-                } else {
-                    val superData = SuperIslandManager.extractSuperIslandData(sbn, applicationContext)
-                    if (superData != null) {
-                        Logger.i(TAG, "超级岛: 检测到超级岛数据，准备转发，pkg=${superData.sourcePackage}, title=${superData.title}")
-                        superData.sourcePackage?.let { LocalSuperIslandTracker.markActive(it) }
-                        try {
-                            val deviceManager = this.deviceManager
-                            // 不再使用包名前缀标记；通过通道头 DATA_SUPERISLAND 区分超级岛
-                            val superPkg = superData.sourcePackage ?: "unknown"
-                            // 严格以通知 sbn.key 作为会话键：一条系统通知只对应一座"岛"，内容变化不影响会话
-                            val featureId = getNotificationKey(sbn, "")
-                            // 图片处理（本地 URI 读取/Base64）可能在 IO 线程耗时，异步发送避免阻塞监听线程；
-                            // sendSuperIslandData 内部已捕获全部异常
-                            sendScope.launch {
-                                sendMutex.withLock {
-                                    MessageSender.sendSuperIslandData(
-                                        applicationContext,
-                                        superPkg,
-                                        superData.appName ?: "超级岛",
-                                        superData.title,
-                                        superData.text,
-                                        sbn.postTime,
-                                        superData.paramV2Raw,
-                                        // 尝试把 simple pic map 提取为 string map（仅支持 string/url 类值）
-                                        (superData.picMap ?: emptyMap()),
-                                        deviceManager,
-                                        featureIdOverride = featureId
-                                    )
-                                }
-                            }
-                        } catch (e: Exception) {
-                            Logger.w(TAG, "超级岛: 转发超级岛数据失败: ${e.message}")
-                        }
-                        true
-                    } else {
+        val superIslandHandledAndStop: Boolean =
+            if (superIslandEnabled) {
+                try {
+                    if (sbn.packageName == applicationContext.packageName) {
                         false
+                    } else {
+                        val superData = SuperIslandManager.extractSuperIslandData(sbn, applicationContext)
+                        if (superData != null) {
+                            Logger.i(TAG, "超级岛: 检测到超级岛数据，准备转发，pkg=${superData.sourcePackage}, title=${superData.title}")
+                            superData.sourcePackage?.let { LocalSuperIslandTracker.markActive(it) }
+                            try {
+                                val deviceManager = this.deviceManager
+                                // 不再使用包名前缀标记；通过通道头 DATA_SUPERISLAND 区分超级岛
+                                val superPkg = superData.sourcePackage ?: "unknown"
+                                // 严格以通知 sbn.key 作为会话键：一条系统通知只对应一座"岛"，内容变化不影响会话
+                                val featureId = getNotificationKey(sbn, "")
+                                // 图片处理（本地 URI 读取/Base64）可能在 IO 线程耗时，异步发送避免阻塞监听线程；
+                                // sendSuperIslandData 内部已捕获全部异常
+                                sendScope.launch {
+                                    sendMutex.withLock {
+                                        MessageSender.sendSuperIslandData(
+                                            applicationContext,
+                                            superPkg,
+                                            superData.appName ?: "超级岛",
+                                            superData.title,
+                                            superData.text,
+                                            sbn.postTime,
+                                            superData.paramV2Raw,
+                                            // 尝试把 simple pic map 提取为 string map（仅支持 string/url 类值）
+                                            (superData.picMap ?: emptyMap()),
+                                            deviceManager,
+                                            featureIdOverride = featureId,
+                                        )
+                                    }
+                                }
+                            } catch (e: Exception) {
+                                Logger.w(TAG, "超级岛: 转发超级岛数据失败: ${e.message}")
+                            }
+                            true
+                        } else {
+                            false
+                        }
                     }
+                } catch (_: Exception) {
+                    false
                 }
-            } catch (_: Exception) {
+            } else {
                 false
             }
-        } else {
-            false
-        }
 
         if (superIslandHandledAndStop) {
             // 超级岛分支已完成，只保留本机历史，不再转发普通通知
@@ -465,7 +492,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         }
 
         if (!BackendLocalFilter.shouldForwardBlocking(sbn, applicationContext, checkProcessed)) {
-            if (Logger.ENABLE_FILTERED_NOTIFICATION_LOG) {
+            if (Logger.enableFilteredNotificationLog) {
                 logSbnDetail("法鸡-黑影 被过滤", sbn)
             }
             return
@@ -507,6 +534,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             }
         }
     }
+
     override fun onNotificationPosted(sbn: StatusBarNotification) {
         Logger.i(TAG, "[NotifyListener] onNotificationPosted called, sbnKey=${sbn.key}, pkg=${sbn.packageName}")
         val isMedia = sbn.notification.category == Notification.CATEGORY_TRANSPORT
@@ -526,22 +554,22 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 getNotificationTitle(sbn),
                 getNotificationText(sbn),
                 sbn.postTime,
-                deviceManager
+                deviceManager,
             )
         } catch (e: Exception) {
             Logger.e(TAG, "自动转发通知到远程设备失败", e)
         }
     }
 
-
     override fun onListenerConnected() {
         Logger.i(TAG, "[NotifyListener] onListenerConnected called")
         super.onListenerConnected()
         // 检查监听服务是否启用
-        val enabledListeners = Settings.Secure.getString(
-            applicationContext.contentResolver,
-            "enabled_notification_listeners"
-        )
+        val enabledListeners =
+            Settings.Secure.getString(
+                applicationContext.contentResolver,
+                "enabled_notification_listeners",
+            )
         val isEnabled = enabledListeners?.contains(applicationContext.packageName) == true
         Logger.i(TAG, "[NotifyListener] Listener enabled: $isEnabled, enabledListeners=$enabledListeners")
         if (!isEnabled) {
@@ -565,26 +593,26 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         startForegroundService()
         // 定时拉取活跃通知，保证后台实时性
         foregroundJob?.cancel()
-        foregroundJob = CoroutineScope(Dispatchers.Default).launch {
-            while (true) {
-                delay(30000)
-                val actives = activeNotifications
-                if (actives != null) {
-
-                    for (sbn in actives) {
-                        if (sbn.packageName == applicationContext.packageName) continue
-                        processNotification(sbn, true)
+        foregroundJob =
+            CoroutineScope(Dispatchers.Default).launch {
+                while (true) {
+                    delay(30000)
+                    val actives = activeNotifications
+                    if (actives != null) {
+                        for (sbn in actives) {
+                            if (sbn.packageName == applicationContext.packageName) continue
+                            processNotification(sbn, true)
+                        }
+                        // 定期清理过期的缓存，避免内存泄漏
+                        cleanupExpiredCacheEntries(System.currentTimeMillis())
+                        if (processedNotifications.size > CACHE_CLEANUP_THRESHOLD) {
+                            Logger.d(TAG, "[NotifyListener] 缓存大小: ${processedNotifications.size}")
+                        }
+                    } else {
+                        Logger.w(TAG, "[NotifyListener] 定时拉取 activeNotifications is null")
                     }
-                    // 定期清理过期的缓存，避免内存泄漏
-                    cleanupExpiredCacheEntries(System.currentTimeMillis())
-                    if (processedNotifications.size > CACHE_CLEANUP_THRESHOLD) {
-                        Logger.d(TAG, "[NotifyListener] 缓存大小: ${processedNotifications.size}")
-                    }
-                } else {
-                    Logger.w(TAG, "[NotifyListener] 定时拉取 activeNotifications is null")
                 }
             }
-        }
     }
 
     override fun onListenerDisconnected() {
@@ -614,47 +642,57 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                     val stopMethod = discovery.javaClass.getDeclaredMethod("stopDiscovery")
                     stopMethod.isAccessible = true
                     stopMethod.invoke(discovery)
-                } catch (_: Exception) {}
+                } catch (_: Exception) {
+                }
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         // 注销网络监听器
         try {
             val connectivityManager = getSystemService(CONNECTIVITY_SERVICE) as ConnectivityManager
             networkCallback?.let { connectivityManager.unregisterNetworkCallback(it) }
             networkCallback = null
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
     }
 
     private fun startForegroundService() {
-        val channel = NotificationChannel(
-            CHANNEL_ID,
-            "通知转发后台服务",
-            NotificationManager.IMPORTANCE_HIGH
-        )
+        val channel =
+            NotificationChannel(
+                channelId,
+                "通知转发后台服务",
+                NotificationManager.IMPORTANCE_HIGH,
+            )
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(channel)
 
         val notification = buildNotification()
-        startForeground(NOTIFY_ID, notification)
+        startForeground(notifyId, notification)
     }
 
     private fun buildNotification(): Notification {
-        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("通知监听/转发中")
-            .setContentText(getNotificationText())
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setOngoing(true)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
+        val builder =
+            NotificationCompat
+                .Builder(this, channelId)
+                .setContentTitle("通知监听/转发中")
+                .setContentText(getNotificationText())
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setOngoing(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
 
         // 为通知主体添加点击事件，实现剪贴板同步功能
         try {
-            val syncIntent = Intent(this, ClipboardSyncReceiver::class.java).apply {
-                action = ClipboardSyncReceiver.ACTION_MANUAL_SYNC
-            }
-            val syncPendingIntent = PendingIntent.getBroadcast(
-                this, 0, syncIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-            )
+            val syncIntent =
+                Intent(this, ClipboardSyncReceiver::class.java).apply {
+                    action = ClipboardSyncReceiver.ACTION_MANUAL_SYNC
+                }
+            val syncPendingIntent =
+                PendingIntent.getBroadcast(
+                    this,
+                    0,
+                    syncIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+                )
             builder.setContentIntent(syncPendingIntent)
         } catch (e: Exception) {
             Logger.w(TAG, "添加剪贴板点击事件失败", e)
@@ -665,9 +703,19 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
     private fun getNotificationText(): String {
         // 使用 DeviceConnectionManager 提供的线程安全方法获取在线且已认证的设备数量
-        val onlineDevices = try { connectionManager.getAuthenticatedOnlineCount() } catch (_: Exception) { 0 }
-        val fcitx5Paired = try { ClipboardSyncManager.isFcitx5Paired(this) } catch (_: Exception) { false }
-        //Logger.d(TAG, "getNotificationText: authenticatedOnlineCount=$onlineDevices")
+        val onlineDevices =
+            try {
+                connectionManager.getAuthenticatedOnlineCount()
+            } catch (_: Exception) {
+                0
+            }
+        val fcitx5Paired =
+            try {
+                ClipboardSyncManager.isFcitx5Paired(this)
+            } catch (_: Exception) {
+                false
+            }
+        // Logger.d(TAG, "getNotificationText: authenticatedOnlineCount=$onlineDevices")
 
         // 优先显示设备连接数，如果有设备连接
         if (onlineDevices > 0) {
@@ -687,11 +735,12 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         val isWifiDirect = capabilities?.hasCapability(NetworkCapabilities.NET_CAPABILITY_WIFI_P2P) == true
 
         // 如果不是WiFi、以太网或WLAN直连，则认为是移动数据等非局域网
-        val baseText = if (!isWifi && !isEthernet && !isWifiDirect) {
-            "非局域网连接"
-        } else {
-            "无设备在线"
-        }
+        val baseText =
+            if (!isWifi && !isEthernet && !isWifiDirect) {
+                "非局域网连接"
+            } else {
+                "无设备在线"
+            }
 
         // Fcitx5 未启用时，添加点击提示
         return if (!fcitx5Paired) {
@@ -704,42 +753,43 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     private fun updateNotification() {
         val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         val notification = buildNotification()
-        manager.notify(NOTIFY_ID, notification)
+        manager.notify(notifyId, notification)
     }
 
     // 保留通知历史，不做移除处理
 
-    private fun getAppName(packageName: String): String {
-        return try {
+    private fun getAppName(packageName: String): String =
+        try {
             val pm = applicationContext.packageManager
             val appInfo = pm.getApplicationInfo(packageName, 0)
             pm.getApplicationLabel(appInfo).toString()
         } catch (_: Exception) {
             packageName
         }
-    }
 
-    private fun getNotificationTitle(sbn: StatusBarNotification): String? {
-        return NotificationRepository.getStringCompat(sbn.notification.extras, "android.title")
-    }
+    private fun getNotificationTitle(sbn: StatusBarNotification): String? = NotificationRepository.getStringCompat(sbn.notification.extras, "android.title")
 
-    private fun getNotificationText(sbn: StatusBarNotification): String? {
-        return NotificationRepository.getStringCompat(sbn.notification.extras, "android.text")
-    }
+    private fun getNotificationText(sbn: StatusBarNotification): String? = NotificationRepository.getStringCompat(sbn.notification.extras, "android.text")
 
-    internal fun getNotificationKey(sbn: StatusBarNotification, separator: String = "|"): String {
-        return sbn.key ?: (sbn.id.toString() + separator + sbn.packageName)
-    }
+    internal fun getNotificationKey(
+        sbn: StatusBarNotification,
+        separator: String = "|",
+    ): String = sbn.key ?: (sbn.id.toString() + separator + sbn.packageName)
 
-    private fun getStorageBoolean(key: String, defaultValue: Boolean): Boolean {
-        return try {
+    private fun getStorageBoolean(
+        key: String,
+        defaultValue: Boolean,
+    ): Boolean =
+        try {
             StorageManager.getBoolean(applicationContext, key, defaultValue)
         } catch (_: Exception) {
             defaultValue
         }
-    }
 
-    private fun logSbnDetail(prefix: String, sbn: StatusBarNotification) {
+    private fun logSbnDetail(
+        prefix: String,
+        sbn: StatusBarNotification,
+    ) {
         val title = getNotificationTitle(sbn) ?: ""
         val text = getNotificationText(sbn) ?: ""
         Logger.d(TAG, "$prefix sbnKey=${sbn.key}, pkg=${sbn.packageName}, id=${sbn.id}, title=$title, text=$text")

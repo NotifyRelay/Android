@@ -19,24 +19,28 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.model.core.ParamV2
+import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CircularProgressCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.core.util.image.ImageUtils
-import github.xzynine.superislandui.common.PreviewData
 
 /**
  * 聊天信息Compose组件
  */
 @Composable
-fun ChatInfoCompose(paramV2: ParamV2, picMap: Map<String, String>?) {
+fun ChatInfoCompose(
+    paramV2: ParamV2,
+    picMap: Map<String, String>?,
+) {
     val chatInfo = paramV2.chatInfo ?: return
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         // 头像
         val avatarUrl = chatInfo.picProfile?.let { picMap?.get(it) }
@@ -46,9 +50,10 @@ fun ChatInfoCompose(paramV2: ParamV2, picMap: Map<String, String>?) {
                 Image(
                     painter = it,
                     contentDescription = null,
-                    modifier = Modifier
-                        .size(48.dp)
-                        .clip(CircleShape)
+                    modifier =
+                        Modifier
+                            .size(48.dp)
+                            .clip(CircleShape),
                 )
             }
         }
@@ -63,8 +68,9 @@ fun ChatInfoCompose(paramV2: ParamV2, picMap: Map<String, String>?) {
 
             // 创建圆形进度条 - 使用common目录下的通用组件
             val progressColor = ImageUtils.parseColor(progressInfo.colorProgress) ?: 0xFF3482FF.toInt()
-            val trackColor = ImageUtils.parseColor(progressInfo.colorProgressEnd)
-                ?: ((progressColor and 0x00FFFFFF) or (0x33 shl 24))
+            val trackColor =
+                ImageUtils.parseColor(progressInfo.colorProgressEnd)
+                    ?: ((progressColor and 0x00FFFFFF) or (0x33 shl 24))
 
             // 使用通用的CircularProgressCompose组件（内部已处理动画）
             CircularProgressCompose(
@@ -73,7 +79,7 @@ fun ChatInfoCompose(paramV2: ParamV2, picMap: Map<String, String>?) {
                 colorUnReach = Color(trackColor),
                 strokeWidth = 3.5.dp,
                 isClockwise = true,
-                size = 48.dp
+                size = 48.dp,
             )
         }
 
@@ -85,7 +91,7 @@ fun ChatInfoCompose(paramV2: ParamV2, picMap: Map<String, String>?) {
                     color = Color(ImageUtils.parseColor(chatInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
                     fontSize = 14.sp,
                     fontWeight = FontWeight.Normal,
-                    modifier = Modifier.padding(start = 8.dp)
+                    modifier = Modifier.padding(start = 8.dp),
                 )
             }
 
@@ -94,7 +100,7 @@ fun ChatInfoCompose(paramV2: ParamV2, picMap: Map<String, String>?) {
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
                     color = Color(ImageUtils.parseColor(chatInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                     fontSize = 12.sp,
-                    modifier = Modifier.padding(start = 8.dp)
+                    modifier = Modifier.padding(start = 8.dp),
                 )
             }
         }
@@ -106,6 +112,6 @@ fun ChatInfoCompose(paramV2: ParamV2, picMap: Map<String, String>?) {
 fun ChatInfoComposePreview() {
     ChatInfoCompose(
         paramV2 = PreviewData.sampleParamV2WithChat,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }

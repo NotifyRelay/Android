@@ -26,7 +26,10 @@ class RemoteAppsViewModel : ViewModel() {
     private var currentDeviceUuid: String? = null
     private var iconUpdatesJob: Job? = null
 
-    fun loadApps(context: Context, deviceUuid: String) {
+    fun loadApps(
+        context: Context,
+        deviceUuid: String,
+    ) {
         currentDeviceUuid = deviceUuid
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
@@ -34,49 +37,60 @@ class RemoteAppsViewModel : ViewModel() {
                 AppRepository.loadPinnedApps(context, deviceUuid)
                 val apps = AppRepository.getRemoteAppsList(context, deviceUuid)
                 val pinnedApps = apps.filter { it.isPinned }
-                _state.update { 
+                _state.update {
                     it.copy(
                         apps = apps,
                         pinnedApps = pinnedApps,
-                        isLoading = false
+                        isLoading = false,
                     )
                 }
             } catch (e: Exception) {
                 _state.update { it.copy(isLoading = false, error = e.message) }
             }
         }
-        
+
         observeIconUpdates(context, deviceUuid)
     }
 
-    private fun observeIconUpdates(context: Context, deviceUuid: String) {
+    private fun observeIconUpdates(
+        context: Context,
+        deviceUuid: String,
+    ) {
         iconUpdatesJob?.cancel()
-        iconUpdatesJob = viewModelScope.launch {
-            AppRepository.iconUpdates.collect { update ->
-                if (update != null) {
-                    val (packageName, _) = update
-                    refreshSingleAppIcon(context, deviceUuid, packageName)
+        iconUpdatesJob =
+            viewModelScope.launch {
+                AppRepository.iconUpdates.collect { update ->
+                    if (update != null) {
+                        val (packageName, _) = update
+                        refreshSingleAppIcon(context, deviceUuid, packageName)
+                    }
                 }
             }
-        }
     }
 
-    private suspend fun refreshSingleAppIcon(context: Context, deviceUuid: String, packageName: String) {
+    private suspend fun refreshSingleAppIcon(
+        context: Context,
+        deviceUuid: String,
+        packageName: String,
+    ) {
         try {
-            val updatedApps = _state.value.apps.map { app ->
-                if (app.packageName == packageName) {
-                    val updatedApp = AppRepository.getRemoteAppsList(context, deviceUuid)
-                        .find { it.packageName == packageName }
-                    updatedApp ?: app
-                } else {
-                    app
+            val updatedApps =
+                _state.value.apps.map { app ->
+                    if (app.packageName == packageName) {
+                        val updatedApp =
+                            AppRepository
+                                .getRemoteAppsList(context, deviceUuid)
+                                .find { it.packageName == packageName }
+                        updatedApp ?: app
+                    } else {
+                        app
+                    }
                 }
-            }
             val pinnedApps = updatedApps.filter { it.isPinned }
-            _state.update { 
+            _state.update {
                 it.copy(
                     apps = updatedApps,
-                    pinnedApps = pinnedApps
+                    pinnedApps = pinnedApps,
                 )
             }
         } catch (e: Exception) {
@@ -91,30 +105,30 @@ class RemoteAppsViewModel : ViewModel() {
             try {
                 val deviceManager = DeviceConnectionManager.getInstance(context)
                 val deviceInfo = findDeviceInfo(deviceManager, deviceUuid)
-                
+
                 if (deviceInfo != null) {
                     Logger.d("RemoteAppsViewModel", "请求远程应用列表: ${deviceInfo.displayName}")
                     AppListSyncManager.requestAppListFromDevice(
                         context,
                         deviceManager,
-                        deviceInfo
+                        deviceInfo,
                     )
                 } else {
                     Logger.w("RemoteAppsViewModel", "未找到设备信息: $deviceUuid")
                     _state.update { it.copy(isLoading = false, error = "设备未连接") }
                     return@launch
                 }
-                
+
                 delay(2000)
-                
+
                 AppRepository.loadPinnedApps(context, deviceUuid)
                 val apps = AppRepository.getRemoteAppsList(context, deviceUuid)
                 val pinnedApps = apps.filter { it.isPinned }
-                _state.update { 
+                _state.update {
                     it.copy(
                         apps = apps,
                         pinnedApps = pinnedApps,
-                        isLoading = false
+                        isLoading = false,
                     )
                 }
             } catch (e: Exception) {
@@ -124,7 +138,10 @@ class RemoteAppsViewModel : ViewModel() {
         }
     }
 
-    private fun findDeviceInfo(deviceManager: DeviceConnectionManager, deviceUuid: String): DeviceInfo? {
+    private fun findDeviceInfo(
+        deviceManager: DeviceConnectionManager,
+        deviceUuid: String,
+    ): DeviceInfo? {
         val onlineDevices = deviceManager.getAuthenticatedOnlineDevices()
         return onlineDevices.find { it.uuid == deviceUuid }
     }
@@ -133,7 +150,10 @@ class RemoteAppsViewModel : ViewModel() {
         _state.update { it.copy(searchQuery = query) }
     }
 
-    fun pinApp(context: Context, packageName: String) {
+    fun pinApp(
+        context: Context,
+        packageName: String,
+    ) {
         val deviceUuid = currentDeviceUuid ?: return
         viewModelScope.launch {
             AppRepository.pinApp(context, deviceUuid, packageName)
@@ -141,7 +161,10 @@ class RemoteAppsViewModel : ViewModel() {
         }
     }
 
-    fun unpinApp(context: Context, packageName: String) {
+    fun unpinApp(
+        context: Context,
+        packageName: String,
+    ) {
         val deviceUuid = currentDeviceUuid ?: return
         viewModelScope.launch {
             AppRepository.unpinApp(context, deviceUuid, packageName)
@@ -151,9 +174,10 @@ class RemoteAppsViewModel : ViewModel() {
 
     private fun updatePinnedState(deviceUuid: String) {
         val pinnedSet = AppRepository.pinnedApps.value[deviceUuid] ?: emptySet()
-        val updatedApps = _state.value.apps.map { app ->
-            app.copy(isPinned = pinnedSet.contains(app.packageName))
-        }
+        val updatedApps =
+            _state.value.apps.map { app ->
+                app.copy(isPinned = pinnedSet.contains(app.packageName))
+            }
         val pinnedApps = updatedApps.filter { it.isPinned }
         _state.update { it.copy(apps = updatedApps, pinnedApps = pinnedApps) }
     }

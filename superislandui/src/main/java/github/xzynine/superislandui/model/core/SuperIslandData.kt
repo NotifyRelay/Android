@@ -10,5 +10,5 @@ data class SuperIslandData(
     val rawExtras: Map<String, Any?>,
     val paramV2Raw: String? = null,
     val picMap: Map<String, String>? = null,
-    val pics: Bundle? = null
+    val pics: Bundle? = null,
 )

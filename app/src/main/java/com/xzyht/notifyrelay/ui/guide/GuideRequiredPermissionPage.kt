@@ -2,8 +2,6 @@ package com.xzyht.notifyrelay.ui.guide
 
 import android.Manifest
 import android.app.Activity
-import android.content.Context
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
@@ -33,7 +31,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal fun GuideRequiredPermissionPage(
     permissionState: GuidePermissionUiState,
     onBack: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
 ) {
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
@@ -49,20 +47,21 @@ internal fun GuideRequiredPermissionPage(
 
     fun requestQueryAppsPermission() {
         try {
-            val isMiuiOrPengpai = Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true) ||
-                try {
-                    val permissionInfo = context.packageManager.getPermissionInfo("com.android.permission.GET_INSTALLED_APPS", 0)
-                    permissionInfo != null && permissionInfo.packageName == "com.lbe.security.miui"
-                } catch (_: Exception) {
-                    false
-                }
+            val isMiuiOrPengpai =
+                Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true) ||
+                    try {
+                        val permissionInfo = context.packageManager.getPermissionInfo("com.android.permission.GET_INSTALLED_APPS", 0)
+                        permissionInfo != null && permissionInfo.packageName == "com.lbe.security.miui"
+                    } catch (_: Exception) {
+                        false
+                    }
             if (isMiuiOrPengpai) {
                 if (ContextCompat.checkSelfPermission(context, "com.android.permission.GET_INSTALLED_APPS") != PackageManager.PERMISSION_GRANTED) {
                     (context as? Activity)?.let { act ->
                         ActivityCompat.requestPermissions(
                             act,
                             arrayOf("com.android.permission.GET_INSTALLED_APPS"),
-                            999
+                            999,
                         )
                         showToast("已请求应用列表权限，请在弹窗中允许")
                     } ?: run {
@@ -77,7 +76,7 @@ internal fun GuideRequiredPermissionPage(
                     context,
                     Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                     Uri.fromParts("package", context.packageName, null),
-                    true
+                    true,
                 )
             }
         } catch (_: Exception) {
@@ -86,7 +85,7 @@ internal fun GuideRequiredPermissionPage(
                 context,
                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                 Uri.fromParts("package", context.packageName, null),
-                true
+                true,
             )
         }
     }
@@ -96,7 +95,7 @@ internal fun GuideRequiredPermissionPage(
             showToast("请求通知发送权限")
             (context as? Activity)?.requestPermissions(
                 arrayOf(Manifest.permission.POST_NOTIFICATIONS),
-                100
+                100,
             )
         } else {
             showToast("请在系统设置中开启通知权限")
@@ -109,76 +108,83 @@ internal fun GuideRequiredPermissionPage(
             context,
             Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
             Uri.fromParts("package", context.packageName, null),
-            true
+            true,
         )
     }
 
-    val requiredChecks = buildList {
-        add(permissionState.notificationListener)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            add(permissionState.postNotifications)
+    val requiredChecks =
+        buildList {
+            add(permissionState.notificationListener)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                add(permissionState.postNotifications)
+            }
+            add(permissionState.queryApps)
         }
-        add(permissionState.queryApps)
-    }
     val requiredGrantedCount = requiredChecks.count { it }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
     ) {
         GuidePageHeader(
             stepLabel = "3 / 6",
             title = "必要权限",
-            subtitle = if (permissionState.requiredGranted) {
-                "所有必要权限已开启，可以继续下一步"
-            } else {
-                "通知转发依赖以下权限，请逐项开启（$requiredGrantedCount/${requiredChecks.size}）"
-            }
+            subtitle =
+                if (permissionState.requiredGranted) {
+                    "所有必要权限已开启，可以继续下一步"
+                } else {
+                    "通知转发依赖以下权限，请逐项开启（$requiredGrantedCount/${requiredChecks.size}）"
+                },
         )
 
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
         ) {
             GuideSectionLabel(
                 title = "必要权限",
-                description = "缺少任一项都会影响通知读取、应用识别或后台服务运行"
+                description = "缺少任一项都会影响通知读取、应用识别或后台服务运行",
             )
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column {
                     GuidePermissionItem(
                         title = "通知访问权限",
-                        summary = if (permissionState.notificationListener) {
-                            "已允许读取通知内容，用于跨设备转发"
-                        } else {
-                            "用于读取通知内容，实现核心转发功能"
-                        },
+                        summary =
+                            if (permissionState.notificationListener) {
+                                "已允许读取通知内容，用于跨设备转发"
+                            } else {
+                                "用于读取通知内容，实现核心转发功能"
+                            },
                         granted = permissionState.notificationListener,
-                        onClick = ::openNotificationListenerSettings
+                        onClick = ::openNotificationListenerSettings,
                     )
                     GuidePermissionItem(
                         title = "应用列表权限",
-                        summary = if (permissionState.queryApps) {
-                            "已允许查询本机已安装应用，可辅助通知跳转"
-                        } else {
-                            "用于发现本机已安装应用，辅助通知跳转"
-                        },
+                        summary =
+                            if (permissionState.queryApps) {
+                                "已允许查询本机已安装应用，可辅助通知跳转"
+                            } else {
+                                "用于发现本机已安装应用，辅助通知跳转"
+                            },
                         granted = permissionState.queryApps,
-                        onClick = ::requestQueryAppsPermission
+                        onClick = ::requestQueryAppsPermission,
                     )
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                         GuidePermissionItem(
                             title = "通知发送权限",
-                            summary = if (permissionState.postNotifications) {
-                                "已允许发送本地通知"
-                            } else {
-                                "用于发送本地通知，部分功能需要开启"
-                            },
+                            summary =
+                                if (permissionState.postNotifications) {
+                                    "已允许发送本地通知"
+                                } else {
+                                    "用于发送本地通知，部分功能需要开启"
+                                },
                             granted = permissionState.postNotifications,
-                            onClick = ::requestPostNotificationPermission
+                            onClick = ::requestPostNotificationPermission,
                         )
                     }
                 }
@@ -190,7 +196,7 @@ internal fun GuideRequiredPermissionPage(
             ArrowPreference(
                 title = "自启动权限",
                 summary = "必选项：部分系统无法直接读取状态。用于保证通知监听服务在后台稳定运行，请点击前往应用详情确认并开启。",
-                onClick = ::openSelfStartSettings
+                onClick = ::openSelfStartSettings,
             )
 
             Spacer(modifier = Modifier.height(20.dp))
@@ -202,7 +208,7 @@ internal fun GuideRequiredPermissionPage(
             nextEnabled = permissionState.requiredGranted,
             onBack = onBack,
             onNext = onNext,
-            hintColor = colorScheme.error
+            hintColor = colorScheme.error,
         )
     }
 }

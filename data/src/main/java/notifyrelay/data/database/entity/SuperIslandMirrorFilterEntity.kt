@@ -7,5 +7,5 @@ import androidx.room.PrimaryKey
 data class SuperIslandMirrorFilterEntity(
     @PrimaryKey val packageName: String,
     val enabled: Boolean = true,
-    val lastUpdated: Long = System.currentTimeMillis()
+    val lastUpdated: Long = System.currentTimeMillis(),
 )

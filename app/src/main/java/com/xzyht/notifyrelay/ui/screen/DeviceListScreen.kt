@@ -1,11 +1,8 @@
 package com.xzyht.notifyrelay.ui.screen
 
-import android.app.Activity
-import android.content.Context
 import android.content.res.Configuration
 import android.os.Handler
 import android.os.Looper
-import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -39,7 +36,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.activity.compose.LocalActivity
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.Font
@@ -48,12 +44,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xzyht.notifyrelay.R
-import com.xzyht.notifyrelay.feature.device.model.HandshakeRequest
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
-import com.xzyht.notifyrelay.ui.dialog.ConnectDeviceDialog
 import com.xzyht.notifyrelay.ui.dialog.PairingCodeDialog
 import com.xzyht.notifyrelay.ui.dialog.PairingMode
 import com.xzyht.notifyrelay.ui.dialog.RejectedDevicesDialog
@@ -61,14 +55,14 @@ import com.xzyht.notifyrelay.ui.navigation.Navigator
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.BatteryIconConverter
 import notifyrelay.core.util.BatteryUtils
-import top.yukonga.miuix.kmp.layout.DialogDefaults
-import top.yukonga.miuix.kmp.window.WindowDialog
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
  * 全局设备选中状态单例
@@ -77,7 +71,9 @@ object GlobalSelectedDeviceHolder {
     private var _selectedDevice by mutableStateOf<DeviceInfo?>(null)
     var selectedDevice: DeviceInfo?
         get() = _selectedDevice
-        set(value) { _selectedDevice = value }
+        set(value) {
+            _selectedDevice = value
+        }
 
     /**
      * Compose可组合函数，供其他页面监听选中设备变化。
@@ -85,9 +81,11 @@ object GlobalSelectedDeviceHolder {
     @Composable
     fun current(): State<DeviceInfo?> {
         rememberUpdatedState(_selectedDevice)
-        return remember { object : State<DeviceInfo?> {
-            override val value: DeviceInfo? get() = _selectedDevice
-        } }
+        return remember {
+            object : State<DeviceInfo?> {
+                override val value: DeviceInfo? get() = _selectedDevice
+            }
+        }
     }
 }
 
@@ -106,14 +104,12 @@ class DeviceListScreenState {
         internal set
     var serverPairingCode by mutableStateOf("")
         internal set
-    
+
     /**
      * 检查是否有任何弹窗显示
      */
-    fun hasAnyDialogShowing(): Boolean {
-        return showRejectedDialog || showPairingCodeDialog
-    }
-    
+    fun hasAnyDialogShowing(): Boolean = showRejectedDialog || showPairingCodeDialog
+
     /**
      * 关闭所有弹窗
      */
@@ -132,47 +128,53 @@ class DeviceListScreenState {
 @Composable
 fun DeviceListScreen(
     navigator: Navigator,
-    state: DeviceListScreenState = remember { DeviceListScreenState() }
+    state: DeviceListScreenState = remember { DeviceListScreenState() },
 ) {
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
     val deviceManager = remember { DeviceConnectionManagerSingleton.getDeviceManager(context) }
-    
+
     var authedDeviceUuids by rememberSaveable { mutableStateOf(setOf<String>()) }
     var rejectedDeviceUuids by rememberSaveable { mutableStateOf(setOf<String>()) }
     var udpDiscoveryEnabled by remember { mutableStateOf(true) }
-    
+
     val deviceMap: Map<String, Pair<DeviceInfo, Boolean>> by deviceManager.devices.collectAsState(initial = emptyMap())
     val devices: List<DeviceInfo> = deviceMap.values.map { it.first }
     val deviceStates: Map<String, Boolean> = deviceMap.mapValues { it.value.second }
     var selectedDevice by remember { mutableStateOf(GlobalSelectedDeviceHolder.selectedDevice) }
     var showDeleteHistoryDialog by remember { mutableStateOf(false) }
     var pendingDeleteDevice by remember { mutableStateOf<DeviceInfo?>(null) }
-    
-    val localBatteryLevel = remember {
-        BatteryUtils.getBatteryLevel(context)
-    }
-    
+
+    val localBatteryLevel =
+        remember {
+            BatteryUtils.getBatteryLevel(context)
+        }
+
     val allDevices: List<DeviceInfo?> = listOf<DeviceInfo?>(null) + devices
     val validAuthedDeviceUuids = authedDeviceUuids.intersect(devices.map { it.uuid }.toSet())
-    val unauthedDevices = if (udpDiscoveryEnabled) {
-        devices.filter { d ->
-            !validAuthedDeviceUuids.contains(d.uuid) && !rejectedDeviceUuids.contains(d.uuid)
+    val unauthedDevices =
+        if (udpDiscoveryEnabled) {
+            devices.filter { d ->
+                !validAuthedDeviceUuids.contains(d.uuid) && !rejectedDeviceUuids.contains(d.uuid)
+            }
+        } else {
+            emptyList()
         }
-    } else {
-        emptyList()
-    }
-    val rejectedDevices = rejectedDeviceUuids.mapNotNull { uuid ->
-        devices.find { it.uuid == uuid } ?: DeviceInfo(uuid, "未知设备", "", 0)
-    }
-    
-    fun findOtherUuidsWithSameIp(ip: String, exceptUuid: String): List<String> {
-        return deviceMap.values.map { it.first }
+    val rejectedDevices =
+        rejectedDeviceUuids.mapNotNull { uuid ->
+            devices.find { it.uuid == uuid } ?: DeviceInfo(uuid, "未知设备", "", 0)
+        }
+
+    fun findOtherUuidsWithSameIp(
+        ip: String,
+        exceptUuid: String,
+    ): List<String> =
+        deviceMap.values
+            .map { it.first }
             .filter { it.ip == ip && it.uuid != exceptUuid && authedDeviceUuids.contains(it.uuid) }
             .map { it.uuid }
-    }
-    
+
     LaunchedEffect(deviceMap, state.showRejectedDialog) {
         val authMap = deviceManager.getAuthenticatedDevices()
         authedDeviceUuids = authMap.filter { (_, auth) -> auth.isAccepted }.keys.toSet()
@@ -182,15 +184,19 @@ fun DeviceListScreen(
     // 有未认证设备连接时：生成配对码并弹出显示
     val mainHandler = remember { Handler(Looper.getMainLooper()) }
     DisposableEffect(deviceManager) {
-        val handler = object : DeviceConnectionManager.HandshakeRequestHandler {
-            override fun onPairingInitRequest(deviceInfo: DeviceInfo, tmpPublicKey: String) {
-                mainHandler.post {
-                    state.pendingConnectDevice = deviceInfo
-                    state.pairingCodeDialogMode = PairingMode.SERVER_MODE
-                    state.showPairingCodeDialog = true
+        val handler =
+            object : DeviceConnectionManager.HandshakeRequestHandler {
+                override fun onPairingInitRequest(
+                    deviceInfo: DeviceInfo,
+                    tmpPublicKey: String,
+                ) {
+                    mainHandler.post {
+                        state.pendingConnectDevice = deviceInfo
+                        state.pairingCodeDialogMode = PairingMode.SERVER_MODE
+                        state.showPairingCodeDialog = true
+                    }
                 }
             }
-        }
         deviceManager.handshakeRequestHandler = handler
         onDispose {
             if (deviceManager.handshakeRequestHandler === handler) {
@@ -224,16 +230,16 @@ fun DeviceListScreen(
     fun UdpDiscoverySwitch() {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)
+            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         ) {
             Text(
                 text = "显示未认证设备",
                 style = textStyles.body2,
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             )
             Switch(
                 checked = udpDiscoveryEnabled,
-                onCheckedChange = { udpDiscoveryEnabled = it }
+                onCheckedChange = { udpDiscoveryEnabled = it },
             )
         }
     }
@@ -241,47 +247,50 @@ fun DeviceListScreen(
     @Composable
     fun LocalDeviceButton() {
         val batteryLevel = localBatteryLevel
-        val isCharging = remember {
-            mutableStateOf(if (BatteryUtils.isCharging(context)) '1' else '0')
-        }
+        val isCharging =
+            remember {
+                mutableStateOf(if (BatteryUtils.isCharging(context)) '1' else '0')
+            }
         val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel, isCharging.value)
-        
-        val buttonColors = if (selectedDevice == null) {
-            ButtonDefaults.buttonColorsPrimary()
-        } else {
-            ButtonDefaults.buttonColors()
-        }
-        
-        val buttonModifier = if (isLandscape) {
-            Modifier
-                .defaultMinSize(minHeight = buttonMinHeight)
-                .fillMaxWidth()
-                .padding(bottom = 4.dp)
-        } else {
-            Modifier
-                .defaultMinSize(minHeight = buttonMinHeight)
-                .wrapContentWidth()
-                .padding(end = 6.dp)
-        }
-        
+
+        val buttonColors =
+            if (selectedDevice == null) {
+                ButtonDefaults.buttonColorsPrimary()
+            } else {
+                ButtonDefaults.buttonColors()
+            }
+
+        val buttonModifier =
+            if (isLandscape) {
+                Modifier
+                    .defaultMinSize(minHeight = buttonMinHeight)
+                    .fillMaxWidth()
+                    .padding(bottom = 4.dp)
+            } else {
+                Modifier
+                    .defaultMinSize(minHeight = buttonMinHeight)
+                    .wrapContentWidth()
+                    .padding(end = 6.dp)
+            }
+
         Column(
             horizontalAlignment = if (isLandscape) Alignment.Start else Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(2.dp),
         ) {
             Button(
                 onClick = { onSelectDevice(null) },
                 modifier = buttonModifier,
                 insideMargin = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                colors = buttonColors
+                colors = buttonColors,
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.Center
+                    horizontalArrangement = Arrangement.Center,
                 ) {
                     Text(
                         text = "本机",
                         style = textStyles.body2.copy(color = if (selectedDevice == null) colorScheme.onPrimary else colorScheme.primary),
-                        overflow = TextOverflow.Ellipsis
+                        overflow = TextOverflow.Ellipsis,
                     )
                 }
             }
@@ -292,7 +301,7 @@ fun DeviceListScreen(
     fun AuthenticatedDeviceButton(device: DeviceInfo) {
         val isOnline = deviceStates[device.uuid] == true
         val context = LocalContext.current
-        
+
         val batteryLevel = remember { mutableIntStateOf(100) }
         val isCharging = remember { mutableStateOf(device.chargingStatus) }
 
@@ -303,50 +312,52 @@ fun DeviceListScreen(
                 batteryLevel.intValue = level
             }
         }
-        
+
         LaunchedEffect(device.chargingStatus) {
             if (device.chargingStatus != '*' && device.chargingStatus != isCharging.value) {
                 isCharging.value = device.chargingStatus
             }
         }
-        
+
         val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel.intValue, isCharging.value)
-        
-        val buttonColors = if (selectedDevice?.uuid == device.uuid) {
-            ButtonDefaults.buttonColorsPrimary()
-        } else {
-            ButtonDefaults.buttonColors()
-        }
-        
+
+        val buttonColors =
+            if (selectedDevice?.uuid == device.uuid) {
+                ButtonDefaults.buttonColorsPrimary()
+            } else {
+                ButtonDefaults.buttonColors()
+            }
+
         Row(
             verticalAlignment = Alignment.Top,
             modifier = if (isLandscape) Modifier.padding(bottom = 4.dp) else Modifier.padding(end = 6.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            val buttonModifier = if (isLandscape) {
-                Modifier
-                    .defaultMinSize(minHeight = buttonMinHeight)
-                    .fillMaxWidth()
-            } else {
-                Modifier
-                    .defaultMinSize(minHeight = buttonMinHeight)
-                    .wrapContentWidth()
-            }
-            
+            val buttonModifier =
+                if (isLandscape) {
+                    Modifier
+                        .defaultMinSize(minHeight = buttonMinHeight)
+                        .fillMaxWidth()
+                } else {
+                    Modifier
+                        .defaultMinSize(minHeight = buttonMinHeight)
+                        .wrapContentWidth()
+                }
+
             Column(
                 modifier = if (isLandscape) Modifier.weight(1f) else Modifier,
                 horizontalAlignment = if (isLandscape) Alignment.Start else Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(2.dp)
+                verticalArrangement = Arrangement.spacedBy(2.dp),
             ) {
                 Button(
                     onClick = { onSelectDevice(device) },
                     modifier = buttonModifier,
                     insideMargin = PaddingValues(horizontal = 8.dp, vertical = 6.dp),
-                    colors = buttonColors
+                    colors = buttonColors,
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.Center
+                        horizontalArrangement = Arrangement.Center,
                     ) {
                         if (isOnline) {
                             Text(
@@ -354,18 +365,18 @@ fun DeviceListScreen(
                                 fontFamily = FontFamily(Font(resId = R.font.segsmdl2)),
                                 fontSize = 16.sp,
                                 color = BatteryIconConverter.getBatteryColor(batteryLevel.intValue),
-                                modifier = Modifier.padding(end = 8.dp)
+                                modifier = Modifier.padding(end = 8.dp),
                             )
                         }
                         Text(
                             text = device.displayName + if (!isOnline) " (离线)" else "",
                             style = textStyles.body2.copy(color = if (selectedDevice?.uuid == device.uuid) colorScheme.onPrimary else colorScheme.primary),
-                            overflow = TextOverflow.Ellipsis
+                            overflow = TextOverflow.Ellipsis,
                         )
                     }
                 }
             }
-            
+
             if (selectedDevice?.uuid == device.uuid) {
                 Spacer(Modifier.width(4.dp))
                 DoubleClickConfirmButton(
@@ -376,14 +387,15 @@ fun DeviceListScreen(
                         pendingDeleteDevice = device
                         showDeleteHistoryDialog = true
                     },
-                    modifier = Modifier
-                        .defaultMinSize(minHeight = buttonMinHeight, minWidth = 60.dp)
-                        .heightIn(min = buttonMinHeight)
-                        .widthIn(min = 60.dp),
+                    modifier =
+                        Modifier
+                            .defaultMinSize(minHeight = buttonMinHeight, minWidth = 60.dp)
+                            .heightIn(min = buttonMinHeight)
+                            .widthIn(min = 60.dp),
                     colors = ButtonDefaults.buttonColors(color = colorScheme.error),
                     confirmColors = ButtonDefaults.buttonColors(color = colorScheme.error),
                     textColor = colorScheme.onError,
-                    confirmTextColor = colorScheme.onError
+                    confirmTextColor = colorScheme.onError,
                 )
             }
         }
@@ -394,17 +406,18 @@ fun DeviceListScreen(
         val isOnline = deviceStates[device.uuid] == true
         Button(
             onClick = { onSelectDevice(device) },
-            modifier = Modifier
-                .then(if (isLandscape) Modifier.fillMaxWidth() else Modifier)
-                .defaultMinSize(minHeight = buttonMinHeight)
-                .then(if (isLandscape) Modifier.padding(vertical = 2.dp) else Modifier.padding(end = 6.dp)),
+            modifier =
+                Modifier
+                    .then(if (isLandscape) Modifier.fillMaxWidth() else Modifier)
+                    .defaultMinSize(minHeight = buttonMinHeight)
+                    .then(if (isLandscape) Modifier.padding(vertical = 2.dp) else Modifier.padding(end = 6.dp)),
             insideMargin = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-            colors = ButtonDefaults.buttonColors(color = colorScheme.surface)
+            colors = ButtonDefaults.buttonColors(color = colorScheme.surface),
         ) {
             Text(
                 device.displayName + if (!isOnline) " (离线)" else "",
                 style = textStyles.body2.copy(color = colorScheme.primary),
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -413,51 +426,54 @@ fun DeviceListScreen(
     fun RejectedDevicesButton() {
         Button(
             onClick = { state.showRejectedDialog = true },
-            modifier = Modifier
-                .then(if (isLandscape) Modifier.fillMaxWidth() else Modifier)
-                .defaultMinSize(minHeight = buttonMinHeight)
-                .then(if (isLandscape) Modifier.padding(vertical = 2.dp) else Modifier.padding(end = 6.dp)),
+            modifier =
+                Modifier
+                    .then(if (isLandscape) Modifier.fillMaxWidth() else Modifier)
+                    .defaultMinSize(minHeight = buttonMinHeight)
+                    .then(if (isLandscape) Modifier.padding(vertical = 2.dp) else Modifier.padding(end = 6.dp)),
             insideMargin = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
-            colors = ButtonDefaults.buttonColors(color = colorScheme.secondaryContainer)
+            colors = ButtonDefaults.buttonColors(color = colorScheme.secondaryContainer),
         ) {
             Text(
                 "查看已拒绝设备",
                 style = textStyles.body2.copy(color = colorScheme.secondary),
-                overflow = TextOverflow.Ellipsis
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
 
     if (isLandscape) {
         Column(
-            modifier = Modifier
-                .fillMaxHeight()
-                .fillMaxWidth()
-                .background(colorScheme.background)
-                .padding(12.dp)
-                .verticalScroll(rememberScrollState())
+            modifier =
+                Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth()
+                    .background(colorScheme.background)
+                    .padding(12.dp)
+                    .verticalScroll(rememberScrollState()),
         ) {
             UdpDiscoverySwitch()
             LocalDeviceButton()
-            
+
             allDevices.forEach { device: DeviceInfo? ->
                 if (device != null && authedDeviceUuids.contains(device.uuid)) {
                     AuthenticatedDeviceButton(device)
                 }
             }
-            
+
             unauthedDevices.forEach {
                 UnauthenticatedDeviceButton(it)
             }
-            
+
             RejectedDevicesButton()
         }
     } else {
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .background(colorScheme.background)
-                .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 12.dp)
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .background(colorScheme.background)
+                    .padding(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 12.dp),
         ) {
             UdpDiscoverySwitch()
             LazyRow(
@@ -465,15 +481,15 @@ fun DeviceListScreen(
                 verticalAlignment = Alignment.Top,
             ) {
                 item { LocalDeviceButton() }
-                
+
                 items(allDevices.filterNotNull().filter { authedDeviceUuids.contains(it.uuid) }) {
                     AuthenticatedDeviceButton(it)
                 }
-                
+
                 items(unauthedDevices) {
                     UnauthenticatedDeviceButton(it)
                 }
-                
+
                 item { RejectedDevicesButton() }
             }
         }
@@ -487,19 +503,20 @@ fun DeviceListScreen(
             pairingCode = state.serverPairingCode,
             show = state.showPairingCodeDialog,
             onDismiss = {
-                 deviceManager.cancelPendingPairing()
-                 state.showPairingCodeDialog = false
+                deviceManager.cancelPendingPairing()
+                state.showPairingCodeDialog = false
             },
             onPairingComplete = { success, _ ->
-                 if (success) {
-                     state.showPairingCodeDialog = false
-                     try {
-                         deviceManager.updateDeviceListInternal()
-                         val authMap = deviceManager.getAuthenticatedDevices()
-                         authedDeviceUuids = authMap.filter { (_, auth) -> auth.isAccepted }.keys.toSet()
-                     } catch (_: Exception) {}
-                 }
-             }
+                if (success) {
+                    state.showPairingCodeDialog = false
+                    try {
+                        deviceManager.updateDeviceListInternal()
+                        val authMap = deviceManager.getAuthenticatedDevices()
+                        authedDeviceUuids = authMap.filter { (_, auth) -> auth.isAccepted }.keys.toSet()
+                    } catch (_: Exception) {
+                    }
+                }
+            },
         )
     }
 
@@ -522,9 +539,10 @@ fun DeviceListScreen(
                         deviceManager.updateDeviceListInternal()
                         val authMap = deviceManager.getAuthenticatedDevices()
                         authedDeviceUuids = authMap.filter { (_, auth) -> auth.isAccepted }.keys.toSet()
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) {
+                    }
                 }
-            }
+            },
         )
     }
 
@@ -549,7 +567,7 @@ fun DeviceListScreen(
             onDismiss = {
                 showDialog.value = false
                 state.showRejectedDialog = false
-            }
+            },
         )
     }
 
@@ -574,12 +592,12 @@ fun DeviceListScreen(
             content = {
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    horizontalAlignment = Alignment.CenterHorizontally,
                 ) {
                     Spacer(modifier = Modifier.height(24.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
                     ) {
                         TextButton(
                             text = "仅删除设备",
@@ -599,7 +617,7 @@ fun DeviceListScreen(
                                 showDeleteHistoryDialog = false
                                 pendingDeleteDevice = null
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                         TextButton(
                             text = "删除并清除历史",
@@ -619,11 +637,11 @@ fun DeviceListScreen(
                                 showDeleteHistoryDialog = false
                                 pendingDeleteDevice = null
                             },
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                     }
                 }
-            }
+            },
         )
     }
 }

@@ -60,7 +60,7 @@ data class FloatingEntry(
     val text: String? = null,
     val appName: String? = null,
     val isOverlapping: Boolean = false,
-    val height: Int = 0 // 实际高度，由Compose组件测量后设置
+    val height: Int = 0, // 实际高度，由Compose组件测量后设置
 )
 
 /**
@@ -72,7 +72,7 @@ fun FloatingWindowContainer(
     onEntryClick: (String) -> Unit,
     modifier: Modifier = Modifier,
     onUpdateEntryHeight: ((String, Int) -> Unit)? = null,
-    isContainerDragging: Boolean = false
+    isContainerDragging: Boolean = false,
 ) {
     LocalContext.current
 
@@ -82,7 +82,7 @@ fun FloatingWindowContainer(
     }
 
     Column(
-        modifier = modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth(),
     ) {
         // 遍历所有条目，按顺序显示（最新的在顶部）
         entries.forEach { entry ->
@@ -92,52 +92,56 @@ fun FloatingWindowContainer(
                 val interactionSource = remember { MutableInteractionSource() }
 
                 Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable(
-                            interactionSource = interactionSource,
-                            indication = null, // 移除默认点击效果
-                            onClick = { 
-                                // 只有当容器未拖动时才执行点击操作
-                                if (!isContainerDragging) {
-                                    onEntryClick(entry.key)
-                                }
-                            }
-                        )
-                        .onGloballyPositioned {
-                            // 测量条目实际高度并更新
-                            val measuredHeight = it.size.height
-                            onUpdateEntryHeight?.invoke(entry.key, measuredHeight)
-                        },
-                    contentAlignment = Alignment.Center // 确保内容居中对齐
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .clickable(
+                                interactionSource = interactionSource,
+                                indication = null, // 移除默认点击效果
+                                onClick = {
+                                    // 只有当容器未拖动时才执行点击操作
+                                    if (!isContainerDragging) {
+                                        onEntryClick(entry.key)
+                                    }
+                                },
+                            ).onGloballyPositioned {
+                                // 测量条目实际高度并更新
+                                val measuredHeight = it.size.height
+                                onUpdateEntryHeight?.invoke(entry.key, measuredHeight)
+                            },
+                    contentAlignment = Alignment.Center, // 确保内容居中对齐
                 ) {
                     // 简化动画，避免闪烁
-                    val expandedEnterTransition = slideInVertically {
-                        // 从顶部滑入
-                        -it / 2 // 减少滑入距离，使动画更平滑
-                    } + fadeIn()
+                    val expandedEnterTransition =
+                        slideInVertically {
+                            // 从顶部滑入
+                            -it / 2 // 减少滑入距离，使动画更平滑
+                        } + fadeIn()
 
-                    val expandedExitTransition = slideOutVertically {
-                        // 向顶部滑出
-                        -it / 2 // 减少滑出距离，使动画更平滑
-                    } + fadeOut()
+                    val expandedExitTransition =
+                        slideOutVertically {
+                            // 向顶部滑出
+                            -it / 2 // 减少滑出距离，使动画更平滑
+                        } + fadeOut()
 
-                    val collapsedEnterTransition = slideInVertically {
-                        // 从底部滑入
-                        it / 2 // 减少滑入距离，使动画更平滑
-                    } + fadeIn()
+                    val collapsedEnterTransition =
+                        slideInVertically {
+                            // 从底部滑入
+                            it / 2 // 减少滑入距离，使动画更平滑
+                        } + fadeIn()
 
-                    val collapsedExitTransition = slideOutVertically {
-                        // 向底部滑出
-                        it / 2 // 减少滑出距离，使动画更平滑
-                    } + fadeOut()
+                    val collapsedExitTransition =
+                        slideOutVertically {
+                            // 向底部滑出
+                            it / 2 // 减少滑出距离，使动画更平滑
+                        } + fadeOut()
 
                     // 展开态内容
                     androidx.compose.animation.AnimatedVisibility(
                         visible = entry.isExpanded,
                         modifier = Modifier,
                         enter = expandedEnterTransition,
-                        exit = expandedExitTransition
+                        exit = expandedExitTransition,
                     ) {
                         SuperIslandComposeRoot(
                             content = {
@@ -152,15 +156,17 @@ fun FloatingWindowContainer(
                                             paramV2.business == "media" -> {
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 MediaIslandCompose")
                                                 // 构建MediaSessionData
-                                                val mediaSession = MediaSessionData(
-                                                    packageName = entry.appName ?: "",
-                                                    appName = entry.appName,
-                                                    title = entry.title ?: "",
-                                                    text = entry.text ?: "",
-                                                    coverUrl = entry.picMap?.get("miui.focus.pic_cover")
-                                                        ?: entry.picMap?.values?.firstOrNull(),
-                                                    deviceName = entry.appName ?: ""
-                                                )
+                                                val mediaSession =
+                                                    MediaSessionData(
+                                                        packageName = entry.appName ?: "",
+                                                        appName = entry.appName,
+                                                        title = entry.title ?: "",
+                                                        text = entry.text ?: "",
+                                                        coverUrl =
+                                                            entry.picMap?.get("miui.focus.pic_cover")
+                                                                ?: entry.picMap?.values?.firstOrNull(),
+                                                        deviceName = entry.appName ?: "",
+                                                    )
                                                 // 使用媒体类型大岛组件
                                                 MediaIslandCompose(
                                                     mediaSession = mediaSession,
@@ -173,25 +179,28 @@ fun FloatingWindowContainer(
                                                         // 媒体控制按钮点击事件，由RemoteMediaSessionManager处理
                                                         com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager.onPlayPause(
                                                             context,
-                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager.getInstance(context)
+                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+                                                                .getInstance(context),
                                                         )
                                                     },
                                                     onPrevious = {
                                                         com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager.onPrevious(
                                                             context,
-                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager.getInstance(context)
+                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+                                                                .getInstance(context),
                                                         )
                                                     },
                                                     onNext = {
                                                         com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager.onNext(
                                                             context,
-                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager.getInstance(context)
+                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+                                                                .getInstance(context),
                                                         )
                                                     },
                                                     onClose = {
                                                         // 发送关闭指令，由外部处理
                                                         onEntryClick(entry.key)
-                                                    }
+                                                    },
                                                 )
                                             }
 
@@ -204,7 +213,7 @@ fun FloatingWindowContainer(
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 BaseInfoCompose")
                                                 BaseInfoCompose(
                                                     paramV2.baseInfo!!,
-                                                    picMap = entry.picMap
+                                                    picMap = entry.picMap,
                                                 )
                                             }
 
@@ -217,7 +226,7 @@ fun FloatingWindowContainer(
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 AnimTextInfoCompose")
                                                 AnimTextInfoCompose(
                                                     paramV2.animTextInfo!!,
-                                                    picMap = entry.picMap
+                                                    picMap = entry.picMap,
                                                 )
                                             }
 
@@ -225,7 +234,7 @@ fun FloatingWindowContainer(
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 HighlightInfoCompose")
                                                 HighlightInfoCompose(
                                                     paramV2.highlightInfo!!,
-                                                    picMap = entry.picMap
+                                                    picMap = entry.picMap,
                                                 )
                                             }
 
@@ -233,7 +242,7 @@ fun FloatingWindowContainer(
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 PicInfoCompose")
                                                 PicInfoCompose(
                                                     paramV2.picInfo!!,
-                                                    picMap = entry.picMap
+                                                    picMap = entry.picMap,
                                                 )
                                             }
 
@@ -241,7 +250,7 @@ fun FloatingWindowContainer(
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 HintInfoCompose")
                                                 HintInfoCompose(
                                                     paramV2.hintInfo!!,
-                                                    picMap = entry.picMap
+                                                    picMap = entry.picMap,
                                                 )
                                             }
 
@@ -249,7 +258,7 @@ fun FloatingWindowContainer(
                                                 Logger.d("超级岛", "FloatingWindowContainer: 渲染 TextButtonCompose")
                                                 TextButtonCompose(
                                                     paramV2.textButton!!,
-                                                    picMap = entry.picMap
+                                                    picMap = entry.picMap,
                                                 )
                                             }
 
@@ -264,7 +273,7 @@ fun FloatingWindowContainer(
                                                 Box(modifier = Modifier.padding(16.dp)) {
                                                     Text(
                                                         text = "未支持的模板",
-                                                        color = Color.White
+                                                        color = Color.White,
                                                     )
                                                 }
                                             }
@@ -282,7 +291,7 @@ fun FloatingWindowContainer(
                                     Box(modifier = Modifier.padding(16.dp)) {
                                         Row(
                                             verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.fillMaxWidth()
+                                            modifier = Modifier.fillMaxWidth(),
                                         ) {
                                             // 添加a区图标
                                             CommonImageCompose(
@@ -290,12 +299,12 @@ fun FloatingWindowContainer(
                                                 picMap = entry.picMap,
                                                 size = 24.dp,
                                                 isFocusIcon = true,
-                                                contentDescription = null
+                                                contentDescription = null,
                                             )
-                                            
+
                                             // 文本内容
                                             Column(
-                                                modifier = Modifier.padding(start = 8.dp)
+                                                modifier = Modifier.padding(start = 8.dp),
                                             ) {
                                                 if (!entry.title.isNullOrEmpty()) {
                                                     Text(
@@ -303,14 +312,14 @@ fun FloatingWindowContainer(
                                                         color = Color.White,
                                                         fontSize = 16.sp,
                                                         fontWeight = FontWeight.Bold,
-                                                        modifier = Modifier.padding(bottom = 8.dp)
+                                                        modifier = Modifier.padding(bottom = 8.dp),
                                                     )
                                                 }
                                                 if (!entry.text.isNullOrEmpty()) {
                                                     Text(
                                                         text = entry.text,
                                                         color = Color(0xFFDDDDDD),
-                                                        fontSize = 14.sp
+                                                        fontSize = 14.sp,
                                                     )
                                                 }
                                             }
@@ -318,7 +327,7 @@ fun FloatingWindowContainer(
                                     }
                                 }
                             },
-                            isOverlapping = entry.isOverlapping
+                            isOverlapping = entry.isOverlapping,
                         )
                     }
 
@@ -327,7 +336,7 @@ fun FloatingWindowContainer(
                         visible = !entry.isExpanded,
                         modifier = Modifier,
                         enter = collapsedEnterTransition,
-                        exit = collapsedExitTransition
+                        exit = collapsedExitTransition,
                     ) {
                         // 提取回落文本：摘要态优先显示有意义的title，appName作为补充
                         val fallbackTitle = entry.title?.takeIf { it.isNotBlank() }
@@ -336,40 +345,47 @@ fun FloatingWindowContainer(
                         // 从paramV2Raw中正确解析bigIslandJson，与传统实现保持一致
                         // 使用remember块确保entry.paramV2Raw变化时重新解析
                         // 合并三次解析为一次，避免重复解析同一个字符串
-                        val parsedRoot = remember(entry.paramV2Raw) {
-                            entry.paramV2Raw?.let {
-                                try {
-                                    JSONObject(it)
-                                } catch (e: Exception) {
-                                    Logger.w("超级岛", "解析paramV2Raw失败: ${e.message}, 原始数据: $it")
-                                    null
+                        val parsedRoot =
+                            remember(entry.paramV2Raw) {
+                                entry.paramV2Raw?.let {
+                                    try {
+                                        JSONObject(it)
+                                    } catch (e: Exception) {
+                                        Logger.w("超级岛", "解析paramV2Raw失败: ${e.message}, 原始数据: $it")
+                                        null
+                                    }
                                 }
                             }
-                        }
 
                         // 从parsedRoot中提取bigIslandJson
-                        val bigIslandJson = remember(parsedRoot) {
-                            parsedRoot?.let { root ->
-                                val island = root.optJSONObject("param_island")
-                                    ?: root.optJSONObject("paramIsland")
-                                    ?: root.optJSONObject("islandParam")
-                                island?.optJSONObject("bigIslandArea") ?: island?.optJSONObject(
-                                    "bigIsland"
-                                )
+                        val bigIslandJson =
+                            remember(parsedRoot) {
+                                parsedRoot?.let { root ->
+                                    val island =
+                                        root.optJSONObject("param_island")
+                                            ?: root.optJSONObject("paramIsland")
+                                            ?: root.optJSONObject("islandParam")
+                                    island?.optJSONObject("bigIslandArea") ?: island?.optJSONObject(
+                                        "bigIsland",
+                                    )
+                                }
                             }
-                        }
 
                         // 优先从entry.paramV2中提取aodPic，然后回退到parsedRoot
-                        val aodPic = remember(entry.paramV2, parsedRoot) {
-                            entry.paramV2?.aodPic ?: parsedRoot?.optString("aodPic", "")?.takeIf { it.isNotBlank() }
-                        }
+                        val aodPic =
+                            remember(entry.paramV2, parsedRoot) {
+                                entry.paramV2?.aodPic ?: parsedRoot?.optString("aodPic", "")?.takeIf { it.isNotBlank() }
+                            }
 
                         // 优先从entry.paramV2中提取picFunction，然后回退到parsedRoot
-                        val picFunction = remember(entry.paramV2, parsedRoot) {
-                            entry.paramV2?.picFunction ?: entry.paramV2?.highlightInfo?.picFunction ?: 
-                            parsedRoot?.optJSONObject("highlightInfo")
-                                ?.optString("picFunction", "")?.takeIf { it.isNotBlank() }
-                        }
+                        val picFunction =
+                            remember(entry.paramV2, parsedRoot) {
+                                entry.paramV2?.picFunction ?: entry.paramV2?.highlightInfo?.picFunction
+                                    ?: parsedRoot
+                                        ?.optJSONObject("highlightInfo")
+                                        ?.optString("picFunction", "")
+                                        ?.takeIf { it.isNotBlank() }
+                            }
 
                         // 直接显示摘要态内容，不添加额外的Box包装，避免方形背景
                         BigIslandCollapsedCompose(
@@ -379,7 +395,7 @@ fun FloatingWindowContainer(
                             fallbackContent = fallbackContent,
                             isOverlapping = entry.isOverlapping,
                             picFunction = picFunction,
-                            aodPic = aodPic
+                            aodPic = aodPic,
                         )
                     }
                     // 闭合Box组件

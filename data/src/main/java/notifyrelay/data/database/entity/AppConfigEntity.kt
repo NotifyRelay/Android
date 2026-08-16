@@ -10,5 +10,5 @@ import androidx.room.PrimaryKey
 @Entity(tableName = "app_config")
 data class AppConfigEntity(
     @PrimaryKey val key: String,
-    val value: String
+    val value: String,
 )

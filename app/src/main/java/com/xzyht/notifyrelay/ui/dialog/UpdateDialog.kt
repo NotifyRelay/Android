@@ -36,133 +36,136 @@ fun UpdateDialog(
     hasUpdate: Boolean,
     allReleases: List<ReleaseInfo>,
     onDownload: (ReleaseInfo) -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
     val scrollState = rememberScrollState()
-    
+
     // 更新提示用 error 语义色；成功绿（0xFF43A047）因无 success 语义角色保留硬编码
     val statusColor = if (hasUpdate) colorScheme.error else Color(0xFF43A047)
     val statusText = if (hasUpdate) "发现新版本，建议更新" else "当前已是最新版本"
     val remoteVersion = releaseInfo?.version ?: "未知"
-    
+
     val expandedGroups = remember { mutableStateMapOf<String, Boolean>() }
-    
+
     if (hasUpdate && releaseInfo != null) {
         expandedGroups[releaseInfo.version] = true
     }
 
     WindowDialog(show = showDialog.value, modifier = Modifier, title = "版本检查结果", titleColor = DialogDefaults.titleColor(), summary = "当前版本: $currentVersion | 远端版本: $remoteVersion", summaryColor = DialogDefaults.summaryColor(), backgroundColor = DialogDefaults.backgroundColor(), enableWindowDim = true, onDismissRequest = {
-                showDialog.value = false
-                onDismiss()
-            }, onDismissFinished = null, outsideMargin = DialogDefaults.outsideMargin, insideMargin = DialogDefaults.insideMargin, defaultWindowInsetsPadding = true, content = {
-            Column(
-                modifier = Modifier
+        showDialog.value = false
+        onDismiss()
+    }, onDismissFinished = null, outsideMargin = DialogDefaults.outsideMargin, insideMargin = DialogDefaults.insideMargin, defaultWindowInsetsPadding = true, content = {
+        Column(
+            modifier =
+                Modifier
                     .fillMaxWidth()
                     .height(320.dp)
                     .verticalScroll(scrollState)
-                    .padding(vertical = 8.dp)
+                    .padding(vertical = 8.dp),
+        ) {
+            Text(
+                text = statusText,
+                style = textStyles.title3,
+                color = statusColor,
+                modifier = Modifier.padding(bottom = 8.dp),
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text(
-                    text = statusText,
-                    style = textStyles.title3,
-                    color = statusColor,
-                    modifier = Modifier.padding(bottom = 8.dp)
-                )
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    if (hasUpdate && releaseInfo != null) {
-                        TextButton(
-                            text = "下载更新",
-                            onClick = {
-                                showDialog.value = false
-                                onDismiss()
-                                onDownload(releaseInfo)
-                            },
-                            modifier = Modifier.weight(1f)
-                        )
-
-                        Spacer(modifier = Modifier.width(8.dp))
-                    }
-
+                if (hasUpdate && releaseInfo != null) {
                     TextButton(
-                        text = "关闭",
+                        text = "下载更新",
                         onClick = {
                             showDialog.value = false
                             onDismiss()
+                            onDownload(releaseInfo)
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     )
+
+                    Spacer(modifier = Modifier.width(8.dp))
                 }
 
-                if (allReleases.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(16.dp))
+                TextButton(
+                    text = "关闭",
+                    onClick = {
+                        showDialog.value = false
+                        onDismiss()
+                    },
+                    modifier = Modifier.weight(1f),
+                )
+            }
 
-                    Text(
-                        text = "历史版本:",
-                        style = textStyles.body1,
-                        color = colorScheme.onSurface,
-                        modifier = Modifier.padding(bottom = 8.dp)
-                    )
+            if (allReleases.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(16.dp))
 
-                    allReleases.forEach { release ->
-                        val isExpanded = expandedGroups[release.version] ?: false
-                        val isLatestUpdate = hasUpdate && releaseInfo != null && release.version == releaseInfo.version
+                Text(
+                    text = "历史版本:",
+                    style = textStyles.body1,
+                    color = colorScheme.onSurface,
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
 
-                        Card(
-                            modifier = Modifier
+                allReleases.forEach { release ->
+                    val isExpanded = expandedGroups[release.version] ?: false
+                    val isLatestUpdate = hasUpdate && releaseInfo != null && release.version == releaseInfo.version
+
+                    Card(
+                        modifier =
+                            Modifier
                                 .fillMaxWidth()
                                 .padding(vertical = 4.dp),
-                            onClick = { expandedGroups[release.version] = !isExpanded },
-                            cornerRadius = 8.dp,
-                            insideMargin = PaddingValues(12.dp),
-                            colors = CardDefaults.defaultColors(
+                        onClick = { expandedGroups[release.version] = !isExpanded },
+                        cornerRadius = 8.dp,
+                        insideMargin = PaddingValues(12.dp),
+                        colors =
+                            CardDefaults.defaultColors(
                                 color = if (isLatestUpdate) colorScheme.primaryContainer else colorScheme.surface,
-                                contentColor = if (isLatestUpdate) colorScheme.onPrimaryContainer else colorScheme.onSurface
+                                contentColor = if (isLatestUpdate) colorScheme.onPrimaryContainer else colorScheme.onSurface,
                             ),
-                            showIndication = !isExpanded,
-                            pressFeedbackType = if (isExpanded) PressFeedbackType.None else PressFeedbackType.Sink
+                        showIndication = !isExpanded,
+                        pressFeedbackType = if (isExpanded) PressFeedbackType.None else PressFeedbackType.Sink,
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
+                            Text(
+                                text = release.name.ifEmpty { "v${release.version}" },
+                                style = textStyles.body1,
+                                color = if (isLatestUpdate) colorScheme.primary else colorScheme.onSurface,
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            if (release.isPrerelease) {
                                 Text(
-                                    text = release.name.ifEmpty { "v${release.version}" },
-                                    style = textStyles.body1,
-                                    color = if (isLatestUpdate) colorScheme.primary else colorScheme.onSurface
-                                )
-                                Spacer(modifier = Modifier.width(8.dp))
-                                if (release.isPrerelease) {
-                                    Text(
-                                        text = "(预发布)",
-                                        style = textStyles.main,
-                                        color = colorScheme.outline
-                                    )
-                                }
-                                Spacer(modifier = Modifier.weight(1f))
-                                Text(
-                                    text = if (isExpanded) "收起" else "展开",
-                                    style = textStyles.body2,
-                                    color = colorScheme.primary
+                                    text = "(预发布)",
+                                    style = textStyles.main,
+                                    color = colorScheme.outline,
                                 )
                             }
+                            Spacer(modifier = Modifier.weight(1f))
+                            Text(
+                                text = if (isExpanded) "收起" else "展开",
+                                style = textStyles.body2,
+                                color = colorScheme.primary,
+                            )
+                        }
 
-                            if (isExpanded && release.releaseNotes.isNotEmpty()) {
-                                Spacer(modifier = Modifier.height(8.dp))
-                                Text(
-                                    text = release.releaseNotes,
-                                    style = textStyles.body2,
-                                    color = colorScheme.onSurfaceSecondary
-                                )
-                            }
+                        if (isExpanded && release.releaseNotes.isNotEmpty()) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = release.releaseNotes,
+                                style = textStyles.body2,
+                                color = colorScheme.onSurfaceSecondary,
+                            )
                         }
                     }
                 }
             }
-        })
+        }
+    })
 }

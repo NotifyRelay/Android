@@ -5,9 +5,9 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.media.AudioAttributes
 import android.media.AudioFormat
+import android.media.AudioPlaybackCaptureConfiguration
 import android.media.AudioRecord
 import android.media.AudioTrack
-import android.media.AudioPlaybackCaptureConfiguration
 import android.media.projection.MediaProjection
 import androidx.core.content.ContextCompat
 import com.xzyht.notifyrelay.nativecore.NativeCore
@@ -21,8 +21,9 @@ import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 
-class AudioRelayPlayer(private val context: Context) {
-
+class AudioRelayPlayer(
+    private val context: Context,
+) {
     private var audioTrack: AudioTrack? = null
     private var audioRecord: AudioRecord? = null
     private var isRunning = false
@@ -38,7 +39,7 @@ class AudioRelayPlayer(private val context: Context) {
         direction: String,
         sampleRate: Int = 48000,
         channels: Int = 2,
-        remoteUuid: String = ""
+        remoteUuid: String = "",
     ): Boolean {
         if (isRunning) return false
         isRunning = true
@@ -59,29 +60,38 @@ class AudioRelayPlayer(private val context: Context) {
                     return false
                 }
 
-                val channelConfig = if (channels == 2) {
-                    AudioFormat.CHANNEL_OUT_STEREO
-                } else {
-                    AudioFormat.CHANNEL_OUT_MONO
-                }
-                val minBuffer = AudioTrack.getMinBufferSize(
-                    sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT
-                )
+                val channelConfig =
+                    if (channels == 2) {
+                        AudioFormat.CHANNEL_OUT_STEREO
+                    } else {
+                        AudioFormat.CHANNEL_OUT_MONO
+                    }
+                val minBuffer =
+                    AudioTrack.getMinBufferSize(
+                        sampleRate,
+                        channelConfig,
+                        AudioFormat.ENCODING_PCM_16BIT,
+                    )
                 val bufferSize = (minBuffer * 4).coerceAtLeast(65536)
-                audioTrack = AudioTrack.Builder()
-                    .setAudioAttributes(
-                        AudioAttributes.Builder()
-                            .setUsage(AudioAttributes.USAGE_MEDIA)
-                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC).build()
-                    )
-                    .setAudioFormat(
-                        AudioFormat.Builder()
-                            .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                            .setSampleRate(sampleRate)
-                            .setChannelMask(channelConfig).build()
-                    )
-                    .setBufferSizeInBytes(bufferSize)
-                    .setTransferMode(AudioTrack.MODE_STREAM).build()
+                audioTrack =
+                    AudioTrack
+                        .Builder()
+                        .setAudioAttributes(
+                            AudioAttributes
+                                .Builder()
+                                .setUsage(AudioAttributes.USAGE_MEDIA)
+                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                                .build(),
+                        ).setAudioFormat(
+                            AudioFormat
+                                .Builder()
+                                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                                .setSampleRate(sampleRate)
+                                .setChannelMask(channelConfig)
+                                .build(),
+                        ).setBufferSizeInBytes(bufferSize)
+                        .setTransferMode(AudioTrack.MODE_STREAM)
+                        .build()
                 audioTrack?.play()
 
                 NativeCore.registerAudioDataCallback { pcmData, sr, ch ->
@@ -116,7 +126,11 @@ class AudioRelayPlayer(private val context: Context) {
         return true
     }
 
-    fun startSendCapture(mediaProjection: MediaProjection, sampleRate: Int = 48000, channels: Int = 2) {
+    fun startSendCapture(
+        mediaProjection: MediaProjection,
+        sampleRate: Int = 48000,
+        channels: Int = 2,
+    ) {
         if (!isRunning) return
         if (captureJob?.isActive == true || audioRecord != null) {
             Logger.w("AudioRelay", "屏幕音频捕获已在运行，忽略重复启动")
@@ -131,23 +145,27 @@ class AudioRelayPlayer(private val context: Context) {
         val minBuffer = AudioRecord.getMinBufferSize(sampleRate, channelConfig, AudioFormat.ENCODING_PCM_16BIT)
         val bufferSize = (minBuffer * 2).coerceAtLeast(8192)
 
-        val config = AudioPlaybackCaptureConfiguration.Builder(mediaProjection)
-            .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
-            .addMatchingUsage(AudioAttributes.USAGE_GAME)
-            .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
-            .build()
+        val config =
+            AudioPlaybackCaptureConfiguration
+                .Builder(mediaProjection)
+                .addMatchingUsage(AudioAttributes.USAGE_MEDIA)
+                .addMatchingUsage(AudioAttributes.USAGE_GAME)
+                .addMatchingUsage(AudioAttributes.USAGE_UNKNOWN)
+                .build()
 
-        audioRecord = AudioRecord.Builder()
-            .setAudioPlaybackCaptureConfig(config)
-            .setAudioFormat(
-                AudioFormat.Builder()
-                    .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                    .setSampleRate(sampleRate)
-                    .setChannelMask(channelConfig)
-                    .build()
-            )
-            .setBufferSizeInBytes(bufferSize)
-            .build()
+        audioRecord =
+            AudioRecord
+                .Builder()
+                .setAudioPlaybackCaptureConfig(config)
+                .setAudioFormat(
+                    AudioFormat
+                        .Builder()
+                        .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
+                        .setSampleRate(sampleRate)
+                        .setChannelMask(channelConfig)
+                        .build(),
+                ).setBufferSizeInBytes(bufferSize)
+                .build()
 
         audioRecord?.startRecording()
 
@@ -157,42 +175,46 @@ class AudioRelayPlayer(private val context: Context) {
         val buf = ByteArray(bytesPerFrame)
         val frameIntervalMs = 20L
         var nextFrameAt = 0L
-        captureJob = CoroutineScope(Dispatchers.IO).launch {
-            val record = audioRecord ?: return@launch
-            try {
-                while (isActive && isRunning) {
-                    // 按实时速率节流发送（50 帧/秒），避免积压突发导致对端 UDP 缓冲溢出丢包
-                    val now = System.currentTimeMillis()
-                    if (nextFrameAt > now) {
-                        delay(nextFrameAt - now)
-                    } else if (now - nextFrameAt > 200) {
-                        // 发送落后过多：重置节奏，避免积压导致突发
-                        nextFrameAt = now
-                    }
-                    nextFrameAt += frameIntervalMs
+        captureJob =
+            CoroutineScope(Dispatchers.IO).launch {
+                val record = audioRecord ?: return@launch
+                try {
+                    while (isActive && isRunning) {
+                        // 按实时速率节流发送（50 帧/秒），避免积压突发导致对端 UDP 缓冲溢出丢包
+                        val now = System.currentTimeMillis()
+                        if (nextFrameAt > now) {
+                            delay(nextFrameAt - now)
+                        } else if (now - nextFrameAt > 200) {
+                            // 发送落后过多：重置节奏，避免积压导致突发
+                            nextFrameAt = now
+                        }
+                        nextFrameAt += frameIntervalMs
 
-                    val read = record.read(buf, 0, buf.size)
-                    if (read < 0) {
-                        Logger.w("AudioRelay", "屏幕音频捕获读取错误: $read")
-                        break
+                        val read = record.read(buf, 0, buf.size)
+                        if (read < 0) {
+                            Logger.w("AudioRelay", "屏幕音频捕获读取错误: $read")
+                            break
+                        }
+                        try {
+                            // AudioPlaybackCapture 在无音频源时 read 返回 0（正常静默），
+                            // 补发静音帧维持 RTP 流连续，等待而非终止
+                            val frame = if (read > 0) buf.copyOf(read) else silenceChunk
+                            NativeCore.audioWriteFrame(frame)
+                        } catch (_: Exception) {
+                        }
+                    }
+                } finally {
+                    try {
+                        record.stop()
+                    } catch (_: Exception) {
                     }
                     try {
-                        // AudioPlaybackCapture 在无音频源时 read 返回 0（正常静默），
-                        // 补发静音帧维持 RTP 流连续，等待而非终止
-                        val frame = if (read > 0) buf.copyOf(read) else silenceChunk
-                        NativeCore.audioWriteFrame(frame)
-                    } catch (_: Exception) {}
+                        record.release()
+                    } catch (_: Exception) {
+                    }
+                    if (audioRecord === record) audioRecord = null
                 }
-            } finally {
-                try {
-                    record.stop()
-                } catch (_: Exception) {}
-                try {
-                    record.release()
-                } catch (_: Exception) {}
-                if (audioRecord === record) audioRecord = null
             }
-        }
     }
 
     fun stopSendCapture() {
@@ -200,7 +222,8 @@ class AudioRelayPlayer(private val context: Context) {
         audioRecord = null
         try {
             record?.stop()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         captureJob?.cancel()
         captureJob = null
     }
@@ -210,7 +233,8 @@ class AudioRelayPlayer(private val context: Context) {
         audioRecord = null
         try {
             record?.stop()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         captureJob?.cancelAndJoin()
         captureJob = null
     }
@@ -221,7 +245,8 @@ class AudioRelayPlayer(private val context: Context) {
         audioRecord = null
         try {
             record?.stop()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         captureJob?.cancel()
         captureJob = null
         audioJob?.cancel()
@@ -229,13 +254,16 @@ class AudioRelayPlayer(private val context: Context) {
         audioScope = null
         try {
             NativeCore.audioStop()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         try {
             audioTrack?.stop()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         try {
             audioTrack?.release()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
         audioTrack = null
 
         val avgEnergy = if (callbackFrames > 0) totalEnergy / callbackFrames else 0L

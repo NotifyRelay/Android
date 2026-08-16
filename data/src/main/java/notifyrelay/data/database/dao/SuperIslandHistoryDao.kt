@@ -11,7 +11,7 @@ import notifyrelay.data.database.entity.SuperIslandHistorySummary
 data class SuperIslandPackageCount(
     val packageName: String,
     val count: Int,
-    val latestTime: Long
+    val latestTime: Long,
 )
 
 /**
@@ -31,19 +31,19 @@ interface SuperIslandHistoryDao {
      */
     @Query("SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, picMap, featureId FROM super_island_history ORDER BY id DESC")
     suspend fun getAllHistorySummary(): List<SuperIslandHistorySummary>
-    
+
     /**
      * 根据特征ID获取最新的历史记录
      */
     @Query("SELECT * FROM super_island_history WHERE featureId = :featureId ORDER BY id DESC LIMIT 1")
     suspend fun getLatestByFeatureId(featureId: String): SuperIslandHistoryEntity?
-    
+
     /**
      * 根据特征ID删除所有历史记录
      */
     @Query("DELETE FROM super_island_history WHERE featureId = :featureId")
     suspend fun deleteByFeatureId(featureId: String)
-    
+
     /**
      * 根据特征ID和内容更新记录（如果存在相同特征ID和内容的记录则更新，否则插入）
      * 注意：相同特征ID但内容不同的记录会被保留
@@ -53,31 +53,31 @@ interface SuperIslandHistoryDao {
         // 实际的去重逻辑在应用层实现
         insert(history)
     }
-    
+
     /**
      * 获取每个特征ID对应的最新一条记录
      */
     @Query("SELECT * FROM super_island_history WHERE id IN (SELECT MAX(id) FROM super_island_history GROUP BY featureId) ORDER BY id DESC")
     suspend fun getLatestByDistinctFeatureId(): List<SuperIslandHistoryEntity>
-    
+
     /**
      * 插入超级岛历史记录（冲突时替换）
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertAll(history: List<SuperIslandHistoryEntity>)
-    
+
     /**
      * 插入单条超级岛历史记录（冲突时替换）
      */
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(history: SuperIslandHistoryEntity)
-    
+
     /**
      * 清空所有超级岛历史记录
      */
     @Query("DELETE FROM super_island_history")
     suspend fun clearAll()
-    
+
     /**
      * 获取最新的N条超级岛历史记录
      */
@@ -95,13 +95,13 @@ interface SuperIslandHistoryDao {
      */
     @Query("SELECT rawPayload FROM super_island_history WHERE id = :id LIMIT 1")
     suspend fun getRawPayloadById(id: Long): String?
-    
+
     /**
      * 删除指定数量的旧记录，保留最新的记录
      */
     @Query("DELETE FROM super_island_history WHERE id NOT IN (SELECT id FROM super_island_history ORDER BY id DESC LIMIT :keepCount)")
     suspend fun deleteOldestRecords(keepCount: Int)
-    
+
     /**
      * 删除单条记录
      */
@@ -112,7 +112,8 @@ interface SuperIslandHistoryDao {
      * 获取按包名分组的统计信息
      * 优先使用 mappedPackage，如果为空则使用 originalPackage
      */
-    @Query("""
+    @Query(
+        """
         SELECT mappedPackage as packageName, COUNT(*) as count, MAX(id) as latestTime
         FROM super_island_history
         WHERE mappedPackage IS NOT NULL AND mappedPackage != ''
@@ -123,17 +124,20 @@ interface SuperIslandHistoryDao {
         WHERE (mappedPackage IS NULL OR mappedPackage = '') AND originalPackage IS NOT NULL AND originalPackage != ''
         GROUP BY originalPackage
         ORDER BY latestTime DESC
-    """)
+    """,
+    )
     suspend fun getPackageCount(): List<SuperIslandPackageCount>
 
     /**
      * 获取未知包名（无包名）的记录统计
      */
-    @Query("""
+    @Query(
+        """
         SELECT '(未知应用)' as packageName, COUNT(*) as count, MAX(id) as latestTime
         FROM super_island_history
         WHERE (mappedPackage IS NULL OR mappedPackage = '') AND (originalPackage IS NULL OR originalPackage = '')
-    """)
+    """,
+    )
     suspend fun getUnknownPackageCount(): SuperIslandPackageCount?
 
     /**
@@ -142,7 +146,8 @@ interface SuperIslandHistoryDao {
      * @param limit 每页数量
      * @param offset 偏移量
      */
-    @Query("""
+    @Query(
+        """
         SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, picMap, featureId
         FROM super_island_history
         WHERE 
@@ -152,13 +157,19 @@ interface SuperIslandHistoryDao {
             END
         ORDER BY id DESC
         LIMIT :limit OFFSET :offset
-    """)
-    suspend fun getByPackage(packageName: String?, limit: Int, offset: Int): List<SuperIslandHistorySummary>
+    """,
+    )
+    suspend fun getByPackage(
+        packageName: String?,
+        limit: Int,
+        offset: Int,
+    ): List<SuperIslandHistorySummary>
 
     /**
      * 按包名获取所有历史记录摘要（不分页，用于分组内展示）
      */
-    @Query("""
+    @Query(
+        """
         SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, picMap, featureId
         FROM super_island_history
         WHERE 
@@ -167,20 +178,23 @@ interface SuperIslandHistoryDao {
                 ELSE (mappedPackage = :packageName OR (mappedPackage IS NULL OR mappedPackage = '') AND originalPackage = :packageName)
             END
         ORDER BY id DESC
-    """)
+    """,
+    )
     suspend fun getAllByPackage(packageName: String?): List<SuperIslandHistorySummary>
 
     /**
      * 按包名删除历史记录
      */
-    @Query("""
+    @Query(
+        """
         DELETE FROM super_island_history
         WHERE 
             CASE 
                 WHEN :packageName IS NULL THEN (mappedPackage IS NULL OR mappedPackage = '') AND (originalPackage IS NULL OR originalPackage = '')
                 ELSE (mappedPackage = :packageName OR (mappedPackage IS NULL OR mappedPackage = '') AND originalPackage = :packageName)
             END
-    """)
+    """,
+    )
     suspend fun deleteByPackage(packageName: String?)
 
     /**

@@ -5,10 +5,16 @@ plugins {
 
 android {
     namespace = "github.xzynine.superislandui"
-    compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdk =
+        libs.versions.compileSdk
+            .get()
+            .toInt()
 
     defaultConfig {
-        minSdk = libs.versions.minSdk.get().toInt()
+        minSdk =
+            libs.versions.minSdk
+                .get()
+                .toInt()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles("consumer-rules.pro")
@@ -19,7 +25,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -44,10 +50,10 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
-    
+
     // Jetpack Compose BOM 统一管理版本
     implementation(platform(libs.androidx.compose.bom))
-    
+
     // Jetpack Compose 依赖（通过 BOM 统一管理版本）
     implementation("androidx.activity:activity-compose")
     implementation("androidx.compose.ui:ui")
@@ -56,25 +62,25 @@ dependencies {
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.compose.runtime:runtime")
-    
+
     // AndroidX Lifecycle
     implementation(libs.bundles.lifecycle)
     implementation(libs.androidx.lifecycle.viewmodel.compose)
-    
+
     // 其他依赖
     implementation(libs.gson)
     implementation(libs.bundles.coil)
-    
+
     // Miuix 风格 UI 库
     implementation(libs.miuix.ui)
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
-    
+
     // 依赖其他模块
     implementation(project(":core"))
     implementation(project(":base"))
     implementation(project(":data"))
-    
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

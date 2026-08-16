@@ -17,6 +17,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.SmallIsland.right.BComponent
 import github.xzynine.superislandui.floating.SmallIsland.right.BEmpty
 import github.xzynine.superislandui.floating.SmallIsland.right.BFixedWidthDigitInfo
@@ -36,7 +37,6 @@ import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.floating.common.parseColorSafe
 import github.xzynine.superislandui.floating.common.resolveIconUrl
-import github.xzynine.superislandui.common.PreviewData
 
 /**
  * B区组件的Compose实现
@@ -44,12 +44,12 @@ import github.xzynine.superislandui.common.PreviewData
 @Composable
 fun BCompose(
     bComp: BComponent,
-    picMap: Map<String, String>?
+    picMap: Map<String, String>?,
 ) {
     val context = LocalContext.current
     Row(
         modifier = Modifier.wrapContentWidth(),
-        verticalAlignment = Alignment.CenterVertically
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         when (bComp) {
             is BImageText2 -> {
@@ -59,9 +59,9 @@ fun BCompose(
                     picMap = picMap,
                     size = 18.dp,
                     isFocusIcon = false,
-                    contentDescription = null
+                    contentDescription = null,
                 )
-                
+
                 // 文本内容
                 CommonTextBlockCompose(
                     frontTitle = bComp.frontTitle,
@@ -70,10 +70,10 @@ fun BCompose(
                     narrow = bComp.narrowFont,
                     highlight = bComp.showHighlightColor,
                     monospace = false,
-                    maxWidth = 160.dp
+                    maxWidth = 160.dp,
                 )
             }
-            
+
             is BImageText3 -> {
                 // 图标
                 CommonImageCompose(
@@ -81,9 +81,9 @@ fun BCompose(
                     picMap = picMap,
                     size = 18.dp,
                     isFocusIcon = false,
-                    contentDescription = null
+                    contentDescription = null,
                 )
-                
+
                 // 文本内容
                 CommonTextBlockCompose(
                     frontTitle = null,
@@ -91,17 +91,17 @@ fun BCompose(
                     content = null,
                     narrow = bComp.narrowFont,
                     highlight = bComp.showHighlightColor,
-                    monospace = false
+                    monospace = false,
                 )
             }
-            
+
             is BImageText4 -> {
                 // 图标 - 仅创建占位，不实际加载图片
                 CommonImagePlaceholder(
                     show = !bComp.pic.isNullOrBlank(),
-                    size = 18.dp
+                    size = 18.dp,
                 )
-                
+
                 // 文本内容
                 CommonTextBlockCompose(
                     frontTitle = null,
@@ -109,7 +109,7 @@ fun BCompose(
                     content = bComp.content,
                     narrow = false,
                     highlight = false,
-                    monospace = false
+                    monospace = false,
                 )
             }
             is BImageText6 -> {
@@ -118,16 +118,16 @@ fun BCompose(
                 // 只处理data URL格式的图片
                 if (iconUrl?.startsWith("data:", ignoreCase = true) == true) {
                     val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(iconUrl, picMap, bComp.picKey)
-                    
+
                     if (painter != null) {
                         Image(
                             painter = painter,
                             contentDescription = null,
-                            modifier = Modifier.size(18.dp)
+                            modifier = Modifier.size(18.dp),
                         )
                     }
                 }
-                
+
                 // 文本内容
                 CommonTextBlockCompose(
                     frontTitle = null,
@@ -135,10 +135,10 @@ fun BCompose(
                     content = null,
                     narrow = bComp.narrowFont,
                     highlight = bComp.showHighlightColor,
-                    monospace = false
+                    monospace = false,
                 )
             }
-            
+
             is BTextInfo -> {
                 // 文本内容
                 CommonTextBlockCompose(
@@ -147,10 +147,10 @@ fun BCompose(
                     content = bComp.content,
                     narrow = bComp.narrowFont,
                     highlight = bComp.showHighlightColor,
-                    monospace = false
+                    monospace = false,
                 )
             }
-            
+
             is BFixedWidthDigitInfo -> {
                 // 文本内容
                 CommonTextBlockCompose(
@@ -159,36 +159,37 @@ fun BCompose(
                     content = bComp.content,
                     narrow = false,
                     highlight = bComp.showHighlightColor,
-                    monospace = true
+                    monospace = true,
                 )
             }
-            
+
             is BSameWidthDigitInfo -> {
                 // 处理计时信息或数字
                 val timer = bComp.timer
                 val isTimerRunning = timer != null && (timer.timerType == 1 || timer.timerType == -1)
 
                 // 标题文本：优先使用 digit，否则格式化 timer（暂停时也直接显示格式化后的值）
-                val titleText = if (timer != null) {
-                    // 使用 remember + key 确保 timer 变化时重置状态
-                    var displayText by remember(timer) {
-                        mutableStateOf(formatTimerInfo(timer))
-                    }
+                val titleText =
+                    if (timer != null) {
+                        // 使用 remember + key 确保 timer 变化时重置状态
+                        var displayText by remember(timer) {
+                            mutableStateOf(formatTimerInfo(timer))
+                        }
 
-                    // 仅计时进行中才每秒刷新
-                    if (isTimerRunning) {
-                        LaunchedEffect(timer) {
-                            while (true) {
-                                displayText = formatTimerInfo(timer)
-                                kotlinx.coroutines.delay(1000L)
+                        // 仅计时进行中才每秒刷新
+                        if (isTimerRunning) {
+                            LaunchedEffect(timer) {
+                                while (true) {
+                                    displayText = formatTimerInfo(timer)
+                                    kotlinx.coroutines.delay(1000L)
+                                }
                             }
                         }
-                    }
 
-                    displayText
-                } else {
-                    bComp.digit ?: ""
-                }
+                        displayText
+                    } else {
+                        bComp.digit ?: ""
+                    }
 
                 // 文本内容
                 CommonTextBlockCompose(
@@ -197,16 +198,16 @@ fun BCompose(
                     content = bComp.content,
                     narrow = false,
                     highlight = bComp.showHighlightColor,
-                    monospace = true
+                    monospace = true,
                 )
             }
-            
+
             is BProgressTextInfo -> {
                 // 进度环 + 图标
                 val size = 20.dp
                 Box(
                     modifier = Modifier.size(size),
-                    contentAlignment = Alignment.Center // 确保内部元素居中
+                    contentAlignment = Alignment.Center, // 确保内部元素居中
                 ) {
                     // 实现圆形进度环
                     CircularProgressCompose(
@@ -215,26 +216,27 @@ fun BCompose(
                         colorUnReach = Color(parseColorSafe(bComp.colorUnReach, 0x33333333)),
                         strokeWidth = 2.5.dp,
                         isClockwise = !bComp.isCCW,
-                        size = size
+                        size = size,
                     )
-                    
+
                     // 中心图标
                     bComp.picKey?.let { picKey ->
                         val iconUrl = resolveIconUrl(picMap, picKey, context)
                         val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(iconUrl, picMap, picKey)
-                        
+
                         if (painter != null) {
                             Image(
                                 painter = painter,
                                 contentDescription = null,
-                                modifier = Modifier
-                                    .size(size - 6.dp)
-                                    .align(Alignment.Center)
+                                modifier =
+                                    Modifier
+                                        .size(size - 6.dp)
+                                        .align(Alignment.Center),
                             )
                         }
                     }
                 }
-                
+
                 // 文本内容
                 CommonTextBlockCompose(
                     frontTitle = bComp.frontTitle,
@@ -242,10 +244,10 @@ fun BCompose(
                     content = bComp.content,
                     narrow = bComp.narrowFont,
                     highlight = bComp.showHighlightColor,
-                    monospace = false
+                    monospace = false,
                 )
             }
-            
+
             is BPicInfo -> {
                 // 图片组件
                 CommonImageCompose(
@@ -253,10 +255,10 @@ fun BCompose(
                     picMap = picMap,
                     size = 24.dp,
                     isFocusIcon = false,
-                    contentDescription = null
+                    contentDescription = null,
                 )
             }
-            
+
             is BEmpty -> {
                 // 空组件，不显示任何内容
             }
@@ -268,11 +270,12 @@ fun BCompose(
 @Composable
 fun BComposeTextInfoPreview() {
     BCompose(
-        bComp = BTextInfo(
-            title = "B区标题",
-            content = "B区内容"
-        ),
-        picMap = PreviewData.samplePicMap
+        bComp =
+            BTextInfo(
+                title = "B区标题",
+                content = "B区内容",
+            ),
+        picMap = PreviewData.samplePicMap,
     )
 }
 
@@ -280,12 +283,13 @@ fun BComposeTextInfoPreview() {
 @Composable
 fun BComposeImageText2Preview() {
     BCompose(
-        bComp = BImageText2(
-            title = "图文标题",
-            content = "图文内容",
-            picKey = "icon_key"
-        ),
-        picMap = PreviewData.samplePicMap
+        bComp =
+            BImageText2(
+                title = "图文标题",
+                content = "图文内容",
+                picKey = "icon_key",
+            ),
+        picMap = PreviewData.samplePicMap,
     )
 }
 
@@ -293,12 +297,12 @@ fun BComposeImageText2Preview() {
 @Composable
 fun BComposeProgressTextInfoPreview() {
     BCompose(
-        bComp = BProgressTextInfo(
-            title = "下载中",
-            content = "60%",
-            progress = 60
-        ),
-        picMap = PreviewData.samplePicMap
+        bComp =
+            BProgressTextInfo(
+                title = "下载中",
+                content = "60%",
+                progress = 60,
+            ),
+        picMap = PreviewData.samplePicMap,
     )
 }
-

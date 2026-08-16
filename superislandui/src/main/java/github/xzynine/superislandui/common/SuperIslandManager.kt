@@ -3,13 +3,13 @@
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.Drawable
-import androidx.core.graphics.drawable.toBitmap
 import android.graphics.drawable.Icon
 import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.service.notification.StatusBarNotification
 import android.util.Base64
+import androidx.core.graphics.drawable.toBitmap
 import github.xzynine.superislandui.model.core.SuperIslandData
 import notifyrelay.base.util.Logger
 import notifyrelay.core.util.image.ImageUtils
@@ -30,27 +30,29 @@ object SuperIslandManager {
     /**
      * 检查用户/配置是否启用了超级岛读取
      */
-    private fun isEnabled(context: Context): Boolean {
-        return try { StorageManager.getBoolean(context, STORAGE_KEY, true) } catch (_: Exception) { true }
-    }
+    private fun isEnabled(context: Context): Boolean =
+        try {
+            StorageManager.getBoolean(context, STORAGE_KEY, true)
+        } catch (_: Exception) {
+            true
+        }
 
     /**
      * 获取焦点通知协议版本：Settings.System.getInt(notification_focus_protocol)
      */
-    fun getFocusProtocolVersion(context: Context): Int {
-        return try {
+    fun getFocusProtocolVersion(context: Context): Int =
+        try {
             Settings.System.getInt(context.contentResolver, "notification_focus_protocol", 0)
         } catch (e: Exception) {
             Logger.w("超级岛", "超级岛: 获取聚焦协议版本失败: ${e.message}")
             0
         }
-    }
 
     /**
      * 调用 content://miui.statusbar.notification.public canShowFocus 判断应用是否有焦点通知权限
      */
-    fun hasFocusPermission(context: Context): Boolean {
-        return try {
+    fun hasFocusPermission(context: Context): Boolean =
+        try {
             val uri = Uri.parse("content://miui.statusbar.notification.public")
             val extras = Bundle()
             extras.putString("package", context.packageName)
@@ -60,13 +62,15 @@ object SuperIslandManager {
             Logger.w("超级岛", "超级岛: 查询应用聚焦权限失败: ${e.message}")
             false
         }
-    }
 
     /**
      * 解析 miui.focus.param（JSON string），返回结构化 SuperIslandData；不存在则返回 null。
      * 按文档，miui.focus.param 中包含 param_v2 字段，内部可能含 param_island / baseInfo / aodTitle 等字段。
      */
-    fun extractSuperIslandData(sbn: StatusBarNotification, context: Context): SuperIslandData? {
+    fun extractSuperIslandData(
+        sbn: StatusBarNotification,
+        context: Context,
+    ): SuperIslandData? {
         try {
             if (!isEnabled(context)) return null
 
@@ -172,7 +176,8 @@ object SuperIslandManager {
                                         val bmp = obj.toBitmap()
                                         picMap[bk] = ImageUtils.bitmapToDataUri(bmp)
                                         continue
-                                    } catch (_: Exception) {}
+                                    } catch (_: Exception) {
+                                    }
                                 }
                                 if (obj is Icon) {
                                     try {
@@ -182,23 +187,28 @@ object SuperIslandManager {
                                             picMap[bk] = ImageUtils.bitmapToDataUri(bmp)
                                             continue
                                         }
-                                    } catch (_: Exception) {}
+                                    } catch (_: Exception) {
+                                    }
                                 }
                                 if (obj is ByteArray) {
                                     try {
                                         val b64 = Base64.encodeToString(obj, Base64.NO_WRAP)
                                         picMap[bk] = "data:image/png;base64,$b64"
                                         continue
-                                    } catch (_: Exception) {}
+                                    } catch (_: Exception) {
+                                    }
                                 }
                                 // 回退到字符串表示
                                 val fallback = obj?.toString()
                                 if (!fallback.isNullOrEmpty()) picMap[bk] = fallback
-                            } catch (_: Exception) {}
+                            } catch (_: Exception) {
+                            }
                         }
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) {
+                    }
                 }
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
             // 支持单独的 pic keys
             for (k in extras.keySet()) {
                 if (k == "miui.focus.pics") continue
@@ -220,7 +230,12 @@ object SuperIslandManager {
                         }
                         // 再尝试 Parcelable（Bitmap / Drawable / Icon / ByteArray）
                         @Suppress("DEPRECATION")
-                        val p = try { extras.get(k) } catch (_: Exception) { null }
+                        val p =
+                            try {
+                                extras.get(k)
+                            } catch (_: Exception) {
+                                null
+                            }
                         if (p is Bitmap) {
                             picMap[k] = ImageUtils.bitmapToDataUri(p)
                             continue
@@ -229,7 +244,8 @@ object SuperIslandManager {
                             try {
                                 picMap[k] = ImageUtils.bitmapToDataUri(p.toBitmap())
                                 continue
-                            } catch (_: Exception) {}
+                            } catch (_: Exception) {
+                            }
                         }
                         if (p is Icon) {
                             try {
@@ -238,14 +254,16 @@ object SuperIslandManager {
                                     picMap[k] = ImageUtils.bitmapToDataUri(drawable.toBitmap())
                                     continue
                                 }
-                            } catch (_: Exception) {}
+                            } catch (_: Exception) {
+                            }
                         }
                         if (p is ByteArray) {
                             try {
                                 val b64 = Base64.encodeToString(p, Base64.NO_WRAP)
                                 picMap[k] = "data:image/png;base64,$b64"
                                 continue
-                            } catch (_: Exception) {}
+                            } catch (_: Exception) {
+                            }
                         }
                         // 最后回退到 toString()
                         @Suppress("DEPRECATION")
@@ -254,7 +272,8 @@ object SuperIslandManager {
                             rawExtras[k] = fallback
                             picMap[k] = fallback
                         }
-                    } catch (_: Exception) {}
+                    } catch (_: Exception) {
+                    }
                 }
             }
 
@@ -267,7 +286,7 @@ object SuperIslandManager {
                     val appIconBitmap = appIconDrawable.toBitmap()
                     val dataUrl = ImageUtils.bitmapToDataUri(appIconBitmap)
                     picMap[appIconKey] = dataUrl
-                    //Logger.d("超级岛", "超级岛: 注入应用图标到 picMap => $appIconKey")
+                    // Logger.d("超级岛", "超级岛: 注入应用图标到 picMap => $appIconKey")
                 }
             } catch (e: Exception) {
                 Logger.w("超级岛", "超级岛: 注入应用图标失败: ${e.message}")
@@ -283,13 +302,15 @@ object SuperIslandManager {
                 val pm = context.packageManager
                 val ai = pm.getApplicationInfo(pkg, 0)
                 appName = pm.getApplicationLabel(ai).toString()
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
 
             Logger.i("超级岛", "超级岛: 提取数据 pkg=$pkg, title=$title, text=$text, keys=${extras.keySet()}")
             try {
                 picMap.entries.take(6).joinToString(",") { (k, v) -> "$k=${v?.take(80)}" }
-                //Logger.d("超级岛", "超级岛: pic_map keys=${picMap.keys.size}, sample={$sample}")
-            } catch (_: Exception) {}
+                // Logger.d("超级岛", "超级岛: pic_map keys=${picMap.keys.size}, sample={$sample}")
+            } catch (_: Exception) {
+            }
 
             return SuperIslandData(
                 sourcePackage = pkg,
@@ -298,7 +319,7 @@ object SuperIslandManager {
                 text = text,
                 rawExtras = rawExtras,
                 paramV2Raw = rawExtras["param_v2_raw"] as? String,
-                picMap = picMap.toMap()
+                picMap = picMap.toMap(),
             )
         } catch (e: Exception) {
             Logger.w("超级岛", "超级岛: 提取超级岛数据时发生错误: ${e.message}")

@@ -28,7 +28,6 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 
 class DeveloperModeActivity : AppCompatActivity() {
-
     companion object {
         private const val KEY_LOG_LEVEL = "log_level"
         private const val KEY_DEBUG_UI_ENABLED = "debug_ui_enabled"
@@ -39,13 +38,13 @@ class DeveloperModeActivity : AppCompatActivity() {
 
         fun initLogConfig(context: Context) {
             val logLevelOrdinal = StorageManager.getInt(context, KEY_LOG_LEVEL, Logger.Level.INFO.ordinal)
-            Logger.CURRENT_LEVEL = Logger.Level.entries.getOrElse(logLevelOrdinal) { Logger.Level.INFO }
+            Logger.currentLevel = Logger.Level.entries.getOrElse(logLevelOrdinal) { Logger.Level.INFO }
         }
 
         fun initDebugUiConfig(context: Context) {
             DEBUG_UI_ENABLED.value = StorageManager.getBoolean(context, KEY_DEBUG_UI_ENABLED, false)
             FILTERED_NOTIFICATION_LOG_ENABLED.value = StorageManager.getBoolean(context, KEY_FILTERED_NOTIFICATION_LOG_ENABLED, true)
-            Logger.ENABLE_FILTERED_NOTIFICATION_LOG = FILTERED_NOTIFICATION_LOG_ENABLED.value
+            Logger.enableFilteredNotificationLog = FILTERED_NOTIFICATION_LOG_ENABLED.value
         }
     }
 
@@ -53,7 +52,8 @@ class DeveloperModeActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
 
         // 先设置沉浸式虚拟键和状态栏
-        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(this.window, false)
+        androidx.core.view.WindowCompat
+            .setDecorFitsSystemWindows(this.window, false)
         this.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
 
         setContent {
@@ -66,7 +66,7 @@ class DeveloperModeActivity : AppCompatActivity() {
                     // 使用标准 TopAppBar 页面容器（内容区 colorScheme.background）
                     ScrollableTopAppBarPage(
                         title = "开发者选项",
-                        onBack = { finish() }
+                        onBack = { finish() },
                     ) {
                         DeveloperModeScreen()
                     }
@@ -80,33 +80,38 @@ class DeveloperModeActivity : AppCompatActivity() {
         val context = LocalContext.current
 
         // 日志级别状态
-        val logLevel = remember {
-            mutableStateOf(Logger.CURRENT_LEVEL)
-        }
+        val logLevel =
+            remember {
+                mutableStateOf(Logger.currentLevel)
+            }
 
         // 日志级别选项，添加[e].[i]等蓝色文本
-        val logLevelOptions = listOf(
-            "关闭" to Logger.Level.NONE,
-            "[E] 错误" to Logger.Level.ERROR,
-            "[W] 警告" to Logger.Level.WARN,
-            "[I] 信息" to Logger.Level.INFO,
-            "[D] 调试" to Logger.Level.DEBUG,
-            "[V] 详细" to Logger.Level.VERBOSE
-        )
+        val logLevelOptions =
+            listOf(
+                "关闭" to Logger.Level.NONE,
+                "[E] 错误" to Logger.Level.ERROR,
+                "[W] 警告" to Logger.Level.WARN,
+                "[I] 信息" to Logger.Level.INFO,
+                "[D] 调试" to Logger.Level.DEBUG,
+                "[V] 详细" to Logger.Level.VERBOSE,
+            )
 
         // 当前选中的日志级别索引
-        val selectedLevelIndex = remember {
-            mutableIntStateOf(logLevelOptions.indexOfFirst { it.second == logLevel.value })
-        }
+        val selectedLevelIndex =
+            remember {
+                mutableIntStateOf(logLevelOptions.indexOfFirst { it.second == logLevel.value })
+            }
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(start = 16.dp, end = 16.dp)
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(start = 16.dp, end = 16.dp),
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
+                modifier =
+                    Modifier
+                        .fillMaxSize(),
             ) {
                 var debugUiEnabled by DEBUG_UI_ENABLED
                 var filteredNotificationLogEnabled by FILTERED_NOTIFICATION_LOG_ENABLED
@@ -118,7 +123,7 @@ class DeveloperModeActivity : AppCompatActivity() {
                     onCheckedChange = {
                         debugUiEnabled = it
                         StorageManager.putBoolean(context, KEY_DEBUG_UI_ENABLED, it)
-                    }
+                    },
                 )
 
                 SwitchPreference(
@@ -127,9 +132,9 @@ class DeveloperModeActivity : AppCompatActivity() {
                     checked = filteredNotificationLogEnabled,
                     onCheckedChange = {
                         filteredNotificationLogEnabled = it
-                        Logger.ENABLE_FILTERED_NOTIFICATION_LOG = it
+                        Logger.enableFilteredNotificationLog = it
                         StorageManager.putBoolean(context, KEY_FILTERED_NOTIFICATION_LOG_ENABLED, it)
-                    }
+                    },
                 )
 
                 WindowDropdownPreference(
@@ -140,9 +145,9 @@ class DeveloperModeActivity : AppCompatActivity() {
                     onSelectedIndexChange = {
                         selectedLevelIndex.intValue = it
                         logLevel.value = logLevelOptions[it].second
-                        Logger.CURRENT_LEVEL = logLevel.value
+                        Logger.currentLevel = logLevel.value
                         StorageManager.putInt(context, KEY_LOG_LEVEL, logLevel.value.ordinal)
-                    }
+                    },
                 )
             }
         }

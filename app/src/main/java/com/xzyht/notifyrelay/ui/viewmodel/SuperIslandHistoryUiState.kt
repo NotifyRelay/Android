@@ -5,7 +5,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslan
 data class SuperIslandHistoryUiState(
     val expandedGroups: Set<String> = emptySet(),
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
 )
 
 data class GroupedSuperIslandHistory(
@@ -13,5 +13,5 @@ data class GroupedSuperIslandHistory(
     val appName: String?,
     val latestTime: Long,
     val entries: List<SuperIslandHistoryStoreEntry>,
-    val isExpanded: Boolean = false
+    val isExpanded: Boolean = false,
 )

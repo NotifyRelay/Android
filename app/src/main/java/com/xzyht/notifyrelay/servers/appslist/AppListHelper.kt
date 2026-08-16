@@ -12,8 +12,8 @@ object AppListHelper {
      * @param context 用于访问 PackageManager 的 Context
      * @return 已安装应用的列表，若发生异常则返回空列表
      */
-    fun getInstalledApplications(context: Context): List<ApplicationInfo> {
-        return try {
+    fun getInstalledApplications(context: Context): List<ApplicationInfo> =
+        try {
             val pm = context.packageManager
             val apps = pm.getInstalledApplications(0)
             // 过滤掉系统应用和自己
@@ -27,7 +27,6 @@ object AppListHelper {
             Logger.e("AppListHelper", "获取已安装应用列表失败: ${e.message}", e)
             emptyList()
         }
-    }
 
     /**
      * 检查是否可以查询应用列表
@@ -35,8 +34,8 @@ object AppListHelper {
      * @param context 用于访问 PackageManager 的 Context
      * @return 如果能够成功查询并且至少检测到多个应用返回 true，否则返回 false
      */
-    fun canQueryApps(context: Context): Boolean {
-        return try {
+    fun canQueryApps(context: Context): Boolean =
+        try {
             val pm = context.packageManager
             val apps = pm.getInstalledApplications(0)
             val result = apps.size > 2 // 简单的检查，至少有几个应用
@@ -47,7 +46,6 @@ object AppListHelper {
             }
             false
         }
-    }
 
     /**
      * 获取应用标签（名称）
@@ -56,8 +54,11 @@ object AppListHelper {
      * @param packageName 要查询的应用包名
      * @return 应用的显示名称，若查询失败则返回 packageName
      */
-    fun getApplicationLabel(context: Context, packageName: String): String {
-        return try {
+    fun getApplicationLabel(
+        context: Context,
+        packageName: String,
+    ): String =
+        try {
             val pm = context.packageManager
             val appInfo = pm.getApplicationInfo(packageName, 0)
             pm.getApplicationLabel(appInfo).toString()
@@ -65,7 +66,6 @@ object AppListHelper {
             Logger.w("AppListHelper", "获取应用名失败, 包名=$packageName, 错误=${e.message}", e)
             packageName // 如果获取失败，返回包名
         }
-    }
 
     /**
      * 根据包名过滤应用列表
@@ -76,7 +76,7 @@ object AppListHelper {
      */
     fun filterAppsByPackageNames(
         context: Context,
-        packageNames: List<String>
+        packageNames: List<String>,
     ): List<ApplicationInfo> {
         val allApps = getInstalledApplications(context)
         return allApps.filter { appInfo ->
@@ -95,7 +95,7 @@ object AppListHelper {
     fun searchApps(
         context: Context,
         query: String,
-        installedApps: List<ApplicationInfo>? = null
+        installedApps: List<ApplicationInfo>? = null,
     ): List<ApplicationInfo> {
         val apps = installedApps ?: getInstalledApplications(context)
         if (query.isBlank()) return apps
@@ -103,10 +103,10 @@ object AppListHelper {
         return apps.filter { appInfo ->
             val appName = getApplicationLabel(context, appInfo.packageName)
             appName.contains(query, ignoreCase = true) ||
-            appInfo.packageName.contains(query, ignoreCase = true)
+                appInfo.packageName.contains(query, ignoreCase = true)
         }
     }
-    
+
     /**
      * 从 JSONArray 解析远程应用列表
      *
@@ -125,7 +125,7 @@ object AppListHelper {
         }
         return result
     }
-    
+
     /**
      * 合并本地和远程应用列表
      *
@@ -135,28 +135,28 @@ object AppListHelper {
      */
     fun mergeLocalAndRemoteApps(
         context: Context,
-        remoteApps: Map<String, String>
+        remoteApps: Map<String, String>,
     ): Map<String, String> {
         val result = mutableMapOf<String, String>()
         val localApps = getInstalledApplications(context)
-        
+
         // 添加本地应用
         localApps.forEach {
             val packageName = it.packageName
             val appName = getApplicationLabel(context, packageName)
             result[packageName] = appName
         }
-        
+
         // 添加远程应用（不覆盖本地应用）
         remoteApps.forEach {
             if (!result.containsKey(it.key)) {
                 result[it.key] = it.value
             }
         }
-        
+
         return result
     }
-    
+
     /**
      * 获取应用名，优先使用本地应用名，其次使用远程应用名
      *
@@ -168,7 +168,7 @@ object AppListHelper {
     fun getAppNameWithFallback(
         context: Context,
         packageName: String,
-        remoteAppName: String? = null
+        remoteAppName: String? = null,
     ): String {
         // 优先尝试获取本地应用名
         return try {

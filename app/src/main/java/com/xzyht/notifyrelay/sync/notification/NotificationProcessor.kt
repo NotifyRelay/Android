@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.sync.notification
 
 import android.content.Context
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.repository.remoteNotificationFilter
 import com.xzyht.notifyrelay.feature.device.repository.replicateNotification
@@ -9,6 +8,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
+import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.sync.IconSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -21,7 +21,6 @@ import org.json.JSONObject
  * 远程通知处理管线（单条通知级别，不负责网络收发）。
  */
 object NotificationProcessor {
-
     private const val TAG = "NotificationProcessor"
 
     data class NotificationInput(
@@ -35,7 +34,7 @@ object NotificationProcessor {
         manager: DeviceConnectionManager,
         scope: CoroutineScope,
         input: NotificationInput,
-        notificationCallbacks: Collection<(String) -> Unit>
+        notificationCallbacks: Collection<(String) -> Unit>,
     ) {
         val (header, data, remoteUuid) = input
 
@@ -45,7 +44,11 @@ object NotificationProcessor {
         handleFilterAndReplicate(context, manager, scope, data, remoteUuid)
 
         notificationCallbacks.forEach { callback ->
-            try { callback.invoke(data) } catch (e: Exception) { Logger.e(TAG, "调用UI层回调失败: ${e.message}") }
+            try {
+                callback.invoke(data)
+            } catch (e: Exception) {
+                Logger.e(TAG, "调用UI层回调失败: ${e.message}")
+            }
         }
     }
 
@@ -54,7 +57,7 @@ object NotificationProcessor {
         manager: DeviceConnectionManager,
         header: String?,
         decrypted: String,
-        remoteUuid: String?
+        remoteUuid: String?,
     ) {
         try {
             if (remoteUuid != null) {
@@ -85,7 +88,7 @@ object NotificationProcessor {
         manager: DeviceConnectionManager,
         scope: CoroutineScope,
         decrypted: String,
-        remoteUuid: String?
+        remoteUuid: String?,
     ) {
         val result = remoteNotificationFilter(decrypted, context)
 
@@ -108,7 +111,7 @@ object NotificationProcessor {
                                 context,
                                 result.mappedPkg,
                                 manager,
-                                sourceDevice
+                                sourceDevice,
                             )
                         }
                     } catch (e: Exception) {
@@ -124,13 +127,14 @@ object NotificationProcessor {
     private fun handleLockedScreenDelayed(
         context: Context,
         scope: CoroutineScope,
-        result: BackendRemoteFilter.FilterResult
+        result: BackendRemoteFilter.FilterResult,
     ) {
         try {
             if (RemoteFilterConfig.enableDeduplication) {
                 BackendRemoteFilter.addPlaceholder(result.title, result.text, result.mappedPkg, 15_000L)
             }
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
 
         scope.launch {
             try {
@@ -138,6 +142,7 @@ object NotificationProcessor {
                 delay(waitMs)
 
                 val localList = NotificationRepository.getNotificationsByDevice("本机")
+
                 fun normalizeTitleLocal(t: String?): String {
                     if (t == null) return ""
                     val prefixPattern = Regex("^\\([^)]+\\)")
@@ -146,14 +151,22 @@ object NotificationProcessor {
 
                 val normalizedPendingTitle = normalizeTitleLocal(result.title)
                 val pendingText = result.text
-                val duplicateFound = localList.any { nr ->
-                    try {
-                        nr.device == "本机" && normalizeTitleLocal(nr.title) == normalizedPendingTitle && (nr.text ?: "") == (pendingText ?: "")
-                    } catch (_: Exception) { false }
-                }
+                val duplicateFound =
+                    localList.any { nr ->
+                        try {
+                            nr.device == "本机" && normalizeTitleLocal(nr.title) == normalizedPendingTitle && (nr.text ?: "") == (pendingText ?: "")
+                        } catch (_: Exception) {
+                            false
+                        }
+                    }
 
                 if (!duplicateFound) {
-                    val placeholderStillExists = try { BackendRemoteFilter.isPlaceholderPresent(result.title, result.text, result.mappedPkg) } catch (e: Exception) { true }
+                    val placeholderStillExists =
+                        try {
+                            BackendRemoteFilter.isPlaceholderPresent(result.title, result.text, result.mappedPkg)
+                        } catch (e: Exception) {
+                            true
+                        }
 
                     if (!placeholderStillExists) {
                         // 占位被移除，跳过复刻
@@ -163,15 +176,24 @@ object NotificationProcessor {
                         } catch (e: Exception) {
                             Logger.e("智能去重", "锁屏延迟复刻执行复刻时发生错误", e)
                         } finally {
-                            try { BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg) } catch (_: Exception) {}
+                            try {
+                                BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg)
+                            } catch (_: Exception) {
+                            }
                         }
                     }
                 } else {
-                    try { BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg) } catch (_: Exception) {}
+                    try {
+                        BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg)
+                    } catch (_: Exception) {
+                    }
                 }
             } catch (e: Exception) {
                 Logger.e("智能去重", "锁屏延迟复刻异常", e)
-                try { BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg) } catch (_: Exception) {}
+                try {
+                    BackendRemoteFilter.removePlaceholderMatching(result.title, result.text, result.mappedPkg)
+                } catch (_: Exception) {
+                }
             }
         }
     }

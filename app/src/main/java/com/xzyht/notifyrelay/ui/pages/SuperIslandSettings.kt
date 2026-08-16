@@ -63,11 +63,12 @@ private val DEFAULT_MIRROR_PACKAGES: List<String>
     get() = FilterConfigDefaults.defaultMirrorPackages
 
 // 注入方式选项
-val specInjectionOptions = listOf(
-    "仅超级岛规范信息注入" to SpecInjectionMode.SUPER_ISLAND,
-    "仅Live Updates规范信息注入" to SpecInjectionMode.LIVE_UPDATES,
-    "两者都注入" to SpecInjectionMode.BOTH
-)
+val specInjectionOptions =
+    listOf(
+        "仅超级岛规范信息注入" to SpecInjectionMode.SUPER_ISLAND,
+        "仅Live Updates规范信息注入" to SpecInjectionMode.LIVE_UPDATES,
+        "两者都注入" to SpecInjectionMode.BOTH,
+    )
 
 @Composable
 fun UISuperIslandSettings() {
@@ -94,22 +95,24 @@ fun UISuperIslandSettings() {
     var showCustomPkgInput by remember { mutableStateOf(false) }
     var customPkgText by remember { mutableStateOf("") }
 
-    val floatingWindowSummary = run {
-        val baseSummary = "用于a16的livedata通知api被系统支持前使用浮窗展示超级岛"
-        val currentOsVersion = PermissionHelper.getDetailedOsVersion() ?: "未知"
-        val versionComparisonResult = PermissionHelper.isVersionGreaterThan(currentOsVersion, "OS3.0.300")
-        if (DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
-            "$baseSummary (当前版本: $currentOsVersion, 版本比较: ${if (versionComparisonResult) "高于" else "低于或等于"} OS3.0.300, 有用户设置: ${if (hasFloatingWindowSetting) "是" else "否"}, 预设默认值: ${if (defaultFloatingWindowEnabled) "开启" else "关闭"})"
-        } else {
-            baseSummary
+    val floatingWindowSummary =
+        run {
+            val baseSummary = "用于a16的livedata通知api被系统支持前使用浮窗展示超级岛"
+            val currentOsVersion = PermissionHelper.getDetailedOsVersion() ?: "未知"
+            val versionComparisonResult = PermissionHelper.isVersionGreaterThan(currentOsVersion, "OS3.0.300")
+            if (DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
+                "$baseSummary (当前版本: $currentOsVersion, 版本比较: ${if (versionComparisonResult) "高于" else "低于或等于"} OS3.0.300, 有用户设置: ${if (hasFloatingWindowSetting) "是" else "否"}, 预设默认值: ${if (defaultFloatingWindowEnabled) "开启" else "关闭"})"
+            } else {
+                baseSummary
+            }
         }
-    }
 
     suspend fun loadCustomPackages() {
         val repo = DatabaseRepository.getInstance(context)
-        customPackages = withContext(Dispatchers.IO) {
-            repo.getAllMirrorFilterPackages()
-        }
+        customPackages =
+            withContext(Dispatchers.IO) {
+                repo.getAllMirrorFilterPackages()
+            }
     }
 
     LaunchedEffect(Unit) {
@@ -122,11 +125,12 @@ fun UISuperIslandSettings() {
     Scaffold {
         Surface(color = colorScheme.background) {
             Column(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .verticalScroll(remember { androidx.compose.foundation.ScrollState(0) }),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(horizontal = 16.dp, vertical = 12.dp)
+                        .verticalScroll(remember { androidx.compose.foundation.ScrollState(0) }),
+                verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 SwitchPreference(
                     title = "超级岛读取",
@@ -135,7 +139,7 @@ fun UISuperIslandSettings() {
                     onCheckedChange = {
                         enabled = it
                         StorageManager.putBoolean(context, SUPER_ISLAND_KEY, it)
-                    }
+                    },
                 )
 
                 SwitchPreference(
@@ -146,7 +150,7 @@ fun UISuperIslandSettings() {
                         showSuperIsland = it
                         StorageManager.putBoolean(context, SUPER_ISLAND_SHOW_KEY, it)
                         ToastUtils.showShortToast(context, "功能开发中")
-                    }
+                    },
                 )
 
                 SwitchPreference(
@@ -157,7 +161,7 @@ fun UISuperIslandSettings() {
                         floatingWindowEnabled = it
                         if (it) notificationListEnabled = false
                         SuperIslandConfigUtils.setFloatingWindowEnabled(context, it)
-                    }
+                    },
                 )
 
                 SwitchPreference(
@@ -171,7 +175,7 @@ fun UISuperIslandSettings() {
                             SuperIslandConfigUtils.setFloatingWindowEnabled(context, false)
                         }
                         SuperIslandConfigUtils.setNotificationListMode(context, it)
-                    }
+                    },
                 )
 
                 WindowDropdownPreference(
@@ -184,14 +188,14 @@ fun UISuperIslandSettings() {
                             specInjectionMode = specInjectionOptions[index].second
                             StorageManager.putInt(context, SPEC_INJECTION_MODE_KEY, specInjectionMode.ordinal)
                         }
-                    }
+                    },
                 )
 
                 ArrowPreference(
                     title = "测试超级岛分支",
                     onClick = {
                         showTestDialog.value = true
-                    }
+                    },
                 )
 
                 HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
@@ -203,14 +207,14 @@ fun UISuperIslandSettings() {
                     onCheckedChange = {
                         mirrorFilterEnabled = it
                         StorageManager.putBoolean(context, MIRROR_FILTER_ENABLED_KEY, it)
-                    }
+                    },
                 )
 
                 Text(
                     "过滤包名列表",
                     style = textStyles.main,
                     color = colorScheme.onSurfaceSecondary,
-                    modifier = Modifier.padding(horizontal = 4.dp)
+                    modifier = Modifier.padding(horizontal = 4.dp),
                 )
 
                 val installedPkgs = remember { AppRepository.getInstalledPackageNamesSync(context) }
@@ -228,13 +232,13 @@ fun UISuperIslandSettings() {
 
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         iconBitmap?.let {
                             Image(
                                 bitmap = it.asImageBitmap(),
                                 contentDescription = null,
-                                modifier = Modifier.size(24.dp)
+                                modifier = Modifier.size(24.dp),
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                         }
@@ -242,20 +246,20 @@ fun UISuperIslandSettings() {
                             pkg,
                             style = textStyles.body2,
                             color = if (isInstalled) colorScheme.primary else colorScheme.onSurface,
-                            modifier = Modifier.weight(1f)
+                            modifier = Modifier.weight(1f),
                         )
                         Switch(
                             checked = isEnabled,
                             onCheckedChange = { v ->
                                 kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                                     DatabaseRepository.getInstance(context).upsertMirrorFilterPackage(
-                                        SuperIslandMirrorFilterEntity(pkg, enabled = v)
+                                        SuperIslandMirrorFilterEntity(pkg, enabled = v),
                                     )
                                     withContext(Dispatchers.Main) {
                                         loadCustomPackages()
                                     }
                                 }
-                            }
+                            },
                         )
                     }
                 }
@@ -275,13 +279,13 @@ fun UISuperIslandSettings() {
 
                         Row(
                             modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             iconBitmap?.let {
                                 Image(
                                     bitmap = it.asImageBitmap(),
                                     contentDescription = null,
-                                    modifier = Modifier.size(24.dp)
+                                    modifier = Modifier.size(24.dp),
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                             }
@@ -289,7 +293,7 @@ fun UISuperIslandSettings() {
                                 pkg,
                                 style = textStyles.body2,
                                 color = if (isInstalled) colorScheme.primary else colorScheme.onSurface,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             )
                             Switch(
                                 checked = pkgEnabled,
@@ -298,7 +302,7 @@ fun UISuperIslandSettings() {
                                     kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                                         DatabaseRepository.getInstance(context).setMirrorFilterEnabled(pkg, v)
                                     }
-                                }
+                                },
                             )
                             Spacer(modifier = Modifier.width(4.dp))
                             Button(
@@ -310,12 +314,12 @@ fun UISuperIslandSettings() {
                                         }
                                     }
                                 },
-                                modifier = Modifier.size(32.dp)
+                                modifier = Modifier.size(32.dp),
                             ) {
                                 Icon(
                                     imageVector = MiuixIcons.Delete,
                                     contentDescription = "删除",
-                                    modifier = Modifier.size(16.dp)
+                                    modifier = Modifier.size(16.dp),
                                 )
                             }
                         }
@@ -324,10 +328,10 @@ fun UISuperIslandSettings() {
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Button(
-                        onClick = { showAppPicker = true }
+                        onClick = { showAppPicker = true },
                     ) {
                         Text("选择应用")
                     }
@@ -346,15 +350,14 @@ fun UISuperIslandSettings() {
                 showAppPicker = false
                 kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
                     DatabaseRepository.getInstance(context).upsertMirrorFilterPackage(
-                        SuperIslandMirrorFilterEntity(pkg, enabled = true)
+                        SuperIslandMirrorFilterEntity(pkg, enabled = true),
                     )
                     withContext(Dispatchers.Main) {
                         loadCustomPackages()
                     }
                 }
             },
-            title = "选择镜像过滤应用"
+            title = "选择镜像过滤应用",
         )
     }
 }
-

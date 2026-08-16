@@ -27,10 +27,10 @@ data class PackageGroupEntity(
             entity = PackageGroupEntity::class,
             parentColumns = ["id"],
             childColumns = ["groupId"],
-            onDelete = ForeignKey.CASCADE
-        )
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
-    indices = [Index("groupId")]
+    indices = [Index("groupId")],
 )
 data class PackageGroupItemEntity(
     val groupId: Long,

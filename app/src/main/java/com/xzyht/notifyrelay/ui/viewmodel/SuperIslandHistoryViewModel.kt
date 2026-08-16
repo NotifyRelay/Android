@@ -25,7 +25,7 @@ import notifyrelay.data.database.repository.DatabaseRepository
 
 class SuperIslandHistoryViewModel(
     private val application: Application,
-    private val repository: DatabaseRepository
+    private val repository: DatabaseRepository,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(SuperIslandHistoryUiState())
     val uiState: StateFlow<SuperIslandHistoryUiState> = _uiState.asStateFlow()
@@ -36,13 +36,15 @@ class SuperIslandHistoryViewModel(
     private val iconLoading = mutableSetOf<String>()
 
     @OptIn(ExperimentalCoroutinesApi::class)
-    val groupedPagingFlow: Flow<PagingData<GroupedSuperIslandHistory>> = refreshSignal.flatMapLatest {
-        Pager(
-            config = PagingConfig(pageSize = 20, enablePlaceholders = false)
-        ) {
-            SuperIslandPagingSource(repository, application)
-        }.flow
-    }.cachedIn(viewModelScope)
+    val groupedPagingFlow: Flow<PagingData<GroupedSuperIslandHistory>> =
+        refreshSignal
+            .flatMapLatest {
+                Pager(
+                    config = PagingConfig(pageSize = 20, enablePlaceholders = false),
+                ) {
+                    SuperIslandPagingSource(repository, application)
+                }.flow
+            }.cachedIn(viewModelScope)
 
     init {
         viewModelScope.launch {
@@ -96,22 +98,22 @@ class SuperIslandHistoryViewModel(
         }
     }
 
-    suspend fun loadEntryDetail(id: Long): SuperIslandHistoryStoreEntry? {
-        return SuperIslandHistoryStore.loadEntryDetail(application, id)
-    }
+    suspend fun loadEntryDetail(id: Long): SuperIslandHistoryStoreEntry? = SuperIslandHistoryStore.loadEntryDetail(application, id)
 
     fun preloadAppIcons(packageNames: List<String>) {
         val targets = packageNames.filter { it.isNotBlank() && it != "(未知应用)" }
         if (targets.isEmpty()) return
 
-        val toLoad = synchronized(iconLoading) {
-            val cache = _appIconCache.value
-            val loadTargets = targets.filter { pkg ->
-                !iconLoading.contains(pkg) && cache[pkg] == null
+        val toLoad =
+            synchronized(iconLoading) {
+                val cache = _appIconCache.value
+                val loadTargets =
+                    targets.filter { pkg ->
+                        !iconLoading.contains(pkg) && cache[pkg] == null
+                    }
+                iconLoading.addAll(loadTargets)
+                loadTargets
             }
-            iconLoading.addAll(loadTargets)
-            loadTargets
-        }
 
         if (toLoad.isEmpty()) return
 
@@ -156,7 +158,9 @@ class SuperIslandHistoryViewModel(
         return name to icon
     }
 
-    class Factory(private val application: Application) : ViewModelProvider.Factory {
+    class Factory(
+        private val application: Application,
+    ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(SuperIslandHistoryViewModel::class.java)) {
                 val repository = DatabaseRepository.getInstance(application)

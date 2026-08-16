@@ -5,9 +5,9 @@ import android.content.ClipboardManager
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.servers.clipboard.ClipboardSyncManager
 import notifyrelay.base.util.Logger
 
 /**
@@ -15,22 +15,21 @@ import notifyrelay.base.util.Logger
  * 当应用不在前台时，通过启动此透明Activity获取焦点，从而能够访问剪贴板
  */
 class ClipboardSyncActivity : AppCompatActivity() {
-
-    private val TAG = "ClipboardSyncActivity"
-    private val CLIPBOARD_TYPE_TEXT = "text"
-    private val CLIPBOARD_TYPE_IMAGE = "image"
+    private val tag = "ClipboardSyncActivity"
+    private val clipboardTypeText = "text"
+    private val clipboardTypeImage = "image"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // 设置透明主题（在AndroidManifest.xml中配置）
-        Logger.d(TAG, "透明Activity创建，准备获取剪贴板数据")
+        Logger.d(tag, "透明Activity创建，准备获取剪贴板数据")
 
         // 移除 setContentView 和 viewTreeObserver 监听，减少UI渲染
         // 直接设置不可触摸标志
         window.setFlags(
             WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
-            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE
+            WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE,
         )
     }
 
@@ -58,9 +57,9 @@ class ClipboardSyncActivity : AppCompatActivity() {
                 }
                 // 移除Toast，减少干扰
             } catch (e: SecurityException) {
-                Logger.e(TAG, "剪贴板访问被拒绝", e)
+                Logger.e(tag, "剪贴板访问被拒绝", e)
             } catch (e: Exception) {
-                Logger.e(TAG, "同步失败", e)
+                Logger.e(tag, "同步失败", e)
             } finally {
                 // 无论成功与否，都立即结束Activity
                 finish()
@@ -89,11 +88,11 @@ class ClipboardSyncActivity : AppCompatActivity() {
             if (clipDescription != null && item != null) {
                 // 处理文本类型
                 if (clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_PLAIN) ||
-                    clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)) {
-
+                    clipDescription.hasMimeType(ClipDescription.MIMETYPE_TEXT_HTML)
+                ) {
                     val text = item.text?.toString()
                     if (!text.isNullOrEmpty()) {
-                        return Pair(CLIPBOARD_TYPE_TEXT, text)
+                        return Pair(clipboardTypeText, text)
                     }
                 }
             }
@@ -110,7 +109,7 @@ class ClipboardSyncActivity : AppCompatActivity() {
      */
     private fun sendClipboardData(
         deviceManager: DeviceConnectionManager,
-        clipboardData: Pair<String, String>
+        clipboardData: Pair<String, String>,
     ) {
         // 直接使用ClipboardSyncManager的手动同步方法
         ClipboardSyncManager.manualSyncClipboard(deviceManager, this)

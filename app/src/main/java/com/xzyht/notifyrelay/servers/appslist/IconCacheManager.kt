@@ -33,7 +33,7 @@ object IconCacheManager {
         try {
             val maxSize = MAX_CACHE_SIZE_MB * 1024 * 1024
             diskCache = DiskLruCache.open(cacheDir, CACHE_VERSION, VALUE_COUNT, maxSize)
-            //Logger.d(TAG, "DiskLruCache 初始化，path=${cacheDir.absolutePath}")
+            // Logger.d(TAG, "DiskLruCache 初始化，path=${cacheDir.absolutePath}")
         } catch (e: Exception) {
             Logger.e(TAG, "初始化 DiskLruCache 失败", e)
             diskCache = null
@@ -42,7 +42,10 @@ object IconCacheManager {
 
     private fun keyFor(packageName: String): String = packageName.md5()
 
-    suspend fun saveIcon(packageName: String, bitmap: Bitmap): Boolean {
+    suspend fun saveIcon(
+        packageName: String,
+        bitmap: Bitmap,
+    ): Boolean {
         return withContext(Dispatchers.IO) {
             try {
                 val key = keyFor(packageName)
@@ -58,7 +61,7 @@ object IconCacheManager {
                         cache.flush()
                         // 更新文件最后修改时间
                         updateMetadata(packageName, System.currentTimeMillis())
-                        //Logger.d(TAG, "图标已缓存 (DiskLruCache): $packageName")
+                        // Logger.d(TAG, "图标已缓存 (DiskLruCache): $packageName")
                         return@withContext true
                     } catch (e: Exception) {
                         try {
@@ -74,11 +77,11 @@ object IconCacheManager {
                         bitmap.compress(
                             Bitmap.CompressFormat.PNG,
                             100,
-                            out
+                            out,
                         )
                     }
                     updateMetadata(packageName, System.currentTimeMillis())
-                    //Logger.d(TAG, "图标已缓存 (fallback): $packageName")
+                    // Logger.d(TAG, "图标已缓存 (fallback): $packageName")
                     return@withContext true
                 }
             } catch (e: Exception) {
@@ -133,8 +136,8 @@ object IconCacheManager {
         }
     }
 
-    suspend fun removeIcon(packageName: String): Boolean {
-        return withContext(Dispatchers.IO) {
+    suspend fun removeIcon(packageName: String): Boolean =
+        withContext(Dispatchers.IO) {
             try {
                 val key = keyFor(packageName)
                 try {
@@ -144,17 +147,16 @@ object IconCacheManager {
                 val f = File(cacheDir, "$key.png")
                 val deleted = if (f.exists()) f.delete() else true
                 removeMetadata(packageName)
-                //Logger.d(TAG, "已从缓存移除图标: $packageName")
+                // Logger.d(TAG, "已从缓存移除图标: $packageName")
                 deleted
             } catch (e: Exception) {
                 Logger.e(TAG, "移除图标失败: $packageName", e)
                 false
             }
         }
-    }
 
-    suspend fun clearAllCache(): Boolean {
-        return withContext(Dispatchers.IO) {
+    suspend fun clearAllCache(): Boolean =
+        withContext(Dispatchers.IO) {
             try {
                 try {
                     diskCache?.delete()
@@ -162,14 +164,13 @@ object IconCacheManager {
                 }
                 // recreate directory
                 cacheDir.listFiles()?.forEach { it.delete() }
-                //Logger.d(TAG, "已清空所有图标缓存")
+                // Logger.d(TAG, "已清空所有图标缓存")
                 true
             } catch (e: Exception) {
                 Logger.e(TAG, "清空缓存失败", e)
                 false
             }
         }
-    }
 
     fun getCacheSize(): Long = cacheDir.listFiles()?.sumOf { it.length() } ?: 0L
 
@@ -200,7 +201,7 @@ object IconCacheManager {
                         if (f.delete()) total -= len
                     }
                 }
-                //Logger.d(TAG, "过期缓存清理完成")
+                // Logger.d(TAG, "过期缓存清理完成")
             } catch (e: Exception) {
                 Logger.e(TAG, "清理过期缓存失败", e)
             }
@@ -214,7 +215,10 @@ object IconCacheManager {
         return System.currentTimeMillis() - ts > maxAgeMillis
     }
 
-    private fun updateMetadata(packageName: String, timestamp: Long) {
+    private fun updateMetadata(
+        packageName: String,
+        timestamp: Long,
+    ) {
         val m = loadMetadata().toMutableMap()
         m[packageName] = timestamp
         saveMetadata(m)
@@ -232,14 +236,18 @@ object IconCacheManager {
         val f = getMetadataFile()
         if (!f.exists()) return emptyMap()
         return try {
-            f.readLines().mapNotNull { line ->
-                val parts = line.split(":")
-                if (parts.size == 2) {
-                    val name = parts[0]
-                    val t = parts[1].toLongOrNull() ?: return@mapNotNull null
-                    name to t
-                } else null
-            }.toMap()
+            f
+                .readLines()
+                .mapNotNull { line ->
+                    val parts = line.split(":")
+                    if (parts.size == 2) {
+                        val name = parts[0]
+                        val t = parts[1].toLongOrNull() ?: return@mapNotNull null
+                        name to t
+                    } else {
+                        null
+                    }
+                }.toMap()
         } catch (e: Exception) {
             Logger.e(TAG, "读取元数据失败", e)
             emptyMap()
@@ -265,7 +273,7 @@ object IconCacheManager {
         val totalSizeBytes: Long,
         val totalSizeMB: Double,
         val expiredCount: Int,
-        val cacheDir: String
+        val cacheDir: String,
     )
 
     fun getCacheStats(): CacheStats {
@@ -281,7 +289,5 @@ object IconCacheManager {
      *
      * @return 已缓存图标的包名集合
      */
-    fun getAllIconKeys(): Set<String> {
-        return loadMetadata().keys
-    }
+    fun getAllIconKeys(): Set<String> = loadMetadata().keys
 }

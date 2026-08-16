@@ -1,8 +1,7 @@
 package github.xzynine.superislandui.common
 
-import kotlin.math.min
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.measureTime
+import kotlin.math.min
 
 /**
  * 文本拆分工具类，用于处理歌词等文本的拆分
@@ -11,47 +10,80 @@ import notifyrelay.base.util.measureTime
 object TextSplitter {
     private const val TAG = "TextSplitter"
 
-    private val HALF_WIDTH_PUNCTUATION = setOf(
-        ',', '.', '!', '?', ';', ':', '-', '_', '(', ')', '[', ']', '{', '}', 
-        '<', '>', '"', '\'', '`', '~', '|', '\\', '/', '%', '^', '&', '*', '+', '='
-    )
+    private val HALF_WIDTH_PUNCTUATION =
+        setOf(
+            ',',
+            '.',
+            '!',
+            '?',
+            ';',
+            ':',
+            '-',
+            '_',
+            '(',
+            ')',
+            '[',
+            ']',
+            '{',
+            '}',
+            '<',
+            '>',
+            '"',
+            '\'',
+            '`',
+            '~',
+            '|',
+            '\\',
+            '/',
+            '%',
+            '^',
+            '&',
+            '*',
+            '+',
+            '=',
+        )
 
-    private val PUNCTUATION = setOf(
-        '，', '。', '！', '？', '；', '：', ',', '.', '!', '?', ';', ':', '、'
-    )
+    private val PUNCTUATION =
+        setOf(
+            '，',
+            '。',
+            '！',
+            '？',
+            '；',
+            '：',
+            ',',
+            '.',
+            '!',
+            '?',
+            ';',
+            ':',
+            '、',
+        )
 
     /**
      * 判断字符是否为标点符号
      */
-    private fun isPunctuation(char: Char): Boolean {
-        return char in PUNCTUATION || char in HALF_WIDTH_PUNCTUATION
-    }
+    private fun isPunctuation(char: Char): Boolean = char in PUNCTUATION || char in HALF_WIDTH_PUNCTUATION
 
     /**
      * 计算文本的视觉权重，复用 CapsuleScrollManager 的权重系统
      * CJK=2，西文=1，空白=0
      */
-    fun calculateTextLength(text: String): Int {
-        return CapsuleScrollManager.calculateWeight(text)
-    }
+    fun calculateTextLength(text: String): Int = CapsuleScrollManager.calculateWeight(text)
 
     /**
      * 截断文本，最长26权重，允许最多超出5个字符
      * @param text 原始文本
      * @return 截断后的文本
      */
-    fun truncateText(text: String): String {
-        return truncateTextInternal(text, 26, 18)
-    }
+    fun truncateText(text: String): String = truncateTextInternal(text, 26, 18)
 
     /**
      * 截断文本（放宽限制），最长52权重，允许最多超出5个字符
      * @param text 原始文本
      * @return 截断后的文本
      */
-    fun truncateTextExtended(text: String): String {
-        return truncateTextInternal(text, 52, 36)
-    }
+    fun truncateTextExtended(text: String): String = truncateTextInternal(text, 52, 36)
 
     /**
      * 截断文本内部实现
@@ -60,7 +92,11 @@ object TextSplitter {
      * @param maxAllowedLength 最大字符数
      * @return 截断后的文本
      */
-    private fun truncateTextInternal(text: String, maxWeight: Int, maxAllowedLength: Int): String {
+    private fun truncateTextInternal(
+        text: String,
+        maxWeight: Int,
+        maxAllowedLength: Int,
+    ): String {
         return measureTime(TAG, "truncateText") {
             if (text.isEmpty()) {
                 return@measureTime text
@@ -110,7 +146,10 @@ object TextSplitter {
      * @param threshold 拆分阈值（视觉权重）
      * @return Pair(图标文本, 胶囊文本)
      */
-    fun splitLyric(lyricText: String, threshold: Int): Pair<String, String> {
+    fun splitLyric(
+        lyricText: String,
+        threshold: Int,
+    ): Pair<String, String> {
         return measureTime(TAG, "splitLyric") {
             val truncatedText = truncateText(lyricText)
 

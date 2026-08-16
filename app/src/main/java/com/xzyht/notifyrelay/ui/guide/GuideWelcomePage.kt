@@ -46,19 +46,21 @@ internal fun GuideWelcomePage(onStart: () -> Unit) {
         GuideGlowBackground(modifier = Modifier.fillMaxSize())
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp),
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 32.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center
+            verticalArrangement = Arrangement.Center,
         ) {
             AnimatedVisibility(
                 visible = revealed,
-                enter = fadeIn(animationSpec = tween(durationMillis = 900)) +
-                    slideInVertically(
-                        animationSpec = tween(durationMillis = 900),
-                        initialOffsetY = { it / 3 }
-                    )
+                enter =
+                    fadeIn(animationSpec = tween(durationMillis = 900)) +
+                        slideInVertically(
+                            animationSpec = tween(durationMillis = 900),
+                            initialOffsetY = { it / 3 },
+                        ),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     GuideAppLogo(modifier = Modifier.size(92.dp))
@@ -66,49 +68,50 @@ internal fun GuideWelcomePage(onStart: () -> Unit) {
                     Text(
                         text = "NotifyRelay",
                         style = MiuixTheme.textStyles.title1,
-                        color = colorScheme.onBackground
+                        color = colorScheme.onBackground,
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "跨设备通知转发 · 设备互联",
                         style = MiuixTheme.textStyles.subtitle,
-                        color = colorScheme.onBackgroundVariant
+                        color = colorScheme.onBackgroundVariant,
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
                         text = "首次使用前，需要完成几项简单设置",
                         style = MiuixTheme.textStyles.body2,
-                        color = colorScheme.onSurfaceVariantSummary
+                        color = colorScheme.onSurfaceVariantSummary,
                     )
                 }
             }
 
             AnimatedVisibility(
                 visible = revealed,
-                enter = fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = 450))
+                enter = fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = 450)),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Spacer(modifier = Modifier.height(52.dp))
                     Box(
-                        modifier = Modifier
-                            .size(68.dp)
-                            .clip(CircleShape)
-                            .background(colorScheme.primary)
-                            .clickable(onClick = onStart),
-                        contentAlignment = Alignment.Center
+                        modifier =
+                            Modifier
+                                .size(68.dp)
+                                .clip(CircleShape)
+                                .background(colorScheme.primary)
+                                .clickable(onClick = onStart),
+                        contentAlignment = Alignment.Center,
                     ) {
                         Icon(
                             painter = painterResource(R.drawable.guide_icon_arrow),
                             contentDescription = "开始",
                             modifier = Modifier.size(width = 31.dp, height = 22.dp),
-                            tint = colorScheme.onPrimary
+                            tint = colorScheme.onPrimary,
                         )
                     }
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
                         text = "开始",
                         style = MiuixTheme.textStyles.body2,
-                        color = colorScheme.onBackground
+                        color = colorScheme.onBackground,
                     )
                 }
             }

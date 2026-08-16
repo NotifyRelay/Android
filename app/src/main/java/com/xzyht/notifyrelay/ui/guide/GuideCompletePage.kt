@@ -31,7 +31,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal fun GuideCompletePage(
     requiredGranted: Boolean,
     onBackToPermissions: () -> Unit,
-    onEnter: () -> Unit
+    onEnter: () -> Unit,
 ) {
     val colorScheme = MiuixTheme.colorScheme
     var revealed by remember { mutableStateOf(false) }
@@ -45,20 +45,22 @@ internal fun GuideCompletePage(
         GuideGlowBackground(modifier = Modifier.fillMaxSize())
 
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(horizontal = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Spacer(modifier = Modifier.weight(1f))
 
             AnimatedVisibility(
                 visible = revealed,
-                enter = fadeIn(animationSpec = tween(durationMillis = 800)) +
-                    slideInVertically(
-                        animationSpec = tween(durationMillis = 800),
-                        initialOffsetY = { it / 3 }
-                    )
+                enter =
+                    fadeIn(animationSpec = tween(durationMillis = 800)) +
+                        slideInVertically(
+                            animationSpec = tween(durationMillis = 800),
+                            initialOffsetY = { it / 3 },
+                        ),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     GuideAppLogo(modifier = Modifier.size(92.dp))
@@ -66,13 +68,13 @@ internal fun GuideCompletePage(
                     Text(
                         text = "设置完成",
                         style = MiuixTheme.textStyles.title1,
-                        color = colorScheme.onBackground
+                        color = colorScheme.onBackground,
                     )
                     Spacer(modifier = Modifier.height(10.dp))
                     Text(
                         text = "NotifyRelay 已准备就绪",
                         style = MiuixTheme.textStyles.subtitle,
-                        color = colorScheme.onBackgroundVariant
+                        color = colorScheme.onBackgroundVariant,
                     )
                 }
             }
@@ -87,15 +89,16 @@ internal fun GuideCompletePage(
                         onBackToPermissions()
                     }
                 },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .defaultMinSize(minHeight = 50.dp),
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .defaultMinSize(minHeight = 50.dp),
                 minWidth = 0.dp,
-                minHeight = 50.dp
+                minHeight = 50.dp,
             ) {
                 Text(
                     text = if (requiredGranted) "进入 NotifyRelay" else "返回权限设置",
-                    style = MiuixTheme.textStyles.button
+                    style = MiuixTheme.textStyles.button,
                 )
             }
 

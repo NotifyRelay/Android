@@ -38,7 +38,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal fun GuideOptionalPermissionPage(
     permissionState: GuidePermissionUiState,
     onBack: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
 ) {
     val context = LocalContext.current
 
@@ -47,63 +47,68 @@ internal fun GuideOptionalPermissionPage(
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .statusBarsPadding()
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .statusBarsPadding(),
     ) {
         GuidePageHeader(
             stepLabel = "4 / 6",
             title = "可选权限",
-            subtitle = "以下权限建议开启，也可以稍后在系统设置或应用内设置中开启"
+            subtitle = "以下权限建议开启，也可以稍后在系统设置或应用内设置中开启",
         )
 
         Column(
-            modifier = Modifier
-                .weight(1f)
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp)
+            modifier =
+                Modifier
+                    .weight(1f)
+                    .verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp),
         ) {
             GuideSectionLabel(
                 title = "建议开启",
-                description = "用于优化设备发现、FTP、超级岛等增强功能"
+                description = "用于优化设备发现、FTP、超级岛等增强功能",
             )
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column {
                     GuidePermissionItem(
                         title = "蓝牙连接权限",
-                        summary = if (permissionState.bluetoothConnect) {
-                            "已授权，可优化设备发现速度并显示真实设备名"
-                        } else {
-                            "用于优化设备发现速度，显示真实设备名"
-                        },
+                        summary =
+                            if (permissionState.bluetoothConnect) {
+                                "已授权，可优化设备发现速度并显示真实设备名"
+                            } else {
+                                "用于优化设备发现速度，显示真实设备名"
+                            },
                         granted = permissionState.bluetoothConnect,
                         onClick = {
                             (context as? Activity)?.let { act ->
                                 PermissionHelper.requestBluetoothConnectPermission(act)
                             }
                             showToast("开启后可优化设备发现速度，并以设备实际名称而非型号作为设备名")
-                        }
+                        },
                     )
                     GuidePermissionItem(
                         title = "文件管理权限",
-                        summary = if (permissionState.manageExternalStorage) {
-                            "已授权，FTP 功能可正常管理设备文件"
-                        } else {
-                            "用于支持 FTP 功能，管理设备文件"
-                        },
+                        summary =
+                            if (permissionState.manageExternalStorage) {
+                                "已授权，FTP 功能可正常管理设备文件"
+                            } else {
+                                "用于支持 FTP 功能，管理设备文件"
+                            },
                         granted = permissionState.manageExternalStorage,
                         onClick = {
                             showToast("跳转文件管理权限设置")
                             PermissionHelper.requestManageExternalStoragePermission(context)
-                        }
+                        },
                     )
                     GuidePermissionItem(
                         title = "后台无限制权限",
-                        summary = if (permissionState.backgroundUnlimited) {
-                            "已设置，应用可在后台保持运行"
-                        } else {
-                            "用于确保应用在后台正常运行，防止被系统杀死"
-                        },
+                        summary =
+                            if (permissionState.backgroundUnlimited) {
+                                "已设置，应用可在后台保持运行"
+                            } else {
+                                "用于确保应用在后台正常运行，防止被系统杀死"
+                            },
                         granted = permissionState.backgroundUnlimited,
                         grantedText = "已设置",
                         pendingText = "去设置",
@@ -112,15 +117,16 @@ internal fun GuideOptionalPermissionPage(
                             val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
                             intent.data = "package:${context.packageName}".toUri()
                             IntentUtils.startActivity(context, intent, true)
-                        }
+                        },
                     )
                     GuidePermissionItem(
                         title = "悬浮窗权限",
-                        summary = if (permissionState.overlay) {
-                            "已授权，可显示超级岛/悬浮岛复刻"
-                        } else {
-                            "用于支持超级岛/悬浮岛复刻，提升通知交互体验"
-                        },
+                        summary =
+                            if (permissionState.overlay) {
+                                "已授权，可显示超级岛/悬浮岛复刻"
+                            } else {
+                                "用于支持超级岛/悬浮岛复刻，提升通知交互体验"
+                            },
                         granted = permissionState.overlay,
                         onClick = {
                             showToast("跳转悬浮窗权限设置")
@@ -135,7 +141,7 @@ internal fun GuideOptionalPermissionPage(
                             } catch (_: Exception) {
                                 showToast("无法跳转悬浮窗设置，请手动在系统设置中允许悬浮窗权限")
                             }
-                        }
+                        },
                     )
                 }
             }
@@ -151,15 +157,16 @@ internal fun GuideOptionalPermissionPage(
                         (context as? Activity)?.let { act ->
                             PermissionHelper.requestSensitiveNotificationPermission(act)
                         }
-                    }
+                    },
                 )
 
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(top = 10.dp, bottom = 20.dp),
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp, bottom = 20.dp),
                     horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Button(
                         onClick = {
@@ -167,12 +174,12 @@ internal fun GuideOptionalPermissionPage(
                                 context,
                                 Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
                                 Uri.fromParts("package", context.packageName, null),
-                                true
+                                true,
                             )
                         },
                         modifier = Modifier.weight(1f),
                         minWidth = 0.dp,
-                        minHeight = 36.dp
+                        minHeight = 36.dp,
                     ) {
                         Text(text = "去设置", style = MiuixTheme.textStyles.body2)
                     }
@@ -186,7 +193,7 @@ internal fun GuideOptionalPermissionPage(
                         },
                         modifier = Modifier.weight(1f),
                         minWidth = 0.dp,
-                        minHeight = 36.dp
+                        minHeight = 36.dp,
                     ) {
                         Text(text = "复制 adb 命令", style = MiuixTheme.textStyles.body2)
                     }
@@ -201,7 +208,7 @@ internal fun GuideOptionalPermissionPage(
             nextText = "下一步",
             nextEnabled = true,
             onBack = onBack,
-            onNext = onNext
+            onNext = onNext,
         )
     }
 }

@@ -16,12 +16,12 @@ data class ActionInfo(
     val actionIntent: String? = null, // 跳转URI
     val clickWithCollapse: Boolean? = null, // 点击是否收起面板
     val type: Int? = null, // 按钮类型：0普通，1进度条文字
-    val progressInfo: ProgressInfo? = null // 进度按钮的进度信息
+    val progressInfo: ProgressInfo? = null, // 进度按钮的进度信息
 )
 
 // 解析操作信息组件（按钮等）
-fun parseActionInfo(json: JSONObject): ActionInfo {
-    return ActionInfo(
+fun parseActionInfo(json: JSONObject): ActionInfo =
+    ActionInfo(
         action = json.optString("action", "").takeIf { it.isNotEmpty() },
         actionIcon = json.optString("actionIcon", "").takeIf { it.isNotEmpty() },
         actionIconDark = json.optString("actionIconDark", "").takeIf { it.isNotEmpty() },
@@ -34,8 +34,7 @@ fun parseActionInfo(json: JSONObject): ActionInfo {
         actionIntent = json.optString("actionIntent", "").takeIf { it.isNotEmpty() },
         clickWithCollapse = json.optBoolean("clickWithCollapse", false),
         type = json.optInt("type", -1).takeIf { it != -1 },
-        progressInfo = json.optJSONObject("progressInfo")?.let { parseProgressInfo(it) }
+        progressInfo = json.optJSONObject("progressInfo")?.let { parseProgressInfo(it) },
     )
-}
 
 // 按钮UI构建已移除，仅保留数据解析逻辑

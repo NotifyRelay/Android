@@ -6,10 +6,10 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
-import com.xzyht.notifyrelay.servers.appslist.AppRepository.loadApps
-import com.xzyht.notifyrelay.sync.IconSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.servers.appslist.AppRepository.loadApps
+import com.xzyht.notifyrelay.sync.IconSyncManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -49,22 +49,22 @@ object AppRepository {
 
     private val _remoteApps = MutableStateFlow<Map<String, String>>(emptyMap())
     val remoteApps: StateFlow<Map<String, String>> = _remoteApps.asStateFlow()
-    
+
     // 图标更新事件流，用于通知UI层图标已更新
     private val _iconUpdates = MutableStateFlow<Pair<String, Long>?>(null)
     val iconUpdates: StateFlow<Pair<String, Long>?> = _iconUpdates.asStateFlow()
-    
+
     /**
      * 通知UI层图标已更新
      * @param packageName 应用包名
      */
-    fun notifyIconUpdated(packageName: String): Unit {
+    fun notifyIconUpdated(packageName: String) {
         val updatedValue: Pair<String, Long>? = Pair(packageName, System.currentTimeMillis())
         _iconUpdates.value = updatedValue
     }
-    
+
     // 初始化数据库仓库
-    private fun initDatabaseRepository(context: Context): Unit {
+    private fun initDatabaseRepository(context: Context) {
         synchronized(databaseRepositoryLock) {
             if (databaseRepository == null) {
                 val instance: DatabaseRepository = DatabaseRepository.getInstance(context)
@@ -83,20 +83,21 @@ object AppRepository {
      * @return 无（在成功或失败后会更新内部状态流 `_apps` 与 `_isLoading`）。
      * @throws Exception 当 PackageManager 访问或数据库操作发生严重错误时向上抛出（调用方可选择捕获）。
      */
-    suspend fun loadApps(context: Context): Unit {
+    suspend fun loadApps(context: Context) {
         initDatabaseRepository(context)
 
         _isLoading.value = true
         try {
-            //Logger.d(TAG, "开始加载应用列表")
-            val apps = AppListHelper.getInstalledApplications(context).sortedBy { appInfo ->
-                try {
-                    context.packageManager.getApplicationLabel(appInfo).toString()
-                } catch (e: Exception) {
-                    Logger.w(TAG, "获取应用标签失败，使用包名: ${appInfo.packageName}", e)
-                    appInfo.packageName
+            // Logger.d(TAG, "开始加载应用列表")
+            val apps =
+                AppListHelper.getInstalledApplications(context).sortedBy { appInfo ->
+                    try {
+                        context.packageManager.getApplicationLabel(appInfo).toString()
+                    } catch (e: Exception) {
+                        Logger.w(TAG, "获取应用标签失败，使用包名: ${appInfo.packageName}", e)
+                        appInfo.packageName
+                    }
                 }
-            }
 
             _apps.value = apps
 
@@ -108,30 +109,32 @@ object AppRepository {
             apps.forEach { appInfo ->
                 try {
                     val packageName = appInfo.packageName
-                    val appName = try {
-                        pm.getApplicationLabel(appInfo).toString()
-                    } catch (e: Exception) {
-                        packageName
-                    }
+                    val appName =
+                        try {
+                            pm.getApplicationLabel(appInfo).toString()
+                        } catch (e: Exception) {
+                            packageName
+                        }
                     val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
 
                     // 获取应用图标
                     var iconBytes: ByteArray? = null
                     try {
                         val drawable = pm.getApplicationIcon(appInfo)
-                        val bitmap = when (drawable) {
-                            is BitmapDrawable -> drawable.bitmap
-                            else -> {
-                                // 将其他类型的drawable转换为bitmap
-                                val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
-                                val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
-                                val createdBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                                val canvas = Canvas(createdBitmap)
-                                drawable.setBounds(0, 0, width, height)
-                                drawable.draw(canvas)
-                                createdBitmap
+                        val bitmap =
+                            when (drawable) {
+                                is BitmapDrawable -> drawable.bitmap
+                                else -> {
+                                    // 将其他类型的drawable转换为bitmap
+                                    val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
+                                    val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
+                                    val createdBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                    val canvas = Canvas(createdBitmap)
+                                    drawable.setBounds(0, 0, width, height)
+                                    drawable.draw(canvas)
+                                    createdBitmap
+                                }
                             }
-                        }
                         // 将bitmap转换为字节数组
                         val baos = ByteArrayOutputStream()
                         bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
@@ -141,22 +144,24 @@ object AppRepository {
                     }
 
                     // 创建应用实体
-                    val appEntity = AppEntity(
-                        packageName = packageName,
-                        appName = appName,
-                        isSystemApp = isSystemApp,
-                        iconBytes = iconBytes,
-                        isIconMissing = iconBytes == null,
-                        lastUpdated = System.currentTimeMillis()
-                    )
+                    val appEntity =
+                        AppEntity(
+                            packageName = packageName,
+                            appName = appName,
+                            isSystemApp = isSystemApp,
+                            iconBytes = iconBytes,
+                            isIconMissing = iconBytes == null,
+                            lastUpdated = System.currentTimeMillis(),
+                        )
                     appEntities.add(appEntity)
 
                     // 保存应用设备关联
-                    val appDeviceEntity = AppDeviceEntity(
-                        packageName = packageName,
-                        sourceDevice = "local",
-                        lastUpdated = System.currentTimeMillis()
-                    )
+                    val appDeviceEntity =
+                        AppDeviceEntity(
+                            packageName = packageName,
+                            sourceDevice = "local",
+                            lastUpdated = System.currentTimeMillis(),
+                        )
                     appDeviceEntities.add(appDeviceEntity)
                 } catch (e: Exception) {
                     Logger.w(TAG, "处理应用信息失败: ${appInfo.packageName}", e)
@@ -167,11 +172,14 @@ object AppRepository {
             if (appEntities.isNotEmpty()) {
                 // 在保存应用之前，先获取所有现有的远程设备应用关联
                 // 因为 saveApps 使用 OnConflictStrategy.REPLACE，会先删除再插入，触发外键级联删除
-                val existingRemoteAssociations = databaseRepository?.getAllAppDeviceAssociations()?.first()
-                    ?.filter { it.sourceDevice != "local" } ?: emptyList()
-                
+                val existingRemoteAssociations =
+                    databaseRepository
+                        ?.getAllAppDeviceAssociations()
+                        ?.first()
+                        ?.filter { it.sourceDevice != "local" } ?: emptyList()
+
                 databaseRepository?.saveApps(appEntities)
-                
+
                 // 重新保存远程设备的应用关联（本机的关联会在后面重新创建）
                 if (existingRemoteAssociations.isNotEmpty()) {
                     databaseRepository?.saveAppDeviceAssociations(existingRemoteAssociations)
@@ -183,7 +191,7 @@ object AppRepository {
                 databaseRepository?.saveAppDeviceAssociations(appDeviceEntities)
             }
 
-            //Logger.d(TAG, "应用列表加载成功，共 ${apps.size} 个应用")
+            // Logger.d(TAG, "应用列表加载成功，共 ${apps.size} 个应用")
         } catch (e: Exception) {
             Logger.e(TAG, "应用列表加载失败", e)
             _apps.value = emptyList()
@@ -203,15 +211,16 @@ object AppRepository {
     fun getFilteredApps(
         query: String,
         showSystemApps: Boolean,
-        context: Context
+        context: Context,
     ): List<ApplicationInfo> {
         val allApps = _apps.value
         if (allApps.isEmpty()) return emptyList()
 
         // 区分用户应用和系统应用
-        val userApps = allApps.filter { app ->
-            (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
-        }
+        val userApps =
+            allApps.filter { app ->
+                (app.flags and ApplicationInfo.FLAG_SYSTEM) == 0
+            }
 
         val displayApps = if (showSystemApps) allApps else userApps
 
@@ -221,15 +230,15 @@ object AppRepository {
 
         // 搜索过滤
         return displayApps.filter { app ->
-                try {
-                    val label = context.packageManager.getApplicationLabel(app).toString()
-                    val matchesLabel = label.contains(query, ignoreCase = true)
-                    val matchesPackage = app.packageName.contains(query, ignoreCase = true)
-                    matchesLabel || matchesPackage
-                } catch (e: Exception) {
-                    Logger.w(TAG, "搜索时获取应用标签失败: ${app.packageName}", e)
-                    app.packageName.contains(query, ignoreCase = true)
-                }
+            try {
+                val label = context.packageManager.getApplicationLabel(app).toString()
+                val matchesLabel = label.contains(query, ignoreCase = true)
+                val matchesPackage = app.packageName.contains(query, ignoreCase = true)
+                matchesLabel || matchesPackage
+            } catch (e: Exception) {
+                Logger.w(TAG, "搜索时获取应用标签失败: ${app.packageName}", e)
+                app.packageName.contains(query, ignoreCase = true)
+            }
         }
     }
 
@@ -238,7 +247,7 @@ object AppRepository {
      *
      * 说明：该方法会清空数据库中的应用与图标缓存。
      */
-    suspend fun clearCache(context: Context): Unit {
+    suspend fun clearCache(context: Context) {
         initDatabaseRepository(context)
 
         // 清除应用数据
@@ -261,7 +270,11 @@ object AppRepository {
      * @param apps 远程应用列表，格式为 Map<包名, 应用名>
      * @param deviceUuid 远程设备UUID
      */
-    suspend fun cacheRemoteAppList(context: Context, apps: Map<String, String>, deviceUuid: String): Unit {
+    suspend fun cacheRemoteAppList(
+        context: Context,
+        apps: Map<String, String>,
+        deviceUuid: String,
+    ) {
         initDatabaseRepository(context)
 
         val appEntities = mutableListOf<AppEntity>()
@@ -270,31 +283,33 @@ object AppRepository {
         apps.forEach { (packageName, appName) ->
             // 检查应用是否已存在
             val existingApp = databaseRepository?.getAppByPackageName(packageName)
-            val appEntity = if (existingApp != null) {
-                // 更新现有应用
-                existingApp.copy(
-                    appName = appName,
-                    lastUpdated = System.currentTimeMillis()
-                )
-            } else {
-                // 创建新应用
-                AppEntity(
-                    packageName = packageName,
-                    appName = appName,
-                    isSystemApp = false,
-                    iconBytes = null,
-                    isIconMissing = true,
-                    lastUpdated = System.currentTimeMillis()
-                )
-            }
+            val appEntity =
+                if (existingApp != null) {
+                    // 更新现有应用
+                    existingApp.copy(
+                        appName = appName,
+                        lastUpdated = System.currentTimeMillis(),
+                    )
+                } else {
+                    // 创建新应用
+                    AppEntity(
+                        packageName = packageName,
+                        appName = appName,
+                        isSystemApp = false,
+                        iconBytes = null,
+                        isIconMissing = true,
+                        lastUpdated = System.currentTimeMillis(),
+                    )
+                }
             appEntities.add(appEntity)
 
             // 创建应用设备关联
-            val appDeviceEntity = AppDeviceEntity(
-                packageName = packageName,
-                sourceDevice = deviceUuid,
-                lastUpdated = System.currentTimeMillis()
-            )
+            val appDeviceEntity =
+                AppDeviceEntity(
+                    packageName = packageName,
+                    sourceDevice = deviceUuid,
+                    lastUpdated = System.currentTimeMillis(),
+                )
             appDeviceEntities.add(appDeviceEntity)
         }
 
@@ -307,7 +322,7 @@ object AppRepository {
         }
 
         _remoteApps.value = apps
-        //Logger.d(TAG, "缓存远程应用列表成功，共 ${apps.size} 个应用")
+        // Logger.d(TAG, "缓存远程应用列表成功，共 ${apps.size} 个应用")
     }
 
     /**
@@ -345,9 +360,10 @@ object AppRepository {
      * @param packageName 目标应用的包名（非空）。
      * @return 应用的标签字符串；若无法获取则返回包名或空字符串，具体由 [AppListHelper.getApplicationLabel] 决定。
      */
-    fun getAppLabel(context: Context, packageName: String): String {
-        return AppListHelper.getApplicationLabel(context, packageName)
-    }
+    fun getAppLabel(
+        context: Context,
+        packageName: String,
+    ): String = AppListHelper.getApplicationLabel(context, packageName)
 
     /**
      * 获取已安装应用包名集合（同步返回）。
@@ -355,9 +371,7 @@ object AppRepository {
      * @param context Android 上下文（未使用，仅为 API 对称性保留）。
      * @return 当前已安装应用包名集合，若尚未加载返回空集合。
      */
-    fun getInstalledPackageNames(context: Context): Set<String> {
-        return _apps.value.map { it.packageName }.toSet()
-    }
+    fun getInstalledPackageNames(context: Context): Set<String> = _apps.value.map { it.packageName }.toSet()
 
     /**
      * 异步获取已安装应用包名集合（确保在返回前数据已加载）。
@@ -398,9 +412,12 @@ object AppRepository {
      * @param context Android 上下文，用于访问 PackageManager 与数据库（非空）。
      * @param apps 需要加载图标的应用列表（非空，可为空列表）。
      */
-    private suspend fun loadAppIcons(context: Context, apps: List<ApplicationInfo>): Unit {
+    private suspend fun loadAppIcons(
+        context: Context,
+        apps: List<ApplicationInfo>,
+    ) {
         try {
-            //Logger.d(TAG, "开始加载应用图标")
+            // Logger.d(TAG, "开始加载应用图标")
             val pm = context.packageManager
 
             apps.forEach { appInfo ->
@@ -409,19 +426,20 @@ object AppRepository {
 
                     // 从PackageManager获取图标
                     val drawable = pm.getApplicationIcon(appInfo)
-                    val bitmap = when (drawable) {
-                        is BitmapDrawable -> drawable.bitmap
-                        else -> {
-                            // 将其他类型的drawable转换为bitmap
-                            val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
-                            val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
-                            val createdBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                            val canvas = Canvas(createdBitmap)
-                            drawable.setBounds(0, 0, width, height)
-                            drawable.draw(canvas)
-                            createdBitmap
+                    val bitmap =
+                        when (drawable) {
+                            is BitmapDrawable -> drawable.bitmap
+                            else -> {
+                                // 将其他类型的drawable转换为bitmap
+                                val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
+                                val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
+                                val createdBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                                val canvas = Canvas(createdBitmap)
+                                drawable.setBounds(0, 0, width, height)
+                                drawable.draw(canvas)
+                                createdBitmap
+                            }
                         }
-                    }
 
                     // 转换为字节数组
                     val baos = ByteArrayOutputStream()
@@ -431,11 +449,12 @@ object AppRepository {
                     // 更新数据库中的图标
                     val existingApp = databaseRepository?.getAppByPackageName(packageName)
                     if (existingApp != null) {
-                        val updatedApp = existingApp.copy(
-                            iconBytes = iconBytes,
-                            isIconMissing = false,
-                            lastUpdated = System.currentTimeMillis()
-                        )
+                        val updatedApp =
+                            existingApp.copy(
+                                iconBytes = iconBytes,
+                                isIconMissing = false,
+                                lastUpdated = System.currentTimeMillis(),
+                            )
                         databaseRepository?.saveApp(updatedApp)
                     }
                 } catch (e: Exception) {
@@ -443,7 +462,7 @@ object AppRepository {
                 }
             }
 
-            //Logger.d(TAG, "应用图标加载成功，共 ${apps.size} 个图标")
+            // Logger.d(TAG, "应用图标加载成功，共 ${apps.size} 个图标")
         } catch (e: Exception) {
             Logger.e(TAG, "应用图标加载失败", e)
         }
@@ -456,7 +475,10 @@ object AppRepository {
      * @param packageName 目标应用的包名（非空）。
      * @return 应用图标的 Bitmap；若不存在则返回 null。
      */
-    suspend fun getAppIconAsync(context: Context, packageName: String): Bitmap? {
+    suspend fun getAppIconAsync(
+        context: Context,
+        packageName: String,
+    ): Bitmap? {
         initDatabaseRepository(context)
 
         if (!isDataLoaded()) {
@@ -482,56 +504,64 @@ object AppRepository {
      * @param icon 要缓存的 Bitmap，若为 null 则只在数据库中移除对应条目。
      * @param deviceUuid 设备UUID，用于关联应用与设备
      */
-    suspend fun cacheExternalAppIcon(context: Context, packageName: String, icon: Bitmap?, deviceUuid: String): Unit {
+    suspend fun cacheExternalAppIcon(
+        context: Context,
+        packageName: String,
+        icon: Bitmap?,
+        deviceUuid: String,
+    ) {
         initDatabaseRepository(context)
-        
+
         // 转换图标为字节数组
-        val iconBytes = if (icon != null) {
-            val baos = ByteArrayOutputStream()
-            icon.compress(Bitmap.CompressFormat.PNG, 100, baos)
-            baos.toByteArray()
-        } else {
-            null
-        }
-        
+        val iconBytes =
+            if (icon != null) {
+                val baos = ByteArrayOutputStream()
+                icon.compress(Bitmap.CompressFormat.PNG, 100, baos)
+                baos.toByteArray()
+            } else {
+                null
+            }
+
         // 检查应用是否已存在
         val existingApp = databaseRepository?.getAppByPackageName(packageName)
-        val appEntity = if (existingApp != null) {
-            // 更新现有应用
-            existingApp.copy(
-                iconBytes = iconBytes,
-                isIconMissing = iconBytes == null,
-                lastUpdated = System.currentTimeMillis()
-            )
-        } else {
-            // 创建新应用
-            AppEntity(
-                packageName = packageName,
-                appName = packageName, // 外部应用可能没有应用名，使用包名代替
-                isSystemApp = false,
-                iconBytes = iconBytes,
-                isIconMissing = iconBytes == null,
-                lastUpdated = System.currentTimeMillis()
-            )
-        }
-        
+        val appEntity =
+            if (existingApp != null) {
+                // 更新现有应用
+                existingApp.copy(
+                    iconBytes = iconBytes,
+                    isIconMissing = iconBytes == null,
+                    lastUpdated = System.currentTimeMillis(),
+                )
+            } else {
+                // 创建新应用
+                AppEntity(
+                    packageName = packageName,
+                    appName = packageName, // 外部应用可能没有应用名，使用包名代替
+                    isSystemApp = false,
+                    iconBytes = iconBytes,
+                    isIconMissing = iconBytes == null,
+                    lastUpdated = System.currentTimeMillis(),
+                )
+            }
+
         // 保存应用到数据库
         databaseRepository?.saveApp(appEntity)
-        
+
         // 保存应用设备关联
         val appDeviceEntities = mutableListOf<AppDeviceEntity>()
-        val appDeviceEntity = AppDeviceEntity(
-            packageName = packageName,
-            sourceDevice = deviceUuid,
-            lastUpdated = System.currentTimeMillis()
-        )
+        val appDeviceEntity =
+            AppDeviceEntity(
+                packageName = packageName,
+                sourceDevice = deviceUuid,
+                lastUpdated = System.currentTimeMillis(),
+            )
         appDeviceEntities.add(appDeviceEntity)
         databaseRepository?.saveAppDeviceAssociations(appDeviceEntities)
-        
+
         // 通知UI层图标已更新
         _iconUpdates.value = Pair(packageName, System.currentTimeMillis())
 
-        //Logger.d(TAG, "缓存外部应用图标: $packageName")
+        // Logger.d(TAG, "缓存外部应用图标: $packageName")
     }
 
     /**
@@ -541,9 +571,12 @@ object AppRepository {
      * @param packageName 目标应用包名。
      * @return 若存在则返回 Bitmap，否则返回 null。
      */
-    suspend fun getExternalAppIcon(context: Context, packageName: String): Bitmap? {
+    suspend fun getExternalAppIcon(
+        context: Context,
+        packageName: String,
+    ): Bitmap? {
         initDatabaseRepository(context)
-        
+
         // 从数据库获取应用信息
         val app = databaseRepository?.getAppByPackageName(packageName)
         val iconBytes = app?.iconBytes
@@ -554,7 +587,7 @@ object AppRepository {
 
         return null
     }
-    
+
     /**
      * 批量获取外部应用图标（从数据库加载）。
      *
@@ -562,13 +595,16 @@ object AppRepository {
      * @param packageNames 目标应用包名列表。
      * @return 包名到图标的映射，若不存在则对应值为 null。
      */
-    suspend fun getExternalAppIcons(context: Context, packageNames: List<String>): Map<String, Bitmap?> {
+    suspend fun getExternalAppIcons(
+        context: Context,
+        packageNames: List<String>,
+    ): Map<String, Bitmap?> {
         initDatabaseRepository(context)
-        
+
         // 从数据库批量获取应用信息
         val apps = databaseRepository?.getAppsByPackageNames(packageNames) ?: emptyList()
         val appMap = apps.associateBy { it.packageName }
-        
+
         // 构建包名到图标的映射
         return packageNames.associateWith { packageName ->
             val app = appMap[packageName]
@@ -581,7 +617,7 @@ object AppRepository {
             }
         }
     }
-    
+
     /**
      * 从 PackageManager 直接获取应用图标
      *
@@ -589,67 +625,73 @@ object AppRepository {
      * @param packageName 目标应用的包名
      * @return 应用图标的 Bitmap；若不存在则返回 null
      */
-    private suspend fun getAppIconFromPackageManager(context: Context, packageName: String): Bitmap? {
-        return try {
+    private suspend fun getAppIconFromPackageManager(
+        context: Context,
+        packageName: String,
+    ): Bitmap? =
+        try {
             val pm = context.packageManager
             val appInfo = pm.getApplicationInfo(packageName, 0)
             val drawable = pm.getApplicationIcon(appInfo)
-            val bitmap = when (drawable) {
-                is BitmapDrawable -> drawable.bitmap
-                else -> {
-                    // 将其他类型的drawable转换为bitmap
-                    val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
-                    val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
-                    val createdBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    val canvas = Canvas(createdBitmap)
-                    drawable.setBounds(0, 0, width, height)
-                    drawable.draw(canvas)
-                    createdBitmap
+            val bitmap =
+                when (drawable) {
+                    is BitmapDrawable -> drawable.bitmap
+                    else -> {
+                        // 将其他类型的drawable转换为bitmap
+                        val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
+                        val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
+                        val createdBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                        val canvas = Canvas(createdBitmap)
+                        drawable.setBounds(0, 0, width, height)
+                        drawable.draw(canvas)
+                        createdBitmap
+                    }
                 }
-            }
-            
+
             // 将获取到的图标缓存到数据库
             val baos = ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
             val iconBytes = baos.toByteArray()
-            
+
             val existingApp = databaseRepository?.getAppByPackageName(packageName)
-            val appEntity = if (existingApp != null) {
-                existingApp.copy(
-                    iconBytes = iconBytes,
-                    isIconMissing = false,
-                    lastUpdated = System.currentTimeMillis()
-                )
-            } else {
-                AppEntity(
-                    packageName = packageName,
-                    appName = try {
-                        pm.getApplicationLabel(appInfo).toString()
-                    } catch (e: Exception) {
-                        packageName
-                    },
-                    isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
-                    iconBytes = iconBytes,
-                    isIconMissing = false,
-                    lastUpdated = System.currentTimeMillis()
-                )
-            }
+            val appEntity =
+                if (existingApp != null) {
+                    existingApp.copy(
+                        iconBytes = iconBytes,
+                        isIconMissing = false,
+                        lastUpdated = System.currentTimeMillis(),
+                    )
+                } else {
+                    AppEntity(
+                        packageName = packageName,
+                        appName =
+                            try {
+                                pm.getApplicationLabel(appInfo).toString()
+                            } catch (e: Exception) {
+                                packageName
+                            },
+                        isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
+                        iconBytes = iconBytes,
+                        isIconMissing = false,
+                        lastUpdated = System.currentTimeMillis(),
+                    )
+                }
             databaseRepository?.saveApp(appEntity)
-            
+
             // 保存应用设备关联，使用 "local" 作为 sourceDevice
-            val appDeviceEntity = AppDeviceEntity(
-                packageName = packageName,
-                sourceDevice = "local",
-                lastUpdated = System.currentTimeMillis()
-            )
+            val appDeviceEntity =
+                AppDeviceEntity(
+                    packageName = packageName,
+                    sourceDevice = "local",
+                    lastUpdated = System.currentTimeMillis(),
+                )
             databaseRepository?.saveAppDeviceAssociations(listOf(appDeviceEntity))
-            
+
             bitmap
         } catch (e: Exception) {
             Logger.w(TAG, "从 PackageManager 获取应用图标失败: $packageName", e)
             null
         }
-    }
 
     /**
      * 统一获取应用图标，自动处理本地和外部应用，并支持自动请求缺失的图标。
@@ -664,33 +706,33 @@ object AppRepository {
         context: Context,
         packageName: String,
         deviceManager: DeviceConnectionManager? = null,
-        sourceDevice: DeviceInfo? = null
+        sourceDevice: DeviceInfo? = null,
     ): Bitmap? {
         try {
             initDatabaseRepository(context)
-            
+
             // 1. 从数据库获取应用图标
             val localIcon = getAppIconAsync(context, packageName)
             if (localIcon != null) {
                 return localIcon
             }
-            
+
             // 2. 尝试从 PackageManager 获取应用图标
             val packageIcon = getAppIconFromPackageManager(context, packageName)
             if (packageIcon != null) {
                 return packageIcon
             }
-            
+
             // 3. 自动请求缺失的图标
             if (deviceManager != null && sourceDevice != null) {
                 IconSyncManager.checkAndSyncIcon(
                     context,
                     packageName,
                     deviceManager,
-                    sourceDevice
+                    sourceDevice,
                 )
             }
-            
+
             return null
         } catch (e: Exception) {
             Logger.w(TAG, "获取应用图标失败: $packageName", e)
@@ -704,7 +746,10 @@ object AppRepository {
     private const val PREFS_NAME = "remote_apps_prefs"
     private const val KEY_PINNED_APPS_PREFIX = "pinned_apps_"
 
-    fun loadPinnedApps(context: Context, deviceUuid: String) {
+    fun loadPinnedApps(
+        context: Context,
+        deviceUuid: String,
+    ) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val key = KEY_PINNED_APPS_PREFIX + deviceUuid
         val pinnedSet = prefs.getStringSet(key, emptySet()) ?: emptySet()
@@ -713,7 +758,11 @@ object AppRepository {
         _pinnedApps.value = currentMap
     }
 
-    fun pinApp(context: Context, deviceUuid: String, packageName: String) {
+    fun pinApp(
+        context: Context,
+        deviceUuid: String,
+        packageName: String,
+    ) {
         val currentMap = _pinnedApps.value.toMutableMap()
         val currentSet = currentMap[deviceUuid]?.toMutableSet() ?: mutableSetOf()
         currentSet.add(packageName)
@@ -722,7 +771,11 @@ object AppRepository {
         savePinnedApps(context, deviceUuid)
     }
 
-    fun unpinApp(context: Context, deviceUuid: String, packageName: String) {
+    fun unpinApp(
+        context: Context,
+        deviceUuid: String,
+        packageName: String,
+    ) {
         val currentMap = _pinnedApps.value.toMutableMap()
         val currentSet = currentMap[deviceUuid]?.toMutableSet() ?: mutableSetOf()
         currentSet.remove(packageName)
@@ -731,30 +784,38 @@ object AppRepository {
         savePinnedApps(context, deviceUuid)
     }
 
-    fun isAppPinned(deviceUuid: String, packageName: String): Boolean {
-        return _pinnedApps.value[deviceUuid]?.contains(packageName) ?: false
-    }
+    fun isAppPinned(
+        deviceUuid: String,
+        packageName: String,
+    ): Boolean = _pinnedApps.value[deviceUuid]?.contains(packageName) ?: false
 
-    private fun savePinnedApps(context: Context, deviceUuid: String) {
+    private fun savePinnedApps(
+        context: Context,
+        deviceUuid: String,
+    ) {
         val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         val key = KEY_PINNED_APPS_PREFIX + deviceUuid
         prefs.edit().putStringSet(key, _pinnedApps.value[deviceUuid] ?: emptySet()).apply()
     }
 
-    suspend fun getRemoteAppsList(context: Context, deviceUuid: String): List<RemoteAppInfo> {
+    suspend fun getRemoteAppsList(
+        context: Context,
+        deviceUuid: String,
+    ): List<RemoteAppInfo> {
         initDatabaseRepository(context)
         val appDevices = databaseRepository?.getAppDevicesByDeviceUuid(deviceUuid)?.first() ?: emptyList()
         val packageNames = appDevices.map { it.packageName }.distinct()
         if (packageNames.isEmpty()) return emptyList()
         val apps = databaseRepository?.getAppsByPackageNames(packageNames) ?: emptyList()
-        return apps.map { entity ->
-            RemoteAppInfo(
-                packageName = entity.packageName,
-                appName = entity.appName,
-                iconBytes = entity.iconBytes,
-                isPinned = isAppPinned(deviceUuid, entity.packageName),
-                isLoading = false
-            )
-        }.sortedWith(compareByDescending<RemoteAppInfo> { it.isPinned }.thenBy { it.appName })
+        return apps
+            .map { entity ->
+                RemoteAppInfo(
+                    packageName = entity.packageName,
+                    appName = entity.appName,
+                    iconBytes = entity.iconBytes,
+                    isPinned = isAppPinned(deviceUuid, entity.packageName),
+                    isLoading = false,
+                )
+            }.sortedWith(compareByDescending<RemoteAppInfo> { it.isPinned }.thenBy { it.appName })
     }
 }

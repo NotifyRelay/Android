@@ -1,0 +1,135 @@
+# 版本号更新：push 到 main 时用 semantic-release（conventional commits 官方算法）分析提交推断版本，
+# 有 releasable 提交（feat→minor / fix|perf→patch / breaking→major）则回写 version.properties
+# （versionCode +1）并创建 v{版本} tag。全部配置内联在运行时生成，不提交进仓库；
+# 回写使用 CI_PUSH_TOKEN（用户 PAT）直推 main（仓库级 ruleset 已为 xzy-nine 配置 bypass），
+# semantic-release 生成的 commit 消息自带 skip-ci 标记防循环。
+name: 版本号更新
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: version-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+
+jobs:
+  update-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          # 需完整历史与 tag 供 semantic-release 推断版本
+          fetch-depth: 0
+          fetch-tags: true
+          persist-credentials: false
+
+      - name: Setup SSH keys
+        uses: webfactory/ssh-agent@v0.10.0
+        with:
+          ssh-private-key: |
+            ${{ secrets.SSH_PRIVATE_KEY_CHECKUPDATA }}
+            ${{ secrets.SSH_PRIVATE_KEY_SCRCPY }}
+
+      - name: Checkout submodules
+        run: git submodule update --init --recursive
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      # 会改动文件的格式化任务，作为写回前的格式门禁；失败则中止不写分支
+      - name: 运行 ktlintFormat
+        run: ./gradlew ktlintFormat
+
+      - name: 生成 semantic-release 临时配置（不提交仓库）
+        run: |
+          # 配置文件与 bump 脚本仅在本次运行使用，用 .git/info/exclude 排除避免被当作未提交改动
+          cat > .git/info/exclude <<'EXCLUDE'
+          package.json
+          release.config.mjs
+          node_modules/
+          package-lock.json
+          EXCLUDE
+          cat > package.json <<'JSON'
+          {
+            "name": "notifyrelay-android",
+            "version": "2.167.0",
+            "private": true
+          }
+          JSON
+          cat > release.config.mjs <<'CONFIG'
+          export default {
+            branches: ['main'],
+            plugins: [
+              ['@semantic-release/commit-analyzer', { preset: 'conventionalcommits' }],
+              ['@semantic-release/release-notes-generator', { preset: 'conventionalcommits' }],
+              ['@semantic-release/exec', { prepareCmd: 'node /tmp/bump-version.mjs ${nextRelease.version}' }],
+              ['@semantic-release/git', {
+                assets: ['version.properties'],
+                message: 'chore(release): ${nextRelease.version} [skip ci]\n\n${nextRelease.notes}',
+              }],
+            ],
+          }
+          CONFIG
+          cat > /tmp/bump-version.mjs <<'JS'
+          import { readFileSync, writeFileSync } from 'node:fs'
+          const nextVersion = process.argv[2]
+          if (!nextVersion) {
+            console.error('缺少版本参数')
+            process.exit(1)
+          }
+          const file = 'version.properties'
+          const text = readFileSync(file, 'utf8')
+          const lines = text.split('\n').map((l) => l.replace(/\r$/, ''))
+          const curCode = lines.find((l) => l.startsWith('versionCode='))?.split('=')[1]
+          if (!curCode) {
+            console.error('version.properties 中未找到 versionCode')
+            process.exit(1)
+          }
+          const nextCode = Number(curCode) + 1
+          const out =
+            lines
+              .map((l) =>
+                l.startsWith('versionName=')
+                  ? `versionName=${nextVersion}`
+                  : l.startsWith('versionCode=')
+                    ? `versionCode=${nextCode}`
+                    : l
+              )
+              .join('\r\n') + (text.endsWith('\n') ? '\n' : '')
+          writeFileSync(file, out)
+          console.log(`回写 version.properties: versionName=${nextVersion}, versionCode=${nextCode}`)
+          JS
+
+      - name: 安装 semantic-release 及插件（不写入仓库，node_modules 已排除）
+        run: |
+          npm install --no-save --no-package-lock --no-audit --no-fund \
+            semantic-release @semantic-release/exec @semantic-release/git \
+            conventional-changelog-conventionalcommits
+
+      - name: 执行 semantic-release（推断版本、回写、打 tag、PAT 推送）
+        env:
+          # git 插件使用该令牌推送（用户 PAT，可绕过 main 保护规则）
+          GITHUB_TOKEN: ${{ secrets.CI_PUSH_TOKEN }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          # 无 releasable 提交时 semantic-release 正常退出（不回写不打 tag）
+          npx --yes semantic-release

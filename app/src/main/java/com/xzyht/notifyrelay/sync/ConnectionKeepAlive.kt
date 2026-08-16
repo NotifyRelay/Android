@@ -1,14 +1,14 @@
 package com.xzyht.notifyrelay.sync
 
-import notifyrelay.base.util.Logger
-import notifyrelay.core.util.BatteryUtils
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.Logger
+import notifyrelay.core.util.BatteryUtils
 
 /**
  * 连接保活与重连策略封装：
@@ -26,9 +26,8 @@ import kotlinx.coroutines.withContext
  */
 class ConnectionKeepAlive(
     private val deviceManager: DeviceConnectionManager,
-    private val scope: CoroutineScope
+    private val scope: CoroutineScope,
 ) {
-
     /**
      * 封装设备连接握手与重试逻辑：
      * - 重试与超时由 Rust `nrc_connect_device` 内部完成（3次/5s超时/1s间隔）
@@ -44,13 +43,15 @@ class ConnectionKeepAlive(
         val isCharging = BatteryUtils.isCharging(deviceManager.contextInternal)
         val battery = if (isCharging) batteryLevel else -batteryLevel
 
-        val result = withContext(Dispatchers.IO) {
-            NativeCore.connectDevice(ctx, device.uuid, device.ip, battery, "android")
-        }
+        val result =
+            withContext(Dispatchers.IO) {
+                NativeCore.connectDevice(ctx, device.uuid, device.ip, battery, "android")
+            }
         if (result == 0) {
             try {
                 scope.launch { deviceManager.updateDeviceListInternal() }
-            } catch (_: Exception) {}
+            } catch (_: Exception) {
+            }
             return Pair(true, null)
         }
         // nrc_connect_device 约定：0=收到 ACCEPT(成功)，-1=被拒绝或重试耗尽；无其他返回码

@@ -21,11 +21,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.model.templates.BaseInfo
+import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.model.templates.BaseInfo
 import notifyrelay.core.util.image.ImageUtils
-import github.xzynine.superislandui.common.PreviewData
 
 /**
  * BaseInfo的Compose实现
@@ -34,13 +34,14 @@ import github.xzynine.superislandui.common.PreviewData
 @Composable
 fun BaseInfoCompose(
     baseInfo: BaseInfo,
-    picMap: Map<String, String>?
+    picMap: Map<String, String>?,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
-            .wrapContentHeight()
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(8.dp)
+                .wrapContentHeight(),
     ) {
         val hasSecondary = baseInfo.content != null || baseInfo.subContent != null || baseInfo.picFunction != null
         val hasMain = baseInfo.title != null || baseInfo.subTitle != null || baseInfo.extraTitle != null || baseInfo.specialTitle != null
@@ -72,10 +73,11 @@ fun BaseInfoCompose(
 @Composable
 private fun MainTextRow(baseInfo: BaseInfo) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentHeight(),
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .wrapContentHeight(),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         baseInfo.title?.let {
             Text(
@@ -85,7 +87,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.wrapContentWidth()
+                modifier = Modifier.wrapContentWidth(),
             )
         }
 
@@ -95,7 +97,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
                 text = "|",
                 color = Color(0xFFDDDDDD),
                 fontSize = 14.sp,
-                modifier = Modifier.wrapContentWidth()
+                modifier = Modifier.wrapContentWidth(),
             )
             Spacer(modifier = Modifier.width(8.dp))
         }
@@ -108,7 +110,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.wrapContentWidth()
+                modifier = Modifier.wrapContentWidth(),
             )
         }
 
@@ -123,7 +125,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.wrapContentWidth()
+                modifier = Modifier.wrapContentWidth(),
             )
         }
 
@@ -138,13 +140,13 @@ private fun MainTextRow(baseInfo: BaseInfo) {
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier
-                    .wrapContentWidth()
-                    .background(
-                        color = Color(ImageUtils.parseColor(baseInfo.colorSpecialBg) ?: 0xFFDDDDDD.toInt()),
-                        shape = RoundedCornerShape(4.dp)
-                    )
-                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                modifier =
+                    Modifier
+                        .wrapContentWidth()
+                        .background(
+                            color = Color(ImageUtils.parseColor(baseInfo.colorSpecialBg) ?: 0xFFDDDDDD.toInt()),
+                            shape = RoundedCornerShape(4.dp),
+                        ).padding(horizontal = 6.dp, vertical = 2.dp),
             )
         }
     }
@@ -153,13 +155,14 @@ private fun MainTextRow(baseInfo: BaseInfo) {
 @Composable
 private fun SecondaryTextRow(
     baseInfo: BaseInfo,
-    picMap: Map<String, String>?
+    picMap: Map<String, String>?,
 ) {
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .wrapContentHeight(),
-        verticalAlignment = Alignment.CenterVertically
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .wrapContentHeight(),
+        verticalAlignment = Alignment.CenterVertically,
     ) {
         baseInfo.content?.let {
             Text(
@@ -168,7 +171,7 @@ private fun SecondaryTextRow(
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.wrapContentWidth()
+                modifier = Modifier.wrapContentWidth(),
             )
         }
 
@@ -182,7 +185,7 @@ private fun SecondaryTextRow(
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.wrapContentWidth()
+                modifier = Modifier.wrapContentWidth(),
             )
         }
 
@@ -195,7 +198,7 @@ private fun SecondaryTextRow(
                 picMap = picMap,
                 size = 24.dp,
                 isFocusIcon = false,
-                contentDescription = null
+                contentDescription = null,
             )
         }
     }
@@ -206,10 +209,11 @@ private fun ContentDivider(baseInfo: BaseInfo) {
     if (baseInfo.showContentDivider == true) {
         Spacer(modifier = Modifier.height(8.dp))
         Spacer(
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(1.dp)
-                .background(color = Color(0xFFDDDDDD))
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(color = Color(0xFFDDDDDD)),
         )
         Spacer(modifier = Modifier.height(8.dp))
     } else {
@@ -222,7 +226,7 @@ private fun ContentDivider(baseInfo: BaseInfo) {
 fun BaseInfoComposeType1Preview() {
     BaseInfoCompose(
         baseInfo = PreviewData.sampleBaseInfo,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }
 
@@ -231,6 +235,6 @@ fun BaseInfoComposeType1Preview() {
 fun BaseInfoComposeType2Preview() {
     BaseInfoCompose(
         baseInfo = PreviewData.sampleBaseInfoType2,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }
