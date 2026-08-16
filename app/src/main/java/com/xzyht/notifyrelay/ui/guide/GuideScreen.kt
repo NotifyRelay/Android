@@ -17,8 +17,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.time.Duration.Companion.seconds
 
@@ -43,19 +45,20 @@ internal fun GuideScreen(
     onContinue: () -> Unit,
 ) {
     val context = LocalContext.current
-    var permissionState by remember { mutableStateOf(readGuidePermissionState(context)) }
-
-    fun refreshPermissions() {
-        permissionState = readGuidePermissionState(context)
+    var permissionState by remember {
+        mutableStateOf(GuidePermissionUiState())
     }
 
-    // 页面首次进入时刷新一次，随后每秒轮询一次，确保从系统设置返回后状态能及时更新
+    suspend fun refreshPermissions() {
+        val state = withContext(Dispatchers.IO) {
+            readGuidePermissionState(context)
+        }
+        permissionState = state
+    }
+
+    // 页面首次进入时刷新一次
     LaunchedEffect(Unit) {
         refreshPermissions()
-        while (true) {
-            delay(1.seconds)
-            refreshPermissions()
-        }
     }
 
     // GuideActivity.onResume 也会主动触发一次刷新

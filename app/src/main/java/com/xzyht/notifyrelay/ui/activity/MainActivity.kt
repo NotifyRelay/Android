@@ -383,10 +383,15 @@ class MainActivity : FragmentActivity() {
         }
 
         val projectionRequestCallback: () -> Unit = {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
-                recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-            } else {
-                launchScreenCapture()
+            Handler(Looper.getMainLooper()).post {
+                if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                    return@post
+                }
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                } else {
+                    launchScreenCapture()
+                }
             }
         }
         registeredOnRequestMediaProjection = projectionRequestCallback

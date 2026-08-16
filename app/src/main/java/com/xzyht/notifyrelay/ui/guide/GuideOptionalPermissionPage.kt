@@ -186,10 +186,14 @@ internal fun GuideOptionalPermissionPage(
                     Button(
                         onClick = {
                             val adbCmd = "adb shell appops set ${context.packageName} RECEIVE_SENSITIVE_NOTIFICATIONS allow"
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                            val clip = ClipData.newPlainText("adb", adbCmd)
-                            clipboard.setPrimaryClip(clip)
-                            showToast("已复制 adb 命令到剪贴板")
+                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
+                            if (clipboard != null) {
+                                val clip = ClipData.newPlainText("adb", adbCmd)
+                                clipboard.setPrimaryClip(clip)
+                                showToast("已复制 adb 命令到剪贴板")
+                            } else {
+                                showToast("剪贴板服务不可用")
+                            }
                         },
                         modifier = Modifier.weight(1f),
                         minWidth = 0.dp,

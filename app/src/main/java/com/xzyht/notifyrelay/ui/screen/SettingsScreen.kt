@@ -165,6 +165,10 @@ fun SettingsScrcpyScreen() {
                     uri,
                     Intent.FLAG_GRANT_READ_URI_PERMISSION,
                 )
+            }.onFailure { e ->
+                Logger.e("SettingsScrcpyScreen", "takePersistableUriPermission 失败: uri=$uri", e)
+            }
+            runCatching {
                 val uriString = uri.toString()
                 StorageManager.putString(
                     context,

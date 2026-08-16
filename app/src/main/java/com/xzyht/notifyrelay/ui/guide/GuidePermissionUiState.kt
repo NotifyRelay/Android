@@ -28,7 +28,9 @@ internal fun readGuidePermissionState(context: Context): GuidePermissionUiState 
             context.contentResolver,
             "enabled_notification_listeners",
         )
-    val hasNotification = enabledListeners?.contains(context.packageName) == true
+    val hasNotification = enabledListeners?.split(":")?.any { entry ->
+        entry.substringBefore("/") == context.packageName
+    } == true
 
     // 与 PermissionHelper.checkAllPermissions 保持一致：MIUI/澎湃系统还需要
     // 显式授予 com.android.permission.GET_INSTALLED_APPS，否则主界面会再次跳回引导页。
