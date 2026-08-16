@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.key
@@ -43,6 +42,7 @@ import github.xzynine.superislandui.model.components.MediaSessionData
 import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
+import top.yukonga.miuix.kmp.basic.Text
 
 /**
  * 浮窗条目数据类，对应原有EntryRecord

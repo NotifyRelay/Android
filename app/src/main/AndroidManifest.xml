@@ -30,6 +30,12 @@
 
     <!-- Android 14+ 数据同步前台服务权限声明（解决 FGS type dataSync 崩溃问题）-->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <!-- Android 14+ MediaProjection 前台服务权限声明 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+    <!-- Android 14+ 媒体播放前台服务权限声明 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
+    <!-- 屏幕音频捕获（Android 13+ 播放捕获输入）所需权限 -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <!-- 文件管理权限 -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ProtectedPermissions" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
@@ -69,8 +75,11 @@
             <intent-filter>
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
+            <meta-data
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="通知监听与同步转发服务" />
         </service>
-        <!-- 注册通知点击广播接收�?-->
+        <!-- 注册通知点击广播接收器 -->
         <receiver
             android:name=".feature.device.receiver.RemoteNotificationClickReceiver"
             android:exported="false" />
@@ -105,12 +114,21 @@
             </intent-filter>
         </receiver>
         
-        <!-- 剪贴板监控服务 -->
+        <!-- MediaProjection 前台服务 -->
         <service
-            android:name=".servers.ClipboardMonitorService"
+            android:name=".servers.MediaProjectionForegroundService"
             android:exported="false"
-            android:foregroundServiceType="dataSync"
-            android:stopWithTask="false" />
+            android:foregroundServiceType="mediaProjection" />
+
+        <!-- 音频中继前台服务 -->
+        <service
+            android:name=".servers.AudioRelayForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback|specialUse">
+            <meta-data
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="音频中继前台服务" />
+        </service>
 
         <!-- 剪贴板同步透明Activity -->
         <activity

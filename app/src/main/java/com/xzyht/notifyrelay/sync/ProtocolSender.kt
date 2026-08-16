@@ -24,7 +24,8 @@ object ProtocolSender {
         target: DeviceInfo,
         header: String,
         plaintext: String,
-        timeoutMs: Long = 10000L
+        timeoutMs: Long = 10000L,
+        dedupKey: String? = null
     ): EnqueueResult {
         val auth = synchronized(deviceManager.authenticatedDevices) {
             deviceManager.authenticatedDevices[target.uuid]
@@ -39,7 +40,7 @@ object ProtocolSender {
 
         val ctx = deviceManager.rustContextInternal ?: return EnqueueResult.MISSING_CONTEXT
         return try {
-            NativeCore.enqueueMessage(ctx, queuePtr, target.uuid, header, plaintext, null)
+            NativeCore.enqueueMessage(ctx, queuePtr, target.uuid, header, plaintext, dedupKey)
             EnqueueResult.SUCCESS
         } catch (e: Exception) {
             Logger.w(TAG, "入队失败 $header -> ${target.displayName}", e)

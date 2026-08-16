@@ -11,7 +11,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import top.yukonga.miuix.kmp.basic.SpinnerEntry
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -27,6 +26,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.MediaMessageReceiv
 import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.servers.MediaControlUtil
 import com.xzyht.notifyrelay.sync.ProtocolSender
+import com.xzyht.notifyrelay.ui.common.MiuixSpinnerPreference
 import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
@@ -34,7 +34,6 @@ import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.preference.WindowSpinnerPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -60,6 +59,12 @@ fun MusicControlPage() {
     
     // 胶囊歌词开关状态
     var capsuleLyricsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "capsule_lyrics_enabled")) }
+    
+    // 发送媒体通知到对端
+    var sendMediaNotificationsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "send_media_notifications_enabled", true)) }
+    
+    // 音频转发方式（0: scrcpy, 1: 中继）
+    var audioRelayMode by remember { mutableStateOf(StorageManager.getInt(context, "audio_relay_mode", 0)) }
     
 
 
@@ -120,12 +125,19 @@ fun MusicControlPage() {
                     
                     try {
                         val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                        val success = deviceManager.requestAudioForwarding(selectedDevice)
+                        val relayMode = StorageManager.getInt(context, "audio_relay_mode", 0)
                         
-                        if (success) {
-                            ToastUtils.showShortToast(context, "已请求${selectedDevice.displayName}转发音频")
+                        if (relayMode == 1) {
+                            // 中继模式：先请求 MediaProjection 授权，再启动发送
+                            deviceManager.startSendTo(selectedDevice.ip, selectedDevice.displayName, selectedDevice.uuid)
                         } else {
-                            ToastUtils.showShortToast(context, "请求发送失败")
+                            // scrcpy 模式：发送 audioRequest（现有逻辑）
+                            val success = deviceManager.requestAudioForwarding(selectedDevice)
+                            if (success) {
+                                ToastUtils.showShortToast(context, "已请求${selectedDevice.displayName}转发音频")
+                            } else {
+                                ToastUtils.showShortToast(context, "请求发送失败")
+                            }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "请求音频转发异常", e)
@@ -146,18 +158,27 @@ fun MusicControlPage() {
                     }
                     
                     try {
-                        val adbPort = notifyrelay.data.config.ScrcpyDefaults.ADB_PORT
-                        val success = io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.startAudioForwarding(
-                            context,
-                            selectedDevice.ip,
-                            adbPort,
-                            selectedDevice.displayName
-                        )
+                        val relayMode = StorageManager.getInt(context, "audio_relay_mode", 0)
                         
-                        if (success) {
-                            ToastUtils.showShortToast(context, "正在连接${selectedDevice.displayName}...")
+                        if (relayMode == 1) {
+                            // 中继模式：Rust 内部自动发控制消息
+                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                            deviceManager.audioRelayPlayer.start("recv", remoteUuid = selectedDevice.uuid)
+                            ToastUtils.showShortToast(context, "已启动中继音频接收")
                         } else {
-                            ToastUtils.showShortToast(context, "启动失败，可能已有转发在进行中")
+                            // scrcpy 模式：启动 scrcpy 音频转发（现有逻辑）
+                            val adbPort = notifyrelay.data.config.ScrcpyDefaults.ADB_PORT
+                            val success = io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.startAudioForwarding(
+                                context,
+                                selectedDevice.ip,
+                                adbPort,
+                                selectedDevice.displayName
+                            )
+                            if (success) {
+                                ToastUtils.showShortToast(context, "正在连接${selectedDevice.displayName}...")
+                            } else {
+                                ToastUtils.showShortToast(context, "启动失败，可能已有转发在进行中")
+                            }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "播放对端音频异常", e)
@@ -174,6 +195,7 @@ fun MusicControlPage() {
         Button(
             onClick = {
                 io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.stopAudioForwarding(context)
+                DeviceConnectionManagerSingleton.getDeviceManager(context).stopAudioRelay()
                 ToastUtils.showShortToast(context, "已停止音频转发")
             },
             modifier = Modifier.fillMaxWidth()
@@ -181,13 +203,28 @@ fun MusicControlPage() {
             Text("停止音频转发")
         }
         
-        WindowSpinnerPreference(
+        // 音频转发方式
+        MiuixSpinnerPreference(
+            title = "音频转发方式",
+            summary = "选择音频转发方式：scrcpy（经 adb 转发）或中继（直接音频流），同时控制发送与接收",
+            items = listOf(
+                "scrcpy（默认）",
+                "中继",
+            ),
+            selectedIndex = audioRelayMode,
+            onSelectedIndexChange = { index ->
+                audioRelayMode = index
+                StorageManager.putInt(context, "audio_relay_mode", index)
+            }
+        )
+        
+        MiuixSpinnerPreference(
             title = "接收媒体消息",
             summary = "接收远端设备媒体播放信息并以超级岛形式显示",
             items = listOf(
-                SpinnerEntry(title = "开"),
-                SpinnerEntry(title = "关"),
-                SpinnerEntry(title = "仅音频时开"),
+                "开",
+                "关",
+                "仅音频时开",
             ),
             selectedIndex = when (mediaMessageReceiveMode) {
                 MediaMessageReceiveMode.On -> 0
@@ -232,16 +269,43 @@ fun MusicControlPage() {
             )
         }
         
+        // 发送媒体通知到对端
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "发送媒体通知到它端",
+                    style = textStyles.body1,
+                    color = colorScheme.onSurface
+                )
+                Text(
+                    text = "关闭后不再发送媒体通知到对端",
+                    style = textStyles.body2,
+                    color = colorScheme.onSurfaceSecondary
+                )
+            }
+            Switch(
+                checked = sendMediaNotificationsEnabled,
+                onCheckedChange = { enabled ->
+                    sendMediaNotificationsEnabled = enabled
+                    StorageManager.putBoolean(context, "send_media_notifications_enabled", enabled)
+                }
+            )
+        }
+        
         // 歌词分割模式设置
         var lyricsSplitMode by remember { mutableStateOf(StorageManager.getInt(context, "lyrics_split_mode", 0)) }
         
-        WindowSpinnerPreference(
+        MiuixSpinnerPreference(
             title = "歌词分割模式",
             summary = "默认：平板时不分割，手机时分割",
             items = listOf(
-                SpinnerEntry(title = "默认"),
-                SpinnerEntry(title = "分割"),
-                SpinnerEntry(title = "不分割"),
+                "默认",
+                "分割",
+                "不分割",
             ),
             selectedIndex = lyricsSplitMode,
             onSelectedIndexChange = { index ->

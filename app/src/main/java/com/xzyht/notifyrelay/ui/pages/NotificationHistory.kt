@@ -29,7 +29,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -103,7 +102,7 @@ fun DeleteButton(modifier: Modifier = Modifier, onClick: () -> Unit) {
             onClick()
         },
         modifier = modifier.fillMaxHeight().width(80.dp),
-        backgroundColor = Color.Companion.Red,
+        backgroundColor = MiuixTheme.colorScheme.error,
         cornerRadius = 8.dp,
         minHeight = 40.dp,
         minWidth = 80.dp
@@ -283,7 +282,7 @@ fun NotificationHistoryScreen() {
     val deleteWidth = 80.dp
 
     // 通用通知列表块
-    @OptIn(ExperimentalFoundationApi::class, ExperimentalMaterial3Api::class)
+    @OptIn(ExperimentalFoundationApi::class)
     @Composable
     fun NotificationListBlock(
         pagingItems: androidx.paging.compose.LazyPagingItems<GroupedNotifications>,
@@ -573,7 +572,6 @@ fun NotificationHistoryScreen() {
     // 使用 Miuix Scaffold 重构布局
     Scaffold(
         containerColor = colorScheme.background,
-        popupHost = { },
         floatingToolbar = {
             if (pagingItems.itemCount > 0) {
                 FloatingToolbar(
@@ -599,9 +597,9 @@ fun NotificationHistoryScreen() {
                             },
                             modifier = Modifier.Companion,
                             colors = ButtonDefaults.buttonColorsPrimary(),
-                            confirmColors = ButtonDefaults.buttonColors(color = Color.Companion.Red),
+                            confirmColors = ButtonDefaults.buttonColors(color = colorScheme.error),
                             textColor = colorScheme.onPrimary,
-                            confirmTextColor = Color.Companion.White
+                            confirmTextColor = colorScheme.onError
                         )
 
                         if (DeveloperModeActivity.DEBUG_UI_ENABLED.value) {

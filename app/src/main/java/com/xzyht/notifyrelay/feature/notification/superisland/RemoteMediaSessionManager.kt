@@ -9,7 +9,6 @@ import notifyrelay.data.StorageManager
 import notifyrelay.data.StorageManager.getBoolean
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import github.xzynine.superislandui.common.SuperIslandProtocol
 import github.xzynine.superislandui.diff.DiffSystem
 import github.xzynine.superislandui.model.components.MediaSessionData
 import org.json.JSONObject
@@ -61,28 +60,36 @@ object RemoteMediaSessionManager {
     // 定时检查超时会话的间隔（毫秒）
     private const val CLEANUP_INTERVAL_MS = 3 * 1000L
     
-    // 用于处理延迟任务的Handler
+    // 用于处理延迟任务的Handler（所有操作都在主线程串行执行）
     private val handler = android.os.Handler(android.os.Looper.getMainLooper())
-    
+
     // 定期检查超时会话的任务
-    private lateinit var cleanupRunnable: Runnable
+    @Volatile
+    private var cleanupRunnable: Runnable? = null
+
+    // 清理循环是否运行中（有活跃会话时才运行，无会话即停止，避免常驻空转）
+    // 访问保护：所有读写都通过 handler 串行执行
+    @Volatile
+    private var cleanupLoopRunning = false
     
-    // 初始化定期检查任务
-    private fun initCleanupRunnable() {
-        cleanupRunnable = Runnable {
+    // 创建定期检查任务
+    private fun createCleanupRunnable(): Runnable {
+        return Runnable {
             try {
                 // 使用保存的应用上下文
                 val context = applicationContext
                 if (context != null) {
-                    cleanupTimeoutSessions(context)
+                    cleanupTimeoutSessionsOnHandler(context)
                 } else {
                     Logger.w("RemoteMediaSessionManager", "应用上下文未初始化，跳过定期检查")
                 }
             } catch (e: Exception) {
                 Logger.e("RemoteMediaSessionManager", "定期检查超时会话失败", e)
             } finally {
-                // 重新安排下一次检查
-                handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
+                // 仍有活跃会话才继续调度，否则停止循环（已在 handler 线程，直接读写）
+                if (cleanupLoopRunning) {
+                    cleanupRunnable?.let { handler.postDelayed(it, CLEANUP_INTERVAL_MS) }
+                }
             }
         }
     }
@@ -102,11 +109,33 @@ object RemoteMediaSessionManager {
         val mode = getReceiveMode(context)
         isEnabled = mode != MediaMessageReceiveMode.Off
         Logger.i("RemoteMediaSessionManager", "远端媒体超级岛接收模式: $mode")
-        
-        // 初始化定期检查任务
-        initCleanupRunnable()
-        // 启动定期检查超时会话的任务
-        handler.postDelayed(cleanupRunnable, CLEANUP_INTERVAL_MS)
+    }
+
+    /**
+     * 确保超时会话清理循环在运行（有活跃媒体会话时调用）
+     * 通过 handler 串行执行，保护 cleanupLoopRunning 读写和 callback 调度
+     */
+    private fun ensureCleanupLoop() {
+        handler.post {
+            if (cleanupLoopRunning) {
+                return@post
+            }
+            cleanupLoopRunning = true
+            val runnable = cleanupRunnable ?: createCleanupRunnable().also { cleanupRunnable = it }
+            handler.removeCallbacks(runnable)
+            handler.postDelayed(runnable, CLEANUP_INTERVAL_MS)
+        }
+    }
+
+    /**
+     * 停止超时会话清理循环（无活跃会话时）
+     * 通过 handler 串行执行，保护 cleanupLoopRunning 读写和 callback 调度
+     */
+    private fun stopCleanupLoop() {
+        handler.post {
+            cleanupLoopRunning = false
+            cleanupRunnable?.let { handler.removeCallbacks(it) }
+        }
     }
 
     fun isEnabled(context: Context): Boolean {
@@ -172,6 +201,17 @@ object RemoteMediaSessionManager {
         json: JSONObject,
         device: DeviceInfo
     ) {
+        // 所有入口逻辑都串行在 handler 上执行，保护会话状态读写和清理循环调度
+        handler.post {
+            processMediaMessageOnHandler(context, json, device)
+        }
+    }
+
+    private fun processMediaMessageOnHandler(
+        context: Context,
+        json: JSONObject,
+        device: DeviceInfo
+    ) {
         if (!shouldReceiveMediaMessage(context)) {
             Logger.d("RemoteMediaSessionManager", "远端媒体消息未接收或未满足音频条件，伪造结束以关闭浮窗")
             closeSessionForDevice(device, "接收条件不满足")
@@ -205,7 +245,7 @@ object RemoteMediaSessionManager {
             val oldSession = mediaSessionCache[device.uuid]?.session
             val finalTitle = title.ifBlank { oldSession?.title ?: "" }
             val finalText = text.ifBlank { oldSession?.text ?: "" }
-            val finalCoverUrl = coverUrl ?: oldSession?.coverUrl
+            val finalCoverUrl = coverUrl.ifBlank { oldSession?.coverUrl }
 
             currentSession = MediaSessionData(
                 packageName = packageName,
@@ -218,25 +258,37 @@ object RemoteMediaSessionManager {
             )
             currentDevice = device
 
-            val lastFeatureId = mediaFeatureIdCache[device.uuid]
-            val currentFeatureId = SuperIslandProtocol.computeFeatureId(
-                packageName, null, title, text
-            )
+            val currentFeatureId = NativeCore.computeFeatureId(
+                packageName, "", title, text, ""
+            ) ?: ""
 
             mediaFeatureIdCache[device.uuid] = currentFeatureId
             mediaLastUpdateTime[device.uuid] = System.currentTimeMillis()
-            cleanupTimeoutSessions(context)
+            cleanupTimeoutSessionsOnHandler(context)
             setupResendTask(context, device.uuid, currentSession!!, device)
+            // 有活跃会话，确保清理循环运行（已在 handler 线程，直接执行）
+            ensureCleanupLoopOnHandler()
 
-            val (currentState, payload) = buildMediaState(
-                sourceKey, finalTitle, finalText, coverUrl, packageName, appName, timestamp
-            )
-            applyMediaSessionState(sourceKey, currentState, payload, appName, context)
+            val currentState = buildMediaState(finalTitle, finalText, finalCoverUrl)
+            applyMediaSessionState(sourceKey, currentState, appName, context)
 
             Logger.i("RemoteMediaSessionManager", "更新远端媒体会话: $title - $text (来自 ${device.displayName})")
         } catch (e: Exception) {
             Logger.e("RemoteMediaSessionManager", "处理远端媒体消息失败", e)
         }
+    }
+
+    /**
+     * 确保清理循环运行（handler 线程内部调用，无需再 post）
+     */
+    private fun ensureCleanupLoopOnHandler() {
+        if (cleanupLoopRunning) {
+            return
+        }
+        cleanupLoopRunning = true
+        val runnable = cleanupRunnable ?: createCleanupRunnable().also { cleanupRunnable = it }
+        handler.removeCallbacks(runnable)
+        handler.postDelayed(runnable, CLEANUP_INTERVAL_MS)
     }
 
     fun clearSession() {
@@ -260,6 +312,7 @@ object RemoteMediaSessionManager {
         mediaSessionCache.clear()
         currentSession = null
         currentDevice = null
+        stopCleanupLoop()
         Logger.i("RemoteMediaSessionManager", "已清除所有远端媒体会话")
     }
 
@@ -318,19 +371,19 @@ object RemoteMediaSessionManager {
     }
     
     /**
-     * 检查并清理超时的媒体会话
+     * 检查并清理超时的媒体会话（handler 线程内部调用）
      */
-    private fun cleanupTimeoutSessions(context: Context) {
+    private fun cleanupTimeoutSessionsOnHandler(context: Context) {
         val currentTime = System.currentTimeMillis()
         val timeoutDevices = mutableListOf<String>()
-        
+
         // 找出超时的设备
         for ((deviceUuid, lastUpdateTime) in mediaLastUpdateTime) {
             if (currentTime - lastUpdateTime > MEDIA_SESSION_TIMEOUT_MS) {
                 timeoutDevices.add(deviceUuid)
             }
         }
-        
+
         // 清理超时会话
         for (deviceUuid in timeoutDevices) {
             val sourceKey = SOURCE_KEY_PREFIX + "_" + deviceUuid
@@ -355,77 +408,53 @@ object RemoteMediaSessionManager {
                 Logger.e("RemoteMediaSessionManager", "清理超时媒体会话失败: $deviceUuid", e)
             }
         }
+
+        // 无任何活跃会话时停止清理循环，避免常驻空转（已在 handler 线程，直接执行）
+        if (mediaLastUpdateTime.isEmpty()) {
+            cleanupLoopRunning = false
+            cleanupRunnable?.let { handler.removeCallbacks(it) }
+        }
     }
     
-    // 统一构建媒体状态与基础 payload（消除 onMediaMessageReceived / setupResendTask 间的重复）
-    private fun buildMediaState(
-        sourceKey: String, title: String, text: String, coverUrl: String?,
-        packageName: String, appName: String?, timestamp: Long
-    ): Pair<DiffSystem.State, JSONObject> {
-        val lastState = SuperIslandRemoteStore.getState(sourceKey)
+    // 构建媒体全量状态（Rust 合并引擎已输出全量，本地无需 diff）
+    private fun buildMediaState(title: String, text: String, coverUrl: String?): DiffSystem.State {
         val currentPics = mutableMapOf<String, String>()
-        lastState?.pics?.let { currentPics.putAll(it) }
-        if (coverUrl != null) currentPics["miui.focus.pic_cover"] = coverUrl
-        val state = DiffSystem.State(title, text,
-            MediaCapsulePresenter.buildParamV2(title, text), currentPics)
-        val payload = JSONObject().apply {
-            put("packageName", packageName)
-            put("appName", appName ?: packageName)
-            put("time", timestamp)
-        }
-        return state to payload
+        if (!coverUrl.isNullOrBlank()) currentPics["miui.focus.pic_cover"] = coverUrl
+        return DiffSystem.State(
+            title,
+            text,
+            MediaCapsulePresenter.buildParamV2(title, text),
+            currentPics
+        )
     }
 
-    // 统一处理媒体会话的差异合并与浮窗更新
+    // 直接以全量状态更新浮窗（Rust 合并引擎已输出全量，本地无需差异合并）
     private fun applyMediaSessionState(
         sourceKey: String,
         currentState: DiffSystem.State,
-        basePayload: JSONObject,
         appName: String?,
         context: Context
     ) {
-        val lastState = SuperIslandRemoteStore.getState(sourceKey)
-        val diff = DiffSystem.diff(lastState, currentState)
-
-        if (diff.isEmpty()) {
-            MediaCapsulePresenter.show(
-                context = context,
-                sourceId = sourceKey,
-                title = currentState.title ?: "",
-                text = currentState.text ?: "",
-                appName = appName,
-                picMap = currentState.pics
-            )
-            return
-        }
-
-        val payload = JSONObject(basePayload.toString())
-        if (lastState != null) {
-            payload.put("changes", diff.toJson())
-        } else {
-            payload.put("title", currentState.title ?: "")
-            payload.put("text", currentState.text ?: "")
+        // 以全量形式写入远端存储，保持 store 语义（结束包/清理时仍可移除）
+        val payload = JSONObject().apply {
+            put("title", currentState.title ?: "")
+            put("text", currentState.text ?: "")
             if (!currentState.paramV2Raw.isNullOrBlank()) {
-                payload.put("param_v2_raw", currentState.paramV2Raw)
+                put("param_v2_raw", currentState.paramV2Raw)
             }
             if (currentState.pics.isNotEmpty()) {
-                payload.put("pics", JSONObject(currentState.pics))
+                put("pics", JSONObject(currentState.pics))
             }
         }
-
-        val merged = SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
-        if (merged != null) {
-            MediaCapsulePresenter.show(
-                context = context,
-                sourceId = sourceKey,
-                title = merged.title,
-                text = merged.text,
-                appName = appName,
-                picMap = merged.pics
-            )
-        } else {
-            com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager.dismissBySource(sourceKey)
-        }
+        SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
+        MediaCapsulePresenter.show(
+            context = context,
+            sourceId = sourceKey,
+            title = currentState.title ?: "",
+            text = currentState.text ?: "",
+            appName = appName,
+            picMap = currentState.pics
+        )
     }
 
     /**
@@ -443,11 +472,8 @@ object RemoteMediaSessionManager {
                 }
 
                 val sourceKey = SOURCE_KEY_PREFIX + "_" + deviceUuid
-                val (currentState, payload) = buildMediaState(
-                    sourceKey, session.title, session.text, session.coverUrl,
-                    session.packageName, session.appName, System.currentTimeMillis()
-                )
-                applyMediaSessionState(sourceKey, currentState, payload, session.appName, context)
+                val currentState = buildMediaState(session.title, session.text, session.coverUrl)
+                applyMediaSessionState(sourceKey, currentState, session.appName, context)
 
                 setupResendTask(context, deviceUuid, session, device)
             } catch (e: Exception) {

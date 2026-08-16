@@ -17,21 +17,19 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
 import com.xzyht.notifyrelay.sync.MessageSender
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 
 // 全局变量，用于保存递增循环的进度值
 private var progressCounter = 0
-
-/**
- * 发送开关状态变量，默认关闭，持久化存储
- */
-private var sendToOtherDevices = false
 
 /**
  * 根据Live Updates开关选择合适的通道显示测试弹窗
@@ -53,35 +51,39 @@ fun showTestNotification(
     appName: String? = "测试应用",
     forceFullPackage: Boolean = true
 ) {
-    if (sendToOtherDevices) {
+    // 直接读取持久化值（与对话框开关 UI 同一真相源），避免重启后全局变量回退导致 UI 与实际行为不一致
+    if (StorageManager.getBoolean(context, "superisland_send_to_other_devices", false)) {
         // 发送开关开启时，仅发送通知给其他端
         try {
             // 获取设备管理器实例
             val deviceManager = DeviceConnectionManager.getInstance(context)
             
-            // 当强制发送全量包时，生成唯一的 featureIdOverride
+            // 强制发送全量包：固定 featureId（同一测试源多次点击刷新原有卡片，
+            // 对齐真实通知增量更新语义：全量重发走合并而非新建）
             val featureIdOverride = if (forceFullPackage) {
-                "${sourceId}_${System.currentTimeMillis()}"
+                sourceId
             } else {
                 null
             }
             
-            // 发送超级岛数据给其他设备
-            MessageSender.sendSuperIslandData(
-                context = context,
-                superPkg = sourceId,
-                appName = appName,
-                title = title,
-                text = text,
-                time = System.currentTimeMillis(),
-                paramV2Raw = paramV2Raw,
-                picMap = picMap,
-                deviceManager = deviceManager,
-                featureIdOverride = featureIdOverride
-            )
+            // 发送超级岛数据给其他设备（图片处理可能在 IO 线程耗时，异步发送避免阻塞 UI 线程）
+            CoroutineScope(Dispatchers.IO).launch {
+                MessageSender.sendSuperIslandData(
+                    context = context,
+                    superPkg = sourceId,
+                    appName = appName,
+                    title = title,
+                    text = text,
+                    time = System.currentTimeMillis(),
+                    paramV2Raw = paramV2Raw,
+                    picMap = picMap,
+                    deviceManager = deviceManager,
+                    featureIdOverride = featureIdOverride
+                )
+            }
         } catch (e: Exception) {
             // 发送失败时记录日志
-            android.util.Log.e("SuperIslandTest", "发送超级岛数据失败: ${e.message}")
+            Logger.e("超级岛测试", "发送超级岛数据失败: ${e.message}")
         }
     } else {
         // 发送开关关闭时，仅在本地显示通知
@@ -873,171 +875,169 @@ fun SuperIslandTestDialog(
         mutableStateOf(StorageManager.getBoolean(context, "superisland_send_to_other_devices", false))
     }
     
-    MiuixTheme {
-        WindowDialog(show = show.value, modifier = Modifier, title = "超级岛测试", titleColor = DialogDefaults.titleColor(), summary = "点击下方按钮测试不同分支下的超级岛效果", summaryColor = DialogDefaults.summaryColor(), backgroundColor = DialogDefaults.backgroundColor(), enableWindowDim = true, onDismissRequest = { show.value = false }, onDismissFinished = null, outsideMargin = DialogDefaults.outsideMargin, insideMargin = DialogDefaults.insideMargin, defaultWindowInsetsPadding = true, content = {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
+    WindowDialog(show = show.value, modifier = Modifier, title = "超级岛测试", titleColor = DialogDefaults.titleColor(), summary = "点击下方按钮测试不同分支下的超级岛效果", summaryColor = DialogDefaults.summaryColor(), backgroundColor = DialogDefaults.backgroundColor(), enableWindowDim = true, onDismissRequest = { show.value = false }, onDismissFinished = null, outsideMargin = DialogDefaults.outsideMargin, insideMargin = DialogDefaults.insideMargin, defaultWindowInsetsPadding = true, content = {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp)
+                ) {
+                    // 进度可变开关
+                    SwitchPreference(
+                        title = "测试设置",
+                        summary = if (isVariableProgress) "进度可变 (测试动画效果)" else "进度固定 (测试静态效果)",
+                        checked = isVariableProgress,
+                        onCheckedChange = { isVariableProgress = it },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    )
+
+                    // 发送开关
+                    SwitchPreference(
+                        title = "发送设置",
+                        summary = if (isSendEnabled) "发送到其他设备" else "仅本地测试",
+                        checked = isSendEnabled,
+                        onCheckedChange = {
+                            isSendEnabled = it
+                            StorageManager.putBoolean(context, "superisland_send_to_other_devices", it)
+                        },
+                        modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
+                    )
+
+                    LazyColumn(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
-                        // 进度可变开关
-                        SwitchPreference(
-                            title = "测试设置",
-                            summary = if (isVariableProgress) "进度可变 (测试动画效果)" else "进度固定 (测试静态效果)",
-                            checked = isVariableProgress,
-                            onCheckedChange = { isVariableProgress = it },
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                        )
-
-                        // 发送开关
-                        SwitchPreference(
-                            title = "发送设置",
-                            summary = if (isSendEnabled) "发送到其他设备" else "仅本地测试",
-                            checked = isSendEnabled,
-                            onCheckedChange = {
-                                isSendEnabled = it
-                                sendToOtherDevices = it
-                                StorageManager.putBoolean(context, "superisland_send_to_other_devices", it)
+                    item {
+                        // 基础文本组件
+                        Button(
+                            onClick = {
+                                testBaseInfo(context)
                             },
-                            modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp)
-                        )
-
-                        LazyColumn(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalArrangement = Arrangement.spacedBy(12.dp)
+                            modifier = Modifier.fillMaxWidth()
                         ) {
-                        item {
-                            // 基础文本组件
-                            Button(
-                                onClick = {
-                                    testBaseInfo(context)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("测试基础文本组件 (baseInfo)")
-                            }
+                            Text("测试基础文本组件 (baseInfo)")
                         }
+                    }
 
-                        item {
-                            // IM图文组件
-                            Button(
-                                onClick = {
-                                    testChatInfo(context)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("测试IM图文组件 (chatInfo)")
-                            }
+                    item {
+                        // IM图文组件
+                        Button(
+                            onClick = {
+                                testChatInfo(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("测试IM图文组件 (chatInfo)")
                         }
+                    }
 
-                        item {
-                            // 动画文本组件
-                            Button(
-                                onClick = {
-                                    testAnimTextInfo(context)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("测试动画文本组件 (animTextInfo)")
-                            }
+                    item {
+                        // 动画文本组件
+                        Button(
+                            onClick = {
+                                testAnimTextInfo(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("测试动画文本组件 (animTextInfo)")
                         }
+                    }
 
-                        item {
-                            // 强调图文组件
-                            Button(
-                                onClick = {
-                                    testHighlightInfo(context)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("测试强调图文组件 (highlightInfo)")
-                            }
+                    item {
+                        // 强调图文组件
+                        Button(
+                            onClick = {
+                                testHighlightInfo(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("测试强调图文组件 (highlightInfo)")
                         }
+                    }
 
-                        item {
-                            // 识别图形组件
-                            Button(
-                                onClick = {
-                                    testPicInfo(context)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("测试识别图形组件 (picInfo)")
-                            }
+                    item {
+                        // 识别图形组件
+                        Button(
+                            onClick = {
+                                testPicInfo(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("测试识别图形组件 (picInfo)")
                         }
+                    }
 
-                        item {
-                            // 提示组件
-                            Button(
-                                onClick = {
-                                    testHintInfo(context)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("测试提示组件 (hintInfo)")
-                            }
+                    item {
+                        // 提示组件
+                        Button(
+                            onClick = {
+                                testHintInfo(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("测试提示组件 (hintInfo)")
                         }
+                    }
 
-                        item {
-                            // 文本按钮组件
-                            Button(
-                                onClick = {
-                                    testTextButton(context)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("测试文本按钮组件 (textButton)")
-                            }
+                    item {
+                        // 文本按钮组件
+                        Button(
+                            onClick = {
+                                testTextButton(context)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("测试文本按钮组件 (textButton)")
                         }
+                    }
 
-                        item {
-                            // 线性进度组件
-                            Button(
-                                onClick = {
-                                    testProgressInfo(context, isVariableProgress)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("测试线性进度组件 (progressInfo)")
-                            }
+                    item {
+                        // 线性进度组件
+                        Button(
+                            onClick = {
+                                testProgressInfo(context, isVariableProgress)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("测试线性进度组件 (progressInfo)")
                         }
+                    }
 
-                        item {
-                            // 多节点进度组件
-                            Button(
-                                onClick = {
-                                    testMultiProgressInfo(context, isVariableProgress)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("测试多节点进度组件 (multiProgressInfo)")
-                            }
+                    item {
+                        // 多节点进度组件
+                        Button(
+                            onClick = {
+                                testMultiProgressInfo(context, isVariableProgress)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("测试多节点进度组件 (multiProgressInfo)")
                         }
+                    }
 
-                        item {
-                            // 带有图标的多节点进度组件
-                            Button(
-                                onClick = {
-                                    testMultiProgressWithIcons(context, isVariableProgress)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("测试带图标多节点进度组件")
-                            }
+                    item {
+                        // 带有图标的多节点进度组件
+                        Button(
+                            onClick = {
+                                testMultiProgressWithIcons(context, isVariableProgress)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("测试带图标多节点进度组件")
                         }
+                    }
 
-                        item {
-                            // 圆形进度组件
-                            Button(
-                                onClick = {
-                                    testCircularProgressInfo(context, isVariableProgress)
-                                },
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text("测试圆形进度组件 (circular)")
-                            }
+                    item {
+                        // 圆形进度组件
+                        Button(
+                            onClick = {
+                                testCircularProgressInfo(context, isVariableProgress)
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text("测试圆形进度组件 (circular)")
                         }
                     }
                 }
-            })
-    }}
+            }
+        })
+}

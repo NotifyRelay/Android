@@ -30,7 +30,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import notifyrelay.base.util.Logger
-import notifyrelay.core.util.PairingCodeManager
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.layout.DialogDefaults
@@ -56,10 +55,17 @@ fun PairingCodeDialog(
     if (mode == PairingMode.CLIENT_MODE) {
         val clipboardManager = LocalClipboardManager.current
         val scope = rememberCoroutineScope()
-        val displayCode = remember { PairingCodeManager.generate() }
+        val displayCode = remember {
+            deviceManager.rustContextInternal?.let { NativeCore.generatePairingCode(it) }
+        }
 
         LaunchedEffect(show) {
             if (show && targetDevice != null) {
+                if (displayCode == null) {
+                    onPairingComplete(false, "配对码生成失败：核心未初始化")
+                    onDismiss()
+                    return@LaunchedEffect
+                }
                 delay(500)
                 val handshakeDeferred = deviceManager.registerHandshakeWaiter(targetDevice.uuid)
                 try {
@@ -119,7 +125,7 @@ fun PairingCodeDialog(
                 ) {
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        text = displayCode,
+                        text = displayCode ?: "",
                         fontSize = 36.sp,
                         color = colorScheme.primary,
                         textAlign = TextAlign.Center,
@@ -137,7 +143,7 @@ fun PairingCodeDialog(
                     TextButton(
                         text = "点击复制",
                         onClick = {
-                            clipboardManager.setText(AnnotatedString(displayCode))
+                            displayCode?.let { clipboardManager.setText(AnnotatedString(it)) }
                         }
                     )
                     Spacer(modifier = Modifier.height(8.dp))
@@ -152,7 +158,7 @@ fun PairingCodeDialog(
                     TextButton(
                         text = "取消",
                         onClick = {
-                            PairingCodeManager.clear()
+                            deviceManager.rustContextInternal?.let { NativeCore.clearPairingCode(it) }
                             onDismiss()
                         }
                     )

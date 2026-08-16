@@ -42,7 +42,8 @@ fun UpdateDialog(
     val textStyles = MiuixTheme.textStyles
     val scrollState = rememberScrollState()
     
-    val statusColor = if (hasUpdate) Color(0xFFE53935) else Color(0xFF43A047)
+    // 更新提示用 error 语义色；成功绿（0xFF43A047）因无 success 语义角色保留硬编码
+    val statusColor = if (hasUpdate) colorScheme.error else Color(0xFF43A047)
     val statusText = if (hasUpdate) "发现新版本，建议更新" else "当前已是最新版本"
     val remoteVersion = releaseInfo?.version ?: "未知"
     

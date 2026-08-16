@@ -3,11 +3,15 @@ package com.xzyht.notifyrelay.sync
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerUtil
 import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
-import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
+import java.util.concurrent.atomic.AtomicLong
 
 object HeartbeatProcessor {
+
+    private const val REFRESH_MIN_INTERVAL_MS = 500L
+    private const val CACHE_MAX_ENTRIES = 500
+    private val lastRefreshAt = AtomicLong(0L)
 
     data class HeartbeatInfo(
         val uuid: String,
@@ -23,20 +27,12 @@ object HeartbeatProcessor {
         val uuid = info.uuid
         if (uuid == deviceManager.uuid) return
 
-        // 记录发现的设备到 Rust core（排除无效 IP）
-        val ctx = deviceManager.rustContextInternal
-        if (ctx != null && info.ip != "0.0.0.0" && info.ip.isNotBlank()) {
-            try {
-                NativeCore.recordDiscoveredDevice(ctx, uuid, info.displayName, info.ip, info.port.toShort(), info.batteryLevel, info.deviceType)
-            } catch (_: Exception) {}
-        }
+        // 运行时状态（lastSeen/在线判定）已迁移至 Rust DeviceRegistry，此处仅做：
+        // 1. 已认证设备的 Room 持久化更新（displayName/lastIp/deviceType）
+        // 2. 缓存回填 + 触发 refreshDevicesFromRust 消费 Rust 状态快照
 
         val isAuthed = synchronized(deviceManager.authenticatedDevices) {
             deviceManager.authenticatedDevices.containsKey(uuid)
-        }
-
-        synchronized(deviceManager.deviceLastSeenInternal) {
-            deviceManager.deviceLastSeenInternal[uuid] = System.currentTimeMillis()
         }
 
         val device = DeviceInfo(uuid, info.displayName, info.ip, info.port, info.batteryLevel, if (info.isCharging) '1' else '0')
@@ -63,32 +59,31 @@ object HeartbeatProcessor {
                 }
             }
 
-            synchronized(deviceManager.heartbeatedDevicesInternal) {
-                deviceManager.heartbeatedDevicesInternal.add(uuid)
-            }
-
             if (needSave) {
                 deviceManager.saveAuthedDevicesInternal()
             }
+        }
 
+        if (isAuthed) {
+            val displayName = deviceManager.decodeDisplayNameFromTransportInternal(info.displayName)
             synchronized(deviceManager.deviceInfoCacheInternal) {
                 val existing = deviceManager.deviceInfoCacheInternal[uuid]
                 val effectiveIp = info.ip.takeUnless { it == "0.0.0.0" || it.isBlank() } ?: existing?.ip ?: info.ip
-                deviceManager.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, info.displayName, effectiveIp, info.port, info.batteryLevel, if (info.isCharging) '1' else '0')
+                // 未知电量（超出 [-100,100]）沿用缓存旧值，不覆盖已显示的电量/充电状态
+                val batteryUnknown = kotlin.math.abs(info.batteryLevel) > 100
+                val batteryLevel = if (batteryUnknown) (existing?.batteryLevel ?: -1) else kotlin.math.abs(info.batteryLevel)
+                val chargingStatus = if (batteryUnknown) (existing?.chargingStatus ?: '0') else if (info.isCharging) '1' else '0'
+                if (deviceManager.deviceInfoCacheInternal.size > CACHE_MAX_ENTRIES) {
+                    deviceManager.deviceInfoCacheInternal.remove(deviceManager.deviceInfoCacheInternal.keys.first())
+                }
+                deviceManager.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, displayName, effectiveIp, info.port, batteryLevel, chargingStatus)
             }
-            DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
+            DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, displayName)
+        }
 
-            deviceManager.coroutineScopeInternal.launch {
-                deviceManager.updateDeviceListInternal()
-            }
-        } else {
-            synchronized(deviceManager.deviceInfoCacheInternal) {
-                val existing = deviceManager.deviceInfoCacheInternal[uuid]
-                val effectiveIp = info.ip.takeUnless { it == "0.0.0.0" || it.isBlank() } ?: existing?.ip ?: info.ip
-                deviceManager.deviceInfoCacheInternal[uuid] = DeviceInfo(uuid, info.displayName, effectiveIp, info.port, info.batteryLevel, if (info.isCharging) '1' else '0')
-            }
-            DeviceConnectionManagerUtil.updateGlobalDeviceName(uuid, info.displayName)
-
+        val now = System.currentTimeMillis()
+        val prev = lastRefreshAt.get()
+        if (now - prev >= REFRESH_MIN_INTERVAL_MS && lastRefreshAt.compareAndSet(prev, now)) {
             deviceManager.coroutineScopeInternal.launch {
                 deviceManager.updateDeviceListInternal()
             }

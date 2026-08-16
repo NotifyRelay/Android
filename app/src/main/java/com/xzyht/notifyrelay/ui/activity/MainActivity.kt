@@ -2,12 +2,17 @@ package com.xzyht.notifyrelay.ui.activity
 
 import android.content.Intent
 import android.content.res.Configuration
+import android.media.projection.MediaProjection
+import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -40,7 +45,6 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -58,19 +62,29 @@ import com.xzyht.notifyrelay.sync.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
 import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.navigation.rememberNavigator
+import com.xzyht.notifyrelay.ui.pages.UIAbout
+import com.xzyht.notifyrelay.ui.pages.UIAppearance
+import com.xzyht.notifyrelay.ui.pages.UILocalFilter
+import com.xzyht.notifyrelay.ui.pages.UIRemoteFilter
+import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
 import com.xzyht.notifyrelay.ui.screen.DeviceForwardScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreenState
 import com.xzyht.notifyrelay.ui.screen.HistoryScreen
+import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -82,6 +96,8 @@ import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.ServiceManager
 import notifyrelay.data.config.DeviceInfoManager
+import notifyrelay.data.config.ScrcpyPreferenceKeys
+import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
@@ -94,29 +110,95 @@ import top.yukonga.miuix.kmp.icon.extended.Community
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Tune
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.MiuixPopupUtils.Companion.MiuixPopupHost
 
 class MainActivity : FragmentActivity() {
     internal val showAutoStartBanner = mutableStateOf(false)
     internal val bannerMessage = mutableStateOf<String?>(null)
 
-    private fun checkPermissionsAndStartServices() {
-        lifecycleScope.launch(Dispatchers.Main) {
+    // 屏幕捕获授权结果，等待本应用前台且媒体投影前台服务就绪后处理
+    private var pendingScreenCapture: Pair<Int, Intent>? = null
+    private var registeredOnForegroundReady: (() -> Unit)? = null
+    private var registeredOnRequestMediaProjection: (() -> Unit)? = null
+
+    private fun processPendingScreenCapture() {
+        if (pendingScreenCapture == null) return
+        try {
+            val onForegroundReady: () -> Unit = { handleScreenCaptureReady() }
+            registeredOnForegroundReady = onForegroundReady
+            com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = onForegroundReady
+            startForegroundService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+        } catch (e: Exception) {
+            Logger.e("NotifyRelay", "屏幕捕获前台服务启动失败，带回前台重试", e)
+            bringMainActivityToFront()
+        }
+    }
+
+    private fun handleScreenCaptureReady() {
+        val pending = pendingScreenCapture ?: return
+        try {
+            val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            val projection = mpm.getMediaProjection(pending.first, pending.second)
+            if (projection != null) {
+                pendingScreenCapture = null
+                val deviceManager = DeviceConnectionManager.getInstance(this)
+                deviceManager.audioRelayPlayer.stopSendCapture()
+                NativeCore.mediaProjection?.stop()
+                NativeCore.mediaProjection = projection
+                projection.registerCallback(object : MediaProjection.Callback() {
+                    override fun onStop() {
+                        deviceManager.audioRelayPlayer.stopSendCapture()
+                        if (NativeCore.mediaProjection === projection) {
+                            NativeCore.mediaProjection = null
+                        }
+                    }
+                }, Handler(Looper.getMainLooper()))
+                deviceManager.startPendingAudioRelaySend()
+            } else {
+                pendingScreenCapture = null
+                stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+            }
+        } catch (e: Exception) {
+            Logger.e("NotifyRelay", "屏幕捕获授权后启动失败", e)
+            pendingScreenCapture = null
+            stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+        }
+    }
+
+    private fun bringMainActivityToFront() {
+        val intent = Intent(this, MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+        }
+        try {
+            startActivity(intent)
+        } catch (_: Exception) {}
+    }
+
+    private suspend fun checkPermissionsAndStartServices() {
+        withContext(Dispatchers.Main) {
             showAutoStartBanner.value = false
             bannerMessage.value = null
+        }
 
-            if (!PermissionHelper.checkAllPermissions(this@MainActivity)) {
-                Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
+        val granted = withContext(Dispatchers.IO) {
+            PermissionHelper.checkAllPermissions(this@MainActivity)
+        }
+        if (!granted) {
+            Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
+            withContext(Dispatchers.Main) {
                 val intent = Intent(this@MainActivity, GuideActivity::class.java)
                 intent.putExtra("from", "MainActivity")
                 startActivity(intent)
                 finish()
-                return@launch
             }
+            return
+        }
 
-            val result = ServiceManager.startAllServices(this@MainActivity)
-            val serviceStarted = result.first
-            val errorMessage = result.second
+        val result = withContext(Dispatchers.IO) {
+            ServiceManager.startAllServices(this@MainActivity)
+        }
+        val serviceStarted = result.first
+        val errorMessage = result.second
+        withContext(Dispatchers.Main) {
             if (errorMessage != null) {
                 showAutoStartBanner.value = true
                 bannerMessage.value = errorMessage
@@ -131,14 +213,37 @@ class MainActivity : FragmentActivity() {
 
     override fun onResume() {
         super.onResume()
+        processPendingScreenCapture()
         // 后台执行权限检查和服务启动，避免阻塞 UI 线程
         lifecycleScope.launch(Dispatchers.Default) {
             checkPermissionsAndStartServices()
         }
     }
 
+    override fun onDestroy() {
+        super.onDestroy()
+        if (com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady === registeredOnForegroundReady) {
+            com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = null
+        }
+        registeredOnForegroundReady = null
+        if (DeviceConnectionManager.getInstance(this).onRequestMediaProjection === registeredOnRequestMediaProjection) {
+            DeviceConnectionManager.getInstance(this).onRequestMediaProjection = null
+        }
+        registeredOnRequestMediaProjection = null
+        pendingScreenCapture = null
+    }
+
     private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
         recreate()
+    }
+
+    private val screenCaptureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == RESULT_OK && result.data != null) {
+            pendingScreenCapture = result.resultCode to result.data!!
+            processPendingScreenCapture()
+        } else {
+            stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -214,6 +319,82 @@ class MainActivity : FragmentActivity() {
                                 entry<Route.Settings> { SettingsScreen() }
                                 entry<Route.ScrcpyAdvanced> { ScrcpyAdvancedScreen(navigator) }
                                 entry<Route.ScrcpyVirtualButtonOrder> { ScrcpyVirtualButtonOrderScreen(navigator) }
+                                entry<Route.SettingsRemoteFilter> {
+                                    ScrollableTopAppBarPage(
+                                        title = "远程过滤",
+                                        onBack = { navigator.pop() }
+                                    ) {
+                                        UIRemoteFilter()
+                                    }
+                                }
+                                entry<Route.SettingsLocalFilter> {
+                                    ScrollableTopAppBarPage(
+                                        title = "本地过滤",
+                                        onBack = { navigator.pop() }
+                                    ) {
+                                        UILocalFilter()
+                                    }
+                                }
+                                entry<Route.SettingsSuperIsland> {
+                                    ScrollableTopAppBarPage(
+                                        title = "超级岛",
+                                        onBack = { navigator.pop() }
+                                    ) {
+                                        UISuperIslandSettings()
+                                    }
+                                }
+                                entry<Route.SettingsScrcpy> {
+                                    val context = LocalContext.current
+                                    val serverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+                                        if (uri == null) return@rememberLauncherForActivityResult
+                                        runCatching {
+                                            context.contentResolver.takePersistableUriPermission(
+                                                uri,
+                                                Intent.FLAG_GRANT_READ_URI_PERMISSION
+                                            )
+                                            // 问题 5 修复：原回调仅 takePersistableUriPermission，未写入 CUSTOM_SERVER_URI；
+                                            // 且 ScrcpyUiViewModel 是单例，只写 StorageManager 不会让 UI/连接生效。
+                                            // 双写：1) StorageManager 持久化；2) viewModel setter 更新单例状态（内部也会持久化到 mainSettings）。
+                                            val uriString = uri.toString()
+                                            StorageManager.putString(
+                                                context,
+                                                ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
+                                                uriString,
+                                                StorageManager.PrefsType.SCRCPY
+                                            )
+                                            val app = context.applicationContext as android.app.Application
+                                            ScrcpyUiViewModel.getInstance(app).customServerUri = uriString
+                                        }.onFailure { e ->
+                                            Logger.e("MainActivity", "scrcpy server URI 保存失败: uri=$uri", e)
+                                        }
+                                    }
+                                    ScrollableTopAppBarPage(
+                                        title = "屏幕镜像",
+                                        onBack = { navigator.pop() }
+                                    ) {
+                                        ScrcpyScreenHost(
+                                            startScreen = ScrcpyRootScreen.Settings,
+                                            onPickServer = { serverPicker.launch(arrayOf("application/java-archive", "application/octet-stream", "*/*")) },
+                                            onExit = { navigator.pop() },
+                                        )
+                                    }
+                                }
+                                entry<Route.SettingsAbout> {
+                                    ScrollableTopAppBarPage(
+                                        title = "关于",
+                                        onBack = { navigator.pop() }
+                                    ) {
+                                        UIAbout()
+                                    }
+                                }
+                                entry<Route.SettingsAppearance> {
+                                    ScrollableTopAppBarPage(
+                                        title = "外观",
+                                        onBack = { navigator.pop() }
+                                    ) {
+                                        UIAppearance()
+                                    }
+                                }
                             }
                         )
                     }
@@ -228,6 +409,13 @@ class MainActivity : FragmentActivity() {
             guideLauncher.launch(intent)
             return
         }
+
+        val projectionRequestCallback: () -> Unit = {
+            val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            screenCaptureLauncher.launch(mpm.createScreenCaptureIntent())
+        }
+        registeredOnRequestMediaProjection = projectionRequestCallback
+        DeviceConnectionManager.getInstance(this).onRequestMediaProjection = projectionRequestCallback
 
         // 后台初始化，避免阻塞 UI 线程
         lifecycleScope.launch(Dispatchers.Default) {
@@ -264,8 +452,8 @@ class MainActivity : FragmentActivity() {
 fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
     val colorScheme = MiuixTheme.colorScheme
     
-    val errorColor = Color(0xFFD32F2F)
-    val onErrorColor = Color.White
+    val errorColor = MiuixTheme.colorScheme.error
+    val onErrorColor = MiuixTheme.colorScheme.onError
     
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -290,7 +478,6 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            popupHost = {},
             topBar = {
                 if (showBanner && !bannerMsg.isNullOrBlank()) {
                     Surface(
@@ -424,7 +611,6 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
                 }
             }
         }
-        MiuixPopupHost()
     }
 }
 

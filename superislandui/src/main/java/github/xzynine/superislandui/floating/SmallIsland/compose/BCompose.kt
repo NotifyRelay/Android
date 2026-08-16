@@ -166,26 +166,30 @@ fun BCompose(
             is BSameWidthDigitInfo -> {
                 // 处理计时信息或数字
                 val timer = bComp.timer
-                val initialTitleText = bComp.digit ?: timer?.let { formatTimerInfo(it) } ?: ""
-                
-                // 使用 mutableStateOf 存储标题文本
-                var titleText by remember {
-                    mutableStateOf(initialTitleText)
-                }
-                
-                if (timer != null) {
-                    LaunchedEffect(timer) {
-                        // 每秒更新一次时间
-                        while (true) {
-                            titleText = formatTimerInfo(timer)
-                            kotlinx.coroutines.delay(1000L)
+                val isTimerRunning = timer != null && (timer.timerType == 1 || timer.timerType == -1)
+
+                // 标题文本：优先使用 digit，否则格式化 timer（暂停时也直接显示格式化后的值）
+                val titleText = if (timer != null) {
+                    // 使用 remember + key 确保 timer 变化时重置状态
+                    var displayText by remember(timer) {
+                        mutableStateOf(formatTimerInfo(timer))
+                    }
+
+                    // 仅计时进行中才每秒刷新
+                    if (isTimerRunning) {
+                        LaunchedEffect(timer) {
+                            while (true) {
+                                displayText = formatTimerInfo(timer)
+                                kotlinx.coroutines.delay(1000L)
+                            }
                         }
                     }
-                } else if (bComp.digit != null) {
-                    // 静态数字，直接赋值
-                    titleText = bComp.digit
+
+                    displayText
+                } else {
+                    bComp.digit ?: ""
                 }
-                
+
                 // 文本内容
                 CommonTextBlockCompose(
                     frontTitle = null,

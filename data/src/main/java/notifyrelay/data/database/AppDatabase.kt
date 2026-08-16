@@ -1,3 +1,16 @@
+@file:Suppress("SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection"
+)
+
 package notifyrelay.data.database
 
 import android.content.Context
@@ -6,11 +19,15 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
 import notifyrelay.base.util.Logger
+import notifyrelay.data.FilterConfigDefaults
 import notifyrelay.data.database.dao.AppConfigDao
 import notifyrelay.data.database.dao.AppDao
 import notifyrelay.data.database.dao.AppDeviceDao
 import notifyrelay.data.database.dao.DeviceDao
+import notifyrelay.data.database.dao.FilterListDao
 import notifyrelay.data.database.dao.NotificationRecordDao
 import notifyrelay.data.database.dao.SuperIslandHistoryDao
 import notifyrelay.data.database.dao.SuperIslandImageDao
@@ -18,12 +35,17 @@ import notifyrelay.data.database.dao.SuperIslandMirrorFilterDao
 import notifyrelay.data.database.entity.AppConfigEntity
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
+import notifyrelay.data.database.entity.BlackListEntryEntity
 import notifyrelay.data.database.entity.DeviceEntity
+import notifyrelay.data.database.entity.FilterEntryEntity
 import notifyrelay.data.database.entity.NotificationRecordEntity
+import notifyrelay.data.database.entity.PackageGroupEntity
+import notifyrelay.data.database.entity.PackageGroupItemEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
 import notifyrelay.data.database.entity.SuperIslandImageEntity
 import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
+import notifyrelay.data.database.entity.WhiteListEntryEntity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,7 +54,29 @@ import notifyrelay.data.database.migration.MigrationHelper
 /**
  * Room数据库核心类
  * 定义数据库的版本、实体类和DAO接口
+ *
+ * 版本历史：
+ * v1: 初始版本
+ * v2: 删除notification_records表外键约束
+ * v3: super_island_history表新增featureId字段
+ * v4: 新增apps表和app_devices表
+ * v5: notification_records表新增复合索引
+ * v6: 新增超级岛图片去重表与绑定表
+ * v7: 新增super_island_mirror_filters表
+ * v8: 名单类配置从app_config移出为独立表（black_list_entries、white_list_entries、filter_entries、package_groups、package_group_items），镜像过滤默认包名入库
  */
+@Suppress("SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection", "SpellCheckingInspection", "SpellCheckingInspection",
+    "SpellCheckingInspection"
+)
 @Database(
     entities = [
         AppConfigEntity::class,
@@ -43,9 +87,14 @@ import notifyrelay.data.database.migration.MigrationHelper
         SuperIslandHistoryEntity::class,
         SuperIslandImageEntity::class,
         SuperIslandImageBindingEntity::class,
-        SuperIslandMirrorFilterEntity::class
+        SuperIslandMirrorFilterEntity::class,
+        BlackListEntryEntity::class,
+        WhiteListEntryEntity::class,
+        FilterEntryEntity::class,
+        PackageGroupEntity::class,
+        PackageGroupItemEntity::class
     ],
-    version = 7,
+    version = 8,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -58,6 +107,7 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun superIslandHistoryDao(): SuperIslandHistoryDao
     abstract fun superIslandImageDao(): SuperIslandImageDao
     abstract fun superIslandMirrorFilterDao(): SuperIslandMirrorFilterDao
+    abstract fun filterListDao(): FilterListDao
     
     companion object {
         // 数据库名称
@@ -89,7 +139,7 @@ abstract class AppDatabase : RoomDatabase() {
                         }
                     }
                 })
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7, MIGRATION_7_8)
                 .build().also { INSTANCE = it }
             }
         }
@@ -251,6 +301,230 @@ abstract class AppDatabase : RoomDatabase() {
                         lastUpdated INTEGER NOT NULL
                     )
                 """.trimIndent())
+            }
+        }
+
+        /**
+         * 数据库迁移：从版本7到版本8
+         * 名单类配置从app_config移出为独立表：
+         * - 远程黑名单/白名单（含启用状态）→ black_list_entries / white_list_entries
+         * - 本地过滤条目（含启用状态）→ filter_entries
+         * - 包名等价组（默认组+自定义组及启用状态）→ package_groups / package_group_items
+         * - 超级岛镜像过滤默认包名禁用集 → super_island_mirror_filters 行
+         */
+        private val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // 1. 建表（与实体 schema 逐列一致）
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS black_list_entries (" +
+                        "packageName TEXT NOT NULL, " +
+                        "keyword TEXT NOT NULL DEFAULT '', " +
+                        "enabled INTEGER NOT NULL DEFAULT 1, " +
+                        "PRIMARY KEY (packageName, keyword))"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS white_list_entries (" +
+                        "packageName TEXT NOT NULL, " +
+                        "keyword TEXT NOT NULL DEFAULT '', " +
+                        "enabled INTEGER NOT NULL DEFAULT 1, " +
+                        "PRIMARY KEY (packageName, keyword))"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS filter_entries (" +
+                        "keyword TEXT NOT NULL DEFAULT '', " +
+                        "packageName TEXT NOT NULL DEFAULT '', " +
+                        "enabled INTEGER NOT NULL DEFAULT 1, " +
+                        "PRIMARY KEY (keyword, packageName))"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS package_groups (" +
+                        "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                        "groupName TEXT NOT NULL, " +
+                        "enabled INTEGER NOT NULL DEFAULT 1, " +
+                        "isDefault INTEGER NOT NULL DEFAULT 0)"
+                )
+                database.execSQL(
+                    "CREATE TABLE IF NOT EXISTS package_group_items (" +
+                        "groupId INTEGER NOT NULL, " +
+                        "packageName TEXT NOT NULL, " +
+                        "PRIMARY KEY (groupId, packageName), " +
+                        "FOREIGN KEY (groupId) REFERENCES package_groups(id) ON DELETE CASCADE)"
+                )
+                database.execSQL("CREATE INDEX IF NOT EXISTS index_package_group_items_groupId ON package_group_items(groupId)")
+
+                // 2. 数据迁移（解析 app_config 旧 JSON 数据写入新表）
+                try {
+                    migrateRemoteBlackWhiteList(database, "black_list_entries", "filter_black_list", "filter_black_list_enabled")
+                    migrateRemoteBlackWhiteList(database, "white_list_entries", "filter_white_list", "filter_white_list_enabled")
+                    migrateLegacySharedList(database)
+                    migrateLocalFilterEntries(database)
+                    migratePackageGroups(database)
+                    migrateMirrorFilterDefaults(database)
+                } catch (e: Exception) {
+                    // 抛出异常以让 Room 回滚整个迁移事务，避免版本被标记为 8 但表为空导致数据静默丢失；
+                    // 下次启动会重新尝试迁移（旧数据仍保留在 app_config 中）
+                    Logger.e("AppDatabase", "MIGRATION_7_8 名单数据迁移失败，将回滚迁移事务", e)
+                    throw e
+                }
+
+                // 3. 清理已迁移的旧 key
+                val migratedKeys = listOf(
+                    "filter_black_list", "filter_black_list_enabled",
+                    "filter_white_list", "filter_white_list_enabled",
+                    "filter_filter_list",
+                    "filter_filter_entries", "filter_enabled_filter_entries",
+                    "filter_package_groups", "filter_default_group_enabled", "filter_custom_group_enabled",
+                    "general_super_island_mirror_filter_disabled_defaults"
+                )
+                migratedKeys.forEach { key ->
+                    database.execSQL("DELETE FROM app_config WHERE key = ?", arrayOf<Any?>(key))
+                }
+            }
+        }
+
+        // ---------- MIGRATION_7_8 辅助方法 ----------
+
+        private fun readConfigValue(db: SupportSQLiteDatabase, key: String): String? {
+            db.query("SELECT value FROM app_config WHERE key = ?", arrayOf<Any?>(key)).use { cursor ->
+                return if (cursor.moveToFirst()) cursor.getString(0) else null
+            }
+        }
+
+        private fun parseJsonSet(json: String?): Set<String> {
+            if (json.isNullOrBlank()) return emptySet()
+            return runCatching {
+                val type = object : TypeToken<Set<String>>() {}.type
+                @Suppress("UNCHECKED_CAST")
+                (Gson().fromJson(json, type) as? Set<String>) ?: emptySet()
+            }.getOrDefault(emptySet())
+        }
+
+        /**
+         * 解析 JSON 数组字符串为有序 List。
+         * 与 parseJsonSet 不同：保留原始顺序，专用于自定义包名组（依赖顺序保证命名一致性）。
+         * Set 反序列化时顺序不可靠，会导致迁移后命名与 savePackageGroups 不一致。
+         */
+        private fun parseJsonList(json: String?): List<String> {
+            if (json.isNullOrBlank()) return emptyList()
+            return runCatching {
+                val type = object : TypeToken<List<String>>() {}.type
+                @Suppress("UNCHECKED_CAST")
+                (Gson().fromJson(json, type) as? List<String>) ?: emptyList()
+            }.getOrDefault(emptyList())
+        }
+
+        /** 黑白名单条目 "pkg|keyword" 或 "pkg" 解析为 (包名, 关键词) */
+        private fun parseFilterEntry(serialized: String): Pair<String, String> {
+            val arr = serialized.split("|", limit = 2)
+            return arr[0] to (arr.getOrNull(1)?.takeIf { it.isNotBlank() } ?: "")
+        }
+
+        private fun lastInsertRowId(db: SupportSQLiteDatabase): Long {
+            db.query("SELECT last_insert_rowid()").use { cursor ->
+                return if (cursor.moveToFirst()) cursor.getLong(0) else 0L
+            }
+        }
+
+        private fun migrateRemoteBlackWhiteList(db: SupportSQLiteDatabase, table: String, listKey: String, enabledKey: String) {
+            val list = parseJsonSet(readConfigValue(db, listKey))
+            if (list.isEmpty()) return
+            val enabledValue = readConfigValue(db, enabledKey)
+            val enabled = parseJsonSet(enabledValue)
+            list.forEach { ser ->
+                val (pkg, kw) = parseFilterEntry(ser)
+                db.execSQL(
+                    "INSERT INTO $table (packageName, keyword, enabled) VALUES (?, ?, ?)",
+                    arrayOf<Any?>(pkg, kw, if (enabledValue.isNullOrBlank() || enabled.contains(ser)) 1 else 0)
+                )
+            }
+        }
+
+        /** 遗留共享 filter_filter_list：按当前 filter_mode 并入对应名单表 */
+        private fun migrateLegacySharedList(db: SupportSQLiteDatabase) {
+            val legacy = parseJsonSet(readConfigValue(db, "filter_filter_list"))
+            if (legacy.isEmpty()) return
+            val mode = readConfigValue(db, "filter_filter_mode") ?: "none"
+            val table = when (mode) {
+                "black" -> "black_list_entries"
+                "white" -> "white_list_entries"
+                else -> return
+            }
+            legacy.forEach { ser ->
+                val (pkg, kw) = parseFilterEntry(ser)
+                db.execSQL(
+                    "INSERT OR IGNORE INTO $table (packageName, keyword, enabled) VALUES (?, ?, 1)",
+                    arrayOf<Any?>(pkg, kw)
+                )
+            }
+        }
+
+        private fun migrateLocalFilterEntries(db: SupportSQLiteDatabase) {
+            val entries = parseJsonSet(readConfigValue(db, "filter_filter_entries"))
+            if (entries.isEmpty()) return
+            val enabledValue = readConfigValue(db, "filter_enabled_filter_entries")
+            val enabled = parseJsonSet(enabledValue)
+            entries.forEach { ser ->
+                val parts = ser.split("\u001F", limit = 2)
+                val kw = parts.getOrNull(0)?.replace("\\u001F", "\u001F") ?: ""
+                val pkg = parts.getOrNull(1)?.replace("\\u001F", "\u001F") ?: ""
+                db.execSQL(
+                    "INSERT INTO filter_entries (keyword, packageName, enabled) VALUES (?, ?, ?)",
+                    arrayOf<Any?>(kw, pkg, if (enabledValue.isNullOrBlank() || enabled.contains(ser)) 1 else 0)
+                )
+            }
+        }
+
+        /** 包名等价组：默认组（常量）+ 自定义组 → package_groups / package_group_items */
+        private fun migratePackageGroups(db: SupportSQLiteDatabase) {
+            // 默认组
+            val defaultEnabled = (readConfigValue(db, "filter_default_group_enabled") ?: "1,1,1")
+                .split(",").map { it == "1" }
+            FilterConfigDefaults.defaultPackageGroups.forEachIndexed { idx, pkgs ->
+                val enabled = defaultEnabled.getOrNull(idx) ?: true
+                db.execSQL(
+                    "INSERT INTO package_groups (groupName, enabled, isDefault) VALUES (?, ?, 1)",
+                    arrayOf<Any?>("默认组${idx + 1}", if (enabled) 1 else 0)
+                )
+                val groupId = lastInsertRowId(db)
+                pkgs.forEach { pkg ->
+                    db.execSQL(
+                        "INSERT INTO package_group_items (groupId, packageName) VALUES (?, ?)",
+                        arrayOf<Any?>(groupId, pkg)
+                    )
+                }
+            }
+            // 自定义组（使用 parseJsonList 保留 JSON 数组顺序，避免 Set 反序列化导致命名错位）
+            val customRaw = parseJsonList(readConfigValue(db, "filter_package_groups"))
+            val customEnabled = (readConfigValue(db, "filter_custom_group_enabled") ?: "")
+                .split(",").filter { it.isNotBlank() }.map { it == "1" }
+            customRaw.forEachIndexed { idx, groupStr ->
+                val pkgs = groupStr.split("|").map { it.trim() }.filter { it.isNotBlank() }
+                if (pkgs.isEmpty()) return@forEachIndexed
+                val enabled = customEnabled.getOrNull(idx) ?: true
+                db.execSQL(
+                    "INSERT INTO package_groups (groupName, enabled, isDefault) VALUES (?, ?, 0)",
+                    arrayOf<Any?>("自定义组${idx + 1}", if (enabled) 1 else 0)
+                )
+                val groupId = lastInsertRowId(db)
+                pkgs.forEach { pkg ->
+                    db.execSQL(
+                        "INSERT INTO package_group_items (groupId, packageName) VALUES (?, ?)",
+                        arrayOf<Any?>(groupId, pkg)
+                    )
+                }
+            }
+        }
+
+        /** 镜像过滤默认包名禁用集 → super_island_mirror_filters 行 */
+        private fun migrateMirrorFilterDefaults(db: SupportSQLiteDatabase) {
+            val disabled = (readConfigValue(db, "general_super_island_mirror_filter_disabled_defaults") ?: "")
+                .split(",").filter { it.isNotBlank() }.toSet()
+            val now = System.currentTimeMillis()
+            FilterConfigDefaults.defaultMirrorPackages.forEach { pkg ->
+                db.execSQL(
+                    "INSERT OR IGNORE INTO super_island_mirror_filters (packageName, enabled, lastUpdated) VALUES (?, ?, ?)",
+                    arrayOf<Any?>(pkg, if (disabled.contains(pkg)) 0 else 1, now)
+                )
             }
         }
 

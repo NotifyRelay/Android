@@ -24,7 +24,10 @@ import kotlinx.coroutines.delay
 fun TimerInfoCompose(timerInfo: TimerInfo, picMap: Map<String, String>? = null) {
     val displayState = remember(timerInfo) { mutableStateOf(formatTimerInfo(timerInfo)) }
 
+    // 仅计时进行中（正计时 timerType=1 / 倒计时 timerType=-1）才每秒刷新，暂停/无效类型静态显示
+    val isTimerRunning = timerInfo.timerType == 1 || timerInfo.timerType == -1
     LaunchedEffect(timerInfo) {
+        if (!isTimerRunning) return@LaunchedEffect
         while (true) {
             displayState.value = formatTimerInfo(timerInfo)
             delay(1000)
