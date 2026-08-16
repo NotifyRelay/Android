@@ -1,5 +1,6 @@
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.File
 import java.util.Properties
 
 plugins {
@@ -9,30 +10,37 @@ plugins {
     id("kotlin-parcelize")
 }
 
-// 自动生成版本号：遵循仓库约定
-// 规则摘要（来自项目说明）：
-// version = major.minor.patch
-// - major: 可通过 gradle.properties 的 versionMajor 覆盖，默认 0
-// - minor: main 分支的提交数（主线提交计数）
-// - patch: 如果当前分支为 main，则使用当前日期的 MMdd（例如 1027 -> Oct 27）；否则使用当前 HEAD 的提交数（dev 分支下）
-// 生成的 versionCode 采用如下编码：major*10_000_000 + minor*1000 + patch
-// 这个值应在 32-bit int 范围内（对于常见 repo 提交量是安全的）。
+// 版本号由 version.properties 提供（update.yml 在 push 到 main 时按 commit 语义回写），
+// 注入优先级：-PversionName/-PversionCode（gradle property）→ VERSION_NAME/VERSION_CODE（环境变量）
+// → version.properties 固定值（本地构建使用）。
+fun loadFixedVersion(): Pair<String, Int> {
+    val props = Properties()
+    val file = rootProject.file("version.properties")
+    require(file.exists()) {
+        "Missing version.properties. Provide -PversionName/-PversionCode (or env VERSION_NAME/VERSION_CODE) when building in CI."
+    }
+    file.inputStream().use { props.load(it) }
 
-// 主版本号（major）
-// - 直接在此处设置主版本号；不再从 gradle.properties 读取。
-// - 在发布重大版本时请在这里更新此值（并可同时调整下方的 versionMajorSubtract）。
-// 例如：val versionMajor: Int = 1
-val versionMajor: Int = 2 // <-- 在此处直接修改主版本号
+    val name =
+        props.getProperty("versionName")
+            ?: error("versionName is missing in version.properties")
+    val code =
+        props.getProperty("versionCode")?.toIntOrNull()
+            ?: error("versionCode is missing or not an Int in version.properties")
+    return name to code
+}
 
-// 使用 buildSrc 中的 Versioning 实现来计算版本信息（包含对非 main 分支仅统计独有提交的修订数）
-// 支持在此文件内直接设置次版本（minor）减量（不使用 gradle.properties）：
-// - 当主版本号（versionMajor）升级后，可以在下面直接把 `versionMajorSubtract` 改为期望的值，
-//   这样 main 的提交计数会在计算中减去该值（下限为 0），防止次版本无限递增。
-// - 示例：如果希望在 major 升级后把 main 的计数回退 340，则设置为 340。
-val versionMajorSubtract: Int = 465 // <-- 在此处直接修改以手动应用减量，当前main分支提交数为465
-val versionInfo = Versioning.compute(rootProject.projectDir, versionMajor, versionMajorSubtract)
-val computedVersionName = versionInfo.versionName
-val computedVersionCode = versionInfo.versionCode
+val (fixedVersionName, fixedVersionCode) = loadFixedVersion()
+val injectedVersionName =
+    providers.gradleProperty("versionName").orNull
+        ?: System.getenv("VERSION_NAME")
+        ?: fixedVersionName
+val injectedVersionCode =
+    (
+        providers.gradleProperty("versionCode").orNull
+            ?: System.getenv("VERSION_CODE")
+            ?: fixedVersionCode.toString()
+    ).toIntOrNull() ?: fixedVersionCode
 
 android {
     namespace = "com.xzyht.notifyrelay"
@@ -48,9 +56,9 @@ android {
             libs.versions.targetSdk
                 .get()
                 .toInt()
-        // 使用自动计算的版本号
-        versionCode = computedVersionCode
-        versionName = computedVersionName
+        // 使用 version.properties 提供的版本号（CI 语义化回写）
+        versionCode = injectedVersionCode
+        versionName = injectedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -246,6 +254,6 @@ dependencies {
 
 tasks.register("printVersionName") {
     doLast {
-        println(computedVersionName)
+        println(injectedVersionName)
     }
 }
