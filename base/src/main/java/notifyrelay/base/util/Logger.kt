@@ -13,10 +13,10 @@ object Logger {
         NONE,
     }
 
-    var CURRENT_LEVEL = Level.INFO
+    var currentLevel = Level.INFO
 
     // 过滤通知日志开关（默认开启）
-    var ENABLE_FILTERED_NOTIFICATION_LOG = true
+    var enableFilteredNotificationLog = true
 
     init {
         try {
@@ -35,9 +35,9 @@ object Logger {
                                 Log.ERROR -> Level.ERROR
                                 else -> return true
                             }
-                        return when (CURRENT_LEVEL) {
+                        return when (currentLevel) {
                             Level.NONE -> false
-                            else -> level.ordinal >= CURRENT_LEVEL.ordinal
+                            else -> level.ordinal >= currentLevel.ordinal
                         }
                     }
                 },

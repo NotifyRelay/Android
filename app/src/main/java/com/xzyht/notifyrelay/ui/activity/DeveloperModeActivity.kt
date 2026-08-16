@@ -38,13 +38,13 @@ class DeveloperModeActivity : AppCompatActivity() {
 
         fun initLogConfig(context: Context) {
             val logLevelOrdinal = StorageManager.getInt(context, KEY_LOG_LEVEL, Logger.Level.INFO.ordinal)
-            Logger.CURRENT_LEVEL = Logger.Level.entries.getOrElse(logLevelOrdinal) { Logger.Level.INFO }
+            Logger.currentLevel = Logger.Level.entries.getOrElse(logLevelOrdinal) { Logger.Level.INFO }
         }
 
         fun initDebugUiConfig(context: Context) {
             DEBUG_UI_ENABLED.value = StorageManager.getBoolean(context, KEY_DEBUG_UI_ENABLED, false)
             FILTERED_NOTIFICATION_LOG_ENABLED.value = StorageManager.getBoolean(context, KEY_FILTERED_NOTIFICATION_LOG_ENABLED, true)
-            Logger.ENABLE_FILTERED_NOTIFICATION_LOG = FILTERED_NOTIFICATION_LOG_ENABLED.value
+            Logger.enableFilteredNotificationLog = FILTERED_NOTIFICATION_LOG_ENABLED.value
         }
     }
 
@@ -82,7 +82,7 @@ class DeveloperModeActivity : AppCompatActivity() {
         // 日志级别状态
         val logLevel =
             remember {
-                mutableStateOf(Logger.CURRENT_LEVEL)
+                mutableStateOf(Logger.currentLevel)
             }
 
         // 日志级别选项，添加[e].[i]等蓝色文本
@@ -132,7 +132,7 @@ class DeveloperModeActivity : AppCompatActivity() {
                     checked = filteredNotificationLogEnabled,
                     onCheckedChange = {
                         filteredNotificationLogEnabled = it
-                        Logger.ENABLE_FILTERED_NOTIFICATION_LOG = it
+                        Logger.enableFilteredNotificationLog = it
                         StorageManager.putBoolean(context, KEY_FILTERED_NOTIFICATION_LOG_ENABLED, it)
                     },
                 )
@@ -145,7 +145,7 @@ class DeveloperModeActivity : AppCompatActivity() {
                     onSelectedIndexChange = {
                         selectedLevelIndex.intValue = it
                         logLevel.value = logLevelOptions[it].second
-                        Logger.CURRENT_LEVEL = logLevel.value
+                        Logger.currentLevel = logLevel.value
                         StorageManager.putInt(context, KEY_LOG_LEVEL, logLevel.value.ordinal)
                     },
                 )

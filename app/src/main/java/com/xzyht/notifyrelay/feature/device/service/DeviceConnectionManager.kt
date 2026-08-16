@@ -24,12 +24,12 @@ import com.xzyht.notifyrelay.sync.AppLaunchManager
 import com.xzyht.notifyrelay.sync.AppListSyncManager
 import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
+import com.xzyht.notifyrelay.sync.FtpServerManager
+import com.xzyht.notifyrelay.sync.FtpServerManager.StartResult
 import com.xzyht.notifyrelay.sync.HeartbeatProcessor
 import com.xzyht.notifyrelay.sync.IconSyncManager
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.ProtocolSender
-import com.xzyht.notifyrelay.sync.ftpServer
-import com.xzyht.notifyrelay.sync.ftpServer.StartResult
 import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
 import com.xzyht.notifyrelay.sync.notification.StatusProcessor
 import com.xzyht.notifyrelay.sync.notification.SuperIslandProcessor
@@ -181,7 +181,7 @@ class DeviceConnectionManager(
 
 // 设备信息缓存，解决未认证设备无法显示详细信息问题
     private val deviceInfoCache = mutableMapOf<String, DeviceInfo>()
-    private val PREFS_AUTHED_DEVICES = "authed_devices_json"
+    private val prefsAuthedDevices = "authed_devices_json"
 
     // 保持 JNA 回调对象强引用，防止被 GC
     private val rustCallbackRefs = mutableListOf<Any>()
@@ -1470,7 +1470,7 @@ class DeviceConnectionManager(
                                             "start" -> {
                                                 val pcUser = json.optString("username", null)
                                                 val pcPass = json.optString("password", null)
-                                                val result = ftpServer.start(getLocalDisplayName(), context, pcUser, pcPass)
+                                                val result = FtpServerManager.start(getLocalDisplayName(), context, pcUser, pcPass)
                                                 when (result.status) {
                                                     StartResult.SUCCESS, StartResult.ALREADY_RUNNING -> {
                                                         result.serverInfo?.let { info ->
@@ -1515,7 +1515,7 @@ class DeviceConnectionManager(
                                                 }
                                             }
                                             "stop" -> {
-                                                ftpServer.stop()
+                                                FtpServerManager.stop()
                                                 val raw = JSONObject().apply { put("action", "stopped") }.toString()
                                                 resolveDeviceInfo(uuid, "", 23333)?.let {
                                                     ProtocolSender.sendEncrypted(this@DeviceConnectionManager, it, "DATA_FTP", raw)
@@ -1733,7 +1733,7 @@ class DeviceConnectionManager(
         lib.nrc_set_on_state_query_cb(ctx, stateQueryCb)
         rustCallbackRefs.add(stateQueryCb)
 
-        // ---- 日志回调（接入 Logger.CURRENT_LEVEL 等级控制） ----
+        // ---- 日志回调（接入 Logger.currentLevel 等级控制） ----
         NativeCore.setLogCallback(ctx)
     }
 

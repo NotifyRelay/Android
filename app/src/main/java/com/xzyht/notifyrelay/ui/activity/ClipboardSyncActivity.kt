@@ -15,15 +15,15 @@ import notifyrelay.base.util.Logger
  * 当应用不在前台时，通过启动此透明Activity获取焦点，从而能够访问剪贴板
  */
 class ClipboardSyncActivity : AppCompatActivity() {
-    private val TAG = "ClipboardSyncActivity"
-    private val CLIPBOARD_TYPE_TEXT = "text"
-    private val CLIPBOARD_TYPE_IMAGE = "image"
+    private val tag = "ClipboardSyncActivity"
+    private val clipboardTypeText = "text"
+    private val clipboardTypeImage = "image"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         // 设置透明主题（在AndroidManifest.xml中配置）
-        Logger.d(TAG, "透明Activity创建，准备获取剪贴板数据")
+        Logger.d(tag, "透明Activity创建，准备获取剪贴板数据")
 
         // 移除 setContentView 和 viewTreeObserver 监听，减少UI渲染
         // 直接设置不可触摸标志
@@ -57,9 +57,9 @@ class ClipboardSyncActivity : AppCompatActivity() {
                 }
                 // 移除Toast，减少干扰
             } catch (e: SecurityException) {
-                Logger.e(TAG, "剪贴板访问被拒绝", e)
+                Logger.e(tag, "剪贴板访问被拒绝", e)
             } catch (e: Exception) {
-                Logger.e(TAG, "同步失败", e)
+                Logger.e(tag, "同步失败", e)
             } finally {
                 // 无论成功与否，都立即结束Activity
                 finish()
@@ -92,7 +92,7 @@ class ClipboardSyncActivity : AppCompatActivity() {
                 ) {
                     val text = item.text?.toString()
                     if (!text.isNullOrEmpty()) {
-                        return Pair(CLIPBOARD_TYPE_TEXT, text)
+                        return Pair(clipboardTypeText, text)
                     }
                 }
             }

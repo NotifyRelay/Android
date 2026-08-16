@@ -835,14 +835,6 @@ object LiveUpdatesNotificationManager {
     }
 
     /**
-     * 添加超级岛相关的结构化数据到Live Updates通知
-     * @param builder 通知构建器
-     * @param paramV2 ParamV2对象
-     * @param paramV2Raw ParamV2原始JSON字符串
-     * @param picMap 图片映射（已解析）
-     */
-
-    /**
      * 辅助方法：处理HTML标题和内容，返回纯文本对
      */
     private fun processHtmlText(

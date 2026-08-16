@@ -13,9 +13,9 @@ import java.util.concurrent.ConcurrentHashMap
 @Stable
 class FloatingWindowManager {
     // 常量定义
-    private val EXPANDED_DURATION_MS = 3000L // 展开态持续时间
-    private val AUTO_DISMISS_DURATION_MS = 12000L // 自动移除时间（非媒体类型）
-    private val AUTO_DISMISS_DURATION_MS_MEDIA = 45_000L // 媒体类型自动移除时间，需长于 30s 轮询刷新周期
+    private val expandedDurationMs = 3000L // 展开态持续时间
+    private val autoDismissDurationMs = 12000L // 自动移除时间（非媒体类型）
+    private val autoDismissDurationMsMedia = 45_000L // 媒体类型自动移除时间，需长于 30s 轮询刷新周期
 
     // 用于处理延迟任务的Handler
     private val handler = Handler(Looper.getMainLooper())
@@ -140,7 +140,7 @@ class FloatingWindowManager {
 
         // 如果不是摘要态且处于展开状态，添加自动收起和自动移除任务
         if (!summaryOnly && finalIsExpanded) {
-            scheduleCollapse(key, EXPANDED_DURATION_MS)
+            scheduleCollapse(key, expandedDurationMs)
         }
 
         // 非媒体条目添加自动移除任务；
@@ -161,7 +161,7 @@ class FloatingWindowManager {
     ) {
         scheduleRemoval(
             key,
-            if (business == "media") AUTO_DISMISS_DURATION_MS_MEDIA else AUTO_DISMISS_DURATION_MS,
+            if (business == "media") autoDismissDurationMsMedia else autoDismissDurationMs,
         )
     }
 
@@ -272,7 +272,7 @@ class FloatingWindowManager {
 
             // 如果切换到展开状态，添加自动收起和自动移除任务
             if (isExpanded) {
-                scheduleCollapse(key, EXPANDED_DURATION_MS)
+                scheduleCollapse(key, expandedDurationMs)
             }
 
             // 重新添加自动移除任务，根据business类型选择正确的自动移除时间
@@ -310,7 +310,7 @@ class FloatingWindowManager {
 
             // 如果切换到展开状态，添加自动收起任务
             if (finalIsExpanded) {
-                scheduleCollapse(key, EXPANDED_DURATION_MS)
+                scheduleCollapse(key, expandedDurationMs)
             }
 
             // 重新添加自动移除任务，根据business类型选择正确的自动移除时间
