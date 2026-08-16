@@ -13,11 +13,10 @@ object DeviceConnectionManagerSingleton {
     /**
      * 获取DeviceConnectionManager实例
      */
-    fun getDeviceManager(context: Context): DeviceConnectionManager {
-        return sharedDeviceManager ?: synchronized(this) {
+    fun getDeviceManager(context: Context): DeviceConnectionManager =
+        sharedDeviceManager ?: synchronized(this) {
             sharedDeviceManager ?: DeviceConnectionManager(context.applicationContext).also { sharedDeviceManager = it }
         }
-    }
 
     /**
      * 清除DeviceConnectionManager实例（仅在测试时使用）

@@ -22,18 +22,28 @@ object ThemeSettingsManager {
         return prefs.getInt(KEY_THEME_BASE_INDEX, THEME_FOLLOW_SYSTEM)
     }
 
-    fun setThemeBaseIndex(context: Context, index: Int) {
-        context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    fun setThemeBaseIndex(
+        context: Context,
+        index: Int,
+    ) {
+        context
+            .getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
             .edit { putInt(KEY_THEME_BASE_INDEX, index.coerceIn(0, 2)) }
         notifyListeners(context)
     }
 
-    fun addThemeChangeListener(context: Context, listener: ThemeChangeListener) {
+    fun addThemeChangeListener(
+        context: Context,
+        listener: ThemeChangeListener,
+    ) {
         val contextListeners = listeners.getOrPut(context.applicationContext) { mutableSetOf() }
         contextListeners.add(listener)
     }
 
-    fun removeThemeChangeListener(context: Context, listener: ThemeChangeListener) {
+    fun removeThemeChangeListener(
+        context: Context,
+        listener: ThemeChangeListener,
+    ) {
         listeners[context.applicationContext]?.remove(listener)
     }
 

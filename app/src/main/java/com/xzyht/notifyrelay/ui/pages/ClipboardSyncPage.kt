@@ -36,9 +36,11 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-enum class ClipboardSyncMode(val displayName: String) {
+enum class ClipboardSyncMode(
+    val displayName: String,
+) {
     OFF("关闭"),
-    FCITX5("Fcitx5")
+    FCITX5("Fcitx5"),
 }
 
 @Composable
@@ -56,8 +58,11 @@ fun ClipboardSyncPage() {
 
     var selectedMode by remember {
         mutableIntStateOf(
-            if (fcitx5Paired) ClipboardSyncMode.FCITX5.ordinal
-            else ClipboardSyncMode.OFF.ordinal
+            if (fcitx5Paired) {
+                ClipboardSyncMode.FCITX5.ordinal
+            } else {
+                ClipboardSyncMode.OFF.ordinal
+            },
         )
     }
 
@@ -73,11 +78,12 @@ fun ClipboardSyncPage() {
     }
 
     DisposableEffect(lifecycleOwner) {
-        val observer = LifecycleEventObserver { _, event ->
-            if (event == Lifecycle.Event.ON_RESUME) {
-                refreshStatus()
+        val observer =
+            LifecycleEventObserver { _, event ->
+                if (event == Lifecycle.Event.ON_RESUME) {
+                    refreshStatus()
+                }
             }
-        }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose {
             lifecycleOwner.lifecycle.removeObserver(observer)
@@ -91,44 +97,48 @@ fun ClipboardSyncPage() {
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(rememberScrollState())
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
         Text(
             text = "剪贴板同步",
             style = textStyles.title1,
-            color = colorScheme.onSurface
+            color = colorScheme.onSurface,
         )
 
         Text(
             text = "管理设备间的剪贴板同步功能",
             style = textStyles.body2,
-            color = colorScheme.onSurfaceSecondary
+            color = colorScheme.onSurfaceSecondary,
         )
 
         Text(
-            text = when (selectedMode) {
-                ClipboardSyncMode.FCITX5.ordinal -> if (fcitx5Paired) "已启用 - 通过 Fcitx5 同步" else "未配对 - 请输入配对码"
-                else -> "已关闭 - 可手动点击通知栏按钮同步"
-            },
+            text =
+                when (selectedMode) {
+                    ClipboardSyncMode.FCITX5.ordinal -> if (fcitx5Paired) "已启用 - 通过 Fcitx5 同步" else "未配对 - 请输入配对码"
+                    else -> "已关闭 - 可手动点击通知栏按钮同步"
+                },
             style = textStyles.body2,
-            color = when (selectedMode) {
-                ClipboardSyncMode.FCITX5.ordinal -> if (fcitx5Paired) colorScheme.primary else colorScheme.error
-                else -> colorScheme.onSurfaceSecondary
-            }
+            color =
+                when (selectedMode) {
+                    ClipboardSyncMode.FCITX5.ordinal -> if (fcitx5Paired) colorScheme.primary else colorScheme.error
+                    else -> colorScheme.onSurfaceSecondary
+                },
         )
         Spacer(modifier = Modifier.height(16.dp))
 
         WindowDropdownPreference(
             title = "同步模式",
-            summary = when {
-                fcitx5Paired -> "Fcitx5 - 已配对"
-                selectedMode == ClipboardSyncMode.FCITX5.ordinal -> "Fcitx5 - 未配对"
-                else -> "关闭"
-            },
+            summary =
+                when {
+                    fcitx5Paired -> "Fcitx5 - 已配对"
+                    selectedMode == ClipboardSyncMode.FCITX5.ordinal -> "Fcitx5 - 未配对"
+                    else -> "关闭"
+                },
             items = ClipboardSyncMode.entries.map { it.displayName },
             selectedIndex = selectedMode,
             onSelectedIndexChange = { index ->
@@ -148,7 +158,7 @@ fun ClipboardSyncPage() {
                         }
                     }
                 }
-            }
+            },
         )
 
         if (selectedMode == ClipboardSyncMode.FCITX5.ordinal) {
@@ -156,7 +166,7 @@ fun ClipboardSyncPage() {
                 Text(
                     text = "Fcitx5 配对状态：已配对",
                     style = textStyles.body1,
-                    color = colorScheme.primary
+                    color = colorScheme.primary,
                 )
 
                 DoubleClickConfirmButton(
@@ -173,24 +183,24 @@ fun ClipboardSyncPage() {
                             }
                         }
                     },
-                    modifier = Modifier.fillMaxWidth()
+                    modifier = Modifier.fillMaxWidth(),
                 )
             } else {
                 Text(
                     text = "配对状态：未配对",
                     style = textStyles.body1,
-                    color = colorScheme.error
+                    color = colorScheme.error,
                 )
 
                 PairingCodeInputField(
                     code = pairingCode,
                     onCodeChange = { pairingCode = it },
-                    enabled = pairingState != "配对中..."
+                    enabled = pairingState != "配对中...",
                 )
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
                     Button(
                         onClick = {
@@ -214,7 +224,7 @@ fun ClipboardSyncPage() {
                                 }
                             }
                         },
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f),
                     ) {
                         Text("配对")
                     }
@@ -224,7 +234,7 @@ fun ClipboardSyncPage() {
                     Text(
                         text = pairingState,
                         style = textStyles.body2,
-                        color = colorScheme.onSurfaceSecondary
+                        color = colorScheme.onSurfaceSecondary,
                     )
                 }
             }
@@ -235,14 +245,15 @@ fun ClipboardSyncPage() {
         Text(
             text = "注意：",
             style = textStyles.body1,
-            color = colorScheme.onSurface
+            color = colorScheme.onSurface,
         )
 
         Text(
-            text = "1. Fcitx5 模式：需安装 Fcitx5 输入法并开启剪贴板广播功能\n" +
+            text =
+                "1. Fcitx5 模式：需安装 Fcitx5 输入法并开启剪贴板广播功能\n" +
                     "2. 关闭时可通过点击通知栏按钮手动同步",
             style = textStyles.body2,
-            color = colorScheme.onSurfaceSecondary
+            color = colorScheme.onSurfaceSecondary,
         )
 
         Spacer(modifier = Modifier.height(16.dp))

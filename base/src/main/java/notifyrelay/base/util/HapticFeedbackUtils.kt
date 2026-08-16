@@ -32,15 +32,19 @@ object HapticFeedbackUtils {
      * @param context 上下文
      * @param durationMs 振动时长，单位毫秒
      */
-    fun performLightHaptic(context: Context, durationMs: Long = 30L) {
+    fun performLightHaptic(
+        context: Context,
+        durationMs: Long = 30L,
+    ) {
         try {
             val vibrator = obtainVibrator(context) ?: return
             if (!vibrator.hasVibrator()) return
 
-            val effect = VibrationEffect.createOneShot(
-                durationMs,
-                VibrationEffect.DEFAULT_AMPLITUDE
-            )
+            val effect =
+                VibrationEffect.createOneShot(
+                    durationMs,
+                    VibrationEffect.DEFAULT_AMPLITUDE,
+                )
             vibrator.vibrate(effect)
         } catch (_: Exception) {
         }
@@ -53,7 +57,11 @@ object HapticFeedbackUtils {
      * @param pattern 振动模式：交替的静止/振动时长（毫秒），例如 [0, 1000, 500, 2000]
      * @param repeat 重复索引：-1 表示不重复，0 表示从第一个元素开始重复
      */
-    fun performPatternHaptic(context: Context, pattern: LongArray, repeat: Int = -1) {
+    fun performPatternHaptic(
+        context: Context,
+        pattern: LongArray,
+        repeat: Int = -1,
+    ) {
         if (pattern.isEmpty()) return
         try {
             val vibrator = obtainVibrator(context) ?: return
@@ -68,8 +76,8 @@ object HapticFeedbackUtils {
     /**
      * 统一获取 Vibrator，兼容 Android 12+ 的 VibratorManager。
      */
-    private fun obtainVibrator(context: Context): Vibrator? {
-        return try {
+    private fun obtainVibrator(context: Context): Vibrator? =
+        try {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
                 val vm = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
                 vm?.defaultVibrator
@@ -80,5 +88,4 @@ object HapticFeedbackUtils {
         } catch (_: Exception) {
             null
         }
-    }
 }

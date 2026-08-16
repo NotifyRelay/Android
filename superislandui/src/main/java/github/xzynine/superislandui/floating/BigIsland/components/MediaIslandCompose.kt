@@ -27,9 +27,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoFitText
 import github.xzynine.superislandui.common.AutoScrollText
-import github.xzynine.superislandui.model.components.MediaSessionData
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.common.PreviewData
+import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.model.components.MediaSessionData
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private const val COVER_SIZE = 80
@@ -42,14 +42,14 @@ fun MediaIslandCompose(
     onPlayPause: () -> Unit = {},
     onPrevious: () -> Unit = {},
     onNext: () -> Unit = {},
-    onClose: () -> Unit = {}
+    onClose: () -> Unit = {},
 ) {
     ExpandedMediaIsland(
         mediaSession = mediaSession,
         onPlayPause = onPlayPause,
         onPrevious = onPrevious,
         onNext = onNext,
-        onClose = onClose
+        onClose = onClose,
     )
 }
 
@@ -59,49 +59,52 @@ private fun ExpandedMediaIsland(
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
-    onClose: () -> Unit
+    onClose: () -> Unit,
 ) {
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.Top
+            verticalAlignment = Alignment.Top,
         ) {
-            val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(
-                url = mediaSession.coverUrl
-            )
-            
+            val painter =
+                SuperIslandImageUtil.rememberSuperIslandImagePainter(
+                    url = mediaSession.coverUrl,
+                )
+
             // 只有在有封面时才显示封面图片
             if (painter != null) {
                 Box(
-                    modifier = Modifier
-                        .size(COVER_SIZE.dp)
-                        .clip(RoundedCornerShape(8.dp))
+                    modifier =
+                        Modifier
+                            .size(COVER_SIZE.dp)
+                            .clip(RoundedCornerShape(8.dp)),
                 ) {
                     androidx.compose.foundation.Image(
                         painter = painter,
                         contentDescription = "歌曲封面",
                         modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                        contentScale = ContentScale.Crop,
                     )
                 }
-                
+
                 // 只有在有封面时才添加间距
                 Spacer(modifier = Modifier.width(12.dp))
             }
 
             Column(
-                modifier = Modifier.weight(1f)
+                modifier = Modifier.weight(1f),
             ) {
                 AutoScrollText(
                     text = mediaSession.title.ifBlank { "未知标题" },
                     style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Medium),
                     color = Color(0xFFFFFFFF.toInt()),
                     baseSpeedPxPerSec = 150f,
-                    pauseMillis = 0
+                    pauseMillis = 0,
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -110,7 +113,7 @@ private fun ExpandedMediaIsland(
                     text = mediaSession.text.ifBlank { "未知艺术家" },
                     style = MiuixTheme.textStyles.body2,
                     color = Color(0xFFDDDDDD.toInt()),
-                    minTextSize = 10f
+                    minTextSize = 10f,
                 )
 
                 Spacer(modifier = Modifier.height(4.dp))
@@ -121,7 +124,7 @@ private fun ExpandedMediaIsland(
                     color = Color(0xFFDDDDDD.toInt()),
                     fontSize = 11.sp,
                     maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
+                    overflow = TextOverflow.Ellipsis,
                 )
             }
         }
@@ -131,41 +134,44 @@ private fun ExpandedMediaIsland(
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+            verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
-                modifier = Modifier
-                    .clickable { onPrevious() }
-                    .padding(8.dp)
+                modifier =
+                    Modifier
+                        .clickable { onPrevious() }
+                        .padding(8.dp),
             ) {
                 Text(
                     text = "上一首",
                     style = MiuixTheme.textStyles.body2,
-                    color = Color(0xFFFFFFFF.toInt())
+                    color = Color(0xFFFFFFFF.toInt()),
                 )
             }
 
             Box(
-                modifier = Modifier
-                    .clickable { onPlayPause() }
-                    .padding(8.dp)
+                modifier =
+                    Modifier
+                        .clickable { onPlayPause() }
+                        .padding(8.dp),
             ) {
                 Text(
                     text = "播放/暂停",
                     style = MiuixTheme.textStyles.body2,
-                    color = Color(0xFFFFFFFF.toInt())
+                    color = Color(0xFFFFFFFF.toInt()),
                 )
             }
 
             Box(
-                modifier = Modifier
-                    .clickable { onNext() }
-                    .padding(8.dp)
+                modifier =
+                    Modifier
+                        .clickable { onNext() }
+                        .padding(8.dp),
             ) {
                 Text(
                     text = "下一首",
                     style = MiuixTheme.textStyles.body2,
-                    color = Color(0xFFFFFFFF.toInt())
+                    color = Color(0xFFFFFFFF.toInt()),
                 )
             }
         }
@@ -176,6 +182,6 @@ private fun ExpandedMediaIsland(
 @Composable
 fun MediaIslandComposePreview() {
     MediaIslandCompose(
-        mediaSession = PreviewData.sampleMediaSessionData
+        mediaSession = PreviewData.sampleMediaSessionData,
     )
 }

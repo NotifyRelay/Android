@@ -23,10 +23,16 @@ object DataUrlUtils {
     fun isDataUrl(text: String): Boolean = ImageUtils.isDataUrl(text)
 
     @Deprecated("迁移至 ImageUtils", ReplaceWith("ImageUtils.decodeDataUrlToBitmap(context, dataUrl)"))
-    suspend fun decodeDataUrlToBitmap(context: Context, dataUrl: String): Bitmap? = ImageUtils.decodeDataUrlToBitmap(context, dataUrl)
+    suspend fun decodeDataUrlToBitmap(
+        context: Context,
+        dataUrl: String,
+    ): Bitmap? = ImageUtils.decodeDataUrlToBitmap(context, dataUrl)
 
     @Deprecated("迁移至 ImageUtils", ReplaceWith("ImageUtils.loadBitmap(context, uri)"))
-    suspend fun loadBitmapWithCoil(context: Context, uri: Any): Bitmap? = ImageUtils.loadBitmap(context, uri)
+    suspend fun loadBitmapWithCoil(
+        context: Context,
+        uri: Any,
+    ): Bitmap? = ImageUtils.loadBitmap(context, uri)
 
     @Deprecated("迁移至 ImageUtils", ReplaceWith("ImageUtils.bitmapToDataUri(bitmap)"))
     fun bitmapToDataUri(bitmap: Bitmap): String = ImageUtils.bitmapToDataUri(bitmap)

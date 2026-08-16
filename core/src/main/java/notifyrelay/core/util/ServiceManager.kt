@@ -24,8 +24,8 @@ object ServiceManager {
      * @param context 应用或组件上下文，用于调用 startService。
      * @return 启动请求是否成功（不代表系统已实际在前台运行，仅表示调用未抛出异常）
      */
-    fun startNotificationListenerService(context: Context): Boolean {
-        return try {
+    fun startNotificationListenerService(context: Context): Boolean =
+        try {
             val cn = ComponentName(context, "com.xzyht.notifyrelay.common.core.notification.servers.NotifyRelayNotificationListenerService")
             val restartIntent = Intent()
             restartIntent.component = cn
@@ -36,7 +36,6 @@ object ServiceManager {
             Logger.e("ServiceManager", "启动通知监听服务失败", e)
             false
         }
-    }
 
     /**
      * 检查指定服务是否正在运行。
@@ -46,7 +45,10 @@ object ServiceManager {
      * @return 若当前系统进程列表中存在匹配的服务则返回 true，否则返回 false。
      */
     @Suppress("DEPRECATION")
-    fun isServiceRunning(context: Context, serviceClassName: String): Boolean {
+    fun isServiceRunning(
+        context: Context,
+        serviceClassName: String,
+    ): Boolean {
         return try {
             val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
             val running = am.getRunningServices(Int.MAX_VALUE)
@@ -63,9 +65,7 @@ object ServiceManager {
      * @param context 用于启动服务的上下文。
      * @return 若能成功发起服务启动请求则返回 true，否则返回 false。
      */
-    fun checkAutoStartPermission(context: Context): Boolean {
-        return startNotificationListenerService(context)
-    }
+    fun checkAutoStartPermission(context: Context): Boolean = startNotificationListenerService(context)
 
     /**
      * 启动所有必要的后台服务（当前仅包括通知监听服务；剪贴板监控服务已移除，

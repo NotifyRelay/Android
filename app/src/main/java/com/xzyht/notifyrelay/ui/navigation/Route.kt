@@ -10,7 +10,9 @@ import kotlinx.serialization.Serializable
  * 路由定义，类型安全的导航键
  * Route definitions, type-safe navigation keys
  */
-sealed interface Route : NavKey, Parcelable {
+sealed interface Route :
+    NavKey,
+    Parcelable {
     /**
      * 主页面（设备互联与增强）
      * Main page (Device connection and enhancement)
@@ -19,9 +21,15 @@ sealed interface Route : NavKey, Parcelable {
     @SuppressLint("ParcelCreator")
     data object Main : Route {
         override fun describeContents(): Int = 0
-        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+
+        override fun writeToParcel(
+            parcel: Parcel,
+            flags: Int,
+        ) {}
+
         object CREATOR : Parcelable.Creator<Main> {
             override fun createFromParcel(parcel: Parcel): Main = Main
+
             override fun newArray(size: Int): Array<Main?> = arrayOfNulls(size)
         }
     }
@@ -34,9 +42,15 @@ sealed interface Route : NavKey, Parcelable {
     @SuppressLint("ParcelCreator")
     data object History : Route {
         override fun describeContents(): Int = 0
-        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+
+        override fun writeToParcel(
+            parcel: Parcel,
+            flags: Int,
+        ) {}
+
         object CREATOR : Parcelable.Creator<History> {
             override fun createFromParcel(parcel: Parcel): History = History
+
             override fun newArray(size: Int): Array<History?> = arrayOfNulls(size)
         }
     }
@@ -49,9 +63,15 @@ sealed interface Route : NavKey, Parcelable {
     @SuppressLint("ParcelCreator")
     data object Settings : Route {
         override fun describeContents(): Int = 0
-        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+
+        override fun writeToParcel(
+            parcel: Parcel,
+            flags: Int,
+        ) {}
+
         object CREATOR : Parcelable.Creator<Settings> {
             override fun createFromParcel(parcel: Parcel): Settings = Settings
+
             override fun newArray(size: Int): Array<Settings?> = arrayOfNulls(size)
         }
     }
@@ -64,9 +84,15 @@ sealed interface Route : NavKey, Parcelable {
     @SuppressLint("ParcelCreator")
     data object ScrcpyAdvanced : Route {
         override fun describeContents(): Int = 0
-        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+
+        override fun writeToParcel(
+            parcel: Parcel,
+            flags: Int,
+        ) {}
+
         object CREATOR : Parcelable.Creator<ScrcpyAdvanced> {
             override fun createFromParcel(parcel: Parcel): ScrcpyAdvanced = ScrcpyAdvanced
+
             override fun newArray(size: Int): Array<ScrcpyAdvanced?> = arrayOfNulls(size)
         }
     }
@@ -79,9 +105,15 @@ sealed interface Route : NavKey, Parcelable {
     @SuppressLint("ParcelCreator")
     data object ScrcpyVirtualButtonOrder : Route {
         override fun describeContents(): Int = 0
-        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+
+        override fun writeToParcel(
+            parcel: Parcel,
+            flags: Int,
+        ) {}
+
         object CREATOR : Parcelable.Creator<ScrcpyVirtualButtonOrder> {
             override fun createFromParcel(parcel: Parcel): ScrcpyVirtualButtonOrder = ScrcpyVirtualButtonOrder
+
             override fun newArray(size: Int): Array<ScrcpyVirtualButtonOrder?> = arrayOfNulls(size)
         }
     }
@@ -94,9 +126,15 @@ sealed interface Route : NavKey, Parcelable {
     @SuppressLint("ParcelCreator")
     data object SettingsRemoteFilter : Route {
         override fun describeContents(): Int = 0
-        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+
+        override fun writeToParcel(
+            parcel: Parcel,
+            flags: Int,
+        ) {}
+
         object CREATOR : Parcelable.Creator<SettingsRemoteFilter> {
             override fun createFromParcel(parcel: Parcel): SettingsRemoteFilter = SettingsRemoteFilter
+
             override fun newArray(size: Int): Array<SettingsRemoteFilter?> = arrayOfNulls(size)
         }
     }
@@ -109,9 +147,15 @@ sealed interface Route : NavKey, Parcelable {
     @SuppressLint("ParcelCreator")
     data object SettingsLocalFilter : Route {
         override fun describeContents(): Int = 0
-        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+
+        override fun writeToParcel(
+            parcel: Parcel,
+            flags: Int,
+        ) {}
+
         object CREATOR : Parcelable.Creator<SettingsLocalFilter> {
             override fun createFromParcel(parcel: Parcel): SettingsLocalFilter = SettingsLocalFilter
+
             override fun newArray(size: Int): Array<SettingsLocalFilter?> = arrayOfNulls(size)
         }
     }
@@ -124,9 +168,15 @@ sealed interface Route : NavKey, Parcelable {
     @SuppressLint("ParcelCreator")
     data object SettingsSuperIsland : Route {
         override fun describeContents(): Int = 0
-        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+
+        override fun writeToParcel(
+            parcel: Parcel,
+            flags: Int,
+        ) {}
+
         object CREATOR : Parcelable.Creator<SettingsSuperIsland> {
             override fun createFromParcel(parcel: Parcel): SettingsSuperIsland = SettingsSuperIsland
+
             override fun newArray(size: Int): Array<SettingsSuperIsland?> = arrayOfNulls(size)
         }
     }
@@ -139,9 +189,15 @@ sealed interface Route : NavKey, Parcelable {
     @SuppressLint("ParcelCreator")
     data object SettingsScrcpy : Route {
         override fun describeContents(): Int = 0
-        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+
+        override fun writeToParcel(
+            parcel: Parcel,
+            flags: Int,
+        ) {}
+
         object CREATOR : Parcelable.Creator<SettingsScrcpy> {
             override fun createFromParcel(parcel: Parcel): SettingsScrcpy = SettingsScrcpy
+
             override fun newArray(size: Int): Array<SettingsScrcpy?> = arrayOfNulls(size)
         }
     }
@@ -154,9 +210,15 @@ sealed interface Route : NavKey, Parcelable {
     @SuppressLint("ParcelCreator")
     data object SettingsAbout : Route {
         override fun describeContents(): Int = 0
-        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+
+        override fun writeToParcel(
+            parcel: Parcel,
+            flags: Int,
+        ) {}
+
         object CREATOR : Parcelable.Creator<SettingsAbout> {
             override fun createFromParcel(parcel: Parcel): SettingsAbout = SettingsAbout
+
             override fun newArray(size: Int): Array<SettingsAbout?> = arrayOfNulls(size)
         }
     }
@@ -169,9 +231,15 @@ sealed interface Route : NavKey, Parcelable {
     @SuppressLint("ParcelCreator")
     data object SettingsAppearance : Route {
         override fun describeContents(): Int = 0
-        override fun writeToParcel(parcel: Parcel, flags: Int) {}
+
+        override fun writeToParcel(
+            parcel: Parcel,
+            flags: Int,
+        ) {}
+
         object CREATOR : Parcelable.Creator<SettingsAppearance> {
             override fun createFromParcel(parcel: Parcel): SettingsAppearance = SettingsAppearance
+
             override fun newArray(size: Int): Array<SettingsAppearance?> = arrayOfNulls(size)
         }
     }

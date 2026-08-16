@@ -1,12 +1,9 @@
 package com.xzyht.notifyrelay.servers
 
-import android.app.PendingIntent
-import android.content.Context
 import android.media.session.PlaybackState
 import notifyrelay.base.util.Logger
 
 object MediaControlUtil {
-
     /**
      * 使用 MediaSession API 触发播放/暂停
      */
@@ -56,7 +53,6 @@ object MediaControlUtil {
         }
     }
 
-
     /**
      * 使用 MediaSession API 触发上一首
      */
@@ -78,8 +74,6 @@ object MediaControlUtil {
         }
     }
 
-
-
     /**
      * 使用 MediaSession API 触发 seekTo
      */
@@ -100,5 +94,4 @@ object MediaControlUtil {
         }
         Logger.w("MediaControlUtil", "seekTo: 未找到媒体会话或不支持该操作")
     }
-    
 }

@@ -8,7 +8,6 @@ import android.view.View
 import android.view.WindowManager
 import androidx.core.net.toUri
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingComposeContainer
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowLifecycleOwner
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
@@ -17,42 +16,43 @@ import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.Lifecycl
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils
-import notifyrelay.base.util.IntentUtils
-import notifyrelay.base.util.Logger
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.IntentUtils
+import notifyrelay.base.util.Logger
 import java.lang.ref.WeakReference
 
 object FloatingReplicaWindowManager {
     private const val TAG = "超级岛浮窗管理"
     private const val FIXED_WIDTH_DP = 320
 
-    private val floatingWindowManager = FloatingWindowManager().apply {
-        onEntriesEmpty = {
-            removeOverlayContainer()
-            NotificationGenerator.clearAllReplicaNotifications(overlayView?.get()?.context)
-        }
-        onEntryRemoved = { key, reason ->
-            if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
-                val context = overlayView?.get()?.context
-                if (context != null) {
-                    NotificationGenerator.cancelReplicaNotification(context, key)
+    private val floatingWindowManager =
+        FloatingWindowManager().apply {
+            onEntriesEmpty = {
+                removeOverlayContainer()
+                NotificationGenerator.clearAllReplicaNotifications(overlayView?.get()?.context)
+            }
+            onEntryRemoved = { key, reason ->
+                if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
+                    val context = overlayView?.get()?.context
+                    if (context != null) {
+                        NotificationGenerator.cancelReplicaNotification(context, key)
+                    } else {
+                        FloatingReplicaMappingManager.removeNotificationId(key)
+                    }
+                    hiddenEntries.remove(key)
                 } else {
-                    FloatingReplicaMappingManager.removeNotificationId(key)
+                    Logger.i(TAG, "超级岛: 条目被隐藏 (HIDDEN)，保留系统通知以便恢复, key=$key")
                 }
-                hiddenEntries.remove(key)
-            } else {
-                Logger.i(TAG, "超级岛: 条目被隐藏 (HIDDEN)，保留系统通知以便恢复, key=$key")
-            }
 
-            val sourceIdsToBlock = FloatingReplicaMappingManager.removeSourceIdMapping(key)
-            sourceIdsToBlock?.forEach { sourceId ->
-                FloatingReplicaMappingManager.handleRemovalReason(sourceId, reason)
+                val sourceIdsToBlock = FloatingReplicaMappingManager.removeSourceIdMapping(key)
+                sourceIdsToBlock?.forEach { sourceId ->
+                    FloatingReplicaMappingManager.handleRemovalReason(sourceId, reason)
+                }
             }
         }
-    }
 
     private val lifecycleManager = LifecycleManager()
     private var overlayLifecycleOwner: FloatingWindowLifecycleOwner? = null
@@ -69,13 +69,9 @@ object FloatingReplicaWindowManager {
 
     fun getFloatingWindowManager(): FloatingWindowManager = floatingWindowManager
 
-    fun isFloatingWindowEnabled(context: Context): Boolean {
-        return SuperIslandConfigUtils.isFloatingWindowEnabled(context)
-    }
+    fun isFloatingWindowEnabled(context: Context): Boolean = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
 
-    fun canShowOverlay(context: Context): Boolean {
-        return Settings.canDrawOverlays(context)
-    }
+    fun canShowOverlay(context: Context): Boolean = Settings.canDrawOverlays(context)
 
     fun requestOverlayPermission(context: Context) {
         runWithErrorHandling("请求悬浮窗权限") {
@@ -94,7 +90,7 @@ object FloatingReplicaWindowManager {
         picMap: Map<String, String>? = null,
         appName: String? = null,
         isLocked: Boolean = false,
-        isRestoring: Boolean = false
+        isRestoring: Boolean = false,
     ) {
         runWithErrorHandling("显示浮窗") {
             if (!isFloatingWindowEnabled(context)) {
@@ -122,9 +118,10 @@ object FloatingReplicaWindowManager {
                     }
                     lifecycleManager.onShow()
 
-                    val internedPicMap = withContext(Dispatchers.IO) {
-                        SuperIslandImageStore.internAll(context, sourceId, picMap)
-                    }
+                    val internedPicMap =
+                        withContext(Dispatchers.IO) {
+                            SuperIslandImageStore.internAll(context, sourceId, picMap)
+                        }
 
                     if (!FloatingReplicaMappingManager.isLatestVersion(sourceId, taskVersion)) {
                         return@runWithErrorHandlingSuspend
@@ -133,21 +130,24 @@ object FloatingReplicaWindowManager {
                     val formattedData = SuperIslandDataFormatter.formatForDisplay(context, paramV2Raw, internedPicMap)
                     val paramV2 = formattedData.paramV2
 
-                    val summaryOnly = when {
-                        paramV2?.business == "miui_flashlight" -> true
-                        paramV2Raw?.contains("miui_flashlight") == true -> true
-                        else -> false
-                    }
+                    val summaryOnly =
+                        when {
+                            paramV2?.business == "miui_flashlight" -> true
+                            paramV2Raw?.contains("miui_flashlight") == true -> true
+                            else -> false
+                        }
 
                     val entryKey = sourceId
 
-                    val displayTitle = title?.takeIf { it.isNotBlank() }
-                        ?: paramV2?.highlightInfo?.title?.takeIf { it.isNotBlank() }
-                        ?: paramV2?.baseInfo?.title?.takeIf { it.isNotBlank() }
+                    val displayTitle =
+                        title?.takeIf { it.isNotBlank() }
+                            ?: paramV2?.highlightInfo?.title?.takeIf { it.isNotBlank() }
+                            ?: paramV2?.baseInfo?.title?.takeIf { it.isNotBlank() }
 
-                    val displayText = text?.takeIf { it.isNotBlank() }
-                        ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
-                        ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
+                    val displayText =
+                        text?.takeIf { it.isNotBlank() }
+                            ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
+                            ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
 
                     floatingWindowManager.addOrUpdateEntry(
                         key = entryKey,
@@ -159,7 +159,7 @@ object FloatingReplicaWindowManager {
                         business = paramV2?.business,
                         title = displayTitle,
                         text = displayText,
-                        appName = appName
+                        appName = appName,
                     )
 
                     FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey)
@@ -173,7 +173,11 @@ object FloatingReplicaWindowManager {
                             runWithErrorHandlingSuspend("发送Live Updates复合通知") {
                                 LiveUpdatesNotificationManager.initialize(context)
                                 LiveUpdatesNotificationManager.showLiveUpdate(
-                                    sourceId, title, text, appName, formattedData
+                                    sourceId,
+                                    title,
+                                    text,
+                                    appName,
+                                    formattedData,
                                 )
                                 val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
                                 FloatingReplicaMappingManager.putNotificationId(entryKey, liveUpdateNotificationId)
@@ -200,7 +204,7 @@ object FloatingReplicaWindowManager {
         text: String?,
         paramV2Raw: String? = null,
         picMap: Map<String, String>? = null,
-        appName: String? = null
+        appName: String? = null,
     ) {
         if (!isFloatingWindowEnabled(context)) {
             if (SuperIslandConfigUtils.isNotificationListMode(context)) {
@@ -234,21 +238,30 @@ object FloatingReplicaWindowManager {
                 val existingEntry = FloatingReplicaMappingManager.getHiddenEntry(sourceId)
                 if (existingEntry != null) {
                     showFloatingInternal(
-                        context, sourceId,
+                        context,
+                        sourceId,
                         existingEntry.title,
                         existingEntry.text,
                         existingEntry.paramV2Raw,
                         existingEntry.picMap,
                         existingEntry.appName,
-                        isLocked = false, isRestoring = true
+                        isLocked = false,
+                        isRestoring = true,
                     )
                     FloatingReplicaMappingManager.removeHiddenEntry(sourceId)
                     hiddenEntries.remove(sourceId)
                     Logger.i(TAG, "超级岛: 从 hiddenEntries 中移除已恢复的条目, key=$sourceId")
                 } else {
                     showFloatingInternal(
-                        context, sourceId, title, text, paramV2Raw, picMap, appName,
-                        isLocked = false, isRestoring = true
+                        context,
+                        sourceId,
+                        title,
+                        text,
+                        paramV2Raw,
+                        picMap,
+                        appName,
+                        isLocked = false,
+                        isRestoring = true,
                     )
                 }
             }
@@ -257,7 +270,7 @@ object FloatingReplicaWindowManager {
 
     fun dismissBySourceInternal(
         sourceId: String,
-        reason: FloatingWindowManager.RemovalReason = FloatingWindowManager.RemovalReason.REMOTE
+        reason: FloatingWindowManager.RemovalReason = FloatingWindowManager.RemovalReason.REMOTE,
     ) {
         runWithErrorHandling("按来源关闭浮窗") {
             if (FloatingReplicaMappingManager.isSourceRecentlyClosedWithinMinute(sourceId)) {
@@ -323,7 +336,10 @@ object FloatingReplicaWindowManager {
                 lifecycleManager.onHide()
 
                 overlayLifecycleOwner?.let {
-                    try { it.onHide() } catch (_: Exception) {}
+                    try {
+                        it.onHide()
+                    } catch (_: Exception) {
+                    }
                 }
             }
         }
@@ -336,46 +352,54 @@ object FloatingReplicaWindowManager {
     private fun addOrUpdateEntry(
         context: Context,
         key: String,
-        summaryOnly: Boolean
+        summaryOnly: Boolean,
     ) {
         runWithErrorHandling("addOrUpdateEntry") {
             if (overlayView?.get() == null || windowManager?.get() == null || overlayLayoutParams == null) {
                 runWithErrorHandling("创建浮窗容器") {
                     val appCtx = context.applicationContext
-                    val wm = appCtx.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
-                        ?: return@runWithErrorHandling
+                    val wm =
+                        appCtx.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
+                            ?: return@runWithErrorHandling
 
-                    val lifecycleOwner = overlayLifecycleOwner ?: FloatingWindowLifecycleOwner().also {
-                        overlayLifecycleOwner = it
+                    val lifecycleOwner =
+                        overlayLifecycleOwner ?: FloatingWindowLifecycleOwner().also {
+                            overlayLifecycleOwner = it
+                        }
+                    try {
+                        lifecycleOwner.onShow()
+                    } catch (_: Exception) {
                     }
-                    try { lifecycleOwner.onShow() } catch (_: Exception) {}
                     lifecycleManager.onShow()
 
                     val density = context.resources.displayMetrics.density
-                    val layoutParams = WindowManager.LayoutParams(
-                        (FIXED_WIDTH_DP * density).toInt(),
-                        WindowManager.LayoutParams.WRAP_CONTENT,
-                        WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-                        WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                        PixelFormat.TRANSLUCENT
-                    ).apply {
-                        gravity = Gravity.START or Gravity.TOP
-                        x = ((context.resources.displayMetrics.widthPixels - (FIXED_WIDTH_DP * density).toInt()) / 2).coerceAtLeast(0)
-                        y = 100
-                    }
+                    val layoutParams =
+                        WindowManager
+                            .LayoutParams(
+                                (FIXED_WIDTH_DP * density).toInt(),
+                                WindowManager.LayoutParams.WRAP_CONTENT,
+                                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+                                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                                PixelFormat.TRANSLUCENT,
+                            ).apply {
+                                gravity = Gravity.START or Gravity.TOP
+                                x = ((context.resources.displayMetrics.widthPixels - (FIXED_WIDTH_DP * density).toInt()) / 2).coerceAtLeast(0)
+                                y = 100
+                            }
 
-                    val composeContainer = FloatingComposeContainer(context).apply {
-                        val padding = (12 * density).toInt()
-                        setPadding(padding, padding, padding, padding)
-                        this.floatingWindowManager = this@FloatingReplicaWindowManager.floatingWindowManager
-                        this.lifecycleOwner = lifecycleOwner
-                        this.windowManager = wm
-                        this.windowLayoutParams = layoutParams
-                        this.onEntryClick = { entryKey -> onEntryClicked(entryKey) }
-                        this.onContainerDragStart = { onContainerDragStarted() }
-                        this.onContainerDragging = { }
-                        this.onContainerDragEnd = { onContainerDragEnded() }
-                    }
+                    val composeContainer =
+                        FloatingComposeContainer(context).apply {
+                            val padding = (12 * density).toInt()
+                            setPadding(padding, padding, padding, padding)
+                            this.floatingWindowManager = this@FloatingReplicaWindowManager.floatingWindowManager
+                            this.lifecycleOwner = lifecycleOwner
+                            this.windowManager = wm
+                            this.windowLayoutParams = layoutParams
+                            this.onEntryClick = { entryKey -> onEntryClicked(entryKey) }
+                            this.onContainerDragStart = { onContainerDragStarted() }
+                            this.onContainerDragging = { }
+                            this.onContainerDragEnd = { onContainerDragEnded() }
+                        }
 
                     var added = false
                     runWithErrorHandling("addView") {
@@ -408,7 +432,10 @@ object FloatingReplicaWindowManager {
     private fun onContainerDragEnded() {
     }
 
-    private inline fun runWithErrorHandling(actionName: String, crossinline block: () -> Unit) {
+    private inline fun runWithErrorHandling(
+        actionName: String,
+        crossinline block: () -> Unit,
+    ) {
         try {
             block()
         } catch (e: Exception) {
@@ -416,7 +443,10 @@ object FloatingReplicaWindowManager {
         }
     }
 
-    private suspend inline fun runWithErrorHandlingSuspend(actionName: String, crossinline block: suspend () -> Unit) {
+    private suspend inline fun runWithErrorHandlingSuspend(
+        actionName: String,
+        crossinline block: suspend () -> Unit,
+    ) {
         try {
             block()
         } catch (e: Exception) {

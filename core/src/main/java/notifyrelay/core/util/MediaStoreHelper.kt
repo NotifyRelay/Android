@@ -7,7 +7,6 @@ import notifyrelay.base.util.Logger
 import java.io.File
 
 object MediaStoreHelper {
-
     private val IMAGE_EXTENSIONS = setOf("jpg", "jpeg", "png", "gif", "bmp", "webp")
     private val VIDEO_EXTENSIONS = setOf("mp4", "avi", "mov", "wmv", "flv", "mkv")
     private val AUDIO_EXTENSIONS = setOf("mp3", "wav", "ogg", "flac", "aac", "m4a")
@@ -16,7 +15,10 @@ object MediaStoreHelper {
      * 在现代 Android 上推荐使用 MediaScannerConnection.scanFile() 来让新文件可见。
      * 该方法会通知媒体扫描器扫描指定路径，避免直接写入已废弃的 DATA 列或发送受保护广播。
      */
-    fun indexFile(context: Context, file: File) {
+    fun indexFile(
+        context: Context,
+        file: File,
+    ) {
         try {
             val mime = getMimeType(file)
             MediaScannerConnection.scanFile(context, arrayOf(file.absolutePath), arrayOf(mime)) { _, _ ->
@@ -33,6 +35,8 @@ object MediaStoreHelper {
     }
 
     private fun File.isImage(): Boolean = extension.lowercase() in IMAGE_EXTENSIONS
+
     private fun File.isVideo(): Boolean = extension.lowercase() in VIDEO_EXTENSIONS
+
     private fun File.isAudio(): Boolean = extension.lowercase() in AUDIO_EXTENSIONS
 }

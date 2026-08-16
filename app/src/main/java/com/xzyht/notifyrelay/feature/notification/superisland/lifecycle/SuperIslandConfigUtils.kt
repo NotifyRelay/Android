@@ -20,24 +20,25 @@ object SuperIslandConfigUtils {
 
     // 注入方式枚举
     enum class SpecInjectionMode {
-        SUPER_ISLAND,      // 仅超级岛规范信息注入
-        LIVE_UPDATES,      // 仅Live Updates规范信息注入
-        BOTH,              // 两者都注入
-        NONE               // 都不注入（不应该使用，但为了完整性保留）
+        SUPER_ISLAND, // 仅超级岛规范信息注入
+        LIVE_UPDATES, // 仅Live Updates规范信息注入
+        BOTH, // 两者都注入
+        NONE, // 都不注入（不应该使用，但为了完整性保留）
     }
 
     /**
      * 检查浮窗功能是否开启
      */
-    fun isFloatingWindowEnabled(context: Context): Boolean {
-        return StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, FloatingReplicaManager.getDefaultFloatingWindowEnabled())
-    }
+    fun isFloatingWindowEnabled(context: Context): Boolean = StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, FloatingReplicaManager.getDefaultFloatingWindowEnabled())
 
     /**
      * 设置浮窗开关（与通知列表模式互斥）。
      * 开启浮窗时自动关闭通知列表模式。
      */
-    fun setFloatingWindowEnabled(context: Context, enabled: Boolean) {
+    fun setFloatingWindowEnabled(
+        context: Context,
+        enabled: Boolean,
+    ) {
         if (enabled && isNotificationListMode(context)) {
             setNotificationListMode(context, false)
             Logger.i(TAG, "浮窗开启，自动关闭通知列表模式（互斥）")
@@ -55,7 +56,7 @@ object SuperIslandConfigUtils {
         return StorageManager.getBoolean(
             context,
             SUPER_ISLAND_NOTIFICATION_LIST_KEY,
-            defaultListMode
+            defaultListMode,
         )
     }
 
@@ -63,7 +64,10 @@ object SuperIslandConfigUtils {
      * 设置通知列表模式（与浮窗互斥）。
      * 开启通知列表模式时自动关闭浮窗。
      */
-    fun setNotificationListMode(context: Context, enabled: Boolean) {
+    fun setNotificationListMode(
+        context: Context,
+        enabled: Boolean,
+    ) {
         if (enabled && isFloatingWindowEnabled(context)) {
             setFloatingWindowEnabled(context, false)
             Logger.i(TAG, "通知列表模式开启，自动关闭浮窗（互斥）")
@@ -99,23 +103,23 @@ object SuperIslandConfigUtils {
      * 检查是否至少有一种规范信息注入开启
      * @return true 如果至少有一种注入开启，false 如果都关闭
      */
-    fun isAnySpecInjectionEnabled(context: Context): Boolean {
-        return isSuperIslandSpecInjectionEnabled(context) || isLiveUpdatesSpecInjectionEnabled(context)
-    }
+    fun isAnySpecInjectionEnabled(context: Context): Boolean = isSuperIslandSpecInjectionEnabled(context) || isLiveUpdatesSpecInjectionEnabled(context)
 
     /**
      * 创建通知移除时的删除 PendingIntent
      */
-    fun createDeletePendingIntent(context: Context, notificationId: Int): PendingIntent? {
-        return PendingIntent.getBroadcast(
+    fun createDeletePendingIntent(
+        context: Context,
+        notificationId: Int,
+    ): PendingIntent? =
+        PendingIntent.getBroadcast(
             context,
             notificationId,
             Intent(context, NotificationBroadcastReceiver::class.java)
                 .putExtra("notificationId", notificationId)
                 .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
-    }
 
     /**
      * 验证规范信息注入开关状态，确保至少有一种开启

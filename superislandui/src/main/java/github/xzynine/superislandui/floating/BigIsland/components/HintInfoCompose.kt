@@ -9,16 +9,18 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.model.templates.HintInfo
-import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.common.PreviewData
-
+import github.xzynine.superislandui.floating.common.CommonImageCompose
+import github.xzynine.superislandui.model.templates.HintInfo
 
 /**
  * 提示信息Compose组件
  */
 @Composable
-fun HintInfoCompose(hintInfo: HintInfo, picMap: Map<String, String>? = null) {
+fun HintInfoCompose(
+    hintInfo: HintInfo,
+    picMap: Map<String, String>? = null,
+) {
     Column(modifier = Modifier.padding(16.dp)) {
         // 图标：使用统一的图片加载工具
         CommonImageCompose(
@@ -26,26 +28,26 @@ fun HintInfoCompose(hintInfo: HintInfo, picMap: Map<String, String>? = null) {
             picMap = picMap,
             size = 40.dp,
             isFocusIcon = false,
-            contentDescription = null
+            contentDescription = null,
         )
-        
+
         // 标题
         hintInfo.title?.let {
             Text(
                 text = it,
                 fontSize = 16.sp,
                 color = Color.White,
-                modifier = Modifier.padding(top = 8.dp)
+                modifier = Modifier.padding(top = 8.dp),
             )
         }
-        
+
         // 内容
         hintInfo.content?.let {
             Text(
                 text = it,
                 fontSize = 14.sp,
                 color = Color.Gray,
-                modifier = Modifier.padding(top = 4.dp)
+                modifier = Modifier.padding(top = 4.dp),
             )
         }
     }
@@ -56,7 +58,7 @@ fun HintInfoCompose(hintInfo: HintInfo, picMap: Map<String, String>? = null) {
 fun HintInfoComposeType1Preview() {
     HintInfoCompose(
         hintInfo = PreviewData.sampleHintInfo,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }
 
@@ -65,6 +67,6 @@ fun HintInfoComposeType1Preview() {
 fun HintInfoComposeType2Preview() {
     HintInfoCompose(
         hintInfo = PreviewData.sampleHintInfoType2,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }

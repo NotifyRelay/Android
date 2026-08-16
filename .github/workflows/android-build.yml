@@ -137,14 +137,17 @@ jobs:
           name: release-signed-apks
           path: app/build/outputs/apk/release/*-release.apk
 
-      - name: Create GitHub Pre-release
-        uses: softprops/action-gh-release@v3
-        with:
-          tag_name: v${{ steps.version.outputs.version }}
-          name: ${{ steps.version.outputs.version }}
-          prerelease: true
-          files: |
-            app/build/outputs/apk/release/*-release.apk
-            app/build/outputs/apk/debug/app-debug.apk
+      - name: Create GitHub Pre-release（挂 update.yml 已创建的 tag）
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="v${{ steps.version.outputs.version }}"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::error::tag $TAG 不存在。版本由 update.yml 在 push 到 main 时按 commit 语义创建，请先推送含 feat/fix 提交的更新"
+            exit 1
+          fi
+          gh release create "$TAG" \
+            --title "${{ steps.version.outputs.version }}" \
+            --prerelease \
+            app/build/outputs/apk/release/*-release.apk \
+            app/build/outputs/apk/debug/app-debug.apk

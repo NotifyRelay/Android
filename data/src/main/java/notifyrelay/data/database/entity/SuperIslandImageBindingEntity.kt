@@ -12,18 +12,18 @@ import androidx.room.Index
             entity = SuperIslandImageEntity::class,
             parentColumns = ["id"],
             childColumns = ["imageId"],
-            onDelete = ForeignKey.CASCADE
-        )
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
     indices = [
         Index(name = "index_super_island_image_bindings_imageId", value = ["imageId"]),
         Index(name = "index_super_island_image_bindings_packageName", value = ["packageName"]),
-        Index(name = "index_super_island_image_bindings_imageKey", value = ["imageKey"])
-    ]
+        Index(name = "index_super_island_image_bindings_imageKey", value = ["imageKey"]),
+    ],
 )
 data class SuperIslandImageBindingEntity(
     val packageName: String,
     val imageKey: String,
     val imageId: Long,
-    val lastUpdated: Long
+    val lastUpdated: Long,
 )

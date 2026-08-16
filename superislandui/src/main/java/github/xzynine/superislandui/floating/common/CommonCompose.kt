@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoScrollText
 import github.xzynine.superislandui.model.components.TimerInfo
-import github.xzynine.superislandui.common.PreviewData
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import java.util.Locale
@@ -44,39 +43,41 @@ fun CommonImageCompose(
     picMap: Map<String, String>?,
     size: Dp = 18.dp,
     isFocusIcon: Boolean = false,
-    contentDescription: String? = null
+    contentDescription: String? = null,
 ) {
     // 对于焦点图标，即使picKey为空，也尝试从picMap中获取
     if (!isFocusIcon && picKey.isNullOrBlank()) return
-    
+
     // 获取当前主题
     val isDarkTheme = isSystemInDarkTheme()
-    
+
     val context = LocalContext.current
-    val iconUrl = if (isFocusIcon) {
-        resolveFocusIconUrl(picMap, picKey, isDarkTheme, context)
-    } else {
-        resolveIconUrl(picMap, picKey, context)
-    }
-    
+    val iconUrl =
+        if (isFocusIcon) {
+            resolveFocusIconUrl(picMap, picKey, isDarkTheme, context)
+        } else {
+            resolveIconUrl(picMap, picKey, context)
+        }
+
     // 预览模式下：只有在有有效URL时才显示占位符
     if (LocalInspectionMode.current) {
         if (iconUrl.isNullOrBlank()) return
         Box(
-            modifier = Modifier
-                .size(size)
-                .background(Color.Gray.copy(alpha = 0.3f), CircleShape)
+            modifier =
+                Modifier
+                    .size(size)
+                    .background(Color.Gray.copy(alpha = 0.3f), CircleShape),
         )
         return
     }
-    
+
     val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(iconUrl, picMap)
-    
+
     if (painter != null) {
         Image(
             painter = painter,
             contentDescription = contentDescription,
-            modifier = Modifier.size(size)
+            modifier = Modifier.size(size),
         )
     }
 }
@@ -88,7 +89,7 @@ fun CommonImageCompose(
 @Composable
 fun CommonImagePlaceholder(
     show: Boolean,
-    size: Dp = 18.dp
+    size: Dp = 18.dp,
 ) {
     if (show) {
         Spacer(modifier = Modifier.size(size))
@@ -114,60 +115,65 @@ fun CommonTextBlockCompose(
     titleFontSize: TextUnit = 14.sp,
     contentColor: Color = Color(0xCCFFFFFF),
     contentFontSize: TextUnit = 12.sp,
-    maxWidth: Dp = 160.dp // 适当增加最大宽度，确保内容完整显示
+    maxWidth: Dp = 160.dp, // 适当增加最大宽度，确保内容完整显示
 ) {
     // 确定字体家族
-    val fontFamily = when {
-        monospace -> FontFamily.Monospace
-        narrow -> FontFamily.SansSerif
-        else -> FontFamily.Default
-    }
-    
+    val fontFamily =
+        when {
+            monospace -> FontFamily.Monospace
+            narrow -> FontFamily.SansSerif
+            else -> FontFamily.Default
+        }
+
     Column(
-        modifier = Modifier
-            .wrapContentWidth()
-            .padding(start = horizontalPadding)
+        modifier =
+            Modifier
+                .wrapContentWidth()
+                .padding(start = horizontalPadding),
     ) {
         // 前置标题
         frontTitle?.let {
             AutoScrollText(
                 text = it,
-                style = TextStyle(
-                    fontFamily = fontFamily,
-                    fontSize = frontTitleFontSize
-                ),
+                style =
+                    TextStyle(
+                        fontFamily = fontFamily,
+                        fontSize = frontTitleFontSize,
+                    ),
                 color = frontTitleColor,
                 baseSpeedPxPerSec = 80f,
-                pauseMillis = 800
+                pauseMillis = 800,
             )
         }
-        
+
         // 主标题
         title?.let {
             AutoScrollText(
                 text = it,
-                style = TextStyle(
-                    fontWeight = FontWeight.Bold,
-                    fontFamily = fontFamily,
-                    fontSize = titleFontSize
-                ),
+                style =
+                    TextStyle(
+                        fontWeight = FontWeight.Bold,
+                        fontFamily = fontFamily,
+                        fontSize = titleFontSize,
+                    ),
                 color = titleColor,
                 baseSpeedPxPerSec = 100f,
-                pauseMillis = 1000
+                pauseMillis = 1000,
             )
         }
-        
+
         // 内容
         content?.let {
             AutoScrollText(
                 text = it,
-                style = TextStyle(
-                    fontFamily = fontFamily,
-                    fontSize = contentFontSize
-                ),
+                style =
+                    TextStyle(
+                        fontFamily = fontFamily,
+                        fontSize = contentFontSize,
+                    ),
                 color = contentColor,
-                baseSpeedPxPerSec = 130f,// 基础滚动速度，单位：px/秒
-                pauseMillis = 200
+                baseSpeedPxPerSec = 130f, // 基础滚动速度，单位：px/秒
+                pauseMillis = 200,
             )
         }
     }
@@ -184,27 +190,32 @@ fun CircularProgressCompose(
     colorUnReach: Color,
     strokeWidth: Dp,
     isClockwise: Boolean,
-    size: Dp = 20.dp
+    size: Dp = 20.dp,
 ) {
     CircularProgressIndicator(
         progress = progress.coerceIn(0, 100).toFloat() / 100f,
         size = size,
         strokeWidth = strokeWidth,
-        colors = ProgressIndicatorDefaults.progressIndicatorColors(
-            foregroundColor = colorReach,
-            backgroundColor = colorUnReach
-        )
+        colors =
+            ProgressIndicatorDefaults.progressIndicatorColors(
+                foregroundColor = colorReach,
+                backgroundColor = colorUnReach,
+            ),
     )
 }
 
 /**
  * 安全解析颜色
  */
-fun parseColorSafe(s: String?, default: Int): Int = try {
-    if (s.isNullOrBlank()) default else s.toIntOrNull(16)?.let { 0xFF000000.toInt() or it } ?: default
-} catch (_: IllegalArgumentException) {
-    default
-}
+fun parseColorSafe(
+    s: String?,
+    default: Int,
+): Int =
+    try {
+        if (s.isNullOrBlank()) default else s.toIntOrNull(16)?.let { 0xFF000000.toInt() or it } ?: default
+    } catch (_: IllegalArgumentException) {
+        default
+    }
 
 /**
  * 格式化计时器信息
@@ -215,31 +226,32 @@ fun formatTimerInfo(timer: TimerInfo): String {
     val timerType = timer.timerType
     val timerWhen = timer.timerWhen // 正计时：开始时间；倒计时：结束时间
     val timerSystemCurrent = timer.timerSystemCurrent // 计时状态变更时的系统时间
-    
-    val displayValue: Long = when (timerType) {
-        -2 -> { // 倒计时暂停
-            // 暂停状态：剩余时间 = 结束时间 - 状态变更时间
-            val remaining = timerWhen - timerSystemCurrent
-            remaining.coerceAtLeast(0)
+
+    val displayValue: Long =
+        when (timerType) {
+            -2 -> { // 倒计时暂停
+                // 暂停状态：剩余时间 = 结束时间 - 状态变更时间
+                val remaining = timerWhen - timerSystemCurrent
+                remaining.coerceAtLeast(0)
+            }
+            -1 -> { // 倒计时进行中
+                // 进行中状态：剩余时间 = 结束时间 - 当前时间
+                val remaining = timerWhen - now
+                remaining.coerceAtLeast(0)
+            }
+            2 -> { // 正计时暂停
+                // 暂停状态：已过时间 = 状态变更时间 - 开始时间
+                val elapsed = timerSystemCurrent - timerWhen
+                elapsed.coerceAtLeast(0)
+            }
+            1 -> { // 正计时进行中
+                // 进行中状态：已过时间 = 当前时间 - 开始时间
+                val elapsed = now - timerWhen
+                elapsed.coerceAtLeast(0)
+            }
+            else -> 0
         }
-        -1 -> { // 倒计时进行中
-            // 进行中状态：剩余时间 = 结束时间 - 当前时间
-            val remaining = timerWhen - now
-            remaining.coerceAtLeast(0)
-        }
-        2 -> { // 正计时暂停
-            // 暂停状态：已过时间 = 状态变更时间 - 开始时间
-            val elapsed = timerSystemCurrent - timerWhen
-            elapsed.coerceAtLeast(0)
-        }
-        1 -> { // 正计时进行中
-            // 进行中状态：已过时间 = 当前时间 - 开始时间
-            val elapsed = now - timerWhen
-            elapsed.coerceAtLeast(0)
-        }
-        else -> 0
-    }
-    
+
     val seconds = (displayValue / 1000).toInt()
     return formatTimeFromSeconds(seconds)
 }
@@ -269,29 +281,32 @@ fun formatDuration(ms: Long): String {
 @Composable
 fun SuperIslandComposeRoot(
     content: @Composable () -> Unit,
-    isOverlapping: Boolean = false
+    isOverlapping: Boolean = false,
 ) {
     Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(8.dp)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(8.dp),
     ) {
         Card(
             shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = if (isOverlapping) {
-                    // 重叠时显示红色背景
-                    Color.Red.copy(alpha = 0.92f)
-                } else {
-                    // 正常时显示黑色背景
-                    Color.Black.copy(alpha = 0.92f)
-                }
-            ),
+            colors =
+                CardDefaults.cardColors(
+                    containerColor =
+                        if (isOverlapping) {
+                            // 重叠时显示红色背景
+                            Color.Red.copy(alpha = 0.92f)
+                        } else {
+                            // 正常时显示黑色背景
+                            Color.Black.copy(alpha = 0.92f)
+                        },
+                ),
             elevation = CardDefaults.cardElevation(6.dp),
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         ) {
             Column(
-                modifier = Modifier.padding(8.dp)
+                modifier = Modifier.padding(8.dp),
             ) {
                 content()
             }
@@ -308,7 +323,7 @@ fun CommonTextBlockComposePreview() {
         content = "内容描述",
         narrow = false,
         highlight = true,
-        monospace = false
+        monospace = false,
     )
 }
 
@@ -321,7 +336,7 @@ fun CircularProgressComposePreview() {
         colorUnReach = Color(0x33333333),
         strokeWidth = 3.dp,
         isClockwise = true,
-        size = 48.dp
+        size = 48.dp,
     )
 }
 
@@ -336,8 +351,8 @@ fun SuperIslandComposeRootPreview() {
                 content = "超级岛内容",
                 narrow = false,
                 highlight = false,
-                monospace = false
+                monospace = false,
             )
-        }
+        },
     )
 }

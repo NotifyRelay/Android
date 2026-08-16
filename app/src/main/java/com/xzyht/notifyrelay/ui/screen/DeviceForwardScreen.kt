@@ -41,37 +41,39 @@ fun DeviceForwardScreen() {
     val context = LocalContext.current
     val navigator = LocalNavigator.current
     val coroutineScope = rememberCoroutineScope()
-    
+
     LaunchedEffect(Unit) {
         if (!RemoteFilterConfig.isLoaded) {
             RemoteFilterConfig.load(context)
             RemoteFilterConfig.isLoaded = true
         }
     }
-    
+
     val tabTitles = listOf("剪贴板同步", "音乐控制", "屏幕镜像", "应用列表")
     val pagerState = rememberPagerState(initialPage = 0) { tabTitles.size }
     val selectedTabIndex = pagerState.currentPage
     val colorScheme = MiuixTheme.colorScheme
-    
+
     val deviceManager = remember { DeviceConnectionManagerSingleton.getDeviceManager(context) }
     val selectedDeviceState = GlobalSelectedDeviceHolder.current()
     val selectedDevice = selectedDeviceState.value
-    
-    val selectedDeviceInfo = selectedDevice?.let {
-        val authInfo = deviceManager.getAuthenticatedDevices()[it.uuid]
-        notifyrelay.data.model.SelectedDeviceInfo(
-            displayName = it.displayName,
-            ip = it.ip,
-            deviceType = authInfo?.deviceType
-        )
-    }
+
+    val selectedDeviceInfo =
+        selectedDevice?.let {
+            val authInfo = deviceManager.getAuthenticatedDevices()[it.uuid]
+            notifyrelay.data.model.SelectedDeviceInfo(
+                displayName = it.displayName,
+                ip = it.ip,
+                deviceType = authInfo?.deviceType,
+            )
+        }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colorScheme.background)
-            .padding(12.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(colorScheme.background)
+                .padding(12.dp),
     ) {
         TabRowWithContour(
             tabs = tabTitles,
@@ -82,39 +84,42 @@ fun DeviceForwardScreen() {
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            colors = TabRowDefaults.tabRowColors(
-                backgroundColor = colorScheme.surface,
-                contentColor = colorScheme.onSurface,
-                selectedBackgroundColor = colorScheme.primary,
-                selectedContentColor = colorScheme.onPrimary
-            ),
+            colors =
+                TabRowDefaults.tabRowColors(
+                    backgroundColor = colorScheme.surface,
+                    contentColor = colorScheme.onSurface,
+                    selectedBackgroundColor = colorScheme.primary,
+                    selectedContentColor = colorScheme.onPrimary,
+                ),
             minWidth = 100.dp,
             height = 48.dp,
-            cornerRadius = 16.dp
+            cornerRadius = 16.dp,
         )
-        
+
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) { page ->
             Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(10.dp),
-                contentAlignment = Alignment.TopStart
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(10.dp),
+                contentAlignment = Alignment.TopStart,
             ) {
                 when (page) {
                     0 -> ClipboardSyncPage()
                     1 -> MusicControlPage()
-                    2 -> ScrcpyScreenHost(
-                        startScreen = ScrcpyRootScreen.Device,
-                        selectedDevice = selectedDeviceInfo,
-                        onOpenAdvanced = { navigator.push(Route.ScrcpyAdvanced) },
-                    )
+                    2 ->
+                        ScrcpyScreenHost(
+                            startScreen = ScrcpyRootScreen.Device,
+                            selectedDevice = selectedDeviceInfo,
+                            onOpenAdvanced = { navigator.push(Route.ScrcpyAdvanced) },
+                        )
                     3 -> {
                         RemoteAppsPage(
                             deviceUuid = selectedDevice?.uuid,
-                            deviceIp = selectedDeviceInfo?.ip
+                            deviceIp = selectedDeviceInfo?.ip,
                         )
                     }
                 }
@@ -125,22 +130,22 @@ fun DeviceForwardScreen() {
 
 @Composable
 fun ScrcpyAdvancedScreen(
-    navigator: Navigator
+    navigator: Navigator,
 ) {
     val context = LocalContext.current
     val app = context.applicationContext as Application
     val scrcpyViewModel = remember { ScrcpyUiViewModel.getInstance(app) }
     ScrcpyAdvancedPage(
         onBack = { navigator.pop() },
-        viewModel = scrcpyViewModel
+        viewModel = scrcpyViewModel,
     )
 }
 
 @Composable
 fun ScrcpyVirtualButtonOrderScreen(
-    navigator: Navigator
+    navigator: Navigator,
 ) {
     ScrcpyVirtualButtonOrderPage(
-        onBack = { navigator.pop() }
+        onBack = { navigator.pop() },
     )
 }

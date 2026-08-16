@@ -12,40 +12,44 @@ import kotlin.math.max
 class NotificationPagingSource(
     private val repository: DatabaseRepository,
     private val deviceUuid: String,
-    private val installedPackages: Set<String>
+    private val installedPackages: Set<String>,
 ) : PagingSource<Int, GroupedNotifications>() {
     private var cachedGroups: List<GroupedPackage>? = null
 
     override suspend fun load(params: LoadParams<Int>): LoadResult<Int, GroupedNotifications> {
         return try {
             val offset = params.key ?: 0
-            val groups = cachedGroups ?: run {
-                val packageCounts = repository.getPackageCountByDevice(deviceUuid)
-                val groupedPackages = buildGroupedPackages(packageCounts)
-                cachedGroups = groupedPackages
-                groupedPackages
-            }
+            val groups =
+                cachedGroups ?: run {
+                    val packageCounts = repository.getPackageCountByDevice(deviceUuid)
+                    val groupedPackages = buildGroupedPackages(packageCounts)
+                    cachedGroups = groupedPackages
+                    groupedPackages
+                }
 
             if (groups.isEmpty()) {
                 return LoadResult.Page(emptyList(), prevKey = null, nextKey = null)
             }
 
             val pageGroups = groups.drop(offset).take(params.loadSize)
-            val data = pageGroups.map { group ->
-                val records = group.packageNames.flatMap { packageName ->
-                    repository.getNotificationsByPackageAndDevice(packageName, deviceUuid)
-                }.sortedByDescending { it.time }
+            val data =
+                pageGroups.map { group ->
+                    val records =
+                        group.packageNames
+                            .flatMap { packageName ->
+                                repository.getNotificationsByPackageAndDevice(packageName, deviceUuid)
+                            }.sortedByDescending { it.time }
 
-                val notifications = records.map { it.toNotificationRecord() }
-                val appName = notifications.firstOrNull()?.appName?.takeIf { it.isNotBlank() } ?: group.groupKey
+                    val notifications = records.map { it.toNotificationRecord() }
+                    val appName = notifications.firstOrNull()?.appName?.takeIf { it.isNotBlank() } ?: group.groupKey
 
-                GroupedNotifications(
-                    packageName = group.groupKey,
-                    appName = appName,
-                    latestTime = group.latestTime,
-                    notifications = notifications
-                )
-            }
+                    GroupedNotifications(
+                        packageName = group.groupKey,
+                        appName = appName,
+                        latestTime = group.latestTime,
+                        notifications = notifications,
+                    )
+                }
 
             val nextKey = if (offset + pageGroups.size >= groups.size) null else offset + pageGroups.size
             val prevKey = if (offset == 0) null else max(offset - params.loadSize, 0)
@@ -53,7 +57,7 @@ class NotificationPagingSource(
             LoadResult.Page(
                 data = data,
                 prevKey = prevKey,
-                nextKey = nextKey
+                nextKey = nextKey,
             )
         } catch (e: Exception) {
             LoadResult.Error(e)
@@ -71,9 +75,10 @@ class NotificationPagingSource(
 
         for (count in packageCounts) {
             val mappedPackage = RemoteFilterConfig.mapToLocalPackage(count.packageName, installedPackages)
-            val group = grouped.getOrPut(mappedPackage) {
-                GroupAccumulator(mappedPackage)
-            }
+            val group =
+                grouped.getOrPut(mappedPackage) {
+                    GroupAccumulator(mappedPackage)
+                }
             group.packageNames.add(count.packageName)
             group.latestTime = max(group.latestTime, count.latestTime)
         }
@@ -83,33 +88,31 @@ class NotificationPagingSource(
                 GroupedPackage(
                     groupKey = accumulator.groupKey,
                     packageNames = accumulator.packageNames.toList(),
-                    latestTime = accumulator.latestTime
+                    latestTime = accumulator.latestTime,
                 )
-            }
-            .sortedByDescending { it.latestTime }
+            }.sortedByDescending { it.latestTime }
     }
 
-    private fun NotificationRecordEntity.toNotificationRecord(): NotificationRecord {
-        return NotificationRecord(
+    private fun NotificationRecordEntity.toNotificationRecord(): NotificationRecord =
+        NotificationRecord(
             key = key,
             packageName = packageName,
             appName = appName,
             title = title,
             text = text,
             time = time,
-            device = deviceUuid
+            device = deviceUuid,
         )
-    }
 
     private data class GroupedPackage(
         val groupKey: String,
         val packageNames: List<String>,
-        val latestTime: Long
+        val latestTime: Long,
     )
 
     private class GroupAccumulator(
         val groupKey: String,
         val packageNames: LinkedHashSet<String> = linkedSetOf(),
-        var latestTime: Long = 0L
+        var latestTime: Long = 0L,
     )
 }

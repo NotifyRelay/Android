@@ -44,7 +44,6 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import kotlin.time.Duration.Companion.milliseconds
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -54,6 +53,7 @@ import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Date
+import kotlin.time.Duration.Companion.milliseconds
 
 private const val DEFAULT_PROXY_URL = "https://gh.llkk.cc/"
 private const val PROXY_URL_KEY = "check_update_proxy_url"
@@ -66,10 +66,10 @@ fun UIAbout() {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
-    
+
     var clickCount by remember { mutableIntStateOf(0) }
     var lastClickTime by remember { mutableLongStateOf(0L) }
-    
+
     var isCheckingUpdate by remember { mutableStateOf(false) }
     val showUpdateDialog = remember { mutableStateOf(false) }
     var latestReleaseInfo by remember { mutableStateOf<ReleaseInfo?>(null) }
@@ -81,54 +81,56 @@ fun UIAbout() {
     var proxyUrl by remember {
         mutableStateOf(StorageManager.getString(context, PROXY_URL_KEY, DEFAULT_PROXY_URL))
     }
-    
+
     val checkUpdateManager = remember { CheckUpdateManager(context.applicationContext) }
-    
+
     LaunchedEffect(proxyUrl) {
         snapshotFlow { proxyUrl }
             .debounce(SAVE_DEBOUNCE_MS.milliseconds)
             .onEach { url ->
                 StorageManager.putString(context, PROXY_URL_KEY, url)
-            }
-            .launchIn(this)
+            }.launchIn(this)
     }
 
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
 
     // 应用图标（圆角矩形显示）
-    val appIcon = remember {
-        runCatching {
-            val pm = context.packageManager
-            val drawable = pm.getApplicationIcon(context.packageName)
-            if (drawable is BitmapDrawable) {
-                drawable.bitmap.asImageBitmap()
-            } else {
-                val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 96
-                val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 96
-                val bmp = createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bmp)
-                drawable.setBounds(0, 0, width, height)
-                drawable.draw(canvas)
-                bmp.asImageBitmap()
-            }
-        }.getOrNull()
-    }
+    val appIcon =
+        remember {
+            runCatching {
+                val pm = context.packageManager
+                val drawable = pm.getApplicationIcon(context.packageName)
+                if (drawable is BitmapDrawable) {
+                    drawable.bitmap.asImageBitmap()
+                } else {
+                    val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 96
+                    val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 96
+                    val bmp = createBitmap(width, height, Bitmap.Config.ARGB_8888)
+                    val canvas = Canvas(bmp)
+                    drawable.setBounds(0, 0, width, height)
+                    drawable.draw(canvas)
+                    bmp.asImageBitmap()
+                }
+            }.getOrNull()
+        }
 
     Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .verticalScroll(scrollState)
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .verticalScroll(scrollState),
     ) {
         appIcon?.let {
             Image(
                 bitmap = it,
                 contentDescription = "应用图标",
-                modifier = Modifier
-                    .padding(top = 24.dp)
-                    .size(72.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .align(Alignment.CenterHorizontally)
+                modifier =
+                    Modifier
+                        .padding(top = 24.dp)
+                        .size(72.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .align(Alignment.CenterHorizontally),
             )
         }
 
@@ -136,9 +138,10 @@ fun UIAbout() {
             text = "Notify Relay",
             style = textStyles.title1,
             color = colorScheme.primary,
-            modifier = Modifier
-                .padding(top = if (appIcon != null) 16.dp else 24.dp, bottom = 16.dp)
-                .align(Alignment.CenterHorizontally)
+            modifier =
+                Modifier
+                    .padding(top = if (appIcon != null) 16.dp else 24.dp, bottom = 16.dp)
+                    .align(Alignment.CenterHorizontally),
         )
 
         ArrowPreference(
@@ -152,7 +155,7 @@ fun UIAbout() {
                     clickCount = 1
                 }
                 lastClickTime = currentTime
-                
+
                 if (clickCount in 3..<5) {
                     Toast.makeText(context, "再点击 ${5 - clickCount} 次进入开发者模式", Toast.LENGTH_SHORT).show()
                 } else if (clickCount >= 5) {
@@ -161,16 +164,17 @@ fun UIAbout() {
                     clickCount = 0
                 }
             },
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
 
         Text(
             text = "Rust Core: ${NativeCore.getGitHash() ?: "未加载"}",
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary,
-            modifier = Modifier
-                .padding(horizontal = 16.dp)
-                .padding(top = 4.dp)
+            modifier =
+                Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 4.dp),
         )
 
         Spacer(modifier = Modifier.height(8.dp))
@@ -180,20 +184,21 @@ fun UIAbout() {
             summary = if (isCheckingUpdate) "检查中..." else "点击检查是否有新版本",
             onClick = {
                 if (isCheckingUpdate) return@ArrowPreference
-                
+
                 isCheckingUpdate = true
-                
+
                 coroutineScope.launch {
                     val rule = if (includePrerelease) VersionRule.LATEST else VersionRule.STABLE
-                    val result = checkUpdateManager.checkUpdate(
-                        owner = "NotifyRelay",
-                        repo = "Android",
-                        currentVersion = BuildConfig.VERSION_NAME,
-                        rule = rule
-                    )
-                    
+                    val result =
+                        checkUpdateManager.checkUpdate(
+                            owner = "NotifyRelay",
+                            repo = "Android",
+                            currentVersion = BuildConfig.VERSION_NAME,
+                            rule = rule,
+                        )
+
                     isCheckingUpdate = false
-                    
+
                     when (result) {
                         is UpdateResult.HasUpdate -> {
                             Logger.i(TAG, "发现新版本: ${result.releaseInfo.version}")
@@ -220,11 +225,11 @@ fun UIAbout() {
                     }
                 }
             },
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
-        
+
         Spacer(modifier = Modifier.height(8.dp))
-        
+
         SwitchPreference(
             title = "包含预发布版本",
             checked = includePrerelease,
@@ -233,22 +238,22 @@ fun UIAbout() {
                 includePrerelease = it
                 StorageManager.putBoolean(context, "check_update_include_prerelease", it)
             },
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
-        
+
         Spacer(modifier = Modifier.height(8.dp))
         Text(
             text = "下载代理设置",
             style = textStyles.main,
             color = colorScheme.onSurfaceSecondary,
-            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp)
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 4.dp),
         )
         TextField(
             value = proxyUrl,
             onValueChange = { proxyUrl = it },
             label = "需完整https地址，以/结尾，如：https://gh.llkk.cc/",
             modifier = Modifier.padding(horizontal = 16.dp),
-            singleLine = true
+            singleLine = true,
         )
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -258,12 +263,13 @@ fun UIAbout() {
             text = "© 2026 Notify Relay",
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary,
-            modifier = Modifier
-                .padding(24.dp)
-                .align(Alignment.CenterHorizontally)
+            modifier =
+                Modifier
+                    .padding(24.dp)
+                    .align(Alignment.CenterHorizontally),
         )
     }
-    
+
     UpdateDialog(
         showDialog = showUpdateDialog,
         releaseInfo = latestReleaseInfo,
@@ -294,6 +300,6 @@ fun UIAbout() {
             showUpdateDialog.value = false
             latestReleaseInfo = null
             allReleases = emptyList()
-        }
+        },
     )
 }

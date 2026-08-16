@@ -24,12 +24,12 @@ data class HintInfo(
     val colorSubContent: String? = null, // 前置文本2颜色
     val colorSubContentDark: String? = null, // 深色模式前置文本2颜色
     val colorContentBg: String? = null, // 图文特殊标签背景色
-    val actionInfo: ActionInfo? = null // 按钮操作信息
+    val actionInfo: ActionInfo? = null, // 按钮操作信息
 )
 
 // 解析提示信息组件（按钮组件2和3）
-fun parseHintInfo(json: JSONObject): HintInfo {
-    return HintInfo(
+fun parseHintInfo(json: JSONObject): HintInfo =
+    HintInfo(
         type = json.optInt("type", 1),
         title = json.optString("title", "").takeIf { it.isNotEmpty() },
         timerInfo = json.optJSONObject("timerInfo")?.let { parseTimerInfo(it) },
@@ -46,7 +46,5 @@ fun parseHintInfo(json: JSONObject): HintInfo {
         colorSubContent = json.optString("colorSubContent", "").takeIf { it.isNotEmpty() },
         colorSubContentDark = json.optString("colorSubContentDark", "").takeIf { it.isNotEmpty() },
         colorContentBg = json.optString("colorContentBg", "").takeIf { it.isNotEmpty() },
-        actionInfo = json.optJSONObject("actionInfo")?.let { parseActionInfo(it) }
+        actionInfo = json.optJSONObject("actionInfo")?.let { parseActionInfo(it) },
     )
-}
-

@@ -15,13 +15,17 @@ class FcitxClipboardReceiver : BroadcastReceiver() {
         const val EXTRA_SENDER_PACKAGE = "sender_package"
     }
 
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         if (intent.action != ACTION_CLIPBOARD_BROADCAST) return
 
-        val encryptedData = intent.getByteArrayExtra(EXTRA_ENCRYPTED_DATA) ?: run {
-            Logger.w(TAG, "收到 Fcitx5 广播但无加密数据")
-            return
-        }
+        val encryptedData =
+            intent.getByteArrayExtra(EXTRA_ENCRYPTED_DATA) ?: run {
+                Logger.w(TAG, "收到 Fcitx5 广播但无加密数据")
+                return
+            }
         val timestamp = intent.getLongExtra(EXTRA_TIMESTAMP, 0)
         val senderPackage = intent.getStringExtra(EXTRA_SENDER_PACKAGE) ?: return
 

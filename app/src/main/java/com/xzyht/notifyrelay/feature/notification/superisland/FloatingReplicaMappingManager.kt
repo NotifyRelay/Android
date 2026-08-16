@@ -3,8 +3,8 @@ package com.xzyht.notifyrelay.feature.notification.superisland
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
-import notifyrelay.base.util.Logger
 import kotlinx.coroutines.Job
+import notifyrelay.base.util.Logger
 import java.lang.ref.WeakReference
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
@@ -44,7 +44,11 @@ object FloatingReplicaMappingManager {
         overlayViewRef = if (view != null) WeakReference(view) else null
     }
 
-    fun addSourceIdMapping(sourceId: String, entryKey: String, notificationId: Int? = null) {
+    fun addSourceIdMapping(
+        sourceId: String,
+        entryKey: String,
+        notificationId: Int? = null,
+    ) {
         if (sourceId.isNotBlank()) {
             sourceIdToEntryKeyMap.computeIfAbsent(sourceId) { ConcurrentHashMap.newKeySet() }.add(entryKey)
             if (notificationId != null) {
@@ -67,7 +71,9 @@ object FloatingReplicaMappingManager {
                         } else {
                             currentKeys
                         }
-                    } else null
+                    } else {
+                        null
+                    }
                 }
             }
         }
@@ -83,21 +89,18 @@ object FloatingReplicaMappingManager {
         }
     }
 
-    fun getSourceIdEntryKeys(sourceId: String): List<String>? {
-        return sourceIdToEntryKeyMap[sourceId]?.toList()
-    }
+    fun getSourceIdEntryKeys(sourceId: String): List<String>? = sourceIdToEntryKeyMap[sourceId]?.toList()
 
-    fun getNotificationId(entryKey: String): Int? {
-        return entryKeyToNotificationId[entryKey]
-    }
+    fun getNotificationId(entryKey: String): Int? = entryKeyToNotificationId[entryKey]
 
-    fun putNotificationId(entryKey: String, notificationId: Int) {
+    fun putNotificationId(
+        entryKey: String,
+        notificationId: Int,
+    ) {
         entryKeyToNotificationId[entryKey] = notificationId
     }
 
-    fun removeNotificationId(entryKey: String): Int? {
-        return entryKeyToNotificationId.remove(entryKey)
-    }
+    fun removeNotificationId(entryKey: String): Int? = entryKeyToNotificationId.remove(entryKey)
 
     fun getAllNotificationIds(): Map<String, Int> = HashMap(entryKeyToNotificationId)
 
@@ -105,13 +108,9 @@ object FloatingReplicaMappingManager {
         entryKeyToNotificationId.clear()
     }
 
-    fun getNotificationIdsBySourceId(sourceId: String): List<Int>? {
-        return sourceIdToNotificationIds[sourceId]?.toList()
-    }
+    fun getNotificationIdsBySourceId(sourceId: String): List<Int>? = sourceIdToNotificationIds[sourceId]?.toList()
 
-    fun removeNotificationIdsBySourceId(sourceId: String): List<Int>? {
-        return sourceIdToNotificationIds.remove(sourceId)?.toList()
-    }
+    fun removeNotificationIdsBySourceId(sourceId: String): List<Int>? = sourceIdToNotificationIds.remove(sourceId)?.toList()
 
     fun removeSourceIdMappings(sourceId: String) {
         sourceIdToNotificationIds.remove(sourceId)
@@ -122,17 +121,16 @@ object FloatingReplicaMappingManager {
         sourceVersions.remove(sourceId)
     }
 
-    fun nextVersion(sourceId: String): Long {
-        return sourceVersions.computeIfAbsent(sourceId) { AtomicLong(0) }.incrementAndGet()
-    }
+    fun nextVersion(sourceId: String): Long = sourceVersions.computeIfAbsent(sourceId) { AtomicLong(0) }.incrementAndGet()
 
-    fun isLatestVersion(sourceId: String, version: Long): Boolean {
-        return sourceVersions[sourceId]?.get() == version
-    }
+    fun isLatestVersion(
+        sourceId: String,
+        version: Long,
+    ): Boolean = sourceVersions[sourceId]?.get() == version
 
     fun handleRemovalReason(
         sourceId: String,
-        reason: FloatingWindowManager.RemovalReason
+        reason: FloatingWindowManager.RemovalReason,
     ) {
         if (reason == FloatingWindowManager.RemovalReason.MANUAL || reason == FloatingWindowManager.RemovalReason.HIDDEN) {
             blockInstance(sourceId)
@@ -201,25 +199,27 @@ object FloatingReplicaMappingManager {
         timeoutJobs.remove(sourceId)?.cancel()
     }
 
-    fun setTimeoutJob(sourceId: String, job: Job) {
+    fun setTimeoutJob(
+        sourceId: String,
+        job: Job,
+    ) {
         timeoutJobs[sourceId] = job
     }
 
-    fun saveHiddenEntry(sourceId: String, entry: FloatingEntry) {
+    fun saveHiddenEntry(
+        sourceId: String,
+        entry: FloatingEntry,
+    ) {
         hiddenEntries[sourceId] = entry
     }
 
-    fun getHiddenEntry(sourceId: String): FloatingEntry? {
-        return hiddenEntries[sourceId]
-    }
+    fun getHiddenEntry(sourceId: String): FloatingEntry? = hiddenEntries[sourceId]
 
     fun removeHiddenEntry(sourceId: String) {
         hiddenEntries.remove(sourceId)
     }
 
-    fun getEntryKeyByNotificationId(notificationId: Int): String? {
-        return entryKeyToNotificationId.entries.find { it.value == notificationId }?.key
-    }
+    fun getEntryKeyByNotificationId(notificationId: Int): String? = entryKeyToNotificationId.entries.find { it.value == notificationId }?.key
 
     fun findSourceIdByNotificationId(notificationId: Int): String? {
         for ((sourceId, notificationIds) in sourceIdToNotificationIds) {
@@ -247,7 +247,10 @@ object FloatingReplicaMappingManager {
         return null
     }
 
-    private inline fun runWithErrorHandling(actionName: String, crossinline block: () -> Unit) {
+    private inline fun runWithErrorHandling(
+        actionName: String,
+        crossinline block: () -> Unit,
+    ) {
         try {
             block()
         } catch (e: Exception) {

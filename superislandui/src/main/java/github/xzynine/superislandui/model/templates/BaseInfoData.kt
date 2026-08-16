@@ -28,12 +28,12 @@ data class BaseInfo(
     val colorSubContent: String? = null, // 次要文本2颜色
     val colorSubContentDark: String? = null, // 深色模式次要文本2颜色
     val showDivider: Boolean? = null, // 是否显示主要文本间分割符
-    val showContentDivider: Boolean? = null // 是否显示主要文本和补充文本分割符
+    val showContentDivider: Boolean? = null, // 是否显示主要文本和补充文本分割符
 )
 
 // 解析基础信息组件（文本组件1和2）
-fun parseBaseInfo(json: JSONObject): BaseInfo {
-    return BaseInfo(
+fun parseBaseInfo(json: JSONObject): BaseInfo =
+    BaseInfo(
         type = json.optInt("type", 1),
         title = json.optString("title").takeIf { it.isNotEmpty() },
         subTitle = json.optString("subTitle").takeIf { it.isNotEmpty() },
@@ -57,7 +57,5 @@ fun parseBaseInfo(json: JSONObject): BaseInfo {
         colorSubContent = json.optString("colorSubContent").takeIf { it.isNotEmpty() },
         colorSubContentDark = json.optString("colorSubContentDark").takeIf { it.isNotEmpty() },
         showDivider = json.optBoolean("showDivider", false),
-        showContentDivider = json.optBoolean("showContentDivider", false)
+        showContentDivider = json.optBoolean("showContentDivider", false),
     )
-}
-

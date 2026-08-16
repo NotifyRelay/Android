@@ -18,14 +18,25 @@ val rustBuild by tasks.registering(Exec::class) {
     inputs.dir(rustCoreDir.resolve("src"))
     inputs.file(rustCoreDir.resolve("Cargo.toml"))
     inputs.file(rustCoreDir.resolve("Cargo.lock"))
-    val outDir = project.layout.buildDirectory.dir("generated/rust/jniLibs").get().asFile
+    val outDir =
+        project.layout.buildDirectory
+            .dir("generated/rust/jniLibs")
+            .get()
+            .asFile
     outputs.dir(outDir)
     workingDir = rustCoreDir
-    commandLine("cargo", "ndk",
-        "-t", "arm64-v8a",
-        "-t", "x86_64",
-        "-o", outDir.absolutePath,
-        "build", "--release")
+    commandLine(
+        "cargo",
+        "ndk",
+        "-t",
+        "arm64-v8a",
+        "-t",
+        "x86_64",
+        "-o",
+        outDir.absolutePath,
+        "build",
+        "--release",
+    )
 }
 
 // 将 Rust 构建挂钩到 Gradle 构建生命周期，确保在打包前生成 .so
@@ -35,7 +46,10 @@ tasks.named("preBuild") {
 
 android {
     namespace = "com.xzyht.notifyrelay.nativecore"
-    compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdk =
+        libs.versions.compileSdk
+            .get()
+            .toInt()
 
     defaultConfig {
         minSdk = 29

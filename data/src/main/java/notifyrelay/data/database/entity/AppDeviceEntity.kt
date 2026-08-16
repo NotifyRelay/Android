@@ -16,15 +16,15 @@ import androidx.room.Index
             entity = AppEntity::class,
             parentColumns = ["packageName"],
             childColumns = ["packageName"],
-            onDelete = ForeignKey.CASCADE
-        )
+            onDelete = ForeignKey.CASCADE,
+        ),
     ],
     indices = [
-        Index(value = ["sourceDevice"])
-    ]
+        Index(value = ["sourceDevice"]),
+    ],
 )
 data class AppDeviceEntity(
     val packageName: String,
     val sourceDevice: String,
-    val lastUpdated: Long
+    val lastUpdated: Long,
 )

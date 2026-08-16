@@ -6,12 +6,10 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowLifecycleOwner
 
-
 /**
  * 浮窗生命周期管理类
  */
 class LifecycleManager {
-
     private var _lifecycleOwner: FloatingWindowLifecycleOwner? = null
 
     /**
@@ -56,10 +54,10 @@ class LifecycleManager {
 @Composable
 fun ProvideLifecycleOwner(
     lifecycleManager: LifecycleManager,
-    content: @Composable () -> Unit
+    content: @Composable () -> Unit,
 ) {
     CompositionLocalProvider(
-        LocalLifecycleOwner provides lifecycleManager.lifecycleOwner
+        LocalLifecycleOwner provides lifecycleManager.lifecycleOwner,
     ) {
         content()
     }

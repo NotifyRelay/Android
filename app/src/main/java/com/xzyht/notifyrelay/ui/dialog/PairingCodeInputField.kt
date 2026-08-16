@@ -42,7 +42,7 @@ fun PairingCodeInputField(
     onCodeChange: (String) -> Unit,
     errorMsg: String? = null,
     enabled: Boolean = true,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val borderColor = colorScheme.outline
@@ -53,31 +53,30 @@ fun PairingCodeInputField(
 
     Row(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.Center
+        horizontalArrangement = Arrangement.Center,
     ) {
         for (i in 0 until 6) {
             val digit = if (i < code.length) code[i].toString() else ""
             Box(
-                modifier = Modifier
-                    .width(40.dp)
-                    .height(48.dp)
-                    .border(
-                        width = 1.dp,
-                        color = if (i == code.length && enabled) colorScheme.primary else borderColor,
-                        shape = inputShape
-                    )
-                    .background(
-                        color = colorScheme.surfaceVariant,
-                        shape = inputShape
-                    )
-                    .clickable(enabled) { codeFocusRequester.requestFocus() },
-                contentAlignment = Alignment.Center
+                modifier =
+                    Modifier
+                        .width(40.dp)
+                        .height(48.dp)
+                        .border(
+                            width = 1.dp,
+                            color = if (i == code.length && enabled) colorScheme.primary else borderColor,
+                            shape = inputShape,
+                        ).background(
+                            color = colorScheme.surfaceVariant,
+                            shape = inputShape,
+                        ).clickable(enabled) { codeFocusRequester.requestFocus() },
+                contentAlignment = Alignment.Center,
             ) {
                 Text(
                     text = if (enabled) digit else "*",
                     fontSize = 24.sp,
                     fontFamily = FontFamily.Monospace,
-                    color = colorScheme.onSurface
+                    color = colorScheme.onSurface,
                 )
             }
             if (i < 5) Spacer(modifier = Modifier.width(8.dp))
@@ -92,13 +91,14 @@ fun PairingCodeInputField(
                 onCodeChange(newVal.filter { it.isDigit() }.take(6))
             }
         },
-        modifier = Modifier
-            .focusRequester(codeFocusRequester)
-            .width(0.dp)
-            .height(0.dp),
+        modifier =
+            Modifier
+                .focusRequester(codeFocusRequester)
+                .width(0.dp)
+                .height(0.dp),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.NumberPassword),
         singleLine = true,
-        enabled = enabled
+        enabled = enabled,
     )
 
     if (errorMsg != null) {
@@ -106,7 +106,7 @@ fun PairingCodeInputField(
             text = errorMsg,
             style = MiuixTheme.textStyles.body2,
             color = MiuixTheme.colorScheme.error,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
         )
     }
 }

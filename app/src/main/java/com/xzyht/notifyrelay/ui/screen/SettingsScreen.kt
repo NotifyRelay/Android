@@ -46,52 +46,53 @@ fun SettingsScreen() {
     }
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colorScheme.background)
-            .verticalScroll(rememberScrollState())
-            .padding(top = 12.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(colorScheme.background)
+                .verticalScroll(rememberScrollState())
+                .padding(top = 12.dp),
     ) {
         ArrowPreference(
             title = "远程过滤",
             summary = "远程通知过滤与黑白名单",
             onClick = { navigator.push(Route.SettingsRemoteFilter) },
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
         ArrowPreference(
             title = "本地过滤",
             summary = "本机通知过滤设置",
             onClick = { navigator.push(Route.SettingsLocalFilter) },
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
         ArrowPreference(
             title = "超级岛",
             summary = "超级岛读取、显示与镜像过滤",
             onClick = { navigator.push(Route.SettingsSuperIsland) },
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
         ArrowPreference(
             title = "屏幕镜像",
             summary = "Scrcpy 屏幕镜像设置",
             onClick = { navigator.push(Route.SettingsScrcpy) },
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
         ArrowPreference(
             title = "外观",
             summary = "外观模式设置",
             onClick = { navigator.push(Route.SettingsAppearance) },
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
         ArrowPreference(
             title = "关于",
             summary = "版本、更新与下载设置",
             onClick = { navigator.push(Route.SettingsAbout) },
-            modifier = Modifier.padding(horizontal = 16.dp)
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
         if (isDeveloperModeEnabled) {
             HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
@@ -101,7 +102,7 @@ fun SettingsScreen() {
                 onClick = {
                     context.startActivity(Intent(context, DeveloperModeActivity::class.java))
                 },
-                modifier = Modifier.padding(horizontal = 16.dp)
+                modifier = Modifier.padding(horizontal = 16.dp),
             )
         }
     }

@@ -15,8 +15,8 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.ui.navigation.Navigator
 import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
-import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
 import com.xzyht.notifyrelay.ui.pages.UIChatTest
+import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
@@ -28,7 +28,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  */
 @Composable
 fun HistoryScreen(
-    navigator: Navigator
+    navigator: Navigator,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val tabTitles = listOf("通知历史", "超级岛历史", "聊天测试")
@@ -38,10 +38,11 @@ fun HistoryScreen(
     val context = LocalContext.current
 
     Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(colorScheme.background)
-            .padding(12.dp)
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(colorScheme.background)
+                .padding(12.dp),
     ) {
         TabRowWithContour(
             tabs = tabTitles,
@@ -52,27 +53,29 @@ fun HistoryScreen(
                 }
             },
             modifier = Modifier.fillMaxWidth(),
-            colors = TabRowDefaults.tabRowColors(
-                backgroundColor = colorScheme.surface,
-                contentColor = colorScheme.onSurface,
-                selectedBackgroundColor = colorScheme.primary,
-                selectedContentColor = colorScheme.onPrimary
-            ),
+            colors =
+                TabRowDefaults.tabRowColors(
+                    backgroundColor = colorScheme.surface,
+                    contentColor = colorScheme.onSurface,
+                    selectedBackgroundColor = colorScheme.primary,
+                    selectedContentColor = colorScheme.onPrimary,
+                ),
             minWidth = 100.dp,
             height = 48.dp,
-            cornerRadius = 16.dp
+            cornerRadius = 16.dp,
         )
 
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier.fillMaxSize()
+            modifier = Modifier.fillMaxSize(),
         ) {
             when (it) {
                 0 -> NotificationHistoryScreen()
                 1 -> UISuperIslandHistory()
-                2 -> UIChatTest(
-                    deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                )
+                2 ->
+                    UIChatTest(
+                        deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context),
+                    )
             }
         }
     }

@@ -3,15 +3,13 @@ package github.xzynine.superislandui.model.components
 import org.json.JSONArray
 import org.json.JSONObject
 
-// 文本按钮模板：按钮组�?，纯文字按钮
+// 文本按钮模板：按钮组�?，纯文字按钮
 data class TextButton(
-    val actions: List<ActionInfo> // 文字按钮列表�?-2个）
+    val actions: List<ActionInfo>, // 文字按钮列表�?-2个）
 )
 
-// 解析文本按钮组件（按钮组�?�?
-fun parseTextButton(json: JSONObject): TextButton {
-    return TextButton(actions = json.optJSONArray("actions")?.let { parseActions(it) } ?: emptyList())
-}
+// 解析文本按钮组件（按钮组�?�?
+fun parseTextButton(json: JSONObject): TextButton = TextButton(actions = json.optJSONArray("actions")?.let { parseActions(it) } ?: emptyList())
 
 // 解析操作列表（按钮组件）
 fun parseActions(jsonArray: JSONArray): List<ActionInfo> {

@@ -17,7 +17,6 @@ import notifyrelay.data.database.entity.WhiteListEntryEntity
  */
 @Dao
 interface FilterListDao {
-
     // ---------- 远程黑名单 ----------
 
     @Query("SELECT * FROM black_list_entries")
@@ -96,14 +95,18 @@ interface FilterListDao {
 
     /** 全量替换包名等价组（组 + 组内包名，itemPackages 与 groups 一一对应） */
     @Transaction
-    suspend fun replacePackageGroups(groups: List<PackageGroupEntity>, itemPackages: List<List<String>>) {
+    suspend fun replacePackageGroups(
+        groups: List<PackageGroupEntity>,
+        itemPackages: List<List<String>>,
+    ) {
         clearPackageGroups()
         clearPackageGroupItems()
         if (groups.isEmpty()) return
         val ids = insertPackageGroups(groups)
-        val items = ids.zip(itemPackages).flatMap { (groupId, pkgs) ->
-            pkgs.map { PackageGroupItemEntity(groupId, it) }
-        }
+        val items =
+            ids.zip(itemPackages).flatMap { (groupId, pkgs) ->
+                pkgs.map { PackageGroupItemEntity(groupId, it) }
+            }
         if (items.isNotEmpty()) insertPackageGroupItems(items)
     }
 }

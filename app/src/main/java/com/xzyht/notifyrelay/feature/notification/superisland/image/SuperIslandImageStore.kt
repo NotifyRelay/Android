@@ -41,7 +41,7 @@ object SuperIslandImageStore {
     suspend fun internAll(
         context: Context,
         packageName: String?,
-        input: Map<String, String>?
+        input: Map<String, String>?,
     ): Map<String, String> {
         if (input.isNullOrEmpty()) return emptyMap()
         ensureMigrated(context)
@@ -59,7 +59,7 @@ object SuperIslandImageStore {
     suspend fun bindAll(
         context: Context,
         packageName: String?,
-        input: Map<String, String>?
+        input: Map<String, String>?,
     ): Map<String, String> {
         if (input.isNullOrEmpty()) return emptyMap()
         ensureMigrated(context)
@@ -80,7 +80,7 @@ object SuperIslandImageStore {
 
     suspend fun resolvePicMap(
         context: Context,
-        picMap: Map<String, String>?
+        picMap: Map<String, String>?,
     ): Map<String, String> {
         if (picMap.isNullOrEmpty()) return emptyMap()
         ensureMigrated(context)
@@ -99,7 +99,10 @@ object SuperIslandImageStore {
         return out
     }
 
-    suspend fun resolveSuspend(context: Context?, value: String?): String? {
+    suspend fun resolveSuspend(
+        context: Context?,
+        value: String?,
+    ): String? {
         if (value.isNullOrBlank()) return value
         val trimmed = value.trim()
         val imageId = trimmed.toLongOrNull() ?: return value
@@ -108,7 +111,10 @@ object SuperIslandImageStore {
         return DatabaseRepository.getInstance(context).resolveSuperIslandImageById(imageId) ?: value
     }
 
-    fun resolve(context: Context?, value: String?): String? {
+    fun resolve(
+        context: Context?,
+        value: String?,
+    ): String? {
         if (value.isNullOrBlank()) return value
         val trimmed = value.trim()
         val imageId = trimmed.toLongOrNull() ?: return value
@@ -123,7 +129,11 @@ object SuperIslandImageStore {
         }
     }
 
-    suspend fun prune(context: Context, maxEntries: Int = 3000, maxAgeDays: Int = 30) {
+    suspend fun prune(
+        context: Context,
+        maxEntries: Int = 3000,
+        maxAgeDays: Int = 30,
+    ) {
         ensureMigrated(context)
         DatabaseRepository.getInstance(context).pruneSuperIslandImages(maxEntries, maxAgeDays)
     }
@@ -138,29 +148,29 @@ object SuperIslandImageStore {
         return if (trimmed.isBlank()) DEFAULT_PACKAGE_NAME else trimmed
     }
 
-    private fun isMainThread(): Boolean {
-        return Looper.myLooper() == Looper.getMainLooper()
-    }
+    private fun isMainThread(): Boolean = Looper.myLooper() == Looper.getMainLooper()
 
     private suspend fun ensureMigrated(context: Context) {
         if (StorageManager.getBoolean(context, MIGRATION_FLAG_KEY, false)) return
 
-        val deferredToAwait: Deferred<Unit>? = migrationMutex.withLock {
-            if (StorageManager.getBoolean(context, MIGRATION_FLAG_KEY, false)) return@withLock null
+        val deferredToAwait: Deferred<Unit>? =
+            migrationMutex.withLock {
+                if (StorageManager.getBoolean(context, MIGRATION_FLAG_KEY, false)) return@withLock null
 
-            migrationDeferred?.let { return@withLock it }
+                migrationDeferred?.let { return@withLock it }
 
-            migrationScope.async {
-                try {
-                    migrateLegacyData(context)
-                    StorageManager.putBoolean(context, MIGRATION_FLAG_KEY, true)
-                } catch (_: Exception) {
-                    migrationMutex.withLock {
-                        migrationDeferred = null
-                    }
-                }
-            }.also { migrationDeferred = it }
-        }
+                migrationScope
+                    .async {
+                        try {
+                            migrateLegacyData(context)
+                            StorageManager.putBoolean(context, MIGRATION_FLAG_KEY, true)
+                        } catch (_: Exception) {
+                            migrationMutex.withLock {
+                                migrationDeferred = null
+                            }
+                        }
+                    }.also { migrationDeferred = it }
+            }
 
         deferredToAwait?.await()
     }
@@ -222,7 +232,10 @@ object SuperIslandImageStore {
         return if (appName.isNotBlank()) appName else DEFAULT_PACKAGE_NAME
     }
 
-    private fun resolveLegacyValue(value: String, legacyImages: Map<String, String>): String? {
+    private fun resolveLegacyValue(
+        value: String,
+        legacyImages: Map<String, String>,
+    ): String? {
         val trimmed = value.trim()
         return if (trimmed.startsWith("ref:", ignoreCase = true)) {
             val hash = trimmed.substringAfter(":").trim()
@@ -253,6 +266,7 @@ object SuperIslandImageStore {
     private fun deleteLegacyStoreFile(context: Context) {
         try {
             File(context.filesDir, LEGACY_IMAGE_STORE_FILE).delete()
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
     }
 }

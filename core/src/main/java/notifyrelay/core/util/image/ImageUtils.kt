@@ -58,7 +58,10 @@ object ImageUtils {
 
     fun isDataUrl(text: String): Boolean = text.trim().startsWith(DATA_PREFIX, ignoreCase = true)
 
-    suspend fun decodeDataUrlToBitmap(context: Context, dataUrl: String): Bitmap? {
+    suspend fun decodeDataUrlToBitmap(
+        context: Context,
+        dataUrl: String,
+    ): Bitmap? {
         val cleaned = cleanDataUrl(dataUrl)
         if (cleaned == null) {
             Logger.w(TAG, "data URL 格式无效，原始前64字符: ")
@@ -84,8 +87,8 @@ object ImageUtils {
         }
     }
 
-    fun bitmapToDataUri(bitmap: Bitmap): String {
-        return try {
+    fun bitmapToDataUri(bitmap: Bitmap): String =
+        try {
             val baos = ByteArrayOutputStream()
             bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
             val b = baos.toByteArray()
@@ -94,21 +97,25 @@ object ImageUtils {
         } catch (e: Exception) {
             ""
         }
-    }
 
     // ==================== 统一图片加载 ====================
 
-    suspend fun loadBitmap(context: Context, uri: Any): Bitmap? {
+    suspend fun loadBitmap(
+        context: Context,
+        uri: Any,
+    ): Bitmap? {
         if (uri is String && uri.trim().startsWith(DATA_PREFIX, ignoreCase = true)) {
             return decodeDataUrlToBitmap(context, uri)
         }
         return withContext(Dispatchers.IO) {
             try {
                 val loader = Coil.imageLoader(context)
-                val request = ImageRequest.Builder(context)
-                    .data(uri)
-                    .allowHardware(false)
-                    .build()
+                val request =
+                    ImageRequest
+                        .Builder(context)
+                        .data(uri)
+                        .allowHardware(false)
+                        .build()
                 val result = loader.execute(request)
                 if (result is SuccessResult) {
                     val drawable = result.drawable
@@ -116,8 +123,11 @@ object ImageUtils {
                     drawable.toBitmap()
                 } else {
                     val error = (result as? ErrorResult)?.throwable
-                    if (error != null) Logger.e(TAG, "loadBitmap 失败: ", error)
-                    else Logger.e(TAG, "loadBitmap 失败: 未知错误")
+                    if (error != null) {
+                        Logger.e(TAG, "loadBitmap 失败: ", error)
+                    } else {
+                        Logger.e(TAG, "loadBitmap 失败: 未知错误")
+                    }
                     null
                 }
             } catch (e: Exception) {
@@ -129,16 +139,15 @@ object ImageUtils {
 
     // ==================== 颜色与文本工具 ====================
 
-    fun parseColor(colorString: String?): Int? {
-        return try {
+    fun parseColor(colorString: String?): Int? =
+        try {
             colorString?.toColorInt()
         } catch (e: Exception) {
             null
         }
-    }
 
-    fun unescapeHtml(input: String): String {
-        return input
+    fun unescapeHtml(input: String): String =
+        input
             .replace("\\u003c", "<")
             .replace("\\u003e", ">")
             .replace("\\u0027", "'")
@@ -149,11 +158,13 @@ object ImageUtils {
             .replace("&quot;", "\"")
             .replace("&apos;", "'")
             .replace("&amp;", "&")
-    }
 
     // ==================== 私有辅助方法 ====================
 
-    private fun findDataEndCandidate(text: String, startIndex: Int): Int {
+    private fun findDataEndCandidate(
+        text: String,
+        startIndex: Int,
+    ): Int {
         var i = startIndex
         val len = text.length
         while (i < len) {

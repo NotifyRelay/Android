@@ -36,7 +36,11 @@ object SystemBarUtils {
         }
     }
 
-    fun setStatusBarColor(window: Window, color: Int, animate: Boolean = false) {
+    fun setStatusBarColor(
+        window: Window,
+        color: Int,
+        animate: Boolean = false,
+    ) {
         try {
             setStatusBarColor2?.invoke(window, color, animate) ?: setStatusBarColor1?.invoke(window, color)
         } catch (_: Throwable) {
@@ -44,7 +48,11 @@ object SystemBarUtils {
         }
     }
 
-    fun setNavigationBarColor(window: Window, color: Int, animate: Boolean = false) {
+    fun setNavigationBarColor(
+        window: Window,
+        color: Int,
+        animate: Boolean = false,
+    ) {
         try {
             setNavigationBarColor2?.invoke(window, color, animate) ?: setNavigationBarColor1?.invoke(window, color)
         } catch (_: Throwable) {

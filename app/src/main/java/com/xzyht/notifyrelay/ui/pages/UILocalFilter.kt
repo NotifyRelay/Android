@@ -32,7 +32,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  */
 @Composable
 fun UILocalFilter(
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -56,9 +56,10 @@ fun UILocalFilter(
         enabledEntries = BackendLocalFilter.getEnabledFilterEntries(context)
     }
 
-    val builtinDefaultEntries = remember(allEntries, builtinKeywords, builtinPackages) {
-        allEntries.filter { entry -> (entry.keyword.isNotBlank() && builtinKeywords.contains(entry.keyword)) || (entry.packageName.isNotBlank() && builtinPackages.contains(entry.packageName)) }
-    }
+    val builtinDefaultEntries =
+        remember(allEntries, builtinKeywords, builtinPackages) {
+            allEntries.filter { entry -> (entry.keyword.isNotBlank() && builtinKeywords.contains(entry.keyword)) || (entry.packageName.isNotBlank() && builtinPackages.contains(entry.packageName)) }
+        }
 
     // 分组：内置关键词条目、内置包名条目、自定义条目
     val builtinKeywordEntries = remember(allEntries, builtinKeywords) { allEntries.filter { it.packageName.isBlank() && builtinKeywords.contains(it.keyword) } }
@@ -66,24 +67,26 @@ fun UILocalFilter(
     val customEntries = remember(allEntries, builtinKeywordEntries, builtinPackageEntries) { allEntries.filter { !builtinKeywordEntries.contains(it) && !builtinPackageEntries.contains(it) } }
 
     LazyColumn(
-        modifier = modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
+        modifier =
+            modifier
+                .fillMaxSize()
+                .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         // 本机通知过滤设置（标题 + 过滤开关）卡片
         item {
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.defaultColors(
-                    color = MiuixTheme.colorScheme.surfaceContainerHighest
-                )
+                colors =
+                    CardDefaults.defaultColors(
+                        color = MiuixTheme.colorScheme.surfaceContainerHighest,
+                    ),
             ) {
                 Text(
                     text = "本机通知过滤设置",
                     style = MiuixTheme.textStyles.title2,
                     color = MiuixTheme.colorScheme.onBackground,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                 )
 
                 // 过滤本应用通知
@@ -94,7 +97,7 @@ fun UILocalFilter(
                         filterSelf = it
                         BackendLocalFilter.filterSelf = it
                     },
-                    checkboxLocation = CheckboxLocation.End
+                    checkboxLocation = CheckboxLocation.End,
                 )
 
                 // 过滤持久化通知
@@ -105,7 +108,7 @@ fun UILocalFilter(
                         filterOngoing = it
                         BackendLocalFilter.filterOngoing = it
                     },
-                    checkboxLocation = CheckboxLocation.End
+                    checkboxLocation = CheckboxLocation.End,
                 )
 
                 // 过滤无标题或无内容
@@ -116,7 +119,7 @@ fun UILocalFilter(
                         filterNoTitleOrText = it
                         BackendLocalFilter.filterNoTitleOrText = it
                     },
-                    checkboxLocation = CheckboxLocation.End
+                    checkboxLocation = CheckboxLocation.End,
                 )
 
                 // 过滤优先级为无的通知
@@ -127,7 +130,7 @@ fun UILocalFilter(
                         filterImportanceNone = it
                         BackendLocalFilter.filterImportanceNone = it
                     },
-                    checkboxLocation = CheckboxLocation.End
+                    checkboxLocation = CheckboxLocation.End,
                 )
             }
         }
@@ -136,13 +139,13 @@ fun UILocalFilter(
         item {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.CenterVertically,
             ) {
                 Text(
                     text = "过滤条目(文本 + 应用包名)",
                     style = MiuixTheme.textStyles.title3,
                     color = MiuixTheme.colorScheme.onBackground,
-                    modifier = Modifier.weight(1f)
+                    modifier = Modifier.weight(1f),
                 )
             }
         }
@@ -172,7 +175,7 @@ fun UILocalFilter(
                         allEntries = BackendLocalFilter.getFilterEntries(context).toList()
                         enabledEntries = BackendLocalFilter.getEnabledFilterEntries(context)
                     }
-                }
+                },
             )
         }
     }

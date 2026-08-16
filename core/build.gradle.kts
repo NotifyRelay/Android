@@ -6,7 +6,10 @@ plugins {
 
 android {
     namespace = "notifyrelay.core"
-    compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdk =
+        libs.versions.compileSdk
+            .get()
+            .toInt()
 
     defaultConfig {
         minSdk = 31
@@ -20,7 +23,7 @@ android {
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
         }
     }
@@ -40,16 +43,16 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
-    
+
     // 依赖base模块
     implementation(project(":base"))
-    
+
     // Compose相关依赖
     implementation(libs.androidx.compose.ui)
-    
+
     // Coil图片加载库
     implementation(libs.bundles.coil)
-    
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

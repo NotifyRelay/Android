@@ -7,9 +7,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.model.components.ProgressInfo
 import notifyrelay.core.util.image.ImageUtils
-import github.xzynine.superislandui.common.PreviewData
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 
@@ -19,19 +19,21 @@ import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 @Composable
 fun ProgressCompose(
     progressInfo: ProgressInfo,
-    picMap: Map<String, String>?
+    picMap: Map<String, String>?,
 ) {
     // 与传统View保持一致，只设置进度条颜色，不设置轨道颜色
     val progressColor = Color(ImageUtils.parseColor(progressInfo.colorProgress) ?: 0xFF00FF00.toInt())
-    
+
     LinearProgressIndicator(
         progress = progressInfo.progress.toFloat() / 100f,
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(top = 4.dp, start = 0.dp, end = 0.dp, bottom = 0.dp),
-        colors = ProgressIndicatorDefaults.progressIndicatorColors(
-            foregroundColor = progressColor
-        )
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(top = 4.dp, start = 0.dp, end = 0.dp, bottom = 0.dp),
+        colors =
+            ProgressIndicatorDefaults.progressIndicatorColors(
+                foregroundColor = progressColor,
+            ),
     )
 }
 
@@ -40,7 +42,7 @@ fun ProgressCompose(
 fun ProgressComposePreview() {
     ProgressCompose(
         progressInfo = PreviewData.sampleProgressInfo,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }
 
@@ -49,6 +51,6 @@ fun ProgressComposePreview() {
 fun ProgressComposeLowPreview() {
     ProgressCompose(
         progressInfo = PreviewData.sampleProgressInfoLow,
-        picMap = PreviewData.samplePicMap
+        picMap = PreviewData.samplePicMap,
     )
 }

@@ -11,8 +11,8 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
-import androidx.activity.compose.setContent
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.isSystemInDarkTheme
@@ -58,13 +58,14 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
-import com.xzyht.notifyrelay.sync.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.sync.AppLaunchManager
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
+import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
 import com.xzyht.notifyrelay.ui.navigation.Route
@@ -78,7 +79,6 @@ import com.xzyht.notifyrelay.ui.screen.DeviceForwardScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreenState
 import com.xzyht.notifyrelay.ui.screen.HistoryScreen
-import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
@@ -95,9 +95,9 @@ import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.ServiceManager
+import notifyrelay.data.StorageManager
 import notifyrelay.data.config.DeviceInfoManager
 import notifyrelay.data.config.ScrcpyPreferenceKeys
-import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
@@ -144,14 +144,17 @@ class MainActivity : FragmentActivity() {
                 deviceManager.audioRelayPlayer.stopSendCapture()
                 NativeCore.mediaProjection?.stop()
                 NativeCore.mediaProjection = projection
-                projection.registerCallback(object : MediaProjection.Callback() {
-                    override fun onStop() {
-                        deviceManager.audioRelayPlayer.stopSendCapture()
-                        if (NativeCore.mediaProjection === projection) {
-                            NativeCore.mediaProjection = null
+                projection.registerCallback(
+                    object : MediaProjection.Callback() {
+                        override fun onStop() {
+                            deviceManager.audioRelayPlayer.stopSendCapture()
+                            if (NativeCore.mediaProjection === projection) {
+                                NativeCore.mediaProjection = null
+                            }
                         }
-                    }
-                }, Handler(Looper.getMainLooper()))
+                    },
+                    Handler(Looper.getMainLooper()),
+                )
                 deviceManager.startPendingAudioRelaySend()
             } else {
                 pendingScreenCapture = null
@@ -165,12 +168,14 @@ class MainActivity : FragmentActivity() {
     }
 
     private fun bringMainActivityToFront() {
-        val intent = Intent(this, MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-        }
+        val intent =
+            Intent(this, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            }
         try {
             startActivity(intent)
-        } catch (_: Exception) {}
+        } catch (_: Exception) {
+        }
     }
 
     private suspend fun checkPermissionsAndStartServices() {
@@ -179,9 +184,10 @@ class MainActivity : FragmentActivity() {
             bannerMessage.value = null
         }
 
-        val granted = withContext(Dispatchers.IO) {
-            PermissionHelper.checkAllPermissions(this@MainActivity)
-        }
+        val granted =
+            withContext(Dispatchers.IO) {
+                PermissionHelper.checkAllPermissions(this@MainActivity)
+            }
         if (!granted) {
             Logger.w("NotifyRelay", "必要权限未授权，跳转引导页")
             withContext(Dispatchers.Main) {
@@ -193,9 +199,10 @@ class MainActivity : FragmentActivity() {
             return
         }
 
-        val result = withContext(Dispatchers.IO) {
-            ServiceManager.startAllServices(this@MainActivity)
-        }
+        val result =
+            withContext(Dispatchers.IO) {
+                ServiceManager.startAllServices(this@MainActivity)
+            }
         val serviceStarted = result.first
         val errorMessage = result.second
         withContext(Dispatchers.Main) {
@@ -233,18 +240,20 @@ class MainActivity : FragmentActivity() {
         pendingScreenCapture = null
     }
 
-    private val guideLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
-        recreate()
-    }
-
-    private val screenCaptureLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-        if (result.resultCode == RESULT_OK && result.data != null) {
-            pendingScreenCapture = result.resultCode to result.data!!
-            processPendingScreenCapture()
-        } else {
-            stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+    private val guideLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { _ ->
+            recreate()
         }
-    }
+
+    private val screenCaptureLauncher =
+        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+            if (result.resultCode == RESULT_OK && result.data != null) {
+                pendingScreenCapture = result.resultCode to result.data!!
+                processPendingScreenCapture()
+            } else {
+                stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+            }
+        }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -274,128 +283,135 @@ class MainActivity : FragmentActivity() {
             val context = LocalContext.current
             val systemDarkTheme = isSystemInDarkTheme()
             val themeBaseIndex = remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
-            
-            val isDarkTheme = when (themeBaseIndex.intValue) {
-                ThemeSettingsManager.THEME_LIGHT -> false
-                ThemeSettingsManager.THEME_DARK -> true
-                else -> systemDarkTheme
-            }
-            
-            DisposableEffect(context) {
-                val listener = ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
-                    themeBaseIndex.intValue = newBaseIndex
+
+            val isDarkTheme =
+                when (themeBaseIndex.intValue) {
+                    ThemeSettingsManager.THEME_LIGHT -> false
+                    ThemeSettingsManager.THEME_DARK -> true
+                    else -> systemDarkTheme
                 }
+
+            DisposableEffect(context) {
+                val listener =
+                    ThemeSettingsManager.ThemeChangeListener { newBaseIndex ->
+                        themeBaseIndex.intValue = newBaseIndex
+                    }
                 ThemeSettingsManager.addThemeChangeListener(context, listener)
                 onDispose {
                     ThemeSettingsManager.removeThemeChangeListener(context, listener)
                 }
             }
-            
+
             NotifyRelayTheme(darkTheme = isDarkTheme) {
                 val colorScheme = MiuixTheme.colorScheme
                 SetupSystemBars(isDarkTheme)
-                
+
                 CompositionLocalProvider(
-                    LocalNavigator provides navigator
+                    LocalNavigator provides navigator,
                 ) {
-                    Box(modifier = Modifier
-                        .fillMaxSize()
-                        .background(colorScheme.background)
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .background(colorScheme.background),
                     ) {
                         NavDisplay(
                             backStack = navigator.backStack,
-                            entryDecorators = listOf(
-                                rememberSaveableStateHolderNavEntryDecorator(),
-                                rememberViewModelStoreNavEntryDecorator()
-                            ),
+                            entryDecorators =
+                                listOf(
+                                    rememberSaveableStateHolderNavEntryDecorator(),
+                                    rememberViewModelStoreNavEntryDecorator(),
+                                ),
                             onBack = {
                                 if (navigator.backStackSize() > 1) {
                                     navigator.pop()
                                 }
                             },
-                            entryProvider = entryProvider {
-                                entry<Route.Main> { MainScreen(navigator) }
-                                entry<Route.History> { HistoryScreen(navigator) }
-                                entry<Route.Settings> { SettingsScreen() }
-                                entry<Route.ScrcpyAdvanced> { ScrcpyAdvancedScreen(navigator) }
-                                entry<Route.ScrcpyVirtualButtonOrder> { ScrcpyVirtualButtonOrderScreen(navigator) }
-                                entry<Route.SettingsRemoteFilter> {
-                                    ScrollableTopAppBarPage(
-                                        title = "远程过滤",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        UIRemoteFilter()
-                                    }
-                                }
-                                entry<Route.SettingsLocalFilter> {
-                                    ScrollableTopAppBarPage(
-                                        title = "本地过滤",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        UILocalFilter()
-                                    }
-                                }
-                                entry<Route.SettingsSuperIsland> {
-                                    ScrollableTopAppBarPage(
-                                        title = "超级岛",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        UISuperIslandSettings()
-                                    }
-                                }
-                                entry<Route.SettingsScrcpy> {
-                                    val context = LocalContext.current
-                                    val serverPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-                                        if (uri == null) return@rememberLauncherForActivityResult
-                                        runCatching {
-                                            context.contentResolver.takePersistableUriPermission(
-                                                uri,
-                                                Intent.FLAG_GRANT_READ_URI_PERMISSION
-                                            )
-                                            // 问题 5 修复：原回调仅 takePersistableUriPermission，未写入 CUSTOM_SERVER_URI；
-                                            // 且 ScrcpyUiViewModel 是单例，只写 StorageManager 不会让 UI/连接生效。
-                                            // 双写：1) StorageManager 持久化；2) viewModel setter 更新单例状态（内部也会持久化到 mainSettings）。
-                                            val uriString = uri.toString()
-                                            StorageManager.putString(
-                                                context,
-                                                ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
-                                                uriString,
-                                                StorageManager.PrefsType.SCRCPY
-                                            )
-                                            val app = context.applicationContext as android.app.Application
-                                            ScrcpyUiViewModel.getInstance(app).customServerUri = uriString
-                                        }.onFailure { e ->
-                                            Logger.e("MainActivity", "scrcpy server URI 保存失败: uri=$uri", e)
+                            entryProvider =
+                                entryProvider {
+                                    entry<Route.Main> { MainScreen(navigator) }
+                                    entry<Route.History> { HistoryScreen(navigator) }
+                                    entry<Route.Settings> { SettingsScreen() }
+                                    entry<Route.ScrcpyAdvanced> { ScrcpyAdvancedScreen(navigator) }
+                                    entry<Route.ScrcpyVirtualButtonOrder> { ScrcpyVirtualButtonOrderScreen(navigator) }
+                                    entry<Route.SettingsRemoteFilter> {
+                                        ScrollableTopAppBarPage(
+                                            title = "远程过滤",
+                                            onBack = { navigator.pop() },
+                                        ) {
+                                            UIRemoteFilter()
                                         }
                                     }
-                                    ScrollableTopAppBarPage(
-                                        title = "屏幕镜像",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        ScrcpyScreenHost(
-                                            startScreen = ScrcpyRootScreen.Settings,
-                                            onPickServer = { serverPicker.launch(arrayOf("application/java-archive", "application/octet-stream", "*/*")) },
-                                            onExit = { navigator.pop() },
-                                        )
+                                    entry<Route.SettingsLocalFilter> {
+                                        ScrollableTopAppBarPage(
+                                            title = "本地过滤",
+                                            onBack = { navigator.pop() },
+                                        ) {
+                                            UILocalFilter()
+                                        }
                                     }
-                                }
-                                entry<Route.SettingsAbout> {
-                                    ScrollableTopAppBarPage(
-                                        title = "关于",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        UIAbout()
+                                    entry<Route.SettingsSuperIsland> {
+                                        ScrollableTopAppBarPage(
+                                            title = "超级岛",
+                                            onBack = { navigator.pop() },
+                                        ) {
+                                            UISuperIslandSettings()
+                                        }
                                     }
-                                }
-                                entry<Route.SettingsAppearance> {
-                                    ScrollableTopAppBarPage(
-                                        title = "外观",
-                                        onBack = { navigator.pop() }
-                                    ) {
-                                        UIAppearance()
+                                    entry<Route.SettingsScrcpy> {
+                                        val context = LocalContext.current
+                                        val serverPicker =
+                                            rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+                                                if (uri == null) return@rememberLauncherForActivityResult
+                                                runCatching {
+                                                    context.contentResolver.takePersistableUriPermission(
+                                                        uri,
+                                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                                                    )
+                                                    // 问题 5 修复：原回调仅 takePersistableUriPermission，未写入 CUSTOM_SERVER_URI；
+                                                    // 且 ScrcpyUiViewModel 是单例，只写 StorageManager 不会让 UI/连接生效。
+                                                    // 双写：1) StorageManager 持久化；2) viewModel setter 更新单例状态（内部也会持久化到 mainSettings）。
+                                                    val uriString = uri.toString()
+                                                    StorageManager.putString(
+                                                        context,
+                                                        ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
+                                                        uriString,
+                                                        StorageManager.PrefsType.SCRCPY,
+                                                    )
+                                                    val app = context.applicationContext as android.app.Application
+                                                    ScrcpyUiViewModel.getInstance(app).customServerUri = uriString
+                                                }.onFailure { e ->
+                                                    Logger.e("MainActivity", "scrcpy server URI 保存失败: uri=$uri", e)
+                                                }
+                                            }
+                                        ScrollableTopAppBarPage(
+                                            title = "屏幕镜像",
+                                            onBack = { navigator.pop() },
+                                        ) {
+                                            ScrcpyScreenHost(
+                                                startScreen = ScrcpyRootScreen.Settings,
+                                                onPickServer = { serverPicker.launch(arrayOf("application/java-archive", "application/octet-stream", "*/*")) },
+                                                onExit = { navigator.pop() },
+                                            )
+                                        }
                                     }
-                                }
-                            }
+                                    entry<Route.SettingsAbout> {
+                                        ScrollableTopAppBarPage(
+                                            title = "关于",
+                                            onBack = { navigator.pop() },
+                                        ) {
+                                            UIAbout()
+                                        }
+                                    }
+                                    entry<Route.SettingsAppearance> {
+                                        ScrollableTopAppBarPage(
+                                            title = "外观",
+                                            onBack = { navigator.pop() },
+                                        ) {
+                                            UIAppearance()
+                                        }
+                                    }
+                                },
                         )
                     }
                 }
@@ -427,7 +443,7 @@ class MainActivity : FragmentActivity() {
             startServicesAndUpdateBanner()
         }
     }
-    
+
     private suspend fun startServicesAndUpdateBanner() {
         val result = ServiceManager.startAllServices(this)
         val serviceStarted = result.first
@@ -451,30 +467,30 @@ class MainActivity : FragmentActivity() {
 @Composable
 fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
     val colorScheme = MiuixTheme.colorScheme
-    
+
     val errorColor = MiuixTheme.colorScheme.error
     val onErrorColor = MiuixTheme.colorScheme.onError
-    
+
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
-    
+
     val activity = LocalActivity.current as? MainActivity
     val showBanner = activity?.showAutoStartBanner?.value == true
     val bannerMsg = activity?.bannerMessage?.value
     val context = LocalContext.current
-    
+
     val deviceListState = remember { DeviceListScreenState() }
-    
+
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
     var selectedTab by rememberSaveable { mutableIntStateOf(0) }
     val coroutineScope = rememberCoroutineScope()
-    
+
     LaunchedEffect(pagerState.currentPage) {
         selectedTab = pagerState.currentPage
     }
-    
+
     MainScreenBackHandler(selectedTab, pagerState, navigator, deviceListState)
-    
+
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
@@ -482,31 +498,31 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
                 if (showBanner && !bannerMsg.isNullOrBlank()) {
                     Surface(
                         color = errorColor,
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier.fillMaxWidth(),
                     ) {
                         Row(
                             Modifier
                                 .fillMaxWidth()
                                 .padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
                             Icon(
                                 imageVector = MiuixIcons.Settings,
-                                contentDescription = null
+                                contentDescription = null,
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
                                 text = bannerMsg,
                                 style = MiuixTheme.textStyles.body1,
                                 color = onErrorColor,
-                                modifier = Modifier.weight(1f)
+                                modifier = Modifier.weight(1f),
                             )
                             Spacer(Modifier.width(10.dp))
                             Button(
                                 onClick = {
                                     IntentUtils.startActivity(context, Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null), true)
                                 },
-                                modifier = Modifier.height(36.dp)
+                                modifier = Modifier.height(36.dp),
                             ) {
                                 Text("前往设置")
                             }
@@ -517,68 +533,72 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
             bottomBar = {
                 NavigationBar(
                     color = colorScheme.background,
-                    modifier = Modifier
-                        .height(75.dp)
-                        .navigationBarsPadding()
+                    modifier =
+                        Modifier
+                            .height(75.dp)
+                            .navigationBarsPadding(),
                 ) {
                     NavigationBarItem(
                         modifier = Modifier.weight(1f),
                         selected = selectedTab == 0,
-                        onClick = { 
+                        onClick = {
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(0)
                             }
                         },
                         icon = MiuixIcons.Community,
-                        label = "历史"
+                        label = "历史",
                     )
                     NavigationBarItem(
                         modifier = Modifier.weight(1f),
                         selected = selectedTab == 1,
-                        onClick = { 
+                        onClick = {
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(1)
                             }
                         },
                         icon = MiuixIcons.Settings,
-                        label = "设备互联与增强"
+                        label = "设备互联与增强",
                     )
                     NavigationBarItem(
                         modifier = Modifier.weight(1f),
                         selected = selectedTab == 2,
-                        onClick = { 
+                        onClick = {
                             coroutineScope.launch {
                                 pagerState.animateScrollToPage(2)
                             }
                         },
                         icon = MiuixIcons.Tune,
-                        label = "设置"
+                        label = "设置",
                     )
                 }
             },
-            containerColor = colorScheme.background
+            containerColor = colorScheme.background,
         ) { paddingValues ->
             if (isLandscape) {
                 Row(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(colorScheme.background)
-                        .padding(paddingValues)
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(colorScheme.background)
+                            .padding(paddingValues),
                 ) {
                     Box(
-                        modifier = Modifier
-                            .width(220.dp)
-                            .fillMaxHeight()
-                            .background(colorScheme.background)
+                        modifier =
+                            Modifier
+                                .width(220.dp)
+                                .fillMaxHeight()
+                                .background(colorScheme.background),
                     ) {
                         DeviceListScreen(navigator, deviceListState)
                     }
                     HorizontalPager(
                         state = pagerState,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxHeight(),
-                        userScrollEnabled = false
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .fillMaxHeight(),
+                        userScrollEnabled = false,
                     ) { page ->
                         when (page) {
                             0 -> HistoryScreen(navigator)
@@ -589,18 +609,20 @@ fun MainScreen(navigator: com.xzyht.notifyrelay.ui.navigation.Navigator) {
                 }
             } else {
                 Column(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(colorScheme.background)
-                        .padding(paddingValues)
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .background(colorScheme.background)
+                            .padding(paddingValues),
                 ) {
                     DeviceListScreen(navigator, deviceListState)
                     HorizontalPager(
                         state = pagerState,
-                        modifier = Modifier
-                            .weight(1f)
-                            .fillMaxWidth(),
-                        userScrollEnabled = false
+                        modifier =
+                            Modifier
+                                .weight(1f)
+                                .fillMaxWidth(),
+                        userScrollEnabled = false,
                     ) { page ->
                         when (page) {
                             0 -> HistoryScreen(navigator)
@@ -619,7 +641,7 @@ private fun MainScreenBackHandler(
     selectedTab: Int,
     pagerState: PagerState,
     navigator: com.xzyht.notifyrelay.ui.navigation.Navigator,
-    deviceListState: DeviceListScreenState
+    deviceListState: DeviceListScreenState,
 ) {
     val activity = LocalActivity.current as? MainActivity
     var backPressedTime by remember { mutableLongStateOf(0L) }
@@ -629,7 +651,7 @@ private fun MainScreenBackHandler(
     val isBackHandlerEnabled by remember {
         derivedStateOf {
             navigator.current() is Route.Main &&
-            navigator.backStackSize() == 1
+                navigator.backStackSize() == 1
         }
     }
 
@@ -654,6 +676,6 @@ private fun MainScreenBackHandler(
                     backPressedTime = currentTime
                 }
             }
-        }
+        },
     )
 }

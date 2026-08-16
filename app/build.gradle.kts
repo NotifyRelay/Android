@@ -1,6 +1,6 @@
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import java.io.ByteArrayOutputStream
+import java.io.File
 import java.util.Properties
 
 plugins {
@@ -10,46 +10,55 @@ plugins {
     id("kotlin-parcelize")
 }
 
+// 版本号由 version.properties 提供（update.yml 在 push 到 main 时按 commit 语义回写），
+// 注入优先级：-PversionName/-PversionCode（gradle property）→ VERSION_NAME/VERSION_CODE（环境变量）
+// → version.properties 固定值（本地构建使用）。
+fun loadFixedVersion(): Pair<String, Int> {
+    val props = Properties()
+    val file = rootProject.file("version.properties")
+    require(file.exists()) {
+        "Missing version.properties. Provide -PversionName/-PversionCode (or env VERSION_NAME/VERSION_CODE) when building in CI."
+    }
+    file.inputStream().use { props.load(it) }
 
+    val name =
+        props.getProperty("versionName")
+            ?: error("versionName is missing in version.properties")
+    val code =
+        props.getProperty("versionCode")?.toIntOrNull()
+            ?: error("versionCode is missing or not an Int in version.properties")
+    return name to code
+}
 
-// 自动生成版本号：遵循仓库约定
-// 规则摘要（来自项目说明）：
-// version = major.minor.patch
-// - major: 可通过 gradle.properties 的 versionMajor 覆盖，默认 0
-// - minor: main 分支的提交数（主线提交计数）
-// - patch: 如果当前分支为 main，则使用当前日期的 MMdd（例如 1027 -> Oct 27）；否则使用当前 HEAD 的提交数（dev 分支下）
-// 生成的 versionCode 采用如下编码：major*10_000_000 + minor*1000 + patch
-// 这个值应在 32-bit int 范围内（对于常见 repo 提交量是安全的）。
-
-// 主版本号（major）
-// - 直接在此处设置主版本号；不再从 gradle.properties 读取。
-// - 在发布重大版本时请在这里更新此值（并可同时调整下方的 versionMajorSubtract）。
-// 例如：val versionMajor: Int = 1
-val versionMajor: Int = 2 // <-- 在此处直接修改主版本号
-
-
-// 使用 buildSrc 中的 Versioning 实现来计算版本信息（包含对非 main 分支仅统计独有提交的修订数）
-// 支持在此文件内直接设置次版本（minor）减量（不使用 gradle.properties）：
-// - 当主版本号（versionMajor）升级后，可以在下面直接把 `versionMajorSubtract` 改为期望的值，
-//   这样 main 的提交计数会在计算中减去该值（下限为 0），防止次版本无限递增。
-// - 示例：如果希望在 major 升级后把 main 的计数回退 340，则设置为 340。
-val versionMajorSubtract: Int = 465 // <-- 在此处直接修改以手动应用减量，当前main分支提交数为465
-val versionInfo = Versioning.compute(rootProject.projectDir, versionMajor, versionMajorSubtract)
-val computedVersionName = versionInfo.versionName
-val computedVersionCode = versionInfo.versionCode
-
+val (fixedVersionName, fixedVersionCode) = loadFixedVersion()
+val injectedVersionName =
+    providers.gradleProperty("versionName").orNull
+        ?: System.getenv("VERSION_NAME")
+        ?: fixedVersionName
+val injectedVersionCode =
+    (
+        providers.gradleProperty("versionCode").orNull
+            ?: System.getenv("VERSION_CODE")
+            ?: fixedVersionCode.toString()
+    ).toIntOrNull() ?: fixedVersionCode
 
 android {
     namespace = "com.xzyht.notifyrelay"
-    compileSdk = libs.versions.compileSdk.get().toInt()
+    compileSdk =
+        libs.versions.compileSdk
+            .get()
+            .toInt()
 
     defaultConfig {
         applicationId = "com.xzyht.notifyrelay"
         minSdk = 31
-        targetSdk = libs.versions.targetSdk.get().toInt()
-        // 使用自动计算的版本号
-        versionCode = computedVersionCode
-        versionName = computedVersionName
+        targetSdk =
+            libs.versions.targetSdk
+                .get()
+                .toInt()
+        // 使用 version.properties 提供的版本号（CI 语义化回写）
+        versionCode = injectedVersionCode
+        versionName = injectedVersionName
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -60,28 +69,36 @@ android {
         val signingKeyPassword = System.getenv("KEY_PASSWORD") ?: project.findProperty("KEY_PASSWORD") as? String
         val signingKeyAlias = System.getenv("KEY_ALIAS") ?: project.findProperty("KEY_ALIAS") as? String
 
-        val localProps = Properties().apply {
-            rootProject.file("local.properties").takeIf { it.isFile }?.inputStream()?.use { load(it) }
-        }
+        val localProps =
+            Properties().apply {
+                rootProject
+                    .file("local.properties")
+                    .takeIf { it.isFile }
+                    ?.inputStream()
+                    ?.use { load(it) }
+            }
         val keyBaseDir = file(localProps.getProperty("KEYSTORE_PATH") ?: "PublicHub")
-        val localPropFiles = listOf(
-            rootProject.file("signing.local.properties"),
-            File(keyBaseDir, "signing.local.properties")
-        )
+        val localPropFiles =
+            listOf(
+                rootProject.file("signing.local.properties"),
+                File(keyBaseDir, "signing.local.properties"),
+            )
         localPropFiles.filter { it.isFile }.forEach { file ->
             file.inputStream().use { localProps.load(it) }
         }
-        val localKeystore = if (keyBaseDir.isFile) {
-            keyBaseDir
-        } else if (keyBaseDir.isDirectory) {
-            keyBaseDir.listFiles()?.firstOrNull { it.isFile && it.name == "PublicHub.jks" }
-                ?: keyBaseDir.listFiles()?.firstOrNull { it.isFile && it.name == "PublicHub" }
-        } else {
-            null
-        }
+        val localKeystore =
+            if (keyBaseDir.isFile) {
+                keyBaseDir
+            } else if (keyBaseDir.isDirectory) {
+                keyBaseDir.listFiles()?.firstOrNull { it.isFile && it.name == "PublicHub.jks" }
+                    ?: keyBaseDir.listFiles()?.firstOrNull { it.isFile && it.name == "PublicHub" }
+            } else {
+                null
+            }
 
-        val resolvedKeystore = keystorePath
-            ?: localKeystore?.absolutePath
+        val resolvedKeystore =
+            keystorePath
+                ?: localKeystore?.absolutePath
         val resolvedStorePassword = signingStorePassword ?: localProps.getProperty("STORE_PASSWORD")
         val resolvedKeyPassword = signingKeyPassword ?: localProps.getProperty("KEY_PASSWORD")
         val resolvedKeyAlias = signingKeyAlias ?: localProps.getProperty("KEY_ALIAS")
@@ -108,7 +125,7 @@ android {
             isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro"
+                "proguard-rules.pro",
             )
             signingConfig = releaseSigning
         }
@@ -165,7 +182,7 @@ dependencies {
 
     // Jetpack Compose BOM 统一管理版本
     implementation(platform(libs.androidx.compose.bom))
-    
+
     // Jetpack Compose 依赖（通过 BOM 统一管理版本）
     implementation("androidx.activity:activity-compose")
     implementation("androidx.compose.ui:ui")
@@ -192,7 +209,7 @@ dependencies {
 
     // Paging 3
     implementation(libs.bundles.paging)
-    
+
     // Miuix风格ui库
     implementation(libs.miuix.ui)
     implementation(libs.miuix.preference)
@@ -211,14 +228,14 @@ dependencies {
     implementation(libs.okio)
     // 局域网设备发现 jmdns
     implementation(libs.jmdns)
-    
+
     // Coil: image loading (Kotlin + Coroutines friendly)
     implementation(libs.bundles.coil)
     // DiskLruCache: stable disk-based LRU cache for icons
     implementation(libs.disklrucache)
     // 添加Apache FtpServer依赖用于FTP服务器实现
     implementation(libs.apache.ftpserver)
-    
+
     // 依赖数据模块
     implementation(project(":data"))
     // 依赖core模块
@@ -237,8 +254,6 @@ dependencies {
 
 tasks.register("printVersionName") {
     doLast {
-        println(computedVersionName)
+        println(injectedVersionName)
     }
 }
-
-
