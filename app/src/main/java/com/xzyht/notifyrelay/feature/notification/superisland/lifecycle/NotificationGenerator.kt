@@ -808,10 +808,6 @@ object NotificationGenerator {
     }
 
     /**
-     * 构建胶囊兼容的通知并注入图标
-     */
-
-    /**
      * 解析小图标位图，遵循优先级：progress -> text -> picMap aPicKey/bPicKey -> appIconKey -> null
      */
     private suspend fun resolveSmallIconBitmap(

@@ -23,17 +23,13 @@ ktlint_standard_no-wildcard-imports = disabled
 [nativecore/**/*.kt]
 ktlint_standard_package-name = disabled
 
-# superislandui 为复制的第三方 UI 库：包名含大写（BigIsland）历史遗留，
-# 文件名/注释结构与上游保持一致的旧风格
+# superislandui 为项目自有模块：包名含大写（BigIsland）为历史遗留，暂豁免
 [superislandui/**/*.kt]
 ktlint_standard_package-name = disabled
-ktlint_standard_filename = disabled
-ktlint_standard_no-consecutive-comments = disabled
 
-# app 内 superisland 相关代码同样复制自该 UI 库，保持与上游一致的命名与注释风格
+# app 内 superisland 相关代码与 superislandui 模块同源：包名含大写（BigIsland）历史遗留，暂豁免
 [app/**/superisland/**/*.kt]
 ktlint_standard_package-name = disabled
-ktlint_standard_no-consecutive-comments = disabled
 
 # FtpServer.kt 中类/对象名为历史小写命名（ftpServer/ftpServerInfo/ftpStartResult），改名影响多处引用
 [app/**/sync/FtpServer.kt]

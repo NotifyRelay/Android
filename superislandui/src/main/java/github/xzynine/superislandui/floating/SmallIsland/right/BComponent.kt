@@ -89,12 +89,6 @@ data class BFixedWidthDigitInfo(
 }
 
 /**
- * 计时信息（sameWidthDigitInfo.timerInfo）
- * - timerType 必传
- * - timerWhen / timerTotal / timerSystemCurrent 可选
- */
-
-/**
  * 等宽数字文本组件（sameWidthDigitInfo）
  * - digit 与 timer 二选一，至少一项存在（digit 兼容旧字段名 text）
  * - content 可选
