@@ -27,11 +27,13 @@ sealed interface Route :
             flags: Int,
         ) {}
 
-        object CREATOR : Parcelable.Creator<Main> {
-            override fun createFromParcel(parcel: Parcel): Main = Main
+        @JvmField
+        val CREATOR: Parcelable.Creator<Main> =
+            object : Parcelable.Creator<Main> {
+                override fun createFromParcel(parcel: Parcel): Main = Main
 
-            override fun newArray(size: Int): Array<Main?> = arrayOfNulls(size)
-        }
+                override fun newArray(size: Int): Array<Main?> = arrayOfNulls(size)
+            }
     }
 
     /**
@@ -48,11 +50,13 @@ sealed interface Route :
             flags: Int,
         ) {}
 
-        object CREATOR : Parcelable.Creator<History> {
-            override fun createFromParcel(parcel: Parcel): History = History
+        @JvmField
+        val CREATOR: Parcelable.Creator<History> =
+            object : Parcelable.Creator<History> {
+                override fun createFromParcel(parcel: Parcel): History = History
 
-            override fun newArray(size: Int): Array<History?> = arrayOfNulls(size)
-        }
+                override fun newArray(size: Int): Array<History?> = arrayOfNulls(size)
+            }
     }
 
     /**
@@ -69,11 +73,13 @@ sealed interface Route :
             flags: Int,
         ) {}
 
-        object CREATOR : Parcelable.Creator<Settings> {
-            override fun createFromParcel(parcel: Parcel): Settings = Settings
+        @JvmField
+        val CREATOR: Parcelable.Creator<Settings> =
+            object : Parcelable.Creator<Settings> {
+                override fun createFromParcel(parcel: Parcel): Settings = Settings
 
-            override fun newArray(size: Int): Array<Settings?> = arrayOfNulls(size)
-        }
+                override fun newArray(size: Int): Array<Settings?> = arrayOfNulls(size)
+            }
     }
 
     /**
@@ -90,11 +96,13 @@ sealed interface Route :
             flags: Int,
         ) {}
 
-        object CREATOR : Parcelable.Creator<ScrcpyAdvanced> {
-            override fun createFromParcel(parcel: Parcel): ScrcpyAdvanced = ScrcpyAdvanced
+        @JvmField
+        val CREATOR: Parcelable.Creator<ScrcpyAdvanced> =
+            object : Parcelable.Creator<ScrcpyAdvanced> {
+                override fun createFromParcel(parcel: Parcel): ScrcpyAdvanced = ScrcpyAdvanced
 
-            override fun newArray(size: Int): Array<ScrcpyAdvanced?> = arrayOfNulls(size)
-        }
+                override fun newArray(size: Int): Array<ScrcpyAdvanced?> = arrayOfNulls(size)
+            }
     }
 
     /**
@@ -111,11 +119,13 @@ sealed interface Route :
             flags: Int,
         ) {}
 
-        object CREATOR : Parcelable.Creator<ScrcpyVirtualButtonOrder> {
-            override fun createFromParcel(parcel: Parcel): ScrcpyVirtualButtonOrder = ScrcpyVirtualButtonOrder
+        @JvmField
+        val CREATOR: Parcelable.Creator<ScrcpyVirtualButtonOrder> =
+            object : Parcelable.Creator<ScrcpyVirtualButtonOrder> {
+                override fun createFromParcel(parcel: Parcel): ScrcpyVirtualButtonOrder = ScrcpyVirtualButtonOrder
 
-            override fun newArray(size: Int): Array<ScrcpyVirtualButtonOrder?> = arrayOfNulls(size)
-        }
+                override fun newArray(size: Int): Array<ScrcpyVirtualButtonOrder?> = arrayOfNulls(size)
+            }
     }
 
     /**
@@ -132,11 +142,13 @@ sealed interface Route :
             flags: Int,
         ) {}
 
-        object CREATOR : Parcelable.Creator<SettingsRemoteFilter> {
-            override fun createFromParcel(parcel: Parcel): SettingsRemoteFilter = SettingsRemoteFilter
+        @JvmField
+        val CREATOR: Parcelable.Creator<SettingsRemoteFilter> =
+            object : Parcelable.Creator<SettingsRemoteFilter> {
+                override fun createFromParcel(parcel: Parcel): SettingsRemoteFilter = SettingsRemoteFilter
 
-            override fun newArray(size: Int): Array<SettingsRemoteFilter?> = arrayOfNulls(size)
-        }
+                override fun newArray(size: Int): Array<SettingsRemoteFilter?> = arrayOfNulls(size)
+            }
     }
 
     /**
@@ -153,11 +165,13 @@ sealed interface Route :
             flags: Int,
         ) {}
 
-        object CREATOR : Parcelable.Creator<SettingsLocalFilter> {
-            override fun createFromParcel(parcel: Parcel): SettingsLocalFilter = SettingsLocalFilter
+        @JvmField
+        val CREATOR: Parcelable.Creator<SettingsLocalFilter> =
+            object : Parcelable.Creator<SettingsLocalFilter> {
+                override fun createFromParcel(parcel: Parcel): SettingsLocalFilter = SettingsLocalFilter
 
-            override fun newArray(size: Int): Array<SettingsLocalFilter?> = arrayOfNulls(size)
-        }
+                override fun newArray(size: Int): Array<SettingsLocalFilter?> = arrayOfNulls(size)
+            }
     }
 
     /**
@@ -174,11 +188,13 @@ sealed interface Route :
             flags: Int,
         ) {}
 
-        object CREATOR : Parcelable.Creator<SettingsSuperIsland> {
-            override fun createFromParcel(parcel: Parcel): SettingsSuperIsland = SettingsSuperIsland
+        @JvmField
+        val CREATOR: Parcelable.Creator<SettingsSuperIsland> =
+            object : Parcelable.Creator<SettingsSuperIsland> {
+                override fun createFromParcel(parcel: Parcel): SettingsSuperIsland = SettingsSuperIsland
 
-            override fun newArray(size: Int): Array<SettingsSuperIsland?> = arrayOfNulls(size)
-        }
+                override fun newArray(size: Int): Array<SettingsSuperIsland?> = arrayOfNulls(size)
+            }
     }
 
     /**
@@ -195,11 +211,13 @@ sealed interface Route :
             flags: Int,
         ) {}
 
-        object CREATOR : Parcelable.Creator<SettingsScrcpy> {
-            override fun createFromParcel(parcel: Parcel): SettingsScrcpy = SettingsScrcpy
+        @JvmField
+        val CREATOR: Parcelable.Creator<SettingsScrcpy> =
+            object : Parcelable.Creator<SettingsScrcpy> {
+                override fun createFromParcel(parcel: Parcel): SettingsScrcpy = SettingsScrcpy
 
-            override fun newArray(size: Int): Array<SettingsScrcpy?> = arrayOfNulls(size)
-        }
+                override fun newArray(size: Int): Array<SettingsScrcpy?> = arrayOfNulls(size)
+            }
     }
 
     /**
@@ -216,11 +234,13 @@ sealed interface Route :
             flags: Int,
         ) {}
 
-        object CREATOR : Parcelable.Creator<SettingsAbout> {
-            override fun createFromParcel(parcel: Parcel): SettingsAbout = SettingsAbout
+        @JvmField
+        val CREATOR: Parcelable.Creator<SettingsAbout> =
+            object : Parcelable.Creator<SettingsAbout> {
+                override fun createFromParcel(parcel: Parcel): SettingsAbout = SettingsAbout
 
-            override fun newArray(size: Int): Array<SettingsAbout?> = arrayOfNulls(size)
-        }
+                override fun newArray(size: Int): Array<SettingsAbout?> = arrayOfNulls(size)
+            }
     }
 
     /**
@@ -237,10 +257,12 @@ sealed interface Route :
             flags: Int,
         ) {}
 
-        object CREATOR : Parcelable.Creator<SettingsAppearance> {
-            override fun createFromParcel(parcel: Parcel): SettingsAppearance = SettingsAppearance
+        @JvmField
+        val CREATOR: Parcelable.Creator<SettingsAppearance> =
+            object : Parcelable.Creator<SettingsAppearance> {
+                override fun createFromParcel(parcel: Parcel): SettingsAppearance = SettingsAppearance
 
-            override fun newArray(size: Int): Array<SettingsAppearance?> = arrayOfNulls(size)
-        }
+                override fun newArray(size: Int): Array<SettingsAppearance?> = arrayOfNulls(size)
+            }
     }
 }

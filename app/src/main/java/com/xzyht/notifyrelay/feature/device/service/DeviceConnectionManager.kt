@@ -1444,6 +1444,7 @@ class DeviceConnectionManager(
                                         coroutineScope.launch {
                                             audioRelayPlayer.stop()
                                             cancelAudioRelayNotification()
+                                            cleanupMediaProjection()
                                             if (json.optString("result", "").isNotEmpty()) return@launch
                                             val device = resolveDeviceInfo(uuid, "", 23333)
                                             if (device != null) {
@@ -2256,6 +2257,16 @@ class DeviceConnectionManager(
         }
         audioRelayPlayer.stop()
         cancelAudioRelayNotification()
+        cleanupMediaProjection()
+    }
+
+    private fun cleanupMediaProjection() {
+        // 停止并清空投影，避免下次授权时 stop 旧投影触发 onStop 回调干扰新会话
+        try {
+            NativeCore.mediaProjection?.stop()
+        } catch (_: Exception) {
+        }
+        NativeCore.mediaProjection = null
     }
 
     private fun cancelAudioRelayNotification() {

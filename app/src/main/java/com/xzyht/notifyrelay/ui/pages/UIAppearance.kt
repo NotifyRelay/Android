@@ -24,29 +24,50 @@ private val THEME_BASE_OPTIONS =
     )
 
 /**
- * 外观设置
- * 提供外观模式选择等界面
+ * 外观设置内容
+ *
+ * 默认自管理主题状态并持久化；传入 [themeBaseIndex] / [onThemeSelected] 时进入受控模式，
+ * 由调用方（如引导页）持有状态并处理变更，便于即时换肤。
+ * 默认自带垂直滚动；当嵌入到外层滚动容器（如引导页基础设置）时需传 [scrollable] = false，
+ * 避免嵌套滚动导致无限高度约束崩溃。
  */
 @Composable
-fun UIAppearance() {
+fun UIAppearance(
+    themeBaseIndex: Int? = null,
+    onThemeSelected: ((Int) -> Unit)? = null,
+    scrollable: Boolean = true,
+) {
     val context = LocalContext.current
-    var themeBaseIndex by remember { mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(context)) }
+    var localThemeBaseIndex by remember {
+        mutableIntStateOf(themeBaseIndex ?: ThemeSettingsManager.getThemeBaseIndex(context))
+    }
+    // 外部受控时以外部传入值为准
+    val selectedIndex = themeBaseIndex ?: localThemeBaseIndex
 
     Column(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(top = 12.dp),
+                .then(
+                    if (scrollable) {
+                        Modifier.verticalScroll(rememberScrollState())
+                    } else {
+                        Modifier
+                    },
+                ).padding(top = 12.dp),
     ) {
         WindowDropdownPreference(
             title = "外观模式",
-            summary = THEME_BASE_OPTIONS.find { it.second == themeBaseIndex }?.first ?: "跟随系统",
+            summary = THEME_BASE_OPTIONS.find { it.second == selectedIndex }?.first ?: "跟随系统",
             items = THEME_BASE_OPTIONS.map { it.first },
-            selectedIndex = themeBaseIndex.coerceIn(0, THEME_BASE_OPTIONS.lastIndex),
+            selectedIndex = selectedIndex.coerceIn(0, THEME_BASE_OPTIONS.lastIndex),
             onSelectedIndexChange = { newIndex ->
-                themeBaseIndex = newIndex
-                ThemeSettingsManager.setThemeBaseIndex(context, newIndex)
+                if (onThemeSelected != null) {
+                    onThemeSelected(newIndex)
+                } else {
+                    localThemeBaseIndex = newIndex
+                    ThemeSettingsManager.setThemeBaseIndex(context, newIndex)
+                }
             },
         )
     }

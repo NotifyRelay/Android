@@ -1,7 +1,11 @@
 package com.xzyht.notifyrelay.ui.screen
 
 import android.content.Intent
+import android.net.Uri
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -17,9 +21,20 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
+import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
 import com.xzyht.notifyrelay.ui.navigation.Route
+import com.xzyht.notifyrelay.ui.pages.UIAbout
+import com.xzyht.notifyrelay.ui.pages.UIAppearance
+import com.xzyht.notifyrelay.ui.pages.UILocalFilter
+import com.xzyht.notifyrelay.ui.pages.UIRemoteFilter
+import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
+import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
+import notifyrelay.data.config.ScrcpyPreferenceKeys
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -107,3 +122,77 @@ fun SettingsScreen() {
         }
     }
 }
+
+/**
+ * 设置子页公共容器
+ * 统一 TopAppBar 与返回导航，子页只需提供标题与内容
+ */
+@Composable
+private fun SettingsSubPage(
+    title: String,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    val navigator = LocalNavigator.current
+    ScrollableTopAppBarPage(
+        title = title,
+        onBack = { navigator.pop() },
+    ) {
+        content()
+    }
+}
+
+@Composable
+fun SettingsRemoteFilterScreen() = SettingsSubPage("远程过滤") { UIRemoteFilter() }
+
+@Composable
+fun SettingsLocalFilterScreen() = SettingsSubPage("本地过滤") { UILocalFilter() }
+
+@Composable
+fun SettingsSuperIslandScreen() = SettingsSubPage("超级岛") { UISuperIslandSettings() }
+
+/**
+ * 屏幕镜像设置子页（含 TopAppBar）
+ */
+@Composable
+fun SettingsScrcpyScreen() {
+    val navigator = LocalNavigator.current
+    val context = LocalContext.current
+    val serverPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
+            if (uri == null) return@rememberLauncherForActivityResult
+            runCatching {
+                context.contentResolver.takePersistableUriPermission(
+                    uri,
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION,
+                )
+            }.onFailure { e ->
+                Logger.e("SettingsScrcpyScreen", "takePersistableUriPermission 失败: uri=$uri", e)
+            }
+            runCatching {
+                val uriString = uri.toString()
+                StorageManager.putString(
+                    context,
+                    ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
+                    uriString,
+                    StorageManager.PrefsType.SCRCPY,
+                )
+                val app = context.applicationContext as android.app.Application
+                ScrcpyUiViewModel.getInstance(app).customServerUri = uriString
+            }.onFailure { e ->
+                Logger.e("SettingsScrcpyScreen", "scrcpy server URI 保存失败: uri=$uri", e)
+            }
+        }
+    SettingsSubPage("屏幕镜像") {
+        ScrcpyScreenHost(
+            startScreen = ScrcpyRootScreen.Settings,
+            onPickServer = { serverPicker.launch(arrayOf("application/java-archive", "application/octet-stream", "*/*")) },
+            onExit = { navigator.pop() },
+        )
+    }
+}
+
+@Composable
+fun SettingsAboutScreen() = SettingsSubPage("关于") { UIAbout() }
+
+@Composable
+fun SettingsAppearanceScreen() = SettingsSubPage("外观") { UIAppearance() }

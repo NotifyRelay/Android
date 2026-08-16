@@ -1,6 +1,8 @@
 package com.xzyht.notifyrelay.ui.activity
 
+import android.Manifest
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
@@ -11,7 +13,6 @@ import android.os.Looper
 import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.compose.LocalActivity
-import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -48,6 +49,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
@@ -65,26 +67,23 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.servers.appslist.AppRepository
 import com.xzyht.notifyrelay.sync.AppLaunchManager
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
-import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
 import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.navigation.rememberNavigator
-import com.xzyht.notifyrelay.ui.pages.UIAbout
-import com.xzyht.notifyrelay.ui.pages.UIAppearance
-import com.xzyht.notifyrelay.ui.pages.UILocalFilter
-import com.xzyht.notifyrelay.ui.pages.UIRemoteFilter
-import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
 import com.xzyht.notifyrelay.ui.screen.DeviceForwardScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreen
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreenState
 import com.xzyht.notifyrelay.ui.screen.HistoryScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
+import com.xzyht.notifyrelay.ui.screen.SettingsAboutScreen
+import com.xzyht.notifyrelay.ui.screen.SettingsAppearanceScreen
+import com.xzyht.notifyrelay.ui.screen.SettingsLocalFilterScreen
+import com.xzyht.notifyrelay.ui.screen.SettingsRemoteFilterScreen
+import com.xzyht.notifyrelay.ui.screen.SettingsScrcpyScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
+import com.xzyht.notifyrelay.ui.screen.SettingsSuperIslandScreen
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -95,9 +94,7 @@ import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.core.util.ServiceManager
-import notifyrelay.data.StorageManager
 import notifyrelay.data.config.DeviceInfoManager
-import notifyrelay.data.config.ScrcpyPreferenceKeys
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
@@ -147,9 +144,11 @@ class MainActivity : FragmentActivity() {
                 projection.registerCallback(
                     object : MediaProjection.Callback() {
                         override fun onStop() {
-                            deviceManager.audioRelayPlayer.stopSendCapture()
+                            // 仅当被停止的投影仍是当前投影时才清理捕获，
+                            // 避免主动 stop 旧投影时其 onStop 回调误杀新会话的捕获。
                             if (NativeCore.mediaProjection === projection) {
                                 NativeCore.mediaProjection = null
+                                deviceManager.audioRelayPlayer.stopSendCapture()
                             }
                         }
                     },
@@ -255,6 +254,22 @@ class MainActivity : FragmentActivity() {
             }
         }
 
+    // 屏幕声音捕获（AudioPlaybackCapture）按官方要求需持有 RECORD_AUDIO 权限，
+    // 在发起 MediaProjection 授权前一并请求，拒绝时明确提示而非静默失败。
+    private val recordAudioPermissionLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            if (granted) {
+                launchScreenCapture()
+            } else {
+                ToastUtils.showShortToast(this, "缺少录音权限，无法捕获屏幕声音")
+            }
+        }
+
+    private fun launchScreenCapture() {
+        val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+        screenCaptureLauncher.launch(mpm.createScreenCaptureIntent())
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -335,81 +350,22 @@ class MainActivity : FragmentActivity() {
                                     entry<Route.ScrcpyAdvanced> { ScrcpyAdvancedScreen(navigator) }
                                     entry<Route.ScrcpyVirtualButtonOrder> { ScrcpyVirtualButtonOrderScreen(navigator) }
                                     entry<Route.SettingsRemoteFilter> {
-                                        ScrollableTopAppBarPage(
-                                            title = "远程过滤",
-                                            onBack = { navigator.pop() },
-                                        ) {
-                                            UIRemoteFilter()
-                                        }
+                                        SettingsRemoteFilterScreen()
                                     }
                                     entry<Route.SettingsLocalFilter> {
-                                        ScrollableTopAppBarPage(
-                                            title = "本地过滤",
-                                            onBack = { navigator.pop() },
-                                        ) {
-                                            UILocalFilter()
-                                        }
+                                        SettingsLocalFilterScreen()
                                     }
                                     entry<Route.SettingsSuperIsland> {
-                                        ScrollableTopAppBarPage(
-                                            title = "超级岛",
-                                            onBack = { navigator.pop() },
-                                        ) {
-                                            UISuperIslandSettings()
-                                        }
+                                        SettingsSuperIslandScreen()
                                     }
                                     entry<Route.SettingsScrcpy> {
-                                        val context = LocalContext.current
-                                        val serverPicker =
-                                            rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
-                                                if (uri == null) return@rememberLauncherForActivityResult
-                                                runCatching {
-                                                    context.contentResolver.takePersistableUriPermission(
-                                                        uri,
-                                                        Intent.FLAG_GRANT_READ_URI_PERMISSION,
-                                                    )
-                                                    // 问题 5 修复：原回调仅 takePersistableUriPermission，未写入 CUSTOM_SERVER_URI；
-                                                    // 且 ScrcpyUiViewModel 是单例，只写 StorageManager 不会让 UI/连接生效。
-                                                    // 双写：1) StorageManager 持久化；2) viewModel setter 更新单例状态（内部也会持久化到 mainSettings）。
-                                                    val uriString = uri.toString()
-                                                    StorageManager.putString(
-                                                        context,
-                                                        ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
-                                                        uriString,
-                                                        StorageManager.PrefsType.SCRCPY,
-                                                    )
-                                                    val app = context.applicationContext as android.app.Application
-                                                    ScrcpyUiViewModel.getInstance(app).customServerUri = uriString
-                                                }.onFailure { e ->
-                                                    Logger.e("MainActivity", "scrcpy server URI 保存失败: uri=$uri", e)
-                                                }
-                                            }
-                                        ScrollableTopAppBarPage(
-                                            title = "屏幕镜像",
-                                            onBack = { navigator.pop() },
-                                        ) {
-                                            ScrcpyScreenHost(
-                                                startScreen = ScrcpyRootScreen.Settings,
-                                                onPickServer = { serverPicker.launch(arrayOf("application/java-archive", "application/octet-stream", "*/*")) },
-                                                onExit = { navigator.pop() },
-                                            )
-                                        }
+                                        SettingsScrcpyScreen()
                                     }
                                     entry<Route.SettingsAbout> {
-                                        ScrollableTopAppBarPage(
-                                            title = "关于",
-                                            onBack = { navigator.pop() },
-                                        ) {
-                                            UIAbout()
-                                        }
+                                        SettingsAboutScreen()
                                     }
                                     entry<Route.SettingsAppearance> {
-                                        ScrollableTopAppBarPage(
-                                            title = "外观",
-                                            onBack = { navigator.pop() },
-                                        ) {
-                                            UIAppearance()
-                                        }
+                                        SettingsAppearanceScreen()
                                     }
                                 },
                         )
@@ -427,8 +383,16 @@ class MainActivity : FragmentActivity() {
         }
 
         val projectionRequestCallback: () -> Unit = {
-            val mpm = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-            screenCaptureLauncher.launch(mpm.createScreenCaptureIntent())
+            Handler(Looper.getMainLooper()).post {
+                if (!lifecycle.currentState.isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)) {
+                    return@post
+                }
+                if (ContextCompat.checkSelfPermission(this, Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
+                    recordAudioPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                } else {
+                    launchScreenCapture()
+                }
+            }
         }
         registeredOnRequestMediaProjection = projectionRequestCallback
         DeviceConnectionManager.getInstance(this).onRequestMediaProjection = projectionRequestCallback
