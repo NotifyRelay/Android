@@ -1,15 +1,15 @@
-package github.xzynine.superislandui.model
+package github.xzynine.superislandui.parser
 
-import github.xzynine.superislandui.floating.SmallIsland.right.BComponent
-import github.xzynine.superislandui.floating.SmallIsland.right.BEmpty
-import github.xzynine.superislandui.floating.SmallIsland.right.BFixedWidthDigitInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText2
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText3
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText6
-import github.xzynine.superislandui.floating.SmallIsland.right.BPicInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BProgressTextInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BSameWidthDigitInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BTextInfo
+import github.xzynine.superislandui.floating.smallisland.right.BComponent
+import github.xzynine.superislandui.floating.smallisland.right.BEmpty
+import github.xzynine.superislandui.floating.smallisland.right.BFixedWidthDigitInfo
+import github.xzynine.superislandui.floating.smallisland.right.BImageText2
+import github.xzynine.superislandui.floating.smallisland.right.BImageText3
+import github.xzynine.superislandui.floating.smallisland.right.BImageText6
+import github.xzynine.superislandui.floating.smallisland.right.BPicInfo
+import github.xzynine.superislandui.floating.smallisland.right.BProgressTextInfo
+import github.xzynine.superislandui.floating.smallisland.right.BSameWidthDigitInfo
+import github.xzynine.superislandui.floating.smallisland.right.BTextInfo
 import github.xzynine.superislandui.model.components.TimerInfo
 import org.json.JSONObject
 

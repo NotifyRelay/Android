@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.floating.SmallIsland.compose
+package github.xzynine.superislandui.floating.smallisland.compose
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.wrapContentWidth
@@ -8,9 +8,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.common.PreviewData
-import github.xzynine.superislandui.floating.SmallIsland.left.AComponent
-import github.xzynine.superislandui.floating.SmallIsland.left.AImageText1
-import github.xzynine.superislandui.floating.SmallIsland.left.AImageText5
+import github.xzynine.superislandui.floating.smallisland.left.AComponent
+import github.xzynine.superislandui.floating.smallisland.left.AImageText1
+import github.xzynine.superislandui.floating.smallisland.left.AImageText5
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.CommonTextBlockCompose
 

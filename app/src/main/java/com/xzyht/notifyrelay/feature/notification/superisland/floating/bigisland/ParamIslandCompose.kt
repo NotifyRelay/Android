@@ -20,7 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import github.xzynine.superislandui.floating.BigIsland.components.ProgressInfoCompose
+import github.xzynine.superislandui.floating.bigisland.components.ProgressInfoCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.ActionInfo
 import github.xzynine.superislandui.model.core.ParamIsland

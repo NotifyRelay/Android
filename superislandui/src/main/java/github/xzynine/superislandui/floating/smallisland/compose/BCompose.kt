@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.floating.SmallIsland.compose
+package github.xzynine.superislandui.floating.smallisland.compose
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -18,17 +18,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.common.PreviewData
-import github.xzynine.superislandui.floating.SmallIsland.right.BComponent
-import github.xzynine.superislandui.floating.SmallIsland.right.BEmpty
-import github.xzynine.superislandui.floating.SmallIsland.right.BFixedWidthDigitInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText2
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText3
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText4
-import github.xzynine.superislandui.floating.SmallIsland.right.BImageText6
-import github.xzynine.superislandui.floating.SmallIsland.right.BPicInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BProgressTextInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BSameWidthDigitInfo
-import github.xzynine.superislandui.floating.SmallIsland.right.BTextInfo
+import github.xzynine.superislandui.floating.smallisland.right.BComponent
+import github.xzynine.superislandui.floating.smallisland.right.BEmpty
+import github.xzynine.superislandui.floating.smallisland.right.BFixedWidthDigitInfo
+import github.xzynine.superislandui.floating.smallisland.right.BImageText2
+import github.xzynine.superislandui.floating.smallisland.right.BImageText3
+import github.xzynine.superislandui.floating.smallisland.right.BImageText4
+import github.xzynine.superislandui.floating.smallisland.right.BImageText6
+import github.xzynine.superislandui.floating.smallisland.right.BPicInfo
+import github.xzynine.superislandui.floating.smallisland.right.BProgressTextInfo
+import github.xzynine.superislandui.floating.smallisland.right.BSameWidthDigitInfo
+import github.xzynine.superislandui.floating.smallisland.right.BTextInfo
 import github.xzynine.superislandui.floating.common.CircularProgressCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.CommonImagePlaceholder

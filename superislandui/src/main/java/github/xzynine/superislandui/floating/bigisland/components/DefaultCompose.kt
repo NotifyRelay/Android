@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.floating.BigIsland.components
+package github.xzynine.superislandui.floating.bigisland.components
 
 import android.graphics.Bitmap
 import androidx.compose.foundation.Image

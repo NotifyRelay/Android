@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.floating.SmallIsland.right
+package github.xzynine.superislandui.floating.smallisland.right
 
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.model.components.TimerInfo

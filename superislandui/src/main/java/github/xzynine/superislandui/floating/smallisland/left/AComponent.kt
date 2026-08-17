@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.floating.SmallIsland.left
+package github.xzynine.superislandui.floating.smallisland.left
 
 /**
  * A区（左侧 imageTextInfoLeft）组件模型。

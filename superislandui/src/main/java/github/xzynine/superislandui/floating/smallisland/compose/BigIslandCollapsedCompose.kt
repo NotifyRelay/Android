@@ -1,4 +1,4 @@
-package github.xzynine.superislandui.floating.SmallIsland.compose
+package github.xzynine.superislandui.floating.smallisland.compose
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -17,13 +17,13 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import github.xzynine.superislandui.floating.SmallIsland.left.AComponent
-import github.xzynine.superislandui.floating.SmallIsland.left.AImageText1
-import github.xzynine.superislandui.floating.SmallIsland.right.BComponent
-import github.xzynine.superislandui.floating.SmallIsland.right.BEmpty
-import github.xzynine.superislandui.floating.SmallIsland.right.BTextInfo
-import github.xzynine.superislandui.model.parseAComponent
-import github.xzynine.superislandui.model.parseBComponent
+import github.xzynine.superislandui.floating.smallisland.left.AComponent
+import github.xzynine.superislandui.floating.smallisland.left.AImageText1
+import github.xzynine.superislandui.floating.smallisland.right.BComponent
+import github.xzynine.superislandui.floating.smallisland.right.BEmpty
+import github.xzynine.superislandui.floating.smallisland.right.BTextInfo
+import github.xzynine.superislandui.parser.parseAComponent
+import github.xzynine.superislandui.parser.parseBComponent
 import org.json.JSONObject
 
 /**

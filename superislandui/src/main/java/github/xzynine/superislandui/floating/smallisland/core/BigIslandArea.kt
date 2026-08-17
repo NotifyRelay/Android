@@ -1,9 +1,9 @@
-package github.xzynine.superislandui.floating.SmallIsland.core
+package github.xzynine.superislandui.floating.smallisland.core
 
-import github.xzynine.superislandui.floating.SmallIsland.left.AComponent
-import github.xzynine.superislandui.floating.SmallIsland.right.BComponent
-import github.xzynine.superislandui.model.parseAComponent
-import github.xzynine.superislandui.model.parseBComponent
+import github.xzynine.superislandui.floating.smallisland.left.AComponent
+import github.xzynine.superislandui.floating.smallisland.right.BComponent
+import github.xzynine.superislandui.parser.parseAComponent
+import github.xzynine.superislandui.parser.parseBComponent
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
 

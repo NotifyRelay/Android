@@ -1,8 +1,8 @@
-package github.xzynine.superislandui.model
+package github.xzynine.superislandui.parser
 
-import github.xzynine.superislandui.floating.SmallIsland.left.AComponent
-import github.xzynine.superislandui.floating.SmallIsland.left.AImageText1
-import github.xzynine.superislandui.floating.SmallIsland.left.AImageText5
+import github.xzynine.superislandui.floating.smallisland.left.AComponent
+import github.xzynine.superislandui.floating.smallisland.left.AImageText1
+import github.xzynine.superislandui.floating.smallisland.left.AImageText5
 import org.json.JSONObject
 
 /**
