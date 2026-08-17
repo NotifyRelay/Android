@@ -64,10 +64,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
-import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.viewmodel.GroupedSuperIslandHistory
 import com.xzyht.notifyrelay.ui.viewmodel.SuperIslandHistoryViewModel

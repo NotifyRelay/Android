@@ -5,6 +5,8 @@ import android.content.Context
 import android.service.notification.StatusBarNotification
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
+import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecordDto
 import kotlinx.coroutines.Dispatchers
@@ -287,8 +289,8 @@ object NotificationRepository {
             syncToCache(context)
             // 被动去重：仅在智能去重开启时，通知 BackendRemoteFilter 检查是否命中可撤回队列并撤回复刻通知
             try {
-                if (com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig.enableDeduplication) {
-                    com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
+                if (RemoteFilterConfig.enableDeduplication) {
+                    BackendRemoteFilter
                         .onLocalNotificationEnqueued(title, text, packageName, time, context)
                 } else {
                     // Logger.d("NotifyRelay", "智能去重已关闭，跳过被动去重推送")

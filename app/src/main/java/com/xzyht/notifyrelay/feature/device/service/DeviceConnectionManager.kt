@@ -12,22 +12,24 @@ import android.util.Base64
 import com.sun.jna.Native
 import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.feature.audio.AudioRelayPlayer
-import com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
-import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
+import com.xzyht.notifyrelay.feature.audio.service.AudioRelayForegroundService
+import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
+import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
-import com.xzyht.notifyrelay.servers.MediaControlUtil
-import com.xzyht.notifyrelay.servers.MediaSessionMonitorService
-import com.xzyht.notifyrelay.servers.NotifyRelayNotificationListenerService
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardProcessor
-import com.xzyht.notifyrelay.sync.AppLaunchManager
-import com.xzyht.notifyrelay.sync.AppListSyncManager
+import com.xzyht.notifyrelay.feature.media.MediaControlUtil
+import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
+import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
+import com.xzyht.notifyrelay.feature.clipboard.ClipboardProcessor
+import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundService
+import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
+import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
 import com.xzyht.notifyrelay.sync.FtpServerManager
 import com.xzyht.notifyrelay.sync.FtpServerManager.StartResult
 import com.xzyht.notifyrelay.sync.HeartbeatProcessor
-import com.xzyht.notifyrelay.sync.IconSyncManager
+import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
@@ -2216,7 +2218,7 @@ class DeviceConnectionManager(
             currentAudioRelayUuid = remoteUuid
         }
         registerAudioRelayStopReceiver()
-        com.xzyht.notifyrelay.servers.AudioRelayForegroundService
+        AudioRelayForegroundService
             .start(context, deviceName, direction)
     }
 
@@ -2228,7 +2230,7 @@ class DeviceConnectionManager(
                     ctx: Context?,
                     intent: Intent?,
                 ) {
-                    if (intent?.action == com.xzyht.notifyrelay.servers.AudioRelayForegroundService.STOP_ACTION) {
+                    if (intent?.action == AudioRelayForegroundService.STOP_ACTION) {
                         stopAudioRelay()
                     }
                 }
@@ -2236,7 +2238,7 @@ class DeviceConnectionManager(
         try {
             context.registerReceiver(
                 audioRelayNotificationReceiver,
-                IntentFilter(com.xzyht.notifyrelay.servers.AudioRelayForegroundService.STOP_ACTION),
+                IntentFilter(AudioRelayForegroundService.STOP_ACTION),
                 Context.RECEIVER_NOT_EXPORTED,
             )
         } catch (_: Exception) {
@@ -2275,9 +2277,9 @@ class DeviceConnectionManager(
         } catch (_: Exception) {
         }
         audioRelayNotificationReceiver = null
-        com.xzyht.notifyrelay.servers.AudioRelayForegroundService
+        AudioRelayForegroundService
             .stop(context)
-        com.xzyht.notifyrelay.servers.MediaProjectionForegroundService
+        MediaProjectionForegroundService
             .stop(context)
     }
 }

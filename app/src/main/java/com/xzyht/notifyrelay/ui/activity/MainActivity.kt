@@ -62,10 +62,11 @@ import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
-import com.xzyht.notifyrelay.sync.AppLaunchManager
+import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundService
+import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
@@ -122,8 +123,8 @@ class MainActivity : FragmentActivity() {
         try {
             val onForegroundReady: () -> Unit = { handleScreenCaptureReady() }
             registeredOnForegroundReady = onForegroundReady
-            com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = onForegroundReady
-            startForegroundService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+            MediaProjectionForegroundService.onForegroundReady = onForegroundReady
+            startForegroundService(Intent(this, MediaProjectionForegroundService::class.java))
         } catch (e: Exception) {
             Logger.e("NotifyRelay", "屏幕捕获前台服务启动失败，带回前台重试", e)
             bringMainActivityToFront()
@@ -157,12 +158,12 @@ class MainActivity : FragmentActivity() {
                 deviceManager.startPendingAudioRelaySend()
             } else {
                 pendingScreenCapture = null
-                stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+                stopService(Intent(this, MediaProjectionForegroundService::class.java))
             }
         } catch (e: Exception) {
             Logger.e("NotifyRelay", "屏幕捕获授权后启动失败", e)
             pendingScreenCapture = null
-            stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+            stopService(Intent(this, MediaProjectionForegroundService::class.java))
         }
     }
 
@@ -228,8 +229,8 @@ class MainActivity : FragmentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        if (com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady === registeredOnForegroundReady) {
-            com.xzyht.notifyrelay.servers.MediaProjectionForegroundService.onForegroundReady = null
+        if (MediaProjectionForegroundService.onForegroundReady === registeredOnForegroundReady) {
+            MediaProjectionForegroundService.onForegroundReady = null
         }
         registeredOnForegroundReady = null
         if (DeviceConnectionManager.getInstance(this).onRequestMediaProjection === registeredOnRequestMediaProjection) {
@@ -250,7 +251,7 @@ class MainActivity : FragmentActivity() {
                 pendingScreenCapture = result.resultCode to result.data!!
                 processPendingScreenCapture()
             } else {
-                stopService(Intent(this, com.xzyht.notifyrelay.servers.MediaProjectionForegroundService::class.java))
+                stopService(Intent(this, MediaProjectionForegroundService::class.java))
             }
         }
 
