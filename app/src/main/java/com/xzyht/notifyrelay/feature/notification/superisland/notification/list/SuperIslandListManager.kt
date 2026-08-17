@@ -122,12 +122,9 @@ object SuperIslandListManager {
         if (entries.size <= 1) return null
 
         val start = (activeIndex + 1) % entries.size
-        while (start != activeIndex) {
-            activeIndex = start
-            manuallyChanged = true
-            return entries[start]
-        }
-        return null
+        activeIndex = start
+        manuallyChanged = true
+        return entries[start]
     }
 
     /** 获取当前激活条目 */
