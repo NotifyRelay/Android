@@ -34,6 +34,7 @@ internal fun GuideAgreementPage(
     onBack: () -> Unit,
     onNext: () -> Unit,
     reauth: Boolean = false,
+    needConsent: Boolean = false,
 ) {
     val colorScheme = MiuixTheme.colorScheme
     var agreed by rememberSaveable { mutableStateOf(reauth) }
@@ -79,7 +80,7 @@ internal fun GuideAgreementPage(
                 .statusBarsPadding(),
     ) {
         GuidePageHeader(
-            stepLabel = if (reauth) "2 / 3" else "2 / 6",
+            stepLabel = if (reauth || needConsent) "2 / 3" else "2 / 6",
             title = "使用须知与授权说明",
             subtitle = "请阅读以下说明，确认后继续",
         )

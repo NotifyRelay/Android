@@ -99,6 +99,7 @@ internal fun GuideScreen(
                         GuideWelcomePage(
                             onStart = { reauthAnimateTo(1) },
                             reauth = reauth,
+                            needConsent = needConsent,
                         )
                     1 ->
                         if (needConsent) {
@@ -106,6 +107,7 @@ internal fun GuideScreen(
                             GuideAgreementPage(
                                 onBack = { reauthAnimateTo(0) },
                                 onNext = { reauthAnimateTo(2) },
+                                needConsent = needConsent,
                             )
                         } else {
                             // 仅授权掉落：引导重新开启必要权限，不重复同意协议。

@@ -36,6 +36,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 internal fun GuideWelcomePage(
     onStart: () -> Unit,
     reauth: Boolean = false,
+    needConsent: Boolean = false,
 ) {
     val colorScheme = MiuixTheme.colorScheme
     var revealed by remember { mutableStateOf(false) }
@@ -84,6 +85,8 @@ internal fun GuideWelcomePage(
                         text =
                             if (reauth) {
                                 "版本更新后系统收回了部分必须权限，仅需重新开启恢复正常使用"
+                            } else if (needConsent) {
+                                "版本更新新增了权限声明，请重新阅读并同意以继续使用"
                             } else {
                                 "首次使用前，需要完成几项简单设置"
                             },
