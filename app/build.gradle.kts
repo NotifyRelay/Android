@@ -1,6 +1,5 @@
 
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
-import java.io.File
 import java.util.Properties
 
 plugins {
@@ -256,4 +255,55 @@ tasks.register("printVersionName") {
     doLast {
         println(injectedVersionName)
     }
+}
+
+// 编译期解析 AndroidManifest.xml，提取每个 <uses-permission> 紧邻上方的注释（含同行注释）作为
+// 用途说明，生成 res/raw/permission_notes.txt（格式：权限名||用途，逐行）。协议页（GuideAgreementPage）
+// 通过 R.raw.permission_notes 读取，维护点唯一为 Manifest 注释，不在 Kotlin 中手抄清单。
+// 采用 res/raw 资源而非 BuildConfig，以避免 Java 11 不支持文本块导致的编译失败。
+val generatePermissionNotes by tasks.registering {
+    val manifestFile = file("src/main/AndroidManifest.xml")
+    val outputFile = file("src/main/res/raw/permission_notes.txt")
+    inputs.file(manifestFile)
+    outputs.file(outputFile)
+    doLast {
+        val text = manifestFile.readText()
+        val notes = mutableListOf<String>()
+        // 1) 同行注释：<!-- 注释 --> <uses-permission .../>
+        val inlineRegex =
+            """<!--\s*(.*?)\s*-->\s*<uses-permission\s+android:name="([^"]+)""""
+                .toRegex()
+        for (m in inlineRegex.findAll(text)) {
+            notes.add("${m.groupValues[2]}||${m.groupValues[1]}")
+        }
+        // 2) 多行注释：上一非空前导注释行 + 下一行 <uses-permission>
+        val lines = text.lineSequence().map { it.trim() }.filter { it.isNotEmpty() }
+        var pendingComment: String? = null
+        for (line in lines) {
+            val comment = """<!--\s*(.*?)\s*-->""".toRegex().find(line)?.groupValues?.get(1)
+            if (comment != null && inlineRegex.containsMatchIn(line)) continue
+            if (comment != null) {
+                pendingComment = comment
+                continue
+            }
+            val perm =
+                """<uses-permission\s+android:name="([^"]+)""""
+                    .toRegex()
+                    .find(line)
+                    ?.groupValues
+                    ?.get(1)
+            if (perm != null) {
+                if (pendingComment != null) notes.add("$perm||$pendingComment")
+                pendingComment = null
+            } else {
+                pendingComment = null
+            }
+        }
+        outputFile.parentFile.mkdirs()
+        outputFile.writeText(notes.distinct().joinToString("\n"))
+    }
+}
+
+tasks.named("preBuild") {
+    dependsOn(generatePermissionNotes)
 }

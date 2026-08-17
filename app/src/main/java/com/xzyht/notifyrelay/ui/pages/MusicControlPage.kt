@@ -20,9 +20,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.feature.notification.superisland.MediaMessageReceiveMode
-import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
-import com.xzyht.notifyrelay.servers.MediaControlUtil
+import com.xzyht.notifyrelay.feature.media.MediaMessageReceiveMode
+import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
+import com.xzyht.notifyrelay.feature.media.MediaControlUtil
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import com.xzyht.notifyrelay.ui.common.MiuixSpinnerPreference
 import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder

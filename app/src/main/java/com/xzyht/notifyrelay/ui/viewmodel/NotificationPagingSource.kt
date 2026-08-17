@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.ui.viewmodel
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
-import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
+import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import notifyrelay.data.database.dao.PackageCount
 import notifyrelay.data.database.entity.NotificationRecordEntity

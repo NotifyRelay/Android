@@ -279,8 +279,7 @@ fun UIAbout() {
         onDownload = { info ->
             val appAbi = ApkArchMatcher.getInstalledAppAbiOrDevice(context)
             val assetFilter = ApkArchMatcher.createAssetFilter(appAbi)
-            val downloadResult = checkUpdateManager.downloadRelease(info, proxyUrl, assetFilter)
-            when (downloadResult) {
+            when (val downloadResult = checkUpdateManager.downloadRelease(info, proxyUrl, assetFilter)) {
                 is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Success -> {
                     Logger.i(TAG, "开始下载: ${downloadResult.fileName}")
                     Toast.makeText(context, "开始下载 ${downloadResult.fileName}", Toast.LENGTH_SHORT).show()

@@ -31,7 +31,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.servers.appslist.RemoteAppInfo
+import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
+import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppsState
 import com.xzyht.notifyrelay.ui.viewmodel.LocalAppInfo
 import com.xzyht.notifyrelay.ui.viewmodel.LocalAppsViewModel
 import com.xzyht.notifyrelay.ui.viewmodel.RemoteAppsViewModel
@@ -386,7 +387,7 @@ private fun LocalAppsContent(
 
 @Composable
 private fun RemoteAppsContent(
-    state: com.xzyht.notifyrelay.servers.appslist.RemoteAppsState,
+    state: RemoteAppsState,
     searchQuery: String,
     onAppClick: (RemoteAppInfo) -> Unit,
     onAppLongClick: (RemoteAppInfo) -> Unit,

@@ -100,7 +100,7 @@ class DeviceListScreenState {
         internal set
     var showPairingCodeDialog by mutableStateOf(false)
         internal set
-    var pairingCodeDialogMode by mutableStateOf(com.xzyht.notifyrelay.ui.dialog.PairingMode.SERVER_MODE)
+    var pairingCodeDialogMode by mutableStateOf(PairingMode.SERVER_MODE)
         internal set
     var serverPairingCode by mutableStateOf("")
         internal set
@@ -230,7 +230,9 @@ fun DeviceListScreen(
     fun UdpDiscoverySwitch() {
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(bottom = 8.dp),
         ) {
             Text(
                 text = "显示未认证设备",

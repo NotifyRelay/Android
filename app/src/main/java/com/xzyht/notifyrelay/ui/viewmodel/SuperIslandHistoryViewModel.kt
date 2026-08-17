@@ -11,7 +11,7 @@ import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStore
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow

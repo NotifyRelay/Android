@@ -2,48 +2,58 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- 通知发送：向系统发送转发结果、执行状态等提醒通知 -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <!-- Live Updates API 所需权限 -->
+    <!-- Live Updates 通知：Live Updates API 所需，用于前台重要提醒展示 -->
     <uses-permission android:name="android.permission.POST_PROMOTED_NOTIFICATIONS" />
+    <!-- 应用列表查询：根据通知来源包名匹配并显示对应的应用名称与图标，便于在转发结果中识别来源 -->
     <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" tools:ignore="QueryAllPackagesPermission" />
+    <!-- 网络访问：用于设备间局域网远程转发与状态获取 -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- 网络状态：判断当前网络连通状态以触发重连 -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- WLAN 状态：获取 Wi-Fi 连接信息以优化局域网转发 -->
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <!-- 附近 Wi-Fi 设备：Android 13+ 发现并连接局域网内设备所需 -->
     <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES" />
     <!-- 触觉反馈：用于超级岛关闭指示器的振动效果 -->
     <uses-permission android:name="android.permission.VIBRATE" />
     <!-- 蓝牙名称获取相关权限 -->
     <uses-permission android:name="android.permission.BLUETOOTH" />
+    <!-- 蓝牙管理：旧版蓝牙连接管理（已废弃，保留以兼容） -->
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
-    <!-- Android 12+ 需声明 BLUETOOTH_CONNECT -->
+    <!-- Android 12+ 需声明 BLUETOOTH_CONNECT：接收已连接设备（如耳机/手表）的媒体信息以展示胶囊歌词等内容 -->
     <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- 使用情况访问：用于判断应用前台状态等（非 MIUI/澎湃路径） -->
     <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" tools:ignore="ProtectedPermissions" />
 
-    <!-- MIUI/澎湃专用应用列表权限声明 -->
+    <!-- MIUI/澎湃专用应用列表权限声明：用于匹配通知来源应用 -->
     <uses-permission android:name="com.android.permission.GET_INSTALLED_APPS" />
     <!-- 悬浮窗权限：用于在其他应用上层显示悬浮窗（超级岛复刻等功能需要） -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-    <!-- 修复后台服务前台启动崩溃 -->
+    <!-- 前台服务：修复后台服务前台启动崩溃，保证转发服务持续运行 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <!-- Android 14+ 特殊前台服务权限声明 -->
+    <!-- Android 14+ 特殊前台服务权限声明：声明特殊用途前台服务（通知监听同步转发） -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
-    <!-- Android 14+ 数据同步前台服务权限声明（解决 FGS type dataSync 崩溃问题）-->
+    <!-- Android 14+ 数据同步前台服务权限声明（解决 FGS type dataSync 崩溃问题）：用于数据同步前台服务 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
-    <!-- Android 14+ MediaProjection 前台服务权限声明 -->
+    <!-- Android 14+ MediaProjection 前台服务权限声明：用于媒体投影前台服务 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
-    <!-- Android 14+ 媒体播放前台服务权限声明 -->
+    <!-- Android 14+ 媒体播放前台服务权限声明：用于媒体播放前台服务 -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <!-- 屏幕音频捕获（Android 13+ 播放捕获输入）所需权限 -->
+    <!-- 屏幕音频捕获（Android 13+ 播放捕获输入）所需权限：用于屏幕音频捕获 -->
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- 文件管理权限 -->
+    <!-- 文件管理权限：用于 FTP / 本地文件转发等访问设备存储 -->
     <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" tools:ignore="ProtectedPermissions" />
+    <!-- 读取存储：读取设备文件用于转发 -->
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <!-- 写入存储：写入转发文件到设备存储 -->
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
-    <!-- 剪贴板访问权限 -->
+    <!-- 剪贴板访问权限：用于跨设备剪贴板同步（Android 34 及以下后台读取） -->
     <uses-permission android:name="android.permission.READ_CLIPBOARD_IN_BACKGROUND" android:maxSdkVersion="34" tools:ignore="ProtectedPermissions" />
 
-    <!-- Fcitx5 剪贴板广播接收权限 -->
+    <!-- Fcitx5 剪贴板广播接收权限：接收 Fcitx5 输入法剪贴板广播以实现同步 -->
     <uses-permission android:name="org.fcitx.fcitx5.android.permission.CLIPBOARD_BROADCAST" />
 
     <application
@@ -66,7 +76,7 @@
         <activity android:name=".ui.activity.MainActivity" android:exported="true" />
         <!-- 通知监听服务声明，用于系统识别通知访问权限 -->
         <service
-            android:name=".servers.NotifyRelayNotificationListenerService"
+            android:name=".feature.notification.service.NotifyRelayNotificationListenerService"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
             android:exported="true"
@@ -86,7 +96,7 @@
         
         <!-- 剪贴板同步广播接收器 -->
         <receiver
-            android:name=".servers.clipboard.ClipboardSyncReceiver"
+            android:name=".feature.clipboard.ClipboardSyncReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.xzyht.notifyrelay.CLIPBOARD_MANUAL_SYNC" />
@@ -96,7 +106,7 @@
         
         <!-- Fcitx5 剪贴板广播接收器 -->
         <receiver
-            android:name=".servers.clipboard.FcitxClipboardReceiver"
+            android:name=".feature.clipboard.FcitxClipboardReceiver"
             android:exported="true"
             android:permission="org.fcitx.fcitx5.android.permission.CLIPBOARD_BROADCAST">
             <intent-filter>
@@ -106,7 +116,7 @@
 
         <!-- 超级岛通知广播接收器，用于处理通知删除事件 -->
         <receiver
-            android:name=".feature.notification.superisland.NotificationBroadcastReceiver"
+            android:name=".feature.notification.superisland.receiver.NotificationBroadcastReceiver"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION" />
@@ -116,13 +126,13 @@
         
         <!-- MediaProjection 前台服务 -->
         <service
-            android:name=".servers.MediaProjectionForegroundService"
+            android:name=".feature.media.service.MediaProjectionForegroundService"
             android:exported="false"
             android:foregroundServiceType="mediaProjection" />
 
         <!-- 音频中继前台服务 -->
         <service
-            android:name=".servers.AudioRelayForegroundService"
+            android:name=".feature.audio.service.AudioRelayForegroundService"
             android:exported="false"
             android:foregroundServiceType="mediaPlayback|specialUse">
             <meta-data

@@ -23,7 +23,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.BigIsland.param.ParamIslandCompose
+import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.bigIsland.ParamIslandCompose
 import github.xzynine.superislandui.floating.BigIsland.components.ActionCompose
 import github.xzynine.superislandui.floating.BigIsland.components.AnimTextInfoCompose
 import github.xzynine.superislandui.floating.BigIsland.components.BaseInfoCompose
@@ -177,21 +178,21 @@ fun FloatingWindowContainer(
                                                     },
                                                     onPlayPause = {
                                                         // 媒体控制按钮点击事件，由RemoteMediaSessionManager处理
-                                                        com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager.onPlayPause(
+                                                        RemoteMediaSessionManager.onPlayPause(
                                                             context,
                                                             com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
                                                                 .getInstance(context),
                                                         )
                                                     },
                                                     onPrevious = {
-                                                        com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager.onPrevious(
+                                                        RemoteMediaSessionManager.onPrevious(
                                                             context,
                                                             com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
                                                                 .getInstance(context),
                                                         )
                                                     },
                                                     onNext = {
-                                                        com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager.onNext(
+                                                        RemoteMediaSessionManager.onNext(
                                                             context,
                                                             com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
                                                                 .getInstance(context),
