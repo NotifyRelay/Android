@@ -3,6 +3,7 @@ package notifyrelay.base.util
 import android.Manifest
 import android.annotation.SuppressLint
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -39,7 +40,7 @@ object PermissionHelper {
                 context.contentResolver,
                 "enabled_notification_listeners",
             ) ?: ""
-        val hasNotification = enabledListeners.contains(context.packageName)
+        val hasNotification = isNotificationListenerEnabled(context, enabledListeners)
 
         // 判断是否为 MIUI/澎湃系统（厂商或系统包识别）
         val isMiui = detectMiuiOrPengpai(context)
@@ -252,8 +253,73 @@ object PermissionHelper {
                 context.contentResolver,
                 "enabled_notification_listeners",
             )
-        return enabledListeners?.contains(context.packageName) == true
+        return isNotificationListenerEnabled(context, enabledListeners)
     }
+
+    /**
+     * 精确判断本应用的通知监听服务是否已在系统中启用。
+     *
+     * 注意：系统设置 [Settings.Secure.ENABLED_NOTIFICATION_LISTENERS] 的每条记录
+     * 格式为「包名/组件类名」（多条目以 `:` 分隔）。仅比对包名会在服务类名发生
+     * 历史变更时误判为已授权（旧授权记录仍含旧包名前缀），导致无法引导用户重新授权。
+     * 因此这里使用 [ComponentName] 精确匹配完整组件标识。
+     *
+     * @param context 用于读取包信息与 PackageManager 的上下文。
+     * @param enabledListeners [Settings.Secure.ENABLED_NOTIFICATION_LISTENERS] 的原始字符串，可空。
+     * @return 当系统已启用本应用声明的某个 NotificationListenerService 组件时返回 true，否则返回 false。
+     */
+    private fun isNotificationListenerEnabled(context: Context, enabledListeners: String?): Boolean {
+        if (enabledListeners.isNullOrEmpty()) return false
+        val enabledSet = enabledListeners.split(":").map { it.trim() }.filter { it.isNotEmpty() }
+        if (enabledSet.isEmpty()) return false
+
+        // 枚举本应用声明的 NotificationListenerService 组件，构造其完整 ComponentName 标识。
+        val pm = context.packageManager
+        val myComponentNames =
+            runCatching {
+                pm
+                    .getPackageInfo(context.packageName, PackageManager.GET_SERVICES)
+                    .services
+                    ?.filter { svc ->
+                        val cls = runCatching { Class.forName(svc.name) }.getOrNull()
+                        cls != null &&
+                            android.service.notification.NotificationListenerService::class.java
+                                .isAssignableFrom(cls)
+                    }?.map { ComponentName(context, it.name).flattenToString() }
+                    ?: emptyList()
+            }.getOrElse { emptyList() }
+
+        if (myComponentNames.isEmpty()) {
+            // 兜底：无法枚举组件时退化为仅比对包名前缀（保持旧行为）。
+            return enabledSet.any { entry ->
+                val pkg = entry.substringBefore("/")
+                pkg == context.packageName
+            }
+        }
+
+        return enabledSet.any { entry -> myComponentNames.contains(entry) }
+    }
+
+    /**
+     * 读取本应用在 AndroidManifest 中声明的全部「普通/危险」权限（即 `<uses-permission>` 节点）。
+     *
+     * 这些权限会随版本升级而增减。通过比对「上次已同意的权限集合」即可判断本次更新是否
+     * 新增了需要用户重新阅读并同意的声明式权限。
+     *
+     * 注意：此方法不包含运行时动态授予的「特殊权限」（如通知监听、使用情况访问、
+     * 悬浮窗、所有文件管理、后台无限制等），它们由各自的检查逻辑单独处理。
+     *
+     * @param context 用于读取包信息的上下文。
+     * @return 声明权限名集合（如 `["android.permission.INTERNET", ...]`），读取失败时返回空集。
+     */
+    fun getDeclaredPermissions(context: Context): Set<String> =
+        runCatching {
+            context.packageManager
+                .getPackageInfo(context.packageName, PackageManager.GET_PERMISSIONS)
+                .requestedPermissions
+                ?.toSet()
+                .orEmpty()
+        }.getOrElse { emptySet() }
 
     /**
      * 检查开发者选项-停用屏幕共享保护是否已开启。

@@ -32,6 +32,7 @@ internal fun GuideRequiredPermissionPage(
     permissionState: GuidePermissionUiState,
     onBack: () -> Unit,
     onNext: () -> Unit,
+    reauth: Boolean = false,
 ) {
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
@@ -129,10 +130,12 @@ internal fun GuideRequiredPermissionPage(
                 .statusBarsPadding(),
     ) {
         GuidePageHeader(
-            stepLabel = "3 / 6",
-            title = "必要权限",
+            stepLabel = if (reauth) "2 / 3" else "3 / 6",
+            title = if (reauth) "重新授权必要权限" else "必要权限",
             subtitle =
-                if (permissionState.requiredGranted) {
+                if (reauth) {
+                    "版本更新后系统收回了通知访问授权，重新开启以下权限即可恢复全部功能"
+                } else if (permissionState.requiredGranted) {
                     "所有必要权限已开启，可以继续下一步"
                 } else {
                     "通知转发依赖以下权限，请逐项开启（$requiredGrantedCount/${requiredChecks.size}）"

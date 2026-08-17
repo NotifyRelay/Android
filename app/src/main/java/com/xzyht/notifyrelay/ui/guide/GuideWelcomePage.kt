@@ -33,7 +33,10 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-internal fun GuideWelcomePage(onStart: () -> Unit) {
+internal fun GuideWelcomePage(
+    onStart: () -> Unit,
+    reauth: Boolean = false,
+) {
     val colorScheme = MiuixTheme.colorScheme
     var revealed by remember { mutableStateOf(false) }
 
@@ -78,7 +81,12 @@ internal fun GuideWelcomePage(onStart: () -> Unit) {
                     )
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        text = "首次使用前，需要完成几项简单设置",
+                        text =
+                            if (reauth) {
+                                "版本更新后系统收回了通知访问授权，仅需重新开启即可恢复全部功能"
+                            } else {
+                                "首次使用前，需要完成几项简单设置"
+                            },
                         style = MiuixTheme.textStyles.body2,
                         color = colorScheme.onSurfaceVariantSummary,
                     )

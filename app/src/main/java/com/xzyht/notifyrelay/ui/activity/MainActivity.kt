@@ -193,6 +193,7 @@ class MainActivity : FragmentActivity() {
             withContext(Dispatchers.Main) {
                 val intent = Intent(this@MainActivity, GuideActivity::class.java)
                 intent.putExtra("from", "MainActivity")
+                intent.putExtra("reauth", true)
                 startActivity(intent)
                 finish()
             }

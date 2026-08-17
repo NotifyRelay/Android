@@ -6,7 +6,7 @@
 # 构建相关文件
 .gradle/
 /build
-
+app/src/main/res/raw/permission_notes.txt
 debug/
 .externalNativeBuild
 .cxx

@@ -38,6 +38,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
+import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import notifyrelay.data.StorageManager
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -620,6 +622,21 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         super.onListenerDisconnected()
         // 停止 MediaSession 监控服务
         mediaSessionMonitorService.stopMonitoring()
+
+        // 兜底：通知监听权限被系统收回时，若应用仍处于前台，回弹引导页要求重新授权，
+        // 避免胶囊歌词/媒体浮窗/转发等功能在权限掉落后静默失效且无入口恢复。
+        if (PermissionHelper.isAppInForeground(this) &&
+            !PermissionHelper.checkNotificationListenerServiceCanStart(this)
+        ) {
+            Logger.w(TAG, "[NotifyListener] 权限掉落且应用在前台，回弹引导页重新授权")
+            try {
+                val intent = Intent(this, GuideActivity::class.java)
+                intent.putExtra("reauth", true)
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                startActivity(intent)
+            } catch (_: Exception) {
+            }
+        }
     }
 
     override fun onDestroy() {
