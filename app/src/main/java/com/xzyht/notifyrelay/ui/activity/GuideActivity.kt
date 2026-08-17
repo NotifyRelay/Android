@@ -28,6 +28,8 @@ class GuideActivity : ComponentActivity() {
         val fromInternal = intent.getBooleanExtra("fromInternal", false)
         val fromftp = intent.getBooleanExtra("fromftp", false)
         val reauthExtra = intent.getBooleanExtra("reauth", false)
+        // 调试用：强制指定引导分支（full=完整流程 / reauth=重授权 / consent=需重新同意），优先级高于自动判定。
+        val forceBranch = intent.getStringExtra("forceBranch")
 
         // 声明式权限（AndroidManifest 中 <uses-permission> 声明的普通/危险权限）比对：
         // 读取上次已同意的权限集合，与当前声明的权限集合做差集，得到「本次更新新增、需重新同意」的权限。
@@ -50,10 +52,22 @@ class GuideActivity : ComponentActivity() {
         val reauth = reauthExtra || (!isFirstLaunch && !PermissionHelper.checkAllPermissions(this) && newPermissions.isEmpty())
         val needConsent = !isFirstLaunch && newPermissions.isNotEmpty() && !reauthExtra
 
+        // 调试分支覆盖：forceBranch 存在时直接采用指定分支，绕过真实状态判定。
+        val debugReauth = when (forceBranch) {
+            "reauth" -> true
+            "consent" -> false
+            else -> reauth
+        }
+        val debugNeedConsent = when (forceBranch) {
+            "consent" -> true
+            "reauth" -> false
+            else -> needConsent
+        }
+
         // 仅冷启动、已首次启动过、且权限满足、且无需重新同意时自动跳主界面；
         // 其余情况（首次启动 / 应用内跳转 / 重授权 / 需重新同意）均渲染引导页。
         // 流程仿照 HyperCeiler：欢迎页 -> 使用须知 -> 权限设置 -> 基础设置（设置总览 + 多个设置页）-> 完成页。
-        if (!fromInternal && !reauth && !needConsent && PermissionHelper.checkAllPermissions(this) && !isFirstLaunch) {
+        if (!fromInternal && !debugReauth && !debugNeedConsent && PermissionHelper.checkAllPermissions(this) && !isFirstLaunch) {
             startActivity(Intent(this, MainActivity::class.java))
             finish()
             return
@@ -81,8 +95,8 @@ class GuideActivity : ComponentActivity() {
                     SetupSystemBars(isDarkTheme)
                     GuideScreen(
                         themeBaseIndex = themeBaseIndex,
-                        reauth = reauth,
-                        needConsent = needConsent,
+                        reauth = debugReauth,
+                        needConsent = debugNeedConsent,
                         onThemeChanged = { newIndex ->
                             ThemeSettingsManager.setThemeBaseIndex(appContext, newIndex)
                             themeBaseIndex = newIndex

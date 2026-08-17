@@ -51,17 +51,13 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
-import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
-import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
 import com.xzyht.notifyrelay.ui.viewmodel.GroupedNotifications
 import com.xzyht.notifyrelay.ui.viewmodel.NotificationHistoryViewModel
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
-import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -72,7 +68,6 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.ToolbarPosition
-import top.yukonga.miuix.kmp.basic.VerticalDivider
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -638,44 +633,6 @@ fun NotificationHistoryScreen() {
                             textColor = colorScheme.onPrimary,
                             confirmTextColor = colorScheme.onError,
                         )
-
-                        if (DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
-                            VerticalDivider(
-                                thickness = 1.dp,
-                                modifier = Modifier.height(40.dp),
-                            )
-
-                            Button(
-                                onClick = {
-                                    try {
-                                        // 跳转引导页面
-                                        val intent =
-                                            IntentUtils.createIntent(
-                                                context,
-                                                GuideActivity::class.java,
-                                            )
-                                        intent.putExtra("fromInternal", true)
-                                        IntentUtils.startActivity(context, intent, true)
-                                    } catch (e: Exception) {
-                                        Logger.e("NotifyRelay", "引导跳转失败", e)
-                                        ToastUtils.showShortToast(
-                                            context,
-                                            "跳转失败: ${e.message}",
-                                        )
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColorsPrimary(),
-                                cornerRadius = 16.dp,
-                                minWidth = 0.dp,
-                                minHeight = 0.dp,
-                                insideMargin = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            ) {
-                                Text(
-                                    text = "引导",
-                                    style = textStyles.body2.copy(color = colorScheme.onPrimary),
-                                )
-                            }
-                        }
                     }
                 }
             }

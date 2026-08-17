@@ -20,10 +20,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
+import android.content.Intent
+import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
+import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
+import top.yukonga.miuix.kmp.basic.DropdownEntry
+import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 
@@ -117,13 +122,50 @@ class DeveloperModeActivity : AppCompatActivity() {
                 var filteredNotificationLogEnabled by FILTERED_NOTIFICATION_LOG_ENABLED
 
                 SwitchPreference(
-                    title = "调试UI显示",
-                    summary = "显示调试信息、测试按钮等开发调试元素",
+                    title = "浮窗/去重调试",
+                    summary = "超级岛浮窗说明显示调试信息、智能去重输出调试日志",
                     checked = debugUiEnabled,
                     onCheckedChange = {
                         debugUiEnabled = it
                         StorageManager.putBoolean(context, KEY_DEBUG_UI_ENABLED, it)
                     },
+                )
+
+                WindowDropdownPreference(
+                    title = "调试引导页",
+                    summary = "选择分支进入引导页调试多分支显示",
+                    entry = DropdownEntry(
+                        items =
+                            listOf(
+                                DropdownItem(
+                                    text = "完整流程",
+                                    onClick = {
+                                        val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
+                                        intent.putExtra("fromInternal", true)
+                                        intent.putExtra("forceBranch", "full")
+                                        IntentUtils.startActivity(context, intent, true)
+                                    },
+                                ),
+                                DropdownItem(
+                                    text = "重授权",
+                                    onClick = {
+                                        val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
+                                        intent.putExtra("fromInternal", true)
+                                        intent.putExtra("forceBranch", "reauth")
+                                        IntentUtils.startActivity(context, intent, true)
+                                    },
+                                ),
+                                DropdownItem(
+                                    text = "需重新同意",
+                                    onClick = {
+                                        val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
+                                        intent.putExtra("fromInternal", true)
+                                        intent.putExtra("forceBranch", "consent")
+                                        IntentUtils.startActivity(context, intent, true)
+                                    },
+                                ),
+                            ),
+                    ),
                 )
 
                 SwitchPreference(

@@ -134,7 +134,7 @@ internal fun GuideRequiredPermissionPage(
             title = if (reauth) "重新授权必要权限" else "必要权限",
             subtitle =
                 if (reauth) {
-                    "版本更新后系统收回了通知访问授权，重新开启以下权限即可恢复全部功能"
+                    "版本更新后系统收回或者丢失了部分权限，请重新开启"
                 } else if (permissionState.requiredGranted) {
                     "所有必要权限已开启，可以继续下一步"
                 } else {

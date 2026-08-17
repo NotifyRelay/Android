@@ -83,7 +83,7 @@ internal fun GuideWelcomePage(
                     Text(
                         text =
                             if (reauth) {
-                                "版本更新后系统收回了通知访问授权，仅需重新开启即可恢复全部功能"
+                                "版本更新后系统收回了部分必须权限，仅需重新开启恢复正常使用"
                             } else {
                                 "首次使用前，需要完成几项简单设置"
                             },
