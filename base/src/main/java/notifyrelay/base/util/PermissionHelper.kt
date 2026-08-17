@@ -301,7 +301,7 @@ object PermissionHelper {
      * @return 详细的 OS 版本字符串，例如 "OS3.0.300.4.WNACNXM"。
      */
     fun getDetailedOsVersion(): String? {
-        val fingerprint = android.os.Build.FINGERPRINT
+        val fingerprint = Build.FINGERPRINT
         return try {
             // 直接搜索包含 "OS" 开头的版本部分
             // 例如：OS3.0.300.4.WNACNXM

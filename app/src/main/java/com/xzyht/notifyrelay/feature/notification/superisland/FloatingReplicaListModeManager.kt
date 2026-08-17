@@ -135,7 +135,7 @@ object FloatingReplicaListModeManager {
             CoroutineScope(Dispatchers.Main).launch {
                 delay(30_000L)
                 runWithErrorHandling("列表模式超时移除") {
-                    FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager.RemovalReason.TIMEOUT)
+                    FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
                 }
             }
         FloatingReplicaMappingManager.setTimeoutJob(sourceId, job)
@@ -160,7 +160,7 @@ object FloatingReplicaListModeManager {
         if (next != null) {
             sendListModeNotification(context, next)
         } else {
-            val nm = context.getSystemService(android.app.NotificationManager::class.java)
+            val nm = context.getSystemService(NotificationManager::class.java)
             nm?.cancel(LIST_MODE_NOTIFICATION_ID)
         }
     }

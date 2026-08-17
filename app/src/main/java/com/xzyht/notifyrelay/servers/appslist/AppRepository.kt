@@ -59,7 +59,7 @@ object AppRepository {
      * @param packageName 应用包名
      */
     fun notifyIconUpdated(packageName: String) {
-        val updatedValue: Pair<String, Long>? = Pair(packageName, System.currentTimeMillis())
+        val updatedValue: Pair<String, Long> = Pair(packageName, System.currentTimeMillis())
         _iconUpdates.value = updatedValue
     }
 
@@ -120,9 +120,8 @@ object AppRepository {
                     // 获取应用图标
                     var iconBytes: ByteArray? = null
                     try {
-                        val drawable = pm.getApplicationIcon(appInfo)
                         val bitmap =
-                            when (drawable) {
+                            when (val drawable = pm.getApplicationIcon(appInfo)) {
                                 is BitmapDrawable -> drawable.bitmap
                                 else -> {
                                     // 将其他类型的drawable转换为bitmap
@@ -425,9 +424,8 @@ object AppRepository {
                     val packageName = appInfo.packageName
 
                     // 从PackageManager获取图标
-                    val drawable = pm.getApplicationIcon(appInfo)
                     val bitmap =
-                        when (drawable) {
+                        when (val drawable = pm.getApplicationIcon(appInfo)) {
                             is BitmapDrawable -> drawable.bitmap
                             else -> {
                                 // 将其他类型的drawable转换为bitmap
@@ -632,9 +630,8 @@ object AppRepository {
         try {
             val pm = context.packageManager
             val appInfo = pm.getApplicationInfo(packageName, 0)
-            val drawable = pm.getApplicationIcon(appInfo)
             val bitmap =
-                when (drawable) {
+                when (val drawable = pm.getApplicationIcon(appInfo)) {
                     is BitmapDrawable -> drawable.bitmap
                     else -> {
                         // 将其他类型的drawable转换为bitmap

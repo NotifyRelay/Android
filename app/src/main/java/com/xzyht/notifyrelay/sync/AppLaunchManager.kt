@@ -20,9 +20,7 @@ object AppLaunchManager {
     ) {
         try {
             val json = JSONObject(decrypted)
-            val action = json.optString("action", "")
-
-            when (action) {
+            when (val action = json.optString("action", "")) {
                 "launchApp" -> {
                     val targetPackageName = json.getString("packageName")
                     val displayId = json.optInt("displayId", -1)

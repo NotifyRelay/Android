@@ -96,7 +96,7 @@ object RemoteMediaSessionManager {
 
     // 媒体会话缓存数据类
     private data class MediaSessionCacheData(
-        val context: android.content.Context,
+        val context: Context,
         val session: MediaSessionData,
         val device: DeviceInfo,
         val resendRunnable: Runnable,
@@ -313,7 +313,7 @@ object RemoteMediaSessionManager {
                 // 从Store中移除
                 SuperIslandRemoteStore.removeExact(sourceKey)
                 // 关闭浮窗
-                com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+                FloatingReplicaManager
                     .dismissBySource(sourceKey)
                 Logger.i("RemoteMediaSessionManager", "已关闭设备媒体超级岛浮窗: $sourceKey")
             } catch (e: Exception) {
@@ -337,7 +337,7 @@ object RemoteMediaSessionManager {
         try {
             cancelResendTask(device.uuid)
             SuperIslandRemoteStore.removeExact(sourceKey)
-            com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+            FloatingReplicaManager
                 .dismissBySource(sourceKey)
             mediaFeatureIdCache.remove(device.uuid)
             mediaLastUpdateTime.remove(device.uuid)
@@ -421,7 +421,7 @@ object RemoteMediaSessionManager {
                 // 从Store中移除
                 SuperIslandRemoteStore.removeExact(sourceKey)
                 // 关闭浮窗
-                com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
+                FloatingReplicaManager
                     .dismissBySource(sourceKey)
                 // 清除缓存
                 mediaFeatureIdCache.remove(deviceUuid)

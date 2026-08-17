@@ -30,7 +30,7 @@ object DeviceUtils {
             try {
                 val canReadBt =
                     if (Build.VERSION.SDK_INT >= 31) {
-                        ContextCompat.checkSelfPermission(context, android.Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
+                        ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED
                     } else {
                         true
                     }

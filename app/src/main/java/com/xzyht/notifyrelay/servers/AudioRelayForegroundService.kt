@@ -45,11 +45,11 @@ class AudioRelayForegroundService : Service() {
                 putExtra(EXTRA_DEVICE_NAME, deviceName)
             }
         val pendingIntent =
-            android.app.PendingIntent.getBroadcast(
+            PendingIntent.getBroadcast(
                 this,
                 0,
                 stopIntent,
-                android.app.PendingIntent.FLAG_UPDATE_CURRENT or android.app.PendingIntent.FLAG_IMMUTABLE,
+                PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
 
         val notification =
