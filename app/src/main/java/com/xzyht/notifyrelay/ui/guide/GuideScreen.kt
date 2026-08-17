@@ -18,11 +18,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import kotlin.time.Duration.Companion.seconds
 
 internal enum class GuideStep {
     WELCOME,
