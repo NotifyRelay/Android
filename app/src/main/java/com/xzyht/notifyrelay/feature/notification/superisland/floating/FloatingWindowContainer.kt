@@ -24,7 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.bigIsland.ParamIslandCompose
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.bigisland.ParamIslandCompose
 import github.xzynine.superislandui.floating.BigIsland.components.ActionCompose
 import github.xzynine.superislandui.floating.BigIsland.components.AnimTextInfoCompose
 import github.xzynine.superislandui.floating.BigIsland.components.BaseInfoCompose

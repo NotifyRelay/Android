@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.floating.bigIsland
+package com.xzyht.notifyrelay.feature.notification.superisland.floating.bigisland
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
