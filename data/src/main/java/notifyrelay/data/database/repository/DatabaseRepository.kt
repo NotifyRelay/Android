@@ -111,13 +111,18 @@ class DatabaseRepository(
 
     /**
      * 删除指定 UUID 的设备迁移行（设备在迁移前被移除时）
+     * 幂等：表已被前述迁移 DROP 时忽略（二次启动/删除设备不再崩溃）
      */
     suspend fun deleteDeviceMigrationByUuid(uuid: String) {
         withContext(Dispatchers.IO) {
-            database.openHelper.writableDatabase.execSQL(
-                "DELETE FROM device_migration WHERE uuid = ?",
-                arrayOf<Any?>(uuid),
-            )
+            try {
+                database.openHelper.writableDatabase.execSQL(
+                    "DELETE FROM device_migration WHERE uuid = ?",
+                    arrayOf<Any?>(uuid),
+                )
+            } catch (_: android.database.sqlite.SQLiteException) {
+                // 表不存在：迁移已完成，幂等忽略
+            }
         }
     }
 
