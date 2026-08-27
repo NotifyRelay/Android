@@ -438,10 +438,11 @@ class DeviceConnectionManager(
         // 设置静态引用供 native 回调使用
         _callbackInstance = this
 
-        // 本机 UUID 由 Rust 生成/持有（库落盘），平台端不生成不存储；
-        // 旧 SP 值仅作 Rust 库异常时的兜底
+        // 本机 UUID：
+        // - 升级用户：SP 旧 uuid 即输入种子（迁移期间保持一致，经 start_core 写入 Rust 库）
+        // - 全新安装：空值，由 Rust 生成/持有（库落盘），平台端不生成不存储
         val legacyUuid = StorageManager.getString(context, "device_uuid")
-        uuid = ""
+        uuid = legacyUuid
         // 兼容旧用户：首次运行时如无保存则默认true
         if (!AppConfig.getUdpDiscoveryEnabled(context)) {
             AppConfig.setUdpDiscoveryEnabled(context, true)
@@ -456,20 +457,25 @@ class DeviceConnectionManager(
             NativeCore.setContext(rustContext)
             val ctx = rustContext!!
 
-            // 本机 UUID：Rust 生成/持有（getLocalUuid 触发生成并落库）
-            try {
-                val rustUuid = NativeCore.getLocalUuid(ctx)
-                if (!rustUuid.isNullOrEmpty()) {
-                    uuid = rustUuid
-                } else if (legacyUuid.isNotEmpty()) {
-                    // 兜底：Rust 库不可用时沿用旧平台 UUID（仅本次进程，不持久化）
-                    uuid = legacyUuid
-                    Logger.w("死神-NotifyRelay", "Rust 私有库未就绪，沿用旧平台 UUID 兜底")
-                }
-            } catch (e: Exception) {
-                if (legacyUuid.isNotEmpty()) {
-                    uuid = legacyUuid
-                    Logger.w("死神-NotifyRelay", "读取 Rust UUID 失败，沿用旧平台 UUID 兜底", e)
+            // 本机 UUID：
+            // - 升级用户（SP 有旧 uuid）：作为迁移种子的旧值，经 start_core(uuid) 写入
+            //   Rust 库（旧加密 blob 的密钥由该 uuid 派生，必须先保持一致）
+            // - 全新安装：Rust 生成 v4 并落库（getLocalUuid）
+            if (uuid.isEmpty()) {
+                try {
+                    val rustUuid = NativeCore.getLocalUuid(ctx)
+                    if (!rustUuid.isNullOrEmpty()) {
+                        uuid = rustUuid
+                    } else if (legacyUuid.isNotEmpty()) {
+                        // 兜底：Rust 库不可用时沿用旧平台 UUID（仅本次进程，不持久化）
+                        uuid = legacyUuid
+                        Logger.w("死神-NotifyRelay", "Rust 私有库未就绪，沿用旧平台 UUID 兜底")
+                    }
+                } catch (e: Exception) {
+                    if (legacyUuid.isNotEmpty()) {
+                        uuid = legacyUuid
+                        Logger.w("死神-NotifyRelay", "读取 Rust UUID 失败，沿用旧平台 UUID 兜底", e)
+                    }
                 }
             }
 
