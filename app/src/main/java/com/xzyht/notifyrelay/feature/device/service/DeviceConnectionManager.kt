@@ -51,8 +51,8 @@ import notifyrelay.core.util.BatteryUtils
 import notifyrelay.data.StorageManager
 import notifyrelay.data.config.AppConfig
 import notifyrelay.data.config.ScrcpyDefaults
-import notifyrelay.data.database.entity.DeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 import java.util.UUID
@@ -188,115 +188,56 @@ class DeviceConnectionManager(
     // 保持 JNA 回调对象强引用，防止被 GC
     private val rustCallbackRefs = mutableListOf<Any>()
 
-    // 加载已认证设备
+    // 加载已认证设备（密钥已由 Rust 私有库/内存持有，仅恢复 UI 元数据与连接目标）
     private fun loadAuthedDevices() {
-        val devices =
-            kotlinx.coroutines.runBlocking {
-                DatabaseRepository.getInstance(context).getDevices()
-            }
-
         val ctx = rustContext
-        var hasOldKey = false
-        // 收集需要回填 sharedSecret 的设备
-        val backfillUpdates = mutableListOf<DeviceEntity>()
-
-        for (device in devices) {
-            if (device.uuid == "本机" || device.uuid == this.uuid) continue
-
-            if (device.sharedSecret.isNotEmpty()) {
-                // 尝试解析为新式 base64 AES 密钥
-                val keyBytes =
-                    try {
-                        Base64.decode(device.sharedSecret, Base64.NO_WRAP)
-                    } catch (_: Exception) {
-                        null
-                    }
-
-                if (keyBytes != null && keyBytes.size == 32) {
-                    // 新式密钥：导入 Rust 上下文
-                    if (ctx != null && !NativeCore.migrateSharedSecret(ctx, device.uuid, keyBytes)) {
-                        Logger.w("死神-NotifyRelay", "迁移密钥失败，跳过设备: ${device.uuid}")
-                        continue
-                    }
-                } else {
-                    // 旧版明文密钥（C#/Kotlin ECDH），与 Rust HKDF 不兼容，清除配对
-                    hasOldKey = true
-                    try {
-                        ctx?.let { NativeCore.removeDevice(it, device.uuid) }
-                    } catch (_: Exception) {
-                    }
-                    kotlinx.coroutines.runBlocking {
-                        DatabaseRepository.getInstance(context).saveDevice(
-                            device.copy(sharedSecret = "", isAccepted = false),
-                        )
-                    }
-                    continue // 跳过认证状态恢复
-                }
-            }
-
-            if (device.isAccepted) {
-                synchronized(authenticatedDevices) {
-                    authenticatedDevices[device.uuid] =
-                        AuthInfo(
-                            publicKey = device.publicKey,
-                            sharedSecret = device.sharedSecret,
-                            isAccepted = true,
-                            displayName = device.displayName,
-                            lastIp = device.lastIp,
-                            lastPort = device.lastPort,
-                        )
-                }
-                registerReconnectTarget(device.uuid, device.lastIp ?: "")
-                registerKnownDevice(device.uuid, device.lastIp ?: "")
-            }
-
-            // 恢复设备名和 IP 到缓存
-            if (!device.displayName.isNullOrEmpty()) {
-                DeviceConnectionManagerUtil.updateGlobalDeviceName(device.uuid, device.displayName)
-            }
-            synchronized(deviceInfoCache) {
-                deviceInfoCache[device.uuid] =
-                    DeviceInfo(
-                        uuid = device.uuid,
-                        displayName = device.displayName,
-                        ip = device.lastIp,
-                        port = device.lastPort,
-                    )
-            }
-        }
-
-        // 回填：对 sharedSecret 为空但 Rust 中有密钥的设备，补充持久化
-        if (ctx != null) {
-            synchronized(authenticatedDevices) {
-                for ((uuid, auth) in authenticatedDevices) {
-                    if (uuid == "本机") continue
-                    if (auth.isAccepted && auth.sharedSecret.isEmpty()) {
-                        val keyJson = NativeCore.exportDeviceKey(ctx, uuid)
-                        if (keyJson != null) {
-                            val json = JSONObject(keyJson)
-                            val aesKey = json.optString("aes_key_b64", "")
-                            authenticatedDevices[uuid] = auth.copy(sharedSecret = aesKey)
-                            backfillUpdates.add(
-                                DeviceEntity(
-                                    uuid = uuid,
-                                    publicKey = auth.publicKey,
-                                    sharedSecret = aesKey,
-                                    isAccepted = true,
-                                    displayName = auth.displayName ?: "",
-                                    lastIp = auth.lastIp ?: "",
-                                    lastPort = auth.lastPort ?: 23333,
-                                ),
+        // 从 Rust 获取设备列表（含库内持久化的名称/IP），恢复已配对设备
+        val json =
+            ctx
+                ?.let { NativeCore.getDeviceList(it, 30_000L, 10_000L) }
+                ?: return
+        try {
+            val arr = JSONArray(json)
+            for (i in 0 until arr.length()) {
+                val obj = arr.getJSONObject(i)
+                val deviceUuid = obj.optString("uuid")
+                if (deviceUuid.isEmpty() || deviceUuid == "本机" || deviceUuid == this.uuid) continue
+                val paired = obj.optBoolean("paired")
+                val name = obj.optString("name")
+                val ip = obj.optString("ip")
+                val port = obj.optInt("port", 23333)
+                if (paired) {
+                    synchronized(authenticatedDevices) {
+                        authenticatedDevices[deviceUuid] =
+                            AuthInfo(
+                                publicKey = "",
+                                sharedSecret = "",
+                                isAccepted = true,
+                                displayName = name.takeIf { it.isNotEmpty() },
+                                lastIp = ip.takeIf { it.isNotEmpty() },
+                                lastPort = port,
                             )
-                        }
+                    }
+                    registerReconnectTarget(deviceUuid, ip)
+                    if (ip.isNotEmpty()) {
+                        registerKnownDevice(deviceUuid, ip)
                     }
                 }
-            }
-            if (backfillUpdates.isNotEmpty()) {
-                kotlinx.coroutines.runBlocking {
-                    val repo = DatabaseRepository.getInstance(context)
-                    backfillUpdates.forEach { repo.saveDevice(it) }
+                if (name.isNotEmpty()) {
+                    DeviceConnectionManagerUtil.updateGlobalDeviceName(deviceUuid, name)
+                }
+                synchronized(deviceInfoCache) {
+                    deviceInfoCache[deviceUuid] =
+                        DeviceInfo(
+                            uuid = deviceUuid,
+                            displayName = name.takeIf { it.isNotEmpty() } ?: "",
+                            ip = ip,
+                            port = port,
+                        )
                 }
             }
+        } catch (e: Exception) {
+            Logger.e("死神-NotifyRelay", "loadAuthedDevices 解析设备列表失败", e)
         }
 
         // 更新设备列表和 Flow
@@ -308,74 +249,13 @@ class DeviceConnectionManager(
             }
         } catch (_: Exception) {
         }
-        if (hasOldKey) {
-            saveRustCoreState()
-            Logger.i("死神-NotifyRelay", "检测到旧版密钥，已清除配对，请重新配对设备")
-        }
     }
 
-    // 保存已认证设备
+    // 保存已认证设备（密钥落盘由 Rust 自动；此处仅刷新 UI 状态）
     private fun saveAuthedDevices() {
         try {
-            // 保存到Room数据库
-            val deviceEntities = mutableListOf<DeviceEntity>()
-            val ctx = rustContext
-            for ((uuid, auth) in authenticatedDevices) {
-                // 过滤掉uuid为"本机"的记录
-                if (uuid == "本机") continue
-
-                if (auth.isAccepted) {
-                    // 从 Rust 导出实际 AES 密钥（base64）作为持久化 fallback
-                    val keyB64 =
-                        ctx
-                            ?.let { NativeCore.exportDeviceKey(it, uuid) }
-                            ?.let { JSONObject(it).optString("aes_key_b64", "") }
-                            ?: auth.sharedSecret
-                    if (keyB64.isBlank()) {
-                        Logger.w("死神-NotifyRelay", "跳过无可用密钥的设备持久化: $uuid")
-                        continue
-                    }
-                    val name = auth.displayName ?: deviceInfoCache[uuid]?.displayName ?: DeviceConnectionManagerUtil.getDisplayNameByUuid(uuid)
-                    val info = deviceInfoCache[uuid]
-                    val deviceEntity =
-                        DeviceEntity(
-                            uuid = uuid,
-                            publicKey = auth.publicKey,
-                            sharedSecret = keyB64,
-                            isAccepted = true,
-                            displayName = name,
-                            lastIp = info?.ip ?: auth.lastIp ?: "",
-                            lastPort = info?.port ?: auth.lastPort ?: 23333,
-                        )
-                    deviceEntities.add(deviceEntity)
-                }
-            }
-
-            // 异步保存到数据库
             coroutineScope.launch {
-                val repository = DatabaseRepository.getInstance(context)
-
-                // 获取当前数据库中的所有设备
-                val currentDevices = repository.getDevices()
-                currentDevices.map { it.uuid }.toSet()
-
-                // 要保存的设备UUID列表
-                val deviceUuidsToSave = deviceEntities.map { it.uuid }.toSet()
-
-                // 删除数据库中存在但内存中不存在的设备
-                currentDevices.forEach {
-                    // 保留uuid为"本机"的记录，避免影响旧数据
-                    if (!deviceUuidsToSave.contains(it.uuid) && it.uuid != "本机") {
-                        repository.deleteDevice(it)
-                    }
-                }
-
-                // 保存或更新设备
-                deviceEntities.forEach {
-                    repository.saveDevice(it)
-                }
-
-                // 更新Flow值
+                updateDeviceList()
                 _authenticatedDevicesFlow.value = authenticatedDevices.toMap()
                 _rejectedDevicesFlow.value = rejectedDevices.toSet()
             }
@@ -425,7 +305,7 @@ class DeviceConnectionManager(
      * 已拒绝设备状态流
      */
     val rejectedDevicesFlow: StateFlow<Set<String>> = _rejectedDevicesFlow
-    internal val uuid: String
+    internal var uuid: String
 
     // 认证设备表，key为uuid
     internal val authenticatedDevices = mutableMapOf<String, AuthInfo>()
@@ -571,16 +451,31 @@ class DeviceConnectionManager(
         if (!AppConfig.getUdpDiscoveryEnabled(context)) {
             AppConfig.setUdpDiscoveryEnabled(context, true)
         }
-        // 初始化 Rust 上下文并获取/生成本机 ECDH 密钥对
+        // 初始化 Rust 上下文并获取/生成本机 ECDH 密钥对（持久化由 Rust 私有库管理）
         var initPubKey = ""
+        // 旧平台加密状态 blob（迁移源：迁移成功后清除）
+        val legacyStateEnc = StorageManager.getString(context, "rust_core_state")
         try {
             rustContext = NativeCore.createContext()
             BackendRemoteFilter.rustContext = rustContext
             NativeCore.setContext(rustContext)
             val ctx = rustContext!!
-            val savedStateEnc = StorageManager.getString(context, "rust_core_state")
-            if (savedStateEnc.isNotEmpty()) {
-                val decrypted = NativeCore.decryptLocalState(ctx, savedStateEnc, uuid)
+
+            // UUID 以 Rust 私有库为准（库有记录则覆盖平台首启值）
+            try {
+                val rustUuid = NativeCore.getLocalUuid(ctx)
+                if (!rustUuid.isNullOrEmpty() && rustUuid != uuid) {
+                    Logger.i("死神-NotifyRelay", "UUID 以 Rust 持久化为准: $rustUuid (原: $uuid)")
+                    uuid = rustUuid
+                    StorageManager.putString(context, "device_uuid", uuid)
+                }
+            } catch (_: Exception) {
+            }
+
+            // 旧平台存储迁移：加密状态 blob（含本机密钥与设备 AES）导入 Rust 内存
+            // （空数据不迁移；核心库自动 load 优先，blob 仅补充/引导导入）
+            if (legacyStateEnc.isNotEmpty()) {
+                val decrypted = NativeCore.decryptLocalState(ctx, legacyStateEnc, uuid)
                 if (decrypted != null) {
                     NativeCore.importState(ctx, decrypted)
                 }
@@ -589,13 +484,6 @@ class DeviceConnectionManager(
                 NativeCore.generateKeypair(ctx)
             }
             initPubKey = NativeCore.getPublicKey(ctx) ?: ""
-            val stateJson = NativeCore.exportState(ctx)
-            if (stateJson != null) {
-                val encrypted = NativeCore.encryptLocalState(ctx, stateJson, uuid)
-                if (encrypted != null) {
-                    StorageManager.putString(context, "rust_core_state", encrypted)
-                }
-            }
             Logger.d("死神-NotifyRelay", "Rust core 上下文已初始化")
             // 注册 Rust 回调
             setupRustCallbacks()
@@ -604,7 +492,6 @@ class DeviceConnectionManager(
         }
         localPublicKey = initPubKey
         loadAuthedDevices()
-        saveRustCoreState()
         // 统一启动核心：TCP/UDP、心跳调度、离线检测、发送队列、已知设备扫描、重连状态机、mDNS 广告与发现
         try {
             rustContext?.let { ctx ->
@@ -628,6 +515,8 @@ class DeviceConnectionManager(
         } catch (e: Exception) {
             Logger.e("死神-NotifyRelay", "启动 Rust Core 失败", e)
         }
+        // 旧设备表迁移与平台存储清理（需在本机 uuid 已进入 Rust 后才可保证落盘）
+        migrateLegacyDevicesAndCleanup(legacyStateEnc)
         // 电池变化监听：电量/充电状态变化时同步到 Rust 心跳调度器，对端实时显示更新
         registerBatteryChangeReceiver()
         // 新增：初始补全本机 deviceInfoCache，便于反向 connectToDevice
@@ -1926,15 +1815,82 @@ class DeviceConnectionManager(
         }
     }
 
-    // 保存 Rust Core 状态到持久化存储，确保重启后 device_keys 可恢复
+    // 保存 Rust Core 状态（兼容占位：密钥状态由 Rust 私有库自动持久化，
+    // 平台端不再持有密钥状态，此函数无副作用）
     internal fun saveRustCoreState() {
+    }
+
+    /**
+     * 一次性迁移旧平台存储到 Rust 私有库（uuid 进入 Rust 后调用）：
+     * - device_migration 表设备行：名称 → renameDevice；base64 AES → migrateSharedSecret；
+     *   旧明文密钥 → removeDevice（不兼容，清除配对）
+     * - 旧加密状态 blob（SP rust_core_state）经 importState 已导入内存，
+     *   getLocalUuid 校验落盘成功后清除
+     * 空数据一律不传入 Rust（无证明已迁移的数据不喂给 Rust）
+     */
+    private fun migrateLegacyDevicesAndCleanup(legacyStateEnc: String) {
+        val ctx = rustContext ?: return
         try {
-            val ctx = rustContext ?: return
-            val stateJson = NativeCore.exportState(ctx) ?: return
-            val encrypted = NativeCore.encryptLocalState(ctx, stateJson, uuid) ?: return
-            StorageManager.putString(context, "rust_core_state", encrypted)
+            val rows =
+                kotlinx.coroutines.runBlocking {
+                    DatabaseRepository.getInstance(context).queryDeviceMigrationRows()
+                }
+            var migratedAny = false
+            for (row in rows) {
+                if (row.uuid.isBlank() || row.uuid == "本机") continue
+                if (row.displayName.isNotBlank()) {
+                    NativeCore.renameDevice(ctx, row.uuid, row.displayName)
+                    migratedAny = true
+                }
+                if (row.sharedSecret.isNotBlank()) {
+                    val keyBytes =
+                        try {
+                            Base64.decode(row.sharedSecret, Base64.NO_WRAP)
+                        } catch (_: Exception) {
+                            null
+                        }
+                    if (keyBytes != null && keyBytes.size == 32) {
+                        NativeCore.migrateSharedSecret(ctx, row.uuid, keyBytes)
+                        migratedAny = true
+                    } else {
+                        // 旧版明文密钥（C#/Kotlin ECDH），与 Rust HKDF 不兼容，清除配对
+                        NativeCore.removeDevice(ctx, row.uuid)
+                        migratedAny = true
+                    }
+                }
+                if (row.lastIp.isNotBlank()) {
+                    try {
+                        NativeCore.addKnownDevice(ctx, row.uuid, row.lastIp)
+                    } catch (_: Exception) {
+                    }
+                }
+            }
+
+            // 触发落盘并校验（startCore 已传入 uuid；读取接口前自动 flush）
+            val persistedUuid = NativeCore.getLocalUuid(ctx)
+            if (persistedUuid.isNullOrEmpty()) {
+                Logger.w("死神-NotifyRelay", "Rust 持久化未就绪，暂缓清理旧平台存储")
+                return
+            }
+            if (persistedUuid != uuid) {
+                Logger.i("死神-NotifyRelay", "UUID 以 Rust 持久化为准: $persistedUuid (原: $uuid)")
+                uuid = persistedUuid
+                StorageManager.putString(context, "device_uuid", uuid)
+            }
+            // 迁移完成：清理旧平台存储（密钥已由 Rust 私有库持有）
+            if (legacyStateEnc.isNotEmpty()) {
+                StorageManager.remove(context, "rust_core_state")
+            }
+            if (rows.isNotEmpty()) {
+                kotlinx.coroutines.runBlocking {
+                    DatabaseRepository.getInstance(context).dropDeviceMigrationTable()
+                }
+            }
+            if (migratedAny) {
+                Logger.i("死神-NotifyRelay", "旧设备数据已迁移至 Rust 持久化")
+            }
         } catch (e: Exception) {
-            Logger.e("死神-NotifyRelay", "保存 Rust Core 状态失败", e)
+            Logger.e("死神-NotifyRelay", "旧设备数据迁移失败", e)
         }
     }
 
@@ -2124,10 +2080,10 @@ class DeviceConnectionManager(
 
             synchronized(authenticatedDevices) {
                 if (authenticatedDevices.containsKey(uuid)) {
-                    // 直接从数据库中删除设备及关联数据
+                    // 删除设备迁移残留行（若旧表数据尚未迁移）及关联数据
                     coroutineScope.launch {
                         val repository = DatabaseRepository.getInstance(context)
-                        repository.deleteDeviceByUuid(uuid)
+                        repository.deleteDeviceMigrationByUuid(uuid)
                         if (deleteHistory) {
                             repository.deleteNotificationsByDevice(uuid)
                             repository.deleteAppDeviceAssociationsByDeviceUuid(uuid)
