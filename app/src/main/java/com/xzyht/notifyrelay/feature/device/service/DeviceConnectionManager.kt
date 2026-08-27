@@ -636,6 +636,21 @@ class DeviceConnectionManager(
      * 1s 定时器（startOfflineDeviceCleaner）与心跳回调共同触发。
      */
     private fun refreshDevicesFromRust() {
+        // 节流：心跳/连接回调并发触发时跳过重复刷新，避免同一时刻
+        // 多个协程并发进入 JNA getDeviceList（会与 Rust 侧线程风暴叠加）
+        if (deviceListRefreshBusy) return
+        deviceListRefreshBusy = true
+        try {
+            refreshDevicesFromRustInternal()
+        } finally {
+            deviceListRefreshBusy = false
+        }
+    }
+
+    @Volatile
+    private var deviceListRefreshBusy = false
+
+    private fun refreshDevicesFromRustInternal() {
         val ctx = rustContext ?: return
         val json =
             try {
