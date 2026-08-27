@@ -250,9 +250,13 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
         // 监听设备状态变化，更新通知
         CoroutineScope(Dispatchers.Default).launch {
-            connectionManager.devices.collect { _ ->
-                // 设备状态发生变化时更新通知
-                updateNotification()
+            try {
+                connectionManager.devices.collect {
+                    // 设备状态发生变化时更新通知
+                    updateNotification()
+                }
+            } catch (e: Exception) {
+                Logger.e(TAG, "设备状态监听协程异常退出，通知将不再自动更新", e)
             }
         }
 
@@ -734,6 +738,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 false
             }
         // Logger.d(TAG, "getNotificationText: authenticatedOnlineCount=$onlineDevices")
+        Logger.d(TAG, "getNotificationText: authenticatedOnlineCount=$onlineDevices")
 
         // 优先显示设备连接数，如果有设备连接
         if (onlineDevices > 0) {
@@ -769,9 +774,14 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     }
 
     private fun updateNotification() {
-        val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-        val notification = buildNotification()
-        manager.notify(notifyId, notification)
+        try {
+            val manager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            val notification = buildNotification()
+            manager.notify(notifyId, notification)
+            Logger.d(TAG, "updateNotification: ${getNotificationText()}")
+        } catch (e: Exception) {
+            Logger.e(TAG, "更新通知失败", e)
+        }
     }
 
     // 保留通知历史，不做移除处理

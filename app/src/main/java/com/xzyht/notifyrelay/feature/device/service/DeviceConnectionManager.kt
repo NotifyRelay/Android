@@ -706,6 +706,12 @@ class DeviceConnectionManager(
             }
             _devices.value = newMap
             updateOnlineDevicesCache(newMap, authSnapshot)
+            Logger.d(
+                "死神-NotifyRelay",
+                "[refreshDevicesFromRust] 列表: ${newMap.size} 台, 在线: ${
+                    newMap.count { it.value.second }
+                }, 已认证: ${authSnapshot.size}",
+            )
         } catch (_: Exception) {
         }
     }
