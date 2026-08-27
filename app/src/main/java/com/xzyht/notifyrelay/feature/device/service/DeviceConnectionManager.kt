@@ -55,7 +55,6 @@ import notifyrelay.data.database.repository.DatabaseRepository
 import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
-import java.util.UUID
 
 data class DeviceInfo(
     val uuid: String,
@@ -439,14 +438,10 @@ class DeviceConnectionManager(
         // 设置静态引用供 native 回调使用
         _callbackInstance = this
 
-        val savedUuid = StorageManager.getString(context, "device_uuid")
-        if (savedUuid.isNotEmpty()) {
-            uuid = savedUuid
-        } else {
-            val newUuid = UUID.randomUUID().toString()
-            StorageManager.putString(context, "device_uuid", newUuid)
-            uuid = newUuid
-        }
+        // 本机 UUID 由 Rust 生成/持有（库落盘），平台端不生成不存储；
+        // 旧 SP 值仅作 Rust 库异常时的兜底
+        val legacyUuid = StorageManager.getString(context, "device_uuid")
+        uuid = ""
         // 兼容旧用户：首次运行时如无保存则默认true
         if (!AppConfig.getUdpDiscoveryEnabled(context)) {
             AppConfig.setUdpDiscoveryEnabled(context, true)
@@ -461,15 +456,21 @@ class DeviceConnectionManager(
             NativeCore.setContext(rustContext)
             val ctx = rustContext!!
 
-            // UUID 以 Rust 私有库为准（库有记录则覆盖平台首启值）
+            // 本机 UUID：Rust 生成/持有（getLocalUuid 触发生成并落库）
             try {
                 val rustUuid = NativeCore.getLocalUuid(ctx)
-                if (!rustUuid.isNullOrEmpty() && rustUuid != uuid) {
-                    Logger.i("死神-NotifyRelay", "UUID 以 Rust 持久化为准: $rustUuid (原: $uuid)")
+                if (!rustUuid.isNullOrEmpty()) {
                     uuid = rustUuid
-                    StorageManager.putString(context, "device_uuid", uuid)
+                } else if (legacyUuid.isNotEmpty()) {
+                    // 兜底：Rust 库不可用时沿用旧平台 UUID（仅本次进程，不持久化）
+                    uuid = legacyUuid
+                    Logger.w("死神-NotifyRelay", "Rust 私有库未就绪，沿用旧平台 UUID 兜底")
                 }
-            } catch (_: Exception) {
+            } catch (e: Exception) {
+                if (legacyUuid.isNotEmpty()) {
+                    uuid = legacyUuid
+                    Logger.w("死神-NotifyRelay", "读取 Rust UUID 失败，沿用旧平台 UUID 兜底", e)
+                }
             }
 
             // 旧平台存储迁移：加密状态 blob（含本机密钥与设备 AES）导入 Rust 内存
@@ -1866,7 +1867,7 @@ class DeviceConnectionManager(
                 }
             }
 
-            // 触发落盘并校验（startCore 已传入 uuid；读取接口前自动 flush）
+            // 触发落盘并校验（读取接口前自动 flush）
             val persistedUuid = NativeCore.getLocalUuid(ctx)
             if (persistedUuid.isNullOrEmpty()) {
                 Logger.w("死神-NotifyRelay", "Rust 持久化未就绪，暂缓清理旧平台存储")
@@ -1875,7 +1876,6 @@ class DeviceConnectionManager(
             if (persistedUuid != uuid) {
                 Logger.i("死神-NotifyRelay", "UUID 以 Rust 持久化为准: $persistedUuid (原: $uuid)")
                 uuid = persistedUuid
-                StorageManager.putString(context, "device_uuid", uuid)
             }
             // 迁移完成：清理旧平台存储（密钥已由 Rust 私有库持有）
             if (legacyStateEnc.isNotEmpty()) {
