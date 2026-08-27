@@ -79,27 +79,32 @@ class DatabaseRepository(
 
     /**
      * 读取旧 devices 表迁移出的设备行（应用层一次性迁移至 Rust 库后清理）
+     * 幂等：表已被前述迁移 DROP 时返回空列表（二次启动不再报错）
      */
     suspend fun queryDeviceMigrationRows(): List<DeviceMigrationRow> =
         withContext(Dispatchers.IO) {
             val rows = mutableListOf<DeviceMigrationRow>()
-            database.openHelper.readableDatabase.query(
-                "SELECT uuid, publicKey, sharedSecret, isAccepted, displayName, lastIp, lastPort FROM device_migration",
-                emptyArray<Any?>(),
-            ).use { cursor ->
-                while (cursor.moveToNext()) {
-                    rows.add(
-                        DeviceMigrationRow(
-                            uuid = cursor.getString(cursor.getColumnIndexOrThrow("uuid")),
-                            publicKey = cursor.getString(cursor.getColumnIndexOrThrow("publicKey")),
-                            sharedSecret = cursor.getString(cursor.getColumnIndexOrThrow("sharedSecret")),
-                            isAccepted = cursor.getInt(cursor.getColumnIndexOrThrow("isAccepted")) != 0,
-                            displayName = cursor.getString(cursor.getColumnIndexOrThrow("displayName")),
-                            lastIp = cursor.getString(cursor.getColumnIndexOrThrow("lastIp")),
-                            lastPort = cursor.getInt(cursor.getColumnIndexOrThrow("lastPort")),
-                        ),
-                    )
+            try {
+                database.openHelper.readableDatabase.query(
+                    "SELECT uuid, publicKey, sharedSecret, isAccepted, displayName, lastIp, lastPort FROM device_migration",
+                    emptyArray<Any?>(),
+                ).use { cursor ->
+                    while (cursor.moveToNext()) {
+                        rows.add(
+                            DeviceMigrationRow(
+                                uuid = cursor.getString(cursor.getColumnIndexOrThrow("uuid")),
+                                publicKey = cursor.getString(cursor.getColumnIndexOrThrow("publicKey")),
+                                sharedSecret = cursor.getString(cursor.getColumnIndexOrThrow("sharedSecret")),
+                                isAccepted = cursor.getInt(cursor.getColumnIndexOrThrow("isAccepted")) != 0,
+                                displayName = cursor.getString(cursor.getColumnIndexOrThrow("displayName")),
+                                lastIp = cursor.getString(cursor.getColumnIndexOrThrow("lastIp")),
+                                lastPort = cursor.getInt(cursor.getColumnIndexOrThrow("lastPort")),
+                            ),
+                        )
+                    }
                 }
+            } catch (_: android.database.sqlite.SQLiteException) {
+                // 表不存在：迁移已完成，幂等返回空
             }
             rows
         }
