@@ -10,6 +10,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.IBinder
+import android.os.PowerManager
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
@@ -309,6 +310,9 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
     // MediaSession 监控服务实例
     private lateinit var mediaSessionMonitorService: MediaSessionMonitorService
+
+    // Wake Lock：锁屏期间保持 CPU 不休眠，确保心跳线程正常运行
+    private var wakeLock: PowerManager.WakeLock? = null
 
     // 使用通用工具将 Drawable 转换为 Bitmap（参照项目中其他模块的实现）
 
@@ -645,6 +649,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
     override fun onDestroy() {
         Logger.i(TAG, "[NotifyListener] onDestroy called")
+        // 释放 Wake Lock
+        releaseWakeLock()
         // 清空服务实例引用
         instance = null
         super.onDestroy()
@@ -690,6 +696,27 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
         val notification = buildNotification()
         startForeground(notifyId, notification)
+        acquireWakeLock()
+    }
+
+    private fun acquireWakeLock() {
+        if (wakeLock == null) {
+            val pm = getSystemService(POWER_SERVICE) as PowerManager
+            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "notifyrelay:core").apply {
+                acquire()
+            }
+            Logger.i(TAG, "Wake Lock 已获取")
+        }
+    }
+
+    private fun releaseWakeLock() {
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+                Logger.i(TAG, "Wake Lock 已释放")
+            }
+        }
+        wakeLock = null
     }
 
     private fun buildNotification(): Notification {
