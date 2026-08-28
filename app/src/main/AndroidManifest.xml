@@ -158,6 +158,15 @@
             android:exported="false"
             android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar" />
 
+        <!-- 公平运行内存适配（小米 HyperOS / 金标联盟） -->
+        <receiver
+            android:name=".feature.device.receiver.FairMemoryReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="itgsa.intent.action.TRIM" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>
