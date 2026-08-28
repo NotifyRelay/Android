@@ -76,31 +76,46 @@ private fun ExpandedMediaIsland(
                     url = mediaSession.coverUrl,
                 )
 
-            // 只有在有封面时才显示封面图片
-            if (painter != null) {
-                Box(
-                    modifier =
-                        Modifier
-                            .size(COVER_SIZE.dp)
-                            .clip(RoundedCornerShape(8.dp)),
-                ) {
+            // 封面图片：有图显示图，无图显示默认音符占位
+            Box(
+                modifier =
+                    Modifier
+                        .size(COVER_SIZE.dp)
+                        .clip(RoundedCornerShape(8.dp)),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (painter != null) {
                     androidx.compose.foundation.Image(
                         painter = painter,
                         contentDescription = "歌曲封面",
                         modifier = Modifier.fillMaxSize(),
                         contentScale = ContentScale.Crop,
                     )
+                } else {
+                    Box(
+                        modifier =
+                            Modifier
+                                .fillMaxSize()
+                                .clip(RoundedCornerShape(8.dp))
+                                .padding(16.dp),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = "\u266A",
+                            fontSize = 32.sp,
+                            color = Color(0xFF888888.toInt()),
+                        )
+                    }
                 }
-
-                // 只有在有封面时才添加间距
-                Spacer(modifier = Modifier.width(12.dp))
             }
+
+            Spacer(modifier = Modifier.width(12.dp))
 
             Column(
                 modifier = Modifier.weight(1f),
             ) {
                 AutoScrollText(
-                    text = mediaSession.title.ifBlank { "未知标题" },
+                    text = mediaSession.title.ifBlank { "未知" },
                     style = MiuixTheme.textStyles.title2.copy(fontWeight = FontWeight.Medium),
                     color = Color(0xFFFFFFFF.toInt()),
                     baseSpeedPxPerSec = 150f,
@@ -110,7 +125,7 @@ private fun ExpandedMediaIsland(
                 Spacer(modifier = Modifier.height(4.dp))
 
                 AutoFitText(
-                    text = mediaSession.text.ifBlank { "未知艺术家" },
+                    text = mediaSession.text.ifBlank { "未知" },
                     style = MiuixTheme.textStyles.body2,
                     color = Color(0xFFDDDDDD.toInt()),
                     minTextSize = 10f,

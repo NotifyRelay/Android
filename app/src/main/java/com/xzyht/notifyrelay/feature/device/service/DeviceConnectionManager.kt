@@ -936,7 +936,9 @@ class DeviceConnectionManager(
                 saveAuthedDevices()
             }
             registerReconnectTarget(uuid, lastIp ?: "")
-            updateDeviceList()
+            // 不能同步调用 updateDeviceList()——此方法从 Rust nrc_connect_device 的回调中触发，
+            // 同步调用 nrc_get_device_list 会导致 Rust 核心重入崩溃
+            coroutineScope.launch { updateDeviceList() }
             Logger.d("死神-NotifyRelay", "长期密钥配对完成: $uuid")
             true
         } catch (e: Exception) {

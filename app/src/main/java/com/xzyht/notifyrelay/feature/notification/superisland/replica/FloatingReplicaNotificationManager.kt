@@ -48,11 +48,13 @@ object FloatingReplicaNotificationManager {
                     title?.takeIf { it.isNotBlank() }
                         ?: paramV2?.highlightInfo?.title?.takeIf { it.isNotBlank() }
                         ?: paramV2?.baseInfo?.title?.takeIf { it.isNotBlank() }
+                        ?: "未知"
 
                 val displayText =
                     text?.takeIf { it.isNotBlank() }
                         ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
                         ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
+                        ?: "未知"
 
                 val entryKey = sourceId
 

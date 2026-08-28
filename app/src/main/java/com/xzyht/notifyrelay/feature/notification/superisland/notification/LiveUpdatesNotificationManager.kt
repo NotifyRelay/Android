@@ -167,7 +167,7 @@ object LiveUpdatesNotificationManager {
             val notificationBuilder =
                 buildBaseNotification()
                     .setContentTitle(title ?: appName ?: "超级岛通知")
-                    .setContentText(text ?: "")
+                    .setContentText(text ?: "未知")
                     .setSmallIcon(R.drawable.stat_notify_more)
 
             // 在浮窗或列表模式下设置删除意图和点击意图
