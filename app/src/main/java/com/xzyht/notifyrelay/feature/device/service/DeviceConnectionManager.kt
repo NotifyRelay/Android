@@ -523,7 +523,10 @@ class DeviceConnectionManager(
             Logger.e("死神-NotifyRelay", "启动 Rust Core 失败", e)
         }
         // 旧设备表迁移与平台存储清理（需在本机 uuid 已进入 Rust 后才可保证落盘）
-        migrateLegacyDevicesAndCleanup(legacyStateEnc)
+        coroutineScope.launch {
+            migrateLegacyDevicesAndCleanup(legacyStateEnc)
+            loadAuthedDevices()
+        }
         // 电池变化监听：电量/充电状态变化时同步到 Rust 心跳调度器，对端实时显示更新
         registerBatteryChangeReceiver()
         // 新增：初始补全本机 deviceInfoCache，便于反向 connectToDevice
@@ -1849,13 +1852,11 @@ class DeviceConnectionManager(
      *   getLocalUuid 校验落盘成功后清除
      * 空数据一律不传入 Rust（无证明已迁移的数据不喂给 Rust）
      */
-    private fun migrateLegacyDevicesAndCleanup(legacyStateEnc: String) {
+    private suspend fun migrateLegacyDevicesAndCleanup(legacyStateEnc: String) {
         val ctx = rustContext ?: return
         try {
             val rows =
-                kotlinx.coroutines.runBlocking {
-                    DatabaseRepository.getInstance(context).queryDeviceMigrationRows()
-                }
+                DatabaseRepository.getInstance(context).queryDeviceMigrationRows()
             var migratedAny = false
             var migrationFailed = false
             for (row in rows) {
@@ -1917,9 +1918,7 @@ class DeviceConnectionManager(
                 StorageManager.remove(context, "rust_core_state")
             }
             if (rows.isNotEmpty()) {
-                kotlinx.coroutines.runBlocking {
-                    DatabaseRepository.getInstance(context).dropDeviceMigrationTable()
-                }
+                DatabaseRepository.getInstance(context).dropDeviceMigrationTable()
             }
             if (migratedAny) {
                 Logger.i("死神-NotifyRelay", "旧设备数据已迁移至 Rust 持久化")
