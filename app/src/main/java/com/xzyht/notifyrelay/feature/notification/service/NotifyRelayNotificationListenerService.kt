@@ -701,11 +701,15 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
     private fun acquireWakeLock() {
         if (wakeLock == null) {
-            val pm = getSystemService(POWER_SERVICE) as PowerManager
-            wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "notifyrelay:core").apply {
-                acquire()
+            try {
+                val pm = getSystemService(POWER_SERVICE) as PowerManager
+                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "notifyrelay:core").apply {
+                    acquire()
+                }
+                Logger.i(TAG, "Wake Lock 已获取")
+            } catch (e: SecurityException) {
+                Logger.w(TAG, "获取 Wake Lock 失败（缺少权限）", e)
             }
-            Logger.i(TAG, "Wake Lock 已获取")
         }
     }
 
