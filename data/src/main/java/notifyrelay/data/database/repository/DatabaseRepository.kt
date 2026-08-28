@@ -103,8 +103,13 @@ class DatabaseRepository(
                         )
                     }
                 }
-            } catch (_: android.database.sqlite.SQLiteException) {
-                // 表不存在：迁移已完成，幂等返回空
+            } catch (e: android.database.sqlite.SQLiteException) {
+                // 仅表不存在视为幂等（迁移已完成，返回空）；
+                // 其他查询失败必须抛出，由调用方暂缓清理旧存储并在下次启动重试，
+                // 否则迁移会被静默跳过导致密钥永久丢失
+                if (e.message?.contains("no such table", ignoreCase = true) != true) {
+                    throw e
+                }
             }
             rows
         }

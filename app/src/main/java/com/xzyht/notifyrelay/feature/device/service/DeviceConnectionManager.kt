@@ -857,7 +857,6 @@ class DeviceConnectionManager(
                     )
                 saveAuthedDevices()
             }
-            saveRustCoreState()
             updateDeviceList()
             Logger.d("死神-NotifyRelay", "客户端配对完成: $remoteUuid")
         } catch (e: Exception) {
@@ -934,7 +933,6 @@ class DeviceConnectionManager(
                 saveAuthedDevices()
             }
             registerReconnectTarget(uuid, lastIp ?: "")
-            saveRustCoreState()
             updateDeviceList()
             Logger.d("死神-NotifyRelay", "长期密钥配对完成: $uuid")
             true
@@ -1843,11 +1841,6 @@ class DeviceConnectionManager(
         }
     }
 
-    // 保存 Rust Core 状态（兼容占位：密钥状态由 Rust 私有库自动持久化，
-    // 平台端不再持有密钥状态，此函数无副作用）
-    internal fun saveRustCoreState() {
-    }
-
     /**
      * 一次性迁移旧平台存储到 Rust 私有库（uuid 进入 Rust 后调用）：
      * - device_migration 表设备行：名称 → renameDevice；base64 AES → migrateSharedSecret；
@@ -1864,10 +1857,14 @@ class DeviceConnectionManager(
                     DatabaseRepository.getInstance(context).queryDeviceMigrationRows()
                 }
             var migratedAny = false
+            var migrationFailed = false
             for (row in rows) {
                 if (row.uuid.isBlank() || row.uuid == "本机") continue
                 if (row.displayName.isNotBlank()) {
-                    NativeCore.renameDevice(ctx, row.uuid, row.displayName)
+                    if (!NativeCore.renameDevice(ctx, row.uuid, row.displayName)) {
+                        Logger.w("死神-NotifyRelay", "设备名称迁移失败 ${row.uuid}，暂缓清理旧平台存储")
+                        migrationFailed = true
+                    }
                     migratedAny = true
                 }
                 if (row.sharedSecret.isNotBlank()) {
@@ -1878,11 +1875,17 @@ class DeviceConnectionManager(
                             null
                         }
                     if (keyBytes != null && keyBytes.size == 32) {
-                        NativeCore.migrateSharedSecret(ctx, row.uuid, keyBytes)
+                        if (!NativeCore.migrateSharedSecret(ctx, row.uuid, keyBytes)) {
+                            Logger.w("死神-NotifyRelay", "设备密钥迁移失败 ${row.uuid}，暂缓清理旧平台存储")
+                            migrationFailed = true
+                        }
                         migratedAny = true
                     } else {
                         // 旧版明文密钥（C#/Kotlin ECDH），与 Rust HKDF 不兼容，清除配对
-                        NativeCore.removeDevice(ctx, row.uuid)
+                        if (!NativeCore.removeDevice(ctx, row.uuid)) {
+                            Logger.w("死神-NotifyRelay", "旧明文密钥设备清除失败 ${row.uuid}，暂缓清理旧平台存储")
+                            migrationFailed = true
+                        }
                         migratedAny = true
                     }
                 }
@@ -1894,7 +1897,7 @@ class DeviceConnectionManager(
                 }
             }
 
-            // 触发落盘并校验（读取接口前自动 flush）
+            // 触发落盘并校验（读取接口前自动 flush；flush 失败返回 null）
             val persistedUuid = NativeCore.getLocalUuid(ctx)
             if (persistedUuid.isNullOrEmpty()) {
                 Logger.w("死神-NotifyRelay", "Rust 持久化未就绪，暂缓清理旧平台存储")
@@ -1903,6 +1906,11 @@ class DeviceConnectionManager(
             if (persistedUuid != uuid) {
                 Logger.i("死神-NotifyRelay", "UUID 以 Rust 持久化为准: $persistedUuid (原: $uuid)")
                 uuid = persistedUuid
+            }
+            // 任一迁移行失败：保留旧存储（SP blob/device_migration 表），下次启动重试
+            if (migrationFailed) {
+                Logger.w("死神-NotifyRelay", "存在迁移失败行，暂缓清理旧平台存储，下次启动重试")
+                return
             }
             // 迁移完成：清理旧平台存储（密钥已由 Rust 私有库持有）
             if (legacyStateEnc.isNotEmpty()) {
@@ -2072,12 +2080,12 @@ class DeviceConnectionManager(
 
     /**
      * 公开API：移除已认证设备（线程安全）。
-     * - 从 Rust 上下文移除设备密钥（registry 状态随之清理）
+     * - 从 Rust 上下文移除设备密钥（registry 状态随之清理，删除结果落库失败则中止）
      * - 从 Rust 重连状态机与已知设备扫描器移除（心跳调度随之停止）
-     * - 直接从数据库中删除设备
+     * - 断开会话（TCP 状态清理，避免已删设备经活跃连接重新出现在列表）
      * - 从内存中移除设备信息
      * - 触发 updateDeviceList() 以通知观察者
-     * 返回 true 表示存在并已移除，false 表示没有该uuid
+     * 返回 true 表示存在并已移除，false 表示没有该uuid 或 Rust 持久化删除未完成
      */
     fun removeAuthenticatedDevice(
         uuid: String,
@@ -2093,9 +2101,23 @@ class DeviceConnectionManager(
             }
 
             // 从 Rust 上下文移除设备密钥（同时清理 registry 状态）
+            // 落库失败（返回 false）时中止平台侧清理：内存已移除但库未同步，
+            // 若继续删除平台记录，重启后设备经旧 state/行复活将造成两端不一致
             try {
-                rustContext?.let { NativeCore.removeDevice(it, uuid) }
-                saveRustCoreState()
+                val ctx = rustContext
+                if (ctx != null && !NativeCore.removeDevice(ctx, uuid)) {
+                    Logger.w("死神-NotifyRelay", "removeAuthenticatedDevice: Rust 删除未完成，中止平台侧清理: $uuid")
+                    return false
+                }
+            } catch (_: Exception) {
+            }
+
+            // 断开会话与重连/扫描器登记（心跳调度随之停止）
+            try {
+                val ctx = rustContext
+                if (ctx != null) {
+                    NativeCore.removeDeviceSession(ctx, uuid)
+                }
             } catch (_: Exception) {
             }
 
