@@ -1050,6 +1050,9 @@ object NotificationGenerator {
             // 清空映射
             FloatingReplicaMappingManager
                 .clearAllNotificationIds()
+            // 清空所有内容指纹
+            FloatingReplicaMappingManager
+                .clearAllNotificationFingerprints()
             // 清空所有滚动更新
             clearAllScrollUpdates()
             Logger.i(TAG, "超级岛 清除所有复刻通知成功")
