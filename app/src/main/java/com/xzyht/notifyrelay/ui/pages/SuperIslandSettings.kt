@@ -23,10 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.notification.superisland.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils
-import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.SuperIslandConfigUtils.SpecInjectionMode
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils.SpecInjectionMode
+import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import com.xzyht.notifyrelay.ui.dialog.SuperIslandTestDialog

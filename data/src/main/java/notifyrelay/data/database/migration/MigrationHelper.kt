@@ -287,9 +287,8 @@ object MigrationHelper {
                     // 获取应用图标
                     var iconBytes: ByteArray? = null
                     try {
-                        val drawable = pm.getApplicationIcon(appInfo)
                         val bitmap =
-                            when (drawable) {
+                            when (val drawable = pm.getApplicationIcon(appInfo)) {
                                 is android.graphics.drawable.BitmapDrawable -> drawable.bitmap
                                 else -> {
                                     val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96

@@ -6,7 +6,6 @@ import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
-import kotlin.collections.iterator
 
 /**
  * StorageManager 是一个用于统一管理应用配置的工具单例，现在使用Room数据库存储。
@@ -51,7 +50,7 @@ object StorageManager {
     ): String =
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.getConfig(prefixedKey, default)
             }
@@ -82,7 +81,7 @@ object StorageManager {
     ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.setConfig(prefixedKey, value)
             }
@@ -113,7 +112,7 @@ object StorageManager {
     ): Boolean =
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.getConfig(prefixedKey, default.toString()).toBoolean()
             }
@@ -144,7 +143,7 @@ object StorageManager {
     ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.setConfig(prefixedKey, value.toString())
             }
@@ -166,7 +165,7 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 for ((key, value) in values) {
                     val prefixedKey = getPrefixedKey(key, prefsType)
@@ -200,7 +199,7 @@ object StorageManager {
     ): Int =
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.getConfig(prefixedKey, default.toString()).toInt()
             }
@@ -231,7 +230,7 @@ object StorageManager {
     ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.setConfig(prefixedKey, value.toString())
             }
@@ -262,7 +261,7 @@ object StorageManager {
     ): Float =
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.getConfig(prefixedKey, default.toString()).toFloat()
             }
@@ -291,7 +290,7 @@ object StorageManager {
     ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.setConfig(prefixedKey, value.toString())
             }
@@ -320,7 +319,7 @@ object StorageManager {
     ): Long =
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.getConfig(prefixedKey, default.toString()).toLong()
             }
@@ -351,7 +350,7 @@ object StorageManager {
     ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.setConfig(prefixedKey, value.toString())
             }
@@ -378,7 +377,7 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 for ((key, value) in values) {
                     val prefixedKey = getPrefixedKey(key, prefsType)
@@ -408,7 +407,7 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 for ((key, value) in values) {
                     val prefixedKey = getPrefixedKey(key, prefsType)
@@ -442,7 +441,7 @@ object StorageManager {
     ): Set<String> =
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             val json =
                 runBlocking {
                     repository.getConfig(prefixedKey, "[]")
@@ -479,7 +478,7 @@ object StorageManager {
             val prefixedKey = getPrefixedKey(key, prefsType)
             val gson = Gson()
             val json = gson.toJson(value)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             runBlocking {
                 repository.setConfig(prefixedKey, json)
             }
@@ -507,7 +506,7 @@ object StorageManager {
     ) {
         try {
             val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             // Room中没有直接删除的方法，我们可以设置为空字符串表示删除
             runBlocking {
                 repository.setConfig(prefixedKey, "")
@@ -561,7 +560,7 @@ object StorageManager {
             fromVersion // 显式读取参数，确保不会被诊断为未使用
             // Logger.d("StorageManager", "migrateData 被调用: fromVersion=${_from}, toVersion=$toVersion")
 
-            val repository = DatabaseRepository.Companion.getInstance(context)
+            val repository = DatabaseRepository.getInstance(context)
             val currentVersion =
                 runBlocking {
                     repository.getConfig("general_data_version", "0").toInt()

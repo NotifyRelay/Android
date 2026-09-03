@@ -48,20 +48,16 @@ import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
+import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
-import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
-import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
 import com.xzyht.notifyrelay.ui.viewmodel.GroupedNotifications
 import com.xzyht.notifyrelay.ui.viewmodel.NotificationHistoryViewModel
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
-import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -72,7 +68,6 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.ToolbarPosition
-import top.yukonga.miuix.kmp.basic.VerticalDivider
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -104,7 +99,9 @@ fun DeleteButton(
         onClick = {
             onClick()
         },
-        modifier = modifier.fillMaxHeight().width(80.dp),
+        modifier = modifier
+            .fillMaxHeight()
+            .width(80.dp),
         backgroundColor = MiuixTheme.colorScheme.error,
         cornerRadius = 8.dp,
         minHeight = 40.dp,
@@ -113,7 +110,7 @@ fun DeleteButton(
         Icon(
             imageVector = MiuixIcons.Delete,
             contentDescription = "Settings",
-            modifier = Modifier.Companion.size(24.dp),
+            modifier = Modifier.size(24.dp),
         )
     }
 }
@@ -142,7 +139,9 @@ fun NotificationCard(
     // 修正：单条通知卡片标题应为原始通知标题
     val displayTitle = record.title ?: "(无标题)"
     Card(
-        modifier = Modifier.Companion.fillMaxWidth().padding(vertical = 4.dp),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
         onClick = {
             // 跳转到对应应用主界面
             val pkg = record.packageName
@@ -191,28 +190,28 @@ fun NotificationCard(
         showIndication = true,
         pressFeedbackType = PressFeedbackType.Tilt,
     ) {
-        Row(verticalAlignment = Alignment.Companion.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
             if (displayAppIcon != null) {
                 Image(
                     bitmap = displayAppIcon.asImageBitmap(),
                     contentDescription = null,
-                    modifier = Modifier.Companion.size(24.dp),
+                    modifier = Modifier.size(24.dp),
                 )
-                Spacer(modifier = Modifier.Companion.width(8.dp))
+                Spacer(modifier = Modifier.width(8.dp))
             }
             // 标题显示为原始通知标题
             Text(
                 text = displayTitle,
                 style = notificationTextStyles.body2.copy(color = cardColorScheme.onSurface),
             )
-            Spacer(modifier = Modifier.Companion.width(8.dp))
+            Spacer(modifier = Modifier.width(8.dp))
         }
-        Spacer(modifier = Modifier.Companion.height(4.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text = record.text ?: "(无内容)",
             style = notificationTextStyles.body1.copy(color = cardColorScheme.onSurface),
         )
-        Spacer(modifier = Modifier.Companion.height(4.dp))
+        Spacer(modifier = Modifier.height(4.dp))
         Text(
             text =
                 LocalDateTime
@@ -348,16 +347,17 @@ fun NotificationHistoryScreen() {
                                 else -> anchoredDraggableState.offset
                             }
                         }
-                    Box(modifier = Modifier.Companion.fillMaxWidth()) {
+                    Box(modifier = Modifier.fillMaxWidth()) {
                         // 卡片
                         Box(
                             modifier =
-                                Modifier.Companion
+                                Modifier
                                     .fillMaxWidth()
                                     .anchoredDraggable(
                                         state = anchoredDraggableState,
                                         orientation = Orientation.Horizontal,
-                                    ).offset { IntOffset(offset.roundToInt(), 0) },
+                                    )
+                                    .offset { IntOffset(offset.roundToInt(), 0) },
                         ) {
                             if (sortedList.size == 1) {
                                 val record = sortedList[0]
@@ -384,7 +384,7 @@ fun NotificationHistoryScreen() {
                                 val expanded = expandedGroups.contains(groupKey)
                                 Card(
                                     modifier =
-                                        Modifier.Companion
+                                        Modifier
                                             .fillMaxWidth()
                                             .padding(vertical = 8.dp),
                                     onClick = { onToggleGroup(groupKey) },
@@ -401,22 +401,22 @@ fun NotificationHistoryScreen() {
                                     pressFeedbackType = if (expanded) PressFeedbackType.None else PressFeedbackType.Sink,
                                 ) {
                                     Row(
-                                        modifier = Modifier.Companion.fillMaxWidth(),
-                                        verticalAlignment = Alignment.Companion.CenterVertically,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
                                     ) {
                                         if (appIcon != null) {
                                             Image(
                                                 bitmap = appIcon.asImageBitmap(),
                                                 contentDescription = null,
-                                                modifier = Modifier.Companion.size(24.dp),
+                                                modifier = Modifier.size(24.dp),
                                             )
-                                            Spacer(modifier = Modifier.Companion.width(8.dp))
+                                            Spacer(modifier = Modifier.width(8.dp))
                                         }
                                         Text(
                                             text = groupTitle,
                                             style = textStyles.title3.copy(color = colorScheme.onSurface),
                                         )
-                                        Spacer(modifier = Modifier.Companion.width(12.dp))
+                                        Spacer(modifier = Modifier.width(12.dp))
                                         Text(
                                             text =
                                                 LocalDateTime
@@ -426,19 +426,19 @@ fun NotificationHistoryScreen() {
                                                     ).format(dateTimeFormatter),
                                             style = textStyles.body2.copy(color = colorScheme.onSurfaceSecondary),
                                         )
-                                        Spacer(modifier = Modifier.Companion.weight(1f))
+                                        Spacer(modifier = Modifier.weight(1f))
                                         Text(
                                             text = if (expanded) "收起" else "展开",
                                             style = textStyles.body2.copy(color = colorScheme.primary),
                                         )
                                     }
-                                    Spacer(modifier = Modifier.Companion.height(8.dp))
+                                    Spacer(modifier = Modifier.height(8.dp))
                                     val showList = if (expanded) sortedList else sortedList.take(3)
                                     if (!expanded) {
                                         showList.forEachIndexed { idx, record ->
                                             Row(
-                                                modifier = Modifier.Companion.fillMaxWidth(),
-                                                verticalAlignment = Alignment.Companion.CenterVertically,
+                                                modifier = Modifier.fillMaxWidth(),
+                                                verticalAlignment = Alignment.CenterVertically,
                                             ) {
                                                 // 修正：标题应为原始通知标题而非应用名
                                                 Text(
@@ -448,13 +448,13 @@ fun NotificationHistoryScreen() {
                                                             color = colorScheme.onSurface,
                                                             fontWeight = FontWeight.Bold,
                                                         ),
-                                                    modifier = Modifier.Companion.weight(0.4f),
+                                                    modifier = Modifier.weight(0.4f),
                                                 )
-                                                Spacer(modifier = Modifier.Companion.width(4.dp))
+                                                Spacer(modifier = Modifier.width(4.dp))
                                                 Text(
                                                     text = record.text ?: "(无内容)",
                                                     style = textStyles.body2.copy(color = colorScheme.onSurfaceSecondary),
-                                                    modifier = Modifier.Companion.weight(0.6f),
+                                                    modifier = Modifier.weight(0.6f),
                                                     maxLines = 1,
                                                     overflow = TextOverflow.Ellipsis,
                                                 )
@@ -462,7 +462,7 @@ fun NotificationHistoryScreen() {
                                             if (idx < showList.lastIndex) {
                                                 HorizontalDivider(
                                                     modifier =
-                                                        Modifier.Companion
+                                                        Modifier
                                                             .fillMaxWidth()
                                                             .padding(vertical = 4.dp),
                                                     color = colorScheme.outline,
@@ -479,7 +479,7 @@ fun NotificationHistoryScreen() {
                                     } else {
                                         LazyColumn(
                                             modifier =
-                                                Modifier.Companion
+                                                Modifier
                                                     .fillMaxWidth()
                                                     .heightIn(max = 360.dp),
                                         ) {
@@ -518,15 +518,16 @@ fun NotificationHistoryScreen() {
                                                             else -> anchoredDraggableState.offset
                                                         }
                                                     }
-                                                Box(modifier = Modifier.Companion.fillMaxWidth()) {
+                                                Box(modifier = Modifier.fillMaxWidth()) {
                                                     Box(
                                                         modifier =
-                                                            Modifier.Companion
+                                                            Modifier
                                                                 .fillMaxWidth()
                                                                 .anchoredDraggable(
                                                                     state = anchoredDraggableState,
                                                                     orientation = Orientation.Horizontal,
-                                                                ).offset {
+                                                                )
+                                                                .offset {
                                                                     IntOffset(
                                                                         offset.roundToInt(),
                                                                         0,
@@ -555,10 +556,11 @@ fun NotificationHistoryScreen() {
                                                                 onDeleteNotification(record.key)
                                                             },
                                                             modifier =
-                                                                Modifier.Companion
+                                                                Modifier
                                                                     .align(
-                                                                        Alignment.Companion.CenterEnd,
-                                                                    ).width(deleteWidth)
+                                                                        Alignment.CenterEnd,
+                                                                    )
+                                                                    .width(deleteWidth)
                                                                     .fillMaxHeight(),
                                                         )
                                                     }
@@ -587,8 +589,8 @@ fun NotificationHistoryScreen() {
                                     }
                                 },
                                 modifier =
-                                    Modifier.Companion
-                                        .align(Alignment.Companion.CenterEnd)
+                                    Modifier
+                                        .align(Alignment.CenterEnd)
                                         .width(deleteWidth)
                                         .fillMaxHeight(),
                             )
@@ -611,9 +613,9 @@ fun NotificationHistoryScreen() {
                 ) {
                     // 使用Row水平排列按钮
                     Row(
-                        modifier = Modifier.Companion.padding(8.dp),
+                        modifier = Modifier.padding(8.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.Companion.CenterVertically,
+                        verticalAlignment = Alignment.CenterVertically,
                     ) {
                         // 清除按钮 - 始终显示
                         DoubleClickConfirmButton(
@@ -631,60 +633,22 @@ fun NotificationHistoryScreen() {
                             textColor = colorScheme.onPrimary,
                             confirmTextColor = colorScheme.onError,
                         )
-
-                        if (DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
-                            VerticalDivider(
-                                thickness = 1.dp,
-                                modifier = Modifier.Companion.height(40.dp),
-                            )
-
-                            Button(
-                                onClick = {
-                                    try {
-                                        // 跳转引导页面
-                                        val intent =
-                                            IntentUtils.createIntent(
-                                                context,
-                                                GuideActivity::class.java,
-                                            )
-                                        intent.putExtra("fromInternal", true)
-                                        IntentUtils.startActivity(context, intent, true)
-                                    } catch (e: Exception) {
-                                        Logger.e("NotifyRelay", "引导跳转失败", e)
-                                        ToastUtils.showShortToast(
-                                            context,
-                                            "跳转失败: ${e.message}",
-                                        )
-                                    }
-                                },
-                                colors = ButtonDefaults.buttonColorsPrimary(),
-                                cornerRadius = 16.dp,
-                                minWidth = 0.dp,
-                                minHeight = 0.dp,
-                                insideMargin = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
-                            ) {
-                                Text(
-                                    text = "引导",
-                                    style = textStyles.body2.copy(color = colorScheme.onPrimary),
-                                )
-                            }
-                        }
                     }
                 }
             }
         },
-        floatingToolbarPosition = ToolbarPosition.Companion.BottomEnd,
+        floatingToolbarPosition = ToolbarPosition.BottomEnd,
         content = { paddingValues ->
             Column(
                 modifier =
-                    Modifier.Companion
+                    Modifier
                         .fillMaxSize()
                         .padding(paddingValues)
                         .padding(16.dp),
             ) {
                 val isEmpty = pagingItems.itemCount == 0
                 if (isEmpty) {
-                    Spacer(modifier = Modifier.Companion.height(16.dp))
+                    Spacer(modifier = Modifier.height(16.dp))
                     Text(
                         text = "暂无通知",
                         style = textStyles.body1.copy(color = colorScheme.onSurfaceSecondary),

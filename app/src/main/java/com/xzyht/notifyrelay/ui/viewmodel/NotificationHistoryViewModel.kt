@@ -10,8 +10,8 @@ import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
-import com.xzyht.notifyrelay.feature.notification.backend.RemoteFilterConfig
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
+import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow

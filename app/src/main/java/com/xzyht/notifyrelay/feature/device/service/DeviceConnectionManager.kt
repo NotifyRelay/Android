@@ -12,22 +12,24 @@ import android.util.Base64
 import com.sun.jna.Native
 import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.feature.audio.AudioRelayPlayer
-import com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
-import com.xzyht.notifyrelay.feature.notification.superisland.RemoteMediaSessionManager
+import com.xzyht.notifyrelay.feature.audio.service.AudioRelayForegroundService
+import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
+import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
-import com.xzyht.notifyrelay.servers.MediaControlUtil
-import com.xzyht.notifyrelay.servers.MediaSessionMonitorService
-import com.xzyht.notifyrelay.servers.NotifyRelayNotificationListenerService
-import com.xzyht.notifyrelay.servers.clipboard.ClipboardProcessor
-import com.xzyht.notifyrelay.sync.AppLaunchManager
-import com.xzyht.notifyrelay.sync.AppListSyncManager
+import com.xzyht.notifyrelay.feature.media.MediaControlUtil
+import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
+import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
+import com.xzyht.notifyrelay.feature.clipboard.ClipboardProcessor
+import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundService
+import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
+import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
 import com.xzyht.notifyrelay.sync.FtpServerManager
 import com.xzyht.notifyrelay.sync.FtpServerManager.StartResult
 import com.xzyht.notifyrelay.sync.HeartbeatProcessor
-import com.xzyht.notifyrelay.sync.IconSyncManager
+import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
@@ -74,7 +76,7 @@ object DeviceConnectionManagerUtil {
         text: String?,
         time: Long,
     ): String {
-        val json = org.json.JSONObject()
+        val json = JSONObject()
         json.put("packageName", packageName)
         json.put("appName", appName ?: packageName)
         json.put("title", title ?: "")
@@ -120,7 +122,7 @@ data class AuthInfo(
 
 // =================== 设备连接管理器主类 ===================
 class DeviceConnectionManager(
-    private val context: android.content.Context,
+    private val context: Context,
 ) {
     companion object {
         private var stopReceiverRegistered = false
@@ -134,7 +136,7 @@ class DeviceConnectionManager(
         /**
          * 获取单例实例
          */
-        fun getInstance(context: android.content.Context): DeviceConnectionManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+        fun getInstance(context: Context): DeviceConnectionManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
     }
 
     private var audioRelayNotificationReceiver: BroadcastReceiver? = null
@@ -205,7 +207,7 @@ class DeviceConnectionManager(
                 // 尝试解析为新式 base64 AES 密钥
                 val keyBytes =
                     try {
-                        android.util.Base64.decode(device.sharedSecret, android.util.Base64.NO_WRAP)
+                        Base64.decode(device.sharedSecret, Base64.NO_WRAP)
                     } catch (_: Exception) {
                         null
                     }
@@ -271,7 +273,7 @@ class DeviceConnectionManager(
                     if (auth.isAccepted && auth.sharedSecret.isEmpty()) {
                         val keyJson = NativeCore.exportDeviceKey(ctx, uuid)
                         if (keyJson != null) {
-                            val json = org.json.JSONObject(keyJson)
+                            val json = JSONObject(keyJson)
                             val aesKey = json.optString("aes_key_b64", "")
                             authenticatedDevices[uuid] = auth.copy(sharedSecret = aesKey)
                             backfillUpdates.add(
@@ -327,7 +329,7 @@ class DeviceConnectionManager(
                     val keyB64 =
                         ctx
                             ?.let { NativeCore.exportDeviceKey(it, uuid) }
-                            ?.let { org.json.JSONObject(it).optString("aes_key_b64", "") }
+                            ?.let { JSONObject(it).optString("aes_key_b64", "") }
                             ?: auth.sharedSecret
                     if (keyB64.isBlank()) {
                         Logger.w("死神-NotifyRelay", "跳过无可用密钥的设备持久化: $uuid")
@@ -494,7 +496,7 @@ class DeviceConnectionManager(
     internal val coroutineScopeInternal: CoroutineScope
         get() = coroutineScope
 
-    internal val contextInternal: android.content.Context
+    internal val contextInternal: Context
         get() = context
 
     internal fun localDisplayNameInternal(): String = getLocalDisplayName()
@@ -508,7 +510,7 @@ class DeviceConnectionManager(
             }
             val decoded =
                 try {
-                    android.util.Base64.decode(encoded, android.util.Base64.NO_WRAP)
+                    Base64.decode(encoded, Base64.NO_WRAP)
                 } catch (_: Exception) {
                     null
                 }
@@ -534,8 +536,8 @@ class DeviceConnectionManager(
     internal fun getDeviceInfoInternal(uuid: String): DeviceInfo? = getDeviceInfo(uuid)
 
     // Rust 原生上下文
-    private var rustContext: com.sun.jna.Pointer? = null
-    internal val rustContextInternal: com.sun.jna.Pointer?
+    private var rustContext: Pointer? = null
+    internal val rustContextInternal: Pointer?
         get() = rustContext
 
     private var batteryReceiver: BroadcastReceiver? = null
@@ -1275,7 +1277,7 @@ class DeviceConnectionManager(
                                     val dm = _callbackInstance ?: return
                                     val keyJson = dm.rustContext?.let { NativeCore.exportDeviceKey(it, uuid) }
                                     if (keyJson != null) {
-                                        val json = org.json.JSONObject(keyJson)
+                                        val json = JSONObject(keyJson)
                                         val ltPub = json.optString("remote_pub_key", "")
                                         if (ltPub.isNotEmpty()) {
                                             dm.completePairingWithLongTermKeys(uuid, ltPub)
@@ -2216,7 +2218,7 @@ class DeviceConnectionManager(
             currentAudioRelayUuid = remoteUuid
         }
         registerAudioRelayStopReceiver()
-        com.xzyht.notifyrelay.servers.AudioRelayForegroundService
+        AudioRelayForegroundService
             .start(context, deviceName, direction)
     }
 
@@ -2228,7 +2230,7 @@ class DeviceConnectionManager(
                     ctx: Context?,
                     intent: Intent?,
                 ) {
-                    if (intent?.action == com.xzyht.notifyrelay.servers.AudioRelayForegroundService.STOP_ACTION) {
+                    if (intent?.action == AudioRelayForegroundService.STOP_ACTION) {
                         stopAudioRelay()
                     }
                 }
@@ -2236,7 +2238,7 @@ class DeviceConnectionManager(
         try {
             context.registerReceiver(
                 audioRelayNotificationReceiver,
-                IntentFilter(com.xzyht.notifyrelay.servers.AudioRelayForegroundService.STOP_ACTION),
+                IntentFilter(AudioRelayForegroundService.STOP_ACTION),
                 Context.RECEIVER_NOT_EXPORTED,
             )
         } catch (_: Exception) {
@@ -2275,9 +2277,9 @@ class DeviceConnectionManager(
         } catch (_: Exception) {
         }
         audioRelayNotificationReceiver = null
-        com.xzyht.notifyrelay.servers.AudioRelayForegroundService
+        AudioRelayForegroundService
             .stop(context)
-        com.xzyht.notifyrelay.servers.MediaProjectionForegroundService
+        MediaProjectionForegroundService
             .stop(context)
     }
 }

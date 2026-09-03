@@ -23,7 +23,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
-import com.xzyht.notifyrelay.servers.clipboard.FcitxClipboardManager
+import com.xzyht.notifyrelay.feature.clipboard.FcitxClipboardManager
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.dialog.PairingCodeInputField
 import kotlinx.coroutines.Dispatchers

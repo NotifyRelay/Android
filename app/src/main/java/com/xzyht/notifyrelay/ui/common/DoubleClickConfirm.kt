@@ -77,7 +77,7 @@ fun DoubleClickConfirmButton(
     onClick: () -> Unit,
     onConfirm: () -> Unit,
     colors: ButtonColors = ButtonDefaults.buttonColors(),
-    confirmColors: ButtonColors = ButtonDefaults.buttonColors(color = Color.Companion.Red),
+    confirmColors: ButtonColors = ButtonDefaults.buttonColors(color = Color.Red),
     textColor: Color? = null,
     confirmTextColor: Color? = null,
 ) {
@@ -106,9 +106,9 @@ fun DoubleClickConfirmButton(
             text = if (state.isConfirming) confirmText else text,
             color =
                 if (state.isConfirming) {
-                    confirmTextColor ?: Color.Companion.White
+                    confirmTextColor ?: Color.White
                 } else {
-                    textColor ?: Color.Companion.White
+                    textColor ?: Color.White
                 },
             style = MiuixTheme.textStyles.body2,
         )

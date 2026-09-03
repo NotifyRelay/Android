@@ -2,7 +2,8 @@ package com.xzyht.notifyrelay.feature.device.repository
 
 import android.content.Context
 import androidx.compose.runtime.MutableState
-import com.xzyht.notifyrelay.servers.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
 import kotlinx.coroutines.delay
 import notifyrelay.base.util.Logger
 
@@ -14,14 +15,14 @@ private val pendingDelayedNotifications = mutableListOf<Triple<String, String, S
 fun remoteNotificationFilter(
     data: String,
     context: Context,
-): com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter.FilterResult =
-    com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
+): BackendRemoteFilter.FilterResult =
+    BackendRemoteFilter
         .filterRemoteNotification(data, context)
 
 // 通知复刻处理函数
 suspend fun replicateNotification(
     context: Context,
-    result: com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter.FilterResult,
+    result: BackendRemoteFilter.FilterResult,
     chatHistoryState: MutableState<List<String>>? = null,
     startMonitoring: Boolean = true, // 是否启动先发后撤回监控（锁屏延迟复刻时可关闭以节省性能）
 ) {
@@ -149,14 +150,14 @@ suspend fun replicateNotification(
         }
         // Logger.d("智能去重", if (startMonitoring) "发送通知并启动监控 - 包名:$pkg, 标题:$title, 内容:$text, 通知ID:$notifyId" else "发送通知（不启用监控） - 包名:$pkg, 标题:$title, 内容:$text, 通知ID:$notifyId")
         // 修复：发出通知前写入dedupCache，确保本地和远程都能去重
-        com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
+        BackendRemoteFilter
             .addToDedupCache(title, text)
         notificationManager.notify(notifyId, builder.build())
         // Logger.d("智能去重", "通知已发送 - 通知ID:$notifyId")
 
         // 添加到待监控队列，准备撤回机制（可按需关闭）
         if (startMonitoring) {
-            com.xzyht.notifyrelay.feature.notification.backend.BackendRemoteFilter
+            BackendRemoteFilter
                 .addPendingNotification(notifyId, title, text, pkg, context)
             // Logger.d("智能去重", "已添加到监控队列 - 通知ID:$notifyId, 将监控15秒内重复")
         }
