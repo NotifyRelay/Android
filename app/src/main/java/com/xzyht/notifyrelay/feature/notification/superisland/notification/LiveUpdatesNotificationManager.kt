@@ -64,6 +64,13 @@ object LiveUpdatesNotificationManager {
             }
         }
 
+    /**
+     * 清空图标缓存（供公平运行内存回调使用）。
+     */
+    fun clearIconCache() {
+        iconCache.evictAll()
+    }
+
     fun initialize(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
             Logger.w(TAG, "当前Android版本不支持Live Updates")
@@ -160,7 +167,7 @@ object LiveUpdatesNotificationManager {
             val notificationBuilder =
                 buildBaseNotification()
                     .setContentTitle(title ?: appName ?: "超级岛通知")
-                    .setContentText(text ?: "")
+                    .setContentText(text ?: "未知")
                     .setSmallIcon(R.drawable.stat_notify_more)
 
             // 在浮窗或列表模式下设置删除意图和点击意图
