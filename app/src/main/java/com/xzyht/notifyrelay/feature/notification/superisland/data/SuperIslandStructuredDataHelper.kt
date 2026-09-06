@@ -113,9 +113,11 @@ object SuperIslandStructuredDataHelper {
      * 为媒体类型通知添加超级岛结构化数据
      * @param builder 通知构建器
      * @param context 上下文
-     * @param title 通知标题
-     * @param text 通知内容
+     * @param title 通知标题（用于展开态 animTextInfo）
+     * @param text 通知内容（用于展开态 animTextInfo）
      * @param picMap 图片映射
+     * @param iconText 左侧文本（分割后的歌词左半部分，用于收起态 imageTextInfoLeft）
+     * @param capsuleText 右侧文本（分割后的歌词右半部分，用于收起态 textInfo）
      */
     fun addMediaSuperIslandStructuredData(
         builder: NotificationCompat.Builder,
@@ -123,6 +125,8 @@ object SuperIslandStructuredDataHelper {
         title: String?,
         text: String?,
         picMap: Map<String, String>?,
+        iconText: String? = null,
+        capsuleText: String? = null,
     ) {
         try {
             val extras = builder.extras
@@ -138,7 +142,7 @@ object SuperIslandStructuredDataHelper {
                     put("updatable", true)
                     put("reopen", "close")
 
-                    // 媒体类型需要的animTextInfo字段
+                    // 媒体类型需要的animTextInfo字段（用于展开态滚动歌词）
                     put(
                         "animTextInfo",
                         JSONObject().apply {
@@ -168,6 +172,40 @@ object SuperIslandStructuredDataHelper {
                                 JSONObject().apply {
                                     put("title", title ?: "")
                                     put("content", text ?: "")
+                                },
+                            )
+
+                            // 构建 bigIsland 结构（摘要态/小岛收起态）
+                            // 左侧：图文组件1（图+歌词左）
+                            // 右侧：文本组件（歌词右）
+                            put(
+                                "bigIsland",
+                                JSONObject().apply {
+                                    put(
+                                        "imageTextInfoLeft",
+                                        JSONObject().apply {
+                                            put("type", 1)
+                                            put(
+                                                "picInfo",
+                                                JSONObject().apply {
+                                                    put("type", 1)
+                                                    put("pic", "miui.focus.pic_cover")
+                                                },
+                                            )
+                                            put(
+                                                "textInfo",
+                                                JSONObject().apply {
+                                                    put("title", iconText ?: "")
+                                                },
+                                            )
+                                        },
+                                    )
+                                    put(
+                                        "textInfo",
+                                        JSONObject().apply {
+                                            put("title", capsuleText ?: "")
+                                        },
+                                    )
                                 },
                             )
                         }

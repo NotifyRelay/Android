@@ -13,11 +13,11 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import androidx.core.app.NotificationCompat
-import com.xzyht.notifyrelay.feature.notification.superisland.receiver.NotificationBroadcastReceiver
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
-import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.data.SuperIslandStructuredDataHelper
+import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
+import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
+import com.xzyht.notifyrelay.feature.notification.superisland.receiver.NotificationBroadcastReceiver
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaMappingManager
 import github.xzynine.superislandui.common.BitmapUtils
 import github.xzynine.superislandui.common.CapsuleScrollManager
@@ -290,6 +290,10 @@ object NotificationGenerator {
 
             // 对于媒体类型，使用HyperCeiler焦点歌词的特殊处理
             if (isMediaType) {
+                // 检查规范信息注入模式
+                val isSuperIslandEnabled = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
+                val isLiveUpdatesEnabled = SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)
+
                 val builder =
                     NotificationCompat
                         .Builder(context, NOTIFICATION_CHANNEL_ID)
@@ -303,7 +307,11 @@ object NotificationGenerator {
                         .setWhen(System.currentTimeMillis())
                         .setOnlyAlertOnce(true)
                         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                        .setRequestPromotedOngoing(true)
+
+                // 仅 Live Updates 模式时注入标志位
+                if (isLiveUpdatesEnabled) {
+                    builder.setRequestPromotedOngoing(true)
+                }
 
                 // 浮窗或列表模式下设置删除意图和点击意图
                 if (needClickIntent) {
@@ -312,31 +320,12 @@ object NotificationGenerator {
                         .setContentIntent(pendingContentIntent)
                 }
 
-                // 添加胶囊形式支持
-                try {
-                    // 使用 ProgressStyle 设置胶囊样式
-                    val segment = NotificationCompat.ProgressStyle.Segment(100)
-                    val segments = ArrayList<NotificationCompat.ProgressStyle.Segment>()
-                    segments.add(segment)
-
-                    val progressStyle =
-                        NotificationCompat
-                            .ProgressStyle()
-                            .setProgressSegments(segments)
-                            .setStyledByProgress(true)
-                            .setProgress(0)
-
-                    builder.setStyle(progressStyle)
-                } catch (e: Exception) {
-                    Logger.e(TAG, "设置胶囊样式失败: ${e.message}")
-                }
-
                 // 处理歌词拆分和显示
                 val lyricText = title ?: ""
                 var capsuleText = lyricText
                 var iconText = ""
 
-                // 检查歌词分割模式设置                // 0=默认（平板不分割，手机分割）�?=分割�?=不分�?
+                // 检查歌词分割模式设置                // 0=默认（平板不分割，手机分割）1=分割 2=不分割
                 val lyricsSplitMode = StorageManager.getInt(context, "lyrics_split_mode", 0)
                 val shouldSplit =
                     when (lyricsSplitMode) {
@@ -347,7 +336,7 @@ object NotificationGenerator {
 
                 if (shouldSplit) {
                     // 当歌词超过阈值时，拆分为图标文本和胶囊文本
-                    // 远端和本地都保持6字符开始分�?
+                    // 远端和本地都保持6字符开始分割
                     val threshold = 12
                     val textLength = TextSplitter.calculateTextLength(lyricText)
                     if (textLength > threshold) {
@@ -366,129 +355,142 @@ object NotificationGenerator {
                 val scrollKey = "${key}_scroll"
                 val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText)
 
-                // 设置胶囊文本
-                builder.setShortCriticalText(displayText)
+                // 仅 Live Updates 模式时注入胶囊文本和滚动更新
+                if (isLiveUpdatesEnabled) {
+                    // 设置胶囊文本
+                    builder.setShortCriticalText(displayText)
 
-                // 设置滚动更新机制
-                setupScrollUpdate(
-                    key,
-                    scrollKey,
-                    capsuleText,
-                    context,
-                    notificationId,
-                    originalBuilder = builder,
-                    notificationManager,
-                )
+                    // 添加 ProgressStyle
+                    try {
+                        val segment = NotificationCompat.ProgressStyle.Segment(100)
+                        val segments = ArrayList<NotificationCompat.ProgressStyle.Segment>()
+                        segments.add(segment)
+
+                        val progressStyle =
+                            NotificationCompat
+                                .ProgressStyle()
+                                .setProgressSegments(segments)
+                                .setStyledByProgress(true)
+                                .setProgress(0)
+
+                        builder.setStyle(progressStyle)
+                    } catch (e: Exception) {
+                        Logger.e(TAG, "设置胶囊样式失败: ${e.message}")
+                    }
+
+                    // 设置滚动更新机制
+                    setupScrollUpdate(
+                        key,
+                        scrollKey,
+                        capsuleText,
+                        context,
+                        notificationId,
+                        originalBuilder = builder,
+                        notificationManager,
+                    )
+                }
 
                 // picMap 已在调用方通过 SuperIslandDataFormatter 解析，直接使用
                 val resolvedPicMap = picMap ?: emptyMap()
 
-                // ... (后续构建extras的代码保持不变)
-                // 添加焦点歌词相关的结构化数据
-                SuperIslandStructuredDataHelper.addMediaSuperIslandStructuredData(
-                    builder = builder,
-                    context = context,
-                    title = title,
-                    text = text,
-                    picMap = resolvedPicMap,
-                )
+                // 仅超级岛模式时注入超级岛结构化数据
+                if (isSuperIslandEnabled) {
+                    SuperIslandStructuredDataHelper.addMediaSuperIslandStructuredData(
+                        builder = builder,
+                        context = context,
+                        title = title,
+                        text = text,
+                        picMap = resolvedPicMap,
+                        iconText = iconText,
+                        capsuleText = capsuleText,
+                    )
+                }
 
                 // 构建通知
                 val notification = builder.build()
 
-                // 生成并注入动态图标
-                if (iconText.isNotEmpty()) {
-                    val albumBitmap = loadAlbumBitmapOrNull(context, picMap, iconText.length)
-                    val iconBitmap = BitmapUtils.textToBitmap(iconText, albumBitmap = albumBitmap)
-                    if (iconBitmap != null) {
-                        injectSmallIcon(notification, iconBitmap, key)
-                    }
-                } else {
-                    // 没有图标文本时，尝试使用专辑图作为小图标
-                    var albumIconSet = false
-                    val coverKey = "miui.focus.pic_cover"
-                    if (!picMap.isNullOrEmpty() && picMap.containsKey(coverKey)) {
-                        val coverUrl = picMap[coverKey]
-                        if (!coverUrl.isNullOrBlank()) {
-                            val bitmap = downloadBitmap(context, coverUrl)
-                            if (bitmap != null) {
-                                injectSmallIcon(notification, bitmap, key)
-                                albumIconSet = true
-                            }
+                // 仅 Live Updates 模式时注入位图
+                if (isLiveUpdatesEnabled) {
+                    // 生成并注入动态图标
+                    if (iconText.isNotEmpty()) {
+                        val albumBitmap = loadAlbumBitmapOrNull(context, picMap, iconText.length)
+                        val iconBitmap = BitmapUtils.textToBitmap(iconText, albumBitmap = albumBitmap)
+                        if (iconBitmap != null) {
+                            injectSmallIcon(notification, iconBitmap, key)
                         }
-                    }
-                    // 专辑图加载失败时，尝试使用应用图标作为小图标
-                    if (!albumIconSet) {
-                        val appIconKey = "miui.focus.pic_app_icon"
-                        if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
-                            val appIconUrl = picMap[appIconKey]
-                            if (!appIconUrl.isNullOrBlank()) {
-                                val bitmap = downloadBitmap(context, appIconUrl)
+                    } else {
+                        // 没有图标文本时，尝试使用专辑图作为小图标
+                        val coverKey = "miui.focus.pic_cover"
+                        if (!picMap.isNullOrEmpty() && picMap.containsKey(coverKey)) {
+                            val coverUrl = picMap[coverKey]
+                            if (!coverUrl.isNullOrBlank()) {
+                                // 同步下载专辑图
+                                val bitmap = downloadBitmap(context, coverUrl)
                                 if (bitmap != null) {
                                     injectSmallIcon(notification, bitmap, key)
                                 }
                             }
                         }
                     }
-                }
 
-                // 检查是否已经有图标文本，如果有，就不再生成新的图标
-                if (iconText.isEmpty()) {
-                    // 尝试从A/B区数据中获取图标或生成位图
-                    var smallIconBitmap: Bitmap? = null
+                    // 检查是否已经有图标文本，如果有，就不再生成新的图标
+                    if (iconText.isEmpty()) {
+                        // 尝试从A/B区数据中获取图标或生成位图
+                        var smallIconBitmap: Bitmap? = null
 
-                    // 使用已解析的 paramV2 中的组件数据
-                    val bigIslandArea = paramV2.paramIsland?.bigIslandArea
-                    val bComponent = bigIslandArea?.bComponent
+                        // 使用已解析的 paramV2 中的组件数据
+                        val bigIslandArea = paramV2.paramIsland?.bigIslandArea
+                        val bComponent = bigIslandArea?.bComponent
 
-                    // 提取进度数据
-                    val bProgress = bComponent.bProgress
-                    val bProgressColorReach = bComponent.bProgressColorReach
-                    val bProgressColorUnReach = bComponent.bProgressColorUnReach
-                    val bProgressIsCCW = bComponent.bProgressIsCCW
+                        // 提取进度数据
+                        val bProgress = bComponent.bProgress
+                        val bProgressColorReach = bComponent.bProgressColorReach
+                        val bProgressColorUnReach = bComponent.bProgressColorUnReach
+                        val bProgressIsCCW = bComponent.bProgressIsCCW
 
-                    // 处理进度数据，生成位图
-                    if (bProgress != null) {
-                        smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
-                    }
-
-                    // 如果没有进度数据，尝试生成文本位图
-                    if (smallIconBitmap == null) {
-                        // 优先使用B区文本生成位图
-                        val textToRender = bComponent.textToRender
-
-                        if (!textToRender.isNullOrBlank()) {
-                            smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
+                        // 处理进度数据，生成位图
+                        if (bProgress != null) {
+                            smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
                         }
-                    }
 
-                    // 如果没有文本数据，尝试使用应用图标
-                    if (smallIconBitmap == null) {
-                        // 优先使用应用图标（大图标的键值提供的图标）
-                        val appIconKey = "miui.focus.pic_app_icon"
-                        if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
-                            val appIconUrl = picMap[appIconKey]
-                            if (!appIconUrl.isNullOrBlank()) {
-                                // 异步下载应用图标
-                                val bitmap = downloadBitmap(context, appIconUrl)
-                                if (bitmap != null) {
-                                    smallIconBitmap = bitmap
+                        // 如果没有进度数据，尝试生成文本位图
+                        if (smallIconBitmap == null) {
+                            // 优先使用B区文本生成位图
+                            val textToRender = bComponent.textToRender
+
+                            if (!textToRender.isNullOrBlank()) {
+                                smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
+                            }
+                        }
+
+                        // 如果没有文本数据，尝试使用应用图标
+                        if (smallIconBitmap == null) {
+                            // 优先使用应用图标（大图标的键值提供的图标）
+                            val appIconKey = "miui.focus.pic_app_icon"
+                            if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
+                                val appIconUrl = picMap[appIconKey]
+                                if (!appIconUrl.isNullOrBlank()) {
+                                    // 异步下载应用图标
+                                    val bitmap = downloadBitmap(context, appIconUrl)
+                                    if (bitmap != null) {
+                                        smallIconBitmap = bitmap
+                                    }
                                 }
                             }
                         }
-                    }
 
-                    // 注入小图标
-                    // 只有当smallIconBitmap不为null时才注入，否则保留之前的图标
-                    if (smallIconBitmap != null) {
-                        injectSmallIcon(notification, smallIconBitmap, key)
+                        // 注入小图标
+                        // 只有当smallIconBitmap不为null时才注入，否则保留之前的图标
+                        if (smallIconBitmap != null) {
+                            injectSmallIcon(notification, smallIconBitmap, key)
+                        } else {
+                            // 保留之前的图标，不进行修改
+                            Logger.i(TAG, "超级岛 保留之前的小图标，不进行修改")
+                        }
                     } else {
-                        // 保留之前的图标，不进行修改
-                        Logger.i(TAG, "超级�? 保留之前的小图标，不进行修改")
+                        // 已经有图标文本，保留之前的图标，不进行修改
+                        Logger.i(TAG, "超级岛 已有图标文本，保留之前的小图标，不进行修改")
                     }
-                } else {
-                    // 已经有图标文本，保留之前的图标，不进行修改
-                    Logger.i(TAG, "超级�? 已有图标文本，保留之前的小图标，不进行修改")
                 }
 
                 // 发送通知
