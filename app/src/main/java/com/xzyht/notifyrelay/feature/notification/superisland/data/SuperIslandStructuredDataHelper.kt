@@ -15,6 +15,10 @@ import org.json.JSONObject
 object SuperIslandStructuredDataHelper {
     private const val TAG = "SuperIslandStructuredDataHelper"
 
+    // FocusTemplate V3 序列化标识（对齐 Xiaomi-SuperIsland-Playground）
+    private const val FOCUS_V3_SERIAL_NAME =
+        "com.xzakota.hyper.notification.focus.FocusNotification.FocusTemplateFactory.V3"
+
     /**
      * 添加超级岛相关的结构化数据到通知
      * @param builder 通知构建�?
@@ -119,7 +123,9 @@ object SuperIslandStructuredDataHelper {
             val extras = builder.extras
 
             // 按照小米超级岛模板库"序号二：a图文组件1 + b文本组件"构建
+            // 外层 type 为 FocusTemplate V3 序列化标识，缺失时 SystemUI 无法识别 V3 模板（picInfo 自定义图失效）
             val fullFocusParam = JSONObject().apply {
+                put("type", FOCUS_V3_SERIAL_NAME)
                 put("param_v2", JSONObject().apply {
                     put("protocol", 1)
                     put("business", "music")
@@ -150,12 +156,15 @@ object SuperIslandStructuredDataHelper {
                                     put("type", 1)
                                     put("pic", "miui.focus.pic_cover")
                                 })
-                                put("textInfo", JSONObject().apply {
-                                    put("title", iconText ?: "")
-                                    put("content", "")
-                                    put("narrowFont", false)
-                                    put("showHighlightColor", true)
-                                })
+                                // 短文本（iconText 为空）时左侧为纯专辑图，不放文字
+                                if (!iconText.isNullOrEmpty()) {
+                                    put("textInfo", JSONObject().apply {
+                                        put("title", iconText)
+                                        put("content", "")
+                                        put("narrowFont", false)
+                                        put("showHighlightColor", true)
+                                    })
+                                }
                             })
                             put("textInfo", JSONObject().apply {
                                 put("frontTitle", "")

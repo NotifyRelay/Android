@@ -311,7 +311,13 @@ object NotificationGenerator {
                         .setWhen(System.currentTimeMillis())
                         .setOnlyAlertOnce(true)
                         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-                        .setRequestPromotedOngoing(true)
+                        .apply {
+                            // 仅在 Live Updates 模式下设置提升标记；
+                            // 超级岛模式设置后 SystemUI 会误判为 LiveUpdates 类并用 custom 结构渲染（左岛空白）
+                            if (isLiveUpdatesEnabled) {
+                                setRequestPromotedOngoing(true)
+                            }
+                        }
 
                 // 浮窗或列表模式下设置删除意图和点击意图
                 if (needClickIntent) {
@@ -418,7 +424,10 @@ object NotificationGenerator {
                 val notification = builder.build()
 
                 // 生成并注入动态图标
-                if (iconText.isNotEmpty()) {
+                if (isSuperIslandEnabled) {
+                    // 超级岛模式：不注入小图标（左岛由图文组件渲染专辑图，V3 模板不依赖小图标）
+                    Logger.i(TAG, "超级岛 超级岛注入模式：不注入小图标，左岛由图文组件渲染专辑图")
+                } else if (iconText.isNotEmpty()) {
                     val albumBitmap = loadAlbumBitmapOrNull(context, picMap, iconText.length)
                     val iconBitmap = BitmapUtils.textToBitmap(iconText, albumBitmap = albumBitmap)
                     if (iconBitmap != null) {
@@ -440,7 +449,8 @@ object NotificationGenerator {
                 }
 
                 // 检查是否已经有图标文本，如果有，就不再生成新的图标
-                if (iconText.isEmpty()) {
+                // 超级岛注入模式下不注入小图标（小图标会抢占左岛展示，左岛应由图文组件渲染专辑图）
+                if (!isSuperIslandEnabled && iconText.isEmpty()) {
                     // 尝试从A/B区数据中获取图标或生成位图
                     var smallIconBitmap: Bitmap? = null
 
@@ -688,9 +698,9 @@ object NotificationGenerator {
                         builtNotification
                     }
 
-                // 发送通知
-                notificationManager.notify(notificationId, notification)
-            }
+                    // 发送通知
+                    notificationManager.notify(notificationId, notification)
+                }
 
             // 保存entryKey到notificationId的映射
             FloatingReplicaMappingManager
@@ -806,6 +816,25 @@ object NotificationGenerator {
     }
 
     // ---- 图标注入辅助方法 ----
+
+    /**
+     * 清除小图标（超级岛模式用）：
+     * 系统需要小图标字段合法存在（不可为 null），因此将 mSmallIcon 替换为透明占位图标。
+     * 目的：左岛小图标优先级高于图文组件时，避免默认图抢占左岛专辑图展示。
+     */
+    private fun clearSmallIcon(notification: Notification) {
+        try {
+            val transparentIcon = Icon.createWithBitmap(
+                Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8).apply { eraseColor(android.graphics.Color.TRANSPARENT) },
+            )
+            val field = Notification::class.java.getDeclaredField("mSmallIcon")
+            field.isAccessible = true
+            field.set(notification, transparentIcon)
+            Logger.i(TAG, "超级岛 已清除小图标（注入透明占位图）")
+        } catch (e: Exception) {
+            Logger.w(TAG, "超级岛 清除小图标失败: ${e.message}")
+        }
+    }
 
     /**
      * 注入小图标到通知，同时缓存供滚动更新复用

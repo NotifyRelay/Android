@@ -91,15 +91,18 @@ object MediaCapsulePresenter {
                                                 put("pic", "miui.focus.pic_cover")
                                             },
                                         )
-                                        put(
-                                            "textInfo",
-                                            JSONObject().apply {
-                                                put("title", iconText)
-                                                put("content", "")
-                                                put("narrowFont", false)
-                                                put("showHighlightColor", true)
-                                            },
-                                        )
+                                        // 短文本（iconText 为空）时左侧为纯专辑图，不放文字
+                                        if (iconText.isNotEmpty()) {
+                                            put(
+                                                "textInfo",
+                                                JSONObject().apply {
+                                                    put("title", iconText)
+                                                    put("content", "")
+                                                    put("narrowFont", false)
+                                                    put("showHighlightColor", true)
+                                                },
+                                            )
+                                        }
                                     },
                                 )
                                 // 右侧：文本组件（歌词右）
