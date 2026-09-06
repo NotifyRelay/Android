@@ -87,6 +87,7 @@ object NotificationGenerator {
         notificationId: Int,
         originalBuilder: NotificationCompat.Builder,
         notificationManager: NotificationManager,
+        progressStyle: NotificationCompat.ProgressStyle? = null,
     ) {
         // 移除旧的滚动Runnable
         scrollRunnable.remove(key)?.let {
@@ -128,6 +129,10 @@ object NotificationGenerator {
                             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                             .setRequestPromotedOngoing(true)
                             .setShortCriticalText(displayText)
+                            .apply {
+                                // 保留 ProgressStyle，避免滚动更新后丢失 Live Updates（超级岛）渲染
+                                progressStyle?.let { setStyle(it) }
+                            }
 
                     // 复制extras
                     val updatedNotification = updatedBuilder.build()
@@ -306,6 +311,7 @@ object NotificationGenerator {
                         .setWhen(System.currentTimeMillis())
                         .setOnlyAlertOnce(true)
                         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                        .setRequestPromotedOngoing(true)
 
                 // 浮窗或列表模式下设置删除意图和点击意图
                 if (needClickIntent) {
@@ -352,7 +358,8 @@ object NotificationGenerator {
                 // 设置右侧文本为拆分后的歌词
                 builder.setContentTitle(capsuleText)
 
-                // 仅 Live Updates 模式时注入胶囊文本和滚动更新
+                // 仅 Live Updates 模式时注入胶囊文本和添加 ProgressStyle
+                var progressStyle: NotificationCompat.ProgressStyle? = null
                 if (isLiveUpdatesEnabled) {
                     // 设置胶囊文本
                     builder.setShortCriticalText(displayText)
@@ -363,7 +370,7 @@ object NotificationGenerator {
                         val segments = ArrayList<NotificationCompat.ProgressStyle.Segment>()
                         segments.add(segment)
 
-                        val progressStyle =
+                        progressStyle =
                             NotificationCompat
                                 .ProgressStyle()
                                 .setProgressSegments(segments)
@@ -374,17 +381,6 @@ object NotificationGenerator {
                     } catch (e: Exception) {
                         Logger.e(TAG, "设置胶囊样式失败: ${e.message}")
                     }
-
-                    // 设置滚动更新机制
-                    setupScrollUpdate(
-                        key,
-                        scrollKey,
-                        capsuleText,
-                        context,
-                        notificationId,
-                        originalBuilder = builder,
-                        notificationManager,
-                    )
                 }
 
                 // picMap 已在调用方通过 SuperIslandDataFormatter 解析，直接使用
@@ -400,6 +396,21 @@ object NotificationGenerator {
                         picMap = resolvedPicMap,
                         iconText = iconText,
                         capsuleText = capsuleText,
+                    )
+                }
+
+                // 仅 Live Updates 模式时设置滚动更新机制
+                // 需在结构化数据注入之后启动，确保滚动更新首次执行时 extras 完整（模拟渲染不丢失）
+                if (isLiveUpdatesEnabled) {
+                    setupScrollUpdate(
+                        key,
+                        scrollKey,
+                        capsuleText,
+                        context,
+                        notificationId,
+                        originalBuilder = builder,
+                        notificationManager,
+                        progressStyle = progressStyle,
                     )
                 }
 
@@ -771,6 +782,7 @@ object NotificationGenerator {
                 .setOnlyAlertOnce(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setRequestPromotedOngoing(true)
 
             // 确保右胶囊文本被正确设置到 miui.focus.param 字段
             // 使用 SuperIslandStructuredDataHelper 添加结构化数据

@@ -1,9 +1,11 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.data
 
 import android.content.Context
+import android.graphics.drawable.Icon
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
 import notifyrelay.base.util.Logger
+import notifyrelay.core.util.image.ImageUtils
 import org.json.JSONObject
 
 /**
@@ -104,7 +106,7 @@ object SuperIslandStructuredDataHelper {
      * @param iconText 左侧文本（分割后的歌词左半部分，用于收起态 imageTextInfoLeft）
      * @param capsuleText 右侧文本（分割后的歌词右半部分，用于收起态 textInfo）
      */
-    fun addMediaSuperIslandStructuredData(
+    suspend fun addMediaSuperIslandStructuredData(
         builder: NotificationCompat.Builder,
         context: Context,
         title: String?,
@@ -139,7 +141,7 @@ object SuperIslandStructuredDataHelper {
                     put("param_island", JSONObject().apply {
                         put("islandProperty", 1)
                         put("islandOrder", false)
-                        put("highlightColor", "#FF6200")
+                        put("highlightColor", "#FFFFFF")
                         // 大岛：a图文组件1（图+歌词左） + b文本组件（歌词右）
                         put("bigIslandArea", JSONObject().apply {
                             put("imageTextInfoLeft", JSONObject().apply {
@@ -177,7 +179,7 @@ object SuperIslandStructuredDataHelper {
             extras.putString("miui.focus.param", fullFocusParam.toString())
 
             addActionBundlesToExtras(extras)
-            addPicMapToExtras(extras, picMap)
+            addMediaPicMapToExtras(context, extras, picMap)
 
             extras.putBoolean("android.reduced.images", true)
             extras.putString("superIslandSourcePackage", context.packageName)
@@ -299,6 +301,37 @@ object SuperIslandStructuredDataHelper {
             }
             extras.putBundle("miui.focus.pics", picsBundle)
             Logger.i(TAG, "添加图片资源成功，共${map.size}个图片")
+        }
+    }
+
+    /**
+     * 媒体类型专用：下载图片为 Bitmap 并转为 Icon 放入 miui.focus.pics（客户端模式要求 Parcelable Icon）
+     */
+    private suspend fun addMediaPicMapToExtras(
+        context: Context,
+        extras: Bundle,
+        picMap: Map<String, String>?,
+    ) {
+        picMap?.let { map ->
+            val picsBundle = Bundle()
+            var count = 0
+            map.forEach { (picKey, picUrl) ->
+                if (!picKey.startsWith("miui.focus.pic_") || picUrl.isBlank()) return@forEach
+                val bitmap = try {
+                    ImageUtils.loadBitmap(context, picUrl)
+                } catch (e: Exception) {
+                    Logger.w(TAG, "媒体图片加载失败 ${picKey}: ${e.message}")
+                    null
+                }
+                if (bitmap != null) {
+                    picsBundle.putParcelable(picKey, Icon.createWithBitmap(bitmap))
+                    count++
+                }
+            }
+            if (count > 0) {
+                extras.putBundle("miui.focus.pics", picsBundle)
+                Logger.i(TAG, "媒体图片资源注入成功，共 $count 个图片")
+            }
         }
     }
 
