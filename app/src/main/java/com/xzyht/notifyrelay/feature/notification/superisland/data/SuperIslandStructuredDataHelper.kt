@@ -33,45 +33,35 @@ object SuperIslandStructuredDataHelper {
         isSuperIslandSpecInjectionEnabled: Boolean = true,
     ) {
         try {
-            // 获取通知的extras，用于添加结构化数据
             val extras = builder.extras
 
-            // 检查超级岛规范信息注入是否开启
             if (isSuperIslandSpecInjectionEnabled) {
-                // 构建符合小米官方规范的完整miui.focus.param结构
                 paramV2Raw?.let { rawData ->
                     try {
-                        // 解析原始paramV2数据
                         val paramV2Json = JSONObject(rawData)
+                        val tickerValue = title ?: paramV2Json.optString("ticker", "")
 
-                        // 构建完整的焦点通知参数结构，包含外层scene、ticker等字段
-                        // 从paramV2Json中直接获取baseInfo，确保与FloatingReplicaManager一致
-                        val baseInfoJson = paramV2Json.optJSONObject("baseInfo")
-                        val tickerValue = baseInfoJson?.optString("title", "") ?: ""
-                        val contentValue = baseInfoJson?.optString("content", "") ?: ""
+                        // 在原始 param_v2 基础上补充缺失字段
+                        if (!paramV2Json.has("protocol")) paramV2Json.put("protocol", 1)
+                        if (!paramV2Json.has("ticker") || paramV2Json.optString("ticker").isBlank()) {
+                            paramV2Json.put("ticker", tickerValue)
+                        }
+                        if (!paramV2Json.has("aodTitle") || paramV2Json.optString("aodTitle").isBlank()) {
+                            paramV2Json.put("aodTitle", tickerValue)
+                        }
+                        if (!paramV2Json.has("updatable")) paramV2Json.put("updatable", true)
+                        if (!paramV2Json.has("reopen")) paramV2Json.put("reopen", "close")
+                        if (!paramV2Json.has("enableFloat")) paramV2Json.put("enableFloat", false)
+                        if (!paramV2Json.has("islandFirstFloat")) paramV2Json.put("islandFirstFloat", false)
 
-                        val fullFocusParam =
-                            JSONObject().apply {
-                                put("protocol", 1)
-                                put("scene", paramV2Json.optString("business", "default"))
-                                put("ticker", tickerValue)
-                                put("content", contentValue)
-                                put("timerType", 0)
-                                put("timerWhen", 0)
-                                put("timerSystemCurrent", 0)
-                                put("enableFloat", false)
-                                put("updatable", true)
-                                put("reopen", paramV2Json.optString("reopen", "close"))
-                                put("timeout", paramV2Json.optInt("timeout", 720))
-                                put("filterWhenNoPermission", paramV2Json.optBoolean("filterWhenNoPermission", false))
-                                put("islandFirstFloat", paramV2Json.optBoolean("islandFirstFloat", false))
-                                put("param_v2", paramV2Json) // 将原始paramV2作为嵌套字段
-                            }
+                        // 顶层包装：type(可选) + param_v2
+                        val fullFocusParam = JSONObject().apply {
+                            put("param_v2", paramV2Json)
+                        }
 
                         extras.putString("miui.focus.param", fullFocusParam.toString())
                         Logger.i(TAG, "添加miui.focus.param成功")
                     } catch (e: Exception) {
-                        // 如果构建完整结构失败，回退到直接使用原始数据
                         extras.putString("miui.focus.param", rawData)
                         Logger.w(TAG, "构建完整焦点通知参数结构失败，回退到原始数据 ${e.message}")
                     }
@@ -80,24 +70,19 @@ object SuperIslandStructuredDataHelper {
                 addPicMapToExtras(extras, picMap)
                 addActionBundlesToExtras(extras)
 
-                // 添加原始通知中存在的其他字段，这些可能影响UI显示
-                // 对于计时器类通知，添加计时器相关字段
+                extras.putBoolean("miui.island.updateNoFloat", false)
+                extras.putBoolean("miui.island.firstFloat", false)
+                extras.putBoolean("miui.enableFloat", false)
+
                 val titleValue = title ?: ""
                 if (titleValue.contains("计时") || titleValue.contains("秒表")) {
                     extras.putBoolean("android.chronometerCountDown", false)
                     extras.putBoolean("android.showChronometer", true)
                 }
 
-                // 添加应用信息，与原始通知保持一致
                 extras.putBoolean("android.reduced.images", true)
-
-                // 添加超级岛源包信息，与原始通知保持一致
                 extras.putString("superIslandSourcePackage", context.packageName)
-
-                // 添加包名信息，与原始通知保持一致
                 extras.putString("app_package", context.packageName)
-
-                // 添加MIUI焦点通知所需的额外字段
                 extras.putBoolean("miui.isFocusNotification", true)
                 extras.putBoolean("miui.showBadge", false)
 
@@ -131,97 +116,74 @@ object SuperIslandStructuredDataHelper {
         try {
             val extras = builder.extras
 
-            // 构建符合HyperIslandApi标准的媒体类型miui.focus.param，优化数据结构
-            val fullFocusParam =
-                JSONObject().apply {
+            // 按照小米超级岛模板库"序号二：a图文组件1 + b文本组件"构建
+            val fullFocusParam = JSONObject().apply {
+                put("param_v2", JSONObject().apply {
                     put("protocol", 1)
-                    put("scene", "music") // 媒体类型固定使用music场景
+                    put("business", "music")
                     put("ticker", title ?: "")
-                    put("content", text ?: "")
-                    put("enableFloat", false)
+                    put("aodTitle", title ?: "")
                     put("updatable", true)
                     put("reopen", "close")
+                    put("enableFloat", false)
+                    put("islandFirstFloat", false)
 
-                    // 媒体类型需要的animTextInfo字段（用于展开态滚动歌词）
-                    put(
-                        "animTextInfo",
-                        JSONObject().apply {
-                            put("title", title ?: "")
-                            put("content", text ?: "")
-                        },
-                    )
+                    // 焦点通知数据（展开态生效）
+                    put("baseInfo", JSONObject().apply {
+                        put("type", 2)
+                        put("title", title ?: "")
+                        put("content", text ?: "")
+                    })
 
-                    // 优化媒体类型param_v2结构，符合小米官方标准
-                    val paramV2Json =
-                        JSONObject().apply {
-                            put("business", "music")
-                            put("protocol", 1)
-                            put("scene", "music")
-                            put("ticker", title ?: "")
-                            put("content", text ?: "")
-                            put("enableFloat", false)
-                            put("updatable", true)
-                            put("reopen", "close")
-                            put("timerType", 0)
-                            put("timerWhen", 0)
-                            put("timerSystemCurrent", 0)
-
-                            // 媒体类型必须包含的baseInfo字段
-                            put(
-                                "baseInfo",
-                                JSONObject().apply {
-                                    put("title", title ?: "")
-                                    put("content", text ?: "")
-                                },
-                            )
-
-                            // 构建 bigIsland 结构（摘要态/小岛收起态）
-                            // 左侧：图文组件1（图+歌词左）
-                            // 右侧：文本组件（歌词右）
-                            put(
-                                "bigIsland",
-                                JSONObject().apply {
-                                    put(
-                                        "imageTextInfoLeft",
-                                        JSONObject().apply {
-                                            put("type", 1)
-                                            put(
-                                                "picInfo",
-                                                JSONObject().apply {
-                                                    put("type", 1)
-                                                    put("pic", "miui.focus.pic_cover")
-                                                },
-                                            )
-                                            put(
-                                                "textInfo",
-                                                JSONObject().apply {
-                                                    put("title", iconText ?: "")
-                                                },
-                                            )
-                                        },
-                                    )
-                                    put(
-                                        "textInfo",
-                                        JSONObject().apply {
-                                            put("title", capsuleText ?: "")
-                                        },
-                                    )
-                                },
-                            )
-                        }
-
-                    put("param_v2", paramV2Json)
-                }
+                    // 岛数据
+                    put("param_island", JSONObject().apply {
+                        put("islandProperty", 1)
+                        put("islandOrder", false)
+                        put("highlightColor", "#FF6200")
+                        // 大岛：a图文组件1（图+歌词左） + b文本组件（歌词右）
+                        put("bigIslandArea", JSONObject().apply {
+                            put("imageTextInfoLeft", JSONObject().apply {
+                                put("type", 1)
+                                put("picInfo", JSONObject().apply {
+                                    put("type", 1)
+                                    put("pic", "miui.focus.pic_cover")
+                                })
+                                put("textInfo", JSONObject().apply {
+                                    put("title", iconText ?: "")
+                                    put("content", "")
+                                    put("narrowFont", false)
+                                    put("showHighlightColor", true)
+                                })
+                            })
+                            put("textInfo", JSONObject().apply {
+                                put("frontTitle", "")
+                                put("title", capsuleText ?: "")
+                                put("content", "")
+                                put("narrowFont", false)
+                                put("showHighlightColor", true)
+                            })
+                        })
+                        // 小岛
+                        put("smallIslandArea", JSONObject().apply {
+                            put("picInfo", JSONObject().apply {
+                                put("type", 1)
+                                put("pic", "miui.focus.pic_cover")
+                            })
+                        })
+                    })
+                })
+            }
 
             extras.putString("miui.focus.param", fullFocusParam.toString())
 
             addActionBundlesToExtras(extras)
             addPicMapToExtras(extras, picMap)
 
-            // 添加应用信息
             extras.putBoolean("android.reduced.images", true)
             extras.putString("superIslandSourcePackage", context.packageName)
             extras.putString("app_package", context.packageName)
+            extras.putBoolean("miui.isFocusNotification", true)
+            extras.putBoolean("miui.showBadge", false)
 
             Logger.i(TAG, "添加媒体类型超级岛结构化数据成功")
         } catch (e: Exception) {

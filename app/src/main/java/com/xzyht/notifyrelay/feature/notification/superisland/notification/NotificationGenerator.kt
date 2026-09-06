@@ -297,7 +297,6 @@ object NotificationGenerator {
                 val builder =
                     NotificationCompat
                         .Builder(context, NOTIFICATION_CHANNEL_ID)
-                        .setContentTitle(appName ?: "媒体应用") // 使用实际应用名作为通知标题
                         .setContentText(title ?: "未知")
                         .setSmallIcon(R.drawable.stat_notify_more) // 使用系统默认图标
                         // 调整为不可被一键清除的属性，只能手动划去
@@ -307,11 +306,6 @@ object NotificationGenerator {
                         .setWhen(System.currentTimeMillis())
                         .setOnlyAlertOnce(true)
                         .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-
-                // 仅 Live Updates 模式时注入标志位
-                if (isLiveUpdatesEnabled) {
-                    builder.setRequestPromotedOngoing(true)
-                }
 
                 // 浮窗或列表模式下设置删除意图和点击意图
                 if (needClickIntent) {
@@ -354,6 +348,9 @@ object NotificationGenerator {
                 // 使用CapsuleScrollManager处理胶囊文本滚动
                 val scrollKey = "${key}_scroll"
                 val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText)
+
+                // 设置右侧文本为拆分后的歌词
+                builder.setContentTitle(capsuleText)
 
                 // 仅 Live Updates 模式时注入胶囊文本和滚动更新
                 if (isLiveUpdatesEnabled) {
@@ -409,88 +406,85 @@ object NotificationGenerator {
                 // 构建通知
                 val notification = builder.build()
 
-                // 仅 Live Updates 模式时注入位图
-                if (isLiveUpdatesEnabled) {
-                    // 生成并注入动态图标
-                    if (iconText.isNotEmpty()) {
-                        val albumBitmap = loadAlbumBitmapOrNull(context, picMap, iconText.length)
-                        val iconBitmap = BitmapUtils.textToBitmap(iconText, albumBitmap = albumBitmap)
-                        if (iconBitmap != null) {
-                            injectSmallIcon(notification, iconBitmap, key)
+                // 生成并注入动态图标
+                if (iconText.isNotEmpty()) {
+                    val albumBitmap = loadAlbumBitmapOrNull(context, picMap, iconText.length)
+                    val iconBitmap = BitmapUtils.textToBitmap(iconText, albumBitmap = albumBitmap)
+                    if (iconBitmap != null) {
+                        injectSmallIcon(notification, iconBitmap, key)
+                    }
+                } else {
+                    // 没有图标文本时，尝试使用专辑图作为小图标
+                    val coverKey = "miui.focus.pic_cover"
+                    if (!picMap.isNullOrEmpty() && picMap.containsKey(coverKey)) {
+                        val coverUrl = picMap[coverKey]
+                        if (!coverUrl.isNullOrBlank()) {
+                            // 同步下载专辑图
+                            val bitmap = downloadBitmap(context, coverUrl)
+                            if (bitmap != null) {
+                                injectSmallIcon(notification, bitmap, key)
+                            }
                         }
-                    } else {
-                        // 没有图标文本时，尝试使用专辑图作为小图标
-                        val coverKey = "miui.focus.pic_cover"
-                        if (!picMap.isNullOrEmpty() && picMap.containsKey(coverKey)) {
-                            val coverUrl = picMap[coverKey]
-                            if (!coverUrl.isNullOrBlank()) {
-                                // 同步下载专辑图
-                                val bitmap = downloadBitmap(context, coverUrl)
+                    }
+                }
+
+                // 检查是否已经有图标文本，如果有，就不再生成新的图标
+                if (iconText.isEmpty()) {
+                    // 尝试从A/B区数据中获取图标或生成位图
+                    var smallIconBitmap: Bitmap? = null
+
+                    // 使用已解析的 paramV2 中的组件数据
+                    val bigIslandArea = paramV2.paramIsland?.bigIslandArea
+                    val bComponent = bigIslandArea?.bComponent
+
+                    // 提取进度数据
+                    val bProgress = bComponent.bProgress
+                    val bProgressColorReach = bComponent.bProgressColorReach
+                    val bProgressColorUnReach = bComponent.bProgressColorUnReach
+                    val bProgressIsCCW = bComponent.bProgressIsCCW
+
+                    // 处理进度数据，生成位图
+                    if (bProgress != null) {
+                        smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
+                    }
+
+                    // 如果没有进度数据，尝试生成文本位图
+                    if (smallIconBitmap == null) {
+                        // 优先使用B区文本生成位图
+                        val textToRender = bComponent.textToRender
+
+                        if (!textToRender.isNullOrBlank()) {
+                            smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
+                        }
+                    }
+
+                    // 如果没有文本数据，尝试使用应用图标
+                    if (smallIconBitmap == null) {
+                        // 优先使用应用图标（大图标的键值提供的图标）
+                        val appIconKey = "miui.focus.pic_app_icon"
+                        if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
+                            val appIconUrl = picMap[appIconKey]
+                            if (!appIconUrl.isNullOrBlank()) {
+                                // 异步下载应用图标
+                                val bitmap = downloadBitmap(context, appIconUrl)
                                 if (bitmap != null) {
-                                    injectSmallIcon(notification, bitmap, key)
+                                    smallIconBitmap = bitmap
                                 }
                             }
                         }
                     }
 
-                    // 检查是否已经有图标文本，如果有，就不再生成新的图标
-                    if (iconText.isEmpty()) {
-                        // 尝试从A/B区数据中获取图标或生成位图
-                        var smallIconBitmap: Bitmap? = null
-
-                        // 使用已解析的 paramV2 中的组件数据
-                        val bigIslandArea = paramV2.paramIsland?.bigIslandArea
-                        val bComponent = bigIslandArea?.bComponent
-
-                        // 提取进度数据
-                        val bProgress = bComponent.bProgress
-                        val bProgressColorReach = bComponent.bProgressColorReach
-                        val bProgressColorUnReach = bComponent.bProgressColorUnReach
-                        val bProgressIsCCW = bComponent.bProgressIsCCW
-
-                        // 处理进度数据，生成位图
-                        if (bProgress != null) {
-                            smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
-                        }
-
-                        // 如果没有进度数据，尝试生成文本位图
-                        if (smallIconBitmap == null) {
-                            // 优先使用B区文本生成位图
-                            val textToRender = bComponent.textToRender
-
-                            if (!textToRender.isNullOrBlank()) {
-                                smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
-                            }
-                        }
-
-                        // 如果没有文本数据，尝试使用应用图标
-                        if (smallIconBitmap == null) {
-                            // 优先使用应用图标（大图标的键值提供的图标）
-                            val appIconKey = "miui.focus.pic_app_icon"
-                            if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
-                                val appIconUrl = picMap[appIconKey]
-                                if (!appIconUrl.isNullOrBlank()) {
-                                    // 异步下载应用图标
-                                    val bitmap = downloadBitmap(context, appIconUrl)
-                                    if (bitmap != null) {
-                                        smallIconBitmap = bitmap
-                                    }
-                                }
-                            }
-                        }
-
-                        // 注入小图标
-                        // 只有当smallIconBitmap不为null时才注入，否则保留之前的图标
-                        if (smallIconBitmap != null) {
-                            injectSmallIcon(notification, smallIconBitmap, key)
-                        } else {
-                            // 保留之前的图标，不进行修改
-                            Logger.i(TAG, "超级岛 保留之前的小图标，不进行修改")
-                        }
+                    // 注入小图标
+                    // 只有当smallIconBitmap不为null时才注入，否则保留之前的图标
+                    if (smallIconBitmap != null) {
+                        injectSmallIcon(notification, smallIconBitmap, key)
                     } else {
-                        // 已经有图标文本，保留之前的图标，不进行修改
-                        Logger.i(TAG, "超级岛 已有图标文本，保留之前的小图标，不进行修改")
+                        // 保留之前的图标，不进行修改
+                        Logger.i(TAG, "超级岛 保留之前的小图标，不进行修改")
                     }
+                } else {
+                    // 已经有图标文本，保留之前的图标，不进行修改
+                    Logger.i(TAG, "超级岛 已有图标文本，保留之前的小图标，不进行修改")
                 }
 
                 // 发送通知
@@ -777,7 +771,6 @@ object NotificationGenerator {
                 .setOnlyAlertOnce(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setRequestPromotedOngoing(true)
 
             // 确保右胶囊文本被正确设置到 miui.focus.param 字段
             // 使用 SuperIslandStructuredDataHelper 添加结构化数据

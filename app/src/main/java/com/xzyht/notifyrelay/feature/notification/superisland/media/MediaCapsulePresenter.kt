@@ -95,6 +95,9 @@ object MediaCapsulePresenter {
                                             "textInfo",
                                             JSONObject().apply {
                                                 put("title", iconText)
+                                                put("content", "")
+                                                put("narrowFont", false)
+                                                put("showHighlightColor", true)
                                             },
                                         )
                                     },
@@ -103,7 +106,11 @@ object MediaCapsulePresenter {
                                 put(
                                     "textInfo",
                                     JSONObject().apply {
+                                        put("frontTitle", "")
                                         put("title", capsuleText)
+                                        put("content", "")
+                                        put("narrowFont", false)
+                                        put("showHighlightColor", true)
                                     },
                                 )
                             },
