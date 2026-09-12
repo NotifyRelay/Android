@@ -29,10 +29,8 @@ fun parseBComponent(
     if (right != null) {
         val type = right.optInt("type", 0)
         val textInfo = right.optJSONObject("textInfo")
-        val titleInline = right.optString("title", "").takeIf { it.isNotBlank() }
-        val contentInline = right.optString("content", "").takeIf { it.isNotBlank() }
-        val titleText = titleInline ?: textInfo?.optString("title", "")?.takeIf { it.isNotBlank() }
-        val contentText = contentInline ?: textInfo?.optString("content", "")?.takeIf { it.isNotBlank() }
+        val titleText = textInfo?.optString("title", "")?.takeIf { it.isNotBlank() }
+        val contentText = textInfo?.optString("content", "")?.takeIf { it.isNotBlank() }
         val frontTitle = textInfo?.optString("frontTitle", "")?.takeIf { it.isNotBlank() }
         val narrowFont = textInfo?.optBoolean("narrowFont", false) ?: false
         val showHighlightColor = textInfo?.optBoolean("showHighlightColor", false) ?: false
@@ -68,6 +66,7 @@ fun parseBComponent(
             // 组件4为系统侧（充电/省电）专用，不走通知数据；本项目不复刻，直接视为空
             4 -> BEmpty
             6 -> {
+                // 图文组件6：必传内容 = 数字（大字 textInfo.title）+ 图片（数字最多 3 个）
                 val title = titleText ?: return BEmpty // 必传
                 // 组件6要求静态图标：picInfo.type==4 且 picKey 必传
                 val staticIcon = (picInfo?.optInt("type", 0) == 4)
@@ -99,10 +98,7 @@ fun parseBComponent(
     }
 
     bigIsland?.optJSONObject("fixedWidthDigitInfo")?.let { fi ->
-        val digit =
-            fi.optString("digit", "").takeIf { it.isNotBlank() }
-                ?: fi.optString("text", "").takeIf { it.isNotBlank() } // 兼容旧字段名
-        digit ?: return@let
+        val digit = fi.optString("digit", "").takeIf { it.isNotBlank() } ?: return@let
         val content = fi.optString("content", "").takeIf { it.isNotBlank() }
         val showHighlightColor = fi.optBoolean("showHighlightColor", false)
         return BFixedWidthDigitInfo(
@@ -134,10 +130,8 @@ fun parseBComponent(
                 }
             }
 
-        // 若无 timerInfo 或不合法，则回退到 digit/text
-        val digit =
-            si.optString("digit", "").takeIf { it.isNotBlank() }
-                ?: si.optString("text", "").takeIf { it.isNotBlank() }
+        // 若无 timerInfo 或不合法，则回退到 digit
+        val digit = si.optString("digit", "").takeIf { it.isNotBlank() }
 
         // 二选一：timer 或 digit 至少一个存在
         if (timer == null && digit == null) return@let

@@ -14,13 +14,19 @@ import github.xzynine.superislandui.model.components.parseTextButton
 import github.xzynine.superislandui.model.components.toMultiProgressInfo
 import github.xzynine.superislandui.model.templates.BaseInfo
 import github.xzynine.superislandui.model.templates.ChatInfo
+import github.xzynine.superislandui.model.templates.CoverInfo
 import github.xzynine.superislandui.model.templates.HighlightInfo
+import github.xzynine.superislandui.model.templates.HighlightInfoV3
 import github.xzynine.superislandui.model.templates.HintInfo
+import github.xzynine.superislandui.model.templates.IconTextInfo
 import github.xzynine.superislandui.model.templates.PicInfo
 import github.xzynine.superislandui.model.templates.parseBaseInfo
 import github.xzynine.superislandui.model.templates.parseChatInfo
+import github.xzynine.superislandui.model.templates.parseCoverInfo
 import github.xzynine.superislandui.model.templates.parseHighlightInfo
+import github.xzynine.superislandui.model.templates.parseHighlightInfoV3
 import github.xzynine.superislandui.model.templates.parseHintInfo
+import github.xzynine.superislandui.model.templates.parseIconTextInfo
 import github.xzynine.superislandui.model.templates.parsePicInfo
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
@@ -39,6 +45,9 @@ data class ParamV2(
     val actions: List<ActionInfo>? = null, // 按钮组件
     val hintInfo: HintInfo? = null, // 提示组件（按钮组件2/3）
     val textButton: TextButton? = null, // 文本按钮组件
+    val iconTextInfo: IconTextInfo? = null, // 新图文组件（OS3 模板 14/14-2/16/17/18/22）
+    val coverInfo: CoverInfo? = null, // 封面组件（OS3 模板 19）
+    val highlightInfoV3: HighlightInfoV3? = null, // 按钮组件5（OS3 模板 17/18/19）
     val paramIsland: ParamIsland? = null, // 摘要态组件
     val business: String? = null, // 可选的业务标识（例如 miui_flashlight）
     val aodPic: String? = null, // AOD图片键
@@ -63,6 +72,9 @@ fun parseParamV2(jsonString: String): ParamV2? =
         var actions: List<ActionInfo>? = null
         var hintInfo: HintInfo? = null
         var textButton: TextButton? = null
+        var iconTextInfo: IconTextInfo? = null
+        var coverInfo: CoverInfo? = null
+        var highlightInfoV3: HighlightInfoV3? = null
         var paramIsland: ParamIsland? = null
 
         // 解析各个字段，每个字段单独try-catch，避免一个字段解析失败导致整体失败
@@ -132,6 +144,24 @@ fun parseParamV2(jsonString: String): ParamV2? =
             Logger.w("超级岛", "解析textButton失败: ${e.message}")
         }
 
+        try {
+            iconTextInfo = json.optJSONObject("iconTextInfo")?.let { parseIconTextInfo(it) }
+        } catch (e: Exception) {
+            Logger.w("超级岛", "解析iconTextInfo失败: ${e.message}")
+        }
+
+        try {
+            coverInfo = json.optJSONObject("coverInfo")?.let { parseCoverInfo(it) }
+        } catch (e: Exception) {
+            Logger.w("超级岛", "解析coverInfo失败: ${e.message}")
+        }
+
+        try {
+            highlightInfoV3 = json.optJSONObject("highlightInfoV3")?.let { parseHighlightInfoV3(it) }
+        } catch (e: Exception) {
+            Logger.w("超级岛", "解析highlightInfoV3失败: ${e.message}")
+        }
+
         // 提取 aodPic 和 picFunction 用于解析 A/B 区组件
         val aodPic = json.optString("aodPic", "").takeIf { it.isNotBlank() }
         val picFunction =
@@ -171,6 +201,9 @@ fun parseParamV2(jsonString: String): ParamV2? =
                 actions = actions,
                 hintInfo = hintInfo,
                 textButton = textButton,
+                iconTextInfo = iconTextInfo,
+                coverInfo = coverInfo,
+                highlightInfoV3 = highlightInfoV3,
                 paramIsland = paramIsland,
                 aodPic = aodPic,
                 picFunction = highlight?.picFunction ?: picFunction,

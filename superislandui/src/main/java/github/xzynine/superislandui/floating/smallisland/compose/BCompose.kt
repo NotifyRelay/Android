@@ -128,7 +128,7 @@ fun BCompose(
                     }
                 }
 
-                // 文本内容
+                // 文本内容（图文组件6：数字/大字，最多3个数字）
                 CommonTextBlockCompose(
                     frontTitle = null,
                     title = bComp.title,
