@@ -1,6 +1,7 @@
 ﻿package github.xzynine.superislandui.floating.bigisland.components
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -8,7 +9,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -26,7 +27,8 @@ import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.core.util.image.ImageUtils
 
 /**
- * 聊天信息Compose组件
+ * IM图文组件（chatInfo）Compose 实现
+ * 版式（MD 结构图）：圆角方形头像（右下角叠加应用图标徽标）+ 主要文本 + 次要文本
  */
 @Composable
 fun ChatInfoCompose(
@@ -42,37 +44,54 @@ fun ChatInfoCompose(
                 .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 头像
+        // 头像（圆角方形，圆角取尺寸 1/4）+ 右下角应用图标徽标
         val avatarUrl = chatInfo.picProfile?.let { picMap?.get(it) }
-        if (!avatarUrl.isNullOrEmpty()) {
-            val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(avatarUrl)
-            painter?.let {
-                Image(
-                    painter = it,
-                    contentDescription = null,
-                    modifier =
-                        Modifier
-                            .size(48.dp)
-                            .clip(CircleShape),
-                )
+        // 应用图标：优先自定义 appIconPkg，其次系统注入的桌面图标
+        val badgeUrl =
+            chatInfo.appIconPkg?.let { picMap?.get(it) }
+                ?: picMap?.get("miui.focus.pic_app_icon")
+        if (!avatarUrl.isNullOrEmpty() || !badgeUrl.isNullOrEmpty()) {
+            Box(modifier = Modifier.size(48.dp)) {
+                if (!avatarUrl.isNullOrEmpty()) {
+                    SuperIslandImageUtil.rememberSuperIslandImagePainter(avatarUrl)?.let {
+                        Image(
+                            painter = it,
+                            contentDescription = null,
+                            modifier =
+                                Modifier
+                                    .size(48.dp)
+                                    .clip(RoundedCornerShape(12.dp)),
+                        )
+                    }
+                }
+                if (!badgeUrl.isNullOrEmpty()) {
+                    SuperIslandImageUtil.rememberSuperIslandImagePainter(badgeUrl)?.let {
+                        Image(
+                            painter = it,
+                            contentDescription = null,
+                            modifier =
+                                Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .size(18.dp)
+                                    .clip(RoundedCornerShape(5.dp)),
+                        )
+                    }
+                }
             }
         }
 
-        // 圆形进度条（从actions中获取）
+        // 圆形进度条（IM + 进度场景，从 actions/progressInfo 获取）
         val actionWithProgress = paramV2.actions?.firstOrNull { it.progressInfo != null }
         val progressInfo = actionWithProgress?.progressInfo ?: paramV2.progressInfo
 
         if (progressInfo != null) {
-            // 添加8dp的margin
             Spacer(modifier = Modifier.width(8.dp))
 
-            // 创建圆形进度条 - 使用common目录下的通用组件
             val progressColor = ImageUtils.parseColor(progressInfo.colorProgress) ?: 0xFF3482FF.toInt()
             val trackColor =
                 ImageUtils.parseColor(progressInfo.colorProgressEnd)
                     ?: ((progressColor and 0x00FFFFFF) or (0x33 shl 24))
 
-            // 使用通用的CircularProgressCompose组件（内部已处理动画）
             CircularProgressCompose(
                 progress = progressInfo.progress,
                 colorReach = Color(progressColor),
@@ -89,8 +108,9 @@ fun ChatInfoCompose(
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
                     color = Color(ImageUtils.parseColor(chatInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Normal,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    maxLines = 1,
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }
@@ -100,6 +120,7 @@ fun ChatInfoCompose(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
                     color = Color(ImageUtils.parseColor(chatInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                     fontSize = 12.sp,
+                    maxLines = 1,
                     modifier = Modifier.padding(start = 8.dp),
                 )
             }

@@ -22,12 +22,8 @@ fun parseAComponent(
     return when (type) {
         1 -> {
             val textInfo = left.optJSONObject("textInfo")
-            val title =
-                left.optString("title", "").takeIf { it.isNotBlank() }
-                    ?: textInfo?.optString("title", "")?.takeIf { it.isNotBlank() }
-            val content =
-                left.optString("content", "").takeIf { it.isNotBlank() }
-                    ?: textInfo?.optString("content", "")?.takeIf { it.isNotBlank() }
+            val title = textInfo?.optString("title", "")?.takeIf { it.isNotBlank() }
+            val content = textInfo?.optString("content", "")?.takeIf { it.isNotBlank() }
             val narrowFont = textInfo?.optBoolean("narrowFont", false) ?: false
             val showHighlightColor = textInfo?.optBoolean("showHighlightColor", false) ?: false
 
@@ -54,12 +50,8 @@ fun parseAComponent(
         }
         5 -> {
             val textInfo = left.optJSONObject("textInfo")
-            val title =
-                textInfo?.optString("title", "")?.takeIf { it.isNotBlank() }
-                    ?: left.optString("title", "").takeIf { it.isNotBlank() }
-            val content =
-                textInfo?.optString("content", "")?.takeIf { it.isNotBlank() }
-                    ?: left.optString("content", "").takeIf { it.isNotBlank() }
+            val title = textInfo?.optString("title", "")?.takeIf { it.isNotBlank() }
+            val content = textInfo?.optString("content", "")?.takeIf { it.isNotBlank() }
             val showHighlightColor = textInfo?.optBoolean("showHighlightColor", false) ?: false
 
             val picInfo = left.optJSONObject("picInfo")

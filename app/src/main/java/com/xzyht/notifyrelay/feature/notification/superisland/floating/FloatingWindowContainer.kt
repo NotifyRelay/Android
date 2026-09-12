@@ -4,13 +4,17 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.key
@@ -29,7 +33,10 @@ import github.xzynine.superislandui.floating.bigisland.components.ActionCompose
 import github.xzynine.superislandui.floating.bigisland.components.AnimTextInfoCompose
 import github.xzynine.superislandui.floating.bigisland.components.BaseInfoCompose
 import github.xzynine.superislandui.floating.bigisland.components.ChatInfoCompose
+import github.xzynine.superislandui.floating.bigisland.components.CoverInfoCompose
 import github.xzynine.superislandui.floating.bigisland.components.HighlightInfoCompose
+import github.xzynine.superislandui.floating.bigisland.components.HighlightInfoV3Compose
+import github.xzynine.superislandui.floating.bigisland.components.IconTextInfoCompose
 import github.xzynine.superislandui.floating.bigisland.components.HintInfoCompose
 import github.xzynine.superislandui.floating.bigisland.components.MediaIslandCompose
 import github.xzynine.superislandui.floating.bigisland.components.MultiProgressCompose
@@ -210,72 +217,117 @@ fun FloatingWindowContainer(
                                                 ParamIslandCompose(paramV2.paramIsland!!, actions = paramV2.actions, picMap = entry.picMap)
                                             }
 
-                                            paramV2.baseInfo != null -> {
-                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 BaseInfoCompose")
-                                                BaseInfoCompose(
-                                                    paramV2.baseInfo!!,
-                                                    picMap = entry.picMap,
-                                                )
-                                            }
-
-                                            paramV2.chatInfo != null -> {
-                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 ChatInfoCompose")
-                                                ChatInfoCompose(paramV2, picMap = entry.picMap)
-                                            }
-
-                                            paramV2.animTextInfo != null -> {
-                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 AnimTextInfoCompose")
-                                                AnimTextInfoCompose(
-                                                    paramV2.animTextInfo!!,
-                                                    picMap = entry.picMap,
-                                                )
-                                            }
-
-                                            paramV2.highlightInfo != null -> {
-                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 HighlightInfoCompose")
-                                                HighlightInfoCompose(
-                                                    paramV2.highlightInfo!!,
-                                                    picMap = entry.picMap,
-                                                )
-                                            }
-
-                                            paramV2.picInfo != null -> {
-                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 PicInfoCompose")
-                                                PicInfoCompose(
-                                                    paramV2.picInfo!!,
-                                                    picMap = entry.picMap,
-                                                )
-                                            }
-
-                                            paramV2.hintInfo != null -> {
-                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 HintInfoCompose")
-                                                HintInfoCompose(
-                                                    paramV2.hintInfo!!,
-                                                    picMap = entry.picMap,
-                                                )
-                                            }
-
-                                            paramV2.textButton != null -> {
-                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 TextButtonCompose")
-                                                TextButtonCompose(
-                                                    paramV2.textButton!!,
-                                                    picMap = entry.picMap,
-                                                )
-                                            }
-
-                                            paramV2.actions?.isNotEmpty() == true -> {
-                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 ActionCompose")
-                                                ActionCompose(paramV2.actions!!, entry.picMap)
-                                            }
-
+                                            // 组合模板渲染：主内容组件 + 右侧识别图形组件1 + 底部按钮组件
                                             else -> {
-                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 DefaultSuperIslandCompose")
-                                                // 默认模板：未支持的模板类型
-                                                Box(modifier = Modifier.padding(16.dp)) {
-                                                    Text(
-                                                        text = "未支持的模板",
-                                                        color = Color.White,
-                                                    )
+                                                // 主内容组件：文本组件/IM图文/动画文本/新图文/封面/强调图文/识别图形
+                                                val hasPrimaryContent =
+                                                    paramV2.baseInfo != null ||
+                                                        paramV2.chatInfo != null ||
+                                                        paramV2.animTextInfo != null ||
+                                                        paramV2.iconTextInfo != null ||
+                                                        paramV2.coverInfo != null ||
+                                                        paramV2.highlightInfo != null
+                                                val hasPicInfo = paramV2.picInfo != null
+                                                // 按钮组件：按钮组件5 / 2、3 / 4 / 1（位于底部按钮区）
+                                                val hasButton =
+                                                    paramV2.highlightInfoV3 != null ||
+                                                        paramV2.hintInfo != null ||
+                                                        paramV2.textButton != null ||
+                                                        paramV2.actions?.isNotEmpty() == true
+
+                                                if (!hasPrimaryContent && !hasPicInfo && !hasButton) {
+                                                    Logger.d("超级岛", "FloatingWindowContainer: 渲染 DefaultSuperIslandCompose")
+                                                    // 默认模板：未支持的模板类型
+                                                    Box(modifier = Modifier.padding(16.dp)) {
+                                                        Text(
+                                                            text = "未支持的模板",
+                                                            color = Color.White,
+                                                        )
+                                                    }
+                                                } else {
+                                                    Column(modifier = Modifier.fillMaxWidth()) {
+                                                        // 顶部：主内容组件 + 右侧识别图形组件1（应用图标）
+                                                        if (hasPrimaryContent || hasPicInfo) {
+                                                            Row(
+                                                                modifier = Modifier.fillMaxWidth(),
+                                                                verticalAlignment = Alignment.CenterVertically,
+                                                            ) {
+                                                                Box(modifier = Modifier.weight(1f)) {
+                                                                    when {
+                                                                        paramV2.baseInfo != null -> {
+                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 BaseInfoCompose")
+                                                                            BaseInfoCompose(paramV2.baseInfo!!, picMap = entry.picMap)
+                                                                        }
+                                                                        paramV2.chatInfo != null -> {
+                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 ChatInfoCompose")
+                                                                            ChatInfoCompose(paramV2, picMap = entry.picMap)
+                                                                        }
+                                                                        paramV2.animTextInfo != null -> {
+                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 AnimTextInfoCompose")
+                                                                            AnimTextInfoCompose(paramV2.animTextInfo!!, picMap = entry.picMap)
+                                                                        }
+                                                                        paramV2.iconTextInfo != null -> {
+                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 IconTextInfoCompose")
+                                                                            IconTextInfoCompose(paramV2.iconTextInfo!!, picMap = entry.picMap)
+                                                                        }
+                                                                        paramV2.coverInfo != null -> {
+                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 CoverInfoCompose")
+                                                                            CoverInfoCompose(paramV2.coverInfo!!, picMap = entry.picMap)
+                                                                        }
+                                                                        paramV2.highlightInfo != null -> {
+                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 HighlightInfoCompose")
+                                                                            HighlightInfoCompose(paramV2.highlightInfo!!, picMap = entry.picMap)
+                                                                        }
+                                                                        paramV2.picInfo != null -> {
+                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 PicInfoCompose")
+                                                                            PicInfoCompose(paramV2.picInfo!!, picMap = entry.picMap)
+                                                                        }
+                                                                    }
+                                                                }
+                                                                // 识别图形组件1：主内容存在时作为右侧应用图标（主内容为 picInfo 自身时不重复）
+                                                                if (hasPicInfo && hasPrimaryContent) {
+                                                                    Spacer(modifier = Modifier.width(8.dp))
+                                                                    CommonImageCompose(
+                                                                        picKey = paramV2.picInfo!!.pic,
+                                                                        picMap = entry.picMap,
+                                                                        size = 28.dp,
+                                                                    )
+                                                                }
+                                                            }
+                                                        }
+                                                        // 底部按钮区：按钮组件5 / 2、3 / 4 / 1
+                                                        if (hasButton) {
+                                                            if (hasPrimaryContent || hasPicInfo) {
+                                                                Spacer(modifier = Modifier.height(6.dp))
+                                                                Spacer(
+                                                                    modifier =
+                                                                        Modifier
+                                                                            .fillMaxWidth()
+                                                                            .height(1.dp)
+                                                                            .background(Color(0x33FFFFFF)),
+                                                                )
+                                                                Spacer(modifier = Modifier.height(2.dp))
+                                                            }
+                                                            when {
+                                                                paramV2.highlightInfoV3 != null -> {
+                                                                    Logger.d("超级岛", "FloatingWindowContainer: 渲染 HighlightInfoV3Compose")
+                                                                    HighlightInfoV3Compose(paramV2.highlightInfoV3!!, picMap = entry.picMap)
+                                                                }
+                                                                paramV2.hintInfo != null -> {
+                                                                    Logger.d("超级岛", "FloatingWindowContainer: 渲染 HintInfoCompose")
+                                                                    HintInfoCompose(paramV2.hintInfo!!, picMap = entry.picMap)
+                                                                }
+                                                                paramV2.textButton != null -> {
+                                                                    Logger.d("超级岛", "FloatingWindowContainer: 渲染 TextButtonCompose")
+                                                                    TextButtonCompose(paramV2.textButton!!, picMap = entry.picMap)
+                                                                }
+                                                                paramV2.actions?.isNotEmpty() == true -> {
+                                                                    Logger.d("超级岛", "FloatingWindowContainer: 渲染 ActionCompose")
+                                                                    ActionCompose(paramV2.actions!!, entry.picMap)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
                                                 }
                                             }
                                         }
