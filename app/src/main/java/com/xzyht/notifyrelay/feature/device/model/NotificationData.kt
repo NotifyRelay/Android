@@ -234,7 +234,8 @@ object NotificationRepository {
         }
         // 保证 title 是实际通知标题
         val title = getStringCompat(notification.extras, Notification.EXTRA_TITLE)
-        val text = getStringCompat(notification.extras, Notification.EXTRA_TEXT)
+        // 使用 getNotificationTextWithVerifyCode 读取文本，优先读取 verify_code 字段
+        val text = getNotificationTextWithVerifyCode(sbn)
         val packageName = sbn.packageName
         val device = "本机"
         // 本地通知的 key 也需要包含设备信息，确保不同设备的相同通知不会冲突
@@ -327,30 +328,67 @@ object NotificationRepository {
         }
     }
 
+    /**
+     * 读取通知的 verify_code 字段（系统短信App在锁屏状态下也会暴露实际验证码）
+     * @return 验证码字符串，如果没有则返回 null
+     */
+    fun getVerifyCode(sbn: StatusBarNotification): String? {
+        return try {
+            val extras = sbn.notification.extras ?: return null
+            extras.getString("verify_code")
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * 获取通知文本，优先使用 verify_code 字段（系统短信App在锁屏状态下会暴露实际验证码）
+     * @return 实际显示的文本
+     */
+    fun getNotificationTextWithVerifyCode(sbn: StatusBarNotification): String? {
+        try {
+            val extras = sbn.notification.extras ?: return null
+
+            // 优先尝试读取 verify_code 字段（系统短信App的隐藏字段）
+            val verifyCode = extras.getString("verify_code")
+            if (!verifyCode.isNullOrEmpty()) {
+                Logger.d("NotifyRelay", "读取到 verify_code 字段(len=${verifyCode.length})")
+                return verifyCode
+            }
+
+            // 如果没有 verify_code，则使用标准的 android.text 字段
+            return getStringCompat(extras, Notification.EXTRA_TEXT)
+        } catch (e: Exception) {
+            return null
+        }
+    }
+
     // 当前选中设备
     var currentDevice: String = "本机"
 
     // 设备列表，自动维护
     val deviceList: MutableList<String> = mutableListOf("本机")
 
-    // 扫描数据库中的设备，自动识别所有设备
+    // 扫描设备列表：设备信息由 Rust 私有库持有（uuid 仅平台端兜底），
+    // 列表数据源改为 DeviceConnectionManager 的已认证设备集合
     fun scanDeviceList(context: Context) {
-        // 从Room数据库中获取所有已认证设备
-        val allDevicesFromDb =
-            runBlocking {
-                DatabaseRepository.getInstance(context).getDevices()
-            }
-
         // 添加本机设备
         val found = mutableSetOf<String>()
         found.add("本机")
 
-        // 添加数据库中的所有已认证设备UUID
-        allDevicesFromDb.forEach { device ->
-            val uuid = device.uuid
-            if (!uuid.isNullOrEmpty() && uuid != "本机") {
-                found.add(uuid)
-            }
+        // 添加已认证设备 UUID（来自 DeviceConnectionManager 内存态，Rust 库为准）
+        try {
+            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+                .getInstance(context)
+                .getAuthenticatedDevices()
+                .keys
+                .forEach { uuid ->
+                    if (!uuid.isNullOrEmpty() && uuid != "本机") {
+                        found.add(uuid)
+                    }
+                }
+        } catch (e: Exception) {
+            Logger.w("NotifyRelay", "[scanDeviceList] 获取已认证设备失败", e)
         }
 
         // 保证本机在首位

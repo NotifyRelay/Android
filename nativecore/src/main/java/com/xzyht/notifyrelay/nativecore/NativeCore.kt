@@ -75,6 +75,15 @@ object NativeCore {
         deviceUuid: String,
     ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_export_device_key(ctx, deviceUuid))
 
+    // ======== Persistence（Rust 私有库：uuid/密钥由 Rust 持有）=======
+    fun getLocalUuid(ctx: Pointer): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_local_uuid(ctx))
+
+    fun renameDevice(
+        ctx: Pointer,
+        deviceUuid: String,
+        name: String,
+    ): Boolean = lib.nrc_rename_device(ctx, deviceUuid, name) == 0
+
     // ======== Process ========
     fun periodicBroadcast(
         ctx: Pointer,
@@ -216,12 +225,6 @@ object NativeCore {
         deviceType: String,
     ) = lib.nrc_update_heartbeat_scheduler_params(ctx, name, battery, deviceType)
 
-    // ======== Heartbeat mode (广播主用 / TCP 备用) ========
-    fun setHeartbeatTcpBackup(
-        ctx: Pointer,
-        enabled: Boolean,
-    ) = lib.nrc_set_heartbeat_tcp_backup(ctx, if (enabled) 1 else 0)
-
     // ======== Device state snapshot ========
     fun getDeviceList(
         ctx: Pointer,
@@ -319,6 +322,8 @@ object NativeCore {
 
     // 推送「全量」超级岛/媒体状态；Rust 内部计算差异、合并、ACK 与心跳，接收端经 on_data 回传全量。
     // isQuery：true=查询回调响应推送（心跳查询发现变更后由平台推送），false=正常主动推送。
+
+    /** @return true=入队成功；false=上下文/队列不可用或原生入队失败（调用方可重试） */
     fun pushSuperislandState(
         ctx: Pointer?,
         queuePtr: Long,
@@ -326,11 +331,13 @@ object NativeCore {
         fullJson: String,
         isEnd: Boolean,
         isQuery: Boolean = false,
-    ) {
-        val c = ctx ?: return
-        lib.nrc_push_superisland_state(c, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0)
+    ): Boolean {
+        val c = ctx ?: return false
+        if (queuePtr == 0L) return false
+        return lib.nrc_push_superisland_state(c, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0) == 0
     }
 
+    /** @return true=入队成功；false=上下文/队列不可用或原生入队失败（调用方可重试） */
     fun pushMediaState(
         ctx: Pointer?,
         queuePtr: Long,
@@ -338,9 +345,10 @@ object NativeCore {
         fullJson: String,
         isEnd: Boolean,
         isQuery: Boolean = false,
-    ) {
-        val c = ctx ?: return
-        lib.nrc_push_media_state(c, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0)
+    ): Boolean {
+        val c = ctx ?: return false
+        if (queuePtr == 0L) return false
+        return lib.nrc_push_media_state(c, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0) == 0
     }
 
     // 注册状态查询回调（Rust 心跳线程锁外调用，返回 0=不存在 / 1=存在无变更 / 2=存在有变更）
@@ -362,11 +370,6 @@ object NativeCore {
 
     // ======== Local IP ========
     fun getLocalIp(): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_local_ip())
-
-    // ======== mDNS ========
-    fun stopMdnsAdvertiser(ctx: Pointer): Int = lib.nrc_stop_mdns_advertiser(ctx)
-
-    fun stopMdnsDiscovery(ctx: Pointer): Int = lib.nrc_stop_mdns_discovery(ctx)
 
     // ======== Discovery ========
     fun addKnownDevice(
@@ -503,7 +506,7 @@ object NativeCore {
     // ======== Version ========
     fun getGitHash(): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_git_hash())
 
-    // ======== Initialize core (统一启动 TCP/UDP、心跳、离线检测、发送队列、扫描、重连、mDNS) ========
+    // ======== Initialize core (统一启动 TCP、心跳、离线检测、发送队列、扫描、重连) ========
     fun startCore(
         ctx: Pointer,
         uuid: String,

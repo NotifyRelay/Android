@@ -60,15 +60,18 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import com.xzyht.notifyrelay.BuildConfig
+import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundService
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
-import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundService
-import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
+import com.xzyht.notifyrelay.ui.dialog.triggerSuperIslandTestSample
 import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
 import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.navigation.rememberNavigator
@@ -113,6 +116,14 @@ class MainActivity : FragmentActivity() {
     internal val showAutoStartBanner = mutableStateOf(false)
     internal val bannerMessage = mutableStateOf<String?>(null)
 
+    companion object {
+        /** 调试用：intent 携带该 extra 时，按值触发对应的超级岛测试样本（见 [triggerSuperIslandTestSample]） */
+        const val EXTRA_SUPER_ISLAND_TEST = "superIslandTest"
+
+        /** 调试用：是否使用可变进度（测试动画效果），默认固定进度 */
+        const val EXTRA_SUPER_ISLAND_TEST_VARIABLE = "superIslandTestVariable"
+    }
+
     // 屏幕捕获授权结果，等待本应用前台且媒体投影前台服务就绪后处理
     private var pendingScreenCapture: Pair<Int, Intent>? = null
     private var registeredOnForegroundReady: (() -> Unit)? = null
@@ -138,24 +149,25 @@ class MainActivity : FragmentActivity() {
             val projection = mpm.getMediaProjection(pending.first, pending.second)
             if (projection != null) {
                 pendingScreenCapture = null
-                val deviceManager = DeviceConnectionManager.getInstance(this)
-                deviceManager.audioRelayPlayer.stopSendCapture()
+                val audioRelay = DeviceConnectionManagerSingleton.getAudioRelay(this)
+                audioRelay.player.stopSendCapture()
                 NativeCore.mediaProjection?.stop()
                 NativeCore.mediaProjection = projection
                 projection.registerCallback(
                     object : MediaProjection.Callback() {
                         override fun onStop() {
-                            // 仅当被停止的投影仍是当前投影时才清理捕获，
-                            // 避免主动 stop 旧投影时其 onStop 回调误杀新会话的捕获。
+                            // 仅当被停止的投影仍是当前投影时才清理，
+                            // 避免主动 stop 旧投影时其 onStop 回调误杀新会话。
                             if (NativeCore.mediaProjection === projection) {
                                 NativeCore.mediaProjection = null
-                                deviceManager.audioRelayPlayer.stopSendCapture()
+                                // 投影被系统回收：完整清理（停播放/捕获、注销停止广播、停前台服务并通知远端结束）
+                                audioRelay.stop()
                             }
                         }
                     },
                     Handler(Looper.getMainLooper()),
                 )
-                deviceManager.startPendingAudioRelaySend()
+                audioRelay.startPendingSend()
             } else {
                 pendingScreenCapture = null
                 stopService(Intent(this, MediaProjectionForegroundService::class.java))
@@ -234,8 +246,8 @@ class MainActivity : FragmentActivity() {
             MediaProjectionForegroundService.onForegroundReady = null
         }
         registeredOnForegroundReady = null
-        if (DeviceConnectionManager.getInstance(this).onRequestMediaProjection === registeredOnRequestMediaProjection) {
-            DeviceConnectionManager.getInstance(this).onRequestMediaProjection = null
+        if (DeviceConnectionManagerSingleton.getAudioRelay(this).onRequestMediaProjection === registeredOnRequestMediaProjection) {
+            DeviceConnectionManagerSingleton.getAudioRelay(this).onRequestMediaProjection = null
         }
         registeredOnRequestMediaProjection = null
         pendingScreenCapture = null
@@ -289,6 +301,21 @@ class MainActivity : FragmentActivity() {
 
         DeveloperModeActivity.initLogConfig(this)
         DeveloperModeActivity.initDebugUiConfig(this)
+
+        // 调试入口：通过 intent 直接触发超级岛测试样本，免去手工点击测试对话框。
+        // adb shell am start -n com.xzyht.notifyrelay/.ui.activity.MainActivity \
+        //     --es superIslandTest multi_progress_with_icons
+        // 仅 debug 构建生效：release 包不读取该参数，也不触发任何测试样本，保证正常启动流程不变。
+        if (BuildConfig.DEBUG) {
+            intent?.getStringExtra(EXTRA_SUPER_ISLAND_TEST)?.let { sampleId ->
+                val variable = intent.getBooleanExtra(EXTRA_SUPER_ISLAND_TEST_VARIABLE, false)
+                if (triggerSuperIslandTestSample(this, sampleId, variable)) {
+                    Logger.i("MainActivity", "已按 intent 触发超级岛测试样本: $sampleId")
+                } else {
+                    Logger.w("MainActivity", "未知的超级岛测试样本 ID: $sampleId")
+                }
+            }
+        }
 
         PermissionHelper.AppForegroundDetector.initialize(this)
 
@@ -397,7 +424,7 @@ class MainActivity : FragmentActivity() {
             }
         }
         registeredOnRequestMediaProjection = projectionRequestCallback
-        DeviceConnectionManager.getInstance(this).onRequestMediaProjection = projectionRequestCallback
+        DeviceConnectionManagerSingleton.getAudioRelay(this).onRequestMediaProjection = projectionRequestCallback
 
         // 后台初始化，避免阻塞 UI 线程
         lifecycleScope.launch(Dispatchers.Default) {

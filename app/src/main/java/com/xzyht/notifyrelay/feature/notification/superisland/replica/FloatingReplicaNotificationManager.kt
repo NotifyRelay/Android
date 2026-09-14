@@ -3,6 +3,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland.replica
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
@@ -48,11 +49,13 @@ object FloatingReplicaNotificationManager {
                     title?.takeIf { it.isNotBlank() }
                         ?: paramV2?.highlightInfo?.title?.takeIf { it.isNotBlank() }
                         ?: paramV2?.baseInfo?.title?.takeIf { it.isNotBlank() }
+                        ?: "未知"
 
                 val displayText =
                     text?.takeIf { it.isNotBlank() }
                         ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
                         ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
+                        ?: "未知"
 
                 val entryKey = sourceId
 
@@ -60,7 +63,21 @@ object FloatingReplicaNotificationManager {
 
                 val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
 
-                if (isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                // 注入模式：超级岛模式优先于 Live Updates 模式（对齐媒体类型的既有分流范式）。
+                // 超级岛模式下，即便含 progressInfo 也走超级岛通道，确保拿到 addSuperIslandStructuredData 注入；
+                // 仅在「Live Updates 注入且非超级岛」时保留现有 Live Updates 通道。
+                val superIslandMode = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
+                val liveUpdatesMode = SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)
+                val injectionModeOrdinal = SuperIslandConfigUtils.getSpecInjectionMode(context).ordinal
+
+                // 注入模式变化时先取消旧通知并清理旧映射，避免两个通道的通知并存/残留
+                FloatingReplicaMappingManager.migrateInjectionModeIfChanged(context, sourceId, injectionModeOrdinal)
+
+                // 不再按内容指纹跳过系统通知刷新：
+                // 系统侧可能出现「通知已入列、ranking 保留、但被焦点插件隐藏」的幽灵状态，
+                // 此时内容指纹与 activeNotifications 判定都"看似正常"，一旦跳过就永远不再重发
+                // （表现为"怎么点都不出"）。重复 notify 只是更新同一条通知（已 setOnlyAlertOnce），代价可控。
+                if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                     runWithErrorHandlingSuspend("发送Live Updates复合通知") {
                         LiveUpdatesNotificationManager.initialize(context)
                         LiveUpdatesNotificationManager.showLiveUpdate(
@@ -179,6 +196,9 @@ object FloatingReplicaNotificationManager {
                 FloatingReplicaMappingManager.removeNotificationId(entryKey)
             }
         }
+
+        // 通知已撤回，清理内容指纹，保证后续保活包（即使无变更）会重新发出通知
+        FloatingReplicaMappingManager.removeNotificationFingerprint(sourceId)
 
         if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
             FloatingReplicaMappingManager.removeBlockedInstance(sourceId)

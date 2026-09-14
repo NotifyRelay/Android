@@ -181,7 +181,14 @@ internal fun GuideAgreementPage(
         }
 
         GuidePageFooter(
-            hint = if (reauth) null else if (agreed) null else "请先阅读并同意使用须知",
+            hint =
+                if (reauth) {
+                    null
+                } else if (agreed) {
+                    null
+                } else {
+                    "请先阅读并同意使用须知"
+                },
             nextText = if (reauth) "重新授权并继续" else "同意并继续",
             nextEnabled = agreed,
             onBack = onBack,

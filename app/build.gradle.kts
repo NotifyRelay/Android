@@ -155,6 +155,10 @@ android {
         resources {
             excludes += "META-INF/DEPENDENCIES"
         }
+        jniLibs {
+            // 16KB 页面大小支持：使用未压缩的共享库
+            useLegacyPackaging = false
+        }
     }
 }
 

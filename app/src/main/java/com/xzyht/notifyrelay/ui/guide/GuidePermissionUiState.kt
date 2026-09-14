@@ -15,13 +15,14 @@ internal data class GuidePermissionUiState(
     val notificationListener: Boolean = false,
     val queryApps: Boolean = false,
     val postNotifications: Boolean = false,
+    val localNetworkGranted: Boolean = false,
     val bluetoothConnect: Boolean = false,
     val manageExternalStorage: Boolean = false,
     val backgroundUnlimited: Boolean = false,
     val overlay: Boolean = false,
 ) {
     val requiredGranted: Boolean
-        get() = notificationListener && queryApps && postNotifications
+        get() = notificationListener && queryApps && postNotifications && localNetworkGranted
 }
 
 internal fun readGuidePermissionState(context: Context): GuidePermissionUiState {
@@ -30,14 +31,15 @@ internal fun readGuidePermissionState(context: Context): GuidePermissionUiState 
             context.contentResolver,
             "enabled_notification_listeners",
         )
-    val hasNotification = run {
-        if (enabledListeners.isNullOrEmpty()) {
-            false
-        } else {
-            val myComponent = ComponentName(context, NotifyRelayNotificationListenerService::class.java).flattenToString()
-            enabledListeners.split(":").map { it.trim() }.any { it == myComponent }
+    val hasNotification =
+        run {
+            if (enabledListeners.isNullOrEmpty()) {
+                false
+            } else {
+                val myComponent = ComponentName(context, NotifyRelayNotificationListenerService::class.java).flattenToString()
+                enabledListeners.split(":").map { it.trim() }.any { it == myComponent }
+            }
         }
-    }
 
     // 与 PermissionHelper.checkAllPermissions 保持一致：MIUI/澎湃系统还需要
     // 显式授予 com.android.permission.GET_INSTALLED_APPS，否则主界面会再次跳回引导页。
@@ -73,6 +75,7 @@ internal fun readGuidePermissionState(context: Context): GuidePermissionUiState 
                 true
             },
         bluetoothConnect = PermissionHelper.checkBluetoothConnectPermission(context),
+        localNetworkGranted = PermissionHelper.checkLocalNetworkPermission(context),
         manageExternalStorage = PermissionHelper.checkManageExternalStoragePermission(context),
         backgroundUnlimited = PermissionHelper.checkBackgroundUnlimitedPermission(context),
         overlay = PermissionHelper.checkOverlayPermission(context),

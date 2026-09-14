@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import androidx.core.net.toUri
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingComposeContainer
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowLifecycleOwner
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
@@ -16,7 +17,6 @@ import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandI
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
-import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -150,6 +150,9 @@ object FloatingReplicaWindowManager {
                             ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
                             ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
 
+                    // 记录更新前浮窗条目是否已存在：存在说明系统通知已发出过，保活包无变更时可跳过通知刷新
+                    val entryExistedBefore = floatingWindowManager.getEntry(entryKey) != null
+
                     floatingWindowManager.addOrUpdateEntry(
                         key = entryKey,
                         paramV2 = paramV2,
@@ -169,25 +172,63 @@ object FloatingReplicaWindowManager {
 
                     val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
 
+                    // 注入模式：超级岛模式优先于 Live Updates 模式（对齐媒体类型的既有分流范式）。
+                    // 超级岛模式下，即便含 progressInfo 也走超级岛通道；
+                    // 仅在「Live Updates 注入且非超级岛」时保留现有 Live Updates 通道。
+                    val superIslandMode = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
+                    val liveUpdatesMode = SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)
+                    val injectionModeOrdinal = SuperIslandConfigUtils.getSpecInjectionMode(context).ordinal
+
                     if (!isRestoring) {
-                        if (isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                        // 注入模式变化时先取消旧通知并清理旧映射，再按新模式发送
+                        FloatingReplicaMappingManager.migrateInjectionModeIfChanged(context, sourceId, injectionModeOrdinal)
+
+                        // 内容与上次成功发出的通知一致且通知仍在展示时，跳过系统通知刷新（不调用 notify），
+                        // 仅保留上方 addOrUpdateEntry 对内部撤回计时器（autoDismiss）的重置。
+                        // 指纹包含注入模式：模式变化时指纹随之变化，不会被误判为「内容无变更」。
+                        val fingerprint =
+                            FloatingReplicaMappingManager.computeNotificationFingerprint(
+                                displayTitle,
+                                displayText,
+                                formattedData.paramV2Raw,
+                                formattedData.resolvedPicMap,
+                                injectionModeOrdinal,
+                            )
+                        val previousNotificationIds = FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
+                        val canSkipRefresh =
+                            entryExistedBefore &&
+                                !previousNotificationIds.isNullOrEmpty() &&
+                                FloatingReplicaMappingManager.isAnyNotificationActive(context, previousNotificationIds) &&
+                                fingerprint == FloatingReplicaMappingManager.getNotificationFingerprint(sourceId)
+
+                        if (canSkipRefresh) {
+                            Logger.i(TAG, "超级岛: 内容无变更，跳过系统通知刷新，仅重置内部撤回计时器: sourceId=$sourceId")
+                        } else if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                             runWithErrorHandlingSuspend("发送Live Updates复合通知") {
                                 LiveUpdatesNotificationManager.initialize(context)
-                                LiveUpdatesNotificationManager.showLiveUpdate(
-                                    sourceId,
-                                    title,
-                                    text,
-                                    appName,
-                                    formattedData,
-                                )
+                                val success =
+                                    LiveUpdatesNotificationManager.showLiveUpdate(
+                                        sourceId,
+                                        displayTitle,
+                                        displayText,
+                                        appName,
+                                        formattedData,
+                                    )
                                 val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
                                 FloatingReplicaMappingManager.putNotificationId(entryKey, liveUpdateNotificationId)
                                 FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
+                                // 仅在确认发出成功后记录指纹，发送异常被吞时留空，避免后续保活包被误跳过
+                                if (success) {
+                                    FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
+                                }
                                 Logger.i(TAG, "浮窗创建时发送Live Updates复合通知作为生命周期管理: sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
                             }
                         } else {
-                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, title, text, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, floatingWindowManager)
+                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, displayTitle, displayText, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, floatingWindowManager)
                             FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, notificationId)
+                            if (notificationId != null) {
+                                FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
+                            }
                             Logger.i(TAG, "浮窗创建时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
                         }
                     } else {

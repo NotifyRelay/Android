@@ -1,15 +1,15 @@
 package com.xzyht.notifyrelay.sync.notification
 
 import android.content.Context
+import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.repository.remoteNotificationFilter
 import com.xzyht.notifyrelay.feature.device.repository.replicateNotification
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
-import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
-import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -105,7 +105,7 @@ object NotificationProcessor {
 
                 if (remoteUuid != null) {
                     try {
-                        val sourceDevice = manager.getDeviceInfoInternal(remoteUuid)
+                        val sourceDevice = manager.lookupDevice(remoteUuid)
                         if (sourceDevice != null) {
                             IconSyncManager.checkAndSyncIcon(
                                 context,

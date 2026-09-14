@@ -3,12 +3,12 @@ package com.xzyht.notifyrelay.ui.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.device.service.DeviceInfo
 import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
 import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppsState
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
+import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay

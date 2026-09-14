@@ -1,18 +1,12 @@
 // Top-level build file where you can add configuration options common to all sub-projects/modules.
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        // 升级 AGP 9 内置 Kotlin 的 KGP 版本，以读取 miuix 0.9.3 (Kotlin 2.4.0) 编译的元数据
-        classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:2.4.0")
-    }
-}
-
 plugins {
     alias(libs.plugins.android.application) apply false
     alias(libs.plugins.android.library) apply false
     alias(libs.plugins.ktlint) apply false
+    // 固定 Kotlin Gradle 插件版本为 2.4.20，以读取 miuix (Kotlin 2.4.20) 编译的元数据。
+    // 原先写在 buildscript { classpath(...) } 里，但 buildscript 块中拿不到版本目录，
+    // 改用 plugins 块（apply false 只把 KGP 放进构建脚本 classpath，不会应用插件），效果等价。
+    alias(libs.plugins.kotlin.android) apply false
 }
 
 // 对除 git 子模块（checkupdata/scrcpy）外的所有项目应用 ktlint；
@@ -45,8 +39,9 @@ gradle.projectsEvaluated {
             if (p.configurations.findByName("androidCompileClasspath") == null) {
                 p.configurations.create("androidCompileClasspath")
             }
-        } catch (ignored: Exception) {
+        } catch (e: Exception) {
             // best-effort: ignore failures creating the shim
+            p.logger.debug("Skip androidCompileClasspath shim for ${p.path}", e)
         }
     }
 }
