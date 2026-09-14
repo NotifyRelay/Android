@@ -196,9 +196,9 @@ abstract class AppDatabase : RoomDatabase() {
          */
         private val MIGRATION_1_2 =
             object : Migration(1, 2) {
-                override fun migrate(database: SupportSQLiteDatabase) {
+                override fun migrate(db: SupportSQLiteDatabase) {
                     // 1. 创建新表，没有外键约束
-                    database.execSQL(
+                    db.execSQL(
                         """
                     CREATE TABLE IF NOT EXISTS notification_records_new (
                         key TEXT PRIMARY KEY NOT NULL,
@@ -214,12 +214,12 @@ abstract class AppDatabase : RoomDatabase() {
                     )
 
                     // 2. 创建索引
-                    database.execSQL("CREATE INDEX IF NOT EXISTS index_notification_records_new_deviceUuid ON notification_records_new(deviceUuid)")
-                    database.execSQL("CREATE INDEX IF NOT EXISTS index_notification_records_new_time ON notification_records_new(time)")
-                    database.execSQL("CREATE INDEX IF NOT EXISTS index_notification_records_new_packageName ON notification_records_new(packageName)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_notification_records_new_deviceUuid ON notification_records_new(deviceUuid)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_notification_records_new_time ON notification_records_new(time)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_notification_records_new_packageName ON notification_records_new(packageName)")
 
                     // 3. 复制数据
-                    database.execSQL(
+                    db.execSQL(
                         """
                     INSERT INTO notification_records_new (key, deviceUuid, packageName, appName, title, text, time, createdAt)
                     SELECT key, deviceUuid, packageName, appName, title, text, time, createdAt
@@ -228,10 +228,10 @@ abstract class AppDatabase : RoomDatabase() {
                     )
 
                     // 4. 删除旧表
-                    database.execSQL("DROP TABLE notification_records")
+                    db.execSQL("DROP TABLE notification_records")
 
                     // 5. 重命名新表
-                    database.execSQL("ALTER TABLE notification_records_new RENAME TO notification_records")
+                    db.execSQL("ALTER TABLE notification_records_new RENAME TO notification_records")
                 }
             }
 
@@ -241,13 +241,13 @@ abstract class AppDatabase : RoomDatabase() {
          */
         private val MIGRATION_2_3 =
             object : Migration(2, 3) {
-                override fun migrate(database: SupportSQLiteDatabase) {
+                override fun migrate(db: SupportSQLiteDatabase) {
                     // 1. 为super_island_history表添加featureId字段
-                    database.execSQL("ALTER TABLE super_island_history ADD COLUMN featureId TEXT")
+                    db.execSQL("ALTER TABLE super_island_history ADD COLUMN featureId TEXT")
 
                     // 2. 创建索引
-                    database.execSQL("CREATE INDEX IF NOT EXISTS index_super_island_feature_id ON super_island_history(featureId)")
-                    database.execSQL("CREATE INDEX IF NOT EXISTS index_super_island_device_feature ON super_island_history(sourceDeviceUuid, featureId)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_super_island_feature_id ON super_island_history(featureId)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_super_island_device_feature ON super_island_history(sourceDeviceUuid, featureId)")
                 }
             }
 
@@ -257,9 +257,9 @@ abstract class AppDatabase : RoomDatabase() {
          */
         private val MIGRATION_3_4 =
             object : Migration(3, 4) {
-                override fun migrate(database: SupportSQLiteDatabase) {
+                override fun migrate(db: SupportSQLiteDatabase) {
                     // 1. 创建apps表
-                    database.execSQL(
+                    db.execSQL(
                         """
                     CREATE TABLE IF NOT EXISTS apps (
                         packageName TEXT PRIMARY KEY NOT NULL,
@@ -273,7 +273,7 @@ abstract class AppDatabase : RoomDatabase() {
                     )
 
                     // 2. 创建app_devices表
-                    database.execSQL(
+                    db.execSQL(
                         """
                     CREATE TABLE IF NOT EXISTS app_devices (
                         packageName TEXT NOT NULL,
@@ -286,7 +286,7 @@ abstract class AppDatabase : RoomDatabase() {
                     )
 
                     // 3. 创建索引
-                    database.execSQL("CREATE INDEX IF NOT EXISTS index_app_devices_source_device ON app_devices(sourceDevice)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_app_devices_source_device ON app_devices(sourceDevice)")
                 }
             }
 
@@ -296,8 +296,8 @@ abstract class AppDatabase : RoomDatabase() {
          */
         private val MIGRATION_4_5 =
             object : Migration(4, 5) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         "CREATE INDEX IF NOT EXISTS index_notification_records_device_package_time ON notification_records(deviceUuid, packageName, time)",
                     )
                 }
@@ -309,8 +309,8 @@ abstract class AppDatabase : RoomDatabase() {
          */
         private val MIGRATION_5_6 =
             object : Migration(5, 6) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS super_island_images (
                             id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
@@ -320,10 +320,10 @@ abstract class AppDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         "CREATE UNIQUE INDEX IF NOT EXISTS index_super_island_images_contentHash ON super_island_images(contentHash)",
                     )
-                    database.execSQL(
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS super_island_image_bindings (
                             packageName TEXT NOT NULL,
@@ -335,13 +335,13 @@ abstract class AppDatabase : RoomDatabase() {
                         )
                         """.trimIndent(),
                     )
-                    database.execSQL(
+                    db.execSQL(
                         "CREATE INDEX IF NOT EXISTS index_super_island_image_bindings_imageId ON super_island_image_bindings(imageId)",
                     )
-                    database.execSQL(
+                    db.execSQL(
                         "CREATE INDEX IF NOT EXISTS index_super_island_image_bindings_packageName ON super_island_image_bindings(packageName)",
                     )
-                    database.execSQL(
+                    db.execSQL(
                         "CREATE INDEX IF NOT EXISTS index_super_island_image_bindings_imageKey ON super_island_image_bindings(imageKey)",
                     )
                 }
@@ -353,8 +353,8 @@ abstract class AppDatabase : RoomDatabase() {
          */
         private val MIGRATION_6_7 =
             object : Migration(6, 7) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         """
                         CREATE TABLE IF NOT EXISTS super_island_mirror_filters (
                             packageName TEXT PRIMARY KEY NOT NULL,
@@ -376,53 +376,53 @@ abstract class AppDatabase : RoomDatabase() {
          */
         private val MIGRATION_7_8 =
             object : Migration(7, 8) {
-                override fun migrate(database: SupportSQLiteDatabase) {
+                override fun migrate(db: SupportSQLiteDatabase) {
                     // 1. 建表（与实体 schema 逐列一致）
-                    database.execSQL(
+                    db.execSQL(
                         "CREATE TABLE IF NOT EXISTS black_list_entries (" +
                             "packageName TEXT NOT NULL, " +
                             "keyword TEXT NOT NULL DEFAULT '', " +
                             "enabled INTEGER NOT NULL DEFAULT 1, " +
                             "PRIMARY KEY (packageName, keyword))",
                     )
-                    database.execSQL(
+                    db.execSQL(
                         "CREATE TABLE IF NOT EXISTS white_list_entries (" +
                             "packageName TEXT NOT NULL, " +
                             "keyword TEXT NOT NULL DEFAULT '', " +
                             "enabled INTEGER NOT NULL DEFAULT 1, " +
                             "PRIMARY KEY (packageName, keyword))",
                     )
-                    database.execSQL(
+                    db.execSQL(
                         "CREATE TABLE IF NOT EXISTS filter_entries (" +
                             "keyword TEXT NOT NULL DEFAULT '', " +
                             "packageName TEXT NOT NULL DEFAULT '', " +
                             "enabled INTEGER NOT NULL DEFAULT 1, " +
                             "PRIMARY KEY (keyword, packageName))",
                     )
-                    database.execSQL(
+                    db.execSQL(
                         "CREATE TABLE IF NOT EXISTS package_groups (" +
                             "id INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                             "groupName TEXT NOT NULL, " +
                             "enabled INTEGER NOT NULL DEFAULT 1, " +
                             "isDefault INTEGER NOT NULL DEFAULT 0)",
                     )
-                    database.execSQL(
+                    db.execSQL(
                         "CREATE TABLE IF NOT EXISTS package_group_items (" +
                             "groupId INTEGER NOT NULL, " +
                             "packageName TEXT NOT NULL, " +
                             "PRIMARY KEY (groupId, packageName), " +
                             "FOREIGN KEY (groupId) REFERENCES package_groups(id) ON DELETE CASCADE)",
                     )
-                    database.execSQL("CREATE INDEX IF NOT EXISTS index_package_group_items_groupId ON package_group_items(groupId)")
+                    db.execSQL("CREATE INDEX IF NOT EXISTS index_package_group_items_groupId ON package_group_items(groupId)")
 
                     // 2. 数据迁移（解析 app_config 旧 JSON 数据写入新表）
                     try {
-                        migrateRemoteBlackWhiteList(database, "black_list_entries", "filter_black_list", "filter_black_list_enabled")
-                        migrateRemoteBlackWhiteList(database, "white_list_entries", "filter_white_list", "filter_white_list_enabled")
-                        migrateLegacySharedList(database)
-                        migrateLocalFilterEntries(database)
-                        migratePackageGroups(database)
-                        migrateMirrorFilterDefaults(database)
+                        migrateRemoteBlackWhiteList(db, "black_list_entries", "filter_black_list", "filter_black_list_enabled")
+                        migrateRemoteBlackWhiteList(db, "white_list_entries", "filter_white_list", "filter_white_list_enabled")
+                        migrateLegacySharedList(db)
+                        migrateLocalFilterEntries(db)
+                        migratePackageGroups(db)
+                        migrateMirrorFilterDefaults(db)
                     } catch (e: Exception) {
                         // 抛出异常以让 Room 回滚整个迁移事务，避免版本被标记为 8 但表为空导致数据静默丢失；
                         // 下次启动会重新尝试迁移（旧数据仍保留在 app_config 中）
@@ -446,7 +446,7 @@ abstract class AppDatabase : RoomDatabase() {
                             "general_super_island_mirror_filter_disabled_defaults",
                         )
                     migratedKeys.forEach { key ->
-                        database.execSQL("DELETE FROM app_config WHERE key = ?", arrayOf<Any?>(key))
+                        db.execSQL("DELETE FROM app_config WHERE key = ?", arrayOf<Any?>(key))
                     }
                 }
             }
@@ -461,8 +461,8 @@ abstract class AppDatabase : RoomDatabase() {
          */
         private val MIGRATION_8_9 =
             object : Migration(8, 9) {
-                override fun migrate(database: SupportSQLiteDatabase) {
-                    database.execSQL(
+                override fun migrate(db: SupportSQLiteDatabase) {
+                    db.execSQL(
                         "CREATE TABLE IF NOT EXISTS device_migration (" +
                             "uuid TEXT NOT NULL PRIMARY KEY, " +
                             "publicKey TEXT NOT NULL DEFAULT '', " +
@@ -474,12 +474,12 @@ abstract class AppDatabase : RoomDatabase() {
                             "createdAt INTEGER NOT NULL DEFAULT 0, " +
                             "updatedAt INTEGER NOT NULL DEFAULT 0)",
                     )
-                    database.execSQL(
+                    db.execSQL(
                         "INSERT OR IGNORE INTO device_migration " +
                             "(uuid, publicKey, sharedSecret, isAccepted, displayName, lastIp, lastPort, createdAt, updatedAt) " +
                             "SELECT uuid, publicKey, sharedSecret, isAccepted, displayName, lastIp, lastPort, createdAt, updatedAt FROM devices",
                     )
-                    database.execSQL("DROP TABLE IF EXISTS devices")
+                    db.execSQL("DROP TABLE IF EXISTS devices")
                 }
             }
 

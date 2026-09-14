@@ -154,7 +154,7 @@ object NotificationProcessor {
                 val duplicateFound =
                     localList.any { nr ->
                         try {
-                            nr.device == "本机" && normalizeTitleLocal(nr.title) == normalizedPendingTitle && (nr.text ?: "") == (pendingText ?: "")
+                            nr.device == "本机" && normalizeTitleLocal(nr.title) == normalizedPendingTitle && (nr.text ?: "") == pendingText
                         } catch (_: Exception) {
                             false
                         }

@@ -55,28 +55,28 @@ class PairingCallbackHandler(
     fun build(): NotifyRelayCore.OnPairingCb =
         object : NotifyRelayCore.OnPairingCb {
             override fun invoke(
-                uuidPtr: Pointer?,
-                msgTypePtr: Pointer?,
-                dataPtr: Pointer?,
+                uuid: Pointer?,
+                messageType: Pointer?,
+                data: Pointer?,
                 intValue: Int,
-                extraPtr: Pointer?,
+                extra: Pointer?,
                 userData: Pointer?,
             ) {
                 Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
-                val msgType = NotifyRelayCore.ptrToString(msgTypePtr) ?: return
-                val data = NotifyRelayCore.ptrToString(dataPtr)
-                val extra = NotifyRelayCore.ptrToString(extraPtr)
+                val uuidStr = NotifyRelayCore.ptrToString(uuid) ?: return
+                val messageTypeStr = NotifyRelayCore.ptrToString(messageType) ?: return
+                val dataStr = NotifyRelayCore.ptrToString(data)
+                val extraStr = NotifyRelayCore.ptrToString(extra)
 
                 try {
-                    when (msgType) {
-                        "HANDSHAKE" -> handleHandshake(uuid, data)
-                        "PAIRING_INIT" -> handlePairingInit(uuid, data)
-                        "PAIRING_RESP" -> Logger.w(TAG, "收到意外的 PAIRING_RESP: $uuid")
-                        "ACCEPT" -> handleAccept(uuid, data)
-                        "REJECT" -> handleReject(uuid)
-                        "RESULT" -> handleResult(uuid, intValue, extra)
-                        "HEARTBEAT_TCP" -> handleHeartbeatTcp(uuid, data, extra, intValue)
+                    when (messageTypeStr) {
+                        "HANDSHAKE" -> handleHandshake(uuidStr, dataStr)
+                        "PAIRING_INIT" -> handlePairingInit(uuidStr, dataStr)
+                        "PAIRING_RESP" -> Logger.w(TAG, "收到意外的 PAIRING_RESP: $uuidStr")
+                        "ACCEPT" -> handleAccept(uuidStr, dataStr)
+                        "REJECT" -> handleReject(uuidStr)
+                        "RESULT" -> handleResult(uuidStr, intValue, extraStr)
+                        "HEARTBEAT_TCP" -> handleHeartbeatTcp(uuidStr, dataStr, extraStr, intValue)
                     }
                 } catch (e: Exception) {
                     Logger.e(TAG, "on_pairing error: ${e.message}")

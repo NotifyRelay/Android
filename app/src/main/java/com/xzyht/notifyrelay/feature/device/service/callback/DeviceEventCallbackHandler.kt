@@ -73,14 +73,14 @@ class DeviceEventCallbackHandler(
     fun buildTimeout(): NotifyRelayCore.OnDeviceTimeoutCb =
         object : NotifyRelayCore.OnDeviceTimeoutCb {
             override fun invoke(
-                uuidPtr: Pointer?,
+                uuid: Pointer?,
                 userData: Pointer?,
             ) {
                 Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
+                val uuidStr = NotifyRelayCore.ptrToString(uuid) ?: return
                 // 超时离线状态由 Rust DeviceRegistry 维护，此处仅重新登记重连目标
-                val auth = synchronized(host.authenticatedDeviceTable) { host.authenticatedDeviceTable[uuid] }
-                if (auth != null) host.registerReconnectTarget(uuid, auth.lastIp ?: "")
+                val auth = synchronized(host.authenticatedDeviceTable) { host.authenticatedDeviceTable[uuidStr] }
+                if (auth != null) host.registerReconnectTarget(uuidStr, auth.lastIp ?: "")
                 // 触发快照刷新，UI 立即反映离线状态（替代原 1s 轮询的离线更新职责）
                 host.triggerDeviceListRefresh()
             }
@@ -90,13 +90,13 @@ class DeviceEventCallbackHandler(
     fun buildConnected(): NotifyRelayCore.OnDeviceConnectedCb =
         object : NotifyRelayCore.OnDeviceConnectedCb {
             override fun invoke(
-                uuidPtr: Pointer?,
-                ipPtr: Pointer?,
+                uuid: Pointer?,
+                ip: Pointer?,
                 userData: Pointer?,
             ) {
                 Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
-                if (uuid == host.localUuid) return
+                val uuidStr = NotifyRelayCore.ptrToString(uuid) ?: return
+                if (uuidStr == host.localUuid) return
                 // 连接来源 IP 由 core registry 维护，此处只需触发快照刷新
                 // （替代原 1s 轮询的在线更新职责）
                 host.triggerDeviceListRefresh()
@@ -107,12 +107,12 @@ class DeviceEventCallbackHandler(
     fun buildDisconnected(): NotifyRelayCore.OnDeviceDisconnectedCb =
         object : NotifyRelayCore.OnDeviceDisconnectedCb {
             override fun invoke(
-                uuidPtr: Pointer?,
+                uuid: Pointer?,
                 userData: Pointer?,
             ) {
                 Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
-                if (uuid == host.localUuid) return
+                val uuidStr = NotifyRelayCore.ptrToString(uuid) ?: return
+                if (uuidStr == host.localUuid) return
                 host.triggerDeviceListRefresh()
             }
         }
@@ -121,16 +121,16 @@ class DeviceEventCallbackHandler(
     fun buildStateQuery(): NotifyRelayCore.OnStateQueryCb =
         object : NotifyRelayCore.OnStateQueryCb {
             override fun invoke(
-                uuidPtr: Pointer?,
-                featureIdPtr: Pointer?,
+                uuid: Pointer?,
+                featureId: Pointer?,
                 isMedia: Int,
                 userData: Pointer?,
             ): Int {
                 Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val remoteUuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return 0
-                val featureId = NotifyRelayCore.ptrToString(featureIdPtr) ?: return 0
+                val remoteUuid = NotifyRelayCore.ptrToString(uuid) ?: return 0
+                val featureIdStr = NotifyRelayCore.ptrToString(featureId) ?: return 0
                 return try {
-                    host.stateQueryResponder.handle(remoteUuid, featureId, isMedia != 0)
+                    host.stateQueryResponder.handle(remoteUuid, featureIdStr, isMedia != 0)
                 } catch (e: Exception) {
                     Logger.e(TAG, "on_state_query error: ${e.message}")
                     1 // 异常保守保活，等待下一次查询
