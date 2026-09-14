@@ -22,6 +22,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingRe
 import github.xzynine.superislandui.common.BitmapUtils
 import github.xzynine.superislandui.common.CapsuleScrollManager
 import github.xzynine.superislandui.common.TextSplitter
+import kotlinx.coroutines.CancellationException
 import github.xzynine.superislandui.floating.smallisland.left.AComponent
 import github.xzynine.superislandui.floating.smallisland.left.aContent
 import github.xzynine.superislandui.floating.smallisland.left.aPicKey
@@ -712,6 +713,9 @@ object NotificationGenerator {
 
             Logger.i(TAG, "超级岛 发送复刻通知成功，key=$key, notificationId=$notificationId")
             return notificationId
+        } catch (e: CancellationException) {
+            // 协程取消必须原样抛出，避免被下面的 catch(Exception) 吞掉后继续执行 notify 流程
+            throw e
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛 发送复刻通知失败: ${e.message}")
             return null
@@ -814,15 +818,25 @@ object NotificationGenerator {
             // 提供到 miui.focus.pics，否则大岛（展开态）里引用图片的组件（如进度组件1 的前进图形/
             // 中间节点/目标点）会因取不到资源而膨胀失败，表现为退化成单进度条或回退小岛数据。
             if (superIslandInjectionEnabled) {
-                SuperIslandStructuredDataHelper.injectPicMapIcons(
-                    context = context,
+                val injectedKeys =
+                    SuperIslandStructuredDataHelper.injectPicMapIcons(
+                        context = context,
+                        extras = builder.extras,
+                        picMap = picMap,
+                    )
+                // 仅对确实注入成功的图片，移除 writePicMap 写入的同名顶层 URL extra；
+                // 注入失败/未使用的图片保留原 extra，维持兼容路径。
+                SuperIslandStructuredDataHelper.removeSupersededPicUrlExtras(
                     extras = builder.extras,
-                    picMap = picMap,
+                    injectedKeys = injectedKeys,
                 )
             }
 
             // 处理 smallIcon - 设置系统默认图标作为占位符
             builder.setSmallIcon(R.drawable.stat_notify_more)
+        } catch (e: CancellationException) {
+            // 协程取消必须原样抛出：否则会被下面的 catch(Exception) 吞掉并继续走 notify 流程
+            throw e
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛 构建胶囊兼容通知失败: ${e.message}")
         }
@@ -1033,6 +1047,9 @@ object NotificationGenerator {
 
             // 返回注入图标后的通知对象
             return notification
+        } catch (e: CancellationException) {
+            // 协程取消必须原样抛出，避免把取消当作构建失败而返回兜底通知
+            throw e
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛 构建胶囊兼容通知并注入图标失败 ${e.message}")
             e.printStackTrace()

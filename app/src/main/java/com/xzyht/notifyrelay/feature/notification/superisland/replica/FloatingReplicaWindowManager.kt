@@ -177,16 +177,22 @@ object FloatingReplicaWindowManager {
                     // 仅在「Live Updates 注入且非超级岛」时保留现有 Live Updates 通道。
                     val superIslandMode = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
                     val liveUpdatesMode = SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)
+                    val injectionModeOrdinal = SuperIslandConfigUtils.getSpecInjectionMode(context).ordinal
 
                     if (!isRestoring) {
+                        // 注入模式变化时先取消旧通知并清理旧映射，再按新模式发送
+                        FloatingReplicaMappingManager.migrateInjectionModeIfChanged(context, sourceId, injectionModeOrdinal)
+
                         // 内容与上次成功发出的通知一致且通知仍在展示时，跳过系统通知刷新（不调用 notify），
-                        // 仅保留上方 addOrUpdateEntry 对内部撤回计时器（autoDismiss）的重置
+                        // 仅保留上方 addOrUpdateEntry 对内部撤回计时器（autoDismiss）的重置。
+                        // 指纹包含注入模式：模式变化时指纹随之变化，不会被误判为「内容无变更」。
                         val fingerprint =
                             FloatingReplicaMappingManager.computeNotificationFingerprint(
                                 displayTitle,
                                 displayText,
                                 formattedData.paramV2Raw,
                                 formattedData.resolvedPicMap,
+                                injectionModeOrdinal,
                             )
                         val previousNotificationIds = FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
                         val canSkipRefresh =

@@ -1,4 +1,4 @@
-﻿package github.xzynine.superislandui.floating.bigisland.components
+package github.xzynine.superislandui.floating.bigisland.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Row
@@ -166,11 +166,12 @@ private fun TimerText(
 }
 
 private fun selectIconKey(highlightInfo: HighlightInfo): String? {
+    // 功能图标（CommonImageCompose）只应使用 picFunction / picFunctionDark。
+    // bigImageLeft / bigImageRight 由下方的 BigAreaImage 负责渲染（尺寸与语义都不同），
+    // 若在此处参与候选会导致同一张图被渲染两次（功能图标 + 大区图）。
     val candidates = mutableListOf<String>()
     candidates.add(highlightInfo.picFunction ?: "")
     candidates.add(highlightInfo.picFunctionDark ?: "")
-    candidates.add(highlightInfo.bigImageLeft ?: "")
-    candidates.add(highlightInfo.bigImageRight ?: "")
     return candidates.firstOrNull { it.isNotBlank() }
 }
 

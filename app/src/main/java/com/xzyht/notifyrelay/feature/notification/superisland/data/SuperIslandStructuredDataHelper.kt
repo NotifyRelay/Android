@@ -39,6 +39,9 @@ object SuperIslandStructuredDataHelper {
     // 超级岛封面图资源 key
     private const val PIC_COVER = "miui.focus.pic_cover"
 
+    // PNG 超限时的 JPEG 兜底压缩质量档位（从高到低逐级试探，直到满足单张上限）
+    private val JPEG_FALLBACK_QUALITIES = intArrayOf(85, 70, 55, 40)
+
     /**
      * 添加超级岛相关的结构化数据到通知
      * @param builder 通知构建器
@@ -318,6 +321,38 @@ object SuperIslandStructuredDataHelper {
     }
 
     /**
+     * 清理已被 Icon 取代的顶层 `miui.focus.pic_*` URL extra。
+     *
+     * `writePicMap` 会为每张图片同时写入顶层 URL extra 与 `miui.focus.pics` Bundle。
+     * 当同一 key 已成功注入 Parcelable Icon 后，顶层 URL 就成了重复数据（同一张图在 extras
+     * 里存两份，曾把体积顶到 527KB 触发 TransactionTooLargeException）。
+     *
+     * **仅移除确实注入成功的 key**：注入失败、未执行注入或未被 Icon 使用的图片必须保留
+     * 原有顶层 extra，以维持兼容路径（系统可直接读取 URL 的场景）。
+     *
+     * @param injectedKeys [injectPicMapIcons] 返回的、已成功写入 Icon 的图片 key 集合
+     * @return 实际移除的 extra 数量
+     */
+    fun removeSupersededPicUrlExtras(
+        extras: Bundle,
+        injectedKeys: Set<String>,
+    ): Int {
+        if (injectedKeys.isEmpty()) return 0
+        var removed = 0
+        injectedKeys.forEach { key ->
+            if (!key.startsWith(SuperIslandExtras.PIC_KEY_PREFIX)) return@forEach
+            if (extras.containsKey(key)) {
+                extras.remove(key)
+                removed++
+            }
+        }
+        if (removed > 0) {
+            Logger.i(TAG, "已移除被 Icon 取代的顶层图片 URL extra，共 $removed 个")
+        }
+        return removed
+    }
+
+    /**
      * 媒体类型专用：下载图片为 Bitmap 并转为 Icon 放入 miui.focus.pics（客户端模式要求 Parcelable Icon）
      */
     private suspend fun addMediaPicMapToExtras(
@@ -333,14 +368,13 @@ object SuperIslandStructuredDataHelper {
                 MAX_MEDIA_PIC_PER_IMAGE_BYTES,
                 MAX_MEDIA_PIC_TOTAL_BYTES,
             )
-        if (result.bitmaps.isEmpty()) return
+        if (result.icons.isEmpty()) return
         val picsBundle = Bundle()
-        result.bitmaps.forEach { (key, bitmap) ->
-            val data = encodePicData(bitmap, MAX_MEDIA_PIC_PER_IMAGE_BYTES)
+        result.icons.forEach { (key, data) ->
             picsBundle.putParcelable(key, Icon.createWithData(data, 0, data.size))
         }
         extras.putBundle(SuperIslandExtras.KEY_PICS, picsBundle)
-        Logger.i(TAG, "媒体图片资源注入成功，共 ${result.bitmaps.size} 个图片（总计 ${result.totalBytes} bytes）")
+        Logger.i(TAG, "媒体图片资源注入成功，共 ${result.icons.size} 个图片（总计 ${result.totalBytes} bytes）")
     }
 
     /**
@@ -349,13 +383,17 @@ object SuperIslandStructuredDataHelper {
      * 背景：复刻数据的图片来源可能是另一台设备（MIPUSH 场景，图片为 https URL）；本端是「客户端实现」，
      * 系统不会下载 URL，必须由应用把图片作为 Icon 资源提供，Json 里的 pic 只作为 pics Bundle 的 key。
      *
-     * @return 实际写入的图片数量
+     * 这里**只写 Bundle**，不再同时写单个 `miui.focus.pic_*` extra —— 双写会让同一份图片在 extras 里
+     * 存两份，曾把通知体积顶到 527KB 触发 TransactionTooLargeException（通知投递失败、不显示）。
+     * 由调用方依据返回值清理 `writePicMap` 已写入的同名顶层 URL extra。
+     *
+     * @return 实际写入 Icon 的图片 key 集合（空集合表示未注入任何图片）
      */
     suspend fun injectPicMapIcons(
         context: Context,
         extras: Bundle,
         picMap: Map<String, String>?,
-    ): Int {
+    ): Set<String> {
         val result =
             loadPicBitmaps(
                 context,
@@ -364,24 +402,21 @@ object SuperIslandStructuredDataHelper {
                 MAX_REPLICA_PIC_PER_IMAGE_BYTES,
                 MAX_REPLICA_PIC_TOTAL_BYTES,
             )
-        if (result.bitmaps.isEmpty()) return 0
+        if (result.icons.isEmpty()) return emptySet()
         // 依据《小米澎湃OS 岛通知开发指南》附录「图片数据参数：miui.focus.pics」：
         // 客户端实现把图片以 Icon 放进 miui.focus.pics Bundle，Json 里的 pic 只作为该 Bundle 的 key。
-        // 这里**只写 Bundle**，不再同时写单个 miui.focus.pic_* extra —— 双写会让同一份图片在 extras 里
-        // 存两份，曾把通知体积顶到 527KB 触发 TransactionTooLargeException（通知投递失败、不显示）。
         val picsBundle = Bundle()
-        result.bitmaps.forEach { (key, bitmap) ->
-            val data = encodePicData(bitmap, MAX_REPLICA_PIC_PER_IMAGE_BYTES)
+        result.icons.forEach { (key, data) ->
             picsBundle.putParcelable(key, Icon.createWithData(data, 0, data.size))
         }
         extras.putBundle(SuperIslandExtras.KEY_PICS, picsBundle)
-        Logger.i(TAG, "超级岛图片资源注入成功（Icon，仅写 pics Bundle），共 ${result.bitmaps.size} 个图片（总计 ${result.totalBytes} bytes）")
-        return result.bitmaps.size
+        Logger.i(TAG, "超级岛图片资源注入成功（Icon，仅写 pics Bundle），共 ${result.icons.size} 个图片（总计 ${result.totalBytes} bytes）")
+        return result.icons.keys
     }
 
-    /** 图片加载结果：key → 缩放后的位图（及编码后总字节数，用于上限统计） */
+    /** 图片加载结果：key → 已编码的图标数据（及编码后总字节数，用于上限统计） */
     private class PicBitmapResult(
-        val bitmaps: Map<String, Bitmap>,
+        val icons: Map<String, ByteArray>,
         val totalBytes: Int,
     )
 
@@ -397,10 +432,10 @@ object SuperIslandStructuredDataHelper {
         maxTotalBytes: Int,
     ): PicBitmapResult {
         if (picMap.isNullOrEmpty()) return PicBitmapResult(emptyMap(), 0)
-        val bitmaps = LinkedHashMap<String, Bitmap>()
+        val icons = LinkedHashMap<String, ByteArray>()
         var totalBytes = 0
         picMap.forEach { (picKey, picUrl) ->
-            if (bitmaps.size >= SuperIslandImageSpec.MAX_IMAGE_COUNT) return@forEach
+            if (icons.size >= SuperIslandImageSpec.MAX_IMAGE_COUNT) return@forEach
             if (!picKey.startsWith(SuperIslandExtras.PIC_KEY_PREFIX)) return@forEach
             if (!SuperIslandImageSpec.isPicEntryValid(picUrl)) return@forEach
             if (totalBytes >= maxTotalBytes) {
@@ -418,18 +453,25 @@ object SuperIslandStructuredDataHelper {
                     null
                 }
             if (bitmap != null) {
-                // 按比例缩放到上限尺寸，并用编码后大小做总量控制，避免通知事务过大
+                // 按比例缩放到上限尺寸
                 val scaled = scaleDownBitmap(bitmap, maxDimension)
-                val size = encodePicData(scaled, maxPerImageBytes).size
-                if (totalBytes + size > maxTotalBytes) {
-                    Logger.w(TAG, "图片超过总大小限制，跳过: $picKey ($size bytes)")
+                // 单张必须真正落在上限内：encodePicData 内部逐级降质重压，
+                // 仍无法满足上限时返回 null，此时拒绝该图片（不能只做总量检查）。
+                val data =
+                    encodePicData(scaled, maxPerImageBytes)
+                        ?: run {
+                            Logger.w(TAG, "图片超过单张大小限制(${maxPerImageBytes} bytes)，跳过: $picKey")
+                            return@forEach
+                        }
+                if (totalBytes + data.size > maxTotalBytes) {
+                    Logger.w(TAG, "图片超过总大小限制，跳过: $picKey (${data.size} bytes)")
                     return@forEach
                 }
-                bitmaps[picKey] = scaled
-                totalBytes += size
+                icons[picKey] = data
+                totalBytes += data.size
             }
         }
-        return PicBitmapResult(bitmaps, totalBytes)
+        return PicBitmapResult(icons, totalBytes)
     }
 
     /**
@@ -448,20 +490,28 @@ object SuperIslandStructuredDataHelper {
     }
 
     /**
-     * 将位图编码为图标数据：优先 PNG（保留透明度），过大时改用 JPEG 压缩以减小体积。
+     * 将位图编码为图标数据，并**保证结果不超过 [maxBytes]**：
+     * 优先 PNG 保留透明度；PNG 超限时改用 JPEG，并从高到低逐级降质重压；
+     * 仍无法满足上限时返回 null，由调用方拒绝该图片（避免超限图片进入通知 extras）。
+     *
+     * @return 编码后的字节数组；无法压到 [maxBytes] 以内时返回 null
      */
     private fun encodePicData(
         bitmap: Bitmap,
         maxBytes: Int = MAX_MEDIA_PIC_PER_IMAGE_BYTES,
-    ): ByteArray {
+    ): ByteArray? {
         val pngOut = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, pngOut)
         val png = pngOut.toByteArray()
         if (png.size <= maxBytes) return png
-        // PNG 过大时改用 JPEG（体积小得多；会丢透明通道，仅作体积兜底）
-        val jpegOut = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.JPEG, 85, jpegOut)
-        return jpegOut.toByteArray()
+        // PNG 过大时改用 JPEG（体积小得多；会丢透明通道，仅作体积兜底），逐级降质直到满足上限
+        for (quality in JPEG_FALLBACK_QUALITIES) {
+            val jpegOut = ByteArrayOutputStream()
+            bitmap.compress(Bitmap.CompressFormat.JPEG, quality, jpegOut)
+            val jpeg = jpegOut.toByteArray()
+            if (jpeg.size <= maxBytes) return jpeg
+        }
+        return null
     }
 
     private fun addActionBundlesToExtras(extras: Bundle) {
