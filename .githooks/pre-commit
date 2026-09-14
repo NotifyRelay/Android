@@ -1,0 +1,58 @@
+#!/bin/sh
+#
+# pre-commit：运行 CI 同款 ./gradlew ktlintFormat，防止 ktlint 违规流入仓库。
+#
+# 背景：ktlint 违规会让 update.yml 的 ktlintFormat 步骤失败，
+# 进而中断整条语义化发版流程（版本号不回写、tag 不打，见 run 34847149469）。
+#
+# ktlintFormat 的行为（已实测）：
+#   - 可自动修复的违规：静默改写文件，退出码仍为 0 —— 格式化不改变语义，故自动 git add 纳入本次提交
+#   - 不可自动修复的违规：构建失败，退出码非 0 —— 这才是会打断 CI 的情况，必须阻断
+# 因此本脚本仅对「构建失败」阻断；被 ktlintFormat 改写的文件会自动重新暂存。
+
+set -e
+
+# 只在有 Kotlin 文件待提交时才跑，纯文档/配置提交跳过
+staged_kt=$(git diff --cached --name-only --diff-filter=ACMR | grep -E '\.(kt|kts)$' || true)
+if [ -z "$staged_kt" ]; then
+  echo "[pre-commit] 无 Kotlin 文件变更，跳过 ktlintFormat"
+  exit 0
+fi
+
+echo "[pre-commit] 运行 ktlintFormat ..."
+
+# 记录待提交 Kotlin 文件的内容哈希，用于检测 ktlintFormat 是否改写了它们
+snapshot=$(mktemp)
+trap 'rm -f "$snapshot"' EXIT
+printf '%s\n' "$staged_kt" |
+  while IFS= read -r f; do
+    [ -f "$f" ] && printf '%s  %s\n' "$(git hash-object "$f")" "$f"
+  done > "$snapshot"
+
+if ! ./gradlew ktlintFormat --console=plain -q; then
+  echo ""
+  echo "[pre-commit] ✗ ktlintFormat 失败：存在无法自动修复的 ktlint 违规。"
+  echo "            该违规同样会让 CI 的 update.yml 在同一步骤失败并中断发版。"
+  echo "            请修正后重新提交（详见各模块 build/reports/ktlint/ 下的报告）。"
+  echo "            确认无需拦截时可用 git commit --no-verify 绕过（不推荐）。"
+  exit 1
+fi
+
+# ktlintFormat 成功；若它改写了待提交文件，则将格式化结果补入暂存区
+changed=""
+while IFS= read -r line; do
+  old=$(printf '%s\n' "$line" | cut -d' ' -f1)
+  f=$(printf '%s\n' "$line" | cut -d' ' -f3-)
+  [ -f "$f" ] || continue
+  if [ "$old" != "$(git hash-object "$f")" ]; then
+    changed="$changed  $f\n"
+    git add -- "$f"
+  fi
+done < "$snapshot"
+
+if [ -n "$changed" ]; then
+  echo "[pre-commit] ktlintFormat 已自动格式化并重新暂存："
+  printf "$changed"
+fi
+
+echo "[pre-commit] ✓ ktlintFormat 通过"
