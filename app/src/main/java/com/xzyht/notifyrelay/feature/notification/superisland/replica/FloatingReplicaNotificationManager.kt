@@ -3,9 +3,9 @@ package com.xzyht.notifyrelay.feature.notification.superisland.replica
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
-import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
@@ -68,6 +68,10 @@ object FloatingReplicaNotificationManager {
                 // 仅在「Live Updates 注入且非超级岛」时保留现有 Live Updates 通道。
                 val superIslandMode = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
                 val liveUpdatesMode = SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)
+                val injectionModeOrdinal = SuperIslandConfigUtils.getSpecInjectionMode(context).ordinal
+
+                // 注入模式变化时先取消旧通知并清理旧映射，避免两个通道的通知并存/残留
+                FloatingReplicaMappingManager.migrateInjectionModeIfChanged(context, sourceId, injectionModeOrdinal)
 
                 // 不再按内容指纹跳过系统通知刷新：
                 // 系统侧可能出现「通知已入列、ranking 保留、但被焦点插件隐藏」的幽灵状态，

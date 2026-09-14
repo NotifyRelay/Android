@@ -4,13 +4,13 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import android.widget.Toast
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandListManager
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
+import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandListManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -107,15 +107,21 @@ object FloatingReplicaListModeManager {
                 // 仅在「Live Updates 注入且非超级岛」时保留现有 Live Updates 通道。
                 val superIslandMode = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
                 val liveUpdatesMode = SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)
+                val injectionModeOrdinal = SuperIslandConfigUtils.getSpecInjectionMode(context).ordinal
+
+                // 注入模式变化时先取消旧通知并清理旧映射，避免切换后旧通道通知残留
+                FloatingReplicaMappingManager.migrateInjectionModeIfChanged(context, entry.sourceId, injectionModeOrdinal)
 
                 // 内容与上次成功发出的通知一致时，跳过系统通知刷新（不调用 notify），仅重置下方撤回计时器；
-                // 切换/移除后展示下一条（forceRefresh）时必须强制刷新，避免通知内容停留旧条目
+                // 切换/移除后展示下一条（forceRefresh）时必须强制刷新，避免通知内容停留旧条目。
+                // 指纹包含注入模式：模式变化时指纹随之变化，不会被误判为「内容无变更」。
                 val fingerprint =
                     FloatingReplicaMappingManager.computeNotificationFingerprint(
                         displayTitle,
                         displayText,
                         formattedData.paramV2Raw,
                         formattedData.resolvedPicMap,
+                        injectionModeOrdinal,
                     )
                 val previousNotificationIds = FloatingReplicaMappingManager.getNotificationIdsBySourceId(entry.sourceId)
                 val canSkipRefresh =
@@ -128,14 +134,15 @@ object FloatingReplicaListModeManager {
                     Logger.i(TAG, "超级岛: 内容无变更，跳过系统通知刷新，仅重置撤回计时器: sourceId=${entry.sourceId}")
                 } else if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                     LiveUpdatesNotificationManager.initialize(context)
-                    val success = LiveUpdatesNotificationManager.showLiveUpdate(
-                        entry.sourceId,
-                        displayTitle,
-                        displayText,
-                        entry.appName,
-                        formattedData,
-                        overrideNotificationId = LIST_MODE_NOTIFICATION_ID,
-                    )
+                    val success =
+                        LiveUpdatesNotificationManager.showLiveUpdate(
+                            entry.sourceId,
+                            displayTitle,
+                            displayText,
+                            entry.appName,
+                            formattedData,
+                            overrideNotificationId = LIST_MODE_NOTIFICATION_ID,
+                        )
                     if (success) {
                         FloatingReplicaMappingManager.putNotificationId(entry.sourceId, LIST_MODE_NOTIFICATION_ID)
                         FloatingReplicaMappingManager.addSourceIdMapping(entry.sourceId, entry.sourceId, LIST_MODE_NOTIFICATION_ID)

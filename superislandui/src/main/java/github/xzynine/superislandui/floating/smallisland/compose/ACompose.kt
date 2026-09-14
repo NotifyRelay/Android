@@ -8,11 +8,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.common.PreviewData
+import github.xzynine.superislandui.floating.common.CommonImageCompose
+import github.xzynine.superislandui.floating.common.CommonTextBlockCompose
 import github.xzynine.superislandui.floating.smallisland.left.AComponent
 import github.xzynine.superislandui.floating.smallisland.left.AImageText1
 import github.xzynine.superislandui.floating.smallisland.left.AImageText5
-import github.xzynine.superislandui.floating.common.CommonImageCompose
-import github.xzynine.superislandui.floating.common.CommonTextBlockCompose
 
 /**
  * A区组件的Compose实现

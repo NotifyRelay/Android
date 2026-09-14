@@ -60,14 +60,15 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.navigationevent.NavigationEventInfo
 import androidx.navigationevent.compose.NavigationBackHandler
 import androidx.navigationevent.compose.rememberNavigationEventState
+import com.xzyht.notifyrelay.BuildConfig
+import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundService
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
-import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundService
-import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.dialog.triggerSuperIslandTestSample
@@ -304,12 +305,15 @@ class MainActivity : FragmentActivity() {
         // 调试入口：通过 intent 直接触发超级岛测试样本，免去手工点击测试对话框。
         // adb shell am start -n com.xzyht.notifyrelay/.ui.activity.MainActivity \
         //     --es superIslandTest multi_progress_with_icons
-        intent?.getStringExtra(EXTRA_SUPER_ISLAND_TEST)?.let { sampleId ->
-            val variable = intent.getBooleanExtra(EXTRA_SUPER_ISLAND_TEST_VARIABLE, false)
-            if (triggerSuperIslandTestSample(this, sampleId, variable)) {
-                Logger.i("MainActivity", "已按 intent 触发超级岛测试样本: $sampleId")
-            } else {
-                Logger.w("MainActivity", "未知的超级岛测试样本 ID: $sampleId")
+        // 仅 debug 构建生效：release 包不读取该参数，也不触发任何测试样本，保证正常启动流程不变。
+        if (BuildConfig.DEBUG) {
+            intent?.getStringExtra(EXTRA_SUPER_ISLAND_TEST)?.let { sampleId ->
+                val variable = intent.getBooleanExtra(EXTRA_SUPER_ISLAND_TEST_VARIABLE, false)
+                if (triggerSuperIslandTestSample(this, sampleId, variable)) {
+                    Logger.i("MainActivity", "已按 intent 触发超级岛测试样本: $sampleId")
+                } else {
+                    Logger.w("MainActivity", "未知的超级岛测试样本 ID: $sampleId")
+                }
             }
         }
 

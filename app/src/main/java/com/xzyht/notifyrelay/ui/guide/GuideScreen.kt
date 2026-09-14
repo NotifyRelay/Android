@@ -17,10 +17,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
-import notifyrelay.base.util.GuidePermissionRequester
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.GuidePermissionRequester
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 internal enum class GuideStep {
@@ -52,9 +52,10 @@ internal fun GuideScreen(
     }
 
     suspend fun refreshPermissions() {
-        val state = withContext(Dispatchers.IO) {
-            readGuidePermissionState(context)
-        }
+        val state =
+            withContext(Dispatchers.IO) {
+                readGuidePermissionState(context)
+            }
         permissionState = state
     }
 

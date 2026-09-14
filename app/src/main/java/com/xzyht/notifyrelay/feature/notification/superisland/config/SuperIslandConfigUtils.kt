@@ -95,21 +95,18 @@ object SuperIslandConfigUtils {
     /**
      * 检查超级岛规范信息注入是否开启
      */
-    fun isSuperIslandSpecInjectionEnabled(context: Context): Boolean =
-        getSpecInjectionMode(context) == SpecInjectionMode.SUPER_ISLAND
+    fun isSuperIslandSpecInjectionEnabled(context: Context): Boolean = getSpecInjectionMode(context) == SpecInjectionMode.SUPER_ISLAND
 
     /**
      * 检查Live Updates规范信息注入是否开启
      */
-    fun isLiveUpdatesSpecInjectionEnabled(context: Context): Boolean =
-        getSpecInjectionMode(context) == SpecInjectionMode.LIVE_UPDATES
+    fun isLiveUpdatesSpecInjectionEnabled(context: Context): Boolean = getSpecInjectionMode(context) == SpecInjectionMode.LIVE_UPDATES
 
     /**
      * 检查是否至少有一种规范信息注入开启
      * @return true 如果至少有一种注入开启，false 如果都关闭
      */
-    fun isAnySpecInjectionEnabled(context: Context): Boolean =
-        getSpecInjectionMode(context) != SpecInjectionMode.NONE
+    fun isAnySpecInjectionEnabled(context: Context): Boolean = getSpecInjectionMode(context) != SpecInjectionMode.NONE
 
     /**
      * 创建通知移除时的删除 PendingIntent

@@ -2,13 +2,12 @@ package com.xzyht.notifyrelay.feature.device.service
 
 import android.content.Context
 import com.sun.jna.Pointer
-import com.xzyht.notifyrelay.nativecore.NativeCore
+import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.feature.device.model.AuthInfo
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.model.DeviceNameCache
 import com.xzyht.notifyrelay.feature.device.model.DeviceSnapshot
 import com.xzyht.notifyrelay.feature.device.model.PendingPairing
-import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController
 import com.xzyht.notifyrelay.feature.device.service.callback.DeviceCallbackHost
 import com.xzyht.notifyrelay.feature.device.service.callback.HandshakeRequestHandler
@@ -24,6 +23,7 @@ import com.xzyht.notifyrelay.feature.device.service.state.PairedDeviceRemover
 import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
 import com.xzyht.notifyrelay.feature.device.service.system.LegacyDeviceMigrator
 import com.xzyht.notifyrelay.feature.device.service.system.SystemStateMonitor
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
 import com.xzyht.notifyrelay.sync.ProtocolSender
@@ -509,5 +509,4 @@ class DeviceConnectionManager(
         }
         return removed
     }
-
 }

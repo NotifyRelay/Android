@@ -24,10 +24,12 @@ class DeviceDirectory(
 
     /** 按 uuid 反查设备信息（优先有有效 IP 的记录，其次兜底；未知设备返回 null）。 */
     fun find(uuid: String): DeviceInfo? {
-        store.snapshot(uuid)
+        store
+            .snapshot(uuid)
             ?.takeIf { it.ip !in INVALID_IPS }
             ?.let { return it.toDeviceInfo(DeviceNameCache.getDisplayNameByUuid(uuid)) }
-        store.currentInfo(uuid)
+        store
+            .currentInfo(uuid)
             ?.takeIf { it.ip !in INVALID_IPS }
             ?.let { return it }
         // 已配对但当前无有效 IP：仍返回快照（IP 可能为空，调用方自行判断可连性）

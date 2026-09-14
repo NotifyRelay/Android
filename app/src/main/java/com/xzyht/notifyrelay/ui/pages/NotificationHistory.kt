@@ -99,9 +99,10 @@ fun DeleteButton(
         onClick = {
             onClick()
         },
-        modifier = modifier
-            .fillMaxHeight()
-            .width(80.dp),
+        modifier =
+            modifier
+                .fillMaxHeight()
+                .width(80.dp),
         backgroundColor = MiuixTheme.colorScheme.error,
         cornerRadius = 8.dp,
         minHeight = 40.dp,
@@ -139,9 +140,10 @@ fun NotificationCard(
     // 修正：单条通知卡片标题应为原始通知标题
     val displayTitle = record.title ?: "(无标题)"
     Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp),
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .padding(vertical = 4.dp),
         onClick = {
             // 跳转到对应应用主界面
             val pkg = record.packageName
@@ -356,8 +358,7 @@ fun NotificationHistoryScreen() {
                                     .anchoredDraggable(
                                         state = anchoredDraggableState,
                                         orientation = Orientation.Horizontal,
-                                    )
-                                    .offset { IntOffset(offset.roundToInt(), 0) },
+                                    ).offset { IntOffset(offset.roundToInt(), 0) },
                         ) {
                             if (sortedList.size == 1) {
                                 val record = sortedList[0]
@@ -526,8 +527,7 @@ fun NotificationHistoryScreen() {
                                                                 .anchoredDraggable(
                                                                     state = anchoredDraggableState,
                                                                     orientation = Orientation.Horizontal,
-                                                                )
-                                                                .offset {
+                                                                ).offset {
                                                                     IntOffset(
                                                                         offset.roundToInt(),
                                                                         0,
@@ -559,8 +559,7 @@ fun NotificationHistoryScreen() {
                                                                 Modifier
                                                                     .align(
                                                                         Alignment.CenterEnd,
-                                                                    )
-                                                                    .width(deleteWidth)
+                                                                    ).width(deleteWidth)
                                                                     .fillMaxHeight(),
                                                         )
                                                     }

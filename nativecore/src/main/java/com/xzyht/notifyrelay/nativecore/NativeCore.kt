@@ -322,6 +322,7 @@ object NativeCore {
 
     // 推送「全量」超级岛/媒体状态；Rust 内部计算差异、合并、ACK 与心跳，接收端经 on_data 回传全量。
     // isQuery：true=查询回调响应推送（心跳查询发现变更后由平台推送），false=正常主动推送。
+
     /** @return true=入队成功；false=上下文/队列不可用或原生入队失败（调用方可重试） */
     fun pushSuperislandState(
         ctx: Pointer?,

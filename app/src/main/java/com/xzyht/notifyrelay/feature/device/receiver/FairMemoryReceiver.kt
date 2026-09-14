@@ -24,7 +24,6 @@ import notifyrelay.base.util.Logger
  * 静态注册，系统可直接发送给未运行的进程。
  */
 class FairMemoryReceiver : BroadcastReceiver() {
-
     companion object {
         private const val TAG = "FairMemoryReceiver"
         private const val ACTION_TRIM = "itgsa.intent.action.TRIM"
@@ -38,7 +37,10 @@ class FairMemoryReceiver : BroadcastReceiver() {
         private const val RESULT_SUCCESS = 0
     }
 
-    override fun onReceive(context: Context, intent: Intent) {
+    override fun onReceive(
+        context: Context,
+        intent: Intent,
+    ) {
         if (ACTION_TRIM != intent.action) return
 
         val extras = intent.extras ?: return
@@ -93,7 +95,10 @@ class FairMemoryReceiver : BroadcastReceiver() {
     /**
      * 处理内存预警：释放非关键缓存，降低内存占用。
      */
-    private fun handleTrim(context: Context, notifyType: Int) {
+    private fun handleTrim(
+        context: Context,
+        notifyType: Int,
+    ) {
         val typeName = if (notifyType == NOTIFY_TYPE_PHYSICAL_MEMORY) "物理内存" else "Java堆"
         Logger.i(TAG, "执行内存预警处理（$typeName）")
 

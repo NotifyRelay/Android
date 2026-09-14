@@ -2,7 +2,6 @@ package com.xzyht.notifyrelay.feature.media.service
 
 import android.content.ComponentName
 import android.content.Context
-import android.graphics.Bitmap
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
@@ -70,16 +69,21 @@ class MediaSessionMonitorService(
         var candidate: LyricField? = null
         var streak: Int = 0
         var confirmed: LyricField? = null
+
         // 当前歌曲标识（切歌即变化，用标题区分：歌词不影响该值）
         var songId: String? = null
+
         // 当前歌曲起始时间（用于软/硬超时判定）
         var songStartAt: Long = 0L
         var state: LyricState = LyricState.PENDING_LYRIC
+
         // 包名历史：用于自适应纯音乐判定阈值
         var lyricHits: Int = 0
         var instrHits: Int = 0
+
         // 最近一次播放位置（用于"位置推进但无歌词"的直接判定）
         var lastPosition: Long = -1L
+
         // 复核上报所需的原始信息（封面按需从当前 MediaController.metadata 重新读取，避免长期持有 Bitmap）
         var lastDuration: Long = 0L
     }
