@@ -38,4 +38,35 @@ LSPosed 模块已拆分为平级独立仓库 `NotifyRelay-LSP`（独立 APK，he
 - 功能开发在独立分支进行，合并到 `main` 时推荐使用非快进合并 (`--no-ff`) 以保留分支提交记录。
 - 当前长期 `dev` 分支 为开发主线，`main` 分支为发布来源。
 
+### Git 钩子（必须启用）
+
+仓库提供 `.githooks/` 下的钩子，已纳入版本控制：
+
+| 钩子 | 作用 |
+|---|---|
+| `pre-commit` | 暂存区有 Kotlin 变更时运行 `./gradlew ktlintFormat`；无变更则跳过 |
+| `pre-push` | 推送前对全量源码运行 `./gradlew ktlintFormat` |
+| `post-merge` | 合并/拉取后自动 `git submodule update --init --recursive` |
+
+**启用（每个克隆只需执行一次；Git 不允许钩子路径随仓库自动生效）：**
+
+```bash
+git config core.hooksPath .githooks
+```
+
+未启用时钩子不会运行——换机器、重新克隆或新增协作者后务必重新执行。可用以下命令确认：
+
+```bash
+git config core.hooksPath   # 应输出 .githooks
+```
+
+**拦截规则**（`ktlintFormat` 行为已实测）：
+
+- 可自动修复的违规：`ktlintFormat` 静默改写文件但退出码仍为 0。格式化不改变语义，故 `pre-commit` 会自动 `git add` 将结果纳入本次提交并放行。
+- 无法自动修复的违规：构建失败、退出码非 0。**两个钩子均阻断**，提示见各模块 `build/reports/ktlint/` 下的报告。
+
+**为何必须拦截**：`update.yml` 在 push 到 `main` 后执行 `./gradlew ktlintFormat`，遇到无法自动修复的违规即构建失败，整条语义化发版流程被中断（版本号不回写、tag 不打，实例见 run 34847149469）。该问题只在 push 之后才暴露，故提前到本地拦截。
+
+紧急情况下可用 `--no-verify` 绕过（不推荐，等同于把问题推迟到 CI）。
+
 
