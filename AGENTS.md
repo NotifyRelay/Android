@@ -15,7 +15,9 @@
 
 ### 应用 API 版本
 
-minSdk：`:app`（主应用）与 `:core`（核心库）minSdk = 31（Android 12），其余库模块（`:base`、`:data`、`:superislandui`、`:lsp`、`:nativecore` 等）minSdk = 29（Android 10）。请勿为任一模块声明的 minSdk 以下版本编写兼容性代码。
+minSdk：`:app`（主应用）与 `:core`（核心库）minSdk = 31（Android 12），其余库模块（`:base`、`:data`、`:superislandui`、`:nativecore` 等）minSdk = 29（Android 10）。请勿为任一模块声明的 minSdk 以下版本编写兼容性代码。
+
+LSPosed 模块已拆分为平级独立仓库 `NotifyRelay-LSP`（独立 APK，headless 无 GUI），不在本仓库内。
 
 - 代码风格遵循 Kotlin 官方规范（`kotlin.code.style=official`）。
 - 如需扩展功能或集成新依赖，优先查阅 `miuix-mcp` 与本项目现有实现。
