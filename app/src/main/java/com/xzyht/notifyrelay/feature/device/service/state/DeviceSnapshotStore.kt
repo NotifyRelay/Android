@@ -79,7 +79,9 @@ class DeviceSnapshotStore(
     private val displayFallback = LinkedHashMap<String, Pair<String, String>>()
 
     /** 刷新节流：心跳/连接回调并发触发时跳过重复刷新，避免同一时刻多个协程并发进入 JNA。 */
-    private val refreshBusy = java.util.concurrent.atomic.AtomicBoolean(false)
+    private val refreshBusy =
+        java.util.concurrent.atomic
+            .AtomicBoolean(false)
 
     // ==================== 刷新入口 ====================
 

@@ -41,7 +41,10 @@ class OnlineDevicesCache(
                             null
                         }
                     }
-            val json = com.google.gson.Gson().toJson(onlineDevices)
+            val json =
+                com.google.gson
+                    .Gson()
+                    .toJson(onlineDevices)
 
             // 只有当内容实际变化时才执行存储和快捷方式更新
             if (json == lastCacheJson) return

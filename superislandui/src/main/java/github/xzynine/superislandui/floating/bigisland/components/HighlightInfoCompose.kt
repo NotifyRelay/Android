@@ -1,12 +1,12 @@
-﻿package github.xzynine.superislandui.floating.bigisland.components
+package github.xzynine.superislandui.floating.bigisland.components
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.width
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -16,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,16 +29,29 @@ import kotlinx.coroutines.delay
 import notifyrelay.core.util.image.ImageUtils
 
 /**
- * 高亮信息Compose组件
+ * 强调图文组件（highlightInfo）Compose 实现
+ * 版式（MD 结构图）：强调文本 | 辅助文本1 | 功能图标 | 辅助文本2，同一行
+ * 强调文本支持计时器
  */
 @Composable
 fun HighlightInfoCompose(
     highlightInfo: HighlightInfo,
     picMap: Map<String, String>?,
 ) {
-    val density = LocalConfiguration.current.densityDpi / 160f
     val iconKey = selectIconKey(highlightInfo)
     val hasIcon = !iconKey.isNullOrEmpty()
+
+    val primaryColor =
+        ImageUtils.parseColor(highlightInfo.colorTitle)
+            ?: ImageUtils.parseColor(highlightInfo.colorContent)
+            ?: 0xFFFFFFFF.toInt()
+    val primaryText =
+        listOfNotNull(highlightInfo.title, highlightInfo.content, highlightInfo.subContent)
+            .firstOrNull { it.isNotBlank() }
+    val timerInfo = highlightInfo.timerInfo
+    // 计时器渲染时，主文本被计时器文本取代，primaryText 实际不渲染；
+    // 去重基准应设为 null，避免 content/subContent 被误判为「与 primaryText 重复」而跳过。
+    val renderedPrimaryText = if (timerInfo != null && !highlightInfo.iconOnly) null else primaryText
 
     Row(
         modifier =
@@ -48,123 +60,68 @@ fun HighlightInfoCompose(
                 .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // 图标
+        // 强调文本（支持计时器）
+        if (timerInfo != null && !highlightInfo.iconOnly) {
+            TimerText(timerInfo, primaryColor)
+        } else {
+            primaryText?.let {
+                Text(
+                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                    color = Color(primaryColor),
+                    fontSize = 20.sp,
+                    modifier = Modifier.padding(end = 4.dp),
+                )
+            }
+        }
+
+        // 辅助文本1（content）
+        highlightInfo.content
+            ?.takeIf { it.isNotBlank() && it != renderedPrimaryText }
+            ?.let {
+                Text(
+                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                    color = Color(ImageUtils.parseColor(highlightInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 8.dp),
+                )
+            }
+
+        // 功能图标（picFunction）
         if (hasIcon) {
-            val iconSize = if (highlightInfo.iconOnly) (48 * density).dp else (40 * density).dp
+            Spacer(modifier = Modifier.width(8.dp))
             CommonImageCompose(
                 picKey = iconKey,
                 picMap = picMap,
-                size = iconSize,
+                size = 24.dp,
                 isFocusIcon = false,
                 contentDescription = null,
             )
         }
 
-        // 文本容器
-        val textLayoutParams =
-            if (highlightInfo.iconOnly) {
-                Modifier.wrapContentWidth()
-            } else {
-                Modifier.weight(1f)
-            }
-        val textContainerModifier = textLayoutParams.let { if (hasIcon) it.padding(start = 8.dp) else it }
-
-        Column(modifier = textContainerModifier) {
-            val timerLabel =
-                highlightInfo.timerInfo?.let { info ->
-                    if (info.timerType <= 0) "倒计时" else "计时器"
-                }
-
-            // 主要文本
-            val primaryTextRaw =
-                listOfNotNull(
-                    highlightInfo.title,
-                    highlightInfo.content,
-                    highlightInfo.subContent,
-                ).firstOrNull { it.isNotBlank() }
-                    ?: timerLabel
-                    ?: if (highlightInfo.iconOnly) null else "高亮信息"
-            primaryTextRaw?.let {
-                val primaryColor =
-                    ImageUtils.parseColor(highlightInfo.colorTitle)
-                        ?: ImageUtils.parseColor(highlightInfo.colorContent)
-                        ?: 0xFFFFFFFF.toInt()
+        // 辅助文本2（subContent）
+        highlightInfo.subContent
+            ?.takeIf { it.isNotBlank() && it != renderedPrimaryText }
+            ?.let {
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                    color = Color(primaryColor),
-                    fontSize = 15.sp,
-                    modifier = Modifier.padding(bottom = 4.dp),
-                )
-            }
-
-            // 状态文本（如“进行中”）
-            val statusText =
-                highlightInfo.timerInfo
-                    ?.let { resolveStatusText(highlightInfo) }
-                    ?.takeIf { it.isNotBlank() && it != primaryTextRaw }
-                    ?: timerLabel?.takeIf { it.isNotBlank() && it != primaryTextRaw }
-            statusText?.let { status ->
-                val statusColor =
-                    ImageUtils.parseColor(highlightInfo.colorSubContent)
-                        ?: ImageUtils.parseColor(highlightInfo.colorContent)
-                        ?: 0xFFDDDDDD.toInt()
-                Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(status),
-                    color = Color(statusColor),
+                    color = Color(ImageUtils.parseColor(highlightInfo.colorSubContent) ?: 0xFF9EA3FF.toInt()),
                     fontSize = 12.sp,
+                    modifier = Modifier.padding(start = 8.dp),
                 )
             }
 
-            // 内容文本
-            highlightInfo.content
-                ?.takeIf { it.isNotBlank() && it != primaryTextRaw }
-                ?.let { content ->
-                    Text(
-                        text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(content),
-                        color = Color(ImageUtils.parseColor(highlightInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                }
-
-            // 子内容文本
-            highlightInfo.subContent
-                ?.takeIf { it.isNotBlank() && it != primaryTextRaw }
-                ?.let { sub ->
-                    Text(
-                        text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(sub),
-                        color = Color(ImageUtils.parseColor(highlightInfo.colorSubContent) ?: 0xFF9EA3FF.toInt()),
-                        fontSize = 12.sp,
-                        modifier = Modifier.padding(bottom = 4.dp),
-                    )
-                }
-
-            // 计时器信息
-            highlightInfo.timerInfo
-                ?.takeIf { !highlightInfo.iconOnly }
-                ?.let { timerInfo ->
-                    val timerColor = ImageUtils.parseColor(highlightInfo.colorTitle) ?: 0xFFFFFFFF.toInt()
-                    TimerText(timerInfo, timerColor)
-                }
-        }
-
-        // 大图片区域
+        // 大岛区域左右图片（仅当显式提供时渲染，避免与功能图标重复）
         if (!highlightInfo.iconOnly) {
-            Row(
-                modifier = Modifier.padding(start = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                // 左侧图片
-                val leftImageUrl = picMap?.get(highlightInfo.bigImageLeft) ?: picMap?.get(iconKey)
-                val leftPainter = leftImageUrl?.let { SuperIslandImageUtil.rememberSuperIslandImagePainter(it) }
-                leftPainter?.let { BigAreaImage(it, density) }
-
-                // 右侧图片
-                val rightImageUrl =
-                    picMap?.get(highlightInfo.bigImageRight)
-                        ?: if (leftPainter == null) picMap?.get(iconKey) else null
-                val rightPainter = rightImageUrl?.let { SuperIslandImageUtil.rememberSuperIslandImagePainter(it) }
-                rightPainter?.let { BigAreaImage(it, density, showLeftMargin = true) }
+            val leftImageUrl = highlightInfo.bigImageLeft?.let { picMap?.get(it) }
+            val rightImageUrl = highlightInfo.bigImageRight?.let { picMap?.get(it) }
+            if (leftImageUrl != null || rightImageUrl != null) {
+                Spacer(modifier = Modifier.width(8.dp))
+                leftImageUrl?.let { SuperIslandImageUtil.rememberSuperIslandImagePainter(it) }?.let {
+                    BigAreaImage(it)
+                }
+                rightImageUrl?.let { SuperIslandImageUtil.rememberSuperIslandImagePainter(it) }?.let {
+                    BigAreaImage(it, showLeftMargin = true)
+                }
             }
         }
     }
@@ -173,10 +130,9 @@ fun HighlightInfoCompose(
 @Composable
 private fun BigAreaImage(
     painter: Painter,
-    density: Float,
     showLeftMargin: Boolean = false,
 ) {
-    val size = (44 * density).dp
+    val size = 44.dp
     val modifier = if (showLeftMargin) Modifier.padding(start = 6.dp) else Modifier
 
     Image(
@@ -203,40 +159,23 @@ private fun TimerText(
     }
     Text(
         text = displayState.value,
-        fontSize = 16.sp,
+        fontSize = 20.sp,
         color = Color(colorInt),
+        modifier = Modifier.padding(end = 4.dp),
     )
 }
 
 private fun selectIconKey(highlightInfo: HighlightInfo): String? {
+    // 功能图标（CommonImageCompose）只应使用 picFunction / picFunctionDark。
+    // bigImageLeft / bigImageRight 由下方的 BigAreaImage 负责渲染（尺寸与语义都不同），
+    // 若在此处参与候选会导致同一张图被渲染两次（功能图标 + 大区图）。
     val candidates = mutableListOf<String>()
     candidates.add(highlightInfo.picFunction ?: "")
     candidates.add(highlightInfo.picFunctionDark ?: "")
-    candidates.add(highlightInfo.bigImageLeft ?: "")
-    candidates.add(highlightInfo.bigImageRight ?: "")
     return candidates.firstOrNull { it.isNotBlank() }
 }
 
-// 状态文本推导逻辑
-private fun resolveStatusText(highlightInfo: HighlightInfo): String? {
-    val preferred =
-        listOfNotNull(
-            highlightInfo.title,
-            highlightInfo.content,
-            highlightInfo.subContent,
-        ).firstOrNull { it.contains("进行") }
-    if (!preferred.isNullOrBlank()) return preferred
-
-    val base =
-        listOfNotNull(
-            highlightInfo.subContent,
-            highlightInfo.title,
-            highlightInfo.content,
-        ).firstOrNull { it.isNotBlank() } ?: return null
-    return if (base.contains("进行")) base else base + "进行中"
-}
-
-@Preview(name = "高亮信息", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Preview(name = "强调图文", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
 @Composable
 fun HighlightInfoComposePreview() {
     HighlightInfoCompose(
@@ -245,7 +184,7 @@ fun HighlightInfoComposePreview() {
     )
 }
 
-@Preview(name = "高亮信息带计时器", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+@Preview(name = "强调图文带计时器", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
 @Composable
 fun HighlightInfoComposeWithTimerPreview() {
     HighlightInfoCompose(

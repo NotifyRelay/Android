@@ -38,6 +38,7 @@ import github.xzynine.superislandui.floating.smallisland.right.bTitle
 import github.xzynine.superislandui.floating.smallisland.right.isTimerType
 import github.xzynine.superislandui.floating.smallisland.right.textToRender
 import github.xzynine.superislandui.model.core.ParamV2
+import kotlinx.coroutines.CancellationException
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.core.util.image.ImageUtils
@@ -519,49 +520,47 @@ object NotificationGenerator {
                 val aComponent = bigIslandArea?.aComponent
                 val bComponent = bigIslandArea?.bComponent
 
-                // 判断是否为计时器类型（包括运行中和暂停状态）
-                val isTimerType = bComponent is BSameWidthDigitInfo && bComponent.timer != null
+                // 判断是否为计时器类型（包括运行中和暂停状态）；进度组件优先，
+                // 避免小岛 B 区带 timerInfo 的进度数据（如「多节点进度」样本）被当作计时器处理。
+                val isTimerType = isTimerNotification(paramV2, bComponent)
+                val timerInfo = if (isTimerType && bComponent is BSameWidthDigitInfo) bComponent.timer else null
 
                 // 计时器通知的标题和内容设置
                 // 标题显示状态，内容显示应用名，时间流逝由chronometer自动处理
                 var timerTitle: String = title ?: appName ?: "超级岛通知"
                 var timerContent: String = text ?: ""
-                if (isTimerType) {
-                    val timer = bComponent.timer
-                    timer?.let {
-                        when (it.timerType) {
-                            -2 -> {
-                                timerTitle = "暂停"
-                                timerContent = appName ?: "计时器"
-                            }
+                timerInfo?.let {
+                    when (it.timerType) {
+                        -2 -> {
+                            timerTitle = "暂停"
+                            timerContent = appName ?: "计时器"
+                        }
 
-                            -1 -> {
-                                timerTitle = "倒计时中"
-                                timerContent = appName ?: "计时器"
-                            }
+                        -1 -> {
+                            timerTitle = "倒计时中"
+                            timerContent = appName ?: "计时器"
+                        }
 
-                            1 -> {
-                                timerTitle = "正计时中"
-                                timerContent = appName ?: "秒表"
-                            }
+                        1 -> {
+                            timerTitle = "正计时中"
+                            timerContent = appName ?: "秒表"
+                        }
 
-                            2 -> {
-                                timerTitle = "暂停"
-                                timerContent = appName ?: "秒表"
-                            }
+                        2 -> {
+                            timerTitle = "暂停"
+                            timerContent = appName ?: "秒表"
+                        }
 
-                            else -> {
-                                timerTitle = title ?: appName ?: "超级岛通知"
-                                timerContent = text ?: ""
-                            }
+                        else -> {
+                            timerTitle = title ?: appName ?: "超级岛通知"
+                            timerContent = text ?: ""
                         }
                     }
                 }
 
                 // 判断是否为正在运行的计时器类型（用于chronometer自动更新）
                 val isRunningTimer =
-                    isTimerType &&
-                        (bComponent.timer!!.timerType == -1 || bComponent.timer!!.timerType == 1)
+                    timerInfo != null && (timerInfo.timerType == -1 || timerInfo.timerType == 1)
 
                 // 构建基础通知，调整属性使其更接近实际超级岛通知
                 val builder =
@@ -631,11 +630,14 @@ object NotificationGenerator {
 
                 // 检查是否为进度类型通知，如果是，则可能已经通过 LiveUpdatesNotificationManager 处理
                 val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
+                // 注入模式：本方法即「超级岛通道」构建器；仅当进度类型确实由 Live Updates 处理时才跳过胶囊注入。
+                // 超级岛模式下，即便含 progressInfo 也走到这里，必须正常添加胶囊兼容字段与图标注入。
+                val liveUpdatesMode = SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)
 
                 // 构建通知
                 val notification =
-                    if (!isProgressType) {
-                        // 非进度类型通知，添加胶囊兼容字段并注入图标
+                    if (!isProgressType || !liveUpdatesMode) {
+                        // 非进度类型通知，或超级岛模式下（含进度类型）的通知：添加胶囊兼容字段并注入图标
                         val builtNotification =
                             buildCapsuleCompatibleNotificationWithIconInjection(
                                 context,
@@ -647,6 +649,7 @@ object NotificationGenerator {
                                 paramV2Raw,
                                 aComponent,
                                 bComponent,
+                                isTimerType,
                             )
                         Logger.i(TAG, "超级岛 非进度类型通知已构建，key=$key")
                         builtNotification
@@ -700,9 +703,9 @@ object NotificationGenerator {
                         builtNotification
                     }
 
-                    // 发送通知
-                    notificationManager.notify(notificationId, notification)
-                }
+                // 发送通知
+                notificationManager.notify(notificationId, notification)
+            }
 
             // 保存entryKey到notificationId的映射
             FloatingReplicaMappingManager
@@ -710,6 +713,9 @@ object NotificationGenerator {
 
             Logger.i(TAG, "超级岛 发送复刻通知成功，key=$key, notificationId=$notificationId")
             return notificationId
+        } catch (e: CancellationException) {
+            // 协程取消必须原样抛出，避免被下面的 catch(Exception) 吞掉后继续执行 notify 流程
+            throw e
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛 发送复刻通知失败: ${e.message}")
             return null
@@ -719,7 +725,7 @@ object NotificationGenerator {
     /**
      * 构建胶囊兼容的通知，添加标准通知字段和 smallIcon 注入
      */
-    private fun buildCapsuleCompatibleNotification(
+    private suspend fun buildCapsuleCompatibleNotification(
         context: Context,
         builder: NotificationCompat.Builder,
         title: String?,
@@ -729,6 +735,7 @@ object NotificationGenerator {
         paramV2Raw: String?,
         aComponent: AComponent?,
         bComponent: BComponent?,
+        isTimerType: Boolean,
     ): NotificationCompat.Builder {
         try {
             // 提取 A/B 区数据（使用已解析的组件）
@@ -744,11 +751,8 @@ object NotificationGenerator {
             val bProgressIsCCW = bComponent.bProgressIsCCW
 
             // 设置标准通知字段
-            // 判断是否为计时器类型（包括运行中和暂停状态）
-            val isTimerType = bComponent.isTimerType
-
-            // 根据计时器状态设置标题和内容
-            if (bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
+            // 根据计时器状态设置标题和内容（isTimerType 由调用方按「进度优先」判定后传入）
+            if (isTimerType && bComponent is BSameWidthDigitInfo && bComponent.timer != null) {
                 val timer = bComponent.timer
                 val timerTitle =
                     timer?.let {
@@ -789,15 +793,17 @@ object NotificationGenerator {
                     .setShortCriticalText(capsuleShortText ?: "")
             }
 
+            // 这里不要设 setRequestPromotedOngoing(true)：常驻提升态会让系统走 promoted(实况)渲染路径，
+            // 不再渲染 param_island.bigIslandArea，点击/长按展开只能看到 smallIslandArea 的兜底数据。
+            // （setOngoing 由上方基础 builder 保留，此处不必重复。）
             builder
-                .setOngoing(true)
                 .setOnlyAlertOnce(true)
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
-                .setRequestPromotedOngoing(true)
 
             // 确保右胶囊文本被正确设置到 miui.focus.param 字段
             // 使用 SuperIslandStructuredDataHelper 添加结构化数据
+            val superIslandInjectionEnabled = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
             SuperIslandStructuredDataHelper.addSuperIslandStructuredData(
                 builder = builder,
                 context = context,
@@ -805,17 +811,54 @@ object NotificationGenerator {
                 picMap = picMap,
                 title = title,
                 text = text,
-                isSuperIslandSpecInjectionEnabled = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context),
+                isSuperIslandSpecInjectionEnabled = superIslandInjectionEnabled,
             )
+
+            // 「客户端实现」方式下系统不会下载 JSON 中 pic 字段引用的 URL，图片必须以 Parcelable Icon
+            // 提供到 miui.focus.pics，否则大岛（展开态）里引用图片的组件（如进度组件1 的前进图形/
+            // 中间节点/目标点）会因取不到资源而膨胀失败，表现为退化成单进度条或回退小岛数据。
+            if (superIslandInjectionEnabled) {
+                val injectedKeys =
+                    SuperIslandStructuredDataHelper.injectPicMapIcons(
+                        context = context,
+                        extras = builder.extras,
+                        picMap = picMap,
+                    )
+                // 仅对确实注入成功的图片，移除 writePicMap 写入的同名顶层 URL extra；
+                // 注入失败/未使用的图片保留原 extra，维持兼容路径。
+                SuperIslandStructuredDataHelper.removeSupersededPicUrlExtras(
+                    extras = builder.extras,
+                    injectedKeys = injectedKeys,
+                )
+            }
 
             // 处理 smallIcon - 设置系统默认图标作为占位符
             builder.setSmallIcon(R.drawable.stat_notify_more)
+        } catch (e: CancellationException) {
+            // 协程取消必须原样抛出：否则会被下面的 catch(Exception) 吞掉并继续走 notify 流程
+            throw e
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛 构建胶囊兼容通知失败: ${e.message}")
         }
 
         return builder
     }
+
+    /**
+     * 是否为「计时器通知」：小岛 B 区携带 timerInfo，且整条数据**不含进度组件**。
+     *
+     * 进度组件（progressInfo / multiProgressInfo）优先：像「多节点进度」这类样本会在
+     * `param_island.bigIslandArea.sameWidthDigitInfo` 里同时带 timerInfo，
+     * 若只用 B 区判定，整条通知会被当成计时器（标题被改写成「正计时中」、启用 chronometer），
+     * 实际应以进度组件为主。
+     */
+    private fun isTimerNotification(
+        paramV2: ParamV2?,
+        bComponent: BComponent?,
+    ): Boolean =
+        !SuperIslandDataFormatter.isProgressType(paramV2) &&
+            bComponent is BSameWidthDigitInfo &&
+            bComponent.timer != null
 
     // ---- 图标注入辅助方法 ----
 
@@ -826,9 +869,10 @@ object NotificationGenerator {
      */
     private fun clearSmallIcon(notification: Notification) {
         try {
-            val transparentIcon = Icon.createWithBitmap(
-                Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8).apply { eraseColor(android.graphics.Color.TRANSPARENT) },
-            )
+            val transparentIcon =
+                Icon.createWithBitmap(
+                    Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8).apply { eraseColor(android.graphics.Color.TRANSPARENT) },
+                )
             val field = Notification::class.java.getDeclaredField("mSmallIcon")
             field.isAccessible = true
             field.set(notification, transparentIcon)
@@ -968,6 +1012,7 @@ object NotificationGenerator {
         paramV2Raw: String?,
         aComponent: AComponent?,
         bComponent: BComponent?,
+        isTimerType: Boolean,
     ): Notification {
         try {
             // 先构建胶囊兼容的通知
@@ -982,6 +1027,7 @@ object NotificationGenerator {
                     paramV2Raw,
                     aComponent,
                     bComponent,
+                    isTimerType,
                 )
 
             // 构建通知并注入图标
@@ -1002,6 +1048,9 @@ object NotificationGenerator {
 
             // 返回注入图标后的通知对象
             return notification
+        } catch (e: CancellationException) {
+            // 协程取消必须原样抛出，避免把取消当作构建失败而返回兜底通知
+            throw e
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛 构建胶囊兼容通知并注入图标失败 ${e.message}")
             e.printStackTrace()

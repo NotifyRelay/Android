@@ -26,7 +26,6 @@ import io.github.lingqiqi5211.ezhooktool.xposed.EzXposed
  * 注意：启用 autoHotReload 要求 minApiVersion=102，即放弃 API 101 框架。
  */
 class XposedInit : XposedModule() {
-
     override fun onModuleLoaded(param: ModuleLoadedParam) {
         EzXposed.initOnModuleLoaded(this, param)
     }

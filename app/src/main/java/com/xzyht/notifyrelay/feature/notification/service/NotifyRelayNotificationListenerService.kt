@@ -24,10 +24,11 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.filter.BackendLocalFilter
+import com.xzyht.notifyrelay.feature.notification.superisland.media.MediaCapsulePresenter
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.tracker.LocalSuperIslandTracker
-import com.xzyht.notifyrelay.feature.notification.superisland.media.MediaCapsulePresenter
 import com.xzyht.notifyrelay.sync.MessageSender
+import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import github.xzynine.superislandui.common.SuperIslandManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -40,7 +41,6 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
-import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import notifyrelay.data.StorageManager
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -705,9 +705,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         if (wakeLock == null) {
             try {
                 val pm = getSystemService(POWER_SERVICE) as PowerManager
-                wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "notifyrelay:core").apply {
-                    acquire()
-                }
+                wakeLock =
+                    pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "notifyrelay:core").apply {
+                        acquire()
+                    }
                 Logger.i(TAG, "Wake Lock 已获取")
             } catch (e: SecurityException) {
                 Logger.w(TAG, "获取 Wake Lock 失败（缺少权限）", e)

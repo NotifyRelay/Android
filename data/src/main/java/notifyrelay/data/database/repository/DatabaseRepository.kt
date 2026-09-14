@@ -85,24 +85,25 @@ class DatabaseRepository(
         withContext(Dispatchers.IO) {
             val rows = mutableListOf<DeviceMigrationRow>()
             try {
-                database.openHelper.readableDatabase.query(
-                    "SELECT uuid, publicKey, sharedSecret, isAccepted, displayName, lastIp, lastPort FROM device_migration",
-                    emptyArray<Any?>(),
-                ).use { cursor ->
-                    while (cursor.moveToNext()) {
-                        rows.add(
-                            DeviceMigrationRow(
-                                uuid = cursor.getString(cursor.getColumnIndexOrThrow("uuid")),
-                                publicKey = cursor.getString(cursor.getColumnIndexOrThrow("publicKey")),
-                                sharedSecret = cursor.getString(cursor.getColumnIndexOrThrow("sharedSecret")),
-                                isAccepted = cursor.getInt(cursor.getColumnIndexOrThrow("isAccepted")) != 0,
-                                displayName = cursor.getString(cursor.getColumnIndexOrThrow("displayName")),
-                                lastIp = cursor.getString(cursor.getColumnIndexOrThrow("lastIp")),
-                                lastPort = cursor.getInt(cursor.getColumnIndexOrThrow("lastPort")),
-                            ),
-                        )
+                database.openHelper.readableDatabase
+                    .query(
+                        "SELECT uuid, publicKey, sharedSecret, isAccepted, displayName, lastIp, lastPort FROM device_migration",
+                        emptyArray<Any?>(),
+                    ).use { cursor ->
+                        while (cursor.moveToNext()) {
+                            rows.add(
+                                DeviceMigrationRow(
+                                    uuid = cursor.getString(cursor.getColumnIndexOrThrow("uuid")),
+                                    publicKey = cursor.getString(cursor.getColumnIndexOrThrow("publicKey")),
+                                    sharedSecret = cursor.getString(cursor.getColumnIndexOrThrow("sharedSecret")),
+                                    isAccepted = cursor.getInt(cursor.getColumnIndexOrThrow("isAccepted")) != 0,
+                                    displayName = cursor.getString(cursor.getColumnIndexOrThrow("displayName")),
+                                    lastIp = cursor.getString(cursor.getColumnIndexOrThrow("lastIp")),
+                                    lastPort = cursor.getInt(cursor.getColumnIndexOrThrow("lastPort")),
+                                ),
+                            )
+                        }
                     }
-                }
             } catch (e: android.database.sqlite.SQLiteException) {
                 // 仅表不存在视为幂等（迁移已完成，返回空）；
                 // 其他查询失败必须抛出，由调用方暂缓清理旧存储并在下次启动重试，

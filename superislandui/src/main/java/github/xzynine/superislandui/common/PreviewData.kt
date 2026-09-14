@@ -11,8 +11,12 @@ import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.model.core.ParamV2
 import github.xzynine.superislandui.model.templates.BaseInfo
 import github.xzynine.superislandui.model.templates.ChatInfo
+import github.xzynine.superislandui.model.templates.CoverInfo
 import github.xzynine.superislandui.model.templates.HighlightInfo
+import github.xzynine.superislandui.model.templates.HighlightInfoV3
 import github.xzynine.superislandui.model.templates.HintInfo
+import github.xzynine.superislandui.model.templates.IconTextAnimIcon
+import github.xzynine.superislandui.model.templates.IconTextInfo
 import github.xzynine.superislandui.model.templates.PicInfo
 
 object PreviewData {
@@ -110,16 +114,19 @@ object PreviewData {
     val sampleHintInfo =
         HintInfo(
             type = 1,
-            title = "提示标题",
-            content = "提示内容",
-            subTitle = "副标题",
+            title = "9:20开场",
+            content = "时间",
+            colorContentBg = "333482FF",
+            actionInfo = sampleActionInfo,
         )
 
     val sampleHintInfoType2 =
         HintInfo(
             type = 2,
-            title = "按钮提示",
-            content = "点击下方按钮进行操作",
+            title = "00:30:59",
+            content = "用时",
+            subTitle = "--",
+            subContent = "配速",
             actionInfo = sampleActionInfo,
         )
 
@@ -146,6 +153,18 @@ object PreviewData {
         ProgressInfo(
             progress = 25,
             colorProgress = "FFA500",
+        )
+
+    val sampleProgressInfoWithNodes =
+        ProgressInfo(
+            progress = 40,
+            colorProgress = "FF8514",
+            colorProgressEnd = "FF8514",
+            picForward = "miui.focus.pic_forward_v2",
+            picMiddle = "miui.focus.pic_middle_v2",
+            picMiddleUnselected = "miui.focus.pic_middle_unselected_v2",
+            picEnd = "miui.focus.pic_end_v2",
+            picEndUnselected = "miui.focus.pic_end_unselected_v2",
         )
 
     val sampleMultiProgressInfo =
@@ -207,5 +226,48 @@ object PreviewData {
     val sampleTextButton =
         TextButton(
             actions = sampleActions,
+        )
+
+    val sampleIconTextInfo =
+        IconTextInfo(
+            animIconInfo =
+                IconTextAnimIcon(
+                    type = 0,
+                    src = "icon_key",
+                ),
+            title = "手电筒",
+            content = "已打开",
+            subContent = "长按关闭",
+            colorTitle = "FFFFFF",
+            colorContent = "DDDDDD",
+        )
+
+    val sampleCoverInfo =
+        CoverInfo(
+            picCover = "miui.focus.pic_forward_v2",
+            title = "哪吒闹海",
+            content = "1号厅",
+            subContent = "21排322座",
+            colorTitle = "FFFFFF",
+            colorContent = "DDDDDD",
+            colorSubContent = "DDDDDD",
+        )
+
+    val sampleHighlightInfoV3 =
+        HighlightInfoV3(
+            primaryText = "4899元",
+            secondaryText = "4999元",
+            showSecondaryLine = true,
+            highLightText = "限时优惠",
+            primaryColor = "3482FF",
+            secondaryColor = "DDDDDD",
+            highLightTextColor = "FF8A3D",
+            highLightbgColor = "33FF8A3D",
+            actionInfo =
+                ActionInfo(
+                    actionTitle = "去支付",
+                    actionTitleColor = "FFFFFF",
+                    actionBgColor = "3482FF",
+                ),
         )
 }

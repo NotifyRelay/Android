@@ -18,10 +18,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
-import android.content.Intent
-import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import notifyrelay.base.util.IntentUtils
@@ -134,38 +133,39 @@ class DeveloperModeActivity : AppCompatActivity() {
                 WindowDropdownPreference(
                     title = "调试引导页",
                     summary = "选择分支进入引导页调试多分支显示",
-                    entry = DropdownEntry(
-                        items =
-                            listOf(
-                                DropdownItem(
-                                    text = "完整流程",
-                                    onClick = {
-                                        val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
-                                        intent.putExtra("fromInternal", true)
-                                        intent.putExtra("forceBranch", "full")
-                                        IntentUtils.startActivity(context, intent, true)
-                                    },
+                    entry =
+                        DropdownEntry(
+                            items =
+                                listOf(
+                                    DropdownItem(
+                                        text = "完整流程",
+                                        onClick = {
+                                            val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
+                                            intent.putExtra("fromInternal", true)
+                                            intent.putExtra("forceBranch", "full")
+                                            IntentUtils.startActivity(context, intent, true)
+                                        },
+                                    ),
+                                    DropdownItem(
+                                        text = "重授权",
+                                        onClick = {
+                                            val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
+                                            intent.putExtra("fromInternal", true)
+                                            intent.putExtra("forceBranch", "reauth")
+                                            IntentUtils.startActivity(context, intent, true)
+                                        },
+                                    ),
+                                    DropdownItem(
+                                        text = "需重新同意",
+                                        onClick = {
+                                            val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
+                                            intent.putExtra("fromInternal", true)
+                                            intent.putExtra("forceBranch", "consent")
+                                            IntentUtils.startActivity(context, intent, true)
+                                        },
+                                    ),
                                 ),
-                                DropdownItem(
-                                    text = "重授权",
-                                    onClick = {
-                                        val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
-                                        intent.putExtra("fromInternal", true)
-                                        intent.putExtra("forceBranch", "reauth")
-                                        IntentUtils.startActivity(context, intent, true)
-                                    },
-                                ),
-                                DropdownItem(
-                                    text = "需重新同意",
-                                    onClick = {
-                                        val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
-                                        intent.putExtra("fromInternal", true)
-                                        intent.putExtra("forceBranch", "consent")
-                                        IntentUtils.startActivity(context, intent, true)
-                                    },
-                                ),
-                            ),
-                    ),
+                        ),
                 )
 
                 SwitchPreference(

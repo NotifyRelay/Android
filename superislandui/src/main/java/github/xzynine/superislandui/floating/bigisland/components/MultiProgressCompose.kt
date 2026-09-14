@@ -99,7 +99,8 @@ fun MultiProgressCompose(
                     TextStyle(
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Normal,
-                        color = Color.Black,
+                        // 标题颜色跟随进度条颜色（MD 示例：蓝色标题）
+                        color = primaryColor,
                     ),
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

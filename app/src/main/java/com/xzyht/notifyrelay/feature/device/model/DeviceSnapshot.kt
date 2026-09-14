@@ -40,7 +40,14 @@ data class DeviceSnapshot(
 
     /** 充电状态：'1' 充电 / '0' 未充电 / '*' 未知 */
     val chargingStatus: Char
-        get() = if (batteryUnknown) '*' else if (battery >= 0) '1' else '0'
+        get() =
+            if (batteryUnknown) {
+                '*'
+            } else if (battery >= 0) {
+                '1'
+            } else {
+                '0'
+            }
 
     /** 电量百分比；未知时为 -1（与 [DeviceInfo.batteryLevel] 约定一致） */
     val batteryPercent: Int get() = if (batteryUnknown) -1 else abs(battery)
