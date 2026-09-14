@@ -510,12 +510,11 @@ object MessageSender {
             val authenticatedDevices = mutableListOf<DeviceInfo>()
 
             authedMap?.forEach { (uuid, _) ->
-                val uuidStr = uuid as String
-                if (uuidStr == myUuid) return@forEach
+                if (uuid == myUuid) return@forEach
 
                 val infoMethod = deviceManager::class.java.getDeclaredMethod("getDeviceInfo", String::class.java)
                 infoMethod.isAccessible = true
-                val deviceInfo = infoMethod.invoke(deviceManager, uuidStr) as? DeviceInfo
+                val deviceInfo = infoMethod.invoke(deviceManager, uuid) as? DeviceInfo
 
                 if (deviceInfo != null) {
                     authenticatedDevices.add(deviceInfo)

@@ -45,53 +45,53 @@ class DataCallbackHandler(
     fun build(): NotifyRelayCore.OnDataCb =
         object : NotifyRelayCore.OnDataCb {
             override fun invoke(
-                uuidPtr: Pointer?,
-                msgTypePtr: Pointer?,
-                plaintextPtr: Pointer?,
+                uuid: Pointer?,
+                messageType: Pointer?,
+                plaintext: Pointer?,
                 userData: Pointer?,
             ) {
                 Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val uuid = NotifyRelayCore.ptrToString(uuidPtr) ?: return
-                val msgType = NotifyRelayCore.ptrToString(msgTypePtr) ?: return
-                val text = NotifyRelayCore.ptrToString(plaintextPtr) ?: return
+                val uuidStr = NotifyRelayCore.ptrToString(uuid) ?: return
+                val messageTypeStr = NotifyRelayCore.ptrToString(messageType) ?: return
+                val text = NotifyRelayCore.ptrToString(plaintext) ?: return
                 val authed =
                     synchronized(host.authenticatedDeviceTable) {
-                        host.authenticatedDeviceTable[uuid]?.isAccepted == true
+                        host.authenticatedDeviceTable[uuidStr]?.isAccepted == true
                     }
-                Logger.d(TAG, "on_data: type=$msgType, authed=$authed, text_len=${text.length}")
-                if (!authed && msgType != "DATA_UNKNOWN") return
+                Logger.d(TAG, "on_data: type=$messageTypeStr, authed=$authed, text_len=${text.length}")
+                if (!authed && messageTypeStr != "DATA_UNKNOWN") return
 
                 try {
-                    when (msgType) {
+                    when (messageTypeStr) {
                         "NOTIFICATION" ->
                             NotificationProcessor.process(
                                 host.callbackContext,
                                 host.deviceManager,
                                 host.callbackScope,
-                                NotificationProcessor.NotificationInput("DATA_NOTIFICATION", text, uuid),
+                                NotificationProcessor.NotificationInput("DATA_NOTIFICATION", text, uuidStr),
                                 host.notificationDataReceivedCallbacks,
                             )
                         "MEDIAPLAY" -> {
                             val json = JSONObject(text)
-                            host.resolveDevice(uuid)?.let {
+                            host.resolveDevice(uuidStr)?.let {
                                 RemoteMediaSessionManager.onMediaMessageReceived(host.callbackContext, json, it)
                             }
                         }
                         "ICON_REQUEST" -> {
-                            host.resolveDevice(uuid)?.let {
+                            host.resolveDevice(uuidStr)?.let {
                                 IconSyncManager.handleIconRequest(text, host.deviceManager, it, host.callbackContext)
                             }
                         }
                         "ICON_RESPONSE" -> IconSyncManager.handleIconResponse(text, host.callbackContext)
                         "APP_LIST_REQUEST" -> {
-                            host.resolveDevice(uuid)?.let {
+                            host.resolveDevice(uuidStr)?.let {
                                 AppListSyncManager.handleAppListRequest(text, host.deviceManager, it, host.callbackContext)
                             }
                         }
                         "APP_LIST_RESPONSE" ->
-                            AppListSyncManager.handleAppListResponse(text, host.callbackContext, uuid, host.deviceManager)
-                        "MEDIA_CONTROL" -> handleMediaControl(uuid, text)
-                        "FTP" -> handleFtp(uuid, text)
+                            AppListSyncManager.handleAppListResponse(text, host.callbackContext, uuidStr, host.deviceManager)
+                        "MEDIA_CONTROL" -> handleMediaControl(uuidStr, text)
+                        "FTP" -> handleFtp(uuidStr, text)
                         "CLIPBOARD" ->
                             ClipboardProcessor.process(host.callbackContext, ClipboardProcessor.ClipboardInput("DATA_CLIPBOARD", text, ""))
                         "STATUS" ->
@@ -99,16 +99,16 @@ class DataCallbackHandler(
                                 host.callbackContext,
                                 host.deviceManager,
                                 host.callbackScope,
-                                StatusProcessor.StatusInput("DATA_STATUS", text, uuid),
+                                StatusProcessor.StatusInput("DATA_STATUS", text, uuidStr),
                                 host.notificationDataReceivedCallbacks,
                             )
                         "APP_LAUNCH" -> {
-                            host.resolveDevice(uuid)?.let {
+                            host.resolveDevice(uuidStr)?.let {
                                 AppLaunchManager.handleAppLaunchRequest(text, host.deviceManager, it, host.callbackContext)
                             }
                         }
-                        "SUPERISLAND" -> SuperIslandProcessor.process(host.callbackContext, host.deviceManager, text, uuid)
-                        else -> Logger.d(TAG, "未知DATA通道: type=$msgType, uuid=$uuid, size=${text.length}")
+                        "SUPERISLAND" -> SuperIslandProcessor.process(host.callbackContext, host.deviceManager, text, uuidStr)
+                        else -> Logger.d(TAG, "未知DATA通道: type=$messageTypeStr, uuid=$uuidStr, size=${text.length}")
                     }
                 } catch (e: Exception) {
                     Logger.e(TAG, "on_data error: ${e.message}")
