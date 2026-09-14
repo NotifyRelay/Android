@@ -51,7 +51,7 @@ data class BImageText4(
 /**
  * 图文组件6（imageTextInfoRight.type = 6）
  * 按模板：必传内容 = 数字（大字）+ 图片，数字最多支持 3 个数字
- * - title 必传（MD 规范字段为 textInfo.title，值即数字，兼容旧字段 digit / text）
+ * - title 必传（MD 规范字段为 textInfo.title，值即数字；旧字段 digit / text 已不再兼容，生产者请迁移到 textInfo.title）
  * - picInfo.type 必须为 4，picKey 必传（miui.focus.pic_xxx）
  */
 data class BImageText6(

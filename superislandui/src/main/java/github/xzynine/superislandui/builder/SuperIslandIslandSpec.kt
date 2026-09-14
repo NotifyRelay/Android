@@ -104,8 +104,8 @@ data class ParamIslandSpec(
     val islandTimeout: Int? = null,
     val dismissIsland: Boolean? = null,
     val highlightColor: String? = null,
-    val bigIslandArea: BigIslandAreaSpec? = null,
-    val smallIslandArea: SmallIslandAreaSpec? = null,
+    val bigIslandArea: BigIslandAreaSpec,
+    val smallIslandArea: SmallIslandAreaSpec,
     val shareData: ShareDataSpec? = null,
 )
 
@@ -205,7 +205,7 @@ fun ParamIslandSpec.toJson(): JSONObject =
         islandTimeout?.let { put("islandTimeout", it) }
         dismissIsland?.let { put("dismissIsland", it) }
         putOpt("highlightColor", highlightColor)
-        bigIslandArea?.let { put("bigIslandArea", it.toJson()) }
-        smallIslandArea?.let { put("smallIslandArea", it.toJson()) }
+        put("bigIslandArea", bigIslandArea.toJson())
+        put("smallIslandArea", smallIslandArea.toJson())
         shareData?.let { put("shareData", it.toJson()) }
     }

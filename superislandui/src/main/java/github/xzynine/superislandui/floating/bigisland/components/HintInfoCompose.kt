@@ -88,7 +88,7 @@ fun HintInfoCompose(
                                 Image(
                                     painter = it,
                                     contentDescription = null,
-                                    modifier = Modifier.size(14.dp).padding(end = 4.dp),
+                                    modifier = Modifier.padding(end = 4.dp).size(14.dp),
                                 )
                             }
                         }

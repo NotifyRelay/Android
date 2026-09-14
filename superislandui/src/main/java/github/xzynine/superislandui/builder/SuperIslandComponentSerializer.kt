@@ -140,6 +140,9 @@ fun HighlightInfo.toJson(): JSONObject =
         putOpt("colorContentDark", colorContentDark)
         putOpt("colorSubContent", colorSubContent)
         putOpt("colorSubContentDark", colorSubContentDark)
+        putOpt("bigImageLeft", bigImageLeft)
+        putOpt("bigImageRight", bigImageRight)
+        if (iconOnly) put("iconOnly", true)
     }
 
 fun PicInfo.toJson(): JSONObject =

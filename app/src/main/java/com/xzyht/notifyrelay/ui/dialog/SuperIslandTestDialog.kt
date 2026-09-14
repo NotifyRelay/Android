@@ -151,7 +151,10 @@ private fun appimgDataUrl(): String {
 private fun testBaseInfo(context: Context) {
     val paramV2Raw = """
         {
+            "protocol": 1,
+            "business": "demo_base_info",
             "baseInfo": {
+                "type": 2,
                 "title": "基础文本测试",
                 "content": "这是一个基础文本组件的展开态测试示例",
                 "colorTitle": "#FFFFFF",
@@ -159,16 +162,17 @@ private fun testBaseInfo(context: Context) {
             },
             "param_island": {
                 "smallIslandArea": {
-                    "primaryText": "基础文本测试",
-                    "secondaryText": "这是摘要态示例",
-                    "iconKey": "base_icon"
+                    "picInfo": {
+                        "type": 1,
+                        "pic": "miui.focus.pic_base_icon"
+                    }
                 },
                 "bigIslandArea": {
                     "imageTextInfoLeft": {
                         "type": 1,
                         "picInfo": {
                             "type": 1,
-                            "pic": "base_icon"
+                            "pic": "miui.focus.pic_base_icon"
                         },
                         "textInfo": {
                             "title": "基础文本",
@@ -179,7 +183,7 @@ private fun testBaseInfo(context: Context) {
                         "type": 2,
                         "picInfo": {
                             "type": 1,
-                            "pic": "base_icon"
+                            "pic": "miui.focus.pic_base_icon"
                         },
                         "textInfo": {
                             "title": "展开态",
@@ -199,7 +203,7 @@ private fun testBaseInfo(context: Context) {
         paramV2Raw = paramV2Raw,
         picMap =
             mapOf(
-                "base_icon" to createBlackBlockDataUrl(),
+                "miui.focus.pic_base_icon" to createBlackBlockDataUrl(),
             ),
     )
 }
@@ -484,31 +488,45 @@ private fun testHintInfo(context: Context) {
 private fun testTextButton(context: Context) {
     val paramV2Raw = """
         {
-            "textButton": {
+            "protocol": 1,
+            "business": "demo_text_button",
+            "baseInfo": {
+                "type": 2,
                 "title": "文本按钮测试",
                 "content": "这是一个文本按钮组件的展开态测试示例"
             },
+            "textButton": [
+                {
+                    "action": "miui.focus.action_1",
+                    "actionTitle": "去支付"
+                },
+                {
+                    "action": "miui.focus.action_2",
+                    "actionTitle": "取消"
+                }
+            ],
             "param_island": {
                 "smallIslandArea": {
-                    "primaryText": "文本按钮测试",
-                    "secondaryText": "点击操作",
-                    "iconKey": "button_icon"
+                    "picInfo": {
+                        "type": 1,
+                        "pic": "miui.focus.pic_button_icon"
+                    }
                 },
                 "bigIslandArea": {
                     "imageTextInfoLeft": {
                         "type": 1,
                         "picInfo": {
                             "type": 1,
-                            "pic": "button_icon"
+                            "pic": "miui.focus.pic_button_icon"
                         },
                         "textInfo": {
                             "title": "文本按钮",
                             "content": "测试"
                         }
                     },
-                    "fixedWidthDigitInfo": {
-                        "digit": "123",
-                        "content": "数字显示",
+                    "textInfo": {
+                        "title": "确认",
+                        "content": "操作",
                         "showHighlightColor": true
                     }
                 }
@@ -524,7 +542,7 @@ private fun testTextButton(context: Context) {
         paramV2Raw = paramV2Raw,
         picMap =
             mapOf(
-                "button_icon" to createBlackBlockDataUrl(),
+                "miui.focus.pic_button_icon" to createBlackBlockDataUrl(),
             ),
     )
 }
@@ -541,7 +559,10 @@ private fun testProgressInfo(
 
     val paramV2Raw = """
         {
+            "protocol": 1,
+            "business": "demo_progress",
             "baseInfo": {
+                "type": 2,
                 "title": "线性进度测试",
                 "content": "这是一个线性进度组件的展开态测试示例"
             },
@@ -552,13 +573,16 @@ private fun testProgressInfo(
             },
             "param_island": {
                 "smallIslandArea": {
-                    "primaryText": "线性进度测试",
-                    "secondaryText": "$progress% 完成",
-                    "iconKey": "progress_icon",
-                    "progressInfo": {
-                        "progress": $progress,
-                        "colorProgress": "#FF8514",
-                        "colorProgressEnd": "#FF8514"
+                    "combinePicInfo": {
+                        "picInfo": {
+                            "type": 1,
+                            "pic": "miui.focus.pic_progress_icon"
+                        },
+                        "progressInfo": {
+                            "progress": $progress,
+                            "colorReach": "#FF8514",
+                            "colorUnReach": "#33FFFFFF"
+                        }
                     }
                 },
                 "bigIslandArea": {
@@ -566,17 +590,19 @@ private fun testProgressInfo(
                         "type": 1,
                         "picInfo": {
                             "type": 1,
-                            "pic": "progress_icon"
+                            "pic": "miui.focus.pic_progress_icon"
                         },
                         "textInfo": {
                             "title": "线性进度",
                             "content": "$progress%"
                         }
                     },
-                    "sameWidthDigitInfo": {
-                        "digit": "$progress",
-                        "content": "进度",
-                        "showHighlightColor": true
+                    "progressTextInfo": {
+                        "progressInfo": {
+                            "progress": $progress,
+                            "colorReach": "#FF8514",
+                            "colorUnReach": "#33FFFFFF"
+                        }
                     }
                 }
             }
@@ -591,7 +617,7 @@ private fun testProgressInfo(
         paramV2Raw = paramV2Raw,
         picMap =
             mapOf(
-                "progress_icon" to createBlackBlockDataUrl(),
+                "miui.focus.pic_progress_icon" to createBlackBlockDataUrl(),
             ),
     )
 }
@@ -605,10 +631,16 @@ private fun testMultiProgressInfo(
 ) {
     // 获取进度值
     val progress = getProgress(isVariableProgress, 60)
+    // 计时信息必须取当前时间：timerWhen 是计时起点，写死的历史时间戳会让倒计时早已结束
+    // （timerWhen - now < 0，系统不再展示），正计时则显示异常的巨大时长。
+    val now = System.currentTimeMillis()
 
     val paramV2Raw = """
         {
+            "protocol": 1,
+            "business": "demo_multi_progress",
             "baseInfo": {
+                "type": 2,
                 "title": "多节点进度测试",
                 "content": "这是一个多节点进度组件的展开态测试示例"
             },
@@ -617,22 +649,25 @@ private fun testMultiProgressInfo(
                 "progress": $progress,
                 "color": "#00FF00",
                 "points": 3,
-                "picForward": "forward_pic",
-                "picForwardBox": "box_pic",
-                "picMiddle": "middle_pic",
-                "picMiddleUnselected": "middle_unselected_pic",
-                "picEnd": "end_pic",
-                "picEndUnselected": "end_unselected_pic"
+                "picForward": "miui.focus.pic_forward_pic",
+                "picForwardBox": "miui.focus.pic_box_pic",
+                "picMiddle": "miui.focus.pic_middle_pic",
+                "picMiddleUnselected": "miui.focus.pic_middle_unselected_pic",
+                "picEnd": "miui.focus.pic_end_pic",
+                "picEndUnselected": "miui.focus.pic_end_unselected_pic"
             },
             "param_island": {
                 "smallIslandArea": {
-                    "primaryText": "多节点进度测试",
-                    "secondaryText": "正在排水",
-                    "iconKey": "forward_pic",
-                    "progressInfo": {
-                        "progress": $progress,
-                        "colorProgress": "#00FF00",
-                        "colorProgressEnd": "#00FF00"
+                    "combinePicInfo": {
+                        "picInfo": {
+                            "type": 1,
+                            "pic": "miui.focus.pic_forward_pic"
+                        },
+                        "progressInfo": {
+                            "progress": $progress,
+                            "colorReach": "#00FF00",
+                            "colorUnReach": "#33FFFFFF"
+                        }
                     }
                 },
                 "bigIslandArea": {
@@ -640,7 +675,7 @@ private fun testMultiProgressInfo(
                         "type": 1,
                         "picInfo": {
                             "type": 1,
-                            "pic": "forward_pic"
+                            "pic": "miui.focus.pic_forward_pic"
                         },
                         "textInfo": {
                             "title": "多节点进度",
@@ -648,11 +683,11 @@ private fun testMultiProgressInfo(
                         }
                     },
                     "sameWidthDigitInfo": {
-                        "timer": {
+                        "timerInfo": {
                             "timerType": 1,
-                            "timerWhen": 1717470687604,
+                            "timerWhen": $now,
                             "timerTotal": 3600000,
-                            "timerSystemCurrent": 1717470687604
+                            "timerSystemCurrent": $now
                         },
                         "content": "倒计时",
                         "showHighlightColor": true
@@ -670,12 +705,12 @@ private fun testMultiProgressInfo(
         paramV2Raw = paramV2Raw,
         picMap =
             mapOf(
-                "forward_pic" to createBlackBlockDataUrl(),
-                "box_pic" to createBlackBlockDataUrl(),
-                "middle_pic" to createBlackBlockDataUrl(),
-                "middle_unselected_pic" to createBlackBlockDataUrl(),
-                "end_pic" to createBlackBlockDataUrl(),
-                "end_unselected_pic" to createBlackBlockDataUrl(),
+                "miui.focus.pic_forward_pic" to createBlackBlockDataUrl(),
+                "miui.focus.pic_box_pic" to createBlackBlockDataUrl(),
+                "miui.focus.pic_middle_pic" to createBlackBlockDataUrl(),
+                "miui.focus.pic_middle_unselected_pic" to createBlackBlockDataUrl(),
+                "miui.focus.pic_end_pic" to createBlackBlockDataUrl(),
+                "miui.focus.pic_end_unselected_pic" to createBlackBlockDataUrl(),
             ),
     )
 }
@@ -689,6 +724,10 @@ private fun testMultiProgressWithIcons(
 ) {
     // 获取进度值
     val progress = getProgress(isVariableProgress, 75)
+    // 更新时间戳：系统按 sequence 比较「本订单第几次更新」，同值会被判定为旧包并拦截投递
+    // （日志表现为 FocusNotifPreHandler: filterOut old + Plugin prevented post）。
+    // 每次触发都取当前时间，保证严格递增，通知才可能被系统接受并渲染。
+    val sequence = System.currentTimeMillis()
 
     // 根据进度值动态生成配送状态文本
     val deliveryStatus =
@@ -743,7 +782,7 @@ private fun testMultiProgressWithIcons(
             },
             "orderId": "8043310281561250264",
             "enableFloat": false,
-            "sequence": 1766745828259,
+            "sequence": $sequence,
             "protocol": 1,
             "filterWhenNoPermission": true,
             "reopen": "close",
@@ -1070,4 +1109,39 @@ fun SuperIslandTestDialog(
             }
         }
     })
+}
+
+/**
+ * 调试入口：按样本 ID 直接触发对应的超级岛测试样本，免去手工点击测试对话框。
+ *
+ * 供 adb / 自动化调用：
+ * ```
+ * adb shell am start -n com.xzyht.notifyrelay/.ui.activity.MainActivity \
+ *     --es superIslandTest multi_progress_with_icons
+ * ```
+ * 追加 `--ez superIslandTestVariable true` 可使用可变进度（测试动画）。
+ *
+ * @param sampleId 样本 ID，取值见下方 `when` 分支
+ * @return 是否命中已知样本
+ */
+fun triggerSuperIslandTestSample(
+    context: Context,
+    sampleId: String,
+    isVariableProgress: Boolean = false,
+): Boolean {
+    when (sampleId) {
+        "base_info" -> testBaseInfo(context)
+        "chat_info" -> testChatInfo(context)
+        "anim_text_info" -> testAnimTextInfo(context)
+        "highlight_info" -> testHighlightInfo(context)
+        "pic_info" -> testPicInfo(context)
+        "hint_info" -> testHintInfo(context)
+        "text_button" -> testTextButton(context)
+        "progress_info" -> testProgressInfo(context, isVariableProgress)
+        "multi_progress_info" -> testMultiProgressInfo(context, isVariableProgress)
+        "multi_progress_with_icons" -> testMultiProgressWithIcons(context, isVariableProgress)
+        "circular_progress_info" -> testCircularProgressInfo(context, isVariableProgress)
+        else -> return false
+    }
+    return true
 }

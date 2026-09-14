@@ -16,7 +16,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -39,7 +38,6 @@ fun HighlightInfoCompose(
     highlightInfo: HighlightInfo,
     picMap: Map<String, String>?,
 ) {
-    val density = LocalConfiguration.current.densityDpi / 160f
     val iconKey = selectIconKey(highlightInfo)
     val hasIcon = !iconKey.isNullOrEmpty()
 
@@ -50,6 +48,10 @@ fun HighlightInfoCompose(
     val primaryText =
         listOfNotNull(highlightInfo.title, highlightInfo.content, highlightInfo.subContent)
             .firstOrNull { it.isNotBlank() }
+    val timerInfo = highlightInfo.timerInfo
+    // 计时器渲染时，主文本被计时器文本取代，primaryText 实际不渲染；
+    // 去重基准应设为 null，避免 content/subContent 被误判为「与 primaryText 重复」而跳过。
+    val renderedPrimaryText = if (timerInfo != null && !highlightInfo.iconOnly) null else primaryText
 
     Row(
         modifier =
@@ -59,7 +61,6 @@ fun HighlightInfoCompose(
         verticalAlignment = Alignment.CenterVertically,
     ) {
         // 强调文本（支持计时器）
-        val timerInfo = highlightInfo.timerInfo
         if (timerInfo != null && !highlightInfo.iconOnly) {
             TimerText(timerInfo, primaryColor)
         } else {
@@ -75,7 +76,7 @@ fun HighlightInfoCompose(
 
         // 辅助文本1（content）
         highlightInfo.content
-            ?.takeIf { it.isNotBlank() && it != primaryText }
+            ?.takeIf { it.isNotBlank() && it != renderedPrimaryText }
             ?.let {
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
@@ -91,7 +92,7 @@ fun HighlightInfoCompose(
             CommonImageCompose(
                 picKey = iconKey,
                 picMap = picMap,
-                size = (24 * density).dp,
+                size = 24.dp,
                 isFocusIcon = false,
                 contentDescription = null,
             )
@@ -99,7 +100,7 @@ fun HighlightInfoCompose(
 
         // 辅助文本2（subContent）
         highlightInfo.subContent
-            ?.takeIf { it.isNotBlank() && it != primaryText }
+            ?.takeIf { it.isNotBlank() && it != renderedPrimaryText }
             ?.let {
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
@@ -116,10 +117,10 @@ fun HighlightInfoCompose(
             if (leftImageUrl != null || rightImageUrl != null) {
                 Spacer(modifier = Modifier.width(8.dp))
                 leftImageUrl?.let { SuperIslandImageUtil.rememberSuperIslandImagePainter(it) }?.let {
-                    BigAreaImage(it, density)
+                    BigAreaImage(it)
                 }
                 rightImageUrl?.let { SuperIslandImageUtil.rememberSuperIslandImagePainter(it) }?.let {
-                    BigAreaImage(it, density, showLeftMargin = true)
+                    BigAreaImage(it, showLeftMargin = true)
                 }
             }
         }
@@ -129,10 +130,9 @@ fun HighlightInfoCompose(
 @Composable
 private fun BigAreaImage(
     painter: Painter,
-    density: Float,
     showLeftMargin: Boolean = false,
 ) {
-    val size = (44 * density).dp
+    val size = 44.dp
     val modifier = if (showLeftMargin) Modifier.padding(start = 6.dp) else Modifier
 
     Image(

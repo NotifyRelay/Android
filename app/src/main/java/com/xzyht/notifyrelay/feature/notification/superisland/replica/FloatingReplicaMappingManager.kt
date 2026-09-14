@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.replica
 
+import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import android.view.View
@@ -121,6 +122,28 @@ object FloatingReplicaMappingManager {
     }
 
     fun getNotificationIdsBySourceId(sourceId: String): List<Int>? = sourceIdToNotificationIds[sourceId]?.toList()
+
+    /**
+     * 指纹命中时用于二次确认：此前发出的通知是否**确实仍在本应用的活动通知中**。
+     *
+     * 若上次 notify 被系统拦下（焦点通知膨胀失败 / 鉴权未就绪等）或通知已被撤回，
+     * 则不应跳过刷新，否则后续保活包与重复触发将永远不再重发，表现为「怎么点都不出」。
+     */
+    fun isAnyNotificationActive(
+        context: Context,
+        ids: List<Int>?,
+    ): Boolean {
+        if (ids.isNullOrEmpty()) return false
+        return try {
+            val notificationManager =
+                context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            val ownPackage = context.packageName
+            notificationManager.activeNotifications.any { sbn -> sbn.packageName == ownPackage && sbn.id in ids }
+        } catch (e: Exception) {
+            Logger.w(TAG, "查询活动通知失败: ${e.message}")
+            false
+        }
+    }
 
     fun removeNotificationIdsBySourceId(sourceId: String): List<Int>? {
         lastNotificationFingerprints.remove(sourceId)

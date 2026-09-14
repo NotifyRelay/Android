@@ -172,6 +172,12 @@ object FloatingReplicaWindowManager {
 
                     val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
 
+                    // 注入模式：超级岛模式优先于 Live Updates 模式（对齐媒体类型的既有分流范式）。
+                    // 超级岛模式下，即便含 progressInfo 也走超级岛通道；
+                    // 仅在「Live Updates 注入且非超级岛」时保留现有 Live Updates 通道。
+                    val superIslandMode = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
+                    val liveUpdatesMode = SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)
+
                     if (!isRestoring) {
                         // 内容与上次成功发出的通知一致且通知仍在展示时，跳过系统通知刷新（不调用 notify），
                         // 仅保留上方 addOrUpdateEntry 对内部撤回计时器（autoDismiss）的重置
@@ -182,13 +188,16 @@ object FloatingReplicaWindowManager {
                                 formattedData.paramV2Raw,
                                 formattedData.resolvedPicMap,
                             )
+                        val previousNotificationIds = FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
                         val canSkipRefresh =
                             entryExistedBefore &&
+                                !previousNotificationIds.isNullOrEmpty() &&
+                                FloatingReplicaMappingManager.isAnyNotificationActive(context, previousNotificationIds) &&
                                 fingerprint == FloatingReplicaMappingManager.getNotificationFingerprint(sourceId)
 
                         if (canSkipRefresh) {
                             Logger.i(TAG, "超级岛: 内容无变更，跳过系统通知刷新，仅重置内部撤回计时器: sourceId=$sourceId")
-                        } else if (isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                        } else if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                             runWithErrorHandlingSuspend("发送Live Updates复合通知") {
                                 LiveUpdatesNotificationManager.initialize(context)
                                 val success = LiveUpdatesNotificationManager.showLiveUpdate(

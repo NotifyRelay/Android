@@ -29,6 +29,13 @@ object SuperIslandStructuredDataHelper {
     private const val MAX_MEDIA_PIC_PER_IMAGE_BYTES = 256 * 1024
     private const val MAX_MEDIA_PIC_TOTAL_BYTES = 768 * 1024
 
+    // 复刻（非媒体）图片上限：图片以 base64 data URI 写入，体积会再膨胀约 1/3，
+    // 而系统通知 extras 的 Binder 事务有上限（实测 527KB 会抛 TransactionTooLargeException 导致通知投递失败），
+    // 因此这里用更小的尺寸与总预算。
+    private const val MAX_REPLICA_PIC_DIMENSION = 160
+    private const val MAX_REPLICA_PIC_PER_IMAGE_BYTES = 48 * 1024
+    private const val MAX_REPLICA_PIC_TOTAL_BYTES = 224 * 1024
+
     // 超级岛封面图资源 key
     private const val PIC_COVER = "miui.focus.pic_cover"
 
@@ -57,23 +64,19 @@ object SuperIslandStructuredDataHelper {
             if (isSuperIslandSpecInjectionEnabled) {
                 paramV2Raw?.let { rawData ->
                     try {
-                        // 由约束构建器补默认值并包裹 param_v2（规范结构）
-                        // 复刻：business 与 param_island 为编译期必传项
-                        val payload =
-                            SuperIslandParamBuilder
-                                .replica(rawData, SuperIslandParamBuilder.businessOf(rawData))
-                                .island(SuperIslandParamBuilder.paramIslandOf(rawData))
-                                .tickerIfBlank(title)
-                                .aodTitleIfBlank(title)
-                                .build()
+                        // 复刻类型：直接透传来源设备的原始超级岛数据，不做二次拼装。
+                        // 复刻数据来自另一台设备已发出的 miui.focus.param（或裸 param_v2），
+                        // 重新构建（补默认值 / 重写 param_island / 追加 ticker 等）会引入与来源不一致的差异，
+                        // 而系统按字段渲染大岛，任何差异都可能让大岛膨胀失败并回退小岛兜底数据。
+                        val payload = buildReplicaPayload(rawData)
 
                         val issues = SuperIslandParamBuilder.validate(payload)
                         if (issues.isNotEmpty()) {
                             Logger.w(TAG, "超级岛 param_v2 合规校验提示: $issues")
                         }
 
-                        extras.putString(SuperIslandExtras.KEY_PARAM, payload)
-                        Logger.i(TAG, "添加miui.focus.param成功")
+                        SuperIslandExtras.writeParam(extras, payload)
+                        Logger.i(TAG, "添加miui.focus.param成功（原样透传复刻数据）")
                     } catch (e: Exception) {
                         extras.putString(SuperIslandExtras.KEY_PARAM, rawData)
                         Logger.w(TAG, "构建完整焦点通知参数结构失败，回退到原始数据 ${e.message}")
@@ -102,6 +105,23 @@ object SuperIslandStructuredDataHelper {
             Logger.w(TAG, "添加超级岛结构化数据失败: ${e.message}")
             e.printStackTrace()
         }
+    }
+
+    /**
+     * 复刻载荷构造：**原样透传**来源数据，仅做必要的「包一层」。
+     *
+     * - 已是完整 `miui.focus.param`（含 `param_v2`）→ 原样返回，保留外层字段；
+     * - 裸 `param_v2` → 仅包一层 `{"param_v2": 原数据}`，不补默认值、不重写任何组件。
+     *
+     * 依据官方《超级岛开发指南》：`miui.focus.param` 顶层**只有 `param_v2`**（文档未定义顶层 `type`），
+     * 因此这里不额外注入任何模板工厂标识，避免与来源设备载荷产生差异。
+     *
+     * 解析失败时抛出，由调用方回退为原始字符串。
+     */
+    private fun buildReplicaPayload(raw: String): String {
+        val json = JSONObject(raw)
+        val inner = json.optJSONObject("param_v2")
+        return if (inner != null) raw else JSONObject().apply { put("param_v2", json) }.toString()
     }
 
     /**
@@ -305,43 +325,111 @@ object SuperIslandStructuredDataHelper {
         extras: Bundle,
         picMap: Map<String, String>?,
     ) {
-        picMap?.let { map ->
-            val picsBundle = Bundle()
-            var count = 0
-            var totalBytes = 0
-            map.forEach { (picKey, picUrl) ->
-                if (!picKey.startsWith("miui.focus.pic_") || picUrl.isBlank()) return@forEach
-                if (totalBytes >= MAX_MEDIA_PIC_TOTAL_BYTES) {
-                    Logger.w(TAG, "媒体图片总大小已达上限，跳过后续图片: $picKey")
+        val result =
+            loadPicBitmaps(
+                context,
+                picMap,
+                MAX_MEDIA_PIC_DIMENSION,
+                MAX_MEDIA_PIC_PER_IMAGE_BYTES,
+                MAX_MEDIA_PIC_TOTAL_BYTES,
+            )
+        if (result.bitmaps.isEmpty()) return
+        val picsBundle = Bundle()
+        result.bitmaps.forEach { (key, bitmap) ->
+            val data = encodePicData(bitmap, MAX_MEDIA_PIC_PER_IMAGE_BYTES)
+            picsBundle.putParcelable(key, Icon.createWithData(data, 0, data.size))
+        }
+        extras.putBundle(SuperIslandExtras.KEY_PICS, picsBundle)
+        Logger.i(TAG, "媒体图片资源注入成功，共 ${result.bitmaps.size} 个图片（总计 ${result.totalBytes} bytes）")
+    }
+
+    /**
+     * 非媒体类型（复刻）：把图片下载/解码后以 [Icon] 写入 `miui.focus.pics` Bundle。
+     *
+     * 背景：复刻数据的图片来源可能是另一台设备（MIPUSH 场景，图片为 https URL）；本端是「客户端实现」，
+     * 系统不会下载 URL，必须由应用把图片作为 Icon 资源提供，Json 里的 pic 只作为 pics Bundle 的 key。
+     *
+     * @return 实际写入的图片数量
+     */
+    suspend fun injectPicMapIcons(
+        context: Context,
+        extras: Bundle,
+        picMap: Map<String, String>?,
+    ): Int {
+        val result =
+            loadPicBitmaps(
+                context,
+                picMap,
+                MAX_REPLICA_PIC_DIMENSION,
+                MAX_REPLICA_PIC_PER_IMAGE_BYTES,
+                MAX_REPLICA_PIC_TOTAL_BYTES,
+            )
+        if (result.bitmaps.isEmpty()) return 0
+        // 依据《小米澎湃OS 岛通知开发指南》附录「图片数据参数：miui.focus.pics」：
+        // 客户端实现把图片以 Icon 放进 miui.focus.pics Bundle，Json 里的 pic 只作为该 Bundle 的 key。
+        // 这里**只写 Bundle**，不再同时写单个 miui.focus.pic_* extra —— 双写会让同一份图片在 extras 里
+        // 存两份，曾把通知体积顶到 527KB 触发 TransactionTooLargeException（通知投递失败、不显示）。
+        val picsBundle = Bundle()
+        result.bitmaps.forEach { (key, bitmap) ->
+            val data = encodePicData(bitmap, MAX_REPLICA_PIC_PER_IMAGE_BYTES)
+            picsBundle.putParcelable(key, Icon.createWithData(data, 0, data.size))
+        }
+        extras.putBundle(SuperIslandExtras.KEY_PICS, picsBundle)
+        Logger.i(TAG, "超级岛图片资源注入成功（Icon，仅写 pics Bundle），共 ${result.bitmaps.size} 个图片（总计 ${result.totalBytes} bytes）")
+        return result.bitmaps.size
+    }
+
+    /** 图片加载结果：key → 缩放后的位图（及编码后总字节数，用于上限统计） */
+    private class PicBitmapResult(
+        val bitmaps: Map<String, Bitmap>,
+        val totalBytes: Int,
+    )
+
+    /**
+     * 下载/解码并缩放图片：仅处理规范的 `miui.focus.pic_` 前缀与合法链接，
+     * 受数量（[SuperIslandImageSpec.MAX_IMAGE_COUNT]）、单张尺寸与总大小上限约束。
+     */
+    private suspend fun loadPicBitmaps(
+        context: Context,
+        picMap: Map<String, String>?,
+        maxDimension: Int,
+        maxPerImageBytes: Int,
+        maxTotalBytes: Int,
+    ): PicBitmapResult {
+        if (picMap.isNullOrEmpty()) return PicBitmapResult(emptyMap(), 0)
+        val bitmaps = LinkedHashMap<String, Bitmap>()
+        var totalBytes = 0
+        picMap.forEach { (picKey, picUrl) ->
+            if (bitmaps.size >= SuperIslandImageSpec.MAX_IMAGE_COUNT) return@forEach
+            if (!picKey.startsWith(SuperIslandExtras.PIC_KEY_PREFIX)) return@forEach
+            if (!SuperIslandImageSpec.isPicEntryValid(picUrl)) return@forEach
+            if (totalBytes >= maxTotalBytes) {
+                Logger.w(TAG, "图片总大小已达上限，跳过后续图片: $picKey")
+                return@forEach
+            }
+            val bitmap =
+                try {
+                    ImageUtils.loadBitmap(context, picUrl)
+                } catch (e: CancellationException) {
+                    // 协程取消必须原样抛出，避免被当作普通异常吞掉
+                    throw e
+                } catch (e: Exception) {
+                    Logger.w(TAG, "图片加载失败 $picKey: ${e.message}")
+                    null
+                }
+            if (bitmap != null) {
+                // 按比例缩放到上限尺寸，并用编码后大小做总量控制，避免通知事务过大
+                val scaled = scaleDownBitmap(bitmap, maxDimension)
+                val size = encodePicData(scaled, maxPerImageBytes).size
+                if (totalBytes + size > maxTotalBytes) {
+                    Logger.w(TAG, "图片超过总大小限制，跳过: $picKey ($size bytes)")
                     return@forEach
                 }
-                val bitmap =
-                    try {
-                        ImageUtils.loadBitmap(context, picUrl)
-                    } catch (e: CancellationException) {
-                        // 协程取消必须原样抛出，避免被当作普通异常吞掉
-                        throw e
-                    } catch (e: Exception) {
-                        Logger.w(TAG, "媒体图片加载失败 ${picKey}: ${e.message}")
-                        null
-                    }
-                if (bitmap != null) {
-                    // 按比例缩放到上限尺寸并压缩，限制单张与总体大小，避免通知事务过大
-                    val data = encodePicData(scaleDownBitmap(bitmap, MAX_MEDIA_PIC_DIMENSION))
-                    if (totalBytes + data.size > MAX_MEDIA_PIC_TOTAL_BYTES) {
-                        Logger.w(TAG, "媒体图片超过总大小限制，跳过: $picKey (${data.size} bytes)")
-                        return@forEach
-                    }
-                    picsBundle.putParcelable(picKey, Icon.createWithData(data, 0, data.size))
-                    totalBytes += data.size
-                    count++
-                }
-            }
-            if (count > 0) {
-                extras.putBundle("miui.focus.pics", picsBundle)
-                Logger.i(TAG, "媒体图片资源注入成功，共 $count 个图片（总计 $totalBytes bytes）")
+                bitmaps[picKey] = scaled
+                totalBytes += size
             }
         }
+        return PicBitmapResult(bitmaps, totalBytes)
     }
 
     /**
@@ -362,11 +450,15 @@ object SuperIslandStructuredDataHelper {
     /**
      * 将位图编码为图标数据：优先 PNG（保留透明度），过大时改用 JPEG 压缩以减小体积。
      */
-    private fun encodePicData(bitmap: Bitmap): ByteArray {
+    private fun encodePicData(
+        bitmap: Bitmap,
+        maxBytes: Int = MAX_MEDIA_PIC_PER_IMAGE_BYTES,
+    ): ByteArray {
         val pngOut = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.PNG, 100, pngOut)
         val png = pngOut.toByteArray()
-        if (png.size <= MAX_MEDIA_PIC_PER_IMAGE_BYTES) return png
+        if (png.size <= maxBytes) return png
+        // PNG 过大时改用 JPEG（体积小得多；会丢透明通道，仅作体积兜底）
         val jpegOut = ByteArrayOutputStream()
         bitmap.compress(Bitmap.CompressFormat.JPEG, 85, jpegOut)
         return jpegOut.toByteArray()

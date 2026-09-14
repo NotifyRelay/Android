@@ -321,10 +321,12 @@ fun FloatingWindowContainer(
                                                                     Logger.d("超级岛", "FloatingWindowContainer: 渲染 TextButtonCompose")
                                                                     TextButtonCompose(paramV2.textButton!!, picMap = entry.picMap)
                                                                 }
-                                                                paramV2.actions?.isNotEmpty() == true -> {
-                                                                    Logger.d("超级岛", "FloatingWindowContainer: 渲染 ActionCompose")
-                                                                    ActionCompose(paramV2.actions!!, entry.picMap)
-                                                                }
+                                                            }
+                                                            // 按钮动作区独立于上方内容分支：只要 actions 非空就渲染，
+                                                            // 避免被 highlightInfoV3 / hintInfo / textButton 任一存在而吞掉。
+                                                            if (paramV2.actions?.isNotEmpty() == true) {
+                                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 ActionCompose")
+                                                                ActionCompose(paramV2.actions!!, entry.picMap)
                                                             }
                                                         }
                                                     }

@@ -46,11 +46,13 @@ class SuperIslandParamBuilder private constructor() {
          * 构建入口：`business`（运营场景）为必传项 —— 编译期强制。
          * @return 阶段对象 [WithBusiness]，在提供 [WithBusiness.island] 前无法构建
          */
-        fun business(value: String): WithBusiness =
-            WithBusiness(
+        fun business(value: String): WithBusiness {
+            require(value.isNotBlank()) { "business 不能为空白" }
+            return WithBusiness(
                 paramV2 = JSONObject().apply { put("business", value) },
                 outerType = null,
             )
+        }
 
         /**
          * 复刻入口：从已有 `miui.focus.param` / 裸 `param_v2` 提取。
@@ -109,7 +111,9 @@ class SuperIslandParamBuilder private constructor() {
                 val json = JSONObject(raw)
                 json.optJSONObject("param_v2") ?: json
             } catch (e: Exception) {
-                JSONObject()
+                // 不再静默返回空对象：让上游 replica() / businessOf() / paramIslandOf()
+                // 抛到调用方 catch，落到 rawData 原始兜底，避免用只有默认值的载荷覆盖损坏数据。
+                throw e
             }
         }
 

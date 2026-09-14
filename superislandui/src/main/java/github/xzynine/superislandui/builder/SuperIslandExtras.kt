@@ -69,7 +69,8 @@ object SuperIslandExtras {
         val picsBundle = Bundle()
         var count = 0
         picMap.forEach { (key, url) ->
-            if (key.startsWith(PIC_KEY_PREFIX)) {
+            if (count >= SuperIslandImageSpec.MAX_IMAGE_COUNT) return@forEach
+            if (key.startsWith(PIC_KEY_PREFIX) && SuperIslandImageSpec.isPicEntryValid(url)) {
                 extras.putString(key, url)
                 picsBundle.putString(key, url)
                 count++
