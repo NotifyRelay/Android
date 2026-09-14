@@ -15,7 +15,7 @@
 
 ### 应用 API 版本
 
-minSdk：`:app`（主应用）与 `:core`（核心库）minSdk = 31（Android 12），其余库模块（`:base`、`:data`、`:superislandui`、`:nativecore` 等）minSdk = 29（Android 10）。请勿为任一模块声明的 minSdk 以下版本编写兼容性代码。
+minSdk：`:app`（主应用）与 `:core`（核心库）minSdk = 31（Android 12），其余库模块（`:base`、`:data`、`:superislandui`、`:nativecore` 等）minSdk = 29（Android 10）；`:scrcpy` minSdk = 26（子模块自带配置）。请勿为任一模块声明的 minSdk 以下版本编写兼容性代码。
 
 LSPosed 模块已拆分为平级独立仓库 `NotifyRelay-LSP`（独立 APK，headless 无 GUI），不在本仓库内。
 
