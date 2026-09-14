@@ -1,8 +1,19 @@
-# Copilot Instructions
+# 记忆文件 
+记忆文件位于./memory
+00main.md为主记忆，其他的带日期的为次记忆|
+信任记忆文件，不要主动验证
+## 每次会话开始时（上班打卡）
+1. 读 00mian.md 和近期日期的md了解状态
 
-## ai的agent要求
+## 会话中
+1. 向日期.md记录普通问题
 
-- 要求修改时直接修改不二次征求同意
+## 每次会话结束前（下班打卡）
+1. 更新 00mian.md （如有重要记忆时，没有时仅更新普通记忆文件）
+
+
+# ai的agent要求
+
 - 尽量最小化改动以避免无法预料的错误
 - 回复时使用中文
 
@@ -16,8 +27,6 @@
 ### 应用 API 版本
 
 minSdk：`:app`（主应用）与 `:core`（核心库）minSdk = 31（Android 12），其余库模块（`:base`、`:data`、`:superislandui`、`:nativecore` 等）minSdk = 29（Android 10）；`:scrcpy` minSdk = 26（子模块自带配置）。请勿为任一模块声明的 minSdk 以下版本编写兼容性代码。
-
-LSPosed 模块已拆分为平级独立仓库 `NotifyRelay-LSP`（独立 APK，headless 无 GUI），不在本仓库内。
 
 - 代码风格遵循 Kotlin 官方规范（`kotlin.code.style=official`）。
 - 如需扩展功能或集成新依赖，优先查阅 `miuix-mcp` 与本项目现有实现。
@@ -40,13 +49,6 @@ LSPosed 模块已拆分为平级独立仓库 `NotifyRelay-LSP`（独立 APK，he
 
 ### Git 钩子（必须启用）
 
-仓库提供 `.githooks/` 下的钩子，已纳入版本控制：
-
-| 钩子 | 作用 |
-|---|---|
-| `pre-commit` | 暂存区有 Kotlin 变更时运行 `./gradlew ktlintFormat`；无变更则跳过 |
-| `pre-push` | 推送前对全量源码运行 `./gradlew ktlintFormat` |
-| `post-merge` | 合并/拉取后自动 `git submodule update --init --recursive` |
 
 **启用（每个克隆只需执行一次；Git 不允许钩子路径随仓库自动生效）：**
 
@@ -59,14 +61,5 @@ git config core.hooksPath .githooks
 ```bash
 git config core.hooksPath   # 应输出 .githooks
 ```
-
-**拦截规则**（`ktlintFormat` 行为已实测）：
-
-- 可自动修复的违规：`ktlintFormat` 静默改写文件但退出码仍为 0。格式化不改变语义，故 `pre-commit` 会自动 `git add` 将结果纳入本次提交并放行。
-- 无法自动修复的违规：构建失败、退出码非 0。**两个钩子均阻断**，提示见各模块 `build/reports/ktlint/` 下的报告。
-
-**为何必须拦截**：`update.yml` 在 push 到 `main` 后执行 `./gradlew ktlintFormat`，遇到无法自动修复的违规即构建失败，整条语义化发版流程被中断（版本号不回写、tag 不打，实例见 run 34847149469）。该问题只在 push 之后才暴露，故提前到本地拦截。
-
-紧急情况下可用 `--no-verify` 绕过（不推荐，等同于把问题推迟到 CI）。
 
 
