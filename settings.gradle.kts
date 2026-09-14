@@ -32,4 +32,6 @@ include(":checkupdata")
 include(":superislandui")
 include(":scrcpy")
 include(":nativecore")
-include(":lsp")
+// LSPosed 模块（启用超级岛鉴权绕过）已拆分为独立仓库 NotifyRelay-LSP 与独立 APK，
+// 不再作为主应用模块参与构建；主应用重装不再触发其热重载。
+// 仓库：https://github.com/NotifyRelay/NotifyRelay-LSP
