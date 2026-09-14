@@ -7,8 +7,8 @@ import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.util.Base64
 import com.xzyht.notifyrelay.feature.appslist.AppRepository
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope

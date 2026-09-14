@@ -18,6 +18,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.common.PreviewData
+import github.xzynine.superislandui.floating.common.CircularProgressCompose
+import github.xzynine.superislandui.floating.common.CommonImageCompose
+import github.xzynine.superislandui.floating.common.CommonImagePlaceholder
+import github.xzynine.superislandui.floating.common.CommonTextBlockCompose
+import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.floating.common.formatTimerInfo
+import github.xzynine.superislandui.floating.common.parseColorSafe
+import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.floating.smallisland.right.BComponent
 import github.xzynine.superislandui.floating.smallisland.right.BEmpty
 import github.xzynine.superislandui.floating.smallisland.right.BFixedWidthDigitInfo
@@ -29,14 +37,6 @@ import github.xzynine.superislandui.floating.smallisland.right.BPicInfo
 import github.xzynine.superislandui.floating.smallisland.right.BProgressTextInfo
 import github.xzynine.superislandui.floating.smallisland.right.BSameWidthDigitInfo
 import github.xzynine.superislandui.floating.smallisland.right.BTextInfo
-import github.xzynine.superislandui.floating.common.CircularProgressCompose
-import github.xzynine.superislandui.floating.common.CommonImageCompose
-import github.xzynine.superislandui.floating.common.CommonImagePlaceholder
-import github.xzynine.superislandui.floating.common.CommonTextBlockCompose
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
-import github.xzynine.superislandui.floating.common.formatTimerInfo
-import github.xzynine.superislandui.floating.common.parseColorSafe
-import github.xzynine.superislandui.floating.common.resolveIconUrl
 
 /**
  * B区组件的Compose实现

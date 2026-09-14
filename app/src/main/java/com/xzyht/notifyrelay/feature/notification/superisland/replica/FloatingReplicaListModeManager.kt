@@ -4,13 +4,13 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import android.widget.Toast
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandListManager
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
+import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandListManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -134,14 +134,15 @@ object FloatingReplicaListModeManager {
                     Logger.i(TAG, "超级岛: 内容无变更，跳过系统通知刷新，仅重置撤回计时器: sourceId=${entry.sourceId}")
                 } else if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                     LiveUpdatesNotificationManager.initialize(context)
-                    val success = LiveUpdatesNotificationManager.showLiveUpdate(
-                        entry.sourceId,
-                        displayTitle,
-                        displayText,
-                        entry.appName,
-                        formattedData,
-                        overrideNotificationId = LIST_MODE_NOTIFICATION_ID,
-                    )
+                    val success =
+                        LiveUpdatesNotificationManager.showLiveUpdate(
+                            entry.sourceId,
+                            displayTitle,
+                            displayText,
+                            entry.appName,
+                            formattedData,
+                            overrideNotificationId = LIST_MODE_NOTIFICATION_ID,
+                        )
                     if (success) {
                         FloatingReplicaMappingManager.putNotificationId(entry.sourceId, LIST_MODE_NOTIFICATION_ID)
                         FloatingReplicaMappingManager.addSourceIdMapping(entry.sourceId, entry.sourceId, LIST_MODE_NOTIFICATION_ID)

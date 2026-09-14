@@ -22,7 +22,6 @@ import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingRe
 import github.xzynine.superislandui.common.BitmapUtils
 import github.xzynine.superislandui.common.CapsuleScrollManager
 import github.xzynine.superislandui.common.TextSplitter
-import kotlinx.coroutines.CancellationException
 import github.xzynine.superislandui.floating.smallisland.left.AComponent
 import github.xzynine.superislandui.floating.smallisland.left.aContent
 import github.xzynine.superislandui.floating.smallisland.left.aPicKey
@@ -39,6 +38,7 @@ import github.xzynine.superislandui.floating.smallisland.right.bTitle
 import github.xzynine.superislandui.floating.smallisland.right.isTimerType
 import github.xzynine.superislandui.floating.smallisland.right.textToRender
 import github.xzynine.superislandui.model.core.ParamV2
+import kotlinx.coroutines.CancellationException
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.core.util.image.ImageUtils
@@ -703,9 +703,9 @@ object NotificationGenerator {
                         builtNotification
                     }
 
-                    // 发送通知
-                    notificationManager.notify(notificationId, notification)
-                }
+                // 发送通知
+                notificationManager.notify(notificationId, notification)
+            }
 
             // 保存entryKey到notificationId的映射
             FloatingReplicaMappingManager
@@ -869,9 +869,10 @@ object NotificationGenerator {
      */
     private fun clearSmallIcon(notification: Notification) {
         try {
-            val transparentIcon = Icon.createWithBitmap(
-                Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8).apply { eraseColor(android.graphics.Color.TRANSPARENT) },
-            )
+            val transparentIcon =
+                Icon.createWithBitmap(
+                    Bitmap.createBitmap(1, 1, Bitmap.Config.ALPHA_8).apply { eraseColor(android.graphics.Color.TRANSPARENT) },
+                )
             val field = Notification::class.java.getDeclaredField("mSmallIcon")
             field.isAccessible = true
             field.set(notification, transparentIcon)

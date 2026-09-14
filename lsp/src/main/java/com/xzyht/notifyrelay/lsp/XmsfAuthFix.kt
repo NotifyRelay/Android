@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.lsp
 
-import android.os.Bundle
 import io.github.libxposed.api.XposedInterface
 import io.github.lingqiqi5211.ezhooktool.xposed.EzXposed
 import io.github.lingqiqi5211.ezhooktool.xposed.dsl.createBeforeHook
@@ -132,9 +131,10 @@ object XmsfAuthFix {
                     }
                 }
             xposed.log(android.util.Log.INFO, TAG, "getAuthSuccess 方法查找结果: ${authSuccessMethods.size}")
-            getAuthSuccess = authSuccessMethods.single().getMethodInstance(classLoader).apply {
-                isAccessible = true
-            }
+            getAuthSuccess =
+                authSuccessMethods.single().getMethodInstance(classLoader).apply {
+                    isAccessible = true
+                }
 
             val authErrorClass =
                 bridge.findClass {
@@ -155,9 +155,10 @@ object XmsfAuthFix {
                     }
                 }
             xposed.log(android.util.Log.INFO, TAG, "errorCode 字段查找结果: ${errorFields.size}")
-            getErrorField = errorFields.single().getFieldInstance(classLoader).apply {
-                isAccessible = true
-            }
+            getErrorField =
+                errorFields.single().getFieldInstance(classLoader).apply {
+                    isAccessible = true
+                }
 
             xposed.log(android.util.Log.INFO, TAG, "DexKit 查找完成")
 

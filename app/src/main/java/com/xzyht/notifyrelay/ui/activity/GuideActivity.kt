@@ -16,9 +16,9 @@ import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.guide.GuideScreen
+import notifyrelay.base.util.GuidePermissionRequester
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.base.util.GuidePermissionRequester
 import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.data.StorageManager
 
@@ -60,16 +60,18 @@ class GuideActivity : ComponentActivity() {
         val needConsent = !isFirstLaunch && newPermissions.isNotEmpty() && !reauthExtra
 
         // 调试分支覆盖：forceBranch 存在时直接采用指定分支，绕过真实状态判定。
-        val debugReauth = when (forceBranch) {
-            "reauth" -> true
-            "consent" -> false
-            else -> reauth
-        }
-        val debugNeedConsent = when (forceBranch) {
-            "consent" -> true
-            "reauth" -> false
-            else -> needConsent
-        }
+        val debugReauth =
+            when (forceBranch) {
+                "reauth" -> true
+                "consent" -> false
+                else -> reauth
+            }
+        val debugNeedConsent =
+            when (forceBranch) {
+                "consent" -> true
+                "reauth" -> false
+                else -> needConsent
+            }
 
         // 仅冷启动、已首次启动过、且权限满足、且无需重新同意时自动跳主界面；
         // 其余情况（首次启动 / 应用内跳转 / 重授权 / 需重新同意）均渲染引导页。

@@ -8,11 +8,11 @@ import androidx.core.app.NotificationCompat
 import github.xzynine.superislandui.builder.SuperIslandExtras
 import github.xzynine.superislandui.builder.SuperIslandImageSpec
 import github.xzynine.superislandui.builder.SuperIslandParamBuilder
-import java.io.ByteArrayOutputStream
 import kotlinx.coroutines.CancellationException
 import notifyrelay.base.util.Logger
 import notifyrelay.core.util.image.ImageUtils
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 
 /**
  * 超级岛结构化数据注入工具
@@ -209,8 +209,7 @@ object SuperIslandStructuredDataHelper {
                         highlightColor("#FFFFFF")
                         bigIslandArea(bigIslandArea)
                         smallIslandArea(smallIslandArea)
-                    }
-                    .focusType(SuperIslandParamBuilder.FOCUS_V3_TYPE)
+                    }.focusType(SuperIslandParamBuilder.FOCUS_V3_TYPE)
                     .ticker(title ?: "")
                     .aodTitle(title ?: "")
                     .component(
@@ -220,8 +219,7 @@ object SuperIslandStructuredDataHelper {
                             put("title", title ?: "")
                             put("content", text ?: "")
                         },
-                    )
-                    .build()
+                    ).build()
 
             extras.putString(SuperIslandExtras.KEY_PARAM, payload)
 
@@ -460,7 +458,7 @@ object SuperIslandStructuredDataHelper {
                 val data =
                     encodePicData(scaled, maxPerImageBytes)
                         ?: run {
-                            Logger.w(TAG, "图片超过单张大小限制(${maxPerImageBytes} bytes)，跳过: $picKey")
+                            Logger.w(TAG, "图片超过单张大小限制($maxPerImageBytes bytes)，跳过: $picKey")
                             return@forEach
                         }
                 if (totalBytes + data.size > maxTotalBytes) {

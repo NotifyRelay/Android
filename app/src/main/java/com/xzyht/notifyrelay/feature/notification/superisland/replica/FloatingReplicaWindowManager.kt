@@ -8,6 +8,7 @@ import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
 import androidx.core.net.toUri
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingComposeContainer
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowLifecycleOwner
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
@@ -16,7 +17,6 @@ import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandI
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
-import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -206,13 +206,14 @@ object FloatingReplicaWindowManager {
                         } else if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                             runWithErrorHandlingSuspend("发送Live Updates复合通知") {
                                 LiveUpdatesNotificationManager.initialize(context)
-                                val success = LiveUpdatesNotificationManager.showLiveUpdate(
-                                    sourceId,
-                                    displayTitle,
-                                    displayText,
-                                    appName,
-                                    formattedData,
-                                )
+                                val success =
+                                    LiveUpdatesNotificationManager.showLiveUpdate(
+                                        sourceId,
+                                        displayTitle,
+                                        displayText,
+                                        appName,
+                                        formattedData,
+                                    )
                                 val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
                                 FloatingReplicaMappingManager.putNotificationId(entryKey, liveUpdateNotificationId)
                                 FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)

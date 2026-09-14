@@ -219,7 +219,10 @@ object PermissionHelper {
      * @param enabledListeners [Settings.Secure.ENABLED_NOTIFICATION_LISTENERS] 的原始字符串，可空。
      * @return 当系统已启用本应用声明的某个 NotificationListenerService 组件时返回 true，否则返回 false。
      */
-    private fun isNotificationListenerEnabled(context: Context, enabledListeners: String?): Boolean {
+    private fun isNotificationListenerEnabled(
+        context: Context,
+        enabledListeners: String?,
+    ): Boolean {
         if (enabledListeners.isNullOrEmpty()) return false
         val enabledSet = enabledListeners.split(":").map { it.trim() }.filter { it.isNotEmpty() }
         if (enabledSet.isEmpty()) return false
