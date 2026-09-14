@@ -118,11 +118,20 @@ jobs:
           console.log(`回写 version.properties: versionName=${nextVersion}, versionCode=${nextCode}`)
           JS
 
+      # 版本一律锁定：这些包不锁版本时会各自漂移到最新大版本，极易互相不兼容。
+      # 曾发生的事故：conventional-changelog-conventionalcommits 漂移到 10.x 后，
+      # 其内部依赖 @conventional-changelog/template 要求 conventional-changelog-writer@9+，
+      # 而 @semantic-release/release-notes-generator@14 依赖的是 writer@^8，
+      # 导致 generateNotes 阶段报 "Missing helper" 并中断发版（run 34860168743）。
+      # 故此处固定在 9.x（该系列仅依赖 compare-func，与 writer@8 兼容）。
+      # 升级时需确认 conventional-changelog-writer 在两侧的主版本一致。
       - name: 安装 semantic-release 及插件（不写入仓库，node_modules 已排除）
         run: |
           npm install --no-save --no-package-lock --no-audit --no-fund \
-            semantic-release @semantic-release/exec @semantic-release/git \
-            conventional-changelog-conventionalcommits
+            semantic-release@25.0.9 \
+            @semantic-release/exec@7.1.0 \
+            @semantic-release/git@11.0.1 \
+            conventional-changelog-conventionalcommits@9.3.1
 
       - name: 执行 semantic-release（推断版本、回写、打 tag、PAT 推送）
         env:

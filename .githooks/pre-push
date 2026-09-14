@@ -1,0 +1,56 @@
+#!/bin/sh
+#
+# pre-push：推送前运行 CI 同款 ./gradlew ktlintFormat，作为发版前的最后一道门禁。
+#
+# 背景：update.yml 在 push 到 main 后执行 ./gradlew ktlintFormat，
+# 一旦出现无法自动修复的 ktlint 违规，整条语义化发版流程会被中断
+# （版本号不回写、tag 不打，见 run 34847149469）。该问题只在 push 之后才暴露，故在此提前拦截。
+#
+# 与 pre-commit 的区别：pre-commit 只校验暂存区，pre-push 校验工作区全量源码，
+# 因此能兜住 amend 遗漏、分支合并、以及 hook 启用前已存在的提交。
+#
+# ktlintFormat 的行为（已实测）：
+#   - 可自动修复的违规：静默改写文件，退出码仍为 0 —— 已在 pre-commit 自动暂存，
+#     此处若仍有差异则说明工作区有未提交的格式化结果，仅提示并中断推送以免推送内容与工作区不一致
+#   - 不可自动修复的违规：构建失败，退出码非 0 —— 必须阻断
+
+set -e
+
+echo "[pre-push] 运行 ktlintFormat ..."
+
+# 记录全部受版本控制的 Kotlin 文件的内容哈希
+snapshot=$(mktemp)
+trap 'rm -f "$snapshot"' EXIT
+git ls-files -z -- '*.kt' '*.kts' |
+  while IFS= read -r -d '' f; do
+    [ -f "$f" ] && printf '%s  %s\n' "$(git hash-object "$f")" "$f"
+  done > "$snapshot"
+
+if ! ./gradlew ktlintFormat --console=plain -q; then
+  echo ""
+  echo "[pre-push] ✗ ktlintFormat 失败：存在无法自动修复的 ktlint 违规。"
+  echo "          推送后 CI 的 update.yml 会在同一步骤失败并中断发版。"
+  echo "          请修正后重新推送（详见各模块 build/reports/ktlint/ 下的报告）。"
+  echo "          如需紧急推送，可用 git push --no-verify 绕过（不推荐）。"
+  exit 1
+fi
+
+changed=""
+while IFS= read -r line; do
+  old=$(printf '%s\n' "$line" | cut -d' ' -f1)
+  f=$(printf '%s\n' "$line" | cut -d' ' -f3-)
+  [ -f "$f" ] || continue
+  if [ "$old" != "$(git hash-object "$f")" ]; then
+    changed="$changed  $f\n"
+  fi
+done < "$snapshot"
+
+if [ -n "$changed" ]; then
+  echo ""
+  echo "[pre-push] ✗ ktlintFormat 改写了以下文件，且结果尚未提交："
+  printf "$changed"
+  echo "          请 git add 并提交后再推送，否则推送内容与工作区不一致、CI 仍可能失败。"
+  exit 1
+fi
+
+echo "[pre-push] ✓ ktlintFormat 通过"

@@ -3,7 +3,7 @@ package github.xzynine.superislandui.builder
 import github.xzynine.superislandui.model.components.TimerInfo
 import org.json.JSONObject
 
-/**
+/*
  * `param_island`（岛数据）类型化模型。
  *
  * 覆盖大岛（A/B 区）与小岛内容，配合 [SuperIslandParamBuilder] 即可用类型化模型构建整棵

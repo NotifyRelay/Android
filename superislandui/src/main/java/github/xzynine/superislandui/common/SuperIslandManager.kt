@@ -1,4 +1,4 @@
-﻿package github.xzynine.superislandui.common
+package github.xzynine.superislandui.common
 
 import android.content.Context
 import android.graphics.Bitmap
@@ -328,7 +328,7 @@ object SuperIslandManager {
                 }
             Logger.i("超级岛", "超级岛: 提取数据 pkg=$pkg, $titleTextLog, keys=${extras.keySet()}")
             try {
-                picMap.entries.take(6).joinToString(",") { (k, v) -> "$k=${v?.take(80)}" }
+                picMap.entries.take(6).joinToString(",") { (k, v) -> "$k=${v.take(80)}" }
                 // Logger.d("超级岛", "超级岛: pic_map keys=${picMap.keys.size}, sample={$sample}")
             } catch (_: Exception) {
             }

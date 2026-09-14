@@ -1,8 +1,19 @@
-# Copilot Instructions
+# 记忆文件 
+记忆文件位于./memory
+00main.md为主记忆，其他的带日期的为次记忆|
+信任记忆文件，不要主动验证
+## 每次会话开始时（上班打卡）
+1. 读 00mian.md 和近期日期的md了解状态
 
-## ai的agent要求
+## 会话中
+1. 向日期.md记录普通问题
 
-- 要求修改时直接修改不二次征求同意
+## 每次会话结束前（下班打卡）
+1. 更新 00mian.md （如有重要记忆时，没有时仅更新普通记忆文件）
+
+
+# ai的agent要求
+
 - 尽量最小化改动以避免无法预料的错误
 - 回复时使用中文
 
@@ -16,8 +27,6 @@
 ### 应用 API 版本
 
 minSdk：`:app`（主应用）与 `:core`（核心库）minSdk = 31（Android 12），其余库模块（`:base`、`:data`、`:superislandui`、`:nativecore` 等）minSdk = 29（Android 10）；`:scrcpy` minSdk = 26（子模块自带配置）。请勿为任一模块声明的 minSdk 以下版本编写兼容性代码。
-
-LSPosed 模块已拆分为平级独立仓库 `NotifyRelay-LSP`（独立 APK，headless 无 GUI），不在本仓库内。
 
 - 代码风格遵循 Kotlin 官方规范（`kotlin.code.style=official`）。
 - 如需扩展功能或集成新依赖，优先查阅 `miuix-mcp` 与本项目现有实现。
@@ -37,5 +46,20 @@ LSPosed 模块已拆分为平级独立仓库 `NotifyRelay-LSP`（独立 APK，he
 
 - 功能开发在独立分支进行，合并到 `main` 时推荐使用非快进合并 (`--no-ff`) 以保留分支提交记录。
 - 当前长期 `dev` 分支 为开发主线，`main` 分支为发布来源。
+
+### Git 钩子（必须启用）
+
+
+**启用（每个克隆只需执行一次；Git 不允许钩子路径随仓库自动生效）：**
+
+```bash
+git config core.hooksPath .githooks
+```
+
+未启用时钩子不会运行——换机器、重新克隆或新增协作者后务必重新执行。可用以下命令确认：
+
+```bash
+git config core.hooksPath   # 应输出 .githooks
+```
 
 
