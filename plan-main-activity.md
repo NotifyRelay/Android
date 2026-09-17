@@ -133,3 +133,26 @@ sequenceDiagram
 - 步骤 1 收益最大且风险最低（215 行 UI 搬移），建议先做。
 - 步骤 2 涉及 Activity 结果启动器的注册时机，**必须保持字段初始化顺序**，是本计划中风险最高的一步，建议单独提交并重点验证屏幕捕获流程。
 - 与 `refactor/split-device-connection-manager`（`AudioRelayController.onRequestMediaProjection`）存在交叉。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1~5 全部完成，含标注「可选」的步骤 5。
+
+### 生命周期重点项（审查已核对无回归）
+- 三个 `registerForActivityResult` 仍在**字段初始化期**注册，未挪进 `onCreate`。
+- `onDestroy` 的 `super` 顺序与 `===` 判断保留。
+- `onCreate`「权限门控 → 注册投影回调 → 后台初始化」与 `onResume`「processPendingScreenCapture → 权限协程」顺序均未变。
+- `MainScreen` 抽出体与原 460-674 行逐行 diff 仅 2 处差异（全限定名 `Navigator` 改为 import）。
+
+### 实际偏离（**有意且正确**）
+- 未合并 `checkPermissionsAndStartServices`(onResume) 与 `startServicesAndUpdateBanner`(onCreate)。原计划提示需确认时序差异是否有意为之；合并会改变「每次回前台重查权限 vs 仅首次启动服务」的语义，故保留两个独立入口。此处记录以便评审识别为「有意」。
+
+### 审查发现（遗留，未处理）
+- **包级循环依赖**（已验证）：`MainActivityContent.kt:24` import `ui.screen.MainScreen`，而 `MainScreen.kt:40` 反向 import `ui.activity.MainActivity`；拆分前二者同文件无此环。
+- 原 `MainActivity.companion` 的 public `EXTRA_SUPER_ISLAND_TEST` / `_VARIABLE` 被删除并迁至 `SuperIslandTestLauncher`，属**对外常量 API 的破坏性移除**（仓内无引用，但应显式说明）。
+- `MainActivity.kt:29-38` `bringMainActivityToFront()` 现仅被协调器 lambda 使用，归属应随 `ScreenCaptureCoordinator` 走。
