@@ -147,3 +147,27 @@ sequenceDiagram
   2. 步骤 4 前**先做并发压测**，记录基线 ANR/日志，拆分后对比。
 - 文件名 `NotificationData.kt` 与内容不符，拆分后建议重命名为更贴切的文件集（`NotificationRecordStore.kt` / `NotificationRepository.kt` / ...），并同步更新 `Docs/文件用途基础说明.md`。
 - 与 `refactor/split-notify-relay-notification-listener-service`（`registerCacheCleaner` + `getStringCompat` 调用方）、`refactor/split-backend-remote-filter`（`onLocalNotificationEnqueued` 契约）、`refactor/split-notification-history`（UI 消费 flow）强交叉，**建议优先或最后合并**。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1、2、3、5 完成；文件已由 `NotificationData.kt` 经 `git mv` 重命名为 `NotificationRepository.kt`（更名副其实）。
+- 步骤 5：全局搜索确认 `maxNotificationsPerDevice` / `debounceJob` / `DEBOUNCE_DELAY` 仅声明无引用，已删除。
+
+### 未完成（**计划步骤 4 未执行，且原计划未声明跳过**）
+- 步骤 4 要求把 `NotificationRepository` 再拆为 `NotificationMemoryStore` / `NotificationPersistence` 两模块。**实际未做**，主文件仍 444 行。
+- 影响：`NotificationRepository.kt` 仍偏大，但门面契约完整、构建与锁粒度均已验证无变化。**是否补做需明确决策**：补做则需再拆并重新验证锁粒度；不补做则应将本步骤正式标记为「不做」。
+
+### 实际偏离（有意，必要）
+- `getStringCompat` 迁走后，`BackendLocalFilter.kt` 与 `NotifyRelayNotificationListenerService.kt` **不改则编译失败**，故改动调用方（仅 import + 2 处调用），**不属于超范围**。
+
+### 行为变化提示（计划步骤 2 授权，但属真实变化）
+- `NotificationRepository.kt:128` 改用带 try/catch 的 `NotificationTextReader.getStringCompat`：当 `getCharSequence` 抛异常时，**旧行为中断入库、新行为静默置 null 继续**。
+
+### 审查发现（遗留，未处理）
+- `NotificationCacheCleaner.kt:22` / `:44` `private` → `public`，建议降 `internal`。
+- `NotificationTextReader.kt:33` `getVerifyCode` 全仓无调用者（基线即死代码）。
