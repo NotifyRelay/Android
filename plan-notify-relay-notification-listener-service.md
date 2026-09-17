@@ -139,3 +139,26 @@ sequenceDiagram
 
 - 本文件是 Service 生命周期 + 多职责聚合，拆分收益中等但风险偏高（涉及并发、反射、跨线程静态入口）。建议按 1→3→2→4 顺序，每步单独提交。
 - 与 `refactor/split-device-connection-manager`（反射 `discoveryManager`）、`refactor/split-message-sender`（`MessageSender` 契约）、`refactor/split-notification-data`（`NotificationRepository` 契约）存在交叉，合并时注意冲突。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1~5 全部完成。三段核心逻辑逐行保真：`shouldProcess` 的 TTL 判定 → 清理 → 写缓存顺序、`tryForwardSuperIsland` 短路顺序、`commitToHistoryAndForward` 的 `added` 判定均未变；`@Volatile instance` 可见性未动。
+- 步骤 5 严格按 §步骤5 原文「建议另开议题，本分支只加日志便于排查」：保留反射，仅把 `onCreate` / `onDestroy` 两处空 `catch` 改为记录 `Logger.w`，未改调用结构。
+
+### 实际偏离（**必要，已论证**）
+- `MediaNotificationHandler` 必须为 `public object`（不能 `internal`）：`NotifyRelayNotificationListenerService.getMediaSessionData` 是 public 静态方法，其返回类型含 `MediaNotificationHandler`，`internal` 会触发 `'public' function exposes its 'internal' return type`。
+- `getAppName` / `getStorageBoolean` / `deviceManager` 由 `private` 提为 `internal`（被搬出的 handler 需要），未改逻辑与签名，仅可见性。
+- `releaseWakeLock()` 增加 `this::foregroundController.isInitialized` 守卫：原 `wakeLock` 是普通可空字段可安全释放，而 controller 是 `lateinit`，不守卫会在未走完 `onCreate` 时抛 `UninitializedPropertyAccessException`。
+
+### 审查发现（遗留，未处理）
+- `:243` / `:573` / `:591` `deviceManager`、`getAppName`、`getStorageBoolean` 由 `private` 放宽为 `internal`，建议改构造注入或回调。
+- `MediaNotificationHandler.kt:60-63` `val mediaSbn = firstOrNull{...}` 结果未使用，又整表循环一遍（冗余扫描，基线遗留）。
+- `:27` 整个 handler 为 `public`，仅为 public 静态 `getMediaSessionData` 的返回类型所需；把入口降 `internal` 即可收窄。
+
+### 合并冲突提示
+- 与 `refactor/split-notification-data` **同时改动** `NotifyRelayNotificationListenerService.kt`（对端已把 `getStringCompat` / `getNotificationTextWithVerifyCode` 迁至 `NotificationTextReader`），是本次最实质的合并冲突点。
