@@ -120,3 +120,21 @@ sequenceDiagram
 
 - 本文件与 `NotificationGenerator` 共享通道、共享 `SuperIslandStructuredDataHelper`、共享 `SuperIslandConfigUtils`，两者若并行拆分，注意 `Docs/文件用途基础说明.md` 同步更新。
 - 步骤 2 中的 `iconCache` 跨线程访问（IO 读 / Main 写）是既有问题，拆分时**不要顺带改**，应另开议题评估。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1~5 全部完成，含标注「可选」的步骤 5。
+
+### 实际偏离（**有意且正确**）
+- 步骤 4（拆分 `showLiveUpdate`）要求把「进度类型判定」并入 `checkEligibility()`，实际实现**保留在 `try` 内**。这是**正确偏离**：若按计划移动，`isProgressType` 抛出的异常会逃出 `catch`，改变异常语义。此处记录以便评审识别为「有意」。
+- 步骤 5 按 §步骤5 原文「建议保留现状」，反射 `canPostPromotedNotifications` 连同 5 个 `catch` 分支逐字节保留。
+
+### 审查发现（遗留，未处理）
+- `LiveUpdatesNotificationManager.kt:39-40` `notificationManager` / `appContext` 由 `private lateinit` 变为 `internal lateinit`，模块内任意代码可写。建议改为依赖注入或回调。
+- helper 反向依赖宿主：`LiveUpdatesIconLoader.kt:139/163/205/233`、`LiveUpdatesProgressStyleBuilder.kt:22/51/134/167` 直接读写宿主字段，导致 helper 无法独立测试。
+- `LiveUpdatesIntentFactory.kt:51-54` 新增两个 `putExtra(..., null)`；已核实消费方只用 `getStringExtra`，行为等价。
