@@ -115,3 +115,24 @@ sequenceDiagram
 
 - 本文件是纯 UI 拆分，风险整体最低，适合作为 UI 类拆分的第一个实践。
 - 若担心 `AnchoredDraggableState` 行为变化，步骤 4 可只搬移 `SummaryRow`(535) 与 `StoreEntryCard`(622)，把 `GroupCard`(347) 与 `ListBlock`(251) 留到最后并单独提交验证。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成（本次审查评价为最规范的一棵）
+- 步骤 1~5 全部完成，含标注「可选」的步骤 5。
+- 逐段比对（`git show 基线:原文件` vs 新文件）：**4 个新文件与基线对应区段字节级一致，唯一差异是 8 处 `private` → `internal`**。
+- 因此以下全部零变化：`remember(groupKey, group.entries.size)` 的 AnchoredDraggable key、`LaunchedEffect` 依赖与所属层级、`mutableStateOf` 持有位置、LazyColumn item key、`produceState` 的 `key1=data`、`SuperIslandImageCache` 的 LRU + `recycle` 生命周期、`formatTimestamp` 的 locale/时区行为。
+- 9 个搬迁符号全仓各仅 1 处定义，无悬空引用、无重复定义。
+- 步骤 5：全工作树 grep `SuperIslandDeleteButton` / `SuperIslandDragValue`，除本文件与 Cards 新文件外无任何调用点，`*.xml` 亦无引用；因 Cards 需跨文件使用，二者由 `public` 降为 `internal`。
+
+### 实际偏离（**有意，已论证**）
+- **未采纳步骤 4 建议的 `SuperIslandHistoryCardArgs` 聚合参数**：聚合会把 `includeImageDataOnCopy` / `deleteWidthPx` 等从独立 Compose 参数变为 data class 字段，其 `equals` 行为会改变相关 `remember(...)` / 重组失效判定（计划自己标注此处「风险：中」，并要求「key 计算必须逐字保留，否则滑动删除行为突变」）。故按「只搬移不重构」执行，四个函数签名原样保留，仅加 `internal`。
+- 未采纳 §备注 的「只搬 SummaryRow / EntryCard、把 GroupCard / ListBlock 留下」备选：该备选是为规避 `AnchoredDraggable` 行为变化而设，而逐字保留 key 已消除该风险。
+
+### 审查发现（遗留，未处理）
+- `SuperIslandHistoryCards.kt:158-167` / `:433-439` 参数透传链仍为 5 层 8 参数（步骤 4 建议的 `CardArgs` 未落地，纯风格债）。
+- `SuperIslandHistory.kt:49` / `:52` `SuperIslandDragValue` / `SuperIslandDeleteButton` 只被 `ui.pages.superisland` 子包使用，却仍留在页面入口文件。
