@@ -118,3 +118,28 @@ sequenceDiagram
 
 - 纯 UI 拆分，整体风险低于数据/服务层文件。建议按 1→2→3→4→5 顺序，每步单独提交。
 - 若 `ui/pages/` 目录已较拥挤（12 个页面文件），新建 `ui/pages/remoteapps/` 子目录更符合项目现有 `superisland` 分包习惯（参照 `ui/dialog/SuperIslandTestSamples.kt` 与 `feature/notification/superisland/` 的分包方式）。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1~5 全部完成。§二 点名的风险点全部守住：
+  - 本地过滤仍在父层、远程过滤仍在 `RemoteAppsContent.kt:113-121`，且**未擅自加 `remember`**；
+  - `deviceUuid!!` / `deviceIp!!` 未改成 `?.let`；
+  - `remember` key 与 `DisposableEffect(isLocalMode)` 未变；
+  - `LazyVerticalGrid` 的 item key（`pinned_` 前缀 / `packageName`）未变。
+- **状态提升检查结论**：未发现重组或状态存活行为回归（状态仍由页面组合持有，层级未变）。
+
+### 实际偏离（**有意**）
+- 步骤 1 选择新建 `ui/pages/remoteapps/` 子目录而非留在 `ui/pages/`，符合 §六 建议与 `superisland` 分包习惯。
+- 子包内新公开声明统一用 `internal`；`RemoteAppsPage` 保持 `public`，调用方 `DeviceForwardScreen.kt` **零改动**。
+- §三 把 `android.util.Log.d` 换 `Logger` 列为「可顺带做」的风格项，**未做**（行为无关，与最小化改动冲突），三处 `Log.d` 原封搬入 `RemoteAppsPageState.kt`。
+- `RemoteAppsPageState` 采用「持有 `MutableState` 并由页面 `by` 委托」的写法（而非类内 `by mutableStateOf`），以保持 `var x by pageState.searchQuery` 的原读写语义与重组行为。
+- 新建文件行尾统一为 CRLF（匹配 `.gitattributes` + `core.autocrlf`），避免整文件行尾噪声 diff。
+
+### 审查发现（遗留，未处理）
+- `RemoteAppsPage.kt:43-44` `colorScheme` / `textStyles` 声明后未使用（使用者已随组件移走），连带 `MiuixTheme` 成为事实死导入。
+- `RemoteAppsMenuHost.kt:20` 内含 `AppContextMenu`，与文件名不符。
