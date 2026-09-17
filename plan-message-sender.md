@@ -136,3 +136,22 @@ sequenceDiagram
 - 本文件**无可变状态**（仅 TAG），拆分本质是**函数分组**，风险低于数据/服务类文件，是 16 个目标中收益/风险比最好的几个之一。
 - 步骤 3（反射替换）是唯一跨分支协同项；若 `refactor/split-device-connection-manager` 尚未合并，**建议本分支先只加日志（备选方案）**，等对方合并后再替换。
 - 与 `refactor/split-notify-relay-notification-listener-service`（主要调用方）、`refactor/split-device-connection-manager`（反射目标）、`refactor/split-notification-history`（`sendHighPriorityNotification` 调用方）交叉。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1~4 全部完成。外部 11 处调用点全部仍走 `MessageSender.` 门面，API 未破。
+- 计划误判 `enqueueNotification` 为「三个 send 共用」（媒体实走 `pushMediaState`）；实现只放 `SendGateway` 一处，处理正确。
+
+### 关于步骤 3 反射（按计划备选方案执行）
+- 计划步骤 3 要求替换反射并给出备选「本分支内可保留反射并补充失败日志与降级」。
+- 核查结论：**无可用非反射访问器**能返回相同语义（`List<DeviceInfo>`、按 uuid 排除自身）——`getAuthenticatedDevices()` 返回 `Map<String, AuthInfo>`（非 `DeviceInfo`、未排除自身），`getAuthenticatedOnlineDevices()` 仅返回在线设备。
+- 故按备选保留反射，并**集中到新建 `SendGateway`**（原先散在 `MessageSender` 内，现去重为单一实现），未复制到三个 Builder。
+
+### 审查发现（遗留，未处理）
+- `SendGateway.kt:23` / `:58` `getAuthenticatedDevices` / `enqueueNotification` 原为 `private`，现为 `public`，建议降 `internal`。
+- `DeviceConnectionManager.getAuthenticatedDevices()` 基线已是 public，反射可部分消除（计划允许延后）。
