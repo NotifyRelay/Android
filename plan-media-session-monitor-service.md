@@ -140,3 +140,22 @@ sequenceDiagram
   1. 拆分前先记录若干代表性 App 的日志行为作为基线。
   2. 步骤 2 单独提交，重点回归测试。
 - 与 `refactor/split-notify-relay-notification-listener-service`（`onMediaSessionUpdated` 契约、服务创建/销毁时序）强交叉。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1~5 全部完成（步骤 5 为「保留在宿主」，未抽离，符合计划）。
+
+### 实际偏离（**有意，未回写原计划**）
+- 步骤 3 要求把 `isConnected` 抽出，实际改为**留在宿主 + 注入 getter + 写回回调**（`onPermissionLost`）。此方案更合理（避免跨对象持有连接状态），但与计划文字不符。
+- 计划中的 `updateControllers` 被改名为 `refreshControllers`。
+
+### 审查发现（遗留，未处理）
+- 4 个新类全为 `public`（`LyricResolver.kt:15`、`MediaControllerRegistry.kt:19`、`MediaSessionHealthMonitor.kt:17`、`LyricFieldProbe.kt:22`）；基线为 private 嵌套声明，建议降 `internal`。
+- `MediaSessionMonitorService.kt:35` `lastComputedIsPlaying` 只在 `:132` 被重置、从不读取（死字段）。
+- `LyricResolver.kt:17` 回调位图类型写成 `Any?`，弱化了类型。
+- 本树原先**未更新** `Docs/文件用途基础说明.md`，已由合并前审查补写。
