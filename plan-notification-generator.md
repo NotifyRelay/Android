@@ -117,3 +117,21 @@ sequenceDiagram
 
 - 步骤 3 是收益最大也最危险的一步，建议 3a → 3b → 3c 分三次提交，每提交后编译 + 真机冒烟（超级岛浮窗、歌词胶囊、计时器通知、进度通知四类样本）。
 - 本文件与 `LiveUpdatesNotificationManager` 共享通道与 `SuperIslandStructuredDataHelper`，两者拆分若并行进行，注意 `Docs/文件用途基础说明.md` 同步。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1~4 全部完成。
+- 行为等价性逐段比对通过：计时器标题改写与 chronometer 覆盖顺序、`isSuperIslandEnabled`/`iconText` 互斥分支、`resolveSmallIconBitmap` 优先级链、3 处 `CancellationException` rethrow、`cachedSmallIcons` 生命周期（仍在 `stopScrollUpdate` / `clearAllScrollUpdates` 同步移除，无泄漏）均保留。
+- 按计划要求 `cachedSmallIcons` 由 `ReplicaIconCache` **单一持有**（滚动读 + 注入写共用），未各建一份。
+
+### 实际偏离（**有意，未回写原计划**）
+- 步骤 3 的 3a / 3b / 3c 合并为**单次提交**，而非 §备注 建议的三次分提交。已逐次真实编译验证（step1b / step23 / step23b / step23-verify 均 exit=0），符合「一次任务只提交一次」的纪律。
+
+### 审查发现（遗留，未处理）
+- `ReplicaSmallIconInjector.kt:424` `resolveSmallIconBitmapPublic` 全仓零调用者，纯转发 wrapper（死代码）。
+- 本树原先**未更新** `Docs/文件用途基础说明.md`（§备注 明确要求），已由合并前审查补写。
