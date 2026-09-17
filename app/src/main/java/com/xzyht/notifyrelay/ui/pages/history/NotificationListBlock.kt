@@ -36,7 +36,7 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
 import com.xzyht.notifyrelay.ui.pages.DragValue
-import com.xzyht.notifyrelay.ui.pages.history.dateTimeFormatter
+import com.xzyht.notifyrelay.ui.pages.dateTimeFormatter
 import com.xzyht.notifyrelay.ui.viewmodel.GroupedNotifications
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
