@@ -4,7 +4,7 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.service.notification.StatusBarNotification
-import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
+import com.xzyht.notifyrelay.feature.device.model.NotificationTextReader
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -213,9 +213,9 @@ object BackendLocalFilter {
         if (enabledPackageFilters.contains(sbn.packageName)) return false
 
         val flags = sbn.notification.flags
-        val title = NotificationRepository.getStringCompat(sbn.notification.extras, "android.title") ?: ""
+        val title = NotificationTextReader.getStringCompat(sbn.notification.extras, "android.title") ?: ""
         // 使用 getNotificationTextWithVerifyCode 读取文本，优先读取 verify_code 字段
-        val text = NotificationRepository.getNotificationTextWithVerifyCode(sbn) ?: ""
+        val text = NotificationTextReader.getNotificationTextWithVerifyCode(sbn) ?: ""
         if (!isFromPeriodicCheck) {
             val titlePreview = if (title.length > 10) "${title.take(10)}..." else title
             Logger.v("NotifyRelay-Filter", "shouldForward: packageName='${sbn.packageName}', titlePreview='$titlePreview'")

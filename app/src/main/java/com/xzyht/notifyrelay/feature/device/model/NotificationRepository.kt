@@ -9,110 +9,9 @@ import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecordDto
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
-
-class NotificationRecordStore(
-    private val context: Context,
-) {
-    // 数据库仓库实例
-    private val repository = DatabaseRepository.getInstance(context)
-
-    // 转换方法：将旧的NotificationRecordDto转换为新的Room实体
-    private fun convertToRoomEntity(
-        old: NotificationRecordDto,
-        deviceUuid: String,
-    ): notifyrelay.data.database.entity.NotificationRecordEntity =
-        notifyrelay.data.database.entity.NotificationRecordEntity(
-            key = old.key,
-            deviceUuid = deviceUuid,
-            packageName = old.packageName,
-            appName = old.appName,
-            title = old.title,
-            text = old.text,
-            time = old.time,
-        )
-
-    // 转换方法：将新的Room实体转换为旧的NotificationRecordEntity
-    private fun convertFromRoomEntity(new: notifyrelay.data.database.entity.NotificationRecordEntity): NotificationRecordDto =
-        NotificationRecordDto(
-            key = new.key,
-            packageName = new.packageName,
-            appName = new.appName,
-            title = new.title,
-            text = new.text,
-            time = new.time,
-            device = new.deviceUuid,
-        )
-
-    internal suspend fun readAll(device: String): MutableList<NotificationRecordDto> {
-        val deviceUuid = if (device == "local") "本机" else device
-        return withContext(Dispatchers.IO) {
-            repository.getNotificationsByDevice(deviceUuid)
-        }.map { convertFromRoomEntity(it) }.toMutableList()
-    }
-
-    internal suspend fun writeAll(
-        list: List<NotificationRecordDto>,
-        device: String,
-    ) {
-        val deviceUuid = if (device == "local") "本机" else device
-        withContext(Dispatchers.IO) {
-            val roomEntities = list.map { convertToRoomEntity(it, deviceUuid) }
-            repository.saveNotifications(roomEntities)
-        }
-    }
-
-    suspend fun insert(record: NotificationRecordDto) {
-        val deviceUuid = if (record.device == "local") "本机" else record.device
-        val roomEntity = convertToRoomEntity(record, deviceUuid)
-        repository.saveNotification(roomEntity)
-    }
-
-    suspend fun getAll(device: String): List<NotificationRecordDto> {
-        val deviceUuid = if (device == "local") "本机" else device
-        return repository
-            .getNotificationsByDevice(deviceUuid)
-            .map { convertFromRoomEntity(it) }
-            .sortedByDescending { it.time }
-    }
-
-    suspend fun deleteByKey(
-        key: String,
-        device: String,
-    ) {
-        // 直接调用数据库删除方法，key是唯一的，不需要设备参数
-        repository.deleteNotificationByKey(key)
-    }
-
-    suspend fun clearByDevice(device: String) {
-        val deviceUuid = if (device == "local") "本机" else device
-        repository.deleteNotificationsByDevice(deviceUuid)
-    }
-
-    suspend fun deleteByPackageAndDevice(
-        packageName: String,
-        device: String,
-    ) {
-        val deviceUuid = if (device == "local") "本机" else device
-        repository.deleteNotificationsByPackageAndDevice(packageName, deviceUuid)
-    }
-}
-
-// 单例提供者
-object NotifyRelayStoreProvider {
-    @Volatile
-    private var instance: NotificationRecordStore? = null
-
-    fun getInstance(context: Context): NotificationRecordStore =
-        instance ?: synchronized(this) {
-            instance ?: NotificationRecordStore(context.applicationContext).also { instance = it }
-        }
-}
 
 // 仓库对象，负责通知数据管理
 object NotificationRepository {
@@ -225,17 +124,10 @@ object NotificationRepository {
         val notification = sbn.notification
         val time = sbn.postTime
 
-        fun getStringCompat(
-            bundle: android.os.Bundle,
-            key: String,
-        ): String? {
-            val value = bundle.getCharSequence(key)
-            return value?.toString()
-        }
-        // 保证 title 是实际通知标题
-        val title = getStringCompat(notification.extras, Notification.EXTRA_TITLE)
+        // 保证 title 是实际通知标题（复用 NotificationTextReader 文本读取工具，去重）
+        val title = NotificationTextReader.getStringCompat(notification.extras, Notification.EXTRA_TITLE)
         // 使用 getNotificationTextWithVerifyCode 读取文本，优先读取 verify_code 字段
-        val text = getNotificationTextWithVerifyCode(sbn)
+        val text = NotificationTextReader.getNotificationTextWithVerifyCode(sbn)
         val packageName = sbn.packageName
         val device = "本机"
         // 本地通知的 key 也需要包含设备信息，确保不同设备的相同通知不会冲突
@@ -313,56 +205,6 @@ object NotificationRepository {
 
     val notifications: SnapshotStateList<NotificationRecord> = mutableStateListOf()
 
-    /**
-     * 兼容 Bundle 字段类型，支持 CharSequence/SpannableString 自动转 String
-     */
-    fun getStringCompat(
-        bundle: android.os.Bundle,
-        key: String,
-    ): String? {
-        try {
-            val charSeq = bundle.getCharSequence(key)
-            return charSeq?.toString()
-        } catch (e: Exception) {
-            return null
-        }
-    }
-
-    /**
-     * 读取通知的 verify_code 字段（系统短信App在锁屏状态下也会暴露实际验证码）
-     * @return 验证码字符串，如果没有则返回 null
-     */
-    fun getVerifyCode(sbn: StatusBarNotification): String? {
-        return try {
-            val extras = sbn.notification.extras ?: return null
-            extras.getString("verify_code")
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    /**
-     * 获取通知文本，优先使用 verify_code 字段（系统短信App在锁屏状态下会暴露实际验证码）
-     * @return 实际显示的文本
-     */
-    fun getNotificationTextWithVerifyCode(sbn: StatusBarNotification): String? {
-        try {
-            val extras = sbn.notification.extras ?: return null
-
-            // 优先尝试读取 verify_code 字段（系统短信App的隐藏字段）
-            val verifyCode = extras.getString("verify_code")
-            if (!verifyCode.isNullOrEmpty()) {
-                Logger.d("NotifyRelay", "读取到 verify_code 字段(len=${verifyCode.length})")
-                return verifyCode
-            }
-
-            // 如果没有 verify_code，则使用标准的 android.text 字段
-            return getStringCompat(extras, Notification.EXTRA_TEXT)
-        } catch (e: Exception) {
-            return null
-        }
-    }
-
     // 当前选中设备
     var currentDevice: String = "本机"
 
@@ -398,9 +240,6 @@ object NotificationRepository {
         deviceList.addAll(sorted)
     }
 
-    private var maxNotificationsPerDevice: Int = 100
-    private var debounceJob: Job? = null
-    private const val DEBOUNCE_DELAY = 500L
     private var hasCleanedUpOldNotifications = false
 
     @Synchronized
@@ -586,63 +425,20 @@ object NotificationRepository {
         return filtered
     }
 
-    // 缓存清理回调
-    private var cacheCleaner: ((Set<String>) -> Unit)? = null
-
-    /**
-     * 注册缓存清理器（由监听服务调用）
-     */
+    // 缓存清理回调（委托给 NotificationCacheCleaner）
     fun registerCacheCleaner(cleaner: (Set<String>) -> Unit) {
-        cacheCleaner = cleaner
+        NotificationCacheCleaner.registerCacheCleaner(cleaner)
     }
 
-    /**
-     * 清理指定通知的缓存
-     */
     private fun clearProcessedCache(notificationKeys: Set<String>) {
-        cacheCleaner?.invoke(notificationKeys)
+        NotificationCacheCleaner.clearProcessedCache(notificationKeys)
     }
 
-    /**
-     * 清理全部缓存（仅用于本机设备）
-     */
     private fun clearProcessedCacheAll() {
-        // 传递空集合表示清除全部缓存
-        cacheCleaner?.invoke(emptySet())
+        NotificationCacheCleaner.clearProcessedCacheAll()
     }
 
-    /**
-     * 清理历史通知，确保每个包名的通知数量不超过80条
-     */
     private suspend fun cleanupOldNotifications(context: Context) {
-        try {
-            Logger.i("NotifyRelay", "开始清理历史通知")
-            val repository = DatabaseRepository.getInstance(context)
-
-            // 获取所有设备的列表
-            val devices = deviceList
-
-            // 对每个设备，清理其通知
-            for (device in devices) {
-                Logger.i("NotifyRelay", "清理设备 $device 的通知")
-
-                // 获取该设备的所有通知
-                val allNotifications = repository.getNotificationsByDevice(device)
-
-                // 按包名分组通知
-                val packageNames = allNotifications.map { it.packageName }.distinct()
-
-                // 对每个包名使用批量删除方法
-                for (packageName in packageNames) {
-                    Logger.i("NotifyRelay", "清理包名 $packageName 的通知")
-                    // 使用数据库仓库的批量删除方法，保留最新的80条
-                    repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
-                }
-            }
-
-            Logger.i("NotifyRelay", "历史通知清理完成")
-        } catch (e: Exception) {
-            Logger.e("NotifyRelay", "清理历史通知失败: ${e.message}")
-        }
+        NotificationCacheCleaner.cleanupOldNotifications(context, deviceList)
     }
 }
