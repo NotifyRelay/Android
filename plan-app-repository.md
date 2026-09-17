@@ -120,3 +120,22 @@ sequenceDiagram
 - 本文件是**重状态 + 数据库 + 并发**的仓库类，与 UI 类拆分（RemoteAppsPage 等）相比风险更高。建议先做步骤 1（收益明确、边界清晰），验证后再推进步骤 2/3。
 - 拆分前**必须先读同目录 `IconCacheManager.kt` 与 `AppListHelper.kt`**，确认图标缓存职责归属，避免造出重复实现（AGENTS.md 明确要求）。
 - 与 `refactor/split-remote-apps-page`（UI 侧读 `pinnedApps`/`iconUpdates`）、`refactor/split-backend-remote-filter`（调 `getInstalledPackageNamesSync`）存在交叉，合并时注意冲突。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1~4 全部完成，含标注「可选」的步骤 4（`RemoteAppsCache`）。
+- 按 §三 建议抽出 `AppDatabaseHolder` 统一持有 DB 单例，未让多个 object 各持一份。
+
+### 实际偏离（有意，安全）
+- 无功能性偏离。`AppRepository` 保持门面，公开 API 与 5 个 StateFlow 引用未变，12 处调用点与 UI 观察点零改动。
+
+### 审查发现（遗留，未处理）
+- `AppIconRepository.kt:55` `loadAppIcons` 全仓无调用者却被升为 `internal`：既扩大公开面，又吞掉了「未使用」警告。
+- `AppIconRepository.kt:267` `getAppIconFromPackageManager` 仅本文件使用，却由 `private` 改为 `internal`。
+- drawable→bitmap→PNG 转换在三处重复（`InstalledAppsRepository:86-102`、`AppIconRepository:68-86` 与 `:274-292`）。§六 要求先核对 `IconCacheManager` 再决定归属，审查确认重复未收敛。
+- `AppDatabaseHolder.kt:37` `get()` 无 `@Volatile` 也无同步。
