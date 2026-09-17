@@ -132,3 +132,27 @@ sequenceDiagram
 - 本文件是**状态持有 + 局部 Composable + 对话框**三合一，拆分收益明确（5 个局部组件 + 4 个对话框块），风险低于服务类文件。
 - 与 `refactor/split-main-activity`（`DeviceListScreenState` 与 `DeviceListScreen` 调用方）强交叉 —— **建议两个分支串行合并**，或先合本分支再合 main-activity。
 - 反射 `rejectedDevices`(561-571) 与 `refactor/split-device-connection-manager` 交叉，合并时优先采用暴露 internal 方法的版本。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1~4 全部完成。5 个局部 Composable 提为顶层，闭包自由变量全部显式化为参数。
+- `DisposableEffect` 的 `===` 注销语义保留在主函数，未下移到状态类。
+- 包名保持 `...ui.screen` 不变（新文件仅物理目录为 `ui/screen/devicelist/`），故 main-activity 分支调用方无需改动。
+
+### 实际偏离（有意，安全）
+- 步骤 1 选择新建 `ui/screen/devicelist/` 子目录而非留在 `ui/pages/`，符合 §六 建议与项目 `superisland` 分包习惯。
+
+### 关于反射（按计划保留）
+- §三 明确「反射读 `rejectedDevices`：跨分支改进项，**本分支保留**」，故原样保留。
+- **合并用事实**：非反射访问器**已存在** —— `DeviceCallbackHost.rejectedDeviceIds: MutableSet<String>`（由 `DeviceConnectionManager` 实现，返回真实可变集合）。与 `refactor/split-device-connection-manager` 合并时一条改动即可切换。
+
+### 审查发现（遗留，未处理）
+- `DeviceListScreen.kt:115` `isAuthed` 拆分后无调用者（死代码）。
+- 新增 9 个顶层 Composable 全为 `public`（`DeviceListButtons.kt:57/199/227/291/404/435`、`DeviceListDialogs.kt:35/98/138`），基线为函数内局部声明，建议降 `internal`。
+- `DeviceListButtons.kt` 名为 Buttons 却容纳布局编排 `DeviceListScreenContent`，归属不符。
+- **目录/包名/文档三处不一致**：文件在 `ui/screen/devicelist/`、package 仍为 `ui.screen`、而 `Docs` 按 `ui/screen/devicelist` 描述。
