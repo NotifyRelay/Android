@@ -21,11 +21,6 @@ import com.xzyht.notifyrelay.ui.viewmodel.NotificationHistoryViewModel
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-// 日期格式化工具（线程安全）
-internal val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.US)
 
 internal enum class DragValue { Center, End }
 

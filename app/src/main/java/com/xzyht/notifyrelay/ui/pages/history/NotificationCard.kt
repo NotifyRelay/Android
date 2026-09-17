@@ -22,7 +22,7 @@ import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.ui.pages.ToastDebounce
-import com.xzyht.notifyrelay.ui.pages.dateTimeFormatter
+import com.xzyht.notifyrelay.ui.pages.history.dateTimeFormatter
 import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
