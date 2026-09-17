@@ -116,3 +116,20 @@ sequenceDiagram
 
 - 步骤 1 是**零风险验证项**，建议先做以验证 worktree + 构建流程可用。
 - 注释 192-193、196 提到「references a non-existent method/class」，是历史遗留注释，清理时可一并处理（属文档性改动，不改行为）。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1~6 全部完成，含 §二 标注「中高风险、可选」的步骤 6（拆分 `filterRemoteNotification`）。
+- 步骤 1 `RemoteFilterConfig` 为纯搬移，与基线逐行一致。
+- 步骤 2 删除 `checkHistorySyncReliability` 前已全局 grep 确认无外部引用。
+
+### 实际偏离（**需决策**）
+- `BackendRemoteFilter.kt:221-222`：命中 10 秒缓存的分支**新增**了 `toCancel.forEach { dedupCache.add(...) }`。基线该分支只撤回、不写去重缓存。此改动会刷新去重窗口并可能堆积重复项，**属计划未声明的行为改动**。若要求严格零行为变更，应回退该行；若为有意修正，应在此处注明理由。
+
+### 审查发现（遗留，未处理）
+- `BackendRemoteFilter.kt:105-108` 第二处 `enableLockScreenOnly && !isLocked` 恒为 `false`，是不可达死分支（基线遗留）。
