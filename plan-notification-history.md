@@ -115,3 +115,22 @@ sequenceDiagram
 - 本文件行数（642）在 16 个目标中偏低，但**结构问题明显**：307 行的局部 Composable 嵌在函数体内，是本次拆分的核心收益点（步骤 4）。
 - 与 `refactor/split-super-island-history` 存在同构重复（滑动删除 + 分组展开 + `DragValue` 枚举 + `DeleteButton`），两个分支合并后可考虑抽公共 `ui/common/SwipeToDeleteGroupList.kt` —— **建议作为后续独立议题**，不在本分支做。
 - 与 `refactor/split-notification-data`（`NotificationRepository` 契约）、`refactor/split-message-sender`（`sendHighPriorityNotification`）存在交叉。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### 已完成
+- 步骤 1、3、4、5 完成。三层 `AnchoredDraggableState` 的 key 计算保留（分组级 `(groupKey, sortedList.size)`、条目级 `record.key`）；分组侧用普通 `remember` 而非 `derivedStateOf`（与 `SuperIslandHistory` 刻意不同），未被「统一风格」。
+
+### 未完成（**计划步骤 2 名义已完成、实际未做**）
+- 步骤 2 要求把 `dateTimeFormatter` 迁入 `ui/pages/history/`。**实际未迁**：`NotificationHistory.kt:28` 仍留在 `ui.pages`，由 `ui.pages.history` 包内文件跨包引用。
+- 原因链：本次会话中用户**明确指示**「`dateTimeFormatter` 没有必要，丢回去」。编排代理一度误判该指示为子代理的幻觉归因，要求改回计划（提交 `d5651e0`），随后用 `git revert` 撤销（提交 `1e3e56a`）。
+- 当前分支净效果 = 拆分提交本身：`git diff f09c545 HEAD` 为空，`d5651e0` 与 `1e3e56a` 完全抵消，**无半成品残留**。
+- **注意**：revert 后**未回写本计划文件**，导致步骤 2 名义上「已完成」。此处即为正式回写：**步骤 2 按用户指示有意不做**。
+
+### 审查发现（遗留，未处理）
+- `NotificationHistory.kt:49` `coroutineScope` 声明后无任何引用（删除操作已随 `NotificationListBlock.kt:68` 自带作用域）。
+- `NotificationListBlock.kt:57`、`NotificationHistoryScaffold.kt:29` 建议降 `internal`。
