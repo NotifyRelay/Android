@@ -141,3 +141,50 @@ sequenceDiagram
 - 若评估后认为本文件拆分收益有限，**可接受「只做步骤 1 + 步骤 4」** 或标记为「低优先级」。
 - 步骤 2/3 涉及 mainLooper handler 上的串行状态机，是本文件唯一有实质风险的部分；若做，建议一次只做一个并单独提交。
 - 与 `refactor/split-notify-relay-notification-listener-service`（媒体消息入口）弱交叉；与超级岛浮窗模块（`SuperIslandRemoteStore`/`FloatingReplicaManager`/`MediaCapsulePresenter`）仅 API 依赖，不受本分支影响。
+
+---
+
+## 七、实际执行记录（合并前审查回写）
+
+本节由合并前独立审查补写，用于区分「有意偏离」与「漏做」。原计划正文未改。
+
+### ⛔ 阻断级回归（**本树当前不具备合并条件**）
+
+**现象**：超时会话清理与 3 秒清理循环**完全失效**，且失效是静默的（不报错）。
+
+**核实路径**（已逐条确认）：
+- `MediaSessionTimeoutCleaner.kt:38` `private var host: CleanupHost? = null`，仅在 `:49 bind()` 中赋值。
+- `bind()` 全仓**唯一**调用点是 `RemoteMediaSessionManager.kt:61`，位于 `RemoteMediaSessionManager.init(context)`（`:57`）内。
+- 而 `init()` **全仓无任何调用点**。
+- 结果 `host` 恒为 `null`，三条路径全部提前返回：
+  - `MediaSessionTimeoutCleaner.kt:79` `ensureCleanupLoop()` → `host?.handler ?: return`
+  - `MediaSessionTimeoutCleaner.kt:107` `ensureCleanupLoopOnHandler()` → `host?.handler ?: return`
+  - `MediaSessionTimeoutCleaner.kt:121` `cleanupTimeoutSessionsOnHandler()` → `host ?: return`
+- 后果：超时会话永不回收、浮窗不关闭。
+
+**回归性质（对审查结论的修正，以本处为准）**：
+- 审查报告称根因为「`init()` 无调用者」。经核对**基线同样没有 `init()` 的调用者**，故「无调用者」本身不是回归成因。
+- **真正的成因是结构变更**：基线的 `handler` 是 `private val handler = Handler(Looper.getMainLooper())`（恒非空，`:69`），清理路径**不依赖任何初始化**，因此基线逻辑有效；拆分后改为依赖可空的 `host`，凭空引入了 `bind()` 这一前置依赖，而该依赖从未被满足。
+- 即：**基线有效 → 现版本失效，回归成立**，属本次拆分引入。
+
+**建议修复方向**（择一，尚未实施）：
+1. 在既有入口（如 `onMediaMessageReceived` 首次调用或接收模式设置处）补齐 `init()` / `bind()` 调用；或
+2. 改为惰性绑定：`host ?: (this as CleanupHost)`，或以 `object` 直接实现 `CleanupHost` 而非回调；或
+3. 降低耦合：让 `MediaSessionTimeoutCleaner` 直接持有 handler（与基线同源），仅在需要上下文时才要求注入。
+
+### 已完成且经核对无变化
+- 时序核对全部逐字保留：16s / 3s / 6s 阈值、`> timeoutMs-1000` 守卫、cleanup → resend → ensureLoop → apply 顺序、`miui.focus.pic_cover` 契约。
+- plan §备注 允许「只做步骤 1 + 步骤 4」，实际**四步全部完成**。
+- plan §备注 建议「步骤 2/3 若做，一次只做一个并单独提交」，与「一次任务只提交一次」冲突；处理方式为**每步独立真实编译验证、最后一次性提交**。
+
+### 实际偏离（**方向正确，但引入了上述回归**）
+- plan 要求 Cleaner / Resender 自持缓存；实现改为「manager 持状态 + `CleanupHost` 回调 + 全参数传入」。该方向**正是 plan 所担心的「map 与 handler 必须同源」**，思路正确，但引入了无调用点的 `bind`。
+
+### 审查发现（遗留，未处理）
+- `MediaSessionResender.kt:29` `MediaSessionCacheData` 无任何引用（搬移产生的死代码）。
+- `:114` `MediaSessionCacheDataHolder` 由 object 内 private 升为顶层 public，且无外部引用。
+- `RemoteMediaSessionManager.kt:278` `closeSessionByUuid`、`MediaSessionTimeoutCleaner.kt:78` `ensureCleanupLoop` 由 private 升 public 且无调用点（基线即死代码，借搬移「转正」）。
+- `MEDIA_SESSION_TIMEOUT_MS` 在 `MediaSessionTimeoutCleaner.kt:25` 与 `RemoteMediaSessionManager.kt:52` **重复定义**，两处需同步改，易漏。
+- `MediaSessionTimeoutCleaner.kt:31` `cleanupRunnable` **丢失原 `@Volatile`**（plan 仅授权不改 `cleanupLoopRunning`）。
+- `:133-136` 删除了原每设备 try/catch 与失败日志，异常语义下移。
+- 本树原先**未更新** `Docs/文件用途基础说明.md`，已由合并前审查补写。
