@@ -45,69 +45,6 @@ internal object AppIconRepository {
     }
 
     /**
-     * 加载并缓存应用图标（仅持久化）。
-     *
-     * 说明：该方法为挂起函数，会从 PackageManager 获取图标并保存到数据库。
-     *
-     * @param context Android 上下文，用于访问 PackageManager 与数据库（非空）。
-     * @param apps 需要加载图标的应用列表（非空，可为空列表）。
-     */
-    suspend fun loadAppIcons(
-        context: Context,
-        apps: List<ApplicationInfo>,
-    ) {
-        try {
-            // Logger.d(TAG, "开始加载应用图标")
-            val pm = context.packageManager
-
-            apps.forEach { appInfo ->
-                try {
-                    val packageName = appInfo.packageName
-
-                    // 从PackageManager获取图标
-                    val bitmap =
-                        when (val drawable = pm.getApplicationIcon(appInfo)) {
-                            is BitmapDrawable -> drawable.bitmap
-                            else -> {
-                                // 将其他类型的drawable转换为bitmap
-                                val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
-                                val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
-                                val createdBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                                val canvas = Canvas(createdBitmap)
-                                drawable.setBounds(0, 0, width, height)
-                                drawable.draw(canvas)
-                                createdBitmap
-                            }
-                        }
-
-                    // 转换为字节数组
-                    val baos = ByteArrayOutputStream()
-                    bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
-                    val iconBytes = baos.toByteArray()
-
-                    // 更新数据库中的图标
-                    val existingApp = AppDatabaseHolder.get()?.getAppByPackageName(packageName)
-                    if (existingApp != null) {
-                        val updatedApp =
-                            existingApp.copy(
-                                iconBytes = iconBytes,
-                                isIconMissing = false,
-                                lastUpdated = System.currentTimeMillis(),
-                            )
-                        AppDatabaseHolder.get()?.saveApp(updatedApp)
-                    }
-                } catch (e: Exception) {
-                    Logger.w(TAG, "获取应用图标失败: ${appInfo.packageName}", e)
-                }
-            }
-
-            // Logger.d(TAG, "应用图标加载成功，共 ${apps.size} 个图标")
-        } catch (e: Exception) {
-            Logger.e(TAG, "应用图标加载失败", e)
-        }
-    }
-
-    /**
      * 异步获取应用图标（确保在返回前数据已加载）。
      *
      * @param context Android 上下文，用于在必要时加载应用列表与访问数据库。
@@ -264,7 +201,7 @@ internal object AppIconRepository {
      * @param packageName 目标应用的包名
      * @return 应用图标的 Bitmap；若不存在则返回 null
      */
-    suspend fun getAppIconFromPackageManager(
+    private suspend fun getAppIconFromPackageManager(
         context: Context,
         packageName: String,
     ): Bitmap? =

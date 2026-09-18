@@ -3,7 +3,6 @@ package com.xzyht.notifyrelay.feature.appslist
 import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
-import com.xzyht.notifyrelay.feature.appslist.AppRepository.loadApps
 import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
