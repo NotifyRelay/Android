@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
@@ -41,8 +42,6 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
-import com.xzyht.notifyrelay.ui.pages.SuperIslandDeleteButton
-import com.xzyht.notifyrelay.ui.pages.SuperIslandDragValue
 import com.xzyht.notifyrelay.ui.viewmodel.GroupedSuperIslandHistory
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import kotlinx.coroutines.Dispatchers
@@ -51,11 +50,45 @@ import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import kotlin.math.roundToInt
+
+/** 删除按钮的拖拽锚点值。 */
+internal enum class SuperIslandDragValue { Center, End }
+
+/**
+ * 滑动删除暴露出的删除按钮。
+ *
+ * 原先定义在 [com.xzyht.notifyrelay.ui.pages.SuperIslandHistory] 入口文件中，但仅被本子包使用，
+ * 故随使用者迁入本文件（纯搬移，行为不变）。
+ */
+@Composable
+internal fun SuperIslandDeleteButton(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    IconButton(
+        onClick = onClick,
+        modifier = modifier.fillMaxHeight().width(80.dp),
+        backgroundColor = MiuixTheme.colorScheme.error,
+        cornerRadius = 8.dp,
+        minHeight = 40.dp,
+        minWidth = 80.dp,
+    ) {
+        Icon(
+            imageVector = MiuixIcons.Delete,
+            contentDescription = "删除",
+            modifier = Modifier.size(24.dp),
+        )
+    }
+}
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
