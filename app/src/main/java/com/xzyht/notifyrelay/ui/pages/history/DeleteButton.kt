@@ -32,7 +32,7 @@ internal fun DeleteButton(
     ) {
         Icon(
             imageVector = MiuixIcons.Delete,
-            contentDescription = "Settings",
+            contentDescription = "删除",
             modifier = Modifier.size(24.dp),
         )
     }

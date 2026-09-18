@@ -21,7 +21,10 @@ internal object ReplicaScrollUpdater {
     private const val TAG = "超级岛通知生成"
 
     private val mainHandler = Handler(Looper.getMainLooper())
-    private val scrollRunnable = mutableMapOf<String, Runnable>()
+
+    // ConcurrentHashMap：本 map 会被主线程 Handler 回调与调用方线程（setup/stop/clear）并发访问，
+    // 普通 MutableMap 的 forEach 期间修改会抛 ConcurrentModificationException（如 clearAllScrollUpdates）。
+    private val scrollRunnable = java.util.concurrent.ConcurrentHashMap<String, Runnable>()
 
     /**
      * 设置滚动更新

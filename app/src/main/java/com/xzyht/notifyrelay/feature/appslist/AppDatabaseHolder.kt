@@ -12,6 +12,10 @@ import notifyrelay.data.database.repository.DatabaseRepository
  * `synchronized` 懒加载语义不变。
  */
 internal object AppDatabaseHolder {
+    // @Volatile：写入在 synchronized 内完成，而 get() 为无同步读取。
+    // 虽然现存调用点都先在本线程 init()（经同一监视器建立 happens-before），
+    // 但补上 @Volatile 可消除跨线程读取到过期 null 的理论风险。
+    @Volatile
     private var databaseRepository: DatabaseRepository? = null
     private val databaseRepositoryLock = Any()
 

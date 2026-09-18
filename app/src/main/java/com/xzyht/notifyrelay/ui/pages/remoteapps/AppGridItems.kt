@@ -4,7 +4,6 @@ import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
-import android.os.Build
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
@@ -201,13 +200,10 @@ internal fun openLocalApp(
         intent?.let {
             intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
 
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                val options = ActivityOptions.makeBasic()
-                options.launchDisplayId = displayId
-                context.startActivity(intent, options.toBundle())
-            } else {
-                context.startActivity(intent)
-            }
+            // minSdk = 31（> O），makeBasic/launchDisplayId 恒可用，无需版本判断
+            val options = ActivityOptions.makeBasic()
+            options.launchDisplayId = displayId
+            context.startActivity(intent, options.toBundle())
         }
     } catch (e: Exception) {
         e.printStackTrace()

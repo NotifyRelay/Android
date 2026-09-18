@@ -5,7 +5,6 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 
@@ -24,12 +23,10 @@ object GlobalSelectedDeviceHolder {
      * Compose可组合函数，供其他页面监听选中设备变化。
      */
     @Composable
-    fun current(): State<DeviceInfo?> {
-        rememberUpdatedState(_selectedDevice)
-        return remember {
+    fun current(): State<DeviceInfo?> =
+        remember {
             object : State<DeviceInfo?> {
                 override val value: DeviceInfo? get() = _selectedDevice
             }
         }
-    }
 }

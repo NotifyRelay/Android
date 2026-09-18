@@ -25,7 +25,8 @@ import org.json.JSONObject
  * 内部数据类与逻辑一字未改，仅搬迁至对应文件。
  */
 object BackendRemoteFilter {
-    /** Rust 上下文指针，由 DeviceConnectionManager 创建时设置 */
+    /** Rust 上下文指针，由 DeviceConnectionManager 创建时设置、在过滤路径跨线程读取 */
+    @Volatile
     var rustContext: Pointer? = null
 
     // 结构化协程作用域，替代 GlobalScope
