@@ -21,9 +21,21 @@ import notifyrelay.data.database.repository.DatabaseRepository
  * - 文本/验证码读取 → [NotificationTextReader]
  * - 缓存与老化清理 → [NotificationCacheCleaner]
  *
- * **锁契约（不可变）**：所有对外方法仍在此对象上加 `@Synchronized`，被委托对象**不自持锁**。
- * 拆分前由同一监视器串行保护内存态与 `runBlocking` 写库；拆分后保持一致，
- * 尤其 `addRemoteNotification`（`@JvmStatic`，可能运行在 Rust/JNA 原生线程）的锁粒度与拆分前逐一相同。
+ * **锁契约（与拆分前逐一相同）**：本对象自身的监视器只覆盖带 `@Synchronized` 的方法——
+ * [notifyHistoryChanged] / [addNotification] / [init] / [removeNotification] /
+ * [removeNotificationsByPackage] / [clearDeviceHistory] / [syncToCache] / [getNotificationsByDevice]。
+ * 被委托对象（[NotificationMemoryStore] / [NotificationPersistence] / [NotificationCacheCleaner]）**不自持锁**，
+ * 其线程安全完全依赖调用方已持有本对象监视器；`@Synchronized` + `runBlocking` 的组合不得新增第二把锁。
+ *
+ * 以下方法**刻意不加** `@Synchronized`（与拆分前一致，非疏漏）：
+ * - [addRemoteNotification]：`@JvmStatic`，可能运行在 Rust/JNA 原生线程。它只写库后再调用 [notifyHistoryChanged]，
+ *   而后者自带 `@Synchronized`；若在此加锁，会与 JNA 线程的阻塞调用叠加放大死锁面。
+ * - [scanDeviceList]：仅刷新 `deviceList` 展示数据，调用点分散（UI 协程 / 通知处理协程），
+ *   且 [init] 与 [syncToCache] 内部已在持锁状态下调用它，故其本体不加锁。
+ * - 属性访问器 `notifications` / `currentDevice` / `deviceList`：直接委托内存态，不加锁。
+ *
+ * 注意：`deviceList` 的 `clear() + addAll()` 非原子，理论上并发调用 [scanDeviceList] 时
+ * UI 可能观察到中间状态（拆分前同样如此）；因其仅用于设备列表展示，影响可忽略。
  */
 object NotificationRepository {
     // 新增：通知历史 StateFlow，UI可订阅
@@ -79,7 +91,10 @@ object NotificationRepository {
     }
 
     /**
-     * 新增：以远程设备uuid存储转发通知
+     * 新增：以远程设备uuid存储转发通知。
+     *
+     * 注意：不加 `@Synchronized`（与拆分前一致）。本方法可能由 Rust/JNA 原生线程调用，
+     * 其写库段自行串行化，最终变更推送依赖 [notifyHistoryChanged] 自带的 `@Synchronized` 保护。
      */
     @JvmStatic
     fun addRemoteNotification(
@@ -225,7 +240,12 @@ object NotificationRepository {
         return !existed
     }
 
-    // 扫描设备列表（委托 NotificationMemoryStore，保持原调用点不变）
+    /**
+     * 扫描并刷新设备列表（委托 [NotificationMemoryStore]，保持原调用点不变）。
+     *
+     * 注意：不加 `@Synchronized`（与拆分前一致）。[init] / [syncToCache] 在持锁状态下也会调用它，
+     * 若在此加锁会与自身监视器重入叠加；`deviceList` 的 clear+addAll 非原子，仅影响 UI 展示瞬时一致性。
+     */
     fun scanDeviceList(context: Context) {
         NotificationMemoryStore.scanDeviceList(context)
     }

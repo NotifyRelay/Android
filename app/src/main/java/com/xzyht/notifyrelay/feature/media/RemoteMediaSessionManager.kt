@@ -33,7 +33,10 @@ object RemoteMediaSessionManager {
 
     private var isEnabled: Boolean = true
 
-    // 应用上下文，用于定期检查任务
+    // 应用上下文，用于定期检查任务。
+    // @Volatile：既被 onMediaMessageReceived 的惰性初始化守卫跨线程读取，也被 CleanupHost 回调读取，
+    // 需保证 init() 写入对其他线程立即可见（与同对象的 currentSession / currentDevice 保持一致）。
+    @Volatile
     private var applicationContext: Context? = null
 
     // 固定sourceKey前缀，以设备为单位
@@ -152,6 +155,8 @@ object RemoteMediaSessionManager {
         // 惰性初始化：init() 无外部调用点，首次收到消息时兜底执行，
         // 保证 MediaSessionTimeoutCleaner.bind() 必然触发（host 非空），避免清理链路静默失效。
         // init() 内部操作幂等（设 applicationContext + bind + 读 receiveMode + 日志），重复调用无害。
+        // 刻意放在 handler.post 之外：init() 含 StorageManager 读盘，留在调用方线程可避免主线程 I/O 阻塞；
+        // 代价是两个并发首帧可能各执行一次 init()（幂等，bind 结果相同），故不引入同步。
         if (applicationContext == null) {
             init(context)
         }

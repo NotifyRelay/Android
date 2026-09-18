@@ -17,6 +17,10 @@ internal object NotificationPersistence {
     /**
      * 将当前设备的通知列表同步到本地缓存。
      * 调用前需已持有 [NotificationRepository] 的监视器。
+     *
+     * 末尾的 `scanDeviceList` 会改写共享的 `deviceList`（clear+addAll 非原子）：
+     * 拆分前后调用链完全一致（基线 `syncToCache` 同样在 `@Synchronized` 内直调非同步的 `scanDeviceList`），
+     * 故此处保持原样，不额外加锁。
      */
     fun syncToCache(
         context: Context,
