@@ -35,9 +35,6 @@ object NotificationGenerator {
     // 通知渠道ID
     internal const val NOTIFICATION_CHANNEL_ID = "super_island_replica"
 
-    // 通知ID基础值
-    private const val NOTIFICATION_BASE_ID = 20000
-
     /**
      * 停止滚动更新（委托给 [ReplicaScrollUpdater]）
      */
@@ -81,7 +78,8 @@ object NotificationGenerator {
             val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
             // 生成唯一的通知ID（列表模式使用固定ID，以便原地更新）
-            val notificationId = overrideNotificationId ?: (key.hashCode().and(0xffff) + NOTIFICATION_BASE_ID)
+            // ID 推导统一由 SuperIslandNotificationIds 提供，避免与 Live Updates 通道区间重叠
+            val notificationId = overrideNotificationId ?: SuperIslandNotificationIds.replica(key)
 
             // 计算点击/删除意图所需的条件标志位
             val intentFlags = ReplicaIntentFactory.computeIntentFlags(context)
