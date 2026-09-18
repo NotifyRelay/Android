@@ -20,6 +20,7 @@ import com.xzyht.notifyrelay.R
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
+import com.xzyht.notifyrelay.feature.device.model.NotificationTextReader
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
@@ -829,9 +830,9 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             packageName
         }
 
-    private fun getNotificationTitle(sbn: StatusBarNotification): String? = NotificationRepository.getStringCompat(sbn.notification.extras, "android.title")
+    private fun getNotificationTitle(sbn: StatusBarNotification): String? = NotificationTextReader.getStringCompat(sbn.notification.extras, "android.title")
 
-    private fun getNotificationText(sbn: StatusBarNotification): String? = NotificationRepository.getNotificationTextWithVerifyCode(sbn)
+    private fun getNotificationText(sbn: StatusBarNotification): String? = NotificationTextReader.getNotificationTextWithVerifyCode(sbn)
 
     internal fun getNotificationKey(
         sbn: StatusBarNotification,
