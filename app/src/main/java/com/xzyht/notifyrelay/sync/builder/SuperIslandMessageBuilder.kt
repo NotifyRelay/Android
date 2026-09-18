@@ -150,11 +150,11 @@ object SuperIslandMessageBuilder {
                 try {
                     NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, false, false)
                 } catch (e: Exception) {
-                    Logger.e("超级岛", "超级岛: 推送超级岛状态失败: ${device.displayName}", e)
+                    Logger.e(TAG, "超级岛: 推送超级岛状态失败: ${device.displayName}", e)
                 }
             }
         } catch (e: Exception) {
-            Logger.e("超级岛", "超级岛: 发送超级岛数据失败", e)
+            Logger.e(TAG, "超级岛: 发送超级岛数据失败", e)
         }
     }
 
@@ -194,11 +194,11 @@ object SuperIslandMessageBuilder {
                 try {
                     NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, true, false)
                 } catch (e: Exception) {
-                    Logger.e("超级岛", "超级岛: 推送超级岛结束失败: ${device.displayName}", e)
+                    Logger.e(TAG, "超级岛: 推送超级岛结束失败: ${device.displayName}", e)
                 }
             }
         } catch (e: Exception) {
-            Logger.e("超级岛", "超级岛: 发送终止事件失败", e)
+            Logger.e(TAG, "超级岛: 发送终止事件失败", e)
         }
     }
 }
