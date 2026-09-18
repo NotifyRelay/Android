@@ -128,8 +128,10 @@ sequenceDiagram
 - 步骤 1 `RemoteFilterConfig` 为纯搬移，与基线逐行一致。
 - 步骤 2 删除 `checkHistorySyncReliability` 前已全局 grep 确认无外部引用。
 
-### 实际偏离（**需决策**）
-- `BackendRemoteFilter.kt:221-222`：命中 10 秒缓存的分支**新增**了 `toCancel.forEach { dedupCache.add(...) }`。基线该分支只撤回、不写去重缓存。此改动会刷新去重窗口并可能堆积重复项，**属计划未声明的行为改动**。若要求严格零行为变更，应回退该行；若为有意修正，应在此处注明理由。
+### 实际偏离（已回退，恢复基线语义）
+- `BackendRemoteFilter.kt` 命中 10 秒缓存分支曾新增 `toCancel.forEach { dedupCache.add(...) }`；`removePlaceholderMatching` 曾新增占位命中写 `dedupCache`。基线该两处均**只撤回/只移除、不写去重缓存**（写缓存仅存在于 `onLocalNotificationEnqueued` 路径）。
+- **决策：已回退两处写入**，恢复基线语义，避免刷新去重窗口导致短时间连续相同通知被持续拦截。
+- 实现方式：`RemoteFilterPlaceholderQueue.removeMatching` 的 `onMatched` 回调改为可选参数（默认空实现），`onLocalNotificationEnqueued` 仍传写缓存回调，`removePlaceholderMatching` 不传。
 
 ### 审查发现（遗留，未处理）
 - `BackendRemoteFilter.kt:105-108` 第二处 `enableLockScreenOnly && !isLocked` 恒为 `false`，是不可达死分支（基线遗留）。

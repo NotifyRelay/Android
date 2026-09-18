@@ -217,9 +217,9 @@ object BackendRemoteFilter {
 
         // 1. 快速缓存检查（10秒内）
         if (dedupCache.containsRecent(title, text)) {
-            // 撤回匹配的待监控通知（按原始标题/文本匹配，与缓存写入口径一致）
-            val toCancel = pendingMonitor.cancelMatchingRaw(title, text)
-            toCancel.forEach { dedupCache.add(it.title, it.text) }
+            // 撤回匹配的待监控通知（按原始标题/文本匹配，与缓存写入口径一致）。
+            // 保持基线语义：命中缓存只撤回，不刷新去重窗口。
+            pendingMonitor.cancelMatchingRaw(title, text)
             // Logger.d("智能去重", "命中10秒缓存并撤回之前的通知 - 包名:$pkg, 标题:$title, 内容:$text")
             return FilterResult(false, mappedPkg, title, text, data)
         }
@@ -306,16 +306,14 @@ object BackendRemoteFilter {
     }
 
     /**
-     * 移除匹配的占位（通常由本机入队触发），返回是否有移除项
+     * 移除匹配的占位（通常由本机入队触发），返回是否有移除项。
+     * 保持基线语义：只移除占位、不写去重缓存（写缓存仅在 [onLocalNotificationEnqueued] 路径）。
      */
     fun removePlaceholderMatching(
         title: String?,
         text: String?,
         packageName: String,
-    ): Boolean =
-        placeholders.removeMatching(title, text, packageName) { ph ->
-            dedupCache.add(ph.title, ph.text)
-        }
+    ): Boolean = placeholders.removeMatching(title, text, packageName)
 
     /**
      * 检查占位是否仍然存在（并清理过期项）

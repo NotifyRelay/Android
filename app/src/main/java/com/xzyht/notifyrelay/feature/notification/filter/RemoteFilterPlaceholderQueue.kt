@@ -39,12 +39,17 @@ internal class RemoteFilterPlaceholderQueue {
         // Logger.d("智能去重", "添加延迟复刻占位 - 标题:$title, 包名:$packageName, ttl=${ttl}ms")
     }
 
-    /** 移除匹配的占位（通常由本机入队触发）。命中项通过 [onMatched] 回调交由调用方写入去重缓存，返回是否移除成功。 */
+    /**
+     * 移除匹配的占位（通常由本机入队触发）。命中项通过 [onMatched] 回调交由调用方写入去重缓存
+     * （默认空实现；仅 [BackendRemoteFilter.onLocalNotificationEnqueued] 需要写缓存，
+     * [BackendRemoteFilter.removePlaceholderMatching] 保持基线「只移除不写缓存」语义）。
+     * 返回是否移除成功。
+     */
     fun removeMatching(
         title: String?,
         text: String?,
         packageName: String,
-        onMatched: (Placeholder) -> Unit,
+        onMatched: (Placeholder) -> Unit = {},
     ): Boolean {
         val normalizedTitle = normalizeTitle(title ?: "")
         val pendingText = text ?: ""
