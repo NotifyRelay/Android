@@ -32,7 +32,7 @@ import top.yukonga.miuix.kmp.window.WindowDialog
  * 抽离后原先的自由变量一律显式化为参数。配对成功后刷新已认证设备集合。
  */
 @Composable
-fun DeviceListPairingCodeDialog(
+internal fun DeviceListPairingCodeDialog(
     state: DeviceListScreenState,
     deviceManager: DeviceConnectionManager,
     onAuthedUuidsChange: (Set<String>) -> Unit,
@@ -95,7 +95,7 @@ fun DeviceListPairingCodeDialog(
  * @param findOtherUuidsWithSameIp 查找与本设备同 IP 的其它已认证设备 uuid（原为外层局部函数）。
  */
 @Composable
-fun RejectedDeviceRestoreDialog(
+internal fun RejectedDeviceRestoreDialog(
     state: DeviceListScreenState,
     deviceManager: DeviceConnectionManager,
     rejectedDevices: List<DeviceInfo>,
@@ -135,7 +135,7 @@ fun RejectedDeviceRestoreDialog(
  * @param onClose 关闭对话框并清空选中/待删除状态（原为内联的四处状态写入）。
  */
 @Composable
-fun DeleteDeviceConfirmDialog(
+internal fun DeleteDeviceConfirmDialog(
     show: Boolean,
     device: DeviceInfo,
     deviceManager: DeviceConnectionManager,

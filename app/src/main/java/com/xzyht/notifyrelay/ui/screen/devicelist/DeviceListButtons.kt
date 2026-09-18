@@ -54,7 +54,7 @@ private val ButtonMinHeight = 44.dp
  * 仅负责布局编排与按钮调用，状态 derivation 与副作用保留在 [DeviceListScreen]。
  */
 @Composable
-fun DeviceListScreenContent(
+internal fun DeviceListScreenContent(
     isLandscape: Boolean,
     discoveryEnabled: Boolean,
     onDiscoveryChange: (Boolean) -> Unit,
@@ -196,7 +196,7 @@ fun DeviceListScreenContent(
  * 「显示未认证设备」开关。
  */
 @Composable
-fun DiscoverySwitch(
+internal fun DiscoverySwitch(
     discoveryEnabled: Boolean,
     onDiscoveryChange: (Boolean) -> Unit,
     textStyles: TextStyles,
@@ -224,7 +224,7 @@ fun DiscoverySwitch(
  * 本机（未指定设备）按钮。
  */
 @Composable
-fun LocalDeviceButton(
+internal fun LocalDeviceButton(
     selectedDevice: DeviceInfo?,
     onSelectDevice: (DeviceInfo?) -> Unit,
     localBatteryLevel: Int,
@@ -288,7 +288,7 @@ fun LocalDeviceButton(
  * 已认证设备按钮（含选中态下的删除按钮）。
  */
 @Composable
-fun AuthenticatedDeviceButton(
+internal fun AuthenticatedDeviceButton(
     device: DeviceInfo,
     deviceStates: Map<String, Boolean>,
     selectedDevice: DeviceInfo?,
@@ -401,7 +401,7 @@ fun AuthenticatedDeviceButton(
  * 未认证设备按钮。
  */
 @Composable
-fun UnauthenticatedDeviceButton(
+internal fun UnauthenticatedDeviceButton(
     device: DeviceInfo,
     deviceStates: Map<String, Boolean>,
     onSelectDevice: (DeviceInfo?) -> Unit,
@@ -432,7 +432,7 @@ fun UnauthenticatedDeviceButton(
  * 「查看已拒绝设备」按钮。
  */
 @Composable
-fun RejectedDevicesButton(
+internal fun RejectedDevicesButton(
     onShowRejectedDialog: () -> Unit,
     isLandscape: Boolean,
     colorScheme: Colors,

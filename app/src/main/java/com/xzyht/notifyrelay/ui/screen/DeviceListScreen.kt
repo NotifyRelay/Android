@@ -112,8 +112,6 @@ fun DeviceListScreen(
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
 
-    fun isAuthed(uuid: String) = authedDeviceUuids.contains(uuid)
-
     val onSelectDevice: (DeviceInfo?) -> Unit = { deviceInfo ->
         if (deviceInfo == null) {
             selectedDevice = null
