@@ -26,6 +26,10 @@ import notifyrelay.core.util.image.ImageUtils
  *
  * 注意：[iconCache] 是既有的共享可变 LruCache（上限 10），原实现本身就存在
  * 「IO 线程写、Main 线程读」的跨线程访问，本拆分保持原样。
+ *
+ * 该并发访问**不需要额外加锁**：`androidx.collection.LruCache` 内部以 `Lock` 对
+ * `get`/`put`/`evictAll` 等全部公开操作做了同步（类文档明确声明 "This class is thread-safe."），
+ * 本项目实际解析到的 1.6.0 版本亦然。故不要为其再包一层全局锁，那只会无谓拖慢图标加载。
  */
 internal object LiveUpdatesIconLoader {
     private const val TAG = LiveUpdatesNotificationManager.TAG

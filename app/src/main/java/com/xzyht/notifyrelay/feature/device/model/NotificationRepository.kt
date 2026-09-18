@@ -229,10 +229,18 @@ object NotificationRepository {
                 Logger.e("NotifyRelay", "调用 onLocalNotificationEnqueued 失败", e)
             }
 
-            // 限制每个包名的通知数量为80
-            val repository = DatabaseRepository.getInstance(context)
-            runBlocking {
-                repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
+            // 限制每个包名的通知数量为80。
+            // 单独 try/catch：裁剪失败不应阻断下方的 notifyHistoryChanged——
+            // 此时内存（notifications/syncToCache）已更新，若直接抛出会导致 UI 不刷新、内存与界面不一致。
+            // 原有唯一调用方（NotifyRelayNotificationListenerService.commitToHistoryAndForward）本身
+            // 已捕获并记录本方法的异常，故此处置为记录后继续，实际对外行为不变。
+            try {
+                val repository = DatabaseRepository.getInstance(context)
+                runBlocking {
+                    repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
+                }
+            } catch (e: Exception) {
+                Logger.e("NotifyRelay", "裁剪包名历史记录失败（内存已更新，继续刷新UI）", e)
             }
         }
 
