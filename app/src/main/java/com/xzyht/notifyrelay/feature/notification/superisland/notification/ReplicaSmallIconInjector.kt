@@ -416,15 +416,4 @@ internal object ReplicaSmallIconInjector {
         if (coverUrl.isBlank()) return null
         return downloadBitmap(context, coverUrl)
     }
-
-    /**
-     * 解析小图标位图，遵循优先级 progress -> text -> picMap aPicKey/bPicKey -> appIconKey -> null。
-     * 暴露给调用方在自定义分支中复用相同优先级链。
-     */
-    suspend fun resolveSmallIconBitmapPublic(
-        context: Context,
-        picMap: Map<String, String>?,
-        aComponent: AComponent?,
-        bComponent: BComponent?,
-    ): Bitmap? = resolveSmallIconBitmap(context, picMap, aComponent, bComponent)
 }
