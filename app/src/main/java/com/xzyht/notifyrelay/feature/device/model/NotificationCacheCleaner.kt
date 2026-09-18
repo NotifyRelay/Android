@@ -12,7 +12,7 @@ import notifyrelay.data.database.repository.DatabaseRepository
  * - cacheCleaner 由监听服务注册，其「空集合 = 清除全部缓存」协议必须保留（见 [clearProcessedCacheAll]）。
  * - cleanupOldNotifications 依赖 deviceList 已由 scanDeviceList 填充（init 中清理前已完成扫描），调用顺序不可变。
  */
-object NotificationCacheCleaner {
+internal object NotificationCacheCleaner {
     // 缓存清理回调（由监听服务注册）
     private var cacheCleaner: ((Set<String>) -> Unit)? = null
 

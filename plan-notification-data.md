@@ -157,17 +157,19 @@ sequenceDiagram
 ### 已完成
 - 步骤 1、2、3、5 完成；文件已由 `NotificationData.kt` 经 `git mv` 重命名为 `NotificationRepository.kt`（更名副其实）。
 - 步骤 5：全局搜索确认 `maxNotificationsPerDevice` / `debounceJob` / `DEBOUNCE_DELAY` 仅声明无引用，已删除。
+- **步骤 4 已补做（本次修复）**：`NotificationRepository` 拆为
+  - `NotificationMemoryStore.kt`：`notifications`(SnapshotStateList)、`currentDevice`、`deviceList`、`scanDeviceList`、`getNotificationsByDevice`
+  - `NotificationPersistence.kt`：`syncToCache` 的写库逻辑
+  - `NotificationRepository` 保留为门面（`addNotification` / `addRemoteNotification` / `removeNotification` / `removeNotificationsByPackage` / `clearDeviceHistory` / `notifyHistoryChanged` / `init` + 公开 flow）
+- **锁粒度零变化（步骤 4 最大风险点已守住）**：门面所有对外方法仍加 `@Synchronized`，`NotificationMemoryStore` / `NotificationPersistence` **不自持任何锁**；`addRemoteNotification`（`@JvmStatic`，可能运行于 Rust/JNA 原生线程）的锁范围与拆分前逐一相同，未新增第二把锁、无新增死锁路径。门面以属性 getter/setter 委托内存态，外部 `NotificationRepository.deviceList` / `.currentDevice` 读写点无需改动。
 
-### 未完成（**计划步骤 4 未执行，且原计划未声明跳过**）
-- 步骤 4 要求把 `NotificationRepository` 再拆为 `NotificationMemoryStore` / `NotificationPersistence` 两模块。**实际未做**，主文件仍 444 行。
-- 影响：`NotificationRepository.kt` 仍偏大，但门面契约完整、构建与锁粒度均已验证无变化。**是否补做需明确决策**：补做则需再拆并重新验证锁粒度；不补做则应将本步骤正式标记为「不做」。
+### 行为变化（已回退，恢复基线语义）
+- 原实现将 `addNotification` 中内联 `getStringCompat`（**无 try/catch**，异常时中断入库）改为带 try/catch 的 `NotificationTextReader.getStringCompat`（异常时静默置 null 继续），属真实行为变化。
+- **决策：已回退**。新增 `NotificationTextReader.getStringCompatStrict`（不吞异常），`addNotification` 改用它，恢复拆分前「异常向上传播、中断本次入库」的语义。
 
 ### 实际偏离（有意，必要）
 - `getStringCompat` 迁走后，`BackendLocalFilter.kt` 与 `NotifyRelayNotificationListenerService.kt` **不改则编译失败**，故改动调用方（仅 import + 2 处调用），**不属于超范围**。
 
-### 行为变化提示（计划步骤 2 授权，但属真实变化）
-- `NotificationRepository.kt:128` 改用带 try/catch 的 `NotificationTextReader.getStringCompat`：当 `getCharSequence` 抛异常时，**旧行为中断入库、新行为静默置 null 继续**。
-
-### 审查发现（遗留，未处理）
-- `NotificationCacheCleaner.kt:22` / `:44` `private` → `public`，建议降 `internal`。
-- `NotificationTextReader.kt:33` `getVerifyCode` 全仓无调用者（基线即死代码）。
+### 审查发现（已处理）
+- `NotificationCacheCleaner` / `NotificationTextReader` 由 `public` 降为 `internal`（仅同模块跨包使用）。
+- `NotificationTextReader.getVerifyCode` 全仓无调用者（基线即死代码），已删除。

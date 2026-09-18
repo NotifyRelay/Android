@@ -3,7 +3,6 @@ package com.xzyht.notifyrelay.feature.device.model
 import android.app.Notification
 import android.content.Context
 import android.service.notification.StatusBarNotification
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
@@ -13,11 +12,34 @@ import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
 
-// 仓库对象，负责通知数据管理
+/**
+ * 通知历史门面（原 NotificationData.kt）。
+ *
+ * 职责已按 plan.md「步骤 4」拆分：
+ * - 内存态（notifications / currentDevice / deviceList / scanDeviceList）→ [NotificationMemoryStore]
+ * - 持久化写入（syncToCache）→ [NotificationPersistence]
+ * - 文本/验证码读取 → [NotificationTextReader]
+ * - 缓存与老化清理 → [NotificationCacheCleaner]
+ *
+ * **锁契约（不可变）**：所有对外方法仍在此对象上加 `@Synchronized`，被委托对象**不自持锁**。
+ * 拆分前由同一监视器串行保护内存态与 `runBlocking` 写库；拆分后保持一致，
+ * 尤其 `addRemoteNotification`（`@JvmStatic`，可能运行在 Rust/JNA 原生线程）的锁粒度与拆分前逐一相同。
+ */
 object NotificationRepository {
     // 新增：通知历史 StateFlow，UI可订阅
     private val _notificationHistoryFlow = kotlinx.coroutines.flow.MutableStateFlow<List<NotificationRecord>>(emptyList())
     val notificationHistoryFlow: kotlinx.coroutines.flow.StateFlow<List<NotificationRecord>> get() = _notificationHistoryFlow
+
+    // 内存态委托（保持 public API 不变；实际持有者为 NotificationMemoryStore）
+    val notifications: SnapshotStateList<NotificationRecord> get() = NotificationMemoryStore.notifications
+
+    var currentDevice: String
+        get() = NotificationMemoryStore.currentDevice
+        set(value) {
+            NotificationMemoryStore.currentDevice = value
+        }
+
+    val deviceList: MutableList<String> get() = NotificationMemoryStore.deviceList
 
     /**
      * 主动刷新指定设备的通知历史并推送到StateFlow
@@ -124,8 +146,8 @@ object NotificationRepository {
         val notification = sbn.notification
         val time = sbn.postTime
 
-        // 保证 title 是实际通知标题（复用 NotificationTextReader 文本读取工具，去重）
-        val title = NotificationTextReader.getStringCompat(notification.extras, Notification.EXTRA_TITLE)
+        // title 读取使用严格版（不吞异常），保持拆分前内联版的异常语义（见 NotificationTextReader.getStringCompatStrict）
+        val title = NotificationTextReader.getStringCompatStrict(notification.extras, Notification.EXTRA_TITLE)
         // 使用 getNotificationTextWithVerifyCode 读取文本，优先读取 verify_code 字段
         val text = NotificationTextReader.getNotificationTextWithVerifyCode(sbn)
         val packageName = sbn.packageName
@@ -203,41 +225,9 @@ object NotificationRepository {
         return !existed
     }
 
-    val notifications: SnapshotStateList<NotificationRecord> = mutableStateListOf()
-
-    // 当前选中设备
-    var currentDevice: String = "本机"
-
-    // 设备列表，自动维护
-    val deviceList: MutableList<String> = mutableListOf("本机")
-
-    // 扫描设备列表：设备信息由 Rust 私有库持有（uuid 仅平台端兜底），
-    // 列表数据源改为 DeviceConnectionManager 的已认证设备集合
+    // 扫描设备列表（委托 NotificationMemoryStore，保持原调用点不变）
     fun scanDeviceList(context: Context) {
-        // 添加本机设备
-        val found = mutableSetOf<String>()
-        found.add("本机")
-
-        // 添加已认证设备 UUID（来自 DeviceConnectionManager 内存态，Rust 库为准）
-        try {
-            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-                .getInstance(context)
-                .getAuthenticatedDevices()
-                .keys
-                .forEach { uuid ->
-                    if (!uuid.isNullOrEmpty() && uuid != "本机") {
-                        found.add(uuid)
-                    }
-                }
-        } catch (e: Exception) {
-            Logger.w("NotifyRelay", "[scanDeviceList] 获取已认证设备失败", e)
-        }
-
-        // 保证本机在首位
-        val sorted = found.sortedWith(compareBy({ if (it == "本机") 0 else 1 }, { it }))
-        Logger.i("NotifyRelay", "[scanDeviceList] found devices: $sorted")
-        deviceList.clear()
-        deviceList.addAll(sorted)
+        NotificationMemoryStore.scanDeviceList(context)
     }
 
     private var hasCleanedUpOldNotifications = false
@@ -385,45 +375,14 @@ object NotificationRepository {
      */
     @Synchronized
     internal fun syncToCache(context: Context) {
-        val ctxType = context::class.java.name
-        val ctxHash = System.identityHashCode(context)
-        Logger.i("NotifyRelay", "[syncToCache] contextType=$ctxType, hash=$ctxHash")
-        try {
-            val store = NotifyRelayStoreProvider.getInstance(context)
-            // 只同步当前设备的通知，避免影响其他设备
-            val currentDeviceNotifications = notifications.filter { it.device == currentDevice }
-            val entities =
-                currentDeviceNotifications.map {
-                    NotificationRecordDto(
-                        key = it.key,
-                        packageName = it.packageName,
-                        appName = it.appName,
-                        title = it.title,
-                        text = it.text,
-                        time = it.time,
-                        device = it.device,
-                    )
-                }
-            val fileKey = if (currentDevice == "本机") "local" else currentDevice
-            // writeAll是suspend函数，需要runBlocking
-            runBlocking { store.writeAll(entities, fileKey) }
-            Logger.i("回声 NotifyRelay", "写入本地历史 device=$currentDevice, fileKey=$fileKey, size=${entities.size}")
-            scanDeviceList(context)
-        } catch (e: Exception) {
-            val device = notifications.firstOrNull()?.device ?: "(unknown)"
-            Logger.e("NotifyRelay", "通知保存到缓存失败, contextType=$ctxType, hash=$ctxHash, device=$device, error=${e.message}\n${e.stackTraceToString()}")
-        }
+        NotificationPersistence.syncToCache(context, notifications, currentDevice)
     }
 
     /**
      * 获取指定设备的通知列表
      */
     @Synchronized
-    fun getNotificationsByDevice(device: String): List<NotificationRecord> {
-        val filtered = notifications.filter { it.device == device }
-        Logger.i("NotifyRelay", "[getNotificationsByDevice] device=$device, found=${filtered.size}")
-        return filtered
-    }
+    fun getNotificationsByDevice(device: String): List<NotificationRecord> = NotificationMemoryStore.getNotificationsByDevice(device)
 
     // 缓存清理回调（委托给 NotificationCacheCleaner）
     fun registerCacheCleaner(cleaner: (Set<String>) -> Unit) {

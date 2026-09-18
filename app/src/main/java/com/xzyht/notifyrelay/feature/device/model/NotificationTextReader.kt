@@ -10,7 +10,7 @@ import notifyrelay.base.util.Logger
  * 原位于 NotificationRepository（NotificationData.kt），为可读性与职责拆分抽离为独立 object。
  * （读 verify_code 隐藏字段、优先于 android.text 的契约不可改。）
  */
-object NotificationTextReader {
+internal object NotificationTextReader {
     /**
      * 兼容 Bundle 字段类型，支持 CharSequence/SpannableString 自动转 String
      */
@@ -27,16 +27,17 @@ object NotificationTextReader {
     }
 
     /**
-     * 读取通知的 verify_code 字段（系统短信App在锁屏状态下也会暴露实际验证码）
-     * @return 验证码字符串，如果没有则返回 null
+     * 与 [getStringCompat] 同义，但**不吞异常**（保持 `addNotification` 拆分前的行为）。
+     *
+     * 拆分前 `NotificationRepository.addNotification` 内联的局部 `getStringCompat` 没有 try/catch：
+     * `getCharSequence` 抛异常时异常向上传播、中断本次入库。为保证行为完全不变，该路径继续使用严格版。
      */
-    fun getVerifyCode(sbn: StatusBarNotification): String? {
-        return try {
-            val extras = sbn.notification.extras ?: return null
-            extras.getString("verify_code")
-        } catch (e: Exception) {
-            null
-        }
+    fun getStringCompatStrict(
+        bundle: Bundle,
+        key: String,
+    ): String? {
+        val value = bundle.getCharSequence(key)
+        return value?.toString()
     }
 
     /**
