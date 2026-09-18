@@ -14,7 +14,7 @@ import notifyrelay.base.util.Logger
  * - [isConnected]：读取当前连接状态（健康检查在权限丢失时会触发 [onPermissionLost] 写回 false）
  * - [onUpdateControllers]：重试成功后将新控制器列表回调给宿主重新注册
  */
-class MediaSessionHealthMonitor(
+internal class MediaSessionHealthMonitor(
     private val handler: Handler,
     private val getMediaSessionManager: () -> MediaSessionManager?,
     private val getComponentName: () -> ComponentName?,

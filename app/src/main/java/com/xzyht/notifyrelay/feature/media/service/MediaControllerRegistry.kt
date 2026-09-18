@@ -16,7 +16,7 @@ import java.util.Objects
  * - [onMetadataUpdate]：主控制器元数据变化时回调宿主 [updateMetadataIfPrimary]
  * - [onRecheckSessions]：控制器会话销毁时触发宿主强制刷新
  */
-class MediaControllerRegistry(
+internal class MediaControllerRegistry(
     private val handler: Handler,
     private val isConnected: () -> Boolean,
     private val getLastMetadataHash: () -> Int,

@@ -12,7 +12,7 @@ import java.util.concurrent.ConcurrentHashMap
  * - [onMediaSessionUpdated]：状态推进时重新上报给 NotifyRelayNotificationListenerService
  * - [getPrimaryController]：复核时读取当前主控制器
  */
-class LyricResolver(
+internal class LyricResolver(
     private val handler: Handler,
     private val onMediaSessionUpdated: (pkg: String, title: String, artist: String, duration: Long, bitmap: Any?) -> Unit,
     private val getPrimaryController: () -> MediaController?,

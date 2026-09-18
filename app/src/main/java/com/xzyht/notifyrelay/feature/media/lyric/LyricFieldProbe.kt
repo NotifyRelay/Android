@@ -1,10 +1,10 @@
 package com.xzyht.notifyrelay.feature.media.lyric
 
 // 歌词所在字段
-enum class LyricField { TITLE, ARTIST }
+internal enum class LyricField { TITLE, ARTIST }
 
 // 当前歌曲的歌词状态（per-song，切歌即重置）
-enum class LyricState {
+internal enum class LyricState {
     // 新歌：等待判断是否带歌词
     PENDING_LYRIC,
 
@@ -19,7 +19,7 @@ enum class LyricState {
 }
 
 // 按包名的歌词字段观测状态
-class LyricFieldProbe {
+internal class LyricFieldProbe {
     var lastTitle: String? = null
     var lastArtist: String? = null
     var candidate: LyricField? = null
