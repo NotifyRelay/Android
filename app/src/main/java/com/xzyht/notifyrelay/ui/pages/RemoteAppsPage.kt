@@ -21,7 +21,6 @@ import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Replace
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun RemoteAppsPage(
@@ -40,8 +39,6 @@ fun RemoteAppsPage(
     val pageState = rememberRemoteAppsPageState(isLocalMode = isLocalMode, context = context)
     var searchQuery by pageState.searchQuery
     var showMenuForApp by pageState.showMenuForApp
-    val colorScheme = MiuixTheme.colorScheme
-    val textStyles = MiuixTheme.textStyles
 
     val displays = pageState.displays
     var selectedDisplayId by pageState.selectedDisplayId
