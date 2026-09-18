@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.ui.activity
 
-import android.content.Intent
 import android.os.Bundle
 import android.view.WindowManager
 import androidx.activity.compose.setContent
@@ -26,17 +25,6 @@ class MainActivity : FragmentActivity() {
     internal val showAutoStartBanner = mutableStateOf(false)
     internal val bannerMessage = mutableStateOf<String?>(null)
 
-    private fun bringMainActivityToFront() {
-        val intent =
-            Intent(this, MainActivity::class.java).apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-            }
-        try {
-            startActivity(intent)
-        } catch (_: Exception) {
-        }
-    }
-
     override fun onResume() {
         super.onResume()
         screenCaptureCoordinator.processPendingScreenCapture()
@@ -57,7 +45,7 @@ class MainActivity : FragmentActivity() {
 
     // 屏幕捕获协调器：其内部三个 registerForActivityResult 必须在本 Activity 字段初始化期注册，
     // 故该字段保持在此处初始化（与原先的 screenCaptureLauncher / recordAudioPermissionLauncher 同位置）。
-    private val screenCaptureCoordinator = ScreenCaptureCoordinator(this) { bringMainActivityToFront() }
+    private val screenCaptureCoordinator = ScreenCaptureCoordinator(this)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)

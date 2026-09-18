@@ -28,7 +28,6 @@ import notifyrelay.base.util.ToastUtils
  */
 internal class ScreenCaptureCoordinator(
     private val activity: MainActivity,
-    private val bringActivityToFront: () -> Unit,
 ) {
     // 屏幕捕获授权结果，等待本应用前台且媒体投影前台服务就绪后处理
     private var pendingScreenCapture: Pair<Int, Intent>? = null
@@ -66,6 +65,20 @@ internal class ScreenCaptureCoordinator(
         } catch (e: Exception) {
             Logger.e("NotifyRelay", "屏幕捕获前台服务启动失败，带回前台重试", e)
             bringActivityToFront()
+        }
+    }
+
+    /**
+     * 将宿主 Activity 带回前台（原 MainActivity.bringMainActivityToFront，随本协调器迁入）。
+     */
+    private fun bringActivityToFront() {
+        val intent =
+            Intent(activity, MainActivity::class.java).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+            }
+        try {
+            activity.startActivity(intent)
+        } catch (_: Exception) {
         }
     }
 
