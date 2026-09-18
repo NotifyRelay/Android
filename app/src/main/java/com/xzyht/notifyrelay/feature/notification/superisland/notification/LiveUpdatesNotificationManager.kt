@@ -37,7 +37,9 @@ object LiveUpdatesNotificationManager {
      */
 
     internal lateinit var notificationManager: NotificationManager
+        private set
     internal lateinit var appContext: Context
+        private set
 
     /**
      * 清空图标缓存（供公平运行内存回调使用）。
