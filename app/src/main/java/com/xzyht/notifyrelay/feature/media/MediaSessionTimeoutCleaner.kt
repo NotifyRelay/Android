@@ -6,6 +6,12 @@ import notifyrelay.base.util.Logger
 import java.util.concurrent.ConcurrentHashMap
 
 /**
+ * 媒体会话超时时间（毫秒），与发送端超时发送时间匹配并略长（16秒）。
+ * 清理扫描（本文件）与复传守卫（[RemoteMediaSessionManager]）共用同一常量，避免两处脱钩。
+ */
+internal const val MEDIA_SESSION_TIMEOUT_MS = 16 * 1000L
+
+/**
  * 超时会话清理循环（plan.md「步骤 2」抽取）。
  *
  * 持有清理循环的状态（[cleanupRunnable] / [cleanupLoopRunning]）与超时扫描逻辑，但所有会话相关业务状态
@@ -15,23 +21,21 @@ import java.util.concurrent.ConcurrentHashMap
  *
  * 关键约束（plan.md 反复强调）：
  * - 全部状态读写串行在 main-looper handler 上。[cleanupLoopRunning] 只在本对象内由 handler 线程读写，
- *   不改为 `@Volatile` 跨线程访问（此处保留原样，未提升可见性语义）。
- * - [ensureCleanupLoop] 是 post 版本（跨线程调用时先 post 进 handler）；[ensureCleanupLoopOnHandler]
- *   是直调版本（已在 handler 线程内调用，不可再 post，否则时序错误）。两者区分不可混淆。
+ *   保留基线 `@Volatile` 标注（防御性，虽实际仅在 handler 线程读写）。
+ * - [ensureCleanupLoopOnHandler] 是直调版本（已在 handler 线程内调用，不可再 post，否则时序错误）。
  * - 传入的 [Handler] 与 [RemoteMediaSessionManager] 同源，保证 callback 调度与移除在同一线程。
  */
-object MediaSessionTimeoutCleaner {
-    // 超时时间（毫秒），与发送端超时发送时间匹配并略长（16秒）
-    private const val MEDIA_SESSION_TIMEOUT_MS = 16 * 1000L
-
+internal object MediaSessionTimeoutCleaner {
     // 定时检查超时会话的间隔（毫秒）
     private const val CLEANUP_INTERVAL_MS = 3 * 1000L
 
-    // 定期检查超时会话的任务
+    // 定期检查超时会话的任务（保留基线 @Volatile：虽仅在 handler 线程读写，保持原语义）
+    @Volatile
     private var cleanupRunnable: Runnable? = null
 
     // 清理循环是否运行中（有活跃会话时才运行，无会话即停止，避免常驻空转）
-    // 访问保护：所有读写都通过 handler 串行执行
+    // 访问保护：所有读写都通过 handler 串行执行（保留基线 @Volatile）
+    @Volatile
     private var cleanupLoopRunning = false
 
     // 宿主回调：提供同源 handler、应用上下文、lastUpdate 缓存，以及统一的单设备会话拆卸
@@ -70,23 +74,6 @@ object MediaSessionTimeoutCleaner {
                 }
             }
         }
-
-    /**
-     * 确保超时会话清理循环在运行（有活跃媒体会话时调用）
-     * 通过 handler 串行执行，保护 cleanupLoopRunning 读写和 callback 调度。
-     */
-    fun ensureCleanupLoop() {
-        val h = host?.handler ?: return
-        h.post {
-            if (cleanupLoopRunning) {
-                return@post
-            }
-            cleanupLoopRunning = true
-            val runnable = cleanupRunnable ?: createCleanupRunnable().also { cleanupRunnable = it }
-            h.removeCallbacks(runnable)
-            h.postDelayed(runnable, CLEANUP_INTERVAL_MS)
-        }
-    }
 
     /**
      * 停止超时会话清理循环（无活跃会话时）

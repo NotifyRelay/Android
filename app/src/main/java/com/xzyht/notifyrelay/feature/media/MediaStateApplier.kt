@@ -15,7 +15,7 @@ import org.json.JSONObject
  * 注释 452/468 说明「Rust 合并引擎已输出全量，本地无需 diff」—— 不引入 diff 逻辑。
  * [buildMediaState] 中 pics 的 key `miui.focus.pic_cover` 是超级岛契约，不可改名。
  */
-object MediaStateApplier {
+internal object MediaStateApplier {
     // 构建媒体全量状态（Rust 合并引擎已输出全量，本地无需 diff）
     fun buildMediaState(
         title: String,

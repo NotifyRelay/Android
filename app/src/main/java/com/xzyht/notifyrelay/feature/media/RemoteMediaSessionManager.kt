@@ -48,8 +48,8 @@ object RemoteMediaSessionManager {
     // 媒体会话数据缓存，用于定时复传（与 MediaSessionResender 共用同一份，保证 map 与 handler 同源）
     private val mediaSessionCache = ConcurrentHashMap<String, MediaSessionCacheDataHolder>()
 
-    // 超时时间（毫秒），与发送端超时发送时间匹配并略长（16秒）。复传守卫与清理扫描共用此值。
-    private const val MEDIA_SESSION_TIMEOUT_MS = 16 * 1000L
+    // 超时时间（毫秒）统一由 MediaSessionTimeoutCleaner.kt 顶层的 MEDIA_SESSION_TIMEOUT_MS 提供，
+    // 复传守卫与清理扫描共用此值，避免两处定义脱钩。
 
     // 用于处理延迟任务的Handler（所有操作都在主线程串行执行）
     private val handler = Handler(Looper.getMainLooper())
@@ -149,6 +149,12 @@ object RemoteMediaSessionManager {
         json: JSONObject,
         device: DeviceInfo,
     ) {
+        // 惰性初始化：init() 无外部调用点，首次收到消息时兜底执行，
+        // 保证 MediaSessionTimeoutCleaner.bind() 必然触发（host 非空），避免清理链路静默失效。
+        // init() 内部操作幂等（设 applicationContext + bind + 读 receiveMode + 日志），重复调用无害。
+        if (applicationContext == null) {
+            init(context)
+        }
         // 所有入口逻辑都串行在 handler 上执行，保护会话状态读写和清理循环调度
         handler.post {
             processMediaMessageOnHandler(context, json, device)

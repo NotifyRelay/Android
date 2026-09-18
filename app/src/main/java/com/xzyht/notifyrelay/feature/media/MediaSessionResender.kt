@@ -18,20 +18,12 @@ import java.util.concurrent.ConcurrentHashMap
  * processMediaMessageOnHandler 还需读同一份缓存做 oldSession 兜底），[mediaSessionCache] 由 manager
  * 持有并传入，本对象不另持副本。本对象只持有复传相关的常量与逻辑。
  */
-object MediaSessionResender {
+internal object MediaSessionResender {
     // 定时复传间隔（毫秒），设置为6秒，确保在12秒自动关闭前更新两次
     private const val MEDIA_SESSION_RESEND_INTERVAL_MS = 6 * 1000L
 
     // 接近超时即停止复传的提前量（毫秒）：> TIMEOUT-1000 时停止
     private const val RESEND_STOP_BEFORE_TIMEOUT_MS = 1000L
-
-    // 媒体会话缓存数据类（仅本对象内部使用，描述一次复传所需数据）
-    private data class MediaSessionCacheData(
-        val context: Context,
-        val session: MediaSessionData,
-        val device: DeviceInfo,
-        val resendRunnable: Runnable,
-    )
 
     /**
      * 创建或更新定时复传任务。
@@ -111,7 +103,7 @@ object MediaSessionResender {
 /**
  * 媒体会话缓存数据类（复传用途），定义在文件顶层便于 [RemoteMediaSessionManager] 复用同一份缓存。
  */
-data class MediaSessionCacheDataHolder(
+internal data class MediaSessionCacheDataHolder(
     val context: Context,
     val session: MediaSessionData,
     val device: DeviceInfo,
