@@ -177,16 +177,9 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 startForeground(id, notification)
             }
         try {
-            val discoveryField = connectionManager.javaClass.getDeclaredField("discoveryManager")
-            discoveryField.isAccessible = true
-            val discovery = discoveryField.get(connectionManager)
-            val startMethod = discovery.javaClass.getDeclaredMethod("startDiscovery")
-            startMethod.isAccessible = true
-            startMethod.invoke(discovery)
+            connectionManager.startDiscovery()
         } catch (e: Exception) {
-            // 反射侵入 DeviceConnectionManager 私有结构，字段改名即静默失效；此处补日志便于排查。
-            // 改为 internal 方法需与 refactor/split-device-connection-manager 分支协调，另开议题处理。
-            Logger.w(TAG, "[NotifyListener] 反射调用 discoveryManager.startDiscovery() 失败", e)
+            Logger.w(TAG, "[NotifyListener] 启动设备发现失败", e)
         }
 
         // 初始化 MediaSession 监控服务
@@ -533,15 +526,9 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         try {
             if (this::connectionManager.isInitialized) {
                 try {
-                    val discoveryField = connectionManager.javaClass.getDeclaredField("discoveryManager")
-                    discoveryField.isAccessible = true
-                    val discovery = discoveryField.get(connectionManager)
-                    val stopMethod = discovery.javaClass.getDeclaredMethod("stopDiscovery")
-                    stopMethod.isAccessible = true
-                    stopMethod.invoke(discovery)
+                    connectionManager.stopDiscovery()
                 } catch (e: Exception) {
-                    // 同 onCreate：反射失败时补日志，避免静默失效。
-                    Logger.w(TAG, "[NotifyListener] 反射调用 discoveryManager.stopDiscovery() 失败", e)
+                    Logger.w(TAG, "[NotifyListener] 停止设备发现失败", e)
                 }
             }
         } catch (_: Exception) {

@@ -108,17 +108,8 @@ internal fun RejectedDeviceRestoreDialog(
             showDialog = showDialog,
             rejectedDevices = rejectedDevices,
             onRestoreDevice = { device ->
-                val field = deviceManager.javaClass.getDeclaredField("rejectedDevices")
-                field.isAccessible = true
-                val rawSet = field.get(deviceManager)
-                if (rawSet is MutableSet<*>) {
-                    @Suppress("UNCHECKED_CAST")
-                    val ms = rawSet as MutableSet<String>
-                    val allUuids = findOtherUuidsWithSameIp(device.ip, "") + device.uuid
-                    allUuids.distinct().forEach { ms.remove(it) }
-                }
-                @Suppress("UNCHECKED_CAST")
-                onRejectedUuidsChange(if (rawSet is MutableSet<*>) (rawSet as MutableSet<String>).toSet() else emptySet())
+                val allUuids = findOtherUuidsWithSameIp(device.ip, "") + device.uuid
+                onRejectedUuidsChange(deviceManager.restoreRejectedDevices(allUuids.distinct()))
             },
             onDismiss = {
                 showDialog.value = false
