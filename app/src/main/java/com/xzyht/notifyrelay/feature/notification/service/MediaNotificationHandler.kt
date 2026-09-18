@@ -57,10 +57,6 @@ object MediaNotificationHandler {
         val service = NotifyRelayNotificationListenerService.instance ?: return
         val activeNotifications = service.activeNotifications
         if (activeNotifications != null) {
-            val mediaSbn =
-                activeNotifications.firstOrNull {
-                    it.packageName == packageName && it.notification.category == Notification.CATEGORY_TRANSPORT
-                }
             for (sbn in activeNotifications) {
                 if (sbn.packageName == packageName && sbn.notification.category == Notification.CATEGORY_TRANSPORT) {
                     processMediaNotification(service, sbn)
