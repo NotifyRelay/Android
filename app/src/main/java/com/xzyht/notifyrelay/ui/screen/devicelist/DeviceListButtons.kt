@@ -1,5 +1,10 @@
 package com.xzyht.notifyrelay.ui.screen
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.os.BatteryManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -19,6 +24,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -234,10 +240,41 @@ internal fun LocalDeviceButton(
 ) {
     val context = LocalContext.current
     val batteryLevel = localBatteryLevel
-    val isCharging =
-        remember {
-            mutableStateOf(if (BatteryUtils.isCharging(context)) '1' else '0')
+    // 充电状态需随系统变化刷新：原实现用 remember 只在首次组合时读一次，插拔电源后图标不再更新。
+    // ACTION_BATTERY_CHANGED 为粘性广播，注册后立即回调一次当前状态，故无需额外初始化读取。
+    val isCharging = remember { mutableStateOf(if (BatteryUtils.isCharging(context)) '1' else '0') }
+    DisposableEffect(context) {
+        val receiver =
+            object : BroadcastReceiver() {
+                override fun onReceive(
+                    ctx: Context?,
+                    intent: Intent?,
+                ) {
+                    if (intent?.action != Intent.ACTION_BATTERY_CHANGED) return
+                    val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
+                    isCharging.value =
+                        if (status == BatteryManager.BATTERY_STATUS_CHARGING ||
+                            status == BatteryManager.BATTERY_STATUS_FULL
+                        ) {
+                            '1'
+                        } else {
+                            '0'
+                        }
+                }
+            }
+        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
+        try {
+            context.registerReceiver(receiver, filter)
+        } catch (_: Exception) {
+            // 注册失败时保留首次读取的静态值，不影响其余 UI
         }
+        onDispose {
+            try {
+                context.unregisterReceiver(receiver)
+            } catch (_: Exception) {
+            }
+        }
+    }
     val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel, isCharging.value)
 
     val buttonColors =

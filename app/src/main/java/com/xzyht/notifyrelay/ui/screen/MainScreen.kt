@@ -20,14 +20,11 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -74,12 +71,12 @@ fun MainScreen(navigator: Navigator) {
     val deviceListState = remember { DeviceListScreenState() }
 
     val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
-    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+    // 单一真源：选中页直接由 pagerState.currentPage 派生。
+    // 原先另有独立的 rememberSaveable selectedTab + LaunchedEffect(currentPage) → selectedTab 单向同步，
+    // 两者一旦不同步（如旋转/进程恢复路径差异）会出现底栏高亮与当前页不符。pagerState 自身已由
+    // rememberSaveable + DefaultPagerState.Saver 保存 currentPage，故派生即可同时满足状态恢复与一致性。
+    val selectedTab = pagerState.currentPage
     val coroutineScope = rememberCoroutineScope()
-
-    LaunchedEffect(pagerState.currentPage) {
-        selectedTab = pagerState.currentPage
-    }
 
     MainScreenBackHandler(selectedTab, pagerState, navigator, deviceListState)
 
