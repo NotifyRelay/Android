@@ -12,7 +12,7 @@ import notifyrelay.base.util.Logger
  * - [getAuthenticatedDevices]：反射取 [DeviceConnectionManager] 私有字段/方法（见 plan 步骤3，本分支保留反射）。
  * - [enqueueNotification]：通知类入队（经 Rust 发送队列：加密、限流、重试、去重由 Rust 统一处理）。
  */
-object SendGateway {
+internal object SendGateway {
     private const val TAG = "MessageSender"
 
     /**
