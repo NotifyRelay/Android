@@ -13,7 +13,7 @@ import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-fun DeleteButton(
+internal fun DeleteButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit,
 ) {

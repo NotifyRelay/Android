@@ -34,7 +34,7 @@ import java.time.LocalDateTime
 import java.time.ZoneId
 
 @Composable
-fun NotificationCard(
+internal fun NotificationCard(
     record: NotificationRecord,
     appIcon: Bitmap?,
     context: Context,

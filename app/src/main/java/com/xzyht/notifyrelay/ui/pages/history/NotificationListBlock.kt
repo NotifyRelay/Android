@@ -54,7 +54,7 @@ import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-fun NotificationListBlock(
+internal fun NotificationListBlock(
     pagingItems: LazyPagingItems<GroupedNotifications>,
     getCachedAppInfo: (String?) -> Pair<String, android.graphics.Bitmap?>,
     expandedGroups: Set<String>,

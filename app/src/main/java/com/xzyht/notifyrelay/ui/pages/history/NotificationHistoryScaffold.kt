@@ -26,7 +26,7 @@ import top.yukonga.miuix.kmp.theme.Colors
 import top.yukonga.miuix.kmp.theme.TextStyles
 
 @Composable
-fun NotificationHistoryScaffold(
+internal fun NotificationHistoryScaffold(
     pagingItems: LazyPagingItems<GroupedNotifications>,
     uiState: NotificationHistoryUiState,
     installedPackages: Set<String>,

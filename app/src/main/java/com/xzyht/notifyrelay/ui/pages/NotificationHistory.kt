@@ -8,7 +8,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
@@ -46,7 +45,7 @@ fun NotificationHistoryScreen() {
         )
 
     // 创建协程作用域用于删除操作等
-    val coroutineScope = rememberCoroutineScope()
+    // （删除操作已随 NotificationListBlock 自带作用域，此处不再需要）
 
     val selectedDeviceObj by GlobalSelectedDeviceHolder.current()
     val selectedDevice = selectedDeviceObj?.uuid ?: "本机"
