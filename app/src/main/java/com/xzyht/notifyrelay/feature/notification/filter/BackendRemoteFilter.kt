@@ -11,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.TextUtils
 import org.json.JSONObject
 
 /**
@@ -266,9 +267,9 @@ object BackendRemoteFilter {
         for (notification in localList) {
             try {
                 if (notification.device != "本机") continue
-                val oldTitle = normalizeTitle(notification.title ?: "")
+                val oldTitle = TextUtils.normalizeTitle(notification.title ?: "")
                 val oldText = notification.text ?: ""
-                val newTitle = normalizeTitle(title)
+                val newTitle = TextUtils.normalizeTitle(title)
                 if (NativeCore.shouldDeduplicate(newTitle, text, oldTitle, oldText)) {
                     hasDuplicate = true
                 }
@@ -335,7 +336,7 @@ object BackendRemoteFilter {
         context: Context,
     ) {
         if (!RemoteFilterConfig.enableDeduplication) return
-        val normalizedPendingTitle = normalizeTitle(title ?: "")
+        val normalizedPendingTitle = TextUtils.normalizeTitle(title ?: "")
         val pendingText = text ?: ""
         // 先处理占位匹配（用于延迟复刻的占位）——在单独的锁上操作以避免并发问题
         placeholders.removeMatching(title, text, packageName) { ph ->

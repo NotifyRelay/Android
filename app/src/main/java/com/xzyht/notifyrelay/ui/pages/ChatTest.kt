@@ -1,9 +1,5 @@
 package com.xzyht.notifyrelay.ui.pages
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -30,7 +26,9 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.sync.MessageSender
+import notifyrelay.base.util.ClipboardUtils
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
@@ -110,13 +108,10 @@ fun UIChatTest(
                                 .combinedClickable(
                                     onClick = {},
                                     onLongClick = {
-                                        try {
-                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            val clip = ClipData.newPlainText("message", msg)
-                                            clipboard.setPrimaryClip(clip)
-                                            Toast.makeText(context, "已复制原始消息到剪贴板", Toast.LENGTH_SHORT).show()
-                                        } catch (e: Exception) {
-                                            Logger.e("NotifyRelay", "复制失败", e)
+                                        if (ClipboardUtils.copyText(context, "message", msg)) {
+                                            ToastUtils.showShortToast(context, "已复制原始消息到剪贴板")
+                                        } else {
+                                            Logger.e("NotifyRelay", "复制失败")
                                         }
                                     },
                                 ),
