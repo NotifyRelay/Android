@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.ui.pages
 
 import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -30,6 +29,7 @@ import androidx.core.graphics.createBitmap
 import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.image.toBitmapOrDefault
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -90,13 +90,7 @@ fun FilterListSection(
             if (drawable is BitmapDrawable) {
                 drawable.bitmap.asImageBitmap()
             } else {
-                val width = drawable?.intrinsicWidth?.takeIf { it > 0 } ?: 48
-                val height = drawable?.intrinsicHeight?.takeIf { it > 0 } ?: 48
-                val bmp = createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                val canvas = Canvas(bmp)
-                drawable?.setBounds(0, 0, width, height)
-                drawable?.draw(canvas)
-                bmp.asImageBitmap()
+                (drawable?.toBitmapOrDefault(48) ?: createBitmap(48, 48, Bitmap.Config.ARGB_8888)).asImageBitmap()
             }
         }
 

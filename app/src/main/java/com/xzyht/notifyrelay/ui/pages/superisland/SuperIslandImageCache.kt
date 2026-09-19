@@ -1,9 +1,8 @@
 package com.xzyht.notifyrelay.ui.pages.superisland
 
 import android.graphics.Bitmap
-import androidx.core.graphics.scale
+import notifyrelay.base.util.image.ImageUtils
 import kotlin.math.max
-import kotlin.math.roundToInt
 
 internal object SuperIslandImageCache {
     private const val MAX_CACHE_SIZE = 32
@@ -43,10 +42,7 @@ internal object SuperIslandImageCache {
         var working = source
         val largestSide = max(width, height)
         if (largestSide > SUPER_ISLAND_IMAGE_MAX_DIMENSION) {
-            val scale = SUPER_ISLAND_IMAGE_MAX_DIMENSION.toFloat() / largestSide.toFloat()
-            val targetWidth = max(1, (width * scale).roundToInt())
-            val targetHeight = max(1, (height * scale).roundToInt())
-            working = source.scale(targetWidth, targetHeight)
+            working = ImageUtils.scaleDown(source, SUPER_ISLAND_IMAGE_MAX_DIMENSION)
         }
 
         if (working.config == Bitmap.Config.HARDWARE) {

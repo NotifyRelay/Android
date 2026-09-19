@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.ui.pages.remoteapps
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -16,6 +15,7 @@ import com.xzyht.notifyrelay.ui.viewmodel.LocalAppInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.image.toBitmapOrDefault
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
@@ -47,13 +47,7 @@ internal fun LocalAppsContent(
                         try {
                             val appInfo = packageManager.getApplicationInfo(app.packageName, 0)
                             val drawable = appInfo.loadIcon(packageManager)
-                            val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 1
-                            val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 1
-                            val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                            val canvas = android.graphics.Canvas(bitmap)
-                            drawable.setBounds(0, 0, width, height)
-                            drawable.draw(canvas)
-                            bitmap.asImageBitmap()
+                            drawable.toBitmapOrDefault(1).asImageBitmap()
                         } catch (e: Exception) {
                             Logger.e("LocalAppsContent", "Failed to load icon for ${app.packageName}", e)
                             null

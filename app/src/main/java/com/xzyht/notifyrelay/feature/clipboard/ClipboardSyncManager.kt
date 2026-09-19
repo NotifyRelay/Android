@@ -186,13 +186,7 @@ object ClipboardSyncManager {
                                     }
                                 }
                             if (imageBitmap != null) {
-                                val dataUrl = ImageUtils.bitmapToDataUri(imageBitmap)
-                                // 从data URI中提取纯base64部分
-                                val commaIndex = dataUrl.indexOf(',')
-                                if (commaIndex > 0) {
-                                    val base64Image = dataUrl.substring(commaIndex + 1)
-                                    return Pair(CLIPBOARD_TYPE_IMAGE, base64Image)
-                                }
+                                return Pair(CLIPBOARD_TYPE_IMAGE, ImageUtils.bitmapToBase64(imageBitmap))
                             }
                         } catch (e: SecurityException) {
                             // 忽略权限异常，直接返回null
