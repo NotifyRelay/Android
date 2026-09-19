@@ -12,7 +12,7 @@ import android.util.Base64
 import androidx.core.graphics.drawable.toBitmap
 import github.xzynine.superislandui.model.core.SuperIslandData
 import notifyrelay.base.util.Logger
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
 import notifyrelay.data.StorageManager
 import org.json.JSONObject
 

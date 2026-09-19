@@ -10,7 +10,7 @@ import github.xzynine.superislandui.builder.SuperIslandImageSpec
 import github.xzynine.superislandui.builder.SuperIslandParamBuilder
 import kotlinx.coroutines.CancellationException
 import notifyrelay.base.util.Logger
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 

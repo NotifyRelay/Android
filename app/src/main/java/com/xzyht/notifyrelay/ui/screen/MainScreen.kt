@@ -8,7 +8,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -20,13 +19,13 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.PagerState
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -37,16 +36,20 @@ import androidx.navigationevent.compose.rememberNavigationEventState
 import com.xzyht.notifyrelay.ui.activity.MainActivity
 import com.xzyht.notifyrelay.ui.navigation.Navigator
 import com.xzyht.notifyrelay.ui.navigation.Route
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.ToastUtils
-import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.Surface
-import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.basic.Snackbar
+import top.yukonga.miuix.kmp.basic.SnackbarDefaults
+import top.yukonga.miuix.kmp.basic.SnackbarDuration
+import top.yukonga.miuix.kmp.basic.SnackbarHost
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.basic.SnackbarResult
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Community
 import top.yukonga.miuix.kmp.icon.extended.Settings
@@ -56,9 +59,6 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun MainScreen(navigator: Navigator) {
     val colorScheme = MiuixTheme.colorScheme
-
-    val errorColor = MiuixTheme.colorScheme.error
-    val onErrorColor = MiuixTheme.colorScheme.onError
 
     val configuration = LocalConfiguration.current
     val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
@@ -79,45 +79,51 @@ fun MainScreen(navigator: Navigator) {
     val coroutineScope = rememberCoroutineScope()
 
     MainScreenBackHandler(selectedTab, pagerState, navigator, deviceListState)
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(showBanner, bannerMsg, snackbarHostState) {
+        withContext(NonCancellable) {
+            snackbarHostState.newestSnackbarData()?.dismiss()
+        }
+        val message = bannerMsg
+        if (!showBanner || message.isNullOrBlank()) return@LaunchedEffect
+
+        val result =
+            snackbarHostState.showSnackbar(
+                message = message,
+                actionLabel = "前往设置",
+                withDismissAction = true,
+                duration = SnackbarDuration.Indefinite,
+            )
+        if (result == SnackbarResult.ActionPerformed) {
+            IntentUtils.startActivity(
+                context,
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.fromParts("package", context.packageName, null),
+                true,
+            )
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         Scaffold(
             modifier = Modifier.fillMaxSize(),
-            topBar = {
-                if (showBanner && !bannerMsg.isNullOrBlank()) {
-                    Surface(
-                        color = errorColor,
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 16.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically,
-                        ) {
-                            Icon(
-                                imageVector = MiuixIcons.Settings,
-                                contentDescription = null,
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Text(
-                                text = bannerMsg,
-                                style = MiuixTheme.textStyles.body1,
-                                color = onErrorColor,
-                                modifier = Modifier.weight(1f),
-                            )
-                            Spacer(Modifier.width(10.dp))
-                            Button(
-                                onClick = {
-                                    IntentUtils.startActivity(context, Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.fromParts("package", context.packageName, null), true)
-                                },
-                                modifier = Modifier.height(36.dp),
-                            ) {
-                                Text("前往设置")
-                            }
-                        }
-                    }
-                }
+            snackbarHost = {
+                SnackbarHost(
+                    state = snackbarHostState,
+                    content = { data ->
+                        Snackbar(
+                            data = data,
+                            colors =
+                                SnackbarDefaults.snackbarColors(
+                                    containerColor = MiuixTheme.colorScheme.error,
+                                    contentColor = MiuixTheme.colorScheme.onError,
+                                    actionContainerColor = MiuixTheme.colorScheme.onError,
+                                    actionContentColor = MiuixTheme.colorScheme.error,
+                                    dismissActionContentColor = MiuixTheme.colorScheme.onError,
+                                ),
+                        )
+                    },
+                )
             },
             bottomBar = {
                 NavigationBar(

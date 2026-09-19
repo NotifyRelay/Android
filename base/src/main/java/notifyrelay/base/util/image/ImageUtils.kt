@@ -1,4 +1,4 @@
-package notifyrelay.core.util.image
+package notifyrelay.base.util.image
 
 import android.content.Context
 import android.graphics.Bitmap

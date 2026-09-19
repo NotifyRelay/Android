@@ -27,7 +27,7 @@ import github.xzynine.superislandui.floating.common.ActionInfoButton
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.templates.HintInfo
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
 
 /**
  * 按钮组件2/3（hintInfo）Compose 实现

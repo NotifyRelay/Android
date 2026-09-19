@@ -79,10 +79,10 @@ fun PairingCodeDialog(
                                 false
                             } else {
                                 val batteryLevel =
-                                    notifyrelay.core.util.BatteryUtils
+                                    notifyrelay.base.util.BatteryUtils
                                         .getBatteryLevel(context)
                                 val isCharging =
-                                    notifyrelay.core.util.BatteryUtils
+                                    notifyrelay.base.util.BatteryUtils
                                         .isCharging(context)
                                 val battery = if (isCharging) batteryLevel else -batteryLevel
                                 NativeCore.sendPairingInit(ctx, deviceManager.uuid, targetDevice!!.uuid, displayCode, battery, "android") == 0
@@ -259,10 +259,10 @@ fun PairingCodeDialog(
                                                     val ltPubKey = deviceManager.localPublicKey
                                                     // 与发起方/保活/扫描路径一致：上报本机真实带符号电量（正=充电，负=放电）
                                                     val batteryLevel =
-                                                        notifyrelay.core.util.BatteryUtils
+                                                        notifyrelay.base.util.BatteryUtils
                                                             .getBatteryLevel(context)
                                                     val isCharging =
-                                                        notifyrelay.core.util.BatteryUtils
+                                                        notifyrelay.base.util.BatteryUtils
                                                             .isCharging(context)
                                                     val battery = if (isCharging) batteryLevel else -batteryLevel
                                                     val sendOk = NativeCore.sendPairingResp(ctx, remoteUuid, ltPubKey, code, remoteIp, battery, "android")

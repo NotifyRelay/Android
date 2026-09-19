@@ -76,8 +76,7 @@ dependencies {
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
 
-    // 依赖其他模块
-    implementation(project(":core"))
+    // 依赖其他模块（原 :core 工具类已并入 :base）
     implementation(project(":base"))
     implementation(project(":data"))
 

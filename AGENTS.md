@@ -26,7 +26,10 @@
 
 ### 应用 API 版本
 
-minSdk：`:app`（主应用）与 `:core`（核心库）minSdk = 31（Android 12），其余库模块（`:base`、`:data`、`:superislandui`、`:nativecore` 等）minSdk = 29（Android 10）；`:scrcpy` minSdk = 26（子模块自带配置）。请勿为任一模块声明的 minSdk 以下版本编写兼容性代码。
+minSdk：`:app`（主应用）minSdk = 31（Android 12），其余库模块（`:base`、`:data`、`:superislandui`、`:core`、`:nativecore` 目录等）minSdk = 29（Android 10）；`:scrcpy` minSdk = 26（子模块自带配置）。请勿为任一模块声明的 minSdk 以下版本编写兼容性代码。
+
+> 模块命名：`:core` 现指 Android 原生核心（Rust FFI，源码目录 `nativecore/`，内含 `notify-relay-core` 子模块）；
+> 原先占用该名的 `notifyrelay.core` 工具库已并入 `:base`，包名为 `notifyrelay.base.util[.image]`。
 
 - 代码风格遵循 Kotlin 官方规范（`kotlin.code.style=official`）。
 - 如需扩展功能或集成新依赖，优先查阅 `miuix-mcp` 与本项目现有实现。

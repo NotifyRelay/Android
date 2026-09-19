@@ -1,10 +1,9 @@
-package notifyrelay.core.util
+package notifyrelay.base.util
 
 import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
-import notifyrelay.base.util.Logger
 
 /**
  * 服务管理工具类
@@ -19,6 +18,18 @@ object ServiceManager {
     private const val AUTO_START_ERROR_MESSAGE = "服务无法启动，可能因系统自启动/后台运行权限被拒绝。请前往系统设置手动允许自启动、后台运行和电池优化白名单，否则通知转发将无法正常工作。"
 
     /**
+     * 通知监听服务的全限定类名。
+     *
+     * 以字符串常量持有而非 `::class.java`：`:base` 位于依赖链底端，不能反向依赖 `:app`，
+     * 故无法在此引用 `NotifyRelayNotificationListenerService` 类。
+     * 该类在 `AndroidManifest.xml` 中注册为
+     * `.feature.notification.service.NotifyRelayNotificationListenerService`，
+     * 包名变更时此常量必须同步更新。
+     */
+    private const val NOTIFICATION_LISTENER_SERVICE_CLASS =
+        "com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService"
+
+    /**
      * 启动通知监听服务。
      *
      * @param context 应用或组件上下文，用于调用 startService。
@@ -26,7 +37,7 @@ object ServiceManager {
      */
     fun startNotificationListenerService(context: Context): Boolean =
         try {
-            val cn = ComponentName(context, "com.xzyht.notifyrelay.common.core.notification.servers.NotifyRelayNotificationListenerService")
+            val cn = ComponentName(context, NOTIFICATION_LISTENER_SERVICE_CLASS)
             val restartIntent = Intent()
             restartIntent.component = cn
             restartIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)

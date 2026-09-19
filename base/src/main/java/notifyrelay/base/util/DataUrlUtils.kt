@@ -1,14 +1,14 @@
-﻿package notifyrelay.core.util
+﻿package notifyrelay.base.util
 
 import android.content.Context
 import android.graphics.Bitmap
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
 
 /**
  * 已迁移至 [ImageUtils]。
  * 此类中的所有方法均已标记为废弃，请直接使用 [ImageUtils] 替代。
  */
-@Deprecated("已迁移至 ImageUtils，请使用 notifyrelay.core.util.image.ImageUtils")
+@Deprecated("已迁移至 ImageUtils，请使用 notifyrelay.base.util.image.ImageUtils")
 object DataUrlUtils {
     private const val TAG = "DataUrlUtils"
     private const val DATA_PREFIX = "data:"

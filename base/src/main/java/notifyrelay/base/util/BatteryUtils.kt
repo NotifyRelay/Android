@@ -1,4 +1,4 @@
-package notifyrelay.core.util
+package notifyrelay.base.util
 
 import android.content.Context
 import android.os.BatteryManager

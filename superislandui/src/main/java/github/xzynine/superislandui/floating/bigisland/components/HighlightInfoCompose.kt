@@ -26,7 +26,7 @@ import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.model.templates.HighlightInfo
 import kotlinx.coroutines.delay
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
 
 /**
  * 强调图文组件（highlightInfo）Compose 实现

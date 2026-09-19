@@ -179,9 +179,9 @@ class ConnectionDiscoveryManager(
     private fun getSignedBatteryLevel(): Int {
         val ctx = context
         val level =
-            notifyrelay.core.util.BatteryUtils
+            notifyrelay.base.util.BatteryUtils
                 .getBatteryLevel(ctx)
-        return if (notifyrelay.core.util.BatteryUtils
+        return if (notifyrelay.base.util.BatteryUtils
                 .isCharging(ctx)
         ) {
             level

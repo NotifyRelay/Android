@@ -1,4 +1,4 @@
-﻿import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.android.library)
@@ -48,6 +48,12 @@ dependencies {
     implementation(libs.material)
     implementation(libs.timber)
     implementation(libs.androidx.lifecycle.process)
+
+    // 原 :core 迁移而来：BatteryIconConverter.getBatteryColor 返回 Compose Color
+    implementation(libs.androidx.compose.ui)
+    // 原 :core 迁移而来：ImageUtils.loadBitmap 基于 Coil（同时传递 kotlinx-coroutines）
+    implementation(libs.bundles.coil)
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
