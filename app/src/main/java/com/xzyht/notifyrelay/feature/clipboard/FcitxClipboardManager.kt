@@ -183,7 +183,7 @@ object FcitxClipboardManager {
         }
         isPaired = false
         SecureKeyStorage
-            .removeKey(context, "fcitx5_clipboard_key")
+            .removeKey(context, CLIPBOARD_KEY_ALIAS)
         try {
             val ks = KeyStore.getInstance("AndroidKeyStore")
             ks.load(null)
