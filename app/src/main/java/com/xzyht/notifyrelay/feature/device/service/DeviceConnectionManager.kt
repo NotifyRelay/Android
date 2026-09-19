@@ -307,6 +307,12 @@ class DeviceConnectionManager(
     // === 以下为提供给内部组件使用的访问器（保持字段本身 private） ===
     internal fun lookupDevice(uuid: String): DeviceInfo? = getDeviceInfo(uuid)
 
+    /** 启动设备发现（转发到内部 [discoveryManager]，替代外部反射调用）。 */
+    internal fun startDiscovery() = discoveryManager.startDiscovery()
+
+    /** 停止设备发现（转发到内部 [discoveryManager]，替代外部反射调用）。 */
+    internal fun stopDiscovery() = discoveryManager.stopDiscovery()
+
     // Rust 原生上下文（由 RustCoreSession 创建并持有）
     private var rustContext: Pointer? = null
 
@@ -382,6 +388,18 @@ class DeviceConnectionManager(
      * 获取已拒绝设备列表
      */
     fun getRejectedDevices(): Set<String> = deviceQuery.rejected()
+
+    /**
+     * 从已拒绝集合中恢复（移除）指定设备，返回移除后的完整已拒绝集合。
+     *
+     * 用于「已拒绝设备」对话框的手动恢复。加锁方式与 [rejectedDeviceIds] 的既有读写一致
+     * （`synchronized(rejectedDevices)`），替换原先外部反射私有字段的做法。
+     */
+    fun restoreRejectedDevices(uuids: Collection<String>): Set<String> =
+        synchronized(rejectedDevices) {
+            uuids.forEach { rejectedDevices.remove(it) }
+            rejectedDevices.toSet()
+        }
 
     /** 待处理的配对请求（由 [PairingCoordinator] 持有）。 */
     override var pendingPairing: PendingPairing?

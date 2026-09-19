@@ -73,13 +73,16 @@ class MainActivity : FragmentActivity() {
         WindowCompat.setDecorFitsSystemWindows(this.window, false)
         this.window.addFlags(WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
 
+        // 权限门控放在 setContent 之前：权限缺失时直接拉起引导页并返回，
+        // 避免主界面先完成一次组合（首帧闪一下）再跳到引导页。
+        // 其余步骤（回调注册、调试初始化、后台初始化）顺序均保持不变。
+        if (!permissions.ensurePermissionsOrLaunchGuide()) {
+            return
+        }
+
         setContent {
             val navigator = rememberNavigator(Route.Main)
             MainActivityContent(navigator)
-        }
-
-        if (!permissions.ensurePermissionsOrLaunchGuide()) {
-            return
         }
 
         screenCaptureCoordinator.registerProjectionRequestCallback()

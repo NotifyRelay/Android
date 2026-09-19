@@ -9,6 +9,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIsl
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
+import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -87,7 +88,7 @@ object FloatingReplicaNotificationManager {
                             appName,
                             formattedData,
                         )
-                        val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
+                        val liveUpdateNotificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
                         FloatingReplicaMappingManager.putNotificationId(entryKey, liveUpdateNotificationId)
                         FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
                         Logger.i(TAG, "浮窗功能关闭时发送Live Updates复合通知: sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
@@ -134,7 +135,7 @@ object FloatingReplicaNotificationManager {
                     LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
                     Logger.i(TAG, "通过LiveUpdatesNotificationManager关闭通知: sourceId=$sourceId")
 
-                    val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
+                    val liveUpdateNotificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
                     val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     try {
                         Logger.i(TAG, "尝试直接关闭Live Updates通知，sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
@@ -170,7 +171,7 @@ object FloatingReplicaNotificationManager {
                     Logger.w(TAG, "没有找到直接映射的 notificationIds，使用回退方案，sourceId=$sourceId")
                     val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     try {
-                        val traditionalNotificationId = sourceId.hashCode().and(0xffff) + 20000
+                        val traditionalNotificationId = SuperIslandNotificationIds.replica(sourceId)
                         Logger.i(TAG, "尝试直接关闭传统复刻通知，sourceId=$sourceId, notificationId=$traditionalNotificationId")
                         notificationManager.cancel(traditionalNotificationId)
                         Logger.i(TAG, "直接关闭传统复刻通知成功，sourceId=$sourceId, notificationId=$traditionalNotificationId")

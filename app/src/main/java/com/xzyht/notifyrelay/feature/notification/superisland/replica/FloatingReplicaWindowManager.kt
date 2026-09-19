@@ -17,6 +17,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandI
 import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
+import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -214,7 +215,7 @@ object FloatingReplicaWindowManager {
                                         appName,
                                         formattedData,
                                     )
-                                val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
+                                val liveUpdateNotificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
                                 FloatingReplicaMappingManager.putNotificationId(entryKey, liveUpdateNotificationId)
                                 FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
                                 // 仅在确认发出成功后记录指纹，发送异常被吞时留空，避免后续保活包被误跳过

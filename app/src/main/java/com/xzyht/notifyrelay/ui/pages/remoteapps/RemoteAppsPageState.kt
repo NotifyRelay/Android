@@ -12,6 +12,10 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateList
+import notifyrelay.base.util.Logger
+
+/** 显示器相关调试日志标签，沿用原 `android.util.Log.d` 的 tag，保持既有排查滤镜可用。 */
+private const val TAG = "RemoteAppsPage"
 
 /**
  * `RemoteAppsPage` 的页面级状态 holder：搜索词、上下文菜单目标、显示器列表与选中显示器。
@@ -45,7 +49,7 @@ internal fun rememberRemoteAppsPageState(
 
             fun updateDisplays() {
                 val allDisplays = displayManager.displays
-                android.util.Log.d("RemoteAppsPage", "所有显示器: ${allDisplays.map { "id=${it.displayId}, name=${it.name}, flags=${it.flags}" }}")
+                Logger.d(TAG, "所有显示器: ${allDisplays.map { "id=${it.displayId}, name=${it.name}, flags=${it.flags}" }}")
 
                 val displayList =
                     allDisplays
@@ -60,7 +64,7 @@ internal fun rememberRemoteAppsPageState(
                             )
                         }.sortedBy { it.id }
 
-                android.util.Log.d("RemoteAppsPage", "显示器列表: $displayList")
+                Logger.d(TAG, "显示器列表: $displayList")
                 displays.clear()
                 displays.addAll(displayList)
 
@@ -70,7 +74,7 @@ internal fun rememberRemoteAppsPageState(
                         displayList.find { it.id == 0 }?.id
                             ?: displayList.firstOrNull()?.id
                             ?: 0
-                    android.util.Log.d("RemoteAppsPage", "selectedDisplayId 不在有效列表中，重置为: ${selectedDisplayId.intValue}")
+                    Logger.d(TAG, "selectedDisplayId 不在有效列表中，重置为: ${selectedDisplayId.intValue}")
                 }
             }
             updateDisplays()

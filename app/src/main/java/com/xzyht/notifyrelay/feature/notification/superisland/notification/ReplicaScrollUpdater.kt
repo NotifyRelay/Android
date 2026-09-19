@@ -88,6 +88,11 @@ internal object ReplicaScrollUpdater {
                     val updatedNotification = updatedBuilder.build()
                     updatedNotification.extras.putAll(originalNotification.extras)
 
+                    // putAll 会用原通知 extras 中的旧值覆盖刚设置的滚动文本（API 36+ 平台的
+                    // setShortCriticalText 就写入 extras 的 android.shortCriticalText），
+                    // 故必须在复制之后重新写回本次要显示的滚动文本，否则滚动不生效。
+                    updatedNotification.extras.putString(NotificationCompat.EXTRA_SHORT_CRITICAL_TEXT, displayText)
+
                     // 恢复之前缓存的小图标，避免滚动更新时丢失实际意义图标
                     val cachedIcon = ReplicaIconCache.get(key)
                     if (cachedIcon != null) {

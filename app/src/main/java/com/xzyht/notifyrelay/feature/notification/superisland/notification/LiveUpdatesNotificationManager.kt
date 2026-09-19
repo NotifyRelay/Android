@@ -20,7 +20,6 @@ object LiveUpdatesNotificationManager {
     internal const val TAG = "超级岛进度类型"
     const val CHANNEL_ID = "super_island_replica"
     private const val CHANNEL_NAME = "超级岛复刻"
-    private const val NOTIFICATION_BASE_ID = 10000
 
     /**
      * 耦合逻辑说明
@@ -128,12 +127,13 @@ object LiveUpdatesNotificationManager {
     /**
      * 计算通知 ID：优先使用调用方指定的 ID，否则由 sourceId 推导。
      *
-     * [NOTIFICATION_BASE_ID] 与 NotificationGenerator 的 20000 刻意错开，避免通知 ID 冲突。
+     * ID 推导统一委托 [SuperIslandNotificationIds.liveUpdates]，其基址与复刻通道保持不重叠
+     * （原实现 `hash+10000` 与复刻通道 `hash+20000` 因 16 位哈希区间达 65535 而实际相交）。
      */
     private fun resolveNotificationId(
         sourceId: String,
         overrideNotificationId: Int?,
-    ): Int = overrideNotificationId ?: (sourceId.hashCode().and(0xffff) + NOTIFICATION_BASE_ID)
+    ): Int = overrideNotificationId ?: SuperIslandNotificationIds.liveUpdates(sourceId)
 
     /**
      * 版本门控与注入开关校验。
@@ -361,7 +361,7 @@ object LiveUpdatesNotificationManager {
                     return
                 }
             }
-            val notificationId = sourceId.hashCode().and(0xffff) + NOTIFICATION_BASE_ID
+            val notificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
             notificationManager.cancel(notificationId)
             Logger.i(TAG, "取消Live Update通知成功: $sourceId")
         } catch (e: Exception) {

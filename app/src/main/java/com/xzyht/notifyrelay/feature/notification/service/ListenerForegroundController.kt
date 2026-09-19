@@ -74,6 +74,19 @@ internal class ListenerForegroundController(
         wakeLock = null
     }
 
+    /**
+     * 获取 WakeLock（无超时，绑定前台服务生命周期）。
+     *
+     * **为什么不加自动超时**（有意保留，勿顺手加 `acquire(timeout)`）：
+     * - 释放点已完整覆盖：`NotifyRelayNotificationListenerService` 的 `onDestroy`
+     *   与 `onListenerDisconnected` 都会调用 [releaseWakeLock]；
+     * - `acquire()` 位于 `startForeground()` 之后（见 [startForegroundService]），
+     *   故调用方在启动前台服务阶段抛异常时，不会留下已获取但无人释放的锁；
+     * - 即使进程被系统杀死，Android 也会随进程回收其持有的 WakeLock。
+     *
+     * 若改为超时自动释放，会导致服务仍在前台时中途丢失唤醒锁、心跳线程可能被挂起，
+     * 属行为变更而非纯加固，故不采用。
+     */
     private fun acquireWakeLock() {
         if (wakeLock == null) {
             try {

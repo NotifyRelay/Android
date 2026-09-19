@@ -253,7 +253,18 @@ object RemoteMediaSessionManager {
         }
     }
 
+    /**
+     * 清除所有设备的媒体会话。
+     *
+     * 会话状态（currentSession/currentDevice/三个 map）与清理循环均由 handler 线程串行读写，
+     * 故此处先 post 到同源 handler 再执行，避免与 [processMediaMessageOnHandler] 并发操作同一批字段
+     * 导致会话「复活」或读到中间态。
+     */
     fun clearSession() {
+        handler.post { clearSessionOnHandler() }
+    }
+
+    private fun clearSessionOnHandler() {
         // 清除所有设备的媒体会话浮窗
         mediaFeatureIdCache.keys.forEach { deviceUuid ->
             val sourceKey = SOURCE_KEY_PREFIX + "_" + deviceUuid

@@ -102,11 +102,8 @@ object BackendRemoteFilter {
                 if (dedupResult != null) return dedupResult
             }
 
-            // 锁屏通知过滤（2）
-            if (RemoteFilterConfig.enableLockScreenOnly && !isLocked) {
-                // Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 锁屏过滤 - 非锁屏通知被过滤")
-                return FilterResult(false, mappedPkg, title, text, data)
-            }
+            // 锁屏过滤已在 passesModeFilters 内统一判定（enableLockScreenOnly && !isLocked 时返回）。
+            // 此处原有一处重复的同条件判断，因该条件为 false 才能走到本行，故其分支不可达，已移除。
 
             // Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 直接通过 - mappedPkg=$mappedPkg title=$title text=$text")
             return FilterResult(true, mappedPkg, title, text, data)
@@ -249,9 +246,9 @@ object BackendRemoteFilter {
 
             // Logger.d("NotifyRelay(狂鼠)", "无历史重复，标记延迟验证")
             return FilterResult(true, mappedPkg, title, text, data, needsDelay = true)
-        } catch (_: Exception) {
-            // Logger.e("智能去重", "历史检查异常", e)
-            // 异常情况下默认延迟验证
+        } catch (e: Exception) {
+            // 异常时保持既有 fail-open 语义（默认延迟验证），但补日志避免静默吞异常难以排查
+            Logger.e("智能去重", "历史检查异常，按 fail-open 默认延迟验证", e)
             return FilterResult(true, mappedPkg, title, text, data, needsDelay = true)
         }
     }
