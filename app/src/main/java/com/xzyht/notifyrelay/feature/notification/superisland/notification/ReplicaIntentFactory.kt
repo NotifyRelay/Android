@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
+import com.xzyht.notifyrelay.feature.notification.superisland.contract.SuperIslandActions
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator.NOTIFICATION_CHANNEL_ID
 import com.xzyht.notifyrelay.feature.notification.superisland.receiver.NotificationBroadcastReceiver
@@ -80,7 +81,7 @@ internal object ReplicaIntentFactory {
     ): Intent? =
         if (needClickIntent) {
             Intent(context, NotificationBroadcastReceiver::class.java).apply {
-                action = "com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"
+                action = SuperIslandActions.TOGGLE_FLOATING
                 putExtra("sourceId", sourceId)
                 putExtra("title", title)
                 putExtra("text", text)

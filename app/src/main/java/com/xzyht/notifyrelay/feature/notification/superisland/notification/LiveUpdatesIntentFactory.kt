@@ -4,6 +4,7 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
+import com.xzyht.notifyrelay.feature.notification.superisland.contract.SuperIslandActions
 import com.xzyht.notifyrelay.feature.notification.superisland.receiver.NotificationBroadcastReceiver
 
 /**
@@ -12,13 +13,10 @@ import com.xzyht.notifyrelay.feature.notification.superisland.receiver.Notificat
  * 由 [LiveUpdatesNotificationManager] 拆分而来：原先在 `showLiveUpdate` 与
  * `updateNotificationWithAllIcons` 中各有一份完全相同的意图构造代码，现统一到此处。
  *
- * [ACTION_TOGGLE_FLOATING] 必须与 [NotificationBroadcastReceiver] 中处理的字符串完全一致，
- * 否则点击通知将无法切换浮窗/列表。
+ * 点击通知的广播 action 取自契约 [SuperIslandActions.TOGGLE_FLOATING]，与消费侧
+ * [NotificationBroadcastReceiver] 共用同一常量，本文件不再自带字面量。
  */
 internal object LiveUpdatesIntentFactory {
-    /** 点击通知切换浮窗/列表的广播 action，与 NotificationBroadcastReceiver 保持一致 */
-    internal const val ACTION_TOGGLE_FLOATING = "com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING"
-
     /**
      * 创建通知移除时的删除意图（用于用户移除通知时关闭浮窗）。
      */
@@ -52,7 +50,7 @@ internal object LiveUpdatesIntentFactory {
                 .putExtra("text", text)
                 .putExtra("appName", appName)
                 .putExtra("paramV2Raw", paramV2Raw)
-                .setAction(ACTION_TOGGLE_FLOATING),
+                .setAction(SuperIslandActions.TOGGLE_FLOATING),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 }

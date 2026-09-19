@@ -25,7 +25,7 @@ import org.json.JSONObject
  *  - 从通知 extras 中提取 miui.focus.param 内容并解析 param_v2 内容
  */
 object SuperIslandManager {
-    private const val STORAGE_KEY = "superisland_enabled"
+    private const val STORAGE_KEY = notifyrelay.base.util.SuperIslandStorageKeys.ENABLED
 
     /**
      * 检查用户/配置是否启用了超级岛读取

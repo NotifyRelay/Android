@@ -4,16 +4,20 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
+import com.xzyht.notifyrelay.feature.notification.superisland.contract.SuperIslandActions
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import notifyrelay.base.util.Logger
 
 /**
  * 通知广播接收器，用于处理超级岛通知的点击和关闭事件
  *
+ * action 契约由 [SuperIslandActions] 统一承载（生产侧 LiveUpdatesIntentFactory /
+ * SuperIslandConfigUtils 引用同一常量），不再靠注释维系。
+ *
  * 耦合逻辑说明：
  * 1. 浮窗功能与通知点击事件的耦合：
- *    - 接收 com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING 广播，处理通知点击事件
- *    - 接收 com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION 广播，处理通知关闭事件
+ *    - 接收 [SuperIslandActions.TOGGLE_FLOATING] 广播，处理通知点击事件
+ *    - 接收 [SuperIslandActions.CLOSE_NOTIFICATION] 广播，处理通知关闭事件
  *    - 当浮窗功能开启时，调用 FloatingReplicaManager 的相应方法处理浮窗状态
  *
  * 2. 通知与浮窗的去耦合：
@@ -31,7 +35,7 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
         val notificationListMode = !floatingWindowEnabled && SuperIslandConfigUtils.isNotificationListMode(context)
 
         when (action) {
-            "com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION" -> {
+            SuperIslandActions.CLOSE_NOTIFICATION -> {
                 if (!floatingWindowEnabled && !notificationListMode) {
                     Logger.i("超级岛", "浮窗/列表均未开启，不处理关闭通知广播")
                     return
@@ -41,7 +45,7 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
                 Logger.i("超级岛", "接收到关闭通知广播，notificationId=$notificationId")
                 FloatingReplicaManager.closeByNotificationId(notificationId)
             }
-            "com.xzyht.notifyrelay.ACTION_TOGGLE_FLOATING" -> {
+            SuperIslandActions.TOGGLE_FLOATING -> {
                 if (!floatingWindowEnabled && !notificationListMode) {
                     Logger.i("超级岛", "浮窗/列表均未开启，不处理切换广播")
                     return

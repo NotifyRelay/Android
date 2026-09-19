@@ -18,7 +18,9 @@ import notifyrelay.base.util.Logger
 
 object LiveUpdatesNotificationManager {
     internal const val TAG = "超级岛进度类型"
-    const val CHANNEL_ID = "super_island_replica"
+
+    /** 通知渠道 ID，唯一来源见 [NotificationGenerator.NOTIFICATION_CHANNEL_ID]。 */
+    const val CHANNEL_ID = NotificationGenerator.NOTIFICATION_CHANNEL_ID
     private const val CHANNEL_NAME = "超级岛复刻"
 
     /**
