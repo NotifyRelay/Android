@@ -6,12 +6,10 @@ import com.google.gson.reflect.TypeToken
 import notifyrelay.base.util.Logger
 import notifyrelay.data.PersistenceManager
 import notifyrelay.data.StorageManager
-import notifyrelay.data.database.dao.AppConfigDao
 import notifyrelay.data.database.dao.AppDao
 import notifyrelay.data.database.dao.AppDeviceDao
 import notifyrelay.data.database.dao.NotificationRecordDao
 import notifyrelay.data.database.dao.SuperIslandHistoryDao
-import notifyrelay.data.database.entity.AppConfigEntity
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.entity.NotificationRecordEntity
@@ -26,31 +24,7 @@ object MigrationHelper {
     private val gson = Gson()
 
     /**
-     * 迁移应用配置
-     */
-    suspend fun migrateAppConfig(
-        context: Context,
-        appConfigDao: AppConfigDao,
-    ) {
-        run {
-            // Logger.d("MigrationHelper", "开始迁移应用配置")
-        }
-
-        val configs = mutableListOf<AppConfigEntity>()
-
-        // 迁移逻辑已经简化，因为StorageManager现在直接使用Room数据库
-        // 我们只需要确保迁移标记被正确设置
-        // Logger.d("MigrationHelper", "应用配置迁移已简化，因为StorageManager现在直接使用Room数据库")
-
-        // 插入到数据库
-        if (configs.isNotEmpty()) {
-            appConfigDao.insertAll(configs)
-            // Logger.d("MigrationHelper", "迁移应用配置完成，共${configs.size}条")
-        }
-    }
-
-    /**
-     * 迁移超级岛历史记录
+     * 迁移通知记录
      */
     suspend fun migrateNotifications(
         context: Context,
