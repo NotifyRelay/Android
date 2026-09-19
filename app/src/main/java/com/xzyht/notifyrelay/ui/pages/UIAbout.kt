@@ -1,9 +1,5 @@
 package com.xzyht.notifyrelay.ui.pages
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
-import android.graphics.drawable.BitmapDrawable
-import android.widget.Toast
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -30,7 +26,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.createBitmap
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.ui.dialog.UpdateDialog
@@ -45,6 +40,8 @@ import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
+import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
@@ -101,17 +98,7 @@ fun UIAbout() {
             runCatching {
                 val pm = context.packageManager
                 val drawable = pm.getApplicationIcon(context.packageName)
-                if (drawable is BitmapDrawable) {
-                    drawable.bitmap.asImageBitmap()
-                } else {
-                    val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 96
-                    val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 96
-                    val bmp = createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    val canvas = Canvas(bmp)
-                    drawable.setBounds(0, 0, width, height)
-                    drawable.draw(canvas)
-                    bmp.asImageBitmap()
-                }
+                drawable.toBitmapOrDefault(96).asImageBitmap()
             }.getOrNull()
         }
 
@@ -157,9 +144,9 @@ fun UIAbout() {
                 lastClickTime = currentTime
 
                 if (clickCount in 3..<5) {
-                    Toast.makeText(context, "再点击 ${5 - clickCount} 次进入开发者模式", Toast.LENGTH_SHORT).show()
+                    ToastUtils.showShortToast(context, "再点击 ${5 - clickCount} 次进入开发者模式")
                 } else if (clickCount >= 5) {
-                    Toast.makeText(context, "开发者模式已激活", Toast.LENGTH_SHORT).show()
+                    ToastUtils.showShortToast(context, "开发者模式已激活")
                     StorageManager.putBoolean(context, "developer_mode_enabled", true)
                     clickCount = 0
                 }
@@ -220,7 +207,7 @@ fun UIAbout() {
                             Logger.e(TAG, "检查更新失败: ${result.message}")
                             result.errorLog?.let { Logger.e(TAG, it) }
                             result.exception?.let { Logger.e(TAG, "异常信息", it) }
-                            Toast.makeText(context, "检查失败: ${result.message}", Toast.LENGTH_SHORT).show()
+                            ToastUtils.showShortToast(context, "检查失败: ${result.message}")
                         }
                     }
                 }
@@ -282,16 +269,16 @@ fun UIAbout() {
             when (val downloadResult = checkUpdateManager.downloadRelease(info, proxyUrl, assetFilter)) {
                 is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Success -> {
                     Logger.i(TAG, "开始下载: ${downloadResult.fileName}")
-                    Toast.makeText(context, "开始下载 ${downloadResult.fileName}", Toast.LENGTH_SHORT).show()
+                    ToastUtils.showShortToast(context, "开始下载 ${downloadResult.fileName}")
                 }
                 is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.NoAsset -> {
                     Logger.e(TAG, "未找到匹配的资源: ${downloadResult.message}")
-                    Toast.makeText(context, "未找到匹配的APK", Toast.LENGTH_SHORT).show()
+                    ToastUtils.showShortToast(context, "未找到匹配的APK")
                 }
                 is github.xzynine.checkupdata.download.SystemDownloader.DownloadResult.Error -> {
                     Logger.e(TAG, "下载失败: ${downloadResult.message}")
                     downloadResult.exception?.let { Logger.e(TAG, "下载异常", it) }
-                    Toast.makeText(context, "下载失败: ${downloadResult.message}", Toast.LENGTH_SHORT).show()
+                    ToastUtils.showShortToast(context, "下载失败: ${downloadResult.message}")
                 }
             }
         },

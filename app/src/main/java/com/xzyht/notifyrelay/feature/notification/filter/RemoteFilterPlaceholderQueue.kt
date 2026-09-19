@@ -1,6 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.filter
 
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.TextUtils
 
 /**
  * 延迟复刻占位队列（用于锁屏延迟复刻的占位，15s 可被本机入队取消）。
@@ -51,12 +52,12 @@ internal class RemoteFilterPlaceholderQueue {
         packageName: String,
         onMatched: (Placeholder) -> Unit = {},
     ): Boolean {
-        val normalizedTitle = normalizeTitle(title ?: "")
+        val normalizedTitle = TextUtils.normalizeTitle(title ?: "")
         val pendingText = text ?: ""
         synchronized(pendingPlaceholders) {
             val matches =
                 pendingPlaceholders.filter { ph ->
-                    normalizeTitle(ph.title) == normalizedTitle && ph.text == pendingText && ph.packageName == packageName
+                    TextUtils.normalizeTitle(ph.title) == normalizedTitle && ph.text == pendingText && ph.packageName == packageName
                 }
             if (matches.isNotEmpty()) {
                 matches.forEach { ph ->
@@ -82,13 +83,13 @@ internal class RemoteFilterPlaceholderQueue {
         packageName: String,
     ): Boolean {
         val now = System.currentTimeMillis()
-        val normalizedTitle = normalizeTitle(title ?: "")
+        val normalizedTitle = TextUtils.normalizeTitle(title ?: "")
         val pendingText = text ?: ""
         synchronized(pendingPlaceholders) {
             // 清理过期占位
             pendingPlaceholders.removeAll { now - it.createTime > it.ttl }
             return pendingPlaceholders.any { ph ->
-                normalizeTitle(ph.title) == normalizedTitle && ph.text == pendingText && ph.packageName == packageName
+                TextUtils.normalizeTitle(ph.title) == normalizedTitle && ph.text == pendingText && ph.packageName == packageName
             }
         }
     }

@@ -1,9 +1,5 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.floating.bigisland
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
-import android.widget.Toast
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -24,7 +20,9 @@ import github.xzynine.superislandui.floating.bigisland.components.ProgressInfoCo
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.ActionInfo
 import github.xzynine.superislandui.model.core.ParamIsland
+import notifyrelay.base.util.ClipboardUtils
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 
@@ -135,18 +133,20 @@ fun ParamIslandCompose(
                                 text = copyAction.actionTitle ?: "复制",
                                 onClick = {
                                     if (code.contains("*")) {
-                                        Toast.makeText(context, "请解锁对端设备", Toast.LENGTH_SHORT).show()
+                                        ToastUtils.showShortToast(context, "请解锁对端设备")
                                     } else {
-                                        try {
-                                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                                            val clip = ClipData.newPlainText("verification code", code)
-                                            clipboard.setPrimaryClip(clip)
-                                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                                            ClipboardSyncManager.syncTextDirectly(deviceManager, code, context)
-                                            Toast.makeText(context, "验证码已复制", Toast.LENGTH_SHORT).show()
-                                        } catch (e: Exception) {
-                                            Logger.e("ParamIslandCompose", "复制验证码失败", e)
-                                            Toast.makeText(context, "复制失败", Toast.LENGTH_SHORT).show()
+                                        if (!ClipboardUtils.copyText(context, "verification code", code)) {
+                                            Logger.e("ParamIslandCompose", "复制验证码失败")
+                                            ToastUtils.showShortToast(context, "复制失败")
+                                        } else {
+                                            try {
+                                                val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                                                ClipboardSyncManager.syncTextDirectly(deviceManager, code, context)
+                                                ToastUtils.showShortToast(context, "验证码已复制")
+                                            } catch (e: Exception) {
+                                                Logger.e("ParamIslandCompose", "复制验证码失败", e)
+                                                ToastUtils.showShortToast(context, "复制失败")
+                                            }
                                         }
                                     }
                                 },

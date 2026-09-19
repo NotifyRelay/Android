@@ -1,9 +1,6 @@
 package com.xzyht.notifyrelay.ui.guide
 
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Build
@@ -25,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.net.toUri
+import notifyrelay.base.util.ClipboardUtils
 import notifyrelay.base.util.GuidePermissionRequester
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.PermissionHelper
@@ -186,10 +184,7 @@ internal fun GuideOptionalPermissionPage(
                     Button(
                         onClick = {
                             val adbCmd = "adb shell appops set ${context.packageName} RECEIVE_SENSITIVE_NOTIFICATIONS allow"
-                            val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                            if (clipboard != null) {
-                                val clip = ClipData.newPlainText("adb", adbCmd)
-                                clipboard.setPrimaryClip(clip)
+                            if (ClipboardUtils.copyText(context, "adb", adbCmd)) {
                                 showToast("已复制 adb 命令到剪贴板")
                             } else {
                                 showToast("剪贴板服务不可用")

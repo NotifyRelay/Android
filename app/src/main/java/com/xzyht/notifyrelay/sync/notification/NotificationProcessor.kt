@@ -15,6 +15,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.base.util.TextUtils
 import org.json.JSONObject
 
 /**
@@ -143,18 +144,12 @@ object NotificationProcessor {
 
                 val localList = NotificationRepository.getNotificationsByDevice("本机")
 
-                fun normalizeTitleLocal(t: String?): String {
-                    if (t == null) return ""
-                    val prefixPattern = Regex("^\\([^)]+\\)")
-                    return t.replace(prefixPattern, "").trim()
-                }
-
-                val normalizedPendingTitle = normalizeTitleLocal(result.title)
+                val normalizedPendingTitle = TextUtils.normalizeTitle(result.title)
                 val pendingText = result.text
                 val duplicateFound =
                     localList.any { nr ->
                         try {
-                            nr.device == "本机" && normalizeTitleLocal(nr.title) == normalizedPendingTitle && (nr.text ?: "") == pendingText
+                            nr.device == "本机" && TextUtils.normalizeTitle(nr.title) == normalizedPendingTitle && (nr.text ?: "") == pendingText
                         } catch (_: Exception) {
                             false
                         }
