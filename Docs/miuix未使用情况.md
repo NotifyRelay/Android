@@ -1,5 +1,11 @@
 
-对 `Android/` 全量 384 个 Kotlin 文件（其中非子模块 UI 代码 331 个）做了逐类扫描 + 逐文件精读。**本次全程只读，未创建/修改/删除任何文件**（任务前后 `git status` 均为空，唯一临时日志目录 `.tmp-ui-audit` 已清理）。
+对 `Android/` 全量 **388** 个 Kotlin 文件（其中非子模块 **323** 个：`:app` 213 / `:data` 32 / `:base` 18 / `:superislandui` 60；子模块 `:scrcpy` 53、`:checkupdata` 10，另 `nativecore/`（`:core`）2 个）做了逐类扫描 + 逐文件精读。**原审计全程只读，未创建/修改/删除任何文件**（任务前后 `git status` 均为空，唯一临时日志目录 `.tmp-ui-audit` 已清理）。
+
+> **修订记录（工具方法审计重构后复核）**
+> 本文原基于重构前基线（全量 384 个 `.kt`）撰写。此后工具方法审计重构已落地
+> （`整理项目` @ `96e70aab`，即 PR #96「统一共享的公用工具，同时移除过时的数据层代码」），本次按**当前代码**重新扫描复核，
+> 仅更新受重构影响的部分：**文件计数**、因增删行而**漂移的行号引用**，以及被重构**顺带解决**的结论（在对应处标注「重构后」）。
+> 其余结论经复核仍然成立，未做改动。
 
 一句话结论：**`app` 模块的 Miuix 迁移相当干净（material3 使用 0 处），问题集中在 `superislandui` 库模块（material3 误用 18 文件）、`scrcpy` 子模块（M2 图标 + material3 IconButton），以及 `app` 层少量手搓基础组件与硬编码颜色。**
 
@@ -58,7 +64,7 @@
 | [AndroidManifest.xml](Android/app/src/main/AndroidManifest.xml):163 | `@style/Theme.MaterialComponents.DayNight.NoActionBar` | |
 | [themes.xml](Android/scrcpy/src/main/res/values/themes.xml):3 | 同上（子模块） | |
 
-⚠ 这是**存量**且属 Compose 之外的原生主题层：Compose 侧已由 `MiuixTheme` 接管（[Theme.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/common/Theme.kt):19），XML 主题目前只承担 windowBackground / 状态栏等宿主职责。要不要改是设计决策，**不建议在本次范围内动**，仅登记。
+⚠ 这是**存量**且属 Compose 之外的原生主题层：Compose 侧已由 `MiuixTheme` 接管（[Theme.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/common/Theme.kt):20），XML 主题目前只承担 windowBackground / 状态栏等宿主职责。要不要改是设计决策，**不建议在本次范围内动**，仅登记。
 
 ---
 
@@ -68,25 +74,25 @@
 
 | # | 位置 | 现状 | 应改用 | 影响面 |
 |---|---|---|---|---|
-| 1 | [GuideComponents.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideComponents.kt):217-254 | `Column + clickable` 手写标题+摘要+状态文案+状态圆点 | `preference.BasicComponent(startAction/endActions)` | **最大收益点**：是 [GuideRequiredPermissionPage.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideRequiredPermissionPage.kt) 与 [GuideOptionalPermissionPage.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideOptionalPermissionPage.kt) 的公共底座，2 页共 6 个权限项 |
+| 1 | [GuideComponents.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideComponents.kt):209-245 | `Column + clickable` 手写标题+摘要+状态文案+状态圆点 | `preference.BasicComponent(startAction/endActions)` | **最大收益点**：是 [GuideRequiredPermissionPage.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideRequiredPermissionPage.kt) 与 [GuideOptionalPermissionPage.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideOptionalPermissionPage.kt) 的公共底座，2 页共 6 个权限项 |
 | 2 | [GuideWelcomePage.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideWelcomePage.kt):105-120 | `Box.size(68.dp).clip(CircleShape).background(primary).clickable` 手搓圆形主按钮 | `IconButton(minWidth=68.dp, minHeight=68.dp, cornerRadius=34.dp)` | 引导页首屏，缺标准按压反馈 |
 | 3 | [GuideAgreementPage.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideAgreementPage.kt):155-177 | `Row + Checkbox + Text+clickable`，勾选态与文案热区手工双向绑定 | `preference.CheckboxPreference` | 引导页法律同意项，热区不一致风险 |
 | 4 | [DeviceListButtons.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/screen/devicelist/DeviceListButtons.kt):205-227 | `Row + Text + Switch`（Switch 本身是 Miuix） | `preference.SwitchPreference` | 丢失整行点击区 |
 | 5 | [MusicControlPage.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/MusicControlPage.kt):250-274, :277-301 | 同上，2 处 | `SwitchPreference` | |
-| 6 | [SuperIslandSettings.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandSettings.kt):234-265 | 同上（默认镜像包名） | `SwitchPreference` | |
-| 7 | [SuperIslandSettings.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandSettings.kt):281-326 | 同上 + :309 用 `Button(size 32.dp)` 当删除按钮 | `SwitchPreference` + `IconButton` | :309 应为 IconButton；同文件 :44-50 已导入 `MiuixIcons.Delete`，说明图标本来可得 |
-| 8 | [SuperIslandHistory.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandHistory.kt):122-142 | `Row + Text + Switch` 手搓开关行 | `SwitchPreference` | |
+| 6 | [SuperIslandSettings.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandSettings.kt):231-262 | 同上（默认镜像包名） | `SwitchPreference` | |
+| 7 | [SuperIslandSettings.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandSettings.kt):278-323 | 同上 + :306 用 `Button(size 32.dp)`（`Modifier.size(32.dp)` 在 :315）当删除按钮 | `SwitchPreference` + `IconButton` | :306 应为 IconButton；同文件 :44-50 已导入 `MiuixIcons.Delete`，说明图标本来可得 |
+| 8 | [SuperIslandHistory.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandHistory.kt):119-139 | `Row + Text + Switch` 手搓开关行 | `SwitchPreference` | |
 | 9 | [DisplayNavigationBar.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/remoteapps/DisplayNavigationBar.kt):40-91 | `Card + Row + Column.clip.background.clickable` 手搓显示设备导航条（图标+两行文字+选中态） | `NavigationBar` / `NavigationRail` | 与 [MainScreen.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/screen/MainScreen.kt):129-169 的 `NavigationBar` 风格不统一 |
 | 10 | [AppGridItems.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/remoteapps/AppGridItems.kt):65-70, :125-130 | `Box.clip(RoundedCornerShape(12.dp)).background(surfaceVariant)` 手搓图标底板 | Miuix `Surface` | 色值已走 colorScheme，仅容器来源 |
 | 11 | [SuperIslandHistoryImages.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/superisland/SuperIslandHistoryImages.kt):105-109, :177-183 | 同上 | Miuix `Surface` | 同上 |
 | 12 | [UIRemoteFilter.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/UIRemoteFilter.kt):254-277 | 用 `Button + Text("+")` / `Text("×")` 当 28.dp 图标按钮 | `IconButton` + `MiuixIcons.Add/Delete` | 文字当图标 |
-| 13 | [SuperIslandSettings.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandSettings.kt):123-124 | 组件内再套 `Scaffold { Surface(background) }` | 删除内层 Scaffold | **嵌套 Scaffold**：该组件已被 [SettingsScreen.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/screen/SettingsScreen.kt):136-141 的 `ScrollableTopAppBarPage`（内部即 Scaffold）与 [GuideBasicSettingsPage.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideBasicSettingsPage.kt):237-239 嵌入，会重复消费 insets |
+| 13 | [SuperIslandSettings.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandSettings.kt):120-121 | 组件内再套 `Scaffold { Surface(background) }` | 删除内层 Scaffold | **嵌套 Scaffold**：该组件已被 [SettingsScreen.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/screen/SettingsScreen.kt):136-141 的 `ScrollableTopAppBarPage`（内部即 Scaffold）与 [GuideBasicSettingsPage.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideBasicSettingsPage.kt):237-239 嵌入，会重复消费 insets |
 
 **判定为「合理、不建议改」的手搓项**（列出以免误改）：
 - [AppPickerDialog.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/dialog/AppPickerDialog.kt):193-220 应用列表项（图标+主副标题+分隔线）——Miuix 无「带图标+双行+可点击」的列表项原语，`BasicComponent` 无法一次容纳异步图标与两行文本的组合，属合理自组；
-- [ChatTest.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/ChatTest.kt):100-133 聊天气泡——无对应组件；
+- [ChatTest.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/ChatTest.kt):98-128 聊天气泡——无对应组件；
 - [AppGridItems.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/remoteapps/AppGridItems.kt):52-59, :112-119 网格磁贴——Miuix 无网格单元组件；
-- [GuideComponents.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideComponents.kt):55-121 Canvas 极光背景——纯装饰绘制。
+- [GuideComponents.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideComponents.kt):53-119 Canvas 极光背景——纯装饰绘制。
 
 ### 2.2 `:superislandui`（6 类）
 
@@ -110,7 +116,7 @@
 | [FloatingComposeContainer.kt](Android/app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/floating/FloatingComposeContainer.kt):33 | `: AbstractComposeView`，作为 `WindowManager.addView` 的宿主，内部已用 `MiuixTheme(darkColorScheme())`（:221） | **必需保留**（悬浮窗必须有 View 宿主）；内部 :222 已正确走 Miuix |
 | [DeviceWidgets.kt](Android/scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/widgets/DeviceWidgets.kt):1040 | `AndroidView` 承载 `ScrcpyInputSurfaceView`（视频 Surface） | **必需保留**（SurfaceView 无法用 Compose 替代） |
 
-唯一 `android.widget.*` 使用是 `Toast`（14 处，`app` 内 9 处 + `base` 的 [ToastUtils.kt](Android/base/src/main/java/notifyrelay/base/util/ToastUtils.kt):19 统一封装）。按要求 Toast 不列为 UI 违规，但顺带登记：`ParamIslandCompose.kt`、`UIAbout.kt`、`SuperIslandHistoryFormatters.kt`、`ChatTest.kt` 直接 `Toast.makeText` 而未走项目 `ToastUtils`，风格不统一（存量）。
+唯一 `android.widget.*` 使用是 `Toast`。**重构后**：原先直接 `Toast.makeText` 而未走项目 `ToastUtils` 的 4 个文件（`ParamIslandCompose.kt`、`UIAbout.kt`、`SuperIslandHistoryFormatters.kt`、`ChatTest.kt`）**已全部改走 `ToastUtils`，风格不统一问题已解决**；现仅剩 1 处直用——[FloatingReplicaListModeManager.kt](Android/app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/replica/FloatingReplicaListModeManager.kt):194-196（`switchNotificationInList`，`Toast` 与 `.makeText` 跨行书写，故按单行 grep `Toast.makeText` 不会命中），建议后续一并改走 `ToastUtils`。`base` 的 [ToastUtils.kt](Android/base/src/main/java/notifyrelay/base/util/ToastUtils.kt):19、:31 是封装本体，属预期。
 
 ---
 
@@ -121,9 +127,9 @@
 | 模块/位置 | 数量 | 判定 |
 |---|---|---|
 | `:superislandui` 10 个文件 | 32 处 | **多为设计特征**：超级岛是仿小米原生岛屿视觉，黑底 `0xEE000000`/`0x92` 透明黑、固定白字 `Color.White`、`0x80FFFFFF` 次级白——这些是岛屿规范，改成主题色反而失真。仅 `BitmapUtils.kt:152` 附近 2 处属工具类残余 |
-| [FloatingWindowContainer.kt](Android/app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/floating/FloatingWindowContainer.kt):244, :307, :367, :376 + [ParamIslandCompose.kt](Android/app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/floating/bigisland/ParamIslandCompose.kt):60, :69, :108, :117 + [ComposeFloatingView.kt](Android/app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/floating/bigisland/ComposeFloatingView.kt):29, :45, :52, :58 | 12 处 | 同上，属岛屿风格 |
+| [FloatingWindowContainer.kt](Android/app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/floating/FloatingWindowContainer.kt):244, :307, :367, :376 + [ParamIslandCompose.kt](Android/app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/floating/bigisland/ParamIslandCompose.kt):58, :67, :106, :115 + [ComposeFloatingView.kt](Android/app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/floating/bigisland/ComposeFloatingView.kt):29, :45, :52, :58 | 12 处 | 同上，属岛屿风格（`ParamIslandCompose` 的行号已按重构后更新：剪贴板/Toast 改走 `:base` 的 `ClipboardUtils`/`ToastUtils`，删去 4 个 import 后上移 2 行） |
 | [DoubleClickConfirm.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/common/DoubleClickConfirm.kt):80 | `ButtonDefaults.buttonColors(color = Color.Red)` | **真违规**：应为 `colorScheme.error`。同项目 [DeviceListButtons.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/screen/devicelist/DeviceListButtons.kt):428 已显式传 `colorScheme.error`，证明这是漏网 |
-| [DoubleClickConfirm.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/common/DoubleClickConfirm.kt):109, :111 | `confirmTextColor ?: Color.White` / `textColor ?: Color.White` | **真违规且默认分支实际生效**：核对全部 5 个调用点——`ClipboardSyncPage.kt:172`（[来源](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/ClipboardSyncPage.kt):172）、`SuperIslandHistory.kt:101`（[来源](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandHistory.kt):101）都**未传** `textColor`，只有 `NotificationHistoryScaffold.kt:61` 与 `DeviceListButtons.kt:418` 传了。应为 `onPrimary` / `onError` |
+| [DoubleClickConfirm.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/common/DoubleClickConfirm.kt):109, :111 | `confirmTextColor ?: Color.White` / `textColor ?: Color.White` | **真违规且默认分支实际生效**：核对全部 5 个调用点——`ClipboardSyncPage.kt:172`（[来源](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/ClipboardSyncPage.kt):172）、`SuperIslandHistory.kt:98`（[来源](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandHistory.kt):98）都**未传** `textColor`，只有 `NotificationHistoryScaffold.kt:61` 与 `DeviceListButtons.kt:418` 传了。应为 `onPrimary` / `onError` |
 | [UpdateDialog.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/dialog/UpdateDialog.kt):46 | `Color(0xFF43A047)` 成功绿 | 次要：Miuix 无 success 语义色，同文件 :45 已有注释说明，建议**登记为已知例外**而非新增语义色 |
 | [AppGridItems.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/remoteapps/AppGridItems.kt):155 | `Color.Black.copy(alpha = 0.5f)` 遮罩 | 次要：无 Miuix scrim 语义色，可用 `onSurface.copy(alpha)` |
 | [DisplayNavigationBar.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/remoteapps/DisplayNavigationBar.kt):64 | `Color.Transparent` + `primary.copy(alpha=0.1f)` | 次要：`Transparent` 无问题，选中底色可换语义色 |
@@ -169,8 +175,8 @@ Gradle 声明了但代码零引用：
 2. [ReorderableList.kt](Android/scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/widgets/ReorderableList.kt):12 —— material3 `IconButton` → Miuix `IconButton`（同文件其余组件已全 Miuix，属漏换）。
 
 **P1（结构性问题）**
-3. [SuperIslandSettings.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandSettings.kt):123-124 删除内层 `Scaffold`（嵌套 Scaffold，重复消费 insets）。
-4. [GuideComponents.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideComponents.kt):217-254 → `BasicComponent`（单点覆盖 2 页 6 个权限项）。
+3. [SuperIslandSettings.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandSettings.kt):120-121 删除内层 `Scaffold`（嵌套 Scaffold，重复消费 insets）。
+4. [GuideComponents.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideComponents.kt):209-245 → `BasicComponent`（单点覆盖 2 页 6 个权限项）。
 5. `:superislandui` 统一 `material3.Text` → Miuix `Text`（18 文件，逐文件机械替换；已核实这些调用都显式传了 color/fontSize，视觉风险低）。建议**先只换 Text，保留 `Card`/`Button` 的岛屿定制色**，分批提交。
 
 **P2（体验一致性）**
@@ -188,7 +194,9 @@ Gradle 声明了但代码零引用：
 
 - **取证方式**：`grep`/`glob` 全量模式扫描（material3/M2 导入、`AndroidView`、`android.widget.*`、`com.clickable`、`combinedClickable`、`Divider`、`height(1.dp)`、`fontSize = N.sp`、`Color(0x…)`），再对命中文件用 `read` 逐行核对真实行号；Miuix 可用组件与 API 签名通过 **miuix-mcp** 核实（`get_all_components`、`get_component_doc` for Text/Card/Button/Surface/BasicComponent、`get_best_practices_doc`）。
 - **基线构建**：`Android` 目录下 `gradlew.bat :app:compileDebugKotlin --rerun-tasks --no-build-cache` → **BUILD SUCCESSFUL，Kotlin 警告 26 条**（与 `memory/2026-09-19.md` 记录的基线 26 条一致）。因本次为纯读取审计，无需构建前后对比。
-- **未修改任何文件**：任务前后 `git -C Android status --porcelain` 均为空；临时日志目录 `.tmp-ui-audit` 已删除。
+- **未修改任何文件**（原审计）：任务前后 `git -C Android status --porcelain` 均为空；临时日志目录 `.tmp-ui-audit` 已删除。
+- **重构后复核（本次修订）**：对本文引用的 **61 个文件**逐一核对存在性与行号（全部存在），其中 **8 个**被该重构改动过——`ParamIslandCompose.kt`、`Theme.kt`、`GuideComponents.kt`、`GuideOptionalPermissionPage.kt`、`GuideRequiredPermissionPage.kt`、`ChatTest.kt`、`SuperIslandHistory.kt`、`SuperIslandSettings.kt`；前 2 个与后 4 个的漂移行号已按当前代码重定位，`Guide*PermissionPage.kt` 仅影响「影响面」描述（不涉行号）。
+- **重构后构建复核**：`gradlew.bat :app:compileDebugKotlin --rerun-tasks --no-build-cache` → **BUILD SUCCESSFUL，Kotlin 警告 26 条**（与重构前基线一致、零新增），`60 actionable tasks: 60 executed`、`FROM-CACHE 0`。`build.gradle.kts` 未被重构改动，故 §五 死依赖的行号与结论不变。
 - **关于 mermaid**：本次为静态只读调查，不涉及任何时序/并发行为变更，故按 AGENTS.md「涉及时序才需 sequenceDiagram」的口径未绘制时序图。若后续进入修复阶段，涉及 `SnackbarHostState` 投递、`AnchoredDraggable` 滑动删除、悬浮窗 `addView`/`updateViewLayout` 三处的改动会补时序图。
 
-**报告未落盘为文件**（避免在工作区产生额外产物）。需要的话我可以把它写成 `Android/Docs/` 下的审计文档，或按 P0–P2 直接进入修复。
+**本文即该审计报告**，已落盘为 `Android/Docs/miuix未使用情况.md`。需要的话可按 P0–P2 直接进入修复。
