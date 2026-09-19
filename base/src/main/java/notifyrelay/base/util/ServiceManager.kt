@@ -1,6 +1,5 @@
 package notifyrelay.base.util
 
-import android.app.ActivityManager
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -47,36 +46,6 @@ object ServiceManager {
             Logger.e("ServiceManager", "启动通知监听服务失败", e)
             false
         }
-
-    /**
-     * 检查指定服务是否正在运行。
-     *
-     * @param context 上下文，用于获取 ActivityManager 服务。
-     * @param serviceClassName 要检查的服务类全名（例如：com.xxx.MyService）。
-     * @return 若当前系统进程列表中存在匹配的服务则返回 true，否则返回 false。
-     */
-    @Suppress("DEPRECATION")
-    fun isServiceRunning(
-        context: Context,
-        serviceClassName: String,
-    ): Boolean {
-        return try {
-            val am = context.getSystemService(Context.ACTIVITY_SERVICE) as? ActivityManager ?: return false
-            val running = am.getRunningServices(Int.MAX_VALUE)
-            running.any { it.service.className == serviceClassName }
-        } catch (e: Exception) {
-            Logger.e("ServiceManager", "检查服务运行状态时发生异常", e)
-            false
-        }
-    }
-
-    /**
-     * 检查自启动权限（实现方式：尝试启动通知监听服务，若能成功发起启动请求则认为拥有自启动/后台运行权限）。
-     *
-     * @param context 用于启动服务的上下文。
-     * @return 若能成功发起服务启动请求则返回 true，否则返回 false。
-     */
-    fun checkAutoStartPermission(context: Context): Boolean = startNotificationListenerService(context)
 
     /**
      * 启动所有必要的后台服务（当前仅包括通知监听服务；剪贴板监控服务已移除，

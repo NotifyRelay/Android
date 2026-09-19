@@ -73,19 +73,6 @@ object PermissionHelper {
     }
 
     /**
-     * 检查敏感通知权限（Android 15+）。
-     *
-     * @param context 用于执行权限检查的上下文。
-     * @return 在 API 35 及以上，返回是否拥有 `RECEIVE_SENSITIVE_NOTIFICATIONS` 权限；在较低版本返回 true（视为不需要该权限）。
-     */
-    fun checkSensitiveNotificationPermission(context: Context): Boolean =
-        if (Build.VERSION.SDK_INT >= 35) {
-            context.checkSelfPermission("android.permission.RECEIVE_SENSITIVE_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED
-        } else {
-            true // 低版本默认有权限
-        }
-
-    /**
      * 请求敏感通知权限（Android 15+）。
      *
      * 说明：Android 15 引入了对敏感通知的更细粒度控制。该方法不会直接弹出系统权限对话框，
@@ -112,33 +99,6 @@ object PermissionHelper {
                 // 其他系统提示使用 ADB
                 ToastUtils.showLongToast(activity, "请用adb授权: adb shell appops set ${activity.packageName} RECEIVE_SENSITIVE_NOTIFICATIONS allow")
             }
-        }
-    }
-
-    /**
-     * 检查应用使用情况访问权限（可选）。
-     *
-     * 该权限用于获取设备上应用的使用情况统计（Usage Stats），某些功能需要此权限来判断应用是否处于前台等。
-     *
-     * @param context 用于获取 AppOpsManager 服务的上下文。
-     * @return 如果 AppOps 管理器允许 `android:get_usage_stats` 则返回 true，否则返回 false。
-     */
-    fun isUsageStatsEnabled(context: Context): Boolean {
-        val appOps = context.getSystemService(Context.APP_OPS_SERVICE) as android.app.AppOpsManager
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            @Suppress("DEPRECATION")
-            appOps.unsafeCheckOpNoThrow(
-                android.app.AppOpsManager.OPSTR_GET_USAGE_STATS,
-                android.os.Process.myUid(),
-                context.packageName,
-            ) == android.app.AppOpsManager.MODE_ALLOWED
-        } else {
-            @Suppress("DEPRECATION")
-            appOps.unsafeCheckOpNoThrow(
-                "android:get_usage_stats",
-                android.os.Process.myUid(),
-                context.packageName,
-            ) == android.app.AppOpsManager.MODE_ALLOWED
         }
     }
 
@@ -325,20 +285,6 @@ object PermissionHelper {
     }
 
     /**
-     * 检查开发者选项-停用屏幕共享保护是否已开启。
-     *
-     * @param context 用于读取 Settings.Global 的上下文。
-     * @return 如果停用屏幕共享保护已开启则返回 true，否则返回 false。
-     */
-    fun checkDevScreenShareProtectOff(context: Context): Boolean =
-        try {
-            val value = Settings.Global.getInt(context.contentResolver, "disable_screen_sharing_protection", 0)
-            value == 1
-        } catch (_: Exception) {
-            false
-        }
-
-    /**
      * 检查文件管理权限（MANAGE_EXTERNAL_STORAGE）。
      *
      * @param context 用于检查权限的上下文。
@@ -435,12 +381,14 @@ object PermissionHelper {
     }
 
     /**
-     * 私有工具：检测设备是否为 MIUI/澎湃（基于厂商名或系统权限信息判断）。
+     * 检测设备是否为 MIUI/澎湃（基于厂商名或系统权限信息判断）。
+     *
+     * 供 `:app` 引导页复用，避免各抄一份厂商判定逻辑。
      *
      * @param context 用于访问 PackageManager 的上下文。
      * @return 如果判断为 MIUI/澎湃返回 true，否则返回 false。
      */
-    private fun detectMiuiOrPengpai(context: Context): Boolean {
+    fun detectMiuiOrPengpai(context: Context): Boolean {
         if (Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true)) return true
         return kotlin
             .runCatching {
@@ -461,26 +409,6 @@ object PermissionHelper {
         } catch (_: Exception) {
             false
         }
-
-    /**
-     * 检查指定的无障碍服务是否已启用。
-     *
-     * @param context 用于访问 Settings.Secure 的上下文。
-     * @param accessibilityServiceName 无障碍服务的完整名称，格式为 "包名/服务类全限定名"。
-     * @return 如果该无障碍服务已在系统设置中启用则返回 true，否则返回 false。
-     */
-    fun isAccessibilityServiceEnabled(
-        context: Context,
-        accessibilityServiceName: String?,
-    ): Boolean {
-        if (accessibilityServiceName.isNullOrEmpty()) return false
-        val enabledServices =
-            Settings.Secure.getString(
-                context.contentResolver,
-                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES,
-            )
-        return enabledServices?.contains(accessibilityServiceName) == true
-    }
 
     /**
      * 检查应用是否处于前台。
