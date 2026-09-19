@@ -302,7 +302,7 @@ object SuperIslandManager {
                 Logger.w("超级岛", "超级岛: 注入应用图标失败: ${e.message}")
             }
 
-            // data URL / bitmap helpers moved to DataUrlUtils
+            // data URL / bitmap helpers 已统一到 notifyrelay.base.util.image.ImageUtils
 
             // 将 picMap 放入 rawExtras 以便上层读取，同时返回到 SuperIslandData
             rawExtras["pic_map"] = picMap
