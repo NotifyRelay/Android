@@ -31,7 +31,7 @@ object FloatingReplicaNotificationManager {
         isLocked: Boolean = false,
     ) {
         CoroutineScope(Dispatchers.Main).launch {
-            runWithErrorHandlingSuspend("发送通知") {
+            runReplicaCatchingSuspend(TAG, "发送通知") {
                 val taskVersion = FloatingReplicaMappingManager.nextVersion(sourceId)
 
                 val internedPicMap =
@@ -40,7 +40,7 @@ object FloatingReplicaNotificationManager {
                     }
 
                 if (!FloatingReplicaMappingManager.isLatestVersion(sourceId, taskVersion)) {
-                    return@runWithErrorHandlingSuspend
+                    return@runReplicaCatchingSuspend
                 }
 
                 val formattedData = SuperIslandDataFormatter.formatForDisplay(context, paramV2Raw, internedPicMap)
@@ -79,7 +79,7 @@ object FloatingReplicaNotificationManager {
                 // 此时内容指纹与 activeNotifications 判定都"看似正常"，一旦跳过就永远不再重发
                 // （表现为"怎么点都不出"）。重复 notify 只是更新同一条通知（已 setOnlyAlertOnce），代价可控。
                 if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                    runWithErrorHandlingSuspend("发送Live Updates复合通知") {
+                    runReplicaCatchingSuspend(TAG, "发送Live Updates复合通知") {
                         LiveUpdatesNotificationManager.initialize(context)
                         LiveUpdatesNotificationManager.showLiveUpdate(
                             sourceId,
@@ -109,7 +109,7 @@ object FloatingReplicaNotificationManager {
                 val timeoutJob =
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(timeoutMs)
-                        runWithErrorHandling("超时自动移除通知") {
+                        runReplicaCatching(TAG, "超时自动移除通知") {
                             Logger.i(TAG, "超级岛: 超时任务触发，准备移除通知, sourceId=$sourceId, timeoutMs=$timeoutMs")
                             FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
                             Logger.i(TAG, "超级岛: 通知超时自动移除, sourceId=$sourceId")
@@ -130,7 +130,7 @@ object FloatingReplicaNotificationManager {
     ) {
         if (context != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                runWithErrorHandling("关闭Live Updates通知") {
+                runReplicaCatching(TAG, "关闭Live Updates通知") {
                     LiveUpdatesNotificationManager.initialize(context)
                     LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
                     Logger.i(TAG, "通过LiveUpdatesNotificationManager关闭通知: sourceId=$sourceId")
@@ -147,7 +147,7 @@ object FloatingReplicaNotificationManager {
                 }
             }
 
-            runWithErrorHandling("关闭传统复刻通知") {
+            runReplicaCatching(TAG, "关闭传统复刻通知") {
                 val notificationIds = notificationIdsBefore ?: FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
                 Logger.i(TAG, "尝试关闭传统复刻通知，sourceId=$sourceId，notificationIds=$notificationIds")
                 if (notificationIds != null && notificationIds.isNotEmpty()) {
@@ -159,7 +159,6 @@ object FloatingReplicaNotificationManager {
                             Logger.i(TAG, "通过直接映射关闭通知成功，sourceId=$sourceId, notificationId=$notificationId")
                         } catch (e: Exception) {
                             Logger.w(TAG, "通过直接映射关闭通知失败: ${e.message}")
-                            e.printStackTrace()
                         }
                     }
                     FloatingReplicaMappingManager.removeSourceIdMappings(sourceId)
@@ -243,28 +242,6 @@ object FloatingReplicaNotificationManager {
             Logger.i(TAG, "超级岛: 根据通知ID关闭浮窗条目成功，notificationId=$notificationId, entryKey=$entryKey")
         } else {
             Logger.w(TAG, "超级岛: 未找到通知ID对应的浮窗条目，notificationId=$notificationId")
-        }
-    }
-
-    private inline fun runWithErrorHandling(
-        actionName: String,
-        crossinline block: () -> Unit,
-    ) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
-        }
-    }
-
-    private suspend inline fun runWithErrorHandlingSuspend(
-        actionName: String,
-        crossinline block: suspend () -> Unit,
-    ) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
         }
     }
 }
