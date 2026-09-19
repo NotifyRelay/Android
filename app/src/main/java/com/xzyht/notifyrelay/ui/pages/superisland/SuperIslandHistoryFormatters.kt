@@ -1,23 +1,14 @@
 package com.xzyht.notifyrelay.ui.pages.superisland
 
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
-import android.text.format.DateFormat
-import android.widget.Toast
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
+import com.xzyht.notifyrelay.ui.pages.formatTimestamp
+import notifyrelay.base.util.ClipboardUtils
 import notifyrelay.base.util.Logger
-import java.util.Date
-
-internal fun formatTimestamp(timestamp: Long): String =
-    try {
-        DateFormat.format("yyyy-MM-dd HH:mm:ss", Date(timestamp)).toString()
-    } catch (_: Exception) {
-        timestamp.toString()
-    }
+import notifyrelay.base.util.ToastUtils
 
 internal fun buildEntryCopyText(
     entry: SuperIslandHistoryStoreEntry,
@@ -65,17 +56,15 @@ internal fun copyEntryToClipboard(
     content: String,
 ) {
     if (content.isBlank()) {
-        Toast.makeText(context, "当前条目无可复制内容", Toast.LENGTH_SHORT).show()
+        ToastUtils.showShortToast(context, "当前条目无可复制内容")
         return
     }
-    try {
-        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-        val clip = ClipData.newPlainText("super_island_entry", content)
-        clipboard.setPrimaryClip(clip)
-        Toast.makeText(context, "已复制原始消息到剪贴板", Toast.LENGTH_SHORT).show()
-    } catch (e: Exception) {
-        Logger.e("NotifyRelay", "复制超级岛原始消息失败", e)
-        Toast.makeText(context, "复制失败", Toast.LENGTH_SHORT).show()
+    if (ClipboardUtils.copyText(context, "super_island_entry", content)) {
+        ToastUtils.showShortToast(context, "已复制原始消息到剪贴板")
+    } else {
+        // ClipboardUtils 内部已记录异常，此处仅补充业务语义提示（异常堆栈见 ClipboardUtils 的 Logger.e）
+        Logger.w("NotifyRelay", "复制超级岛原始消息失败")
+        ToastUtils.showShortToast(context, "复制失败")
     }
 }
 

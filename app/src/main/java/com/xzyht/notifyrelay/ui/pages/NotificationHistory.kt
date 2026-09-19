@@ -9,8 +9,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
@@ -20,11 +18,6 @@ import com.xzyht.notifyrelay.ui.viewmodel.NotificationHistoryViewModel
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.time.format.DateTimeFormatter
-import java.util.Locale
-
-// 日期格式化工具（线程安全）
-internal val dateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss", Locale.US)
 
 internal enum class DragValue { Center, End }
 
@@ -95,9 +88,7 @@ fun NotificationHistoryScreen() {
             )
         }
     }
-    val density = LocalDensity.current
-    val deleteWidthPx = with(density) { 80.dp.toPx() }
-    val deleteWidth = 80.dp
+    val (deleteWidthPx, deleteWidth) = rememberDeleteSwipeWidth()
 
     NotificationHistoryScaffold(
         pagingItems = pagingItems,

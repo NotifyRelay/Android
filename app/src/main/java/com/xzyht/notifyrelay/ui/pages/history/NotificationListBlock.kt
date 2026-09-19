@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
+import com.xzyht.notifyrelay.ui.pages.DeleteButton
 import com.xzyht.notifyrelay.ui.pages.DragValue
 import com.xzyht.notifyrelay.ui.pages.dateTimeFormatter
 import com.xzyht.notifyrelay.ui.viewmodel.GroupedNotifications
