@@ -20,7 +20,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingl
 import com.xzyht.notifyrelay.feature.device.service.callback.HandshakeRequestHandler
 import com.xzyht.notifyrelay.ui.dialog.PairingMode
 import com.xzyht.notifyrelay.ui.navigation.Navigator
-import notifyrelay.core.util.BatteryUtils
+import notifyrelay.base.util.BatteryUtils
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**

@@ -6,8 +6,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.base.util.ServiceManager
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.core.util.ServiceManager
 
 /**
  * 权限检查与服务启动协调器

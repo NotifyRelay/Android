@@ -31,9 +31,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.BatteryUtils
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
-import notifyrelay.core.util.BatteryUtils
 import notifyrelay.data.config.AppConfig
 
 // =================== 设备连接管理器主类 ===================

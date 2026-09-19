@@ -23,7 +23,7 @@ import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.templates.IconTextInfo
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
 
 /**
  * 新图文组件（iconTextInfo）Compose 实现（OS3 模板 14 / 14-2 / 16 / 17 / 18 / 22）
