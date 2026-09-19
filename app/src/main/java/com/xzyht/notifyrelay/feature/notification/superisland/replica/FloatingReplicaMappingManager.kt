@@ -316,7 +316,7 @@ object FloatingReplicaMappingManager {
         }
 
         if (reason != FloatingWindowManager.RemovalReason.HIDDEN && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-            runWithErrorHandling("关闭Live Updates复合通知") {
+            runReplicaCatching(TAG, "关闭Live Updates复合通知") {
                 val context = overlayViewRef?.get()?.context
                 if (context != null) {
                     LiveUpdatesNotificationManager.initialize(context)
@@ -424,16 +424,5 @@ object FloatingReplicaMappingManager {
             }
         }
         return null
-    }
-
-    private inline fun runWithErrorHandling(
-        actionName: String,
-        crossinline block: () -> Unit,
-    ) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
-        }
     }
 }
