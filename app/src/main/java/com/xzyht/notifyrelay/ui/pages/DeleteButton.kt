@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages.history
+package com.xzyht.notifyrelay.ui.pages
 
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.size
