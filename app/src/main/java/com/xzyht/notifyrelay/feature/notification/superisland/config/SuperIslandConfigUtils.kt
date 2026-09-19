@@ -3,6 +3,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland.config
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import com.xzyht.notifyrelay.feature.notification.superisland.contract.SuperIslandActions
 import com.xzyht.notifyrelay.feature.notification.superisland.receiver.NotificationBroadcastReceiver
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import notifyrelay.base.util.DeviceUtils
@@ -14,9 +15,18 @@ import notifyrelay.data.StorageManager
  */
 object SuperIslandConfigUtils {
     private const val TAG = "SuperIslandConfigUtils"
-    private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
-    private const val SUPER_ISLAND_NOTIFICATION_LIST_KEY = "super_island_notification_list"
-    private const val SPEC_INJECTION_MODE_KEY = "spec_injection_mode"
+
+    /** 浮窗开关的存储 key。持久化契约，值不可改。 */
+    internal const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
+
+    /** 通知列表模式的存储 key。持久化契约，值不可改。 */
+    internal const val SUPER_ISLAND_NOTIFICATION_LIST_KEY = "super_island_notification_list"
+
+    /** 规范信息注入方式的存储 key。持久化契约，值不可改。 */
+    internal const val SPEC_INJECTION_MODE_KEY = "spec_injection_mode"
+
+    /** 镜像应用过滤开关的存储 key。持久化契约，值不可改。 */
+    internal const val MIRROR_FILTER_ENABLED_KEY = "super_island_mirror_filter_enabled"
 
     // 注入方式枚举
     enum class SpecInjectionMode {
@@ -93,6 +103,20 @@ object SuperIslandConfigUtils {
     }
 
     /**
+     * 设置规范信息注入模式。
+     * 写入值为模式枚举序数，与 [getSpecInjectionMode] 的读取口径一致。
+     *
+     * @param context 用于写入存储的上下文。
+     * @param mode 目标注入模式。
+     */
+    fun setSpecInjectionMode(
+        context: Context,
+        mode: SpecInjectionMode,
+    ) {
+        StorageManager.putInt(context, SPEC_INJECTION_MODE_KEY, mode.ordinal)
+    }
+
+    /**
      * 检查超级岛规范信息注入是否开启
      */
     fun isSuperIslandSpecInjectionEnabled(context: Context): Boolean = getSpecInjectionMode(context) == SpecInjectionMode.SUPER_ISLAND
@@ -120,7 +144,7 @@ object SuperIslandConfigUtils {
             notificationId,
             Intent(context, NotificationBroadcastReceiver::class.java)
                 .putExtra("notificationId", notificationId)
-                .setAction("com.xzyht.notifyrelay.ACTION_CLOSE_NOTIFICATION"),
+                .setAction(SuperIslandActions.CLOSE_NOTIFICATION),
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
         )
 

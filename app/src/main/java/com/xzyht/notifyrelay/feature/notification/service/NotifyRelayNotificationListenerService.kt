@@ -6,7 +6,6 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.os.IBinder
-import android.provider.Settings
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
@@ -31,6 +30,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.base.util.SuperIslandStorageKeys
 import notifyrelay.data.StorageManager
 
 class NotifyRelayNotificationListenerService : NotificationListenerService() {
@@ -267,7 +267,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         checkProcessed: Boolean = false,
     ) {
         // 读取超级岛设置开关，决定是否按超级岛专用逻辑处理
-        val superIslandEnabled = getStorageBoolean("superisland_enabled", true)
+        val superIslandEnabled = getStorageBoolean(SuperIslandStorageKeys.ENABLED, true)
 
         // 检查是否为媒体播放通知
         val isMediaNotification = sbn.notification.category == Notification.CATEGORY_TRANSPORT
@@ -435,14 +435,9 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     override fun onListenerConnected() {
         Logger.i(TAG, "[NotifyListener] onListenerConnected called")
         super.onListenerConnected()
-        // 检查监听服务是否启用
-        val enabledListeners =
-            Settings.Secure.getString(
-                applicationContext.contentResolver,
-                "enabled_notification_listeners",
-            )
-        val isEnabled = enabledListeners?.contains(applicationContext.packageName) == true
-        Logger.i(TAG, "[NotifyListener] Listener enabled: $isEnabled, enabledListeners=$enabledListeners")
+        // 检查监听服务是否启用（复用 :base 的 ComponentName 精确匹配实现）
+        val isEnabled = PermissionHelper.checkNotificationListenerServiceCanStart(applicationContext)
+        Logger.i(TAG, "[NotifyListener] Listener enabled: $isEnabled")
         if (!isEnabled) {
             Logger.w(TAG, "[NotifyListener] NotificationListenerService 未被系统启用，无法获取通知！")
         }

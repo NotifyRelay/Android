@@ -34,6 +34,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.base.util.SuperIslandStorageKeys
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.FilterConfigDefaults
 import notifyrelay.data.StorageManager
@@ -53,11 +54,7 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-private const val SUPER_ISLAND_KEY = "superisland_enabled"
 private const val SUPER_ISLAND_SHOW_KEY = "superisland_show"
-private const val SUPER_ISLAND_FLOATING_WINDOW_KEY = "super_island_floating_window"
-private const val SPEC_INJECTION_MODE_KEY = "spec_injection_mode"
-private const val MIRROR_FILTER_ENABLED_KEY = "super_island_mirror_filter_enabled"
 
 private val DEFAULT_MIRROR_PACKAGES: List<String>
     get() = FilterConfigDefaults.defaultMirrorPackages
@@ -73,21 +70,21 @@ val specInjectionOptions =
 fun UISuperIslandSettings() {
     val context = LocalContext.current
 
-    var enabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_KEY, true)) }
+    var enabled by remember { mutableStateOf(StorageManager.getBoolean(context, SuperIslandStorageKeys.ENABLED, true)) }
     var showSuperIsland by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_SHOW_KEY, true)) }
-    var floatingWindowEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, FloatingReplicaManager.getDefaultFloatingWindowEnabled())) }
+    var floatingWindowEnabled by remember { mutableStateOf(SuperIslandConfigUtils.isFloatingWindowEnabled(context)) }
     var notificationListEnabled by remember { mutableStateOf(SuperIslandConfigUtils.isNotificationListMode(context)) }
 
     val savedInjectionMode = SuperIslandConfigUtils.getSpecInjectionMode(context)
     var specInjectionMode by remember { mutableStateOf(savedInjectionMode) }
 
-    val hasFloatingWindowSetting = StorageManager.getString(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, "") != ""
+    val hasFloatingWindowSetting = StorageManager.getString(context, SuperIslandConfigUtils.SUPER_ISLAND_FLOATING_WINDOW_KEY, "") != ""
 
     val defaultFloatingWindowEnabled = FloatingReplicaManager.getDefaultFloatingWindowEnabled()
 
     val showTestDialog = remember { mutableStateOf(false) }
 
-    var mirrorFilterEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, MIRROR_FILTER_ENABLED_KEY, true)) }
+    var mirrorFilterEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, true)) }
     var customPackages by remember { mutableStateOf<List<SuperIslandMirrorFilterEntity>>(emptyList()) }
     var showAppPicker by remember { mutableStateOf(false) }
     var showCustomPkgInput by remember { mutableStateOf(false) }
@@ -136,7 +133,7 @@ fun UISuperIslandSettings() {
                     checked = enabled,
                     onCheckedChange = {
                         enabled = it
-                        StorageManager.putBoolean(context, SUPER_ISLAND_KEY, it)
+                        StorageManager.putBoolean(context, SuperIslandStorageKeys.ENABLED, it)
                     },
                 )
 
@@ -184,7 +181,7 @@ fun UISuperIslandSettings() {
                     onSelectedIndexChange = { index ->
                         if (index in specInjectionOptions.indices) {
                             specInjectionMode = specInjectionOptions[index].second
-                            StorageManager.putInt(context, SPEC_INJECTION_MODE_KEY, specInjectionMode.ordinal)
+                            SuperIslandConfigUtils.setSpecInjectionMode(context, specInjectionMode)
                             if (specInjectionMode == SpecInjectionMode.SUPER_ISLAND) {
                                 ToastUtils.showLongToast(context, "请通过lsp模块关闭超级岛白名单否则大概率无法展示")
                             }
@@ -207,7 +204,7 @@ fun UISuperIslandSettings() {
                     checked = mirrorFilterEnabled,
                     onCheckedChange = {
                         mirrorFilterEnabled = it
-                        StorageManager.putBoolean(context, MIRROR_FILTER_ENABLED_KEY, it)
+                        StorageManager.putBoolean(context, SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, it)
                     },
                 )
 
