@@ -103,9 +103,7 @@ object SuperIslandImageStore {
         context: Context?,
         value: String?,
     ): String? {
-        if (value.isNullOrBlank()) return value
-        val trimmed = value.trim()
-        val imageId = trimmed.toLongOrNull() ?: return value
+        val imageId = resolveId(value) ?: return value
         if (imageId <= 0 || context == null) return value
         ensureMigrated(context)
         return DatabaseRepository.getInstance(context).resolveSuperIslandImageById(imageId) ?: value
@@ -115,9 +113,7 @@ object SuperIslandImageStore {
         context: Context?,
         value: String?,
     ): String? {
-        if (value.isNullOrBlank()) return value
-        val trimmed = value.trim()
-        val imageId = trimmed.toLongOrNull() ?: return value
+        val imageId = resolveId(value) ?: return value
         if (imageId <= 0 || context == null || isMainThread()) {
             if (isMainThread()) {
                 Logger.w("SuperIslandImageStore", "resolve在主线程调用，无法解析图片ID: $imageId，请使用resolveSuspend或resolvePicMap")
@@ -127,6 +123,20 @@ object SuperIslandImageStore {
         return runBlocking(Dispatchers.IO) {
             DatabaseRepository.getInstance(context).resolveSuperIslandImageById(imageId) ?: value
         }
+    }
+
+    /**
+     * 把可能承载「图片ID」的取值解析为 Long。
+     *
+     * 空串/纯空白/非数字返回 null（调用侧原样返回入参 value）；
+     * 数值是否为正由调用侧自行判断，以保持原有 `<= 0` 分支的位置与语义不变。
+     *
+     * @param value 待解析的原始取值。
+     * @return 解析出的 Long；不可解析时为 null。
+     */
+    private fun resolveId(value: String?): Long? {
+        if (value.isNullOrBlank()) return null
+        return value.trim().toLongOrNull()
     }
 
     suspend fun prune(

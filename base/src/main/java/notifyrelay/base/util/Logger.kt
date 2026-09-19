@@ -46,10 +46,6 @@ object Logger {
         }
     }
 
-    fun plant(tree: Timber.Tree) {
-        Timber.plant(tree)
-    }
-
     fun v(
         tag: String,
         message: String,

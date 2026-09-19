@@ -7,6 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.TextUtils
 import kotlin.time.Duration.Companion.milliseconds
 
 /**
@@ -70,7 +71,7 @@ internal class RemoteFilterPendingMonitor(
         synchronized(pendingNotifications) {
             val matches =
                 pendingNotifications.filter { pending ->
-                    normalizeTitle(pending.title) == normalizedTitle && pending.text == pendingText && pending.packageName == packageName
+                    TextUtils.normalizeTitle(pending.title) == normalizedTitle && pending.text == pendingText && pending.packageName == packageName
                 }
             matches.forEach { matched ->
                 try {

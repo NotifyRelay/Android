@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import java.lang.ref.WeakReference
 
 object FloatingReplicaWindowManager {
@@ -73,10 +74,10 @@ object FloatingReplicaWindowManager {
 
     fun isFloatingWindowEnabled(context: Context): Boolean = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
 
-    fun canShowOverlay(context: Context): Boolean = Settings.canDrawOverlays(context)
+    fun canShowOverlay(context: Context): Boolean = PermissionHelper.checkOverlayPermission(context)
 
     fun requestOverlayPermission(context: Context) {
-        runWithErrorHandling("请求悬浮窗权限") {
+        runReplicaCatching(TAG, "请求悬浮窗权限") {
             val intent = IntentUtils.createImplicitIntent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
             intent.data = "package:${context.packageName}".toUri()
             IntentUtils.startActivity(context, intent, true)
@@ -94,25 +95,25 @@ object FloatingReplicaWindowManager {
         isLocked: Boolean = false,
         isRestoring: Boolean = false,
     ) {
-        runWithErrorHandling("显示浮窗") {
+        runReplicaCatching(TAG, "显示浮窗") {
             if (!isFloatingWindowEnabled(context)) {
                 Logger.i(TAG, "超级岛: 浮窗功能已关闭，不创建浮窗, sourceId=$sourceId")
-                return@runWithErrorHandling
+                return@runReplicaCatching
             }
 
             if (!isRestoring && sourceId.isNotBlank() && FloatingReplicaMappingManager.isInstanceBlocked(sourceId)) {
                 Logger.i(TAG, "超级岛: instanceId=$sourceId 已在本轮会话中被屏蔽，忽略展示")
-                return@runWithErrorHandling
+                return@runReplicaCatching
             }
 
             if (!canShowOverlay(context)) {
                 Logger.i(TAG, "超级岛: 无悬浮窗权限，尝试请求权限")
                 requestOverlayPermission(context)
-                return@runWithErrorHandling
+                return@runReplicaCatching
             }
 
             CoroutineScope(Dispatchers.Main).launch {
-                runWithErrorHandlingSuspend("显示浮窗(协程)") {
+                runReplicaCatchingSuspend(TAG, "显示浮窗(协程)") {
                     val taskVersion = FloatingReplicaMappingManager.nextVersion(sourceId)
 
                     if (overlayLifecycleOwner == null) {
@@ -126,7 +127,7 @@ object FloatingReplicaWindowManager {
                         }
 
                     if (!FloatingReplicaMappingManager.isLatestVersion(sourceId, taskVersion)) {
-                        return@runWithErrorHandlingSuspend
+                        return@runReplicaCatchingSuspend
                     }
 
                     val formattedData = SuperIslandDataFormatter.formatForDisplay(context, paramV2Raw, internedPicMap)
@@ -205,7 +206,7 @@ object FloatingReplicaWindowManager {
                         if (canSkipRefresh) {
                             Logger.i(TAG, "超级岛: 内容无变更，跳过系统通知刷新，仅重置内部撤回计时器: sourceId=$sourceId")
                         } else if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                            runWithErrorHandlingSuspend("发送Live Updates复合通知") {
+                            runReplicaCatchingSuspend(TAG, "发送Live Updates复合通知") {
                                 LiveUpdatesNotificationManager.initialize(context)
                                 val success =
                                     LiveUpdatesNotificationManager.showLiveUpdate(
@@ -259,7 +260,7 @@ object FloatingReplicaWindowManager {
             return
         }
 
-        runWithErrorHandling("切换浮窗状态") {
+        runReplicaCatching(TAG, "切换浮窗状态") {
             val entryKeys = FloatingReplicaMappingManager.getSourceIdEntryKeys(sourceId)
             val isShowing = entryKeys?.any { floatingWindowManager.getEntry(it) != null } == true
 
@@ -315,10 +316,10 @@ object FloatingReplicaWindowManager {
         sourceId: String,
         reason: FloatingWindowManager.RemovalReason = FloatingWindowManager.RemovalReason.REMOTE,
     ) {
-        runWithErrorHandling("按来源关闭浮窗") {
+        runReplicaCatching(TAG, "按来源关闭浮窗") {
             if (FloatingReplicaMappingManager.isSourceRecentlyClosedWithinMinute(sourceId)) {
                 Logger.i(TAG, "dismissBySourceInternal: sourceId=$sourceId 最近已关闭过，跳过")
-                return@runWithErrorHandling
+                return@runReplicaCatching
             }
 
             if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
@@ -338,7 +339,7 @@ object FloatingReplicaWindowManager {
                     FloatingReplicaMappingManager.removeBlockedInstance(sourceId)
                 }
                 Logger.i(TAG, "dismissBySourceInternal: 列表模式处理完成, sourceId=$sourceId")
-                return@runWithErrorHandling
+                return@runReplicaCatching
             }
 
             val floatingEnabled = if (ctx != null) isFloatingWindowEnabled(ctx) else true
@@ -363,7 +364,7 @@ object FloatingReplicaWindowManager {
     }
 
     fun removeOverlayContainer() {
-        runWithErrorHandling("移除浮窗容器") {
+        runReplicaCatching(TAG, "移除浮窗容器") {
             val view = overlayView?.get()
             val wm = windowManager?.get()
             val lp = overlayLayoutParams
@@ -397,13 +398,13 @@ object FloatingReplicaWindowManager {
         key: String,
         summaryOnly: Boolean,
     ) {
-        runWithErrorHandling("addOrUpdateEntry") {
+        runReplicaCatching(TAG, "addOrUpdateEntry") {
             if (overlayView?.get() == null || windowManager?.get() == null || overlayLayoutParams == null) {
-                runWithErrorHandling("创建浮窗容器") {
+                runReplicaCatching(TAG, "创建浮窗容器") {
                     val appCtx = context.applicationContext
                     val wm =
                         appCtx.getSystemService(Context.WINDOW_SERVICE) as? WindowManager
-                            ?: return@runWithErrorHandling
+                            ?: return@runReplicaCatching
 
                     val lifecycleOwner =
                         overlayLifecycleOwner ?: FloatingWindowLifecycleOwner().also {
@@ -445,7 +446,7 @@ object FloatingReplicaWindowManager {
                         }
 
                     var added = false
-                    runWithErrorHandling("addView") {
+                    runReplicaCatching(TAG, "addView") {
                         wm.addView(composeContainer, layoutParams)
                         added = true
                     }
@@ -473,27 +474,5 @@ object FloatingReplicaWindowManager {
     }
 
     private fun onContainerDragEnded() {
-    }
-
-    private inline fun runWithErrorHandling(
-        actionName: String,
-        crossinline block: () -> Unit,
-    ) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
-        }
-    }
-
-    private suspend inline fun runWithErrorHandlingSuspend(
-        actionName: String,
-        crossinline block: suspend () -> Unit,
-    ) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
-        }
     }
 }

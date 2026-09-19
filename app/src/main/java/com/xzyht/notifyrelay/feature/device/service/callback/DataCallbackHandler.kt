@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.feature.device.service.callback
 
 import android.os.Build
-import android.os.Environment
 import com.sun.jna.Native
 import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
@@ -21,6 +20,7 @@ import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import org.json.JSONObject
 
 /**
@@ -228,7 +228,7 @@ class DataCallbackHandler(
                                 put("port", info.port)
                             }.toString()
                     host.resolveDevice(uuid)?.let { replyToDevice(it, "DATA_FTP", raw) }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !Environment.isExternalStorageManager()) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !PermissionHelper.checkManageExternalStoragePermission(host.callbackContext)) {
                         val intent = IntentUtils.createIntent(host.callbackContext, GuideActivity::class.java)
                         intent.putExtra("fromftp", true)
                         intent.putExtra("fromInternal", true)

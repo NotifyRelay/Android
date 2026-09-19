@@ -1,8 +1,14 @@
-package com.xzyht.notifyrelay.ui.common
+package notifyrelay.base.util
 
 import android.view.Window
 import java.lang.reflect.Method
 
+/**
+ * 系统栏工具类
+ *
+ * 纯 Android 平台工具：仅依赖 [Window] 与反射，不涉及 Compose / Context / 业务模型 / 资源，
+ * 故由 `:app` 的 `ui/common` 下沉至 `:base`，供各模块复用。
+ */
 object SystemBarUtils {
     private val setStatusBarColor2: Method? by lazy {
         try {

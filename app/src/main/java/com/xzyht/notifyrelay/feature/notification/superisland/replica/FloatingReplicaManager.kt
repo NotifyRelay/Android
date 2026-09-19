@@ -18,8 +18,6 @@ object FloatingReplicaManager {
         return !isGreater
     }
 
-    private fun isFloatingWindowEnabled(context: Context): Boolean = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
-
     fun getAppContext(): Context? = appContext
 
     fun isSourceRecentlyClosed(sourceId: String): Boolean = FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)
@@ -39,7 +37,7 @@ object FloatingReplicaManager {
 
         val isRecentlyClosed = FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)
 
-        if (isFloatingWindowEnabled(context)) {
+        if (SuperIslandConfigUtils.isFloatingWindowEnabled(context)) {
             if (isRecentlyClosed) {
                 Logger.i(TAG, "超级岛: sourceId=$sourceId 在30秒内被关闭过，跳过浮窗展示")
                 return
@@ -72,12 +70,12 @@ object FloatingReplicaManager {
     }
 
     fun closeByNotificationId(notificationId: Int) {
-        runWithErrorHandling("根据通知ID关闭浮窗条目") {
-            val ctx = appContext ?: return@runWithErrorHandling
+        runReplicaCatching(TAG, "根据通知ID关闭浮窗条目") {
+            val ctx = appContext ?: return@runReplicaCatching
 
-            if (!isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
+            if (!SuperIslandConfigUtils.isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
                 FloatingReplicaListModeManager.closeListModeNotification(ctx, notificationId)
-                return@runWithErrorHandling
+                return@runReplicaCatching
             }
 
             FloatingReplicaNotificationManager.closeNotificationByNotificationId(ctx, notificationId)
@@ -86,16 +84,5 @@ object FloatingReplicaManager {
 
     fun dismissBySource(sourceId: String) {
         FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.REMOTE)
-    }
-
-    private inline fun runWithErrorHandling(
-        actionName: String,
-        crossinline block: () -> Unit,
-    ) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
-        }
     }
 }

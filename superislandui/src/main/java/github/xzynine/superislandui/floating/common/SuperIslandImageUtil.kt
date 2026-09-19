@@ -21,7 +21,7 @@ import notifyrelay.base.util.image.ImageUtils
  */
 object SuperIslandImageUtil {
     /**
-     * 统一的Compose图片加载工具，封装了现有ImageLoader和DataUrlUtils的功能
+     * 统一的Compose图片加载工具，封装了现有ImageLoader和ImageUtils的功能
      */
     @Composable
     fun rememberSuperIslandImagePainter(

@@ -319,13 +319,6 @@ class DatabaseRepository(
     suspend fun getLatestSuperIslandHistoryByFeatureId(featureId: String): SuperIslandHistoryEntity? = superIslandHistoryDao.getLatestByFeatureId(featureId)
 
     /**
-     * 保存超级岛历史记录列表
-     */
-    suspend fun saveSuperIslandHistory(history: List<SuperIslandHistoryEntity>) {
-        superIslandHistoryDao.insertAll(history)
-    }
-
-    /**
      * 保存单条超级岛历史记录
      */
     suspend fun saveSuperIslandHistory(history: SuperIslandHistoryEntity) {
@@ -641,11 +634,6 @@ class DatabaseRepository(
     suspend fun getExpiredApps(expiryTime: Long): List<AppEntity> = appDao.getExpiredApps(expiryTime)
 
     // 应用设备关联相关方法
-
-    /**
-     * 获取所有应用设备关联
-     */
-    fun getAllAppDevices() = appDeviceDao.getAll()
 
     /**
      * 根据包名获取应用设备关联

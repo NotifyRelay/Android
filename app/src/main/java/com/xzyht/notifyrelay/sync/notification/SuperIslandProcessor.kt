@@ -6,6 +6,7 @@ import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStore
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
@@ -117,7 +118,7 @@ object SuperIslandProcessor {
                 }
             val isEnd = (termVal == SuperIslandProtocol.TERMINATE_VALUE)
 
-            val mirrorFilterEnabled = StorageManager.getBoolean(context, "super_island_mirror_filter_enabled", true)
+            val mirrorFilterEnabled = StorageManager.getBoolean(context, SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, true)
             if (mirrorFilterEnabled) {
                 val isMirrorEnabled =
                     runBlocking(Dispatchers.IO) {

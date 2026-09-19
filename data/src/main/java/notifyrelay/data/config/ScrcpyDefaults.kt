@@ -58,17 +58,12 @@ object ScrcpyDefaults {
     const val CROP_Y = ""
 
     // Settings
-    const val THEME_BASE_INDEX = 0
-    const val MONET = false
-
     const val FULLSCREEN_DEBUG_INFO = false
     const val SHOW_FULLSCREEN_VIRTUAL_BUTTONS = true
     const val KEEP_SCREEN_ON_WHEN_STREAMING = false
     const val LOW_LATENCY = false
     const val VIRTUAL_BUTTONS_LAYOUT =
         "more:1,pip:0,ime:0,app_switch:1,home:0,back:1,menu:0,notification:0,volume_up:0,volume_down:0,volume_mute:0,power:0,screenshot:0"
-
-    const val PASSWORD_REQUIRE_AUTH = true
 
     const val CUSTOM_SERVER_URI = ""
 

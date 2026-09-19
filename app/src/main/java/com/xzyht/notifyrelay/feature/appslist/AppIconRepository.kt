@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
@@ -13,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import java.io.ByteArrayOutputStream
@@ -211,16 +211,7 @@ internal object AppIconRepository {
             val bitmap =
                 when (val drawable = pm.getApplicationIcon(appInfo)) {
                     is BitmapDrawable -> drawable.bitmap
-                    else -> {
-                        // 将其他类型的drawable转换为bitmap
-                        val width = if (drawable.intrinsicWidth > 0) drawable.intrinsicWidth else 96
-                        val height = if (drawable.intrinsicHeight > 0) drawable.intrinsicHeight else 96
-                        val createdBitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                        val canvas = Canvas(createdBitmap)
-                        drawable.setBounds(0, 0, width, height)
-                        drawable.draw(canvas)
-                        createdBitmap
-                    }
+                    else -> drawable.toBitmapOrDefault(96)
                 }
 
             // 将获取到的图标缓存到数据库

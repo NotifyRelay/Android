@@ -6,14 +6,6 @@ import android.os.Build
 import github.xzynine.checkupdata.model.ReleaseInfo
 
 object ApkArchMatcher {
-    val SUPPORTED_ABIS: Set<String> =
-        setOf(
-            "arm64-v8a",
-            "armeabi-v7a",
-            "x86_64",
-            "x86",
-        )
-
     val ABI_PATTERNS: Map<String, List<String>> =
         mapOf(
             "arm64-v8a" to listOf("arm64", "aarch64", "arm64-v8a"),
@@ -45,31 +37,6 @@ object ApkArchMatcher {
         }
 
     fun getInstalledAppAbiOrDevice(context: Context): String = getInstalledAppAbi(context) ?: getDeviceAbi()
-
-    fun matchAssetByArch(
-        assets: List<ReleaseInfo.ReleaseAsset>,
-        preferredAbi: String? = null,
-    ): ReleaseInfo.ReleaseAsset? {
-        val allApks =
-            assets.filter {
-                it.name.endsWith(".apk", ignoreCase = true)
-            }
-
-        val universalApk =
-            allApks.find {
-                val name = it.name.lowercase()
-                name.contains("universal") || name.contains("noarch")
-            }
-
-        val patterns = ABI_PATTERNS[preferredAbi] ?: emptyList()
-        val matchedApk =
-            allApks.find { asset ->
-                val name = asset.name.lowercase()
-                patterns.any { pattern -> name.contains(pattern) }
-            }
-
-        return matchedApk ?: universalApk ?: allApks.firstOrNull()
-    }
 
     fun createAssetFilter(preferredAbi: String): (ReleaseInfo.ReleaseAsset) -> Boolean {
         val patterns = ABI_PATTERNS[preferredAbi] ?: emptyList()

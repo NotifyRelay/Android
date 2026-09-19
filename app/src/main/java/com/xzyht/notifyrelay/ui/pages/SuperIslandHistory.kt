@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.ui.pages
 
 import android.app.Activity
-import android.widget.Toast
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,7 +20,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -30,6 +28,7 @@ import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.pages.superisland.SuperIslandHistoryListBlock
 import com.xzyht.notifyrelay.ui.viewmodel.SuperIslandHistoryViewModel
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
@@ -74,15 +73,13 @@ fun UISuperIslandHistory() {
             viewModel.clearHistory()
         } catch (e: Exception) {
             Logger.e("NotifyRelay", "清除超级岛历史异常", e)
-            Toast.makeText(context, "清除失败: ${e.message}", Toast.LENGTH_SHORT).show()
+            ToastUtils.showShortToast(context, "清除失败: ${e.message}")
         }
     }
 
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
-    val density = LocalDensity.current
-    val deleteWidthPx = with(density) { 80.dp.toPx() }
-    val deleteWidth = 80.dp
+    val (deleteWidthPx, deleteWidth) = rememberDeleteSwipeWidth()
 
     Scaffold(
         containerColor = colorScheme.background,

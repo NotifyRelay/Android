@@ -2,11 +2,11 @@ package com.xzyht.notifyrelay.sync
 
 import android.content.Context
 import android.os.Build
-import android.os.Environment
 import android.os.Handler
 import android.os.Looper
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
 import org.apache.ftpserver.FtpServer
 import org.apache.ftpserver.FtpServerFactory
@@ -124,7 +124,7 @@ object FtpServerManager {
 
         // 检查文件管理权限
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            if (!Environment.isExternalStorageManager()) {
+            if (!PermissionHelper.checkManageExternalStoragePermission(context)) {
                 Logger.w(TAG, "FTP 服务需要文件管理权限，当前未授权")
                 // 在UI线程中显示Toast提示用户
                 Handler(Looper.getMainLooper()).post {
