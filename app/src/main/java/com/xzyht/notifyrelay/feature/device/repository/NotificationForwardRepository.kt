@@ -6,6 +6,7 @@ import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
 import kotlinx.coroutines.delay
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.image.toBitmapOrDefault
 
 // 延迟去重缓存（10秒内）
 // private val dedupCache = mutableListOf<Triple<String, String, Long>>() // title, text, time
@@ -83,13 +84,7 @@ suspend fun replicateNotification(
                 if (defaultIcon is android.graphics.drawable.BitmapDrawable) {
                     appIcon = defaultIcon.bitmap
                 } else {
-                    val width = if (defaultIcon.intrinsicWidth > 0) defaultIcon.intrinsicWidth else 96
-                    val height = if (defaultIcon.intrinsicHeight > 0) defaultIcon.intrinsicHeight else 96
-                    val bitmap = android.graphics.Bitmap.createBitmap(width, height, android.graphics.Bitmap.Config.ARGB_8888)
-                    val canvas = android.graphics.Canvas(bitmap)
-                    defaultIcon.setBounds(0, 0, width, height)
-                    defaultIcon.draw(canvas)
-                    appIcon = bitmap
+                    appIcon = defaultIcon.toBitmapOrDefault(96)
                 }
                 // Logger.d("NotifyRelay(狂鼠)", "使用默认应用图标作为回退")
             } catch (fallbackException: Exception) {

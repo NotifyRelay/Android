@@ -1,7 +1,5 @@
 package com.xzyht.notifyrelay.ui.guide
 
-import android.graphics.Bitmap
-import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
@@ -43,8 +41,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.createBitmap
 import com.xzyht.notifyrelay.R
+import notifyrelay.base.util.image.toBitmapOrDefault
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
@@ -134,13 +132,7 @@ internal fun GuideAppLogo(modifier: Modifier = Modifier) {
                 if (drawable is BitmapDrawable) {
                     drawable.bitmap.asImageBitmap()
                 } else {
-                    val width = drawable.intrinsicWidth.takeIf { it > 0 } ?: 96
-                    val height = drawable.intrinsicHeight.takeIf { it > 0 } ?: 96
-                    val bitmap = createBitmap(width, height, Bitmap.Config.ARGB_8888)
-                    val canvas = Canvas(bitmap)
-                    drawable.setBounds(0, 0, width, height)
-                    drawable.draw(canvas)
-                    bitmap.asImageBitmap()
+                    drawable.toBitmapOrDefault(96).asImageBitmap()
                 }
             }.getOrNull()
         }

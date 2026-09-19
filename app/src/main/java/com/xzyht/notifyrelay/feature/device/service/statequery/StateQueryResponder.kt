@@ -2,13 +2,13 @@ package com.xzyht.notifyrelay.feature.device.service.statequery
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.util.Base64
 import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.MessageSender
 import github.xzynine.superislandui.common.SuperIslandManager
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.image.ImageUtils
 import java.io.ByteArrayOutputStream
 
 /**
@@ -161,7 +161,7 @@ class StateQueryResponder(
                             try {
                                 val stream = ByteArrayOutputStream()
                                 bmp.compress(Bitmap.CompressFormat.JPEG, 80, stream)
-                                "data:image/jpeg;base64," + Base64.encodeToString(stream.toByteArray(), Base64.NO_WRAP)
+                                ImageUtils.bytesToDataUrl(stream.toByteArray(), "image/jpeg")
                             } catch (_: Exception) {
                                 null
                             }

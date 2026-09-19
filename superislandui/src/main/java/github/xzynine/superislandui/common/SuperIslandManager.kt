@@ -8,7 +8,6 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.service.notification.StatusBarNotification
-import android.util.Base64
 import androidx.core.graphics.drawable.toBitmap
 import github.xzynine.superislandui.model.core.SuperIslandData
 import notifyrelay.base.util.Logger
@@ -205,8 +204,7 @@ object SuperIslandManager {
                                 }
                                 if (obj is ByteArray) {
                                     try {
-                                        val b64 = Base64.encodeToString(obj, Base64.NO_WRAP)
-                                        picMap[bk] = "data:image/png;base64,$b64"
+                                        picMap[bk] = ImageUtils.bytesToDataUrl(obj, "image/png")
                                         continue
                                     } catch (_: Exception) {
                                     }
@@ -272,8 +270,7 @@ object SuperIslandManager {
                         }
                         if (p is ByteArray) {
                             try {
-                                val b64 = Base64.encodeToString(p, Base64.NO_WRAP)
-                                picMap[k] = "data:image/png;base64,$b64"
+                                picMap[k] = ImageUtils.bytesToDataUrl(p, "image/png")
                                 continue
                             } catch (_: Exception) {
                             }

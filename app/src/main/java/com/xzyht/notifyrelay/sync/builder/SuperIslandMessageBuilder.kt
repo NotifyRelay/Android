@@ -2,7 +2,6 @@ package com.xzyht.notifyrelay.sync.builder
 
 import android.content.Context
 import android.net.Uri
-import android.util.Base64
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.SendGateway
@@ -10,6 +9,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.base.util.image.ImageUtils
 import org.json.JSONObject
 
 /**
@@ -55,8 +55,7 @@ object SuperIslandMessageBuilder {
                                     val file = java.io.File(v)
                                     if (file.isFile) {
                                         val bytes = file.readBytes()
-                                        val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                                        processedPics[k] = "data:image/png;base64,$b64"
+                                        processedPics[k] = ImageUtils.bytesToDataUrl(bytes, "image/png")
                                     } else {
                                         processedPics[k] = v
                                     }
@@ -66,8 +65,7 @@ object SuperIslandMessageBuilder {
                                         val bytes = input.readBytes()
                                         val mime =
                                             context.contentResolver.getType(uri) ?: "image/png"
-                                        val b64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
-                                        processedPics[k] = "data:$mime;base64,$b64"
+                                        processedPics[k] = ImageUtils.bytesToDataUrl(bytes, mime)
                                     } ?: run {
                                         // 无法打开则回退到原始字符串
                                         processedPics[k] = v
