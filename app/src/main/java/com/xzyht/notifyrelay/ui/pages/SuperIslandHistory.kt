@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -33,9 +32,9 @@ import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.ToolbarPosition
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -116,27 +115,15 @@ fun UISuperIslandHistory() {
                         .padding(paddingValues)
                         .padding(12.dp),
             ) {
-                Row(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(bottom = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                ) {
-                    Text(
-                        text = "复制图片详细信息",
-                        style = textStyles.body2,
-                        color = colorScheme.onSurface,
-                    )
-                    Switch(
-                        checked = includeImageDataOnCopy,
-                        onCheckedChange = {
-                            includeImageDataOnCopy = it
-                            StorageManager.putBoolean(context, "superisland_copy_image_data", it)
-                        },
-                    )
-                }
+                SwitchPreference(
+                    title = "复制图片详细信息",
+                    checked = includeImageDataOnCopy,
+                    onCheckedChange = {
+                        includeImageDataOnCopy = it
+                        StorageManager.putBoolean(context, "superisland_copy_image_data", it)
+                    },
+                    modifier = Modifier.padding(bottom = 8.dp),
+                )
 
                 Spacer(modifier = Modifier.height(12.dp))
 
