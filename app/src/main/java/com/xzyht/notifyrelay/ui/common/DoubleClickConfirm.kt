@@ -67,7 +67,7 @@ fun rememberDoubleClickConfirm(): DoubleClickConfirmState {
  * @param onConfirm 第二次点击确认时的回调
  * @param modifier 修饰符
  * @param colors 默认状态下的按钮颜色
- * @param confirmColors 确认状态下的按钮颜色，默认为红色
+ * @param confirmColors 确认状态下的按钮颜色，默认为错误色
  */
 @Composable
 fun DoubleClickConfirmButton(
@@ -77,7 +77,7 @@ fun DoubleClickConfirmButton(
     onClick: () -> Unit,
     onConfirm: () -> Unit,
     colors: ButtonColors = ButtonDefaults.buttonColors(),
-    confirmColors: ButtonColors = ButtonDefaults.buttonColors(color = Color.Red),
+    confirmColors: ButtonColors = ButtonDefaults.buttonColors(color = MiuixTheme.colorScheme.error),
     textColor: Color? = null,
     confirmTextColor: Color? = null,
 ) {
@@ -106,9 +106,9 @@ fun DoubleClickConfirmButton(
             text = if (state.isConfirming) confirmText else text,
             color =
                 if (state.isConfirming) {
-                    confirmTextColor ?: Color.White
+                    confirmTextColor ?: colorScheme.onError
                 } else {
-                    textColor ?: Color.White
+                    textColor ?: colorScheme.onPrimary
                 },
             style = MiuixTheme.textStyles.body2,
         )
