@@ -49,7 +49,6 @@ android {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.material)
 
     // Jetpack Compose BOM 统一管理版本
     implementation(platform(libs.androidx.compose.bom))
@@ -73,8 +72,6 @@ dependencies {
 
     // Miuix 风格 UI 库
     implementation(libs.miuix.ui)
-    implementation(libs.miuix.preference)
-    implementation(libs.miuix.icons)
 
     // 依赖其他模块（原 :core 工具类已并入 :base）
     implementation(project(":base"))
