@@ -7,12 +7,19 @@
 > 仅更新受重构影响的部分：**文件计数**、因增删行而**漂移的行号引用**，以及被重构**顺带解决**的结论（在对应处标注「重构后」）。
 > 其余结论经复核仍然成立，未做改动。
 
+> **第二轮修订（Miuix P0–P3 修复落地后复核）**
+> 本次已按 §六 优先级执行 P0–P3 中**可做的全部项**，并**更正了本报告自身的 4 处结论错误**（详见 §1.1、§五 各处的「勘误」标注）。
+> 执行分支：4 个本地 `miuix/*` 分支 —— `T1-dead-deps` @ `5b02b6e5`、`T2-double-confirm` @ `e672b3db`、
+> `T3-superisland-text` @ `f04af3a5`、`T4-app-prefs` @ `b44424e9`，以及集成分支 `miuix/INTEG-all` @ `a5f127cc`（**均未推送**）。
+> 本文中的行号引用**已按修复后的代码更新**；凡因修复而失效的行号，在对应处标注「行号已失效」。
+> 已修复项与故意未做项见 §六，本次引入的已知损失见 §八。
+
 一句话结论：**`app` 模块的 Miuix 迁移相当干净（material3 使用 0 处），问题集中在 `superislandui` 库模块（material3 误用 18 文件）、`scrcpy` 子模块（M2 图标 + material3 IconButton），以及 `app` 层少量手搓基础组件与硬编码颜色。**
 
 | 模块 | material3/M2 组件误用 | 手搓基础组件 | 硬编码色/字号 | 评级 |
 |---|---|---|---|---|
 | `:app` | **0** | 13 处（多为小面积） | 11 处 | 良好 |
-| `:superislandui` | **18 文件 / 25 处** | 6 类 | 32 色 + 40 字号 | 需整改 |
+| `:superislandui` | **18 文件 / 47 个 `Text(` 调用点**（勘误 3，原记「25 处」为 import 行口径） | 6 类 | 32 色 + 40 字号 | 需整改 |
 | `:scrcpy`（子模块） | 1 处 material3 + 6 文件 M2 图标 | — | — | 需在子模块仓库处理 |
 | `:base` `:data` `:checkupdata` `:core` | 0 | 0 | 0 | 合规 |
 
@@ -20,7 +27,22 @@
 
 ## 一、严重级：误用 material3 / Material2
 
-### 1.1 `:superislandui`（18 个文件，25 处）
+### 1.1 `:superislandui`（18 个文件，47 个 `Text(` 调用点）
+
+> **勘误 3（本次修正计数口径）**：原文的「25 处」是 **material3 import 行口径**，**不是调用点数**。
+> 实测（`65b249df` 基线）：
+> - **18 个文件**——正确；
+> - **`Text(` 调用点 = 47**（43 处 bare `Text(` + 4 处全限定 `androidx.compose.material3.Text(`）；
+> - 这 47 处**全部显式传了 `color`**；41 处传 `fontSize`；11 处传 `style`
+>   （其中 `HighlightInfoV3Compose.kt:67, :77` 的 `style` 是 `style = if (...) {`，故传具体样式对象的为 **9 处**）；
+> - 既无 `fontSize` 也无 `style` 的仅 **1 处**：`ActionCompose.kt:32`（见 §八 已知损失）。
+>
+> 复核命令（T3 分支上执行，`<T3FILES>` 为 `git show --name-only --pretty=format: miuix/T3-superisland-text` 的输出）：
+> `git show "65b249df:<file>"` 逐文件取内容后，用括号配对解析每个 `Text(` 实参块并统计 `color=` / `fontSize=` / `style=`。
+> **勘误 3 的处置**：本节标题与 §顶部汇总表的「25 处」已改为「47 个 `Text(` 调用点」。
+> ⚠ 注意：**import 行数实测为 18 条**（Text 15 + Button 1 + Card 1 + CardDefaults 1），
+> 加上 `superislandui/build.gradle.kts:60` 的 `androidx.compose.material3:material3` 依赖声明共 19 行；
+> 若把该模块内所有含 `material3` 字样的行都算上则为 **23 行**。原文「25」无法用任何一种口径精确复现，故一并作废。
 
 | 文件:行 | 现状 | 应改用 | 说明 |
 |---|---|---|---|
@@ -30,6 +52,10 @@
 | [HighlightInfoV3Compose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/HighlightInfoV3Compose.kt):67, :77, :103 | 3 处全限定 `androidx.compose.material3.Text(` | Miuix `Text` | |
 | [SuperIslandTextComponents.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/common/SuperIslandTextComponents.kt):8 | `material3.Text`（3 个调用点） | Miuix `Text` | `AutoFitText` / `AutoScrollText` 是全局文本基座，影响面最大 |
 | 其余 12 个文件 | 各 1 处 `import androidx.compose.material3.Text`：[AnimTextInfoCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/AnimTextInfoCompose.kt):9、[BaseInfoCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/BaseInfoCompose.kt):14、[ChatInfoCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/ChatInfoCompose.kt):13、[CoverInfoCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/CoverInfoCompose.kt):10、[DefaultCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/DefaultCompose.kt):11、[HighlightInfoCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/HighlightInfoCompose.kt):10、[HintInfoCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/HintInfoCompose.kt):14、[IconTextInfoCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/IconTextInfoCompose.kt):10、[MediaIslandCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt):16、[MultiProgressCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/MultiProgressCompose.kt):15、[PicInfoCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/PicInfoCompose.kt):8、[TextButtonCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/TextButtonCompose.kt):7、[TimerInfoCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/TimerInfoCompose.kt):5 | Miuix `Text` | 已核对：这些 `Text` 调用**全部显式传了 `color` 与 `fontSize`/`style`**，唯一的例外是 `ActionCompose.kt:32`（只传 `color`，未传 style/字号）。因此换成 Miuix `Text` 时默认样式差异被显式参数覆盖，**视觉风险低**；`ActionCompose.kt:32` 需补 style |
+
+> **本轮修复结果**：上表全部 18 个文件已由 `miuix/T3-superisland-text` @ `f04af3a5` 统一为 Miuix `Text` / `Card` / `Button`
+> （18 files changed, +27/−27）。修复后该模块内 `material3` 字样计数为 **0**（`git grep material3 miuix/T3-superisland-text -- 'superislandui/src/main/java/**/*.kt'` → 0 行）。
+> 其中 `CommonCompose.kt` 的 `Card` 因 Miuix `Card` 无 `elevation` 参数而**丢失 6.dp 阴影**，见 §八 已知损失。
 
 ⚠ 关键判断依据：Miuix `Text` 支持 `color` + `fontSize` + `fontWeight` + `style` 全参数（已通过 miuix-mcp 核实 `Text` 组件文档），所以「岛屿固定白字」不是保留 material3 的理由。
 
@@ -148,45 +174,115 @@
 
 ---
 
-## 五、附带发现：未使用的依赖声明（死依赖）
+## 五、附带发现：依赖声明核查（原判「死依赖」，本轮更正 2 处误判）
 
-Gradle 声明了但代码零引用：
+> **勘误 1 / 勘误 2（本次修正）**：下表原把 `:app` 的两条声明都判为「0 引用死依赖」，**均为误判**。
+> 勘误 1：`libs.material`（M2 AAR）是 **XML 宿主主题的资源链接必需项**，非死依赖；
+> 勘误 2：`libs.miuix.navigation3.ui` 是 **编译必需项**（该 AAR 内嵌了 `androidx.navigation3.ui`），非死依赖。
+> 两者的取证与处置见下表对应行的「判定」列。**行号引用已按修复后的代码更新**，失效处已标注。
 
-| 模块 | 文件:行 | 声明 | 代码使用 |
-|---|---|---|---|
-| `:app` | [build.gradle.kts](Android/app/build.gradle.kts):177, :192 | `libs.androidx.material3` + `androidx.compose.material3:material3` | **0**（app 全模块无任何 material3 引用） |
-| `:app` | [build.gradle.kts](Android/app/build.gradle.kts):175, :193 | `libs.material`（M2）+ `androidx.compose.material:material` | **0** |
-| `:app` | [build.gradle.kts](Android/app/build.gradle.kts):220 | `libs.miuix.navigation3.ui` | **0**（app 导航全部走 `androidx.navigation3` 原生 + `navigationevent`） |
-| `:superislandui` | [build.gradle.kts](Android/superislandui/build.gradle.kts):76 | `libs.miuix.preference` | **0** |
-| `:superislandui` | [build.gradle.kts](Android/superislandui/build.gradle.kts):77 | `libs.miuix.icons` | **0** |
-| `:superislandui` | [build.gradle.kts](Android/superislandui/build.gradle.kts):52 | `libs.material`（M2） | **0** |
-| `:scrcpy` | [build.gradle.kts](Android/scrcpy/build.gradle.kts):70 | `libs.miuix.navigation3.ui` | **0** |
-| `:scrcpy` | [build.gradle.kts](Android/scrcpy/build.gradle.kts):63, :64, :66 | `material3` / `material-icons-extended` / M2 material | material3 仅 1 处、icons 29 处、M2 material 0 处 |
-| `:base` / `:data` | 各自 `build.gradle.kts` | `libs.material`（M2） | **0** |
+Gradle 声明但代码零引用（下表已按本轮修复结果更新：**✅ 已移除 / ⛔ 非死依赖保留 / ⏸ 未处理**）：
+
+| 模块 | 文件:行（基线 `65b249df`） | 声明 | 代码使用 | 判定 |
+|---|---|---|---|---|
+| `:app` | [build.gradle.kts](Android/app/build.gradle.kts):177, :192 | `libs.androidx.material3` + `androidx.compose.material3:material3` | **0**（`:app` 全模块无任何 `androidx.compose.material3` 引用） | ⏸ **未删除**：确为 0 引用，但本轮 T1 为最小化改动、避免与 T3 耦合而**故意保留**，登记为遗留待办（详见 T1 报告） |
+| `:app` | [build.gradle.kts](Android/app/build.gradle.kts):175 | `libs.material`（M2 AAR，`com.google.android.material:material`） | **0 处源码引用，但资源层必需** | ⛔ **勘误 1：非死依赖**，**保留**——XML 宿主主题必需（证据见下方勘误 1） |
+| `:app` | [build.gradle.kts](Android/app/build.gradle.kts):193 | `androidx.compose.material:material`（Compose M2） | **0** | ✅ **已移除** `5b02b6e5` |
+| `:app` | [build.gradle.kts](Android/app/build.gradle.kts):220 | `libs.miuix.navigation3.ui` | 源码**不含**该包名字符串，但 `import androidx.navigation3.ui.NavDisplay` 由它提供 | ⛔ **勘误 2：非死依赖**，**保留**——编译必需（证据见下方勘误 2） |
+| `:superislandui` | [build.gradle.kts](Android/superislandui/build.gradle.kts):76 | `libs.miuix.preference` | **0** | ✅ **已移除** `5b02b6e5`（勘误 4：原结论正确） |
+| `:superislandui` | [build.gradle.kts](Android/superislandui/build.gradle.kts):77 | `libs.miuix.icons` | **0** | ✅ **已移除** `5b02b6e5`（勘误 4：原结论正确） |
+| `:superislandui` | [build.gradle.kts](Android/superislandui/build.gradle.kts):52 | `libs.material`（M2） | **0** | ✅ **已移除** `5b02b6e5`（勘误 4：原结论正确） |
+| `:base` | [build.gradle.kts](Android/base/build.gradle.kts):48 | `libs.material`（M2） | **0** | ✅ **已移除** `5b02b6e5` |
+| `:data` | [build.gradle.kts](Android/data/build.gradle.kts):49 | `libs.material`（M2） | **0** | ✅ **已移除** `5b02b6e5` |
+| `:scrcpy` | [build.gradle.kts](Android/scrcpy/build.gradle.kts):70 | `libs.miuix.navigation3.ui` | **0** | ⏸ 子模块，**本轮未处理**（用户决定不碰子模块） |
+| `:scrcpy` | [build.gradle.kts](Android/scrcpy/build.gradle.kts):63, :64, :66 | `material3` / `material-icons-extended` / M2 material | material3 仅 1 处、icons 29 处、M2 material 0 处 | ⏸ 子模块，**本轮未处理**（同 P0-2） |
+
+**本轮实际删除 6 条**（`git show --stat miuix/T1-dead-deps` → `4 files changed, 6 deletions(-)`，0 插入）：
+`:app` 1 条（`:193`）+ `:superislandui` 3 条（`:52`、`:76`、`:77`）+ `:base` 1 条（`:48`）+ `:data` 1 条（`:49`）。
+
+> **勘误 1 证据**（`:app` 的 `libs.material` 非死依赖）：
+> `git grep -n 'Theme.MaterialComponents' 65b249df -- 'app/src/main/res/**/*.xml'` 输出 4 行：
+> `values/themes.xml:3`、`values/themes.xml:18`、`values/themes.xml:31`、`values-night/themes.xml:3`，
+> 全部为 `parent="Theme.MaterialComponents.DayNight.*"`；另
+> `git grep -n 'Theme.MaterialComponents' 65b249df -- app/src/main/AndroidManifest.xml` 输出
+> `:163 android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar"`。
+> 该主题由 `com.google.android.material:material` 提供，**删除后资源链接会失败**。
+> ⚠ 原文自相矛盾：本报告 §1.4 自己已写明这些 XML 主题「**不建议在本次范围内动**」，§五 却把它列为「死依赖」。
+
+> **勘误 2 证据**（`:app` 的 `libs.miuix.navigation3.ui` 非死依赖，已实测复现）：
+> 删除该行后 `:app:compileDebugKotlin --rerun-tasks --no-build-cache` → **BUILD FAILED / 5 errors**，
+> 报错含 `MainActivityContent.kt:17:29 Unresolved reference 'ui'` 与 `:79:17 Unresolved reference 'NavDisplay'`；
+> 该次构建 `executed=60 fromCache=0`，**非缓存假象**。
+> 根因：`top.yukonga.miuix.kmp:miuix-navigation3-ui-android:0.9.3` 的 AAR **内嵌（shade）了 `androidx.navigation3.ui`**
+> ——解包其 `classes.jar` 含 `androidx/navigation3/ui/NavDisplay.class`、`NavDisplayKt.class`、`androidx/navigation3/scene/*`；
+> 而 `:app:dependencies --configuration debugCompileClasspath` 的解析树里**不出现**独立的
+> `androidx.navigation3:navigation3-ui`。
+> 方法性漏判根因：原审计的 grep 只搜了 Miuix 包名 `top.yukonga.miuix.navigation3`，
+> 而源码写的是 `import androidx.navigation3.ui.NavDisplay`（**不含**该字符串）。
+> 本轮在 `65b249df` 上复核：`git grep -c 'top\.yukonga\.miuix\.navigation3' 65b249df -- 'app/src/'` → **0 命中**，
+> 但 `MainActivityContent.kt:17` 确实为 `import androidx.navigation3.ui.NavDisplay`、`:79` 为 `NavDisplay(`。
+> 处置：**保留**，标注「**非死依赖**：编译必需（Miuix 内嵌 `androidx.navigation3.ui`）」。
 
 > `:superislandui` 实际只用了 miuix 的 4 个符号：`CircularProgressIndicator`、`LinearProgressIndicator`、`ProgressIndicatorDefaults`、`MiuixTheme`（共 7 处，全在 `CommonCompose.kt`/`MediaIslandCompose.kt`）——该模块对 Miuix 的接入度远低于 `:app`，这也是它为何大面积停留 material3。
 
 ---
 
-## 六、建议修复优先级（仅建议，本次未改动）
+## 六、修复优先级与执行结果（本轮已按 P0–P3 执行）
+
+> **本轮执行状态图例**：✅ 已修复（附提交 sha） / ❌ 故意未做（附理由） / ⏸ 未处理（子模块，超出范围）
+>
+> 本节原为「仅建议，本次未改动」，现已改为**执行结果清单**。逐条对照 `git show --name-only` 核实，
+> 未凭推测填写。
 
 **P0（明确的规范违规，改动面小、收益直接）**
-1. [DoubleClickConfirm.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/common/DoubleClickConfirm.kt):80, :109, :111 —— 3 处硬编码色，其中 `Color.White` 默认分支有 2 个调用方实际命中。
-2. [ReorderableList.kt](Android/scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/widgets/ReorderableList.kt):12 —— material3 `IconButton` → Miuix `IconButton`（同文件其余组件已全 Miuix，属漏换）。
+
+1. ✅ **已修复** `e672b3db` —— [DoubleClickConfirm.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/common/DoubleClickConfirm.kt):80, :109, :111 的 3 处硬编码色。
+   证据：`git show --name-only --pretty=format: miuix/T2-double-confirm` → 仅
+   `app/src/main/java/com/xzyht/notifyrelay/ui/common/DoubleClickConfirm.kt` 1 个文件；
+   `git diff --numstat 65b249df miuix/T2-double-confirm` → `1 file, +4 −4`。
+2. ❌ **未做（故意）** —— [ReorderableList.kt](Android/scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/widgets/ReorderableList.kt):12 的 material3 `IconButton` → Miuix `IconButton`。
+   理由：**用户决定本次不碰子模块**（`scrcpy` 是 `ScrcpyForAndroid` 子模块，改动须走 `submodule-modifier` 跨仓流程）。
+   证据：`miuix/T1-dead-deps`、`T2`、`T3`、`T4` 四棵树的 `git show --name-only` 中**均无** `scrcpy/` 下任何文件。
 
 **P1（结构性问题）**
-3. [SuperIslandSettings.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandSettings.kt):120-121 删除内层 `Scaffold`（嵌套 Scaffold，重复消费 insets）。
-4. [GuideComponents.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideComponents.kt):209-245 → `BasicComponent`（单点覆盖 2 页 6 个权限项）。
-5. `:superislandui` 统一 `material3.Text` → Miuix `Text`（18 文件，逐文件机械替换；已核实这些调用都显式传了 color/fontSize，视觉风险低）。建议**先只换 Text，保留 `Card`/`Button` 的岛屿定制色**，分批提交。
+
+3. ✅ **已修复** `b44424e9` —— [SuperIslandSettings.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/SuperIslandSettings.kt):120-121 嵌套 `Scaffold`（重复消费 insets）。
+   证据：`git show --name-only --pretty=format: miuix/T4-app-prefs` 含 `.../ui/pages/SuperIslandSettings.kt`。
+4. ✅ **已修复** `b44424e9` —— [GuideComponents.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideComponents.kt):209-245 → `BasicComponent`。
+   证据：同上，`git show --name-only` 含 `.../ui/guide/GuideComponents.kt`。
+5. ✅ **已修复** `f04af3a5` —— `:superislandui` 统一 `material3` → Miuix（**18 文件 / 47 个 `Text(` 调用点**，非原文「25 处」，见 §1.1 勘误 3）。
+   证据：`git diff --stat 65b249df miuix/T3-superisland-text` → `18 files changed, 27 insertions(+), 27 deletions(-)`；
+   修复后 `git grep material3 miuix/T3-superisland-text -- 'superislandui/src/main/java/**/*.kt'` → **0 行**。
+   注：原文建议「先只换 Text，保留 `Card`/`Button` 的岛屿定制色」——实际执行时 `Card`/`Button` **也一并换了**
+   （`CommonCompose.kt` 的 `Card`、`ActionCompose.kt` 的 `Button`），这正是 §八 记录「根卡片 6.dp elevation 丢失」的原因。
 
 **P2（体验一致性）**
-6. 手搓开关行（6 处）→ `SwitchPreference`；[DisplayNavigationBar.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/remoteapps/DisplayNavigationBar.kt):58-66 → `NavigationBar`。
-7. [GuideWelcomePage.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideWelcomePage.kt):105-120 手搓圆按钮 → `IconButton`。
+
+6. ✅ **已修复**（开关行部分）`b44424e9` —— 6 处手搓开关行 → `SwitchPreference`。
+   证据：`git diff --numstat 65b249df miuix/T4-app-prefs` → 5 files `+219 −306`，改动文件含
+   `.../ui/screen/devicelist/DeviceListButtons.kt`、`.../ui/pages/MusicControlPage.kt`、
+   `.../ui/pages/SuperIslandHistory.kt`、`.../ui/pages/SuperIslandSettings.kt`。
+   ❌ **未做（故意）**（同条目的后半）—— [DisplayNavigationBar.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/pages/remoteapps/DisplayNavigationBar.kt):40-91 → `NavigationBar`。
+   理由：该组件是远程应用页**顶部**的显示器切换条（Card + 图标 + 两行文字 + 选中底色），
+   与 Miuix `NavigationBar`（屏幕**底部**导航栏，2–5 项 + insets）**语义不匹配**；
+   强换会与 [MainScreen.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/screen/MainScreen.kt):129-169 的底部导航栏语义重复。
+   **用户决定保持现状。**
+7. ❌ **未做** —— [GuideWelcomePage.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideWelcomePage.kt):105-120 手搓圆按钮 → `IconButton`。
+   证据：`git show --name-only --pretty=format: miuix/T4-app-prefs` 的 5 个文件中**不含** `GuideWelcomePage.kt`
+   （实为 `GuideComponents.kt`、`MusicControlPage.kt`、`SuperIslandHistory.kt`、`SuperIslandSettings.kt`、`DeviceListButtons.kt`），
+   故 T4 未改该文件 → 按事实标注**未做**。
 
 **P3（清理，非必要）**
-8. 移除上表的死依赖声明；`scrcpy` 的 M2 图标体系替换（须在 `ScrcpyForAndroid` 子模块仓库进行，并调用 `submodule-modifier` 流程）。
+
+8. ✅ **部分已修复** `5b02b6e5` —— 移除真死依赖声明，**实删 6 条**（非本节原表全部；原表含 2 条误判，见 §五 勘误 1 / 勘误 2）。
+   证据：`git show --stat miuix/T1-dead-deps` → `4 files changed, 6 deletions(-)`，0 插入。
+   ❌ **未做（故意）**（同条目的后半）—— `scrcpy` 的 **29 处 M2 图标**体系替换。
+   理由：同 P0-2，须在 `ScrcpyForAndroid` 子模块仓库进行并调用 `submodule-modifier` 流程；**用户决定本次不碰子模块**。
 
 **建议保持现状（已核实为设计/技术必需）**：`superislandui` 的固定黑底白字与固定字号、`ActionInfoButton`/`HighlightInfoV3` 的数据驱动色值、`FloatingComposeContainer` 的 `AbstractComposeView`、`DeviceWidgets` 的 `AndroidView`、M2 XML 宿主主题。
+
+> 关于最后一项「M2 XML 宿主主题」：本轮**确认其保持现状**，并由此得出 §五 勘误 1
+> （既然主题不动，`libs.material` 就不是死依赖）。
 
 ---
 
@@ -195,8 +291,56 @@ Gradle 声明了但代码零引用：
 - **取证方式**：`grep`/`glob` 全量模式扫描（material3/M2 导入、`AndroidView`、`android.widget.*`、`com.clickable`、`combinedClickable`、`Divider`、`height(1.dp)`、`fontSize = N.sp`、`Color(0x…)`），再对命中文件用 `read` 逐行核对真实行号；Miuix 可用组件与 API 签名通过 **miuix-mcp** 核实（`get_all_components`、`get_component_doc` for Text/Card/Button/Surface/BasicComponent、`get_best_practices_doc`）。
 - **基线构建**：`Android` 目录下 `gradlew.bat :app:compileDebugKotlin --rerun-tasks --no-build-cache` → **BUILD SUCCESSFUL，Kotlin 警告 26 条**（与 `memory/2026-09-19.md` 记录的基线 26 条一致）。因本次为纯读取审计，无需构建前后对比。
 - **未修改任何文件**（原审计）：任务前后 `git -C Android status --porcelain` 均为空；临时日志目录 `.tmp-ui-audit` 已删除。
+- **本轮（P0–P3 修复）改动的文件**：共 **28 个文件**，全部为既有文件的修改，**零新增 / 零删除 / 零重命名**
+  （`git diff --name-only --diff-filter=A` 与 `--diff-filter=D` 对 4 棵树**均为空**）：
+  T1 4 个 `build.gradle.kts`（`+0/−6`）、T2 1 个 `.kt`（`+4/−4`）、T3 18 个 `.kt`（`+27/−27`）、
+  T4 5 个 `.kt`（`+219/−306`）。**未触碰任何 `.kt` 之外的新增文件**，亦未改动 `AGENTS.md`。
 - **重构后复核（本次修订）**：对本文引用的 **61 个文件**逐一核对存在性与行号（全部存在），其中 **8 个**被该重构改动过——`ParamIslandCompose.kt`、`Theme.kt`、`GuideComponents.kt`、`GuideOptionalPermissionPage.kt`、`GuideRequiredPermissionPage.kt`、`ChatTest.kt`、`SuperIslandHistory.kt`、`SuperIslandSettings.kt`；前 2 个与后 4 个的漂移行号已按当前代码重定位，`Guide*PermissionPage.kt` 仅影响「影响面」描述（不涉行号）。
 - **重构后构建复核**：`gradlew.bat :app:compileDebugKotlin --rerun-tasks --no-build-cache` → **BUILD SUCCESSFUL，Kotlin 警告 26 条**（与重构前基线一致、零新增），`60 actionable tasks: 60 executed`、`FROM-CACHE 0`。`build.gradle.kts` 未被重构改动，故 §五 死依赖的行号与结论不变。
+  > ⚠ **本条已被「第二轮修订」部分推翻**：§五 的**结论**并非全部正确——其中 `:app` 的 `libs.material`
+  > 与 `libs.miuix.navigation3.ui` 两条经实测证明**不是死依赖**（见 §五 勘误 1 / 勘误 2）。
+  > 原文「结论不变」仅在当时（工具方法重构后）成立，本轮 P0–P3 修复后已作废。
 - **关于 mermaid**：本次为静态只读调查，不涉及任何时序/并发行为变更，故按 AGENTS.md「涉及时序才需 sequenceDiagram」的口径未绘制时序图。若后续进入修复阶段，涉及 `SnackbarHostState` 投递、`AnchoredDraggable` 滑动删除、悬浮窗 `addView`/`updateViewLayout` 三处的改动会补时序图。
+- **本轮修复的验证口径（P0–P3 落地后）**：
+  - **权威基线**（唯一一次真实全量，未命中缓存）：`:app:compileDebugKotlin --rerun-tasks --no-build-cache`
+    → **26 警告 / 0 错误 / 60 executed / FROM-CACHE 0 / BUILD SUCCESSFUL**。
+  - **每棵树**：均用 `--rerun-tasks --no-build-cache` 做**真实全量**编译，
+    并按 **`<相对路径>|<消息>` 计数**做集合比对（**去掉 `:行:列`**，防止行号漂移被误判成「新增+消失」），
+    结果**全部 PASS（新增 0 / 消失 0）**。
+  - **集成树** `miuix/INTEG-all`：4 棵树零冲突合并后跑端到端 `:app:assembleDebug`
+    → **exit=0 / 161 executed / FROM-CACHE 0 / 26 警告 / 0 错误 / APK 123.55MB**（实际产出，非仅编译通过）。
+  - ⚠ 判读要点（可复用）：只看「警告数 ≤ 基线」**不足以**判定干净——增量编译会让未改动文件不再报警告，
+    总数天然变少；必须用**集合包含**（按文件+消息计数）判定。
+- **方法论教训（本轮新增，可复用）**：
+  - **判断 Gradle 依赖是否为「死依赖」，不能只 grep 该依赖自身的包名，必须核对它实际提供的包名与传递依赖。**
+    实例即勘误 2：`miuix-navigation3-ui` 自身包名（`top.yukonga.miuix.navigation3`）在源码中**零出现**，
+    但它**内嵌（shade）**了 `androidx.navigation3.ui`，而源码 import 的正是后者 → 按「包名 grep」判死会**误删**，
+    且误删的代价直到编译期才暴露（`Unresolved reference 'NavDisplay'`）。
+    正确做法：`grep` 该依赖**提供的所有包名**（含解包 AAR 的 `classes.jar`），并核对
+    `dependencies --configuration <variant>CompileClasspath` 的解析树里该类是否还有**其它来源**。
+  - **资源型依赖（AAR 资源/主题）无法用源码 grep 判定死活**：勘误 1 的 `libs.material` 在 `.kt` 中 0 引用，
+    但 `themes.xml` / `AndroidManifest.xml` 通过 `parent="Theme.MaterialComponents.*"` 依赖它做资源链接。
+    判定此类依赖必须同时检索 `res/` 与 `AndroidManifest.xml`。
+  - **同一份报告内部可能自相矛盾**：原 §五（判 M2 AAR 为死依赖）与 §1.4（写明 XML 主题「不建议动」）冲突，
+    复核时应做**跨节一致性检查**，而不是只逐条核对单点结论。
 
-**本文即该审计报告**，已落盘为 `Android/Docs/miuix未使用情况.md`。需要的话可按 P0–P2 直接进入修复。
+**本文即该审计报告**，已落盘为 `Android/Docs/miuix未使用情况.md`。
+
+---
+
+## 八、本次修复引入的已知损失（未做真机验证）
+
+> ⚠ 以下均为**如实登记**的取舍，**全部未做真机/运行期验证**（本轮验证仅到**编译 + 打包**级：
+> `:app:compileDebugKotlin` 真实全量 + `:app:assembleDebug` 端到端产出 APK）。
+> 不得据此认为视觉/交互无回归。
+
+| # | 位置 | 变化 | 原因 | 验证状态 |
+|---|---|---|---|---|
+| 1 | [CommonCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/common/CommonCompose.kt) 超级岛根卡片 | **`elevation = 6.dp` 丢失**：由 material3 的 6.dp 阴影变为 Miuix **无阴影**（squircle 表面） | Miuix `Card` 的 API **无 `elevation` / `shape` 参数**（只有 `cornerRadius: Dp` 与 `colors`），无法等价表达 | ❌ 未真机验证 |
+| 2 | [ActionCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/ActionCompose.kt):32 | **字号变化 14sp → 17sp** | 该处是 47 个调用点里**唯一既无 `fontSize` 也无 `style`** 的：material3 走默认 `LocalTextStyle.current`（14sp）→ Miuix 走 `LocalTextStyles.current.main`（17sp） | ❌ 未真机验证 |
+| 3 | [GuideComponents.kt](Android/app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideComponents.kt) `GuidePermissionItem` 改用 `BasicComponent` | ① 标题由 `body1` 无字重 → `headline1 + FontWeight.Medium`（**变大变粗**）；② 新增**最小高度 56.dp**；③ 摘要原来的 `start = 20.dp` **缩进丢失**；④ 圆点后间距由 `Spacer(12.dp)` 变为**内置 8.dp** | 改用 Miuix `preference.BasicComponent` 的标准布局 | ❌ 未真机验证 |
+| 4 | 6 处手搓开关行（`DeviceListButtons.kt` / `MusicControlPage.kt` ×2 / `SuperIslandSettings.kt` ×2 / `SuperIslandHistory.kt`） | 由「自定义 Row + Switch」改为**标准设置行**布局 | 改用 `preference.SwitchPreference` | ❌ 未真机验证 |
+| 5 | [ActionCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/ActionCompose.kt) 与 [TextButtonCompose.kt](Android/superislandui/src/main/java/github/xzynine/superislandui/floating/bigisland/components/TextButtonCompose.kt) | **`onClick` 空实现 + `TODO` 仍然存在**（功能性缺陷） | 本次按范围**保持原样**，未实现点击逻辑 | ❌ 未修复 |
+
+**汇总**：本轮**未做任何真机 / 运行期验证**，仅完成**编译级 + 打包级**验证。
+上表 5 项中，第 1–4 项属**视觉/布局回归风险**，第 5 项属**存量功能性缺陷**（非本轮引入）。
