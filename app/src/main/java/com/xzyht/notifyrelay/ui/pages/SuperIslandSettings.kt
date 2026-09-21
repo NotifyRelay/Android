@@ -258,7 +258,7 @@ fun UISuperIslandSettings() {
                     val pkg = pkgEntity.packageName
                     val isInstalled = installedPkgs.contains(pkg)
                     var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
-                    var pkgEnabled by remember { mutableStateOf(pkgEntity.enabled) }
+                    var pkgEnabled by remember(pkgEntity.packageName, pkgEntity.enabled) { mutableStateOf(pkgEntity.enabled) }
 
                     LaunchedEffect(pkg) {
                         if (iconBitmap == null) {
