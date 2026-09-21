@@ -2,7 +2,6 @@ package github.xzynine.superislandui.floating.bigisland.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -16,6 +15,7 @@ import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.model.components.TimerInfo
 import kotlinx.coroutines.delay
+import top.yukonga.miuix.kmp.basic.Text
 
 /**
  * 计时器信息Compose组件（简化）

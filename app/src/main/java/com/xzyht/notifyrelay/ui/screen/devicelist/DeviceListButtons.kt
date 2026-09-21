@@ -44,8 +44,8 @@ import notifyrelay.base.util.BatteryIconConverter
 import notifyrelay.base.util.BatteryUtils
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.Colors
 import top.yukonga.miuix.kmp.theme.TextStyles
 
@@ -207,23 +207,12 @@ internal fun DiscoverySwitch(
     onDiscoveryChange: (Boolean) -> Unit,
     textStyles: TextStyles,
 ) {
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .padding(bottom = 8.dp),
-    ) {
-        Text(
-            text = "显示未认证设备",
-            style = textStyles.body2,
-            modifier = Modifier.weight(1f),
-        )
-        Switch(
-            checked = discoveryEnabled,
-            onCheckedChange = onDiscoveryChange,
-        )
-    }
+    SwitchPreference(
+        title = "显示未认证设备",
+        checked = discoveryEnabled,
+        onCheckedChange = onDiscoveryChange,
+        modifier = Modifier.padding(bottom = 8.dp),
+    )
 }
 
 /**

@@ -19,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.components.ActionInfo
 import notifyrelay.base.util.image.ImageUtils
+import top.yukonga.miuix.kmp.basic.Text
 
 /**
  * 圆头图文按钮（actionInfo）：圆角背景 + 可选图标 + 文本
@@ -70,7 +71,7 @@ fun ActionInfoButton(
             }
         }
         action.actionTitle?.let { title ->
-            androidx.compose.material3.Text(
+            Text(
                 text = title,
                 color = titleColor,
                 fontSize = 13.sp,

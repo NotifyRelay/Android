@@ -11,9 +11,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -29,6 +26,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoScrollText
 import github.xzynine.superislandui.model.components.TimerInfo
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import java.util.Locale
@@ -290,10 +289,10 @@ fun SuperIslandComposeRoot(
                 .padding(8.dp),
     ) {
         Card(
-            shape = RoundedCornerShape(16.dp),
+            cornerRadius = 16.dp,
             colors =
-                CardDefaults.cardColors(
-                    containerColor =
+                CardDefaults.defaultColors(
+                    color =
                         if (isOverlapping) {
                             // 重叠时显示红色背景
                             Color.Red.copy(alpha = 0.92f)
@@ -302,7 +301,6 @@ fun SuperIslandComposeRoot(
                             Color.Black.copy(alpha = 0.92f)
                         },
                 ),
-            elevation = CardDefaults.cardElevation(6.dp),
             modifier = Modifier.fillMaxWidth(),
         ) {
             Column(

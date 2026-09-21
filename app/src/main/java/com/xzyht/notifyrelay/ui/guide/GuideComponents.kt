@@ -10,10 +10,10 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -43,6 +43,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.R
 import notifyrelay.base.util.image.toBitmapOrDefault
+import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
@@ -206,14 +207,11 @@ internal fun GuidePermissionItem(
     extraContent: @Composable () -> Unit = {},
 ) {
     val colorScheme = MiuixTheme.colorScheme
-    Column(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .clickable(onClick = onClick)
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-    ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    BasicComponent(
+        title = title,
+        summary = summary,
+        insideMargin = PaddingValues(horizontal = 16.dp, vertical = 14.dp),
+        startAction = {
             Box(
                 modifier =
                     Modifier
@@ -221,28 +219,17 @@ internal fun GuidePermissionItem(
                         .clip(CircleShape)
                         .background(if (granted) colorScheme.primary else colorScheme.outline),
             )
-            Spacer(modifier = Modifier.width(12.dp))
-            Text(
-                text = title,
-                style = MiuixTheme.textStyles.body1,
-                color = colorScheme.onSurface,
-                modifier = Modifier.weight(1f),
-            )
+        },
+        endActions = {
             Text(
                 text = if (granted) grantedText else pendingText,
                 style = MiuixTheme.textStyles.body2,
                 color = if (granted) colorScheme.primary else colorScheme.error,
             )
-        }
-        Spacer(modifier = Modifier.height(6.dp))
-        Text(
-            text = summary,
-            style = MiuixTheme.textStyles.body2,
-            color = colorScheme.onSurfaceVariantSummary,
-            modifier = Modifier.padding(start = 20.dp),
-        )
-        extraContent()
-    }
+        },
+        bottomAction = extraContent,
+        onClick = onClick,
+    )
     HorizontalDivider(color = colorScheme.dividerLine, thickness = 1.dp)
 }
 
