@@ -209,7 +209,6 @@ object NotificationGenerator {
             FloatingReplicaMappingManager
                 .putNotificationId(key, notificationId)
 
-            Logger.i(TAG, "超级岛 发送复刻通知成功，key=$key, notificationId=$notificationId")
             return notificationId
         } catch (e: CancellationException) {
             // 协程取消必须原样抛出，避免被下面的 catch(Exception) 吞掉后继续执行 notify 流程
@@ -236,7 +235,6 @@ object NotificationGenerator {
                 notificationManager.cancel(notificationId)
                 // 停止对应的滚动更新
                 stopScrollUpdate(key)
-                Logger.i(TAG, "超级岛 取消复刻通知成功，key=$key, notificationId=$notificationId")
             }
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛 取消复刻通知失败: ${e.message}")
@@ -259,7 +257,6 @@ object NotificationGenerator {
                     notificationManager.cancel(notificationId)
                     // 停止对应的滚动更新
                     stopScrollUpdate(key)
-                    Logger.i(TAG, "超级岛 取消复刻通知成功，key=$key, notificationId=$notificationId")
                 }
             }
 
@@ -271,7 +268,6 @@ object NotificationGenerator {
                 .clearAllNotificationFingerprints()
             // 清空所有滚动更新
             clearAllScrollUpdates()
-            Logger.i(TAG, "超级岛 清除所有复刻通知成功")
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛 清除所有复刻通知失败: ${e.message}")
         }

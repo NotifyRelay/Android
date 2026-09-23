@@ -61,7 +61,6 @@ object SuperIslandConfigUtils {
     ) {
         if (enabled && isNotificationListMode(context)) {
             setNotificationListMode(context, false)
-            Logger.i(TAG, "浮窗开启，自动关闭通知列表模式（互斥）")
         }
         StorageManager.putBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, enabled)
     }
@@ -90,7 +89,6 @@ object SuperIslandConfigUtils {
     ) {
         if (enabled && isFloatingWindowEnabled(context)) {
             setFloatingWindowEnabled(context, false)
-            Logger.i(TAG, "通知列表模式开启，自动关闭浮窗（互斥）")
         }
         StorageManager.putBoolean(context, SUPER_ISLAND_NOTIFICATION_LIST_KEY, enabled)
     }

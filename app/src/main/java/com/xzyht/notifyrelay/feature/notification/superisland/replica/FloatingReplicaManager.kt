@@ -48,11 +48,9 @@ object FloatingReplicaManager {
             return
         } else if (SuperIslandConfigUtils.isNotificationListMode(context)) {
             FloatingReplicaMappingManager.removeClosedSource(sourceId)
-            Logger.i(TAG, "超级岛: 列表模式, sourceId=$sourceId")
             FloatingReplicaListModeManager.showFloatingListMode(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked)
         } else {
             FloatingReplicaMappingManager.removeClosedSource(sourceId)
-            Logger.i(TAG, "超级岛: 浮窗功能已关闭，仅创建通知, sourceId=$sourceId")
             FloatingReplicaNotificationManager.sendNotification(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked)
         }
     }

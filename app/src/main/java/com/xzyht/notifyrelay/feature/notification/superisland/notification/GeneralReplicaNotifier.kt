@@ -138,7 +138,6 @@ internal object GeneralReplicaNotifier {
                                 builder.setShowWhen(true) // 确保显示时间
                                 // 设置倒计时的终点时间
                                 timer.let { builder.setWhen(it.timerWhen) }
-                                Logger.i(TAG, "超级岛 倒计时通知已设置chronometer，自动更新，key=$key")
                             }
                         }
                     } else {
@@ -148,7 +147,6 @@ internal object GeneralReplicaNotifier {
                         builder.setShowWhen(true) // 确保显示时间
                         // 设置正计时的起点时间
                         timer.let { builder.setWhen(it.timerWhen) }
-                        Logger.i(TAG, "超级岛 正计时通知已设置chronometer，自动更新，key=$key")
                     }
                 }
             }
@@ -177,7 +175,6 @@ internal object GeneralReplicaNotifier {
                         bComponent,
                         isTimerType,
                     )
-                Logger.i(TAG, "超级岛 非进度类型通知已构建，key=$key")
                 builtNotification
             } else {
                 // 进度类型通知，已经通过 LiveUpdatesNotificationManager 处理，不重复添加胶囊兼容字段
@@ -225,7 +222,6 @@ internal object GeneralReplicaNotifier {
                     ReplicaSmallIconInjector.injectSmallIconWithoutCache(builtNotification, smallIconBitmap)
                 }
 
-                Logger.i(TAG, "超级岛 进度类型通知已构建，key=$key")
                 builtNotification
             }
 

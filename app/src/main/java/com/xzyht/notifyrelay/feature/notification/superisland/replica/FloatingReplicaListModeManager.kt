@@ -222,7 +222,6 @@ object FloatingReplicaListModeManager {
                 FloatingReplicaWindowManager.dismissBySourceInternal(active.sourceId, FloatingWindowManager.RemovalReason.MANUAL)
             }
         } else {
-            Logger.i(TAG, "超级岛: 列表模式下关闭非列表通知，notificationId=$notificationId")
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(notificationId)
         }

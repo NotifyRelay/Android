@@ -120,7 +120,6 @@ object FloatingReplicaNotificationManager {
                         if (success) {
                             FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
                         }
-                        Logger.i(TAG, "浮窗功能关闭时发送Live Updates复合通知: sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
                     }
                 } else {
                     val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, displayTitle, displayText, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, FloatingReplicaWindowManager.getFloatingWindowManager())
@@ -128,27 +127,17 @@ object FloatingReplicaNotificationManager {
                     if (notificationId != null) {
                         FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
                     }
-                    Logger.i(TAG, "浮窗功能关闭时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
                 }
 
-                val timeoutMs = 30 * 1000L
-
-                Logger.i(TAG, "超级岛: 设置超时时间, sourceId=$sourceId, timeoutMs=$timeoutMs")
-
                 FloatingReplicaMappingManager.cancelTimeoutJob(sourceId)
-                Logger.i(TAG, "超级岛: 取消现有的超时任务（如果存在）, sourceId=$sourceId")
-
                 val timeoutJob =
                     CoroutineScope(Dispatchers.Main).launch {
-                        delay(timeoutMs)
+                        delay(30_000L)
                         runReplicaCatching(TAG, "超时自动移除通知") {
-                            Logger.i(TAG, "超级岛: 超时任务触发，准备移除通知, sourceId=$sourceId, timeoutMs=$timeoutMs")
                             FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
-                            Logger.i(TAG, "超级岛: 通知超时自动移除, sourceId=$sourceId")
                         }
                     }
                 FloatingReplicaMappingManager.setTimeoutJob(sourceId, timeoutJob)
-                Logger.i(TAG, "超级岛: 已启动新的超时任务, sourceId=$sourceId, timeoutMs=$timeoutMs")
             }
         }
     }
@@ -165,14 +154,11 @@ object FloatingReplicaNotificationManager {
                 runReplicaCatching(TAG, "关闭Live Updates通知") {
                     LiveUpdatesNotificationManager.initialize(context)
                     LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
-                    Logger.i(TAG, "通过LiveUpdatesNotificationManager关闭通知: sourceId=$sourceId")
 
                     val liveUpdateNotificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
                     val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     try {
-                        Logger.i(TAG, "尝试直接关闭Live Updates通知，sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
                         notificationManager.cancel(liveUpdateNotificationId)
-                        Logger.i(TAG, "直接关闭Live Updates通知成功，sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
                     } catch (e: Exception) {
                         Logger.w(TAG, "直接关闭Live Updates通知失败: ${e.message}")
                     }
@@ -180,45 +166,20 @@ object FloatingReplicaNotificationManager {
             }
 
             runReplicaCatching(TAG, "关闭传统复刻通知") {
-                val notificationIds = notificationIdsBefore ?: FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
-                Logger.i(TAG, "尝试关闭传统复刻通知，sourceId=$sourceId，notificationIds=$notificationIds")
-                if (notificationIds != null && notificationIds.isNotEmpty()) {
-                    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    notificationIds.forEach { notificationId ->
-                        try {
-                            Logger.i(TAG, "正在取消通知，sourceId=$sourceId, notificationId=$notificationId")
-                            notificationManager.cancel(notificationId)
-                            Logger.i(TAG, "通过直接映射关闭通知成功，sourceId=$sourceId, notificationId=$notificationId")
-                        } catch (e: Exception) {
-                            Logger.w(TAG, "通过直接映射关闭通知失败: ${e.message}")
-                        }
-                    }
-                    FloatingReplicaMappingManager.removeSourceIdMappings(sourceId)
-                    val keys = entryKeys ?: listOf(sourceId)
-                    keys.forEach { entryKey ->
-                        FloatingReplicaMappingManager.removeNotificationId(entryKey)
-                    }
-                } else {
-                    Logger.w(TAG, "没有找到直接映射的 notificationIds，使用回退方案，sourceId=$sourceId")
-                    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    try {
-                        val traditionalNotificationId = SuperIslandNotificationIds.replica(sourceId)
-                        Logger.i(TAG, "尝试直接关闭传统复刻通知，sourceId=$sourceId, notificationId=$traditionalNotificationId")
-                        notificationManager.cancel(traditionalNotificationId)
-                        Logger.i(TAG, "直接关闭传统复刻通知成功，sourceId=$sourceId, notificationId=$traditionalNotificationId")
-                    } catch (e: Exception) {
-                        Logger.w(TAG, "直接关闭传统复刻通知失败: ${e.message}")
-                    }
-
-                    val keys = entryKeys ?: listOf(sourceId)
-                    keys.forEach { entryKey ->
-                        NotificationGenerator.cancelReplicaNotification(context, entryKey)
-                    }
-                    if (keys.isEmpty()) {
-                        NotificationGenerator.clearAllReplicaNotifications(context)
-                    }
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                try {
+                    notificationManager.cancel(SuperIslandNotificationIds.replica(sourceId))
+                } catch (e: Exception) {
+                    Logger.w(TAG, "直接关闭传统复刻通知失败: ${e.message}")
                 }
-                Logger.i(TAG, "关闭传统复刻通知完成: sourceId=$sourceId")
+
+                val keys = entryKeys ?: listOf(sourceId)
+                keys.forEach { entryKey ->
+                    NotificationGenerator.cancelReplicaNotification(context, entryKey)
+                }
+                if (keys.isEmpty()) {
+                    NotificationGenerator.clearAllReplicaNotifications(context)
+                }
             }
         } else {
             Logger.w(TAG, "超级岛: 无法获取上下文，无法关闭通知: sourceId=$sourceId")
@@ -246,15 +207,12 @@ object FloatingReplicaNotificationManager {
         val isFloatingEnabled = FloatingReplicaWindowManager.isFloatingWindowEnabled(context)
 
         if (!isFloatingEnabled) {
-            Logger.i(TAG, "超级岛: 浮窗功能已关闭，直接关闭通知，notificationId=$notificationId")
-
             if (sourceIdToStop != null) {
                 FloatingReplicaWindowManager.dismissBySourceInternal(sourceIdToStop, FloatingWindowManager.RemovalReason.MANUAL)
             } else {
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 try {
                     notificationManager.cancel(notificationId)
-                    Logger.i(TAG, "超级岛: 直接关闭通知成功，notificationId=$notificationId")
                 } catch (e: Exception) {
                     Logger.w(TAG, "超级岛: 直接关闭通知失败: ${e.message}")
                 }
@@ -264,14 +222,12 @@ object FloatingReplicaNotificationManager {
 
         if (sourceIdToStop != null) {
             NotificationGenerator.stopScrollUpdate(sourceIdToStop)
-            Logger.i(TAG, "超级岛: 关闭通知时停止滚动更新, sourceId=$sourceIdToStop, notificationId=$notificationId")
         }
 
         val entryKey = FloatingReplicaMappingManager.getEntryKeyByNotificationId(notificationId)
 
         if (entryKey != null) {
             FloatingReplicaWindowManager.getFloatingWindowManager().removeEntry(entryKey, FloatingWindowManager.RemovalReason.MANUAL)
-            Logger.i(TAG, "超级岛: 根据通知ID关闭浮窗条目成功，notificationId=$notificationId, entryKey=$entryKey")
         } else {
             Logger.w(TAG, "超级岛: 未找到通知ID对应的浮窗条目，notificationId=$notificationId")
         }

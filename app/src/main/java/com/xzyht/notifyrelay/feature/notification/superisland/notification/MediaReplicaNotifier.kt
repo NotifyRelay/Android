@@ -224,11 +224,9 @@ internal object MediaReplicaNotifier {
                 ReplicaSmallIconInjector.injectSmallIconWithCache(notification, smallIconBitmap, key)
             } else {
                 // 保留之前的图标，不进行修改
-                Logger.i(TAG, "超级岛 保留之前的小图标，不进行修改")
             }
         } else {
             // 已经有图标文本，保留之前的图标，不进行修改
-            Logger.i(TAG, "超级岛 已有图标文本，保留之前的小图标，不进行修改")
         }
 
         return notification

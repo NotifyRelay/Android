@@ -100,7 +100,6 @@ object FloatingReplicaMappingManager {
         }
 
         return if (sourceIdsToRemove.isNotEmpty()) {
-            Logger.i(TAG, "removeSourceIdMapping: 成功移除 sourceIds=$sourceIdsToRemove, key=$key")
             sourceIdsToRemove
         } else {
             Logger.i(TAG, "removeSourceIdMapping: 未找到匹配的 sourceId，key=$key")
@@ -321,7 +320,6 @@ object FloatingReplicaMappingManager {
                 if (context != null) {
                     LiveUpdatesNotificationManager.initialize(context)
                     LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
-                    Logger.i(TAG, "关闭Live Updates复合通知: sourceId=$sourceId")
                 } else {
                     Logger.w(TAG, "无法关闭Live Updates复合通知，上下文为空")
                 }

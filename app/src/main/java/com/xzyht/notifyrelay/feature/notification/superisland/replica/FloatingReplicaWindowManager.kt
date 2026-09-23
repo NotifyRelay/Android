@@ -46,8 +46,6 @@ object FloatingReplicaWindowManager {
                         FloatingReplicaMappingManager.removeNotificationId(key)
                     }
                     hiddenEntries.remove(key)
-                } else {
-                    Logger.i(TAG, "超级岛: 条目被隐藏 (HIDDEN)，保留系统通知以便恢复, key=$key")
                 }
 
                 val sourceIdsToBlock = FloatingReplicaMappingManager.removeSourceIdMapping(key)
@@ -231,7 +229,6 @@ object FloatingReplicaWindowManager {
                                 if (success) {
                                     FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
                                 }
-                                Logger.i(TAG, "浮窗创建时发送Live Updates复合通知作为生命周期管理: sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
                             }
                         } else {
                             val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, displayTitle, displayText, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, floatingWindowManager)
@@ -239,10 +236,8 @@ object FloatingReplicaWindowManager {
                             if (notificationId != null) {
                                 FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
                             }
-                            Logger.i(TAG, "浮窗创建时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
                         }
                     } else {
-                        Logger.i(TAG, "浮窗从隐藏状态恢复，不重新发送通知，使用现有的通知: sourceId=$sourceId")
                     }
                 }
             }
@@ -260,7 +255,6 @@ object FloatingReplicaWindowManager {
     ) {
         if (!isFloatingWindowEnabled(context)) {
             if (SuperIslandConfigUtils.isNotificationListMode(context)) {
-                Logger.i(TAG, "超级岛: 列表模式 - 切换到下一条通知, sourceId=$sourceId")
                 FloatingReplicaListModeManager.switchNotificationInList(context.applicationContext)
             } else {
                 Logger.i(TAG, "超级岛: 浮窗功能已关闭，不处理浮窗状态切换, sourceId=$sourceId")
@@ -273,18 +267,14 @@ object FloatingReplicaWindowManager {
             val isShowing = entryKeys?.any { floatingWindowManager.getEntry(it) != null } == true
 
             if (isShowing) {
-                Logger.i(TAG, "超级岛: 点击通知切换 - 隐藏浮窗, sourceId=$sourceId")
-
                 val entry = floatingWindowManager.getEntry(sourceId)
                 if (entry != null) {
                     hiddenEntries[sourceId] = entry
                     FloatingReplicaMappingManager.saveHiddenEntry(sourceId, entry)
-                    Logger.i(TAG, "超级岛: 保存被隐藏的条目到 hiddenEntries, key=$sourceId")
                 }
 
                 dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.HIDDEN)
             } else {
-                Logger.i(TAG, "超级岛: 点击通知切换 - 恢复浮窗, sourceId=$sourceId")
                 FloatingReplicaMappingManager.removeBlockedInstance(sourceId)
 
                 val existingEntry = FloatingReplicaMappingManager.getHiddenEntry(sourceId)
@@ -302,7 +292,6 @@ object FloatingReplicaWindowManager {
                     )
                     FloatingReplicaMappingManager.removeHiddenEntry(sourceId)
                     hiddenEntries.remove(sourceId)
-                    Logger.i(TAG, "超级岛: 从 hiddenEntries 中移除已恢复的条目, key=$sourceId")
                 } else {
                     showFloatingInternal(
                         context,
@@ -326,7 +315,6 @@ object FloatingReplicaWindowManager {
     ) {
         runReplicaCatching(TAG, "按来源关闭浮窗") {
             if (FloatingReplicaMappingManager.isSourceRecentlyClosedWithinMinute(sourceId)) {
-                Logger.i(TAG, "dismissBySourceInternal: sourceId=$sourceId 最近已关闭过，跳过")
                 return@runReplicaCatching
             }
 
@@ -335,10 +323,8 @@ object FloatingReplicaWindowManager {
             }
 
             FloatingReplicaMappingManager.cancelTimeoutJob(sourceId)
-            Logger.i(TAG, "dismissBySourceInternal: 清理超时任务, sourceId=$sourceId")
 
             NotificationGenerator.stopScrollUpdate(sourceId)
-            Logger.i(TAG, "dismissBySourceInternal: 已停止滚动更新, sourceId=$sourceId")
 
             val ctx = FloatingReplicaMappingManager.getAppContext()
             if (ctx != null && !isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
@@ -346,7 +332,6 @@ object FloatingReplicaWindowManager {
                 if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
                     FloatingReplicaMappingManager.removeBlockedInstance(sourceId)
                 }
-                Logger.i(TAG, "dismissBySourceInternal: 列表模式处理完成, sourceId=$sourceId")
                 return@runReplicaCatching
             }
 
@@ -354,7 +339,6 @@ object FloatingReplicaWindowManager {
 
             val notificationIdsBefore = FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
             val entryKeys = FloatingReplicaMappingManager.getSourceIdEntryKeys(sourceId)
-            Logger.i(TAG, "dismissBySourceInternal: sourceId=$sourceId, floatingEnabled=$floatingEnabled, notificationIdsBefore=$notificationIdsBefore, entryKeys=$entryKeys")
 
             if (floatingEnabled) {
                 if (entryKeys != null) {
@@ -379,7 +363,6 @@ object FloatingReplicaWindowManager {
 
             if (view != null && wm != null && lp != null) {
                 wm.removeView(view)
-                Logger.i(TAG, "超级岛: 浮窗容器已移除")
 
                 overlayView = null
                 overlayLayoutParams = null
@@ -463,7 +446,6 @@ object FloatingReplicaWindowManager {
                         overlayLayoutParams = layoutParams
                         windowManager = WeakReference(wm)
                         FloatingReplicaMappingManager.setOverlayView(composeContainer)
-                        Logger.i(TAG, "超级岛: 浮窗容器已创建(首条条目触发)，x=${layoutParams.x}, y=${layoutParams.y}")
                     }
                 }
             }

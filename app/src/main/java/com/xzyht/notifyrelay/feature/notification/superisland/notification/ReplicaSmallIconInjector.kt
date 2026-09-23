@@ -51,7 +51,6 @@ internal object ReplicaSmallIconInjector {
             val field = Notification::class.java.getDeclaredField("mSmallIcon")
             field.isAccessible = true
             field.set(notification, transparentIcon)
-            Logger.i(TAG, "超级岛 已清除小图标（注入透明占位图）")
         } catch (e: Exception) {
             Logger.w(TAG, "超级岛 清除小图标失败: ${e.message}")
         }
@@ -75,7 +74,6 @@ internal object ReplicaSmallIconInjector {
                 if (cacheKey != null) {
                     ReplicaIconCache.put(cacheKey, icon)
                 }
-                Logger.i(TAG, "超级岛 成功注入小图标到胶囊通知")
             } catch (e: Exception) {
                 Logger.w(TAG, "超级岛 注入小图标失败: ${e.message}")
             }

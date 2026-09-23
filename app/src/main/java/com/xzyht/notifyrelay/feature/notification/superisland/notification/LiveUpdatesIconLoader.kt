@@ -309,7 +309,6 @@ internal object LiveUpdatesIconLoader {
             updatedBuilder.setStyle(progressStyle)
 
             LiveUpdatesNotificationManager.notificationManager.notify(notificationId, updatedBuilder.build())
-            Logger.i(TAG, "更新进度通知图标成功: $sourceId")
         } catch (e: Exception) {
             Logger.w(TAG, "更新通知所有图标失败: ${e.message}")
             e.printStackTrace()

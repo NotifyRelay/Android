@@ -315,8 +315,6 @@ object LiveUpdatesNotificationManager {
             hasPromotable?.let {
                 if (!it) {
                     Logger.w(TAG, "通知不具有可提升特性 - Live Updates可能无法正常显示")
-                } else {
-                    Logger.i(TAG, "通知具有可提升特性")
                 }
             }
         } catch (e: Exception) {
@@ -325,7 +323,6 @@ object LiveUpdatesNotificationManager {
 
         // 发送通知
         notificationManager.notify(notificationId, notification)
-        Logger.i(TAG, "发送Live Update进度通知成功: $sourceId")
 
         // 异步加载图标并更新通知，确保图标正确显示
         LiveUpdatesIconLoader.loadIconsAndUpdateNotification(sourceId, notificationId, paramV2, picMap)
@@ -365,7 +362,6 @@ object LiveUpdatesNotificationManager {
             }
             val notificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
             notificationManager.cancel(notificationId)
-            Logger.i(TAG, "取消Live Update通知成功: $sourceId")
         } catch (e: Exception) {
             Logger.e(TAG, "取消Live Update通知失败: ${e.message}")
         }
@@ -398,7 +394,6 @@ object LiveUpdatesNotificationManager {
             // 先检查方法是否存在
             val canPostPromotedNotificationsMethod = notificationManager.javaClass.getMethod("canPostPromotedNotifications")
             val result = canPostPromotedNotificationsMethod.invoke(notificationManager) as Boolean
-            Logger.i(TAG, "canUseLiveUpdates: canPostPromotedNotifications返回 $result")
             return result
         } catch (e: NoSuchMethodException) {
             Logger.w(TAG, "canUseLiveUpdates: 未找到canPostPromotedNotifications方法 - 设备可能不支持Live Updates")
