@@ -82,28 +82,52 @@ object FloatingReplicaNotificationManager {
                 // 注入模式变化时先取消旧通知并清理旧映射，避免两个通道的通知并存/残留
                 FloatingReplicaMappingManager.migrateInjectionModeIfChanged(context, sourceId, injectionModeOrdinal)
 
-                // 不再按内容指纹跳过系统通知刷新：
-                // 系统侧可能出现「通知已入列、ranking 保留、但被焦点插件隐藏」的幽灵状态，
-                // 此时内容指纹与 activeNotifications 判定都"看似正常"，一旦跳过就永远不再重发
-                // （表现为"怎么点都不出"）。重复 notify 只是更新同一条通知（已 setOnlyAlertOnce），代价可控。
-                if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                // 内容与上次成功发出的通知一致且通知仍在展示时，跳过系统通知刷新（不调用 notify），
+                // 仅保留下方超时计时器的重置。
+                // 超级岛信息注入模式下重发会触发系统展开态悬浮（islandFirstFloat 默认 true），影响用户体感；
+                // Live Updates 模式走系统兼容转换，重发虽无展开态副作用，但内容不变时同样无需重发。
+                // 指纹包含注入模式：模式变化时指纹随之变化，不会被误判为「内容无变更」。
+                val fingerprint =
+                    FloatingReplicaMappingManager.computeNotificationFingerprint(
+                        displayTitle,
+                        displayText,
+                        formattedData.paramV2Raw,
+                        formattedData.resolvedPicMap,
+                        injectionModeOrdinal,
+                    )
+                val previousNotificationIds = FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
+                val canSkipRefresh =
+                    !previousNotificationIds.isNullOrEmpty() &&
+                        FloatingReplicaMappingManager.isAnyNotificationActive(context, previousNotificationIds) &&
+                        fingerprint == FloatingReplicaMappingManager.getNotificationFingerprint(sourceId)
+
+                if (canSkipRefresh) {
+                    Logger.i(TAG, "超级岛: 内容无变更，跳过系统通知刷新: sourceId=$sourceId")
+                } else if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                     runReplicaCatchingSuspend(TAG, "发送Live Updates复合通知") {
                         LiveUpdatesNotificationManager.initialize(context)
-                        LiveUpdatesNotificationManager.showLiveUpdate(
-                            sourceId,
-                            displayTitle,
-                            displayText,
-                            appName,
-                            formattedData,
-                        )
+                        val success =
+                            LiveUpdatesNotificationManager.showLiveUpdate(
+                                sourceId,
+                                displayTitle,
+                                displayText,
+                                appName,
+                                formattedData,
+                            )
                         val liveUpdateNotificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
                         FloatingReplicaMappingManager.putNotificationId(entryKey, liveUpdateNotificationId)
                         FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
+                        if (success) {
+                            FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
+                        }
                         Logger.i(TAG, "浮窗功能关闭时发送Live Updates复合通知: sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
                     }
                 } else {
                     val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, displayTitle, displayText, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, FloatingReplicaWindowManager.getFloatingWindowManager())
                     FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, notificationId)
+                    if (notificationId != null) {
+                        FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
+                    }
                     Logger.i(TAG, "浮窗功能关闭时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
                 }
 
