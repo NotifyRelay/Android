@@ -130,6 +130,14 @@ object FloatingReplicaWindowManager {
                         return@runReplicaCatchingSuspend
                     }
 
+                    // 竞态守卫：协程 nextVersion 可能在 dismissBySource 的 removeSourceIdMappings 之后执行，
+                    // 导致版本被 computeIfAbsent 重建、isLatestVersion 误判通过。
+                    // 此处复检 isSourceRecentlyClosed（dismissBySource 已 markSourceClosed），命中即中止。
+                    if (FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)) {
+                        Logger.i(TAG, "超级岛: sourceId=$sourceId 在异步发送期间被关闭，中止显示")
+                        return@runReplicaCatchingSuspend
+                    }
+
                     val formattedData = SuperIslandDataFormatter.formatForDisplay(context, paramV2Raw, internedPicMap)
                     val paramV2 = formattedData.paramV2
 

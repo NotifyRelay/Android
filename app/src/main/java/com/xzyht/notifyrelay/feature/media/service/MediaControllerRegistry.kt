@@ -22,6 +22,7 @@ internal class MediaControllerRegistry(
     private val getLastMetadataHash: () -> Int,
     private val onMetadataUpdate: (controller: MediaController) -> Unit,
     private val onRecheckSessions: () -> Unit,
+    private val onSessionDestroyedByPackage: (packageName: String) -> Unit,
 ) {
     companion object {
         private const val TAG = "MediaControllerRegistry"
@@ -97,7 +98,10 @@ internal class MediaControllerRegistry(
                                 }
 
                                 override fun onSessionDestroyed() {
+                                    val pkg = controller.packageName
                                     handler.post {
+                                        // 先关闭对应胶囊歌词浮窗，再刷新控制器列表
+                                        onSessionDestroyedByPackage(pkg)
                                         onRecheckSessions() // 强制完全刷新
                                     }
                                 }

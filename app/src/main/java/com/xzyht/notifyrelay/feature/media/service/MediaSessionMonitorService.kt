@@ -67,6 +67,9 @@ class MediaSessionMonitorService(
             getLastMetadataHash = { lastMetadataHash },
             onMetadataUpdate = { controller -> updateMetadataIfPrimary(controller) },
             onRecheckSessions = { recheckSessions() },
+            onSessionDestroyedByPackage = { packageName ->
+                NotifyRelayNotificationListenerService.dismissMediaCapsuleByPackageName(packageName)
+            },
         )
 
     // 健康检查与重试机制（see MediaSessionHealthMonitor）。

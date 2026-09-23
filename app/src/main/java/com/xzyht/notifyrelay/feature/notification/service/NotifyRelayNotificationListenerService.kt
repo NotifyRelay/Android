@@ -59,6 +59,11 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
         // 获取指定包名的媒体会话数据
         fun getMediaSessionData(packageName: String): MediaNotificationHandler.MediaSessionData? = MediaNotificationHandler.getMediaSessionData(packageName)
+
+        // MediaSession 销毁时，关闭对应 packageName 的胶囊歌词浮窗
+        fun dismissMediaCapsuleByPackageName(packageName: String) {
+            MediaNotificationHandler.dismissCapsuleByPackageName(packageName)
+        }
     }
 
     override fun onNotificationRemoved(sbn: StatusBarNotification) {

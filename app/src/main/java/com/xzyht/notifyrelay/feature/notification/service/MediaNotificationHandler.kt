@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.service.notification.StatusBarNotification
 import android.util.Base64
 import com.xzyht.notifyrelay.feature.notification.superisland.media.MediaCapsulePresenter
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.sync.MessageSender
 import notifyrelay.base.util.Logger
 import java.io.ByteArrayOutputStream
@@ -68,6 +69,27 @@ object MediaNotificationHandler {
 
     // 获取指定包名的媒体会话数据
     fun getMediaSessionData(packageName: String): MediaSessionData? = mediaSessionDataCache[packageName]
+
+    /**
+     * 本机 MediaSession 销毁时，关闭对应 packageName 的胶囊歌词浮窗。
+     *
+     * 通过 packageName 查找 CATEGORY_TRANSPORT 通知的 sbnKey，再 dismissBySource。
+     * 若通知已被移除，[NotifyRelayNotificationListenerService.onNotificationRemoved] 应已先行关闭，
+     * 此处找不到活动通知即视为已关闭，无需重复处理。
+     */
+    fun dismissCapsuleByPackageName(packageName: String) {
+        val service = NotifyRelayNotificationListenerService.instance ?: return
+        val activeNotifications = service.activeNotifications ?: return
+        for (sbn in activeNotifications) {
+            if (sbn.packageName == packageName && sbn.notification.category == Notification.CATEGORY_TRANSPORT) {
+                val sbnKey = service.getNotificationKey(sbn)
+                FloatingReplicaManager.dismissBySource(sbnKey)
+                Logger.i(TAG, "MediaSession 销毁，关闭胶囊歌词浮窗: pkg=$packageName, sbnKey=$sbnKey")
+                return
+            }
+        }
+        Logger.d(TAG, "MediaSession 销毁，未找到对应媒体通知（可能已移除）: pkg=$packageName")
+    }
 
     /**
      * 处理媒体播放通知
