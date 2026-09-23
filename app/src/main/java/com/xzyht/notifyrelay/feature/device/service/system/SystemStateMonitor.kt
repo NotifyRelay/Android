@@ -7,7 +7,7 @@ import android.content.IntentFilter
 import android.os.BatteryManager
 import android.os.Build
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import notifyrelay.core.util.BatteryUtils
+import notifyrelay.base.util.BatteryUtils
 
 /**
  * 系统状态广播监听（锁屏状态 + 电池状态），把平台侧才能采集到的状态推送给 Rust core。

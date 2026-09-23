@@ -9,6 +9,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIsl
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
+import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -30,7 +31,7 @@ object FloatingReplicaNotificationManager {
         isLocked: Boolean = false,
     ) {
         CoroutineScope(Dispatchers.Main).launch {
-            runWithErrorHandlingSuspend("发送通知") {
+            runReplicaCatchingSuspend(TAG, "发送通知") {
                 val taskVersion = FloatingReplicaMappingManager.nextVersion(sourceId)
 
                 val internedPicMap =
@@ -39,7 +40,15 @@ object FloatingReplicaNotificationManager {
                     }
 
                 if (!FloatingReplicaMappingManager.isLatestVersion(sourceId, taskVersion)) {
-                    return@runWithErrorHandlingSuspend
+                    return@runReplicaCatchingSuspend
+                }
+
+                // 竞态守卫：协程 nextVersion 可能在 dismissBySource 的 removeSourceIdMappings 之后执行，
+                // 导致版本被 computeIfAbsent 重建、isLatestVersion 误判通过。
+                // 此处复检 isSourceRecentlyClosed（dismissBySource 已 markSourceClosed），命中即中止。
+                if (FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)) {
+                    Logger.i(TAG, "超级岛: sourceId=$sourceId 在异步发送期间被关闭，中止发送")
+                    return@runReplicaCatchingSuspend
                 }
 
                 val formattedData = SuperIslandDataFormatter.formatForDisplay(context, paramV2Raw, internedPicMap)
@@ -73,49 +82,62 @@ object FloatingReplicaNotificationManager {
                 // 注入模式变化时先取消旧通知并清理旧映射，避免两个通道的通知并存/残留
                 FloatingReplicaMappingManager.migrateInjectionModeIfChanged(context, sourceId, injectionModeOrdinal)
 
-                // 不再按内容指纹跳过系统通知刷新：
-                // 系统侧可能出现「通知已入列、ranking 保留、但被焦点插件隐藏」的幽灵状态，
-                // 此时内容指纹与 activeNotifications 判定都"看似正常"，一旦跳过就永远不再重发
-                // （表现为"怎么点都不出"）。重复 notify 只是更新同一条通知（已 setOnlyAlertOnce），代价可控。
-                if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                    runWithErrorHandlingSuspend("发送Live Updates复合通知") {
+                // 内容与上次成功发出的通知一致且通知仍在展示时，跳过系统通知刷新（不调用 notify），
+                // 仅保留下方超时计时器的重置。
+                // 超级岛信息注入模式下重发会触发系统展开态悬浮（islandFirstFloat 默认 true），影响用户体感；
+                // Live Updates 模式走系统兼容转换，重发虽无展开态副作用，但内容不变时同样无需重发。
+                // 指纹包含注入模式：模式变化时指纹随之变化，不会被误判为「内容无变更」。
+                val fingerprint =
+                    FloatingReplicaMappingManager.computeNotificationFingerprint(
+                        displayTitle,
+                        displayText,
+                        formattedData.paramV2Raw,
+                        formattedData.resolvedPicMap,
+                        injectionModeOrdinal,
+                    )
+                val previousNotificationIds = FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
+                val canSkipRefresh =
+                    !previousNotificationIds.isNullOrEmpty() &&
+                        FloatingReplicaMappingManager.isAnyNotificationActive(context, previousNotificationIds) &&
+                        fingerprint == FloatingReplicaMappingManager.getNotificationFingerprint(sourceId)
+
+                if (canSkipRefresh) {
+                    Logger.i(TAG, "超级岛: 内容无变更，跳过系统通知刷新: sourceId=$sourceId")
+                } else if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+                    runReplicaCatchingSuspend(TAG, "发送Live Updates复合通知") {
                         LiveUpdatesNotificationManager.initialize(context)
-                        LiveUpdatesNotificationManager.showLiveUpdate(
-                            sourceId,
-                            displayTitle,
-                            displayText,
-                            appName,
-                            formattedData,
-                        )
-                        val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
+                        val success =
+                            LiveUpdatesNotificationManager.showLiveUpdate(
+                                sourceId,
+                                displayTitle,
+                                displayText,
+                                appName,
+                                formattedData,
+                            )
+                        val liveUpdateNotificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
                         FloatingReplicaMappingManager.putNotificationId(entryKey, liveUpdateNotificationId)
                         FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
-                        Logger.i(TAG, "浮窗功能关闭时发送Live Updates复合通知: sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
+                        if (success) {
+                            FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
+                        }
                     }
                 } else {
                     val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, displayTitle, displayText, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, FloatingReplicaWindowManager.getFloatingWindowManager())
                     FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, notificationId)
-                    Logger.i(TAG, "浮窗功能关闭时发送传统复刻通知: sourceId=$sourceId, notificationId=$notificationId")
+                    if (notificationId != null) {
+                        FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
+                    }
                 }
 
-                val timeoutMs = 30 * 1000L
-
-                Logger.i(TAG, "超级岛: 设置超时时间, sourceId=$sourceId, timeoutMs=$timeoutMs")
-
                 FloatingReplicaMappingManager.cancelTimeoutJob(sourceId)
-                Logger.i(TAG, "超级岛: 取消现有的超时任务（如果存在）, sourceId=$sourceId")
-
                 val timeoutJob =
                     CoroutineScope(Dispatchers.Main).launch {
-                        delay(timeoutMs)
-                        runWithErrorHandling("超时自动移除通知") {
-                            Logger.i(TAG, "超级岛: 超时任务触发，准备移除通知, sourceId=$sourceId, timeoutMs=$timeoutMs")
+                        delay(30_000L)
+                        runReplicaCatching(TAG, "超时自动移除通知") {
                             FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
-                            Logger.i(TAG, "超级岛: 通知超时自动移除, sourceId=$sourceId")
                         }
                     }
                 FloatingReplicaMappingManager.setTimeoutJob(sourceId, timeoutJob)
-                Logger.i(TAG, "超级岛: 已启动新的超时任务, sourceId=$sourceId, timeoutMs=$timeoutMs")
             }
         }
     }
@@ -129,64 +151,35 @@ object FloatingReplicaNotificationManager {
     ) {
         if (context != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                runWithErrorHandling("关闭Live Updates通知") {
+                runReplicaCatching(TAG, "关闭Live Updates通知") {
                     LiveUpdatesNotificationManager.initialize(context)
                     LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
-                    Logger.i(TAG, "通过LiveUpdatesNotificationManager关闭通知: sourceId=$sourceId")
 
-                    val liveUpdateNotificationId = sourceId.hashCode().and(0xffff) + 10000
+                    val liveUpdateNotificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
                     val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                     try {
-                        Logger.i(TAG, "尝试直接关闭Live Updates通知，sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
                         notificationManager.cancel(liveUpdateNotificationId)
-                        Logger.i(TAG, "直接关闭Live Updates通知成功，sourceId=$sourceId, notificationId=$liveUpdateNotificationId")
                     } catch (e: Exception) {
                         Logger.w(TAG, "直接关闭Live Updates通知失败: ${e.message}")
                     }
                 }
             }
 
-            runWithErrorHandling("关闭传统复刻通知") {
-                val notificationIds = notificationIdsBefore ?: FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
-                Logger.i(TAG, "尝试关闭传统复刻通知，sourceId=$sourceId，notificationIds=$notificationIds")
-                if (notificationIds != null && notificationIds.isNotEmpty()) {
-                    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    notificationIds.forEach { notificationId ->
-                        try {
-                            Logger.i(TAG, "正在取消通知，sourceId=$sourceId, notificationId=$notificationId")
-                            notificationManager.cancel(notificationId)
-                            Logger.i(TAG, "通过直接映射关闭通知成功，sourceId=$sourceId, notificationId=$notificationId")
-                        } catch (e: Exception) {
-                            Logger.w(TAG, "通过直接映射关闭通知失败: ${e.message}")
-                            e.printStackTrace()
-                        }
-                    }
-                    FloatingReplicaMappingManager.removeSourceIdMappings(sourceId)
-                    val keys = entryKeys ?: listOf(sourceId)
-                    keys.forEach { entryKey ->
-                        FloatingReplicaMappingManager.removeNotificationId(entryKey)
-                    }
-                } else {
-                    Logger.w(TAG, "没有找到直接映射的 notificationIds，使用回退方案，sourceId=$sourceId")
-                    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    try {
-                        val traditionalNotificationId = sourceId.hashCode().and(0xffff) + 20000
-                        Logger.i(TAG, "尝试直接关闭传统复刻通知，sourceId=$sourceId, notificationId=$traditionalNotificationId")
-                        notificationManager.cancel(traditionalNotificationId)
-                        Logger.i(TAG, "直接关闭传统复刻通知成功，sourceId=$sourceId, notificationId=$traditionalNotificationId")
-                    } catch (e: Exception) {
-                        Logger.w(TAG, "直接关闭传统复刻通知失败: ${e.message}")
-                    }
-
-                    val keys = entryKeys ?: listOf(sourceId)
-                    keys.forEach { entryKey ->
-                        NotificationGenerator.cancelReplicaNotification(context, entryKey)
-                    }
-                    if (keys.isEmpty()) {
-                        NotificationGenerator.clearAllReplicaNotifications(context)
-                    }
+            runReplicaCatching(TAG, "关闭传统复刻通知") {
+                val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                try {
+                    notificationManager.cancel(SuperIslandNotificationIds.replica(sourceId))
+                } catch (e: Exception) {
+                    Logger.w(TAG, "直接关闭传统复刻通知失败: ${e.message}")
                 }
-                Logger.i(TAG, "关闭传统复刻通知完成: sourceId=$sourceId")
+
+                val keys = entryKeys ?: listOf(sourceId)
+                keys.forEach { entryKey ->
+                    NotificationGenerator.cancelReplicaNotification(context, entryKey)
+                }
+                if (keys.isEmpty()) {
+                    NotificationGenerator.clearAllReplicaNotifications(context)
+                }
             }
         } else {
             Logger.w(TAG, "超级岛: 无法获取上下文，无法关闭通知: sourceId=$sourceId")
@@ -214,15 +207,12 @@ object FloatingReplicaNotificationManager {
         val isFloatingEnabled = FloatingReplicaWindowManager.isFloatingWindowEnabled(context)
 
         if (!isFloatingEnabled) {
-            Logger.i(TAG, "超级岛: 浮窗功能已关闭，直接关闭通知，notificationId=$notificationId")
-
             if (sourceIdToStop != null) {
                 FloatingReplicaWindowManager.dismissBySourceInternal(sourceIdToStop, FloatingWindowManager.RemovalReason.MANUAL)
             } else {
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 try {
                     notificationManager.cancel(notificationId)
-                    Logger.i(TAG, "超级岛: 直接关闭通知成功，notificationId=$notificationId")
                 } catch (e: Exception) {
                     Logger.w(TAG, "超级岛: 直接关闭通知失败: ${e.message}")
                 }
@@ -232,38 +222,14 @@ object FloatingReplicaNotificationManager {
 
         if (sourceIdToStop != null) {
             NotificationGenerator.stopScrollUpdate(sourceIdToStop)
-            Logger.i(TAG, "超级岛: 关闭通知时停止滚动更新, sourceId=$sourceIdToStop, notificationId=$notificationId")
         }
 
         val entryKey = FloatingReplicaMappingManager.getEntryKeyByNotificationId(notificationId)
 
         if (entryKey != null) {
             FloatingReplicaWindowManager.getFloatingWindowManager().removeEntry(entryKey, FloatingWindowManager.RemovalReason.MANUAL)
-            Logger.i(TAG, "超级岛: 根据通知ID关闭浮窗条目成功，notificationId=$notificationId, entryKey=$entryKey")
         } else {
             Logger.w(TAG, "超级岛: 未找到通知ID对应的浮窗条目，notificationId=$notificationId")
-        }
-    }
-
-    private inline fun runWithErrorHandling(
-        actionName: String,
-        crossinline block: () -> Unit,
-    ) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
-        }
-    }
-
-    private suspend inline fun runWithErrorHandlingSuspend(
-        actionName: String,
-        crossinline block: suspend () -> Unit,
-    ) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
         }
     }
 }

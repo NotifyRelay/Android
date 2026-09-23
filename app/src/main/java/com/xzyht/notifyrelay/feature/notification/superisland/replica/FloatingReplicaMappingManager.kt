@@ -7,6 +7,7 @@ import android.view.View
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
 import kotlinx.coroutines.Job
 import notifyrelay.base.util.Logger
 import java.lang.ref.WeakReference
@@ -99,10 +100,8 @@ object FloatingReplicaMappingManager {
         }
 
         return if (sourceIdsToRemove.isNotEmpty()) {
-            Logger.i(TAG, "removeSourceIdMapping: 成功移除 sourceIds=$sourceIdsToRemove, key=$key")
             sourceIdsToRemove
         } else {
-            Logger.i(TAG, "removeSourceIdMapping: 未找到匹配的 sourceId，key=$key")
             null
         }
     }
@@ -240,7 +239,8 @@ object FloatingReplicaMappingManager {
      * 再允许调用方按新注入模式发送通知。
      *
      * 为什么必须迁移：超级岛通道与 Live Updates 通道使用**不同的 notificationId**
-     * （复刻通道 `hash+20000`、Live Updates `hash+10000`，列表模式为固定 30000），
+     * （由 `SuperIslandNotificationIds` 按通道基址 + 16 位哈希推导，两通道基址间距大于哈希空间，
+     * 区间互不重叠；列表模式为固定 30000），
      * 且渲染方式不同；若仅在旧通知上叠加，会出现旧通知残留、两条通知并存或旧模式内容不更新。
      *
      * 同时清理内容指纹：指纹只描述内容，不含模式，模式变化后若沿用旧指纹，
@@ -265,10 +265,12 @@ object FloatingReplicaMappingManager {
         var cancelled = 0
         val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val mappedIds = removeNotificationIdsBySourceId(sourceId)
+        // 兜底取消两个通道的推导 id，避免映射缺失时旧通知残留在通知栏。
+        // 统一走 SuperIslandNotificationIds，保证与发送侧使用完全相同的推导公式。
         val fallbackIds =
             listOf(
-                sourceId.hashCode().and(0xffff) + 10_000, // Live Updates 通道
-                sourceId.hashCode().and(0xffff) + 20_000, // 复刻通道路径
+                SuperIslandNotificationIds.liveUpdates(sourceId), // Live Updates 通道
+                SuperIslandNotificationIds.replica(sourceId), // 复刻通道路径
             )
         (mappedIds.orEmpty() + fallbackIds).distinct().forEach { id ->
             try {
@@ -312,12 +314,11 @@ object FloatingReplicaMappingManager {
         }
 
         if (reason != FloatingWindowManager.RemovalReason.HIDDEN && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-            runWithErrorHandling("关闭Live Updates复合通知") {
+            runReplicaCatching(TAG, "关闭Live Updates复合通知") {
                 val context = overlayViewRef?.get()?.context
                 if (context != null) {
                     LiveUpdatesNotificationManager.initialize(context)
                     LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
-                    Logger.i(TAG, "关闭Live Updates复合通知: sourceId=$sourceId")
                 } else {
                     Logger.w(TAG, "无法关闭Live Updates复合通知，上下文为空")
                 }
@@ -420,16 +421,5 @@ object FloatingReplicaMappingManager {
             }
         }
         return null
-    }
-
-    private inline fun runWithErrorHandling(
-        actionName: String,
-        crossinline block: () -> Unit,
-    ) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
-        }
     }
 }

@@ -8,11 +8,10 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.service.notification.StatusBarNotification
-import android.util.Base64
 import androidx.core.graphics.drawable.toBitmap
 import github.xzynine.superislandui.model.core.SuperIslandData
 import notifyrelay.base.util.Logger
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
 import notifyrelay.data.StorageManager
 import org.json.JSONObject
 
@@ -25,7 +24,7 @@ import org.json.JSONObject
  *  - 从通知 extras 中提取 miui.focus.param 内容并解析 param_v2 内容
  */
 object SuperIslandManager {
-    private const val STORAGE_KEY = "superisland_enabled"
+    private const val STORAGE_KEY = notifyrelay.base.util.SuperIslandStorageKeys.ENABLED
 
     /**
      * 检查用户/配置是否启用了超级岛读取
@@ -205,8 +204,7 @@ object SuperIslandManager {
                                 }
                                 if (obj is ByteArray) {
                                     try {
-                                        val b64 = Base64.encodeToString(obj, Base64.NO_WRAP)
-                                        picMap[bk] = "data:image/png;base64,$b64"
+                                        picMap[bk] = ImageUtils.bytesToDataUrl(obj, "image/png")
                                         continue
                                     } catch (_: Exception) {
                                     }
@@ -272,8 +270,7 @@ object SuperIslandManager {
                         }
                         if (p is ByteArray) {
                             try {
-                                val b64 = Base64.encodeToString(p, Base64.NO_WRAP)
-                                picMap[k] = "data:image/png;base64,$b64"
+                                picMap[k] = ImageUtils.bytesToDataUrl(p, "image/png")
                                 continue
                             } catch (_: Exception) {
                             }
@@ -305,7 +302,7 @@ object SuperIslandManager {
                 Logger.w("超级岛", "超级岛: 注入应用图标失败: ${e.message}")
             }
 
-            // data URL / bitmap helpers moved to DataUrlUtils
+            // data URL / bitmap helpers 已统一到 notifyrelay.base.util.image.ImageUtils
 
             // 将 picMap 放入 rawExtras 以便上层读取，同时返回到 SuperIslandData
             rawExtras["pic_map"] = picMap

@@ -10,7 +10,7 @@ import github.xzynine.superislandui.builder.SuperIslandImageSpec
 import github.xzynine.superislandui.builder.SuperIslandParamBuilder
 import kotlinx.coroutines.CancellationException
 import notifyrelay.base.util.Logger
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 
@@ -452,7 +452,7 @@ object SuperIslandStructuredDataHelper {
                 }
             if (bitmap != null) {
                 // 按比例缩放到上限尺寸
-                val scaled = scaleDownBitmap(bitmap, maxDimension)
+                val scaled = ImageUtils.scaleDown(bitmap, maxDimension)
                 // 单张必须真正落在上限内：encodePicData 内部逐级降质重压，
                 // 仍无法满足上限时返回 null，此时拒绝该图片（不能只做总量检查）。
                 val data =
@@ -470,21 +470,6 @@ object SuperIslandStructuredDataHelper {
             }
         }
         return PicBitmapResult(icons, totalBytes)
-    }
-
-    /**
-     * 按比例缩小位图，使最长边不超过 [maxDimension]；已在范围内则原样返回。
-     */
-    private fun scaleDownBitmap(
-        bitmap: Bitmap,
-        maxDimension: Int,
-    ): Bitmap {
-        val longest = maxOf(bitmap.width, bitmap.height)
-        if (longest <= maxDimension || longest <= 0) return bitmap
-        val ratio = maxDimension.toFloat() / longest
-        val targetWidth = (bitmap.width * ratio).toInt().coerceAtLeast(1)
-        val targetHeight = (bitmap.height * ratio).toInt().coerceAtLeast(1)
-        return Bitmap.createScaledBitmap(bitmap, targetWidth, targetHeight, true)
     }
 
     /**

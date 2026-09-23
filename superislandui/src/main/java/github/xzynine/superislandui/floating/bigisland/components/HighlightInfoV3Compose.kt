@@ -24,7 +24,8 @@ import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.ActionInfoButton
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.model.templates.HighlightInfoV3
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
+import top.yukonga.miuix.kmp.basic.Text
 
 /**
  * 按钮组件5（highlightInfoV3）Compose 实现（OS3 模板 17 / 18 / 19）
@@ -64,7 +65,7 @@ fun HighlightInfoV3Compose(
         ) {
             // 高亮文本
             highlightInfoV3.primaryText?.let { text ->
-                androidx.compose.material3.Text(
+                Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
                     color = primaryColor,
                     fontSize = 17.sp,
@@ -74,7 +75,7 @@ fun HighlightInfoV3Compose(
             }
             // 补充文本（可划线）
             highlightInfoV3.secondaryText?.let { text ->
-                androidx.compose.material3.Text(
+                Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
                     color = secondaryColor,
                     fontSize = 14.sp,
@@ -100,7 +101,7 @@ fun HighlightInfoV3Compose(
                         (if (preferDark) ImageUtils.parseColor(highlightInfoV3.highLightbgColorDark) else ImageUtils.parseColor(highlightInfoV3.highLightbgColor))
                             ?: 0x333482FF,
                     )
-                androidx.compose.material3.Text(
+                Text(
                     text = label,
                     color = labelTextColor,
                     fontSize = 12.sp,

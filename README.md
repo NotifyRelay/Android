@@ -4,60 +4,28 @@
 ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/NotifyRelay/Android/total)
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/NotifyRelay/Android?utm_source=oss&utm_medium=github&utm_campaign=NotifyRelay%2FAndroid&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 ## 应用简介
-本应用可实现多设备间的通知相互转发功能。通过获取设备通知访问权限、应用列表权限及网络权限，设备间可双向转发通知原文。转发消息包含原通知的应用跳转接口，若接收设备安装了对应应用，点击转发消息即可跳转至与发送方一致的应用。
 
-## 构建环境要求
+NotifyRelay 是一套**跨设备通知与状态同步**方案。Android 端与 Windows 端在局域网内直连配对，把一台设备上的通知、剪贴板、媒体状态等实时同步到另一台设备，数据不经过公网服务器。
 
-本项目使用 Rust 编写核心加密与协议模块（`notify-relay-core`），构建前需安装以下环境：
+| 端 | 仓库 |
+|---|---|
+| Android 端（本仓库） | https://github.com/NotifyRelay/Android |
+| Windows 端 | https://github.com/NotifyRelay/Windows |
+| 跨平台 Rust 核心 | https://github.com/NotifyRelay/notify-relay-core |
 
-### 1. 安装 Rust
+### 功能特性
 
-```sh
-# Windows (使用 rustup-init.exe)
-# 从 https://rustup.rs 下载安装
-# 或使用 winget:
-winget install Rustlang.Rustup
+- **通知双向转发**：读取本机通知原文并转发到已配对设备，设备间可双向互转。
+- **通知回跳**：转发消息携带原通知的应用跳转信息，接收端安装了对应应用时，点击即可跳转至与发送方一致的界面。
+- **超级岛 / 实况通知**：将远端通知渲染为小米超级岛悬浮窗或实况通知，支持进度、计时、图文等模板。
+- **剪贴板同步**：跨设备同步剪贴板文本与图片，已适配 Fcitx 输入法。
+- **媒体控制**：同步媒体播放状态，并可在对端控制播放。
+- **音频转发**：将本机音频转发到其他设备播放。
+- **应用列表同步与远程拉起**：同步已安装应用列表与图标，可查看并拉起对端应用。
+- **通知过滤与历史**：支持黑/白名单与关键词过滤，本地留存通知历史与超级岛历史。
+- **设备发现与配对**：局域网内自动发现设备，配对码认证，基于 ECDH 派生密钥加密传输。
+- **屏幕镜像**：内置 Scrcpy 能力，可镜像并控制 Android 设备。
 
-# Linux / macOS:
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-```
-
-安装后重启终端，验证：
-```sh
-rustc --version
-cargo --version
-```
-
-### 2. 添加 Android 编译目标
-
-```sh
-rustup target add aarch64-linux-android x86_64-linux-android
-```
-
-### 3. 安装 cargo-ndk
-
-```sh
-cargo install cargo-ndk
-```
-
-### 4. 安装 Android NDK
-
-通过 Android Studio SDK Manager 安装 NDK（Side-by-side）。  
-确保 `local.properties` 中正确配置了 SDK 路径，或在 Android Studio 中直接打开项目。
-
-### 5. 构建 APK
-
-```sh
-# Windows
-gradlew.bat assembleDebug
-
-# Linux / macOS
-./gradlew assembleDebug
-```
-
-首次构建时会自动编译 Rust 原生库（耗时约 2-5 分钟）。后续构建如有缓存则仅需数秒。
-
-> **注意**：预编译 APK 可在 [Releases](https://github.com/NotifyRelay/Android/releases) 页面下载，无需自行构建。
 
 ## 开始使用
 进入应用后显示欢迎界面,请授权所有的必须权限;

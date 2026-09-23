@@ -70,11 +70,11 @@ object FloatingReplicaListModeManager {
         forceRefresh: Boolean = false,
     ) {
         CoroutineScope(Dispatchers.Main).launch {
-            runWithErrorHandlingSuspend("发送列表模式通知") {
+            runReplicaCatchingSuspend(TAG, "发送列表模式通知") {
                 val taskVersion = FloatingReplicaMappingManager.nextVersion(entry.sourceId)
 
                 if (SuperIslandListManager.getActive()?.sourceId != entry.sourceId) {
-                    return@runWithErrorHandlingSuspend
+                    return@runReplicaCatchingSuspend
                 }
                 val internedPicMap =
                     withContext(Dispatchers.IO) {
@@ -82,7 +82,7 @@ object FloatingReplicaListModeManager {
                     }
 
                 if (SuperIslandListManager.getActive()?.sourceId != entry.sourceId || !FloatingReplicaMappingManager.isLatestVersion(entry.sourceId, taskVersion)) {
-                    return@runWithErrorHandlingSuspend
+                    return@runReplicaCatchingSuspend
                 }
 
                 val formattedData =
@@ -181,7 +181,7 @@ object FloatingReplicaListModeManager {
         val job =
             CoroutineScope(Dispatchers.Main).launch {
                 delay(30_000L)
-                runWithErrorHandling("列表模式超时移除") {
+                runReplicaCatching(TAG, "列表模式超时移除") {
                     FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
                 }
             }
@@ -222,31 +222,8 @@ object FloatingReplicaListModeManager {
                 FloatingReplicaWindowManager.dismissBySourceInternal(active.sourceId, FloatingWindowManager.RemovalReason.MANUAL)
             }
         } else {
-            Logger.i(TAG, "超级岛: 列表模式下关闭非列表通知，notificationId=$notificationId")
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
             nm.cancel(notificationId)
-        }
-    }
-
-    private suspend inline fun runWithErrorHandlingSuspend(
-        actionName: String,
-        crossinline block: suspend () -> Unit,
-    ) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
-        }
-    }
-
-    private inline fun runWithErrorHandling(
-        actionName: String,
-        crossinline block: () -> Unit,
-    ) {
-        try {
-            block()
-        } catch (e: Exception) {
-            Logger.w(TAG, "超级岛: $actionName 失败: ${e.message}")
         }
     }
 }

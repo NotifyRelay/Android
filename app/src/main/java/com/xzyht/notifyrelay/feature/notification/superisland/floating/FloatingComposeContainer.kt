@@ -12,9 +12,11 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.savedstate.SavedStateRegistry
 import androidx.savedstate.SavedStateRegistryController
 import androidx.savedstate.SavedStateRegistryOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
 import kotlin.math.abs
@@ -99,23 +101,11 @@ class FloatingComposeContainer
         }
 
         override fun onAttachedToWindow() {
-            try {
-                // 先设置ViewTreeLifecycleOwner，再调用super.onAttachedToWindow()
-                // 这样父类方法在调用时就能找到LifecycleOwner
-                val viewTreeLifecycleOwnerClass = Class.forName("androidx.lifecycle.ViewTreeLifecycleOwner")
-                val viewClass = Class.forName("android.view.View")
-                val lifecycleOwnerClass = Class.forName("androidx.lifecycle.LifecycleOwner")
-                val setMethod = viewTreeLifecycleOwnerClass.getDeclaredMethod("set", viewClass, lifecycleOwnerClass)
-                setMethod.invoke(null, this, internalLifecycleOwner)
-
-                // 同时设置SavedStateRegistryOwner
-                val viewTreeSavedStateRegistryOwnerClass = Class.forName("androidx.savedstate.ViewTreeSavedStateRegistryOwner")
-                val savedStateRegistryOwnerClass = Class.forName("androidx.savedstate.SavedStateRegistryOwner")
-                val setSavedStateMethod = viewTreeSavedStateRegistryOwnerClass.getDeclaredMethod("set", viewClass, savedStateRegistryOwnerClass)
-                setSavedStateMethod.invoke(null, this, internalLifecycleOwner)
-            } catch (_: Exception) {
-                // 忽略异常，继续执行
-            }
+            // 先设置ViewTreeLifecycleOwner，再调用super.onAttachedToWindow()
+            // 这样父类方法在调用时就能找到LifecycleOwner。
+            // 二者均为 androidx 公开的 Kotlin 扩展（底层 setTag），直接调用即可，无需反射。
+            setViewTreeLifecycleOwner(internalLifecycleOwner)
+            setViewTreeSavedStateRegistryOwner(internalLifecycleOwner)
 
             // 调用父类方法
             super.onAttachedToWindow()
@@ -129,21 +119,9 @@ class FloatingComposeContainer
             internalLifecycleOwner.dispatchLifecycleEvent(Lifecycle.Event.ON_STOP)
             internalLifecycleOwner.dispatchLifecycleEvent(Lifecycle.Event.ON_DESTROY)
 
-            try {
-                // 清理LifecycleOwner和SavedStateRegistryOwner
-                val viewTreeLifecycleOwnerClass = Class.forName("androidx.lifecycle.ViewTreeLifecycleOwner")
-                val viewClass = Class.forName("android.view.View")
-                val lifecycleOwnerClass = Class.forName("androidx.lifecycle.LifecycleOwner")
-                val setMethod = viewTreeLifecycleOwnerClass.getDeclaredMethod("set", viewClass, lifecycleOwnerClass)
-                setMethod.invoke(null, this, null)
-
-                val viewTreeSavedStateRegistryOwnerClass = Class.forName("androidx.savedstate.ViewTreeSavedStateRegistryOwner")
-                val savedStateRegistryOwnerClass = Class.forName("androidx.savedstate.SavedStateRegistryOwner")
-                val setSavedStateMethod = viewTreeSavedStateRegistryOwnerClass.getDeclaredMethod("set", viewClass, savedStateRegistryOwnerClass)
-                setSavedStateMethod.invoke(null, this, null)
-            } catch (_: Exception) {
-                // 忽略异常
-            }
+            // 清理LifecycleOwner和SavedStateRegistryOwner
+            setViewTreeLifecycleOwner(null)
+            setViewTreeSavedStateRegistryOwner(null)
         }
 
         // 重写dispatchTouchEvent，确保触摸事件能够被正确传递和处理

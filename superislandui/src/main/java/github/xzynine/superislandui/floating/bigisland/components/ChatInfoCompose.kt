@@ -10,7 +10,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -24,7 +23,8 @@ import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CircularProgressCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.model.core.ParamV2
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
+import top.yukonga.miuix.kmp.basic.Text
 
 /**
  * IM图文组件（chatInfo）Compose 实现

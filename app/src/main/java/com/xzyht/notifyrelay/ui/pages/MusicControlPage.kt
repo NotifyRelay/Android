@@ -15,7 +15,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -30,8 +29,8 @@ import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
-import top.yukonga.miuix.kmp.basic.Switch
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -247,58 +246,26 @@ fun MusicControlPage() {
         )
 
         // 胶囊歌词开关
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "启用胶囊歌词",
-                    style = textStyles.body1,
-                    color = colorScheme.onSurface,
-                )
-                Text(
-                    text = "接收本机媒体播放信息并以超级岛形式显示",
-                    style = textStyles.body2,
-                    color = colorScheme.onSurfaceSecondary,
-                )
-            }
-            Switch(
-                checked = capsuleLyricsEnabled,
-                onCheckedChange = { enabled ->
-                    capsuleLyricsEnabled = enabled
-                    StorageManager.putBoolean(context, "capsule_lyrics_enabled", enabled)
-                },
-            )
-        }
+        SwitchPreference(
+            title = "启用胶囊歌词",
+            summary = "接收本机媒体播放信息并以超级岛形式显示",
+            checked = capsuleLyricsEnabled,
+            onCheckedChange = { enabled ->
+                capsuleLyricsEnabled = enabled
+                StorageManager.putBoolean(context, "capsule_lyrics_enabled", enabled)
+            },
+        )
 
         // 发送媒体通知到对端
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Column(modifier = Modifier.weight(1f)) {
-                Text(
-                    text = "发送媒体通知到它端",
-                    style = textStyles.body1,
-                    color = colorScheme.onSurface,
-                )
-                Text(
-                    text = "关闭后不再发送媒体通知到对端",
-                    style = textStyles.body2,
-                    color = colorScheme.onSurfaceSecondary,
-                )
-            }
-            Switch(
-                checked = sendMediaNotificationsEnabled,
-                onCheckedChange = { enabled ->
-                    sendMediaNotificationsEnabled = enabled
-                    StorageManager.putBoolean(context, "send_media_notifications_enabled", enabled)
-                },
-            )
-        }
+        SwitchPreference(
+            title = "发送媒体通知到它端",
+            summary = "关闭后不再发送媒体通知到对端",
+            checked = sendMediaNotificationsEnabled,
+            onCheckedChange = { enabled ->
+                sendMediaNotificationsEnabled = enabled
+                StorageManager.putBoolean(context, "send_media_notifications_enabled", enabled)
+            },
+        )
 
         // 歌词分割模式设置
         var lyricsSplitMode by remember { mutableStateOf(StorageManager.getInt(context, "lyrics_split_mode", 0)) }

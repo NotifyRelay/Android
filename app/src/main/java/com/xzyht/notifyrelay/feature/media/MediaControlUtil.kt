@@ -74,25 +74,4 @@ object MediaControlUtil {
             Logger.e("MediaControlUtil", "使用 MediaSession API 触发上一首失败", e)
         }
     }
-
-    /**
-     * 使用 MediaSession API 触发 seekTo
-     */
-    fun seekTo(position: Long) {
-        try {
-            val mediaSessionMonitor = MediaSessionMonitorService.instance
-            val primaryController = mediaSessionMonitor?.getPrimaryController()
-            if (primaryController != null) {
-                val playbackState = primaryController.playbackState
-                if (playbackState != null && (playbackState.actions and PlaybackState.ACTION_SEEK_TO != 0L)) {
-                    primaryController.transportControls.seekTo(position)
-                    Logger.i("MediaControlUtil", "seekTo: 触发成功，位置: $position")
-                    return
-                }
-            }
-        } catch (e: Exception) {
-            Logger.e("MediaControlUtil", "使用 MediaSession API 触发 seekTo 失败", e)
-        }
-        Logger.w("MediaControlUtil", "seekTo: 未找到媒体会话或不支持该操作")
-    }
 }

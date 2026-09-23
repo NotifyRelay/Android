@@ -190,7 +190,6 @@ dependencies {
     implementation("androidx.activity:activity-compose")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.material:material")
     implementation("androidx.compose.ui:ui-tooling-preview")
     debugImplementation("androidx.compose.ui:ui-tooling")
     implementation("androidx.compose.foundation:foundation")
@@ -241,7 +240,7 @@ dependencies {
 
     // 依赖数据模块
     implementation(project(":data"))
-    // 依赖core模块
+    // 依赖core模块（Rust FFI 绑定 + JNA，源码目录 nativecore/）
     implementation(project(":core"))
     // 依赖base模块
     implementation(project(":base"))
@@ -251,8 +250,6 @@ dependencies {
     implementation(project(":superislandui"))
     // 依赖scrcpy模块
     implementation(project(":scrcpy"))
-    // 依赖nativecore模块（Rust FFI 绑定 + JNA）
-    implementation(project(":nativecore"))
 }
 
 tasks.register("printVersionName") {

@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import notifyrelay.base.util.GuidePermissionRequester
 import notifyrelay.base.util.IntentUtils
+import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -48,14 +49,7 @@ internal fun GuideRequiredPermissionPage(
 
     fun requestQueryAppsPermission() {
         try {
-            val isMiuiOrPengpai =
-                Build.MANUFACTURER.equals("Xiaomi", ignoreCase = true) ||
-                    try {
-                        val permissionInfo = context.packageManager.getPermissionInfo("com.android.permission.GET_INSTALLED_APPS", 0)
-                        permissionInfo != null && permissionInfo.packageName == "com.lbe.security.miui"
-                    } catch (_: Exception) {
-                        false
-                    }
+            val isMiuiOrPengpai = PermissionHelper.detectMiuiOrPengpai(context)
             if (isMiuiOrPengpai) {
                 if (ContextCompat.checkSelfPermission(context, "com.android.permission.GET_INSTALLED_APPS") != PackageManager.PERMISSION_GRANTED) {
                     permissionRequester.requestQueryApps()

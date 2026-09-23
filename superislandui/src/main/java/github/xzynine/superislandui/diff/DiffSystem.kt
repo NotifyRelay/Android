@@ -1,5 +1,6 @@
 package github.xzynine.superislandui.diff
 
+import notifyrelay.base.util.toHex
 import org.json.JSONArray
 import org.json.JSONObject
 import java.security.MessageDigest
@@ -73,6 +74,6 @@ object DiffSystem {
 
     fun sha256(input: String): String {
         val bytes = MessageDigest.getInstance("SHA-256").digest(input.toByteArray())
-        return bytes.joinToString("") { b -> ((b.toInt() and 0xFF).toString(16)).padStart(2, '0') }
+        return bytes.toHex()
     }
 }

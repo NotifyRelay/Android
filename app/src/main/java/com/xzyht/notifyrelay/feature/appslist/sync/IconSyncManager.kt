@@ -3,7 +3,6 @@ package com.xzyht.notifyrelay.feature.appslist.sync
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Canvas
 import android.graphics.drawable.BitmapDrawable
 import android.util.Base64
 import com.xzyht.notifyrelay.feature.appslist.AppRepository
@@ -17,11 +16,12 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 import org.json.JSONArray
 import org.json.JSONObject
-import java.io.ByteArrayOutputStream
 
 /**
  * 图标同步管理器
@@ -216,7 +216,7 @@ object IconSyncManager {
                         if (pkg.isNullOrEmpty()) continue
                         val icon = getLocalAppIcon(context, pkg)
                         if (icon != null) {
-                            val base64 = bitmapToBase64(icon)
+                            val base64 = ImageUtils.bitmapToBase64(icon)
                             val item =
                                 JSONObject().apply {
                                     put("packageName", pkg)
@@ -258,7 +258,7 @@ object IconSyncManager {
                             put("type", "ICON_RESPONSE")
                             put("packageName", single)
                             if (icon != null) {
-                                put("iconData", bitmapToBase64(icon))
+                                put("iconData", ImageUtils.bitmapToBase64(icon))
                             } else {
                                 put("missing", true)
                             }
@@ -331,12 +331,6 @@ object IconSyncManager {
         }
     }
 
-    private fun bitmapToBase64(icon: Bitmap): String {
-        val bos = ByteArrayOutputStream()
-        icon.compress(Bitmap.CompressFormat.PNG, 100, bos)
-        return Base64.encodeToString(bos.toByteArray(), Base64.NO_WRAP)
-    }
-
     private suspend fun getLocalAppIcon(
         context: Context,
         packageName: String,
@@ -349,13 +343,7 @@ object IconSyncManager {
                 if (drawable is BitmapDrawable) {
                     drawable.bitmap
                 } else {
-                    val w = drawable.intrinsicWidth.takeIf { it > 0 } ?: 96
-                    val h = drawable.intrinsicHeight.takeIf { it > 0 } ?: 96
-                    val bmp = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
-                    val canvas = Canvas(bmp)
-                    drawable.setBounds(0, 0, w, h)
-                    drawable.draw(canvas)
-                    bmp
+                    drawable.toBitmapOrDefault(96)
                 }
             }
         } catch (e: Exception) {

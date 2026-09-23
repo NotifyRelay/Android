@@ -31,16 +31,19 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.BatteryUtils
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
-import notifyrelay.core.util.BatteryUtils
-import notifyrelay.data.config.AppConfig
+import notifyrelay.data.StorageManager
 
 // =================== 设备连接管理器主类 ===================
 class DeviceConnectionManager(
     private val context: Context,
 ) : DeviceCallbackHost {
     companion object {
+        /** UDP 发现功能开关的存储 key */
+        private const val UDP_DISCOVERY_ENABLED_KEY = "udp_discovery_enabled"
+
         /**
          * 获取单例实例
          */
@@ -307,14 +310,20 @@ class DeviceConnectionManager(
     // === 以下为提供给内部组件使用的访问器（保持字段本身 private） ===
     internal fun lookupDevice(uuid: String): DeviceInfo? = getDeviceInfo(uuid)
 
+    /** 启动设备发现（转发到内部 [discoveryManager]，替代外部反射调用）。 */
+    internal fun startDiscovery() = discoveryManager.startDiscovery()
+
+    /** 停止设备发现（转发到内部 [discoveryManager]，替代外部反射调用）。 */
+    internal fun stopDiscovery() = discoveryManager.stopDiscovery()
+
     // Rust 原生上下文（由 RustCoreSession 创建并持有）
     private var rustContext: Pointer? = null
 
     // UI全局开关：是否启用设备发现，使用内存缓存避免频繁数据库访问
     var discoveryEnabled: Boolean
-        get() = AppConfig.getUdpDiscoveryEnabled(context)
+        get() = StorageManager.getBoolean(context, UDP_DISCOVERY_ENABLED_KEY, true)
         set(value) {
-            AppConfig.setUdpDiscoveryEnabled(context, value)
+            StorageManager.putBoolean(context, UDP_DISCOVERY_ENABLED_KEY, value)
         }
 
     init {
@@ -324,8 +333,8 @@ class DeviceConnectionManager(
         val legacyUuid = rustSession.readLegacyUuid()
         uuid = legacyUuid
         // 兼容旧用户：首次运行时如无保存则默认true
-        if (!AppConfig.getUdpDiscoveryEnabled(context)) {
-            AppConfig.setUdpDiscoveryEnabled(context, true)
+        if (!StorageManager.getBoolean(context, UDP_DISCOVERY_ENABLED_KEY, true)) {
+            StorageManager.putBoolean(context, UDP_DISCOVERY_ENABLED_KEY, true)
         }
 
         // 初始化 Rust 上下文、密钥与回调（持久化由 Rust 私有库管理）
@@ -382,6 +391,18 @@ class DeviceConnectionManager(
      * 获取已拒绝设备列表
      */
     fun getRejectedDevices(): Set<String> = deviceQuery.rejected()
+
+    /**
+     * 从已拒绝集合中恢复（移除）指定设备，返回移除后的完整已拒绝集合。
+     *
+     * 用于「已拒绝设备」对话框的手动恢复。加锁方式与 [rejectedDeviceIds] 的既有读写一致
+     * （`synchronized(rejectedDevices)`），替换原先外部反射私有字段的做法。
+     */
+    fun restoreRejectedDevices(uuids: Collection<String>): Set<String> =
+        synchronized(rejectedDevices) {
+            uuids.forEach { rejectedDevices.remove(it) }
+            rejectedDevices.toSet()
+        }
 
     /** 待处理的配对请求（由 [PairingCoordinator] 持有）。 */
     override var pendingPairing: PendingPairing?

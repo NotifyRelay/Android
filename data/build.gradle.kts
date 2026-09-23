@@ -46,7 +46,6 @@ kotlin {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.material)
 
     // 依赖base模块
     implementation(project(":base"))

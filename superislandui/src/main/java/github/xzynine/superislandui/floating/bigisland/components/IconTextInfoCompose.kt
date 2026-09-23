@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -23,7 +22,8 @@ import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.templates.IconTextInfo
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
+import top.yukonga.miuix.kmp.basic.Text
 
 /**
  * 新图文组件（iconTextInfo）Compose 实现（OS3 模板 14 / 14-2 / 16 / 17 / 18 / 22）

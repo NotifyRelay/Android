@@ -35,6 +35,15 @@ class SuperIslandHistoryViewModel(
     private val refreshSignal = MutableStateFlow(0L)
     private val iconLoading = mutableSetOf<String>()
 
+    /** 图标批量加载共用实现；`iconUpdates` 订阅仍留在本类的 `init`（失效路径不迁移）。 */
+    private val appIconPreloader =
+        AppIconPreloader(
+            application = application,
+            scope = viewModelScope,
+            cache = _appIconCache,
+            iconLoading = iconLoading,
+        )
+
     @OptIn(ExperimentalCoroutinesApi::class)
     val groupedPagingFlow: Flow<PagingData<GroupedSuperIslandHistory>> =
         refreshSignal
@@ -101,61 +110,11 @@ class SuperIslandHistoryViewModel(
     suspend fun loadEntryDetail(id: Long): SuperIslandHistoryStoreEntry? = SuperIslandHistoryStore.loadEntryDetail(application, id)
 
     fun preloadAppIcons(packageNames: List<String>) {
-        val targets = packageNames.filter { it.isNotBlank() && it != "(未知应用)" }
-        if (targets.isEmpty()) return
-
-        val toLoad =
-            synchronized(iconLoading) {
-                val cache = _appIconCache.value
-                val loadTargets =
-                    targets.filter { pkg ->
-                        !iconLoading.contains(pkg) && cache[pkg] == null
-                    }
-                iconLoading.addAll(loadTargets)
-                loadTargets
-            }
-
-        if (toLoad.isEmpty()) return
-
-        viewModelScope.launch(Dispatchers.IO) {
-            try {
-                val updates = mutableMapOf<String, Pair<String, Bitmap?>>()
-                for (packageName in toLoad) {
-                    updates[packageName] = getAppNameAndIcon(packageName)
-                }
-                if (updates.isNotEmpty()) {
-                    _appIconCache.update { cache ->
-                        cache + updates
-                    }
-                }
-            } finally {
-                synchronized(iconLoading) {
-                    iconLoading.removeAll(toLoad)
-                }
-            }
-        }
+        appIconPreloader.preload(packageNames, excludeUnknownApp = true)
     }
 
     private fun refreshPaging() {
         refreshSignal.value = System.currentTimeMillis()
-    }
-
-    private suspend fun getAppNameAndIcon(packageName: String): Pair<String, Bitmap?> {
-        var name: String
-        var icon: Bitmap?
-        try {
-            val pm = application.packageManager
-            val appInfo = pm.getApplicationInfo(packageName, 0)
-            name = pm.getApplicationLabel(appInfo).toString()
-        } catch (_: Exception) {
-            name = packageName
-        }
-        try {
-            icon = AppRepository.getAppIconWithAutoRequest(application, packageName)
-        } catch (_: Exception) {
-            icon = null
-        }
-        return name to icon
     }
 
     class Factory(

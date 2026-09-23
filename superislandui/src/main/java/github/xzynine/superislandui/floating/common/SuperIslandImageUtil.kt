@@ -13,7 +13,7 @@ import androidx.compose.ui.platform.LocalInspectionMode
 import coil.compose.rememberAsyncImagePainter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import notifyrelay.core.util.image.ImageUtils
+import notifyrelay.base.util.image.ImageUtils
 
 /**
  * 超级岛图片加载和处理工具类
@@ -21,7 +21,7 @@ import notifyrelay.core.util.image.ImageUtils
  */
 object SuperIslandImageUtil {
     /**
-     * 统一的Compose图片加载工具，封装了现有ImageLoader和DataUrlUtils的功能
+     * 统一的Compose图片加载工具，封装了现有ImageLoader和ImageUtils的功能
      */
     @Composable
     fun rememberSuperIslandImagePainter(

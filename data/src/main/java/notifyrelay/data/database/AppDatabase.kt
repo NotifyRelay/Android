@@ -659,12 +659,6 @@ abstract class AppDatabase : RoomDatabase() {
             }
 
             try {
-                // 迁移应用配置
-                MigrationHelper.migrateAppConfig(
-                    context,
-                    database.appConfigDao(),
-                )
-
                 // 迁移通知记录（设备表已退役，不再创建设备记录）
                 MigrationHelper.migrateNotifications(
                     context,
