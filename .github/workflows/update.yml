@@ -1,6 +1,6 @@
 # 版本号更新：push 到 main 时用 semantic-release（conventional commits 官方算法）分析提交推断版本，
 # 有 releasable 提交（feat→minor / fix|perf→patch / breaking→major）则回写 version.properties
-# （versionCode +1）并创建 v{版本} tag。全部配置内联在运行时生成，不提交进仓库；
+# （versionCode +1）并创建 v{版本} tag，随后按该 tag 构建签名 APK 并创建 GitHub 预发布；全部配置内联在运行时生成，不提交进仓库；
 # 回写使用 CI_PUSH_TOKEN（用户 PAT）直推 main（仓库级 ruleset 已为 xzy-nine 配置 bypass），
 # semantic-release 生成的 commit 消息自带 skip-ci 标记防循环。
 name: 版本号更新
@@ -134,6 +134,7 @@ jobs:
             conventional-changelog-conventionalcommits@9.3.1
 
       - name: 执行 semantic-release（推断版本、回写、打 tag、PAT 推送）
+        id: release
         env:
           # git 插件使用该令牌推送（用户 PAT，可绕过 main 保护规则）
           GITHUB_TOKEN: ${{ secrets.CI_PUSH_TOKEN }}
@@ -142,3 +143,117 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # 无 releasable 提交时 semantic-release 正常退出（不回写不打 tag）
           npx --yes semantic-release
+
+          # semantic-release 把 tag 打在自己新建的 chore(release) 提交上（即当前 HEAD），故直接取 HEAD 上的 tag；
+          # 无 releasable 提交时既不回写也不打 tag，此处取到空值 → 后续打包与预发布整体跳过。
+          TAG=$(git tag --points-at HEAD --list 'v*' | head -n 1)
+          if [ -z "$TAG" ]; then
+            # 兜底：万一 tag 落在 pre-prepare 提交上，改用 version.properties 是否被回写来判定
+            VERSION=$(sed -n 's/^versionName=//p' version.properties | tr -cd '0-9.')
+            if ! git diff --quiet "${{ github.sha }}" -- version.properties && git rev-parse -q --verify "refs/tags/v$VERSION" >/dev/null; then
+              TAG="v$VERSION"
+            fi
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          if [ -z "$TAG" ]; then
+            echo "本次无 releasable 提交，未产生新 tag，跳过打包与预发布"
+          else
+            echo "本次发版：$TAG"
+          fi
+
+      # ---- 以下为原 android-build.yml（已删除）的构建与发布步骤，仅在本次产生新 tag 时执行 ----
+
+      - name: Set up Gradle
+        if: steps.release.outputs.tag != ''
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          cache-read-only: false
+          cache-cleanup: never
+
+      - name: Set up Rust
+        if: steps.release.outputs.tag != ''
+        id: rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: aarch64-linux-android,x86_64-linux-android
+
+      - name: Install cargo-ndk and sccache
+        if: steps.release.outputs.tag != ''
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-ndk,sccache
+
+      - name: Cache Cargo dependencies
+        if: steps.release.outputs.tag != ''
+        uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git/db
+          key: cargo-deps-${{ runner.os }}-${{ hashFiles('nativecore/notify-relay-core/Cargo.lock') }}
+          restore-keys: |
+            cargo-deps-${{ runner.os }}-
+
+      - name: Cache sccache
+        if: steps.release.outputs.tag != ''
+        uses: actions/cache@v5
+        with:
+          path: ~/.cache/sccache
+          key: sccache-${{ runner.os }}-${{ steps.rust.outputs.cachekey }}-${{ hashFiles('nativecore/notify-relay-core/Cargo.lock') }}
+          restore-keys: |
+            sccache-${{ runner.os }}-${{ steps.rust.outputs.cachekey }}-
+            sccache-${{ runner.os }}-
+
+      - name: Enable sccache for Rust builds
+        if: steps.release.outputs.tag != ''
+        run: |
+          echo "RUSTC_WRAPPER=sccache" >> $GITHUB_ENV
+          echo "SCCACHE_CACHE_SIZE=2G" >> $GITHUB_ENV
+
+      - name: Decode keystore into app module
+        if: steps.release.outputs.tag != ''
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > app/keystore.jks
+
+      - name: Build debug APK
+        if: steps.release.outputs.tag != ''
+        run: ./gradlew assembleDebug
+        env:
+          KEYSTORE_PATH: app/keystore.jks
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Upload signed universal debug APK
+        if: steps.release.outputs.tag != ''
+        uses: actions/upload-artifact@v5
+        with:
+          name: universal-debug-signed-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
+      - name: Build release APKs (split by ABI)
+        if: steps.release.outputs.tag != ''
+        run: ./gradlew assembleRelease
+        env:
+          KEYSTORE_PATH: app/keystore.jks
+          KEY_ALIAS: ${{ secrets.KEY_ALIAS }}
+          STORE_PASSWORD: ${{ secrets.STORE_PASSWORD }}
+          KEY_PASSWORD: ${{ secrets.KEY_PASSWORD }}
+
+      - name: Upload signed release APKs
+        if: steps.release.outputs.tag != ''
+        uses: actions/upload-artifact@v5
+        with:
+          name: release-signed-apks
+          path: app/build/outputs/apk/release/*-release.apk
+
+      - name: Create GitHub Pre-release（挂 semantic-release 刚创建的 tag）
+        if: steps.release.outputs.tag != ''
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          TAG="${{ steps.release.outputs.tag }}"
+          VERSION="${{ steps.release.outputs.version }}"
+          gh release create "$TAG" --title "$VERSION" --prerelease app/build/outputs/apk/release/*-release.apk app/build/outputs/apk/debug/app-debug.apk
