@@ -271,7 +271,6 @@ object RemoteMediaSessionManager {
             try {
                 // 取消复传任务并拆卸会话（统一实现，保证单一来源）
                 closeSessionByUuid(deviceUuid)
-                Logger.i("RemoteMediaSessionManager", "已关闭设备媒体超级岛浮窗: $sourceKey")
             } catch (e: Exception) {
                 Logger.e("RemoteMediaSessionManager", "关闭媒体超级岛浮窗失败: $sourceKey", e)
             }
@@ -282,15 +281,20 @@ object RemoteMediaSessionManager {
         currentSession = null
         currentDevice = null
         MediaSessionTimeoutCleaner.stopCleanupLoop()
-        Logger.i("RemoteMediaSessionManager", "已清除所有远端媒体会话")
     }
 
     private fun closeSessionForDevice(
         device: DeviceInfo,
         reason: String,
     ) {
+        // 无活跃会话时跳过，避免反复 dismiss 已关闭的 sourceKey 产生无谓日志
+        if (!mediaSessionCache.containsKey(device.uuid) &&
+            !mediaFeatureIdCache.containsKey(device.uuid) &&
+            currentDevice?.uuid != device.uuid
+        ) {
+            return
+        }
         closeSessionByUuid(device.uuid)
-        Logger.i("RemoteMediaSessionManager", "已关闭设备媒体超级岛浮窗: ${device.displayName}, reason=$reason")
     }
 
     /**

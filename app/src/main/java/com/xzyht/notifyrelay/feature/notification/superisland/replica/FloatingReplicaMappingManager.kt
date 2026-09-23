@@ -102,7 +102,6 @@ object FloatingReplicaMappingManager {
         return if (sourceIdsToRemove.isNotEmpty()) {
             sourceIdsToRemove
         } else {
-            Logger.i(TAG, "removeSourceIdMapping: 未找到匹配的 sourceId，key=$key")
             null
         }
     }
