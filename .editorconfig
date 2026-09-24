@@ -16,15 +16,3 @@ ktlint_standard_function-naming = disabled
 ktlint_standard_backing-property-naming = disabled
 # Compose 代码惯用通配导入（foundation.layout.* / runtime.* 等），豁免通配导入规则
 ktlint_standard_no-wildcard-imports = disabled
-
-# nativecore 为 Rust/JNI 绑定模块：函数名须匹配原生符号（snake_case）
-[nativecore/**/*.kt]
-ktlint_standard_package-name = disabled
-
-# superislandui 为项目自有模块：包名含大写（BigIsland）为历史遗留，暂豁免
-[superislandui/**/*.kt]
-ktlint_standard_package-name = disabled
-
-# app 内 superisland 相关代码与 superislandui 模块同源：包名含大写（BigIsland）历史遗留，暂豁免
-[app/**/superisland/**/*.kt]
-ktlint_standard_package-name = disabled
