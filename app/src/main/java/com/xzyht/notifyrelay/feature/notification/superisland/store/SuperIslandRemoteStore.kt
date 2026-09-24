@@ -1,8 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.store
 
-import github.xzynine.superislandui.common.SuperIslandProtocol
 import github.xzynine.superislandui.diff.DiffSystem
-import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
 /**
@@ -23,30 +21,14 @@ object SuperIslandRemoteStore {
     @Synchronized
     fun applyIncoming(
         sourceId: String,
-        payload: JSONObject,
+        title: String?,
+        text: String?,
+        paramV2Raw: String?,
+        pics: Map<String, String>,
     ): DiffSystem.State? {
-        return try {
-            // 结束包标识：存在 terminateValue 且等于约定值
-            val term = payload.optString("terminateValue", "")
-            if (term == SuperIslandProtocol.TERMINATE_VALUE) {
-                store.remove(sourceId)
-                return null
-            }
-
-            // 兼容旧设备增量(delta)报文：含 changes 字段时与现有状态合并，而非全量覆盖
-            val changes = payload.optJSONObject("changes")
-            val state =
-                if (changes != null) {
-                    mergeDelta(store[sourceId], changes, payload)
-                } else {
-                    // Rust 合并引擎已输出全量，直接解析存储
-                    parseStateFromFull(payload)
-                }
-            store[sourceId] = state
-            state
-        } catch (_: Exception) {
-            null
-        }
+        val state = DiffSystem.State(title, text, paramV2Raw, pics.toMutableMap())
+        store[sourceId] = state
+        return state
     }
 
     /**
@@ -101,58 +83,4 @@ object SuperIslandRemoteStore {
         } catch (_: Exception) {
             null
         }
-
-    private fun parseStateFromFull(obj: JSONObject): DiffSystem.State {
-        val title = obj.optString("title", "").takeIf { it.isNotEmpty() }
-        val text = obj.optString("text", "").takeIf { it.isNotEmpty() }
-        val p2 = obj.optString("param_v2_raw", "").takeIf { it.isNotEmpty() }
-        val picsJson = obj.optJSONObject("pics")
-        val picsMap = mutableMapOf<String, String>()
-        if (picsJson != null) {
-            val it = picsJson.keys()
-            while (it.hasNext()) {
-                val k = it.next()
-                val v = picsJson.optString(k)
-                if (!v.isNullOrEmpty()) picsMap[k] = v
-            }
-        }
-        return DiffSystem.State(title, text, p2, picsMap)
-    }
-
-    /**
-     * 增量合并：以 changes 中的字段覆盖现有状态，未涉及的字段保持原值。
-     * 缺失 param 时回退读取 payload 顶层的 raw/param_v2_raw 字段。
-     */
-    private fun mergeDelta(
-        current: DiffSystem.State?,
-        changes: JSONObject,
-        payload: JSONObject,
-    ): DiffSystem.State {
-        val base = current ?: DiffSystem.State(null, null, null, mutableMapOf())
-        val title = if (changes.has("title")) changes.optString("title").takeIf { it.isNotEmpty() } else base.title
-        val text = if (changes.has("text")) changes.optString("text").takeIf { it.isNotEmpty() } else base.text
-        val p2 =
-            if (changes.has("param_v2_raw")) {
-                changes.optString("param_v2_raw").takeIf { it.isNotEmpty() }
-            } else {
-                payload.optString("raw", "").takeIf { it.isNotEmpty() }
-                    ?: payload.optString("param_v2_raw", "").takeIf { it.isNotEmpty() }
-                    ?: base.paramV2Raw
-            }
-        val pics = base.pics.toMutableMap()
-        changes.optJSONObject("pics")?.let { picsJson ->
-            val it = picsJson.keys()
-            while (it.hasNext()) {
-                val k = it.next()
-                val v = picsJson.optString(k)
-                if (!v.isNullOrEmpty()) pics[k] = v
-            }
-        }
-        changes.optJSONArray("pics_removed")?.let { removed ->
-            for (i in 0 until removed.length()) {
-                removed.optString(i).takeIf { it.isNotEmpty() }?.let { pics.remove(it) }
-            }
-        }
-        return DiffSystem.State(title, text, p2, pics)
-    }
 }

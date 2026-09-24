@@ -168,6 +168,12 @@ object NativeCore {
         instanceId: String,
     ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_feature_id(superPkg, paramV2Raw, title, text, instanceId))
 
+    fun parseSuperIslandInbound(
+        deviceUuid: String,
+        pkg: String,
+        fullJson: String,
+    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_superisland_inbound(deviceUuid, pkg, fullJson))
+
     // ======== Dedup engine ========
     fun dedup(
         ctx: Pointer,

@@ -4,7 +4,6 @@ import android.content.Context
 import com.xzyht.notifyrelay.feature.notification.superisland.media.MediaCapsulePresenter
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandRemoteStore
 import github.xzynine.superislandui.diff.DiffSystem
-import org.json.JSONObject
 
 /**
  * 媒体全量状态的构建与下发。
@@ -40,18 +39,13 @@ internal object MediaStateApplier {
         context: Context,
     ) {
         // 以全量形式写入远端存储，保持 store 语义（结束包/清理时仍可移除）
-        val payload =
-            JSONObject().apply {
-                put("title", currentState.title ?: "")
-                put("text", currentState.text ?: "")
-                if (!currentState.paramV2Raw.isNullOrBlank()) {
-                    put("param_v2_raw", currentState.paramV2Raw)
-                }
-                if (currentState.pics.isNotEmpty()) {
-                    put("pics", JSONObject(currentState.pics))
-                }
-            }
-        SuperIslandRemoteStore.applyIncoming(sourceKey, payload)
+        SuperIslandRemoteStore.applyIncoming(
+            sourceKey,
+            currentState.title,
+            currentState.text,
+            currentState.paramV2Raw,
+            currentState.pics,
+        )
         MediaCapsulePresenter.show(
             context = context,
             sourceId = sourceKey,

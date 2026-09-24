@@ -14,7 +14,6 @@ import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingRe
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandRemoteStore
 import com.xzyht.notifyrelay.feature.notification.superisland.tracker.LocalSuperIslandTracker
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import github.xzynine.superislandui.common.SuperIslandProtocol
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
@@ -96,13 +95,25 @@ object SuperIslandProcessor {
             if (remoteUuid == null) return false
             val json = JSONObject(decrypted)
             val pkg = json.optString("packageName")
-            val appName = json.optString("appName")
-            val title = json.optString("title").takeIf { it.isNotEmpty() }
-            val text = json.optString("text").takeIf { it.isNotEmpty() }
             val time = json.optLong("time", System.currentTimeMillis())
 
             val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
             val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
+
+            // 入站解析统一委托 core：字段抽取 + featureId + isEnd + sourceKey 一次完成
+            val parsed =
+                try {
+                    NativeCore.parseSuperIslandInbound(remoteUuid, mappedPkg, decrypted)?.let { JSONObject(it) }
+                } catch (_: Exception) {
+                    null
+                }
+            val appName = parsed?.optString("appName") ?: ""
+            val title = parsed?.optString("title")?.takeIf { it.isNotEmpty() }
+            val text = parsed?.optString("text")?.takeIf { it.isNotEmpty() }
+            val paramV2Raw = parsed?.optString("paramV2Raw")?.takeIf { it.isNotBlank() }
+            val featureId = parsed?.optString("featureId") ?: ""
+            val sourceKey = parsed?.optString("sourceKey") ?: ""
+            val isEnd = parsed?.optBoolean("isEnd", false) ?: false
 
             val siType =
                 try {
@@ -110,13 +121,6 @@ object SuperIslandProcessor {
                 } catch (_: Exception) {
                     ""
                 }
-            val termVal =
-                try {
-                    json.optString("terminateValue", "")
-                } catch (_: Exception) {
-                    ""
-                }
-            val isEnd = (termVal == SuperIslandProtocol.TERMINATE_VALUE)
 
             val mirrorFilterEnabled = StorageManager.getBoolean(context, SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, true)
             if (mirrorFilterEnabled) {
@@ -158,31 +162,6 @@ object SuperIslandProcessor {
                 } catch (_: Exception) {
                     false
                 }
-            val paramV2Raw =
-                try {
-                    val s = json.optString("param_v2_raw")
-                    if (s.isNullOrBlank()) null else s
-                } catch (_: Exception) {
-                    null
-                }
-            // 优先使用显式传回的 featureKeyValue（若发送端已计算并包含），保证 full/delta/end 使用相同的 featureId
-            val explicitFeatureKeyCandidate =
-                try {
-                    json.optString("featureKeyValue", "")
-                } catch (_: Exception) {
-                    ""
-                }
-            val featureId =
-                if (!explicitFeatureKeyCandidate.isNullOrBlank()) {
-                    explicitFeatureKeyCandidate
-                } else {
-                    try {
-                        NativeCore.computeFeatureId(pkg, paramV2Raw ?: "", json.optString("title"), json.optString("text"), "") ?: ""
-                    } catch (_: Exception) {
-                        ""
-                    }
-                }
-            val sourceKey = listOfNotNull(remoteUuid, mappedPkg, featureId.takeIf { it.isNotBlank() }).joinToString("|")
             val contentHash = (title.orEmpty() + text.orEmpty() + (paramV2Raw ?: "")).hashCode()
             val dedupKey = "$remoteUuid|$mappedPkg|$featureId|$contentHash"
 
@@ -289,7 +268,16 @@ object SuperIslandProcessor {
                 Logger.i("超级岛", "非锁屏状态，正常处理超级岛通知: sourceKey=$sourceKey, title=${mTitle ?: "无标题"}")
             }
 
-            val merged = SuperIslandRemoteStore.applyIncoming(sourceKey, json)
+            val siPics = mutableMapOf<String, String>()
+            parsed?.optJSONObject("pics")?.let { picsJson ->
+                val keys = picsJson.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val v = picsJson.optString(k)
+                    if (!v.isNullOrEmpty()) siPics[k] = v
+                }
+            }
+            val merged = SuperIslandRemoteStore.applyIncoming(sourceKey, title, text, paramV2Raw, siPics)
 
             var mParam2 = merged?.paramV2Raw ?: paramV2Raw
 

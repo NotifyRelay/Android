@@ -177,6 +177,12 @@ interface NotifyRelayCore : Library {
         instanceId: String,
     ): Pointer
 
+    fun nrc_parse_superisland_inbound(
+        deviceUuid: String,
+        pkg: String,
+        fullJson: String,
+    ): Pointer
+
     // ======== Text similarity & dedup ========
     fun nrc_should_deduplicate(
         newTitle: String,
