@@ -174,6 +174,14 @@ object NativeCore {
         fullJson: String,
     ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_superisland_inbound(deviceUuid, pkg, fullJson))
 
+    fun parseNotificationInbound(
+        fullJson: String,
+    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_notification_inbound(fullJson))
+
+    fun parseMediaInbound(
+        fullJson: String,
+    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_media_inbound(fullJson))
+
     // ======== Dedup engine ========
     fun dedup(
         ctx: Pointer,

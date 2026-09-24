@@ -10,6 +10,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
+import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -62,12 +63,20 @@ object NotificationProcessor {
     ) {
         try {
             if (remoteUuid != null) {
-                val json = JSONObject(decrypted)
-                val pkg = json.optString("packageName")
-                val appName = json.optString("appName")
-                val title = json.optString("title")
-                val text = json.optString("text")
-                val time = json.optLong("time", System.currentTimeMillis())
+                val parsedJson =
+                    try {
+                        NativeCore.parseNotificationInbound(decrypted)
+                    } catch (_: Exception) {
+                        null
+                    }
+                if (parsedJson == null) return
+                val parsed = JSONObject(parsedJson)
+                val pkg = parsed.optString("packageName")
+                val appName = parsed.optString("appName")
+                val title = parsed.optString("title")
+                val text = parsed.optString("text")
+                val timeRaw = parsed.optLong("time", 0L)
+                val time = if (timeRaw == 0L) System.currentTimeMillis() else timeRaw
 
                 val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
                 val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)

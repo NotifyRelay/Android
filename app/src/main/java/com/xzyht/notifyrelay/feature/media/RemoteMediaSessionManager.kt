@@ -178,9 +178,15 @@ object RemoteMediaSessionManager {
         }
 
         try {
-            val mediaType = json.optString("mediaType", "")
-            val terminateValue = json.optString("terminateValue", "")
-            val isEndPackage = mediaType.equals("END", true) || terminateValue.equals("__END__", true)
+            val parsed =
+                try {
+                    NativeCore.parseMediaInbound(json.toString())?.let { JSONObject(it) }
+                } catch (_: Exception) {
+                    null
+                }
+            if (parsed == null) return
+
+            val isEndPackage = parsed.optBoolean("isEnd", false)
 
             val sourceKey = SOURCE_KEY_PREFIX + "_" + device.uuid
 
@@ -190,12 +196,13 @@ object RemoteMediaSessionManager {
                 return
             }
 
-            val packageName = json.optString("packageName", "")
-            val appName = json.optString("appName", "")
-            val title = json.optString("title", "")
-            val text = json.optString("text", "")
-            val coverUrl = json.optString("coverUrl", "")
-            val timestamp = json.optLong("time", System.currentTimeMillis())
+            val packageName = parsed.optString("packageName", "")
+            val appName = parsed.optString("appName", "")
+            val title = parsed.optString("title", "")
+            val text = parsed.optString("text", "")
+            val coverUrl = parsed.optString("coverImage", "")
+            val timeRaw = parsed.optLong("time", 0L)
+            val timestamp = if (timeRaw == 0L) System.currentTimeMillis() else timeRaw
 
             if (title.isBlank() && text.isBlank()) {
                 Logger.w("RemoteMediaSessionManager", "收到空的媒体会话数据，继续处理以保持浮窗活跃")

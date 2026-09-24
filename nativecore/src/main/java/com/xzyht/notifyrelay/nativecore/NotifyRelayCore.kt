@@ -183,6 +183,10 @@ interface NotifyRelayCore : Library {
         fullJson: String,
     ): Pointer
 
+    fun nrc_parse_notification_inbound(fullJson: String): Pointer
+
+    fun nrc_parse_media_inbound(fullJson: String): Pointer
+
     // ======== Text similarity & dedup ========
     fun nrc_should_deduplicate(
         newTitle: String,
