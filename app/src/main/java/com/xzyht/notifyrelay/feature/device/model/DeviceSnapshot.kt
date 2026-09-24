@@ -1,7 +1,5 @@
 package com.xzyht.notifyrelay.feature.device.model
 
-import kotlin.math.abs
-
 /**
  * Rust core `nrc_get_device_list` 快照条目（平台端的只读投影）。
  *
@@ -27,30 +25,27 @@ data class DeviceSnapshot(
     val paired: Boolean,
     /** 是否在线（阈值由 core 内建：已认证 12s / 未认证 20s） */
     val online: Boolean,
+    /** 电量百分比；未知时为 -1（core 派生，与 [DeviceInfo.batteryLevel] 约定一致） */
+    val batteryPercent: Int,
+    /** 是否充电中（core 派生） */
+    val isCharging: Boolean,
+    /** 电量是否未知（core 派生） */
+    val batteryUnknown: Boolean,
 ) {
     companion object {
         const val UNKNOWN_DEVICE_TYPE = "unknown"
-
-        /** 电量绝对值超过该值视为未知 */
-        const val BATTERY_UNKNOWN_THRESHOLD = 100
     }
 
-    /** 电量是否未知 */
-    val batteryUnknown: Boolean get() = abs(battery) > BATTERY_UNKNOWN_THRESHOLD
-
-    /** 充电状态：'1' 充电 / '0' 未充电 / '*' 未知 */
+    /** 充电状态：'1' 充电 / '0' 未充电 / '*' 未知（由 core 派生字段映射，保留 Char 形态） */
     val chargingStatus: Char
         get() =
             if (batteryUnknown) {
                 '*'
-            } else if (battery >= 0) {
+            } else if (isCharging) {
                 '1'
             } else {
                 '0'
             }
-
-    /** 电量百分比；未知时为 -1（与 [DeviceInfo.batteryLevel] 约定一致） */
-    val batteryPercent: Int get() = if (batteryUnknown) -1 else abs(battery)
 
     /** 设备类型是否有效 */
     val hasKnownDeviceType: Boolean get() = deviceType.isNotBlank() && deviceType != UNKNOWN_DEVICE_TYPE

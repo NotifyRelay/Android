@@ -174,7 +174,7 @@ class DeviceSnapshotStore(
         obj: org.json.JSONObject,
         uuid: String,
     ): DeviceSnapshot {
-        // 电量一律以 core 为准；未知值（|v|>100）不沿用上帧，交由 batteryPercent 统一转为 -1
+        // 电量一律以 core 为准；batteryPercent/isCharging/batteryUnknown 由 core 派生下发，平台不再自行计算阈值
         val battery = obj.optInt("battery", -101)
 
         val rawType = obj.optString("deviceType", DeviceSnapshot.UNKNOWN_DEVICE_TYPE)
@@ -206,6 +206,9 @@ class DeviceSnapshotStore(
             connected = obj.optBoolean("connected"),
             paired = obj.optBoolean("paired"),
             online = obj.optBoolean("online"),
+            batteryPercent = obj.optInt("batteryPercent", -1),
+            isCharging = obj.optBoolean("isCharging"),
+            batteryUnknown = obj.optBoolean("batteryUnknown"),
         )
     }
 }
