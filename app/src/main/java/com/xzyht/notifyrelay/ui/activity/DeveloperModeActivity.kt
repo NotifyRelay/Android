@@ -23,11 +23,13 @@ import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
+import com.xzyht.notifyrelay.ui.devtools.NotificationFieldDumpPage
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.DropdownEntry
 import top.yukonga.miuix.kmp.basic.DropdownItem
+import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 
@@ -67,12 +69,28 @@ class DeveloperModeActivity : AppCompatActivity() {
                 NotifyRelayTheme(darkTheme = isDarkTheme) {
                     // 设置系统栏外观
                     SetupSystemBars(isDarkTheme)
+                    // 页内切换：主设置页 ↔ 通知字段转储页（不新增 Activity 与 Manifest 条目）
+                    var showNotificationDump by remember { mutableStateOf(false) }
+                    // 系统返回键：在转储页时先回到开发者选项主页面，而不是直接退出 Activity
+                    androidx.activity.compose.BackHandler(enabled = showNotificationDump) {
+                        showNotificationDump = false
+                    }
                     // 使用标准 TopAppBar 页面容器（内容区 colorScheme.background）
                     ScrollableTopAppBarPage(
-                        title = "开发者选项",
-                        onBack = { finish() },
+                        title = if (showNotificationDump) "通知字段转储" else "开发者选项",
+                        onBack = {
+                            if (showNotificationDump) {
+                                showNotificationDump = false
+                            } else {
+                                finish()
+                            }
+                        },
                     ) {
-                        DeveloperModeScreen()
+                        if (showNotificationDump) {
+                            NotificationFieldDumpPage()
+                        } else {
+                            DeveloperModeScreen(onOpenNotificationDump = { showNotificationDump = true })
+                        }
                     }
                 }
             }
@@ -80,7 +98,7 @@ class DeveloperModeActivity : AppCompatActivity() {
     }
 
     @Composable
-    fun DeveloperModeScreen() {
+    fun DeveloperModeScreen(onOpenNotificationDump: () -> Unit) {
         val context = LocalContext.current
 
         // 日志级别状态
@@ -190,6 +208,12 @@ class DeveloperModeActivity : AppCompatActivity() {
                         Logger.currentLevel = logLevel.value
                         StorageManager.putInt(context, KEY_LOG_LEVEL, logLevel.value.ordinal)
                     },
+                )
+
+                ArrowPreference(
+                    title = "通知字段转储",
+                    summary = "抓取当前通知栏活跃通知的全部字段（仅内存留存），长按单项复制",
+                    onClick = onOpenNotificationDump,
                 )
             }
         }
