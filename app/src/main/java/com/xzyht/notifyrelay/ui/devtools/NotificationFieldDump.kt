@@ -1,218 +1,297 @@
 package com.xzyht.notifyrelay.ui.devtools
 
-import android.app.Notification
 import android.app.PendingIntent
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.BitmapDrawable
+import android.graphics.drawable.Drawable
 import android.graphics.drawable.Icon
 import android.os.Bundle
-import android.os.Parcelable
+import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import android.util.SparseArray
 import android.widget.RemoteViews
 import notifyrelay.base.util.image.ImageUtils
 import notifyrelay.base.util.image.toBitmapOrDefault
 import org.json.JSONArray
 import org.json.JSONObject
+import java.lang.reflect.Field
+import java.lang.reflect.Modifier
+import java.lang.reflect.Array as ReflectArray
 
-/**
- * 通知「全字段」转储器（开发者选项 → 通知字段转储页专用）。
- *
- * 用途：把当前通知栏某条通知（[StatusBarNotification]）的元信息、`Notification` 字段与
- * `extras` 全部键值逐项展开，供超级岛 / Apple Watch 转发链路的结构适配排查。
- *
- * 设计要点：
- * - **单一数据源**：先构造一棵 [JSONObject] 树（[buildDumpJson]），
- *   文本（[renderDumpText]）与 JSON（[buildDumpJson] + [JSONObject.toString]）都从该树渲染，
- *   避免两份实现字段漂移。
- * - **二进制可选**：`includeBinary = false` 时 Bitmap / Icon / byte[] 等只给
- *   「类型 + 尺寸」摘要；为 `true` 时转成 data URI / base64 内联（体积可能很大，由调用方显式开启）。
- * - **只读**：不修改通知，不写任何存储（页面侧同样只在内存中保留本次载入结果）。
- *
- * 注意：`Bundle.get(String)` 在 API 33 起被标记废弃，但**枚举未知类型的 extras 键值没有等价替代**，
- * 故按项目既有做法（`SuperIslandManager` 同类场景）做局部 `@Suppress("DEPRECATION")`。
- */
 internal object NotificationFieldDump {
     private const val INDENT = "  "
 
-    /** 递归展开 Bundle 的最大深度，防御异常自嵌套结构。 */
-    private const val MAX_DEPTH = 8
+    /** 递归最大深度。 */
+    private const val MAX_DEPTH = 12
+
+    /** 单个集合 / 数组 / Bundle 最多展开的元素数。 */
+    private const val MAX_ITEMS = 200
+
+    /** 单次 dump 内反射字段总数上限，防御极端对象图。 */
+    private const val MAX_FIELDS = 4000
+
+    /** 截断事件最多记录条数，超出部分只计数。 */
+    private const val MAX_TRUNCATION_EVENTS = 100
+
+    /** 反射跳过：这些字段无信息量（静态常量等）。 */
+    private val SKIPPED_FIELD_NAMES = setOf("CREATOR")
+
+    /** 反射跳过：这些类型不下钻（会牵出 Context / Handler / 进程级对象图）。 */
+    private val SKIPPED_VALUE_TYPES =
+        setOf(
+            "android.content.Context",
+            "android.content.res.Resources",
+            "android.os.Handler",
+            "android.os.Looper",
+            "android.view.View",
+            "android.view.ViewGroup",
+            "java.lang.Class",
+            "java.lang.ClassLoader",
+        )
+
+    /** 本次 dump 剩余可反射字段数；每次 dump 重置。 */
+    private var fieldBudget = MAX_FIELDS
+
+    /** 本次 dump 的截断 / 跳过事件；每次 dump 重置。 */
+    private val truncations = mutableListOf<JSONObject>()
+
+    /** 超出 [MAX_TRUNCATION_EVENTS] 而未逐条记录的截断事件数。 */
+    private var truncationsOmitted = 0
+
+    /** 当前遍历路径（字段名逐级入栈），用于让截断事件能定位到具体位置。 */
+    private val pathStack = ArrayDeque<String>()
+
+    /** 当前路径的可读形式。 */
+    private fun currentPath(): String = if (pathStack.isEmpty()) "<root>" else pathStack.joinToString(".")
+
+    /**
+     * 数组 / 集合被截断时插入的标记元素。
+     *
+     * `JSONArray` 只有单参数 `put`，无法直接写入「键 + 值」，故用带 `__truncated` 键的对象承载，
+     * 既能在 JSON 中保留位置，也能在文本渲染里显式出现。
+     */
+    private fun truncationMarker(detail: String): JSONObject =
+        JSONObject().apply {
+            put("__truncated", detail)
+        }
+
+    /**
+     * 记录一次截断 / 跳过。
+     *
+     * **凡有上限被触及都必须调用本方法**：输出（剪贴板文本 / JSON 文件）会据此在开头给出
+     * 显式警告，避免使用者把不完整的 dump 当成完整数据。
+     */
+    private fun recordTruncation(
+        reason: String,
+        detail: String,
+    ) {
+        if (truncations.size >= MAX_TRUNCATION_EVENTS) {
+            truncationsOmitted++
+            return
+        }
+        truncations +=
+            JSONObject().apply {
+                put("path", currentPath())
+                put("reason", reason)
+                put("detail", detail)
+            }
+    }
+
+    /** 在 [block] 执行期间把 [segment] 压入路径栈。 */
+    private inline fun <T> withPath(
+        segment: String,
+        block: () -> T,
+    ): T {
+        pathStack.addLast(segment)
+        try {
+            return block()
+        } finally {
+            pathStack.removeLast()
+        }
+    }
 
     /**
      * 构造一条通知的完整字段 JSON 树。
      *
+     * 本对象为单例，而 [fieldBudget] / [truncations] / [pathStack] 是遍历期间的共享可变状态，
+     * 故整体加锁：并发调用（如快速连续长按两条通知）不会互相串数据。
+     *
      * @param context 用于加载 [Icon] 位图（仅在 [includeBinary] 为 true 时使用）。
      * @param sbn 目标通知。
      * @param includeBinary 是否内联二进制内容（Bitmap / Icon / byte[]）。
+     * @param ranking 该通知的系统排序/渠道信息；`null` 时跳过。
      */
+    @Synchronized
     fun buildDumpJson(
         context: Context,
         sbn: StatusBarNotification,
         includeBinary: Boolean,
+        ranking: NotificationListenerService.Ranking? = null,
     ): JSONObject {
+        fieldBudget = MAX_FIELDS
+        truncations.clear()
+        truncationsOmitted = 0
+        pathStack.clear()
+
         val root = JSONObject()
         root.put("dumpTime", System.currentTimeMillis())
         root.put("includeBinary", includeBinary)
-        root.put("statusBarNotification", buildSbnJson(sbn))
-        root.put("notification", buildNotificationJson(context, sbn.notification, includeBinary))
+        root.put("statusBarNotification", reflectObject(context, sbn, includeBinary, 0, HashSet()))
+        ranking?.let { root.put("ranking", reflectObject(context, it, includeBinary, 0, HashSet())) }
+
+        // 截断报告置于根部：任何上限被触及都在输出里显式声明，绝不静默丢数据
+        val truncated = truncations.isNotEmpty() || truncationsOmitted > 0
+        root.put("truncated", truncated)
+        if (truncated) {
+            root.put(
+                "truncationSummary",
+                "本次转储不完整：有 ${truncations.size + truncationsOmitted} 处触及上限，已省略部分字段",
+            )
+            root.put("truncations", JSONArray(truncations))
+            if (truncationsOmitted > 0) root.put("truncationsOmitted", truncationsOmitted)
+        }
         return root
     }
 
-    /** 把字段树渲染为可读文本（`key: value` 缩进结构，内嵌 JSON 字符串会展开为嵌套块）。 */
-    fun renderDumpText(root: JSONObject): String = buildString { appendJsonBlock(this, root, 0) }.trimEnd()
-
-    // ==================== StatusBarNotification ====================
-
-    private fun buildSbnJson(sbn: StatusBarNotification): JSONObject =
-        JSONObject()
-            .apply {
-                put("key", sbn.key ?: "")
-                put("id", sbn.id)
-                put("tag", sbn.tag ?: "")
-                put("packageName", sbn.packageName)
-                put("postTime", sbn.postTime)
-                put("isOngoing", sbn.isOngoing)
-                put("isClearable", sbn.isClearable)
-                put("groupKey", sbn.groupKey ?: "")
-                put("overrideGroupKey", sbn.overrideGroupKey ?: "")
-                put("user", sbn.user?.toString() ?: "")
+    /**
+     * 把字段树渲染为可读文本（缩进结构，内嵌 JSON 字符串会展开为嵌套块）。
+     *
+     * 若 [root] 标记为已截断，**开头先输出醒目警告与截断位置清单**。
+     */
+    fun renderDumpText(root: JSONObject): String =
+        buildString {
+            if (root.optBoolean("truncated", false)) {
+                appendLine("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                appendLine("!! 本次转储被截断，以下内容不完整，请勿当作全量数据 !!")
+                appendLine("!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!")
+                root
+                    .optString("truncationSummary")
+                    .takeIf { it.isNotBlank() }
+                    ?.let { appendLine(it) }
+                root.optJSONArray("truncations")?.let { array ->
+                    for (i in 0 until array.length()) {
+                        val event = array.optJSONObject(i) ?: continue
+                        appendLine("  - ${event.optString("path")}: ${event.optString("reason")} (${event.optString("detail")})")
+                    }
+                }
+                root
+                    .optInt("truncationsOmitted", 0)
+                    .takeIf { it > 0 }
+                    ?.let { appendLine("  ...另有 $it 处截断未逐条列出") }
+                appendLine("--------------------------------------------")
             }
+            appendJsonBlock(this, root, 0)
+        }.trimEnd()
 
-    // ==================== Notification ====================
-
-    private fun buildNotificationJson(
-        context: Context,
-        notification: Notification,
-        includeBinary: Boolean,
-    ): JSONObject =
-        JSONObject()
-            .apply {
-                put("when", notification.`when`)
-                put("flags", notification.flags)
-                put("flagsDecoded", JSONArray(decodeFlags(notification.flags)))
-                put("category", notification.category ?: "")
-                put("channelId", notification.channelId ?: "")
-                put("color", notification.color)
-                put("number", notification.number)
-                put("tickerText", notification.tickerText?.toString() ?: "")
-                put("visibility", notification.visibility)
-                put("sortKey", notification.sortKey ?: "")
-                put("group", notification.group ?: "")
-                put("shortcutId", notification.shortcutId ?: "")
-                put("isGroupSummary", notification.flags and Notification.FLAG_GROUP_SUMMARY != 0)
-                put("isForegroundService", notification.flags and Notification.FLAG_FOREGROUND_SERVICE != 0)
-                // 以下 4 个字段在 API 26 起标记废弃（分别由 NotificationChannel 的声音/灯光配置与
-                // 自定义样式取代），但**全字段转储必须原样呈现**，且没有等价替代 getter，故保留。
-                put("audioAttributes", notification.audioAttributes?.toString() ?: "")
-                put("contentIntent", describeValue(context, notification.contentIntent, includeBinary, 0))
-                put("deleteIntent", describeValue(context, notification.deleteIntent, includeBinary, 0))
-                put("fullScreenIntent", describeValue(context, notification.fullScreenIntent, includeBinary, 0))
-                put("contentView", describeValue(context, notification.contentView, includeBinary, 0))
-                put("bigContentView", describeValue(context, notification.bigContentView, includeBinary, 0))
-                put("headsUpContentView", describeValue(context, notification.headsUpContentView, includeBinary, 0))
-                put("actions", buildActionsJson(context, notification.actions, includeBinary))
-                put("extras", buildBundleJson(context, notification.extras, includeBinary, 0))
-            }
+    // ==================== 反射遍历核心 ====================
 
     /**
-     * 解码 `Notification.flags` 中**未废弃**的标志位名，便于人工判读。
+     * 反射遍历 [target] 的全部实例字段（含继承链），返回 JSON 表示。
      *
-     * 刻意不含 `FLAG_SHOW_LIGHTS` / `FLAG_HIGH_PRIORITY`：二者自 API 26 起废弃且仅用于推导展示，
-     * 原始 `flags` 整数值已完整输出，无需为它们引入新的废弃 API 警告。
+     * @param visited 已访问对象身份集合（IdentityHashMap 语义，用 `System.identityHashCode` 判定），
+     *   用于打断循环引用。
      */
-    private fun decodeFlags(flags: Int): List<String> {
-        val known =
-            listOf(
-                Notification.FLAG_ONGOING_EVENT to "ONGOING_EVENT",
-                Notification.FLAG_INSISTENT to "INSISTENT",
-                Notification.FLAG_ONLY_ALERT_ONCE to "ONLY_ALERT_ONCE",
-                Notification.FLAG_AUTO_CANCEL to "AUTO_CANCEL",
-                Notification.FLAG_NO_CLEAR to "NO_CLEAR",
-                Notification.FLAG_FOREGROUND_SERVICE to "FOREGROUND_SERVICE",
-                Notification.FLAG_LOCAL_ONLY to "LOCAL_ONLY",
-                Notification.FLAG_GROUP_SUMMARY to "GROUP_SUMMARY",
-                Notification.FLAG_BUBBLE to "BUBBLE",
-            )
-        return known.filter { flags and it.first != 0 }.map { it.second }
-    }
-
-    private fun buildActionsJson(
+    private fun reflectObject(
         context: Context,
-        actions: Array<Notification.Action>?,
-        includeBinary: Boolean,
-    ): JSONArray {
-        val array = JSONArray()
-        actions?.forEach { action ->
-            array.put(
-                JSONObject()
-                    .apply {
-                        put("title", action.title?.toString() ?: "")
-                        // 取 Icon 对象而非已废弃的 int icon 字段（后者无额外信息）
-                        put("icon", describeValue(context, action.getIcon(), includeBinary, 0))
-                        put("actionIntent", describeValue(context, action.actionIntent, includeBinary, 0))
-                        put("semanticAction", action.semanticAction)
-                        put("isContextual", action.isContextual)
-                        put("allowGeneratedReplies", action.allowGeneratedReplies)
-                        put("remoteInputs", describeValue(context, action.remoteInputs, includeBinary, 0))
-                        put("extras", buildBundleJson(context, action.extras, includeBinary, 0))
-                    },
-            )
-        }
-        return array
-    }
-
-    // ==================== Bundle 递归 ====================
-
-    private fun buildBundleJson(
-        context: Context,
-        bundle: Bundle?,
+        target: Any,
         includeBinary: Boolean,
         depth: Int,
-    ): JSONObject {
-        val json = JSONObject()
-        if (bundle == null) return json
-        if (depth >= MAX_DEPTH) {
-            json.put("<truncated>", "超过最大递归深度 $MAX_DEPTH")
-            return json
+        visited: MutableSet<Int>,
+    ): Any {
+        if (depth > MAX_DEPTH) {
+            recordTruncation("超过最大递归深度", "MAX_DEPTH=$MAX_DEPTH，类型=${target.javaClass.name}")
+            return "<超过最大递归深度 $MAX_DEPTH>"
         }
-        // Bundle.get(String) 在 API 33 起废弃，但枚举未知类型 extras 无等价替代（见类注释）
-        @Suppress("DEPRECATION")
-        bundle.keySet().forEach { key ->
-            val value =
-                try {
-                    bundle.get(key)
-                } catch (e: Exception) {
-                    "<读取失败: ${e.javaClass.simpleName}>"
+        val typeName = target.javaClass.name
+        if (typeName in SKIPPED_VALUE_TYPES) {
+            recordTruncation("类型不下钻", typeName)
+            return "<$typeName 已跳过>"
+        }
+
+        // 循环引用检测：同一对象在**当前路径**上再次出现即截断
+        val identity = System.identityHashCode(target)
+        if (!visited.add(identity)) {
+            recordTruncation("循环引用", target.javaClass.name)
+            return "<循环引用 ${target.javaClass.simpleName}>"
+        }
+        try {
+            val json = JSONObject()
+            json.put("__class", typeName)
+            var count = 0
+            for (field in allFields(target.javaClass)) {
+                if (field.name in SKIPPED_FIELD_NAMES) continue
+                if (Modifier.isStatic(field.modifiers)) continue
+                if (fieldBudget <= 0) {
+                    recordTruncation("反射字段总数超上限", "MAX_FIELDS=$MAX_FIELDS，字段 ${field.name} 起未输出")
+                    json.put("__truncated", "反射字段数超过上限 $MAX_FIELDS")
+                    break
                 }
-            json.put(key, describeValue(context, value, includeBinary, depth + 1))
+                fieldBudget--
+                count++
+                val value =
+                    try {
+                        field.isAccessible = true
+                        field.get(target)
+                    } catch (e: Exception) {
+                        recordTruncation("反射读取失败", "${field.name}: ${e.javaClass.simpleName}")
+                        "<反射读取失败: ${e.javaClass.simpleName}>"
+                    }
+                json.put(
+                    field.name,
+                    withPath(field.name) { describeValue(context, value, includeBinary, depth + 1, visited) },
+                )
+            }
+            if (count == 0) json.put("__note", "无实例字段")
+            return json
+        } finally {
+            visited.remove(identity)
         }
-        return json
+    }
+
+    /** 取类及其父类的全部声明字段（不含 Object）。 */
+    private fun allFields(clazz: Class<*>): List<Field> {
+        val result = mutableListOf<Field>()
+        var current: Class<*>? = clazz
+        while (current != null && current != Any::class.java) {
+            result += current.declaredFields
+            current = current.superclass
+        }
+        return result
     }
 
     /**
-     * 把任意 extras / 字段值转成 JSON 可承载的表示。
+     * 把任意值转成 JSON 可承载的表示。
      *
-     * 返回值类型：`JSONObject.NULL` / String / JSONObject / JSONArray / Boolean / Int / Long / Double。
+     * 基本类型 / 字符串直接输出；已知叶子类型语义化描述；
+     * 其余对象（含 [Bundle]、[SparseArray]、集合、数组）继续递归。
      */
     private fun describeValue(
         context: Context,
         value: Any?,
         includeBinary: Boolean,
         depth: Int,
+        visited: MutableSet<Int>,
     ): Any {
         if (value == null) return JSONObject.NULL
-        if (depth > MAX_DEPTH) return "<超过最大递归深度 $MAX_DEPTH>"
+        if (depth > MAX_DEPTH) {
+            recordTruncation("超过最大递归深度", "MAX_DEPTH=$MAX_DEPTH")
+            return "<超过最大递归深度 $MAX_DEPTH>"
+        }
         return when (value) {
             is String -> value
             is CharSequence -> value.toString()
             is Boolean, is Int, is Long, is Double -> value
             is Float -> value.toDouble()
             is Byte, is Short -> value.toInt()
-            is Bundle -> buildBundleJson(context, value, includeBinary, depth)
+            is Enum<*> -> value.name
+            is Bundle -> reflectBundle(context, value, includeBinary, depth, visited)
+            is SparseArray<*> -> reflectSparseArray(context, value, includeBinary, depth, visited)
             is Bitmap -> describeBitmap(value, includeBinary)
             is Icon -> describeIcon(context, value, includeBinary)
             is PendingIntent -> describePendingIntent(value)
             is RemoteViews -> describeRemoteViews(value)
+            is Drawable -> describeDrawable(value, includeBinary)
             is ByteArray -> describeBytes(value, includeBinary)
             is IntArray -> JSONArray(value.toList())
             is LongArray -> JSONArray(value.toList())
@@ -221,12 +300,147 @@ internal object NotificationFieldDump {
             is BooleanArray -> JSONArray(value.toList())
             is CharArray -> JSONArray(value.map { it.toString() })
             is ShortArray -> JSONArray(value.map { it.toInt() })
-            is Array<*> -> JSONArray(value.map { describeValue(context, it, includeBinary, depth + 1) })
-            is Collection<*> -> JSONArray(value.map { describeValue(context, it, includeBinary, depth + 1) })
-            is Parcelable -> "<${value.javaClass.name}: $value>"
-            else -> "<${value.javaClass.name}: $value>"
+            is Array<*> -> reflectIterable(context, value.toList(), includeBinary, depth, visited)
+            is Collection<*> -> reflectIterable(context, value, includeBinary, depth, visited)
+            is Map<*, *> -> reflectMap(context, value, includeBinary, depth, visited)
+            // 基本类型的包装类在反射字段上已覆盖；此处兜底处理剩余任意对象
+            else -> {
+                val clazz = value.javaClass
+                if (clazz.isPrimitive || clazz.name.startsWith("java.lang.")) {
+                    value.toString()
+                } else if (clazz.isArray) {
+                    val length = ReflectArray.getLength(value)
+                    JSONArray().apply {
+                        val limit = minOf(length, MAX_ITEMS)
+                        for (i in 0 until limit) {
+                            put(describeValue(context, ReflectArray.get(value, i), includeBinary, depth + 1, visited))
+                        }
+                        if (length > limit) {
+                            recordTruncation("数组元素超上限", "共 $length 项，仅输出 $limit 项")
+                            put(truncationMarker("共 $length 项，仅输出 $limit 项"))
+                        }
+                    }
+                } else {
+                    reflectObject(context, value, includeBinary, depth, visited)
+                }
+            }
         }
     }
+
+    private fun reflectIterable(
+        context: Context,
+        items: Collection<*>,
+        includeBinary: Boolean,
+        depth: Int,
+        visited: MutableSet<Int>,
+    ): JSONArray =
+        JSONArray().apply {
+            val limit = minOf(items.size, MAX_ITEMS)
+            items.take(limit).forEach { item ->
+                put(describeValue(context, item, includeBinary, depth + 1, visited))
+            }
+            if (items.size > limit) {
+                recordTruncation("集合元素超上限", "共 ${items.size} 项，仅输出 $limit 项")
+                put(truncationMarker("共 ${items.size} 项，仅输出 $limit 项"))
+            }
+        }
+
+    private fun reflectMap(
+        context: Context,
+        map: Map<*, *>,
+        includeBinary: Boolean,
+        depth: Int,
+        visited: MutableSet<Int>,
+    ): JSONObject =
+        JSONObject().apply {
+            val limit = minOf(map.size, MAX_ITEMS)
+            map.entries.take(limit).forEach { (k, v) ->
+                put(
+                    k.toString(),
+                    withPath(k.toString()) { describeValue(context, v, includeBinary, depth + 1, visited) },
+                )
+            }
+            if (map.size > limit) {
+                recordTruncation("Map 条目超上限", "共 ${map.size} 项，仅输出 $limit 项")
+                put("<truncated>", "共 ${map.size} 项，仅输出 $limit 项")
+            }
+        }
+
+    private fun reflectSparseArray(
+        context: Context,
+        array: SparseArray<*>,
+        includeBinary: Boolean,
+        depth: Int,
+        visited: MutableSet<Int>,
+    ): JSONObject =
+        JSONObject().apply {
+            val size = array.size()
+            val limit = minOf(size, MAX_ITEMS)
+            for (i in 0 until limit) {
+                val key = array.keyAt(i).toString()
+                put(
+                    key,
+                    withPath(key) { describeValue(context, array.valueAt(i), includeBinary, depth + 1, visited) },
+                )
+            }
+            if (size > limit) {
+                recordTruncation("SparseArray 元素超上限", "共 $size 项，仅输出 $limit 项")
+                put("<truncated>", "共 $size 项，仅输出 $limit 项")
+            }
+        }
+
+    /**
+     * Bundle 逐键展开。
+     *
+     * `Bundle.get(String)` / `keySet()` 自 API 33 起废弃，但**枚举未知类型的 extras 键值
+     * 没有等价替代**，故整体抑制该废弃警告。
+     */
+    @Suppress("DEPRECATION")
+    private fun reflectBundle(
+        context: Context,
+        bundle: Bundle,
+        includeBinary: Boolean,
+        depth: Int,
+        visited: MutableSet<Int>,
+    ): JSONObject {
+        val json = JSONObject()
+        val keys =
+            try {
+                bundle.keySet()
+            } catch (e: Exception) {
+                emptySet<String>()
+            }
+        if (keys.isEmpty()) {
+            json.put("__note", "空 Bundle")
+            return json
+        }
+        val limit = minOf(keys.size, MAX_ITEMS)
+        keys.take(limit).forEach { key ->
+            val value =
+                try {
+                    bundle.get(key)
+                } catch (e: Exception) {
+                    recordTruncation("Bundle 取值失败", "$key: ${e.javaClass.simpleName}")
+                    "<读取失败: ${e.javaClass.simpleName}>"
+                }
+            json.put(
+                key,
+                try {
+                    withPath(key) { describeValue(context, value, includeBinary, depth + 1, visited) }
+                } catch (e: Exception) {
+                    recordTruncation("Bundle 描述失败", "$key: ${e.javaClass.simpleName}")
+                    "<描述失败(${e.javaClass.simpleName}): ${e.message}>"
+                },
+            )
+        }
+        if (keys.size > limit) {
+            recordTruncation("Bundle 键数超上限", "共 ${keys.size} 键，仅输出 $limit 键")
+            json.put("<truncated>", "共 ${keys.size} 键，仅输出 $limit 键")
+        }
+        return json
+    }
+
+    // ==================== 叶子类型语义化描述 ====================
 
     private fun describeBitmap(
         bitmap: Bitmap,
@@ -238,12 +452,25 @@ internal object NotificationFieldDump {
             "<Bitmap ${bitmap.width}x${bitmap.height} ${bitmap.config}>"
         }
 
+    /**
+     * 描述 [Icon]。
+     *
+     * 必须按 [Icon.getType] 分别取字段：`getResId()` / `getResPackage()` 仅在 `TYPE_RESOURCE`
+     * 下合法，`getUri()` 仅在 URI 类型下合法，其余类型调用会抛 `IllegalStateException`。
+     */
     private fun describeIcon(
         context: Context,
         icon: Icon,
         includeBinary: Boolean,
     ): String {
-        val header = "<Icon type=${icon.type} res=${icon.resId} pkg=${icon.resPackage}>"
+        val header =
+            when (icon.type) {
+                Icon.TYPE_RESOURCE -> "<Icon type=RESOURCE res=${icon.resId} pkg=${icon.resPackage}>"
+                Icon.TYPE_URI, Icon.TYPE_URI_ADAPTIVE_BITMAP -> "<Icon type=URI uri=${icon.uri}>"
+                Icon.TYPE_BITMAP, Icon.TYPE_ADAPTIVE_BITMAP -> "<Icon type=BITMAP>"
+                Icon.TYPE_DATA -> "<Icon type=DATA>"
+                else -> "<Icon type=${icon.type}>"
+            }
         if (!includeBinary) return header
         return try {
             val drawable = icon.loadDrawable(context) ?: return header
@@ -258,6 +485,26 @@ internal object NotificationFieldDump {
             "$header (加载失败: ${e.javaClass.simpleName})"
         }
     }
+
+    private fun describeDrawable(
+        drawable: Drawable,
+        includeBinary: Boolean,
+    ): String =
+        if (!includeBinary) {
+            "<Drawable ${drawable.javaClass.name} intrinsic=${drawable.intrinsicWidth}x${drawable.intrinsicHeight}>"
+        } else {
+            try {
+                val bitmap =
+                    if (drawable is BitmapDrawable) {
+                        drawable.bitmap
+                    } else {
+                        drawable.toBitmapOrDefault(96)
+                    }
+                ImageUtils.bitmapToDataUri(bitmap).ifEmpty { "<Drawable 编码失败>" }
+            } catch (e: Exception) {
+                "<Drawable 编码异常: ${e.javaClass.simpleName}>"
+            }
+        }
 
     private fun describePendingIntent(pendingIntent: PendingIntent): String =
         "<PendingIntent creator=${pendingIntent.creatorPackage} activity=${pendingIntent.isActivity} " +

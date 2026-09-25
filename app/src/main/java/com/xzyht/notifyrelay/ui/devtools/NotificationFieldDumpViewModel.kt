@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
+import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
@@ -27,12 +28,14 @@ import notifyrelay.base.util.ToastUtils
  * 通知字段转储页的内存状态（**不持久化**）。
  *
  * @param record 供通知历史页卡片展示的记录。
- * @param sbn 原始系统通知引用；字段树在复制 / 下载时按需构建，避免常驻多份大 JSON。
+ * @param sbn 原始系统通知引用；字段树在复制 / 分享时按需反射构建。
+ * @param ranking 系统侧排序/渠道信息（决定是否渲染），可为 null。
  * @param appIcon 应用图标（可能为 null）。
  */
 internal data class NotificationDumpEntry(
     val record: NotificationRecord,
     val sbn: StatusBarNotification,
+    val ranking: NotificationListenerService.Ranking?,
     val appIcon: Bitmap?,
 )
 
@@ -83,11 +86,15 @@ internal class NotificationFieldDumpViewModel(
                 val actives = listener.activeNotifications ?: emptyArray()
                 val installed = AppRepository.getInstalledPackageNamesSync(application)
                 iconCache.clear()
+                // 系统侧排序/渠道信息（importance / rank / suppressedVisualEffects / channel 等）
+                // 不在 sbn 与 notification 里，只能经 RankingMap 按 key 取；这些字段决定是否渲染
+                val rankingMap = listener.currentRanking
                 val entries =
                     actives.map { sbn ->
                         NotificationDumpEntry(
                             record = buildRecord(sbn),
                             sbn = sbn,
+                            ranking = resolveRanking(rankingMap, sbn),
                             appIcon = loadAppIcon(sbn.packageName),
                         )
                     }
@@ -121,11 +128,10 @@ internal class NotificationFieldDumpViewModel(
     ) {
         viewModelScope.launch {
             val entry = _uiState.value.entries.getOrNull(index) ?: return@launch
-            val text =
+            val (text, truncated) =
                 withContext(Dispatchers.IO) {
-                    NotificationFieldDump.renderDumpText(
-                        NotificationFieldDump.buildDumpJson(application, entry.sbn, includeBinary),
-                    )
+                    val json = NotificationFieldDump.buildDumpJson(application, entry.sbn, includeBinary, entry.ranking)
+                    NotificationFieldDump.renderDumpText(json) to json.optBoolean("truncated", false)
                 }
             if (text.isBlank()) {
                 Logger.w(TAG, "该通知无可复制内容: pkg=${entry.record.packageName}")
@@ -133,7 +139,12 @@ internal class NotificationFieldDumpViewModel(
                 return@launch
             }
             if (ClipboardUtils.copyText(context, "notification_field_dump", text)) {
-                ToastUtils.showShortToast(context, "已复制通知全部字段到剪贴板")
+                if (truncated) {
+                    Logger.w(TAG, "已复制但内容被截断: pkg=${entry.record.packageName}")
+                    ToastUtils.showLongToast(context, "已复制（内容被截断，详见开头警告）")
+                } else {
+                    ToastUtils.showShortToast(context, "已复制通知全部字段到剪贴板")
+                }
             } else {
                 Logger.w(TAG, "复制通知字段失败（剪贴板写入返回 false）: pkg=${entry.record.packageName}")
                 ToastUtils.showShortToast(context, "复制失败")
@@ -156,11 +167,10 @@ internal class NotificationFieldDumpViewModel(
     ): String? {
         val entry = _uiState.value.entries.getOrNull(index) ?: return "未找到该通知"
         return try {
-            val payload =
+            val (payload, truncated) =
                 withContext(Dispatchers.IO) {
-                    NotificationFieldDump
-                        .buildDumpJson(application, entry.sbn, includeBinary)
-                        .toString(2)
+                    val json = NotificationFieldDump.buildDumpJson(application, entry.sbn, includeBinary, entry.ranking)
+                    json.toString(2) to json.optBoolean("truncated", false)
                 }
             val fileName = "notification_dump_${entry.record.packageName.replace('.', '_')}.json"
             val file = NotificationDumpCache.write(application, fileName, payload)
@@ -179,7 +189,8 @@ internal class NotificationFieldDumpViewModel(
                         }
                     context.startActivity(chooser)
                 }
-                null
+                // 截断信息已在 JSON 的 truncated / truncationSummary / truncations 中声明
+                if (truncated) "已导出（内容被截断，见 JSON 的 truncations）" else null
             }
         } catch (e: Exception) {
             Logger.e(TAG, "导出并分享通知字段失败", e)
@@ -202,6 +213,22 @@ internal class NotificationFieldDumpViewModel(
     fun getCachedAppInfo(packageName: String?): Pair<String, Bitmap?> {
         if (packageName.isNullOrBlank()) return "" to null
         return iconCache[packageName] ?: (packageName to null)
+    }
+
+    /** 从 [NotificationListenerService.RankingMap] 按 sbn.key 取出该通知的系统排序信息。 */
+    private fun resolveRanking(
+        rankingMap: NotificationListenerService.RankingMap?,
+        sbn: StatusBarNotification,
+    ): NotificationListenerService.Ranking? {
+        if (rankingMap == null) return null
+        val key = sbn.key ?: return null
+        return try {
+            val ranking = NotificationListenerService.Ranking()
+            if (rankingMap.getRanking(key, ranking)) ranking else null
+        } catch (e: Exception) {
+            Logger.w(TAG, "读取 Ranking 失败: key=$key, ${e.message}")
+            null
+        }
     }
 
     private fun buildRecord(sbn: StatusBarNotification): NotificationRecord =
