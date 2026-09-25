@@ -14,6 +14,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingW
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.list.FloatingReplicaListModeManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds

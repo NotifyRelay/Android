@@ -17,7 +17,7 @@ import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandListManager
+import com.xzyht.notifyrelay.feature.notification.superisland.list.SuperIslandListManager
 import notifyrelay.base.util.Logger
 
 /**

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.replica
+package com.xzyht.notifyrelay.feature.notification.superisland.list
 
 import android.app.NotificationManager
 import android.content.Context
@@ -11,7 +11,11 @@ import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIsl
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandListManager
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaWindowManager
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaNotificationCloser
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaStateStore
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.runReplicaCatching
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.runReplicaCatchingSuspend
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay

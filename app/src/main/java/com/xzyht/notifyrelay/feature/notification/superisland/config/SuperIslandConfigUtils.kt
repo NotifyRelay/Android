@@ -1,18 +1,20 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.config
 
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
-import com.xzyht.notifyrelay.feature.notification.superisland.contract.SuperIslandActions
-import com.xzyht.notifyrelay.feature.notification.superisland.receiver.NotificationBroadcastReceiver
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.StorageManager
 
 /**
- * 超级岛配置工具类，提供浮窗和规范信息注入相关的公共方法
+ * 超级岛配置工具类：**只做纯配置读写与推导**。
+ *
+ * 越权职责已剥离（P2-5 / P2-6）：
+ * - 意图 / 渠道构造 → `intent.NotificationIntentFactory`（本类不再 import `PendingIntent` / `Intent`
+ *   / `NotificationBroadcastReceiver` / `SuperIslandActions`）；
+ * - 通道切换副作用 → 由设置页调用方在写入后触发 `FloatingReplicaManager.switchSuperIslandChannel`，
+ *   本类不再依赖 `replica` 包（原为 config ↔ replica 双向依赖）。
  */
 object SuperIslandConfigUtils {
     private const val TAG = "SuperIslandConfigUtils"
@@ -51,12 +53,24 @@ object SuperIslandConfigUtils {
     private const val CODE_NONE = 3
 
     /**
+     * 浮窗兼容开关的**默认值**：OS 版本高于 OS3.0.300 时默认关闭。
+     *
+     * 原为 `FloatingReplicaManager.getDefaultFloatingWindowEnabled()`，由 config 调用 replica
+     * 形成 config→replica 依赖；按 P2-6 移入 config 自身（判定逻辑逐字不变）。
+     */
+    fun defaultFloatingWindowEnabled(): Boolean {
+        val detailedOsVersion = PermissionHelper.getDetailedOsVersion()
+        val isGreater = PermissionHelper.isVersionGreaterThan(detailedOsVersion, "OS3.0.300")
+        return !isGreater
+    }
+
+    /**
      * 检查浮窗功能是否开启
      */
-    fun isFloatingWindowEnabled(context: Context): Boolean = StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, FloatingReplicaManager.getDefaultFloatingWindowEnabled())
+    fun isFloatingWindowEnabled(context: Context): Boolean = StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, defaultFloatingWindowEnabled())
 
     /** 远端超级岛的展示通道：三者互斥，由浮窗 / 列表两个开关推导。 */
-    private enum class DisplayChannel {
+    enum class DisplayChannel {
         FLOATING,
         LIST,
         NOTIFICATION,
@@ -68,7 +82,7 @@ object SuperIslandConfigUtils {
      * 注意 [isNotificationListMode] 的默认值依赖浮窗开关，故必须在**配置写入前后**各算一次，
      * 才能得到真实的通道变化。
      */
-    private fun resolveDisplayChannel(context: Context): DisplayChannel =
+    fun resolveDisplayChannel(context: Context): DisplayChannel =
         when {
             isFloatingWindowEnabled(context) -> DisplayChannel.FLOATING
             isNotificationListMode(context) -> DisplayChannel.LIST
@@ -79,13 +93,16 @@ object SuperIslandConfigUtils {
      * 设置浮窗开关（与通知列表模式互斥）。
      * 开启浮窗时自动关闭通知列表模式。
      *
-     * 展示通道发生变化时（含"开启浮窗 → 列表模式被互斥关闭"），撤下旧通道展示并按新通道
-     * 重建当前展示内容，见 [FloatingReplicaManager.switchSuperIslandChannel]。
+     * **只写配置，不触发通道切换**（P2-6：副作用上移到设置页调用方）：
+     * 展示通道变化时由调用方按返回值决定是否调用
+     * `FloatingReplicaManager.switchSuperIslandChannel`（撤下旧通道并按新通道重建）。
+     *
+     * @return 展示通道是否发生变化；true 表示调用方需要执行通道切换。
      */
     fun setFloatingWindowEnabled(
         context: Context,
         enabled: Boolean,
-    ) {
+    ): Boolean {
         val previousChannel = resolveDisplayChannel(context)
         // 列表模式是否开启必须在写入浮窗开关**之前**判定：平板默认值由「非浮窗」推导
         val listModeWillClose = enabled && isNotificationListMode(context)
@@ -93,9 +110,7 @@ object SuperIslandConfigUtils {
         if (listModeWillClose) {
             StorageManager.putBoolean(context, SUPER_ISLAND_NOTIFICATION_LIST_KEY, false)
         }
-        if (resolveDisplayChannel(context) != previousChannel) {
-            FloatingReplicaManager.switchSuperIslandChannel(context)
-        }
+        return resolveDisplayChannel(context) != previousChannel
     }
 
     /**
@@ -116,23 +131,22 @@ object SuperIslandConfigUtils {
      * 设置通知列表模式（与浮窗互斥）。
      * 开启通知列表模式时自动关闭浮窗。
      *
-     * 展示通道发生变化时，撤下旧通道（列表聚合 / 普通复刻 / Live Updates）通知并按新通道
-     * 重建当前展示内容（见 [FloatingReplicaManager.switchSuperIslandChannel]）：
-     * 各通道的通知 ID 与渲染方式均不同，若不清理会出现旧通道通知残留或两条通知并存，
-     * 若不重建则内容会空到远端下一个包到来（一次性通知甚至不再出现）。
+     * **只写配置，不触发通道切换**（P2-6）：各通道的通知 ID 与渲染方式均不同，通道变化时
+     * 由调用方调用 `FloatingReplicaManager.switchSuperIslandChannel`：撤下旧通道展示并按新通道
+     * 重建当前展示内容，否则会出现旧通道通知残留、两条通知并存，或内容空到远端下一个包到来。
+     *
+     * @return 展示通道是否发生变化；true 表示调用方需要执行通道切换。
      */
     fun setNotificationListMode(
         context: Context,
         enabled: Boolean,
-    ) {
+    ): Boolean {
         val previousChannel = resolveDisplayChannel(context)
         if (enabled && isFloatingWindowEnabled(context)) {
             StorageManager.putBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, false)
         }
         StorageManager.putBoolean(context, SUPER_ISLAND_NOTIFICATION_LIST_KEY, enabled)
-        if (resolveDisplayChannel(context) != previousChannel) {
-            FloatingReplicaManager.switchSuperIslandChannel(context)
-        }
+        return resolveDisplayChannel(context) != previousChannel
     }
 
     /**
@@ -147,7 +161,7 @@ object SuperIslandConfigUtils {
      * 设置是否显示来自远端的超级岛。
      *
      * 仅写入配置；已展示的条目由调用方在关闭时调用
-     * [FloatingReplicaManager.dismissAllRemoteSuperIsland] 立即撤下。
+     * `FloatingReplicaManager.dismissAllRemoteSuperIsland` 立即撤下。
      */
     fun setRemoteSuperIslandDisplayEnabled(
         context: Context,
@@ -231,22 +245,6 @@ object SuperIslandConfigUtils {
      * @return true 如果至少有一种注入开启，false 如果都关闭
      */
     fun isAnySpecInjectionEnabled(context: Context): Boolean = getSpecInjectionMode(context) != SpecInjectionMode.NONE
-
-    /**
-     * 创建通知移除时的删除 PendingIntent
-     */
-    fun createDeletePendingIntent(
-        context: Context,
-        notificationId: Int,
-    ): PendingIntent? =
-        PendingIntent.getBroadcast(
-            context,
-            notificationId,
-            Intent(context, NotificationBroadcastReceiver::class.java)
-                .putExtra("notificationId", notificationId)
-                .setAction(SuperIslandActions.CLOSE_NOTIFICATION),
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
-        )
 
     /**
      * 验证规范信息注入开关状态，确保至少有一种开启

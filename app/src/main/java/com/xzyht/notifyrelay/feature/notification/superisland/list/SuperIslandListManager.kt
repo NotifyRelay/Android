@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.notification
+package com.xzyht.notifyrelay.feature.notification.superisland.list
 
 /**
  * 超级岛通知列表管理器。

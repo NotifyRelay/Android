@@ -75,7 +75,7 @@ fun UISuperIslandSettings() {
 
     val hasFloatingWindowSetting = StorageManager.getString(context, SuperIslandConfigUtils.SUPER_ISLAND_FLOATING_WINDOW_KEY, "") != ""
 
-    val defaultFloatingWindowEnabled = FloatingReplicaManager.getDefaultFloatingWindowEnabled()
+    val defaultFloatingWindowEnabled = SuperIslandConfigUtils.defaultFloatingWindowEnabled()
 
     val showTestDialog = remember { mutableStateOf(false) }
 
@@ -152,7 +152,10 @@ fun UISuperIslandSettings() {
                 onCheckedChange = {
                     floatingWindowEnabled = it
                     if (it) notificationListEnabled = false
-                    SuperIslandConfigUtils.setFloatingWindowEnabled(context, it)
+                    // 配置只写入库；通道变化由设置页调用方触发切换与重建（P2-6）
+                    if (SuperIslandConfigUtils.setFloatingWindowEnabled(context, it)) {
+                        FloatingReplicaManager.switchSuperIslandChannel(context)
+                    }
                 },
             )
 
@@ -167,7 +170,10 @@ fun UISuperIslandSettings() {
                         // 避免先单独关浮窗触发一次多余的通道切换与重建
                         floatingWindowEnabled = false
                     }
-                    SuperIslandConfigUtils.setNotificationListMode(context, it)
+                    // 配置只写入库；通道变化由设置页调用方触发切换与重建（P2-6）
+                    if (SuperIslandConfigUtils.setNotificationListMode(context, it)) {
+                        FloatingReplicaManager.switchSuperIslandChannel(context)
+                    }
                 },
             )
 

@@ -5,7 +5,7 @@ import android.os.Build
 import androidx.collection.LruCache
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
-import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
+import com.xzyht.notifyrelay.feature.notification.superisland.intent.NotificationIntentFactory
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -247,15 +247,13 @@ internal object LiveUpdatesIconLoader {
                 }
             updatedBuilder.setShortCriticalText(shortText)
 
-            // 检查浮窗功能是否开启
-            val floatingWindowEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(LiveUpdatesNotificationManager.appContext)
-            val notificationListMode = !floatingWindowEnabled && SuperIslandConfigUtils.isNotificationListMode(LiveUpdatesNotificationManager.appContext)
-            val needClickIntent = floatingWindowEnabled || notificationListMode
+            // 检查浮窗功能是否开启；判定统一走 NotificationIntentFactory.needClickIntent
+            val needClickIntent = NotificationIntentFactory.needClickIntent(LiveUpdatesNotificationManager.appContext)
 
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
             val deleteIntent =
                 if (needClickIntent) {
-                    LiveUpdatesIntentFactory.createDeleteIntent(LiveUpdatesNotificationManager.appContext, notificationId)
+                    NotificationIntentFactory.createDeleteIntent(LiveUpdatesNotificationManager.appContext, notificationId)
                 } else {
                     null
                 }
@@ -263,7 +261,7 @@ internal object LiveUpdatesIconLoader {
             // 创建点击意图，用于处理用户点击通知时切换浮窗或切换列表
             val contentIntent =
                 if (needClickIntent) {
-                    LiveUpdatesIntentFactory.createContentIntent(
+                    NotificationIntentFactory.createPendingContentIntent(
                         context = LiveUpdatesNotificationManager.appContext,
                         notificationId = notificationId,
                         sourceId = sourceId,

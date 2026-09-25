@@ -13,6 +13,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIsland
 import com.xzyht.notifyrelay.feature.notification.superisland.data.SuperIslandStructuredDataHelper
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.FormattedSuperIslandData
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
+import com.xzyht.notifyrelay.feature.notification.superisland.intent.NotificationIntentFactory
 import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.util.Logger
 
@@ -175,16 +176,14 @@ object LiveUpdatesNotificationManager {
         paramV2: ParamV2?,
         notificationId: Int,
     ): Notification? {
-        // 检查浮窗功能是否开启
-        val floatingWindowEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(appContext)
-        // 列表模式（浮窗关闭时）也需要点击意图用于切换
-        val notificationListMode = !floatingWindowEnabled && SuperIslandConfigUtils.isNotificationListMode(appContext)
-        val needClickIntent = floatingWindowEnabled || notificationListMode
+        // 检查浮窗功能是否开启；列表模式（浮窗关闭时）也需要点击意图用于切换。
+        // 判定统一走 NotificationIntentFactory.needClickIntent（原为本文件内的三判之一）
+        val needClickIntent = NotificationIntentFactory.needClickIntent(appContext)
 
         // 创建删除意图，用于处理用户移除通知时关闭浮窗
         val deleteIntent =
             if (needClickIntent) {
-                LiveUpdatesIntentFactory.createDeleteIntent(appContext, notificationId)
+                NotificationIntentFactory.createDeleteIntent(appContext, notificationId)
             } else {
                 null
             }
@@ -192,7 +191,7 @@ object LiveUpdatesNotificationManager {
         // 创建点击意图，用于处理用户点击通知时切换浮窗或切换列表
         val contentIntent =
             if (needClickIntent) {
-                LiveUpdatesIntentFactory.createContentIntent(
+                NotificationIntentFactory.createPendingContentIntent(
                     context = appContext,
                     notificationId = notificationId,
                     sourceId = sourceId,

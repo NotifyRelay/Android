@@ -6,22 +6,16 @@ import android.os.Build
 import com.xzyht.notifyrelay.feature.notification.service.ListenerForegroundController
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
+import com.xzyht.notifyrelay.feature.notification.superisland.list.FloatingReplicaListModeManager
+import com.xzyht.notifyrelay.feature.notification.superisland.list.SuperIslandListManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandListManager
 import notifyrelay.base.util.Logger
-import notifyrelay.base.util.PermissionHelper
 
 object FloatingReplicaManager {
     private const val TAG = "超级岛复刻实现骨架"
 
     private var appContext: Context? = null
-
-    fun getDefaultFloatingWindowEnabled(): Boolean {
-        val detailedOsVersion = PermissionHelper.getDetailedOsVersion()
-        val isGreater = PermissionHelper.isVersionGreaterThan(detailedOsVersion, "OS3.0.300")
-        return !isGreater
-    }
 
     fun getAppContext(): Context? = appContext
 

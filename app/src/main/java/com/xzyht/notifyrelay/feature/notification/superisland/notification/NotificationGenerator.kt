@@ -5,6 +5,7 @@ import android.content.Context
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
+import com.xzyht.notifyrelay.feature.notification.superisland.intent.NotificationIntentFactory
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaStateStore
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.CancellationException
@@ -25,7 +26,7 @@ import notifyrelay.base.util.Logger
  *    - 浮窗功能关闭时，不设置与浮窗关联的通知点击和关闭意图
  *    - 浮窗功能关闭时，仅创建基础通知，不添加与浮窗相关的功能
  *
- * 拆分后：配置/意图由 [ReplicaIntentFactory] 负责，媒体分支由 [MediaReplicaNotifier] 负责，
+ * 拆分后：配置/意图由 [NotificationIntentFactory] 负责，媒体分支由 [MediaReplicaNotifier] 负责，
  * 非媒体分支由 [GeneralReplicaNotifier] 负责，滚动更新由 [ReplicaScrollUpdater] 负责，
  * 小图标注入由 [ReplicaSmallIconInjector] 负责，共享缓存由 [ReplicaIconCache] 负责。
  */
@@ -68,7 +69,7 @@ object NotificationGenerator {
     ): Int? {
         try {
             // 验证规范信息注入开关状态，确保至少有一种开启
-            ReplicaIntentFactory.validateSpecInjectionSwitches(context)
+            SuperIslandConfigUtils.validateSpecInjectionSwitches(context)
 
             // 共享通知ID模式下（列表模式），清理旧的滚动任务避免冲突
             if (overrideNotificationId != null) {
@@ -82,12 +83,11 @@ object NotificationGenerator {
             val notificationId = overrideNotificationId ?: SuperIslandNotificationIds.replica(key)
 
             // 计算点击/删除意图所需的条件标志位
-            val intentFlags = ReplicaIntentFactory.computeIntentFlags(context)
-            val needClickIntent = intentFlags.needClickIntent
+            val needClickIntent = NotificationIntentFactory.needClickIntent(context)
 
             // 创建点击意图，用于处理用户点击通知时切换浮窗或切换列表
             val contentIntent =
-                ReplicaIntentFactory.createContentIntent(
+                NotificationIntentFactory.createContentIntent(
                     context = context,
                     key = key,
                     title = title,
@@ -96,16 +96,14 @@ object NotificationGenerator {
                     paramV2Raw = paramV2Raw,
                     picMap = picMap,
                     floatingWindowManager = floatingWindowManager,
-                    needClickIntent = needClickIntent,
                     sourceId = sourceId,
                 )
 
             val pendingContentIntent =
-                ReplicaIntentFactory.createPendingContentIntent(
+                NotificationIntentFactory.createPendingContentIntent(
                     context = context,
                     notificationId = notificationId,
                     contentIntent = contentIntent,
-                    needClickIntent = needClickIntent,
                 )
 
             // 检查是否为媒体类型的超级岛浮窗
@@ -113,14 +111,14 @@ object NotificationGenerator {
 
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
             val deleteIntent =
-                ReplicaIntentFactory.createDeleteIntent(
-                    context = context,
-                    notificationId = notificationId,
-                    needClickIntent = needClickIntent,
-                )
+                if (needClickIntent) {
+                    NotificationIntentFactory.createDeleteIntent(context, notificationId)
+                } else {
+                    null
+                }
 
             // 统一使用"超级岛复刻"通知渠道
-            ReplicaIntentFactory.ensureChannel(context, notificationManager)
+            NotificationIntentFactory.ensureChannel(context, notificationManager)
 
             if (isMediaType) {
                 // 检查规范信息注入模式
