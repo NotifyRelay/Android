@@ -14,25 +14,47 @@ import kotlinx.coroutines.CompletableDeferred
 class HandshakeWaiterRegistry {
     private val pending = mutableMapOf<String, CompletableDeferred<Boolean>>()
 
+    /**
+     * 最近一次失败原因（key=uuid）。
+     *
+     * 供 UI 把笼统的"配对超时/验证失败"细化为真实原因（如 core 版本不兼容）。
+     * 仅保留失败原因；成功或重新注册时清除，避免残留误导。
+     */
+    private val failureReasons = mutableMapOf<String, String>()
+
     /** 注册等待握手结果（同一 uuid 的旧等待器会被取消）。 */
     fun register(uuid: String): CompletableDeferred<Boolean> {
         val deferred = CompletableDeferred<Boolean>()
         synchronized(pending) {
             pending[uuid]?.cancel()
             pending[uuid] = deferred
+            failureReasons.remove(uuid)
         }
         return deferred
     }
 
-    /** 解析挂起的握手结果。 */
+    /**
+     * 解析挂起的握手结果。
+     *
+     * @param reason 失败原因码（成功时忽略），如 `version_mismatch`、`rejected`。
+     */
     fun resolve(
         uuid: String,
         success: Boolean,
+        reason: String? = null,
     ) {
         synchronized(pending) {
+            if (success) {
+                failureReasons.remove(uuid)
+            } else if (!reason.isNullOrBlank()) {
+                failureReasons[uuid] = reason
+            }
             pending.remove(uuid)?.complete(success)
         }
     }
+
+    /** 读取该 uuid 最近一次失败原因（不清除；由 [register] 在下次注册时清理）。 */
+    fun failureReason(uuid: String): String? = synchronized(pending) { failureReasons[uuid] }
 
     /** 按 Deferred 实例清理等待器，防止迟到请求完成或移除其他等待器。 */
     fun cancel(

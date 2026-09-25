@@ -50,6 +50,14 @@ class PairingCallbackHandler(
 ) {
     companion object {
         private const val TAG = "CoreCb"
+
+        /**
+         * core 版本不兼容原因码，须与 Rust 侧 `codec::RejectReason::VERSION_MISMATCH` 保持一致。
+         *
+         * 两端 core 跨 major.minor 时无法通信，失败原因会随 REJECT/RESULT 上抛，
+         * 平台据此提示用户升级对端，而非笼统报"配对超时"。
+         */
+        const val REASON_VERSION_MISMATCH = "version_mismatch"
     }
 
     fun build(): NotifyRelayCore.OnPairingCb =
@@ -74,7 +82,7 @@ class PairingCallbackHandler(
                         "PAIRING_INIT" -> handlePairingInit(uuidStr, dataStr)
                         "PAIRING_RESP" -> Logger.w(TAG, "收到意外的 PAIRING_RESP: $uuidStr")
                         "ACCEPT" -> handleAccept(uuidStr, dataStr)
-                        "REJECT" -> handleReject(uuidStr)
+                        "REJECT" -> handleReject(uuidStr, dataStr, extraStr)
                         "RESULT" -> handleResult(uuidStr, intValue, extraStr)
                         "HEARTBEAT_TCP" -> handleHeartbeatTcp(uuidStr, dataStr, extraStr, intValue)
                     }
@@ -213,13 +221,26 @@ class PairingCallbackHandler(
         Logger.d(TAG, "ACCEPT 已处理: $uuid")
     }
 
-    /** 对端拒绝：唤醒等待者并记入拒绝集合。 */
-    private fun handleReject(uuid: String) {
-        host.handshakeWaiters.resolve(uuid, false)
+    /** 对端拒绝：唤醒等待者并记入拒绝集合，同时保留原因供 UI 明确提示。 */
+    private fun handleReject(
+        uuid: String,
+        data: String?,
+        extra: String?,
+    ) {
+        // core 在"版本不兼容"等主动拒绝场景会带上 reason（REJECT 负载第二段）。
+        val reason =
+            data
+                ?.let { runCatching { JSONObject(it).optString("reason", "") }.getOrDefault("") }
+                .orEmpty()
+                .ifEmpty { extra.orEmpty() }
+        if (reason == REASON_VERSION_MISMATCH) {
+            synchronized(host.incompatibleDeviceIds) { host.incompatibleDeviceIds.add(uuid) }
+        }
+        host.handshakeWaiters.resolve(uuid, false, reason.ifEmpty { null })
         synchronized(host.rejectedDeviceIds) {
             host.rejectedDeviceIds.add(uuid)
         }
-        Logger.w(TAG, "REJECT 已处理: $uuid")
+        Logger.w(TAG, "REJECT 已处理: $uuid, reason=${reason.ifEmpty { "unspecified" }}")
     }
 
     /** 本机发起的配对结果。 */
@@ -229,8 +250,12 @@ class PairingCallbackHandler(
         extra: String?,
     ) {
         if (intValue == 0) {
-            Logger.w(TAG, "配对失败: $uuid, error=${extra ?: ""}")
-            host.handshakeWaiters.resolve(uuid, false)
+            val reason = extra.orEmpty()
+            if (reason == REASON_VERSION_MISMATCH) {
+                synchronized(host.incompatibleDeviceIds) { host.incompatibleDeviceIds.add(uuid) }
+            }
+            Logger.w(TAG, "配对失败: $uuid, error=${reason.ifEmpty { "unspecified" }}")
+            host.handshakeWaiters.resolve(uuid, false, reason.ifEmpty { null })
             return
         }
         Logger.d(TAG, "配对成功: $uuid")
