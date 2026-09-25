@@ -32,21 +32,21 @@ object FloatingReplicaNotificationManager {
     ) {
         CoroutineScope(Dispatchers.Main).launch {
             runReplicaCatchingSuspend(TAG, "发送通知") {
-                val taskVersion = FloatingReplicaMappingManager.nextVersion(sourceId)
+                val taskVersion = ReplicaStateStore.nextVersion(sourceId)
 
                 val internedPicMap =
                     withContext(Dispatchers.IO) {
                         SuperIslandImageStore.internAll(context, sourceId, picMap)
                     }
 
-                if (!FloatingReplicaMappingManager.isLatestVersion(sourceId, taskVersion)) {
+                if (!ReplicaStateStore.isLatestVersion(sourceId, taskVersion)) {
                     return@runReplicaCatchingSuspend
                 }
 
                 // 竞态守卫：协程 nextVersion 可能在 dismissBySource 的 removeSourceIdMappings 之后执行，
                 // 导致版本被 computeIfAbsent 重建、isLatestVersion 误判通过。
                 // 此处复检 isSourceRecentlyClosed（dismissBySource 已 markSourceClosed），命中即中止。
-                if (FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)) {
+                if (ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId)) {
                     Logger.i(TAG, "超级岛: sourceId=$sourceId 在异步发送期间被关闭，中止发送")
                     return@runReplicaCatchingSuspend
                 }
@@ -68,7 +68,7 @@ object FloatingReplicaNotificationManager {
 
                 val entryKey = sourceId
 
-                FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey)
+                ReplicaStateStore.addSourceIdMapping(sourceId, entryKey)
 
                 val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
 
@@ -80,7 +80,7 @@ object FloatingReplicaNotificationManager {
                 val injectionModeOrdinal = SuperIslandConfigUtils.getSpecInjectionMode(context).ordinal
 
                 // 注入模式变化时先取消旧通知并清理旧映射，避免两个通道的通知并存/残留
-                FloatingReplicaMappingManager.migrateInjectionModeIfChanged(context, sourceId, injectionModeOrdinal)
+                ReplicaNotificationCloser.migrateInjectionModeIfChanged(context, sourceId, injectionModeOrdinal)
 
                 // 内容与上次成功发出的通知一致且通知仍在展示时，跳过系统通知刷新（不调用 notify），
                 // 仅保留下方超时计时器的重置。
@@ -88,18 +88,18 @@ object FloatingReplicaNotificationManager {
                 // Live Updates 模式走系统兼容转换，重发虽无展开态副作用，但内容不变时同样无需重发。
                 // 指纹包含注入模式：模式变化时指纹随之变化，不会被误判为「内容无变更」。
                 val fingerprint =
-                    FloatingReplicaMappingManager.computeNotificationFingerprint(
+                    ReplicaStateStore.computeNotificationFingerprint(
                         displayTitle,
                         displayText,
                         formattedData.paramV2Raw,
                         formattedData.resolvedPicMap,
                         injectionModeOrdinal,
                     )
-                val previousNotificationIds = FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
+                val previousNotificationIds = ReplicaStateStore.getNotificationIdsBySourceId(sourceId)
                 val canSkipRefresh =
                     !previousNotificationIds.isNullOrEmpty() &&
-                        FloatingReplicaMappingManager.isAnyNotificationActive(context, previousNotificationIds) &&
-                        fingerprint == FloatingReplicaMappingManager.getNotificationFingerprint(sourceId)
+                        ReplicaStateStore.isAnyNotificationActive(context, previousNotificationIds) &&
+                        fingerprint == ReplicaStateStore.getNotificationFingerprint(sourceId)
 
                 if (canSkipRefresh) {
                     Logger.i(TAG, "超级岛: 内容无变更，跳过系统通知刷新: sourceId=$sourceId")
@@ -115,21 +115,21 @@ object FloatingReplicaNotificationManager {
                                 formattedData,
                             )
                         val liveUpdateNotificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
-                        FloatingReplicaMappingManager.putNotificationId(entryKey, liveUpdateNotificationId)
-                        FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
+                        ReplicaStateStore.putNotificationId(entryKey, liveUpdateNotificationId)
+                        ReplicaStateStore.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
                         if (success) {
-                            FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
+                            ReplicaStateStore.setNotificationFingerprint(sourceId, fingerprint)
                         }
                     }
                 } else {
                     val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, displayTitle, displayText, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, FloatingReplicaWindowManager.getFloatingWindowManager())
-                    FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, notificationId)
+                    ReplicaStateStore.addSourceIdMapping(sourceId, entryKey, notificationId)
                     if (notificationId != null) {
-                        FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
+                        ReplicaStateStore.setNotificationFingerprint(sourceId, fingerprint)
                     }
                 }
 
-                FloatingReplicaMappingManager.cancelTimeoutJob(sourceId)
+                ReplicaStateStore.cancelTimeoutJob(sourceId)
                 val timeoutJob =
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(30_000L)
@@ -137,7 +137,7 @@ object FloatingReplicaNotificationManager {
                             FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
                         }
                     }
-                FloatingReplicaMappingManager.setTimeoutJob(sourceId, timeoutJob)
+                ReplicaStateStore.setTimeoutJob(sourceId, timeoutJob)
             }
         }
     }
@@ -183,18 +183,18 @@ object FloatingReplicaNotificationManager {
             }
         } else {
             Logger.w(TAG, "超级岛: 无法获取上下文，无法关闭通知: sourceId=$sourceId")
-            FloatingReplicaMappingManager.removeSourceIdMappings(sourceId)
+            ReplicaStateStore.removeSourceIdMappings(sourceId)
             val keys = entryKeys ?: listOf(sourceId)
             keys.forEach { entryKey ->
-                FloatingReplicaMappingManager.removeNotificationId(entryKey)
+                ReplicaStateStore.removeNotificationId(entryKey)
             }
         }
 
         // 通知已撤回，清理内容指纹，保证后续保活包（即使无变更）会重新发出通知
-        FloatingReplicaMappingManager.removeNotificationFingerprint(sourceId)
+        ReplicaStateStore.removeNotificationFingerprint(sourceId)
 
         if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
-            FloatingReplicaMappingManager.removeBlockedInstance(sourceId)
+            ReplicaTtlRegistry.removeBlockedInstance(sourceId)
         }
     }
 
@@ -202,7 +202,7 @@ object FloatingReplicaNotificationManager {
         context: Context,
         notificationId: Int,
     ) {
-        val sourceIdToStop = FloatingReplicaMappingManager.findSourceIdByNotificationId(notificationId)
+        val sourceIdToStop = ReplicaStateStore.findSourceIdByNotificationId(notificationId)
 
         val isFloatingEnabled = FloatingReplicaWindowManager.isFloatingWindowEnabled(context)
 
@@ -224,7 +224,7 @@ object FloatingReplicaNotificationManager {
             NotificationGenerator.stopScrollUpdate(sourceIdToStop)
         }
 
-        val entryKey = FloatingReplicaMappingManager.getEntryKeyByNotificationId(notificationId)
+        val entryKey = ReplicaStateStore.getEntryKeyByNotificationId(notificationId)
 
         if (entryKey != null) {
             FloatingReplicaWindowManager.getFloatingWindowManager().removeEntry(entryKey, FloatingWindowManager.RemovalReason.MANUAL)

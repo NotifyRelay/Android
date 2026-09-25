@@ -42,16 +42,16 @@ object FloatingReplicaWindowManager {
                     if (context != null) {
                         NotificationGenerator.cancelReplicaNotification(context, key)
                     } else {
-                        FloatingReplicaMappingManager.removeNotificationId(key)
+                        ReplicaStateStore.removeNotificationId(key)
                     }
                     // 浮窗自身的自动移除（12s/45s）不经过 dismissBySourceInternal，
                     // 必须在此同步移除展示内容缓存，否则切换通道时会把已消失的条目重新展示出来
                     ReplicaDisplayCache.remove(key)
                 }
 
-                val sourceIdsToBlock = FloatingReplicaMappingManager.removeSourceIdMapping(key)
+                val sourceIdsToBlock = ReplicaStateStore.removeSourceIdMapping(key)
                 sourceIdsToBlock?.forEach { sourceId ->
-                    FloatingReplicaMappingManager.handleRemovalReason(sourceId, reason)
+                    ReplicaNotificationCloser.handleRemovalReason(sourceId, reason)
                 }
             }
         }
@@ -63,7 +63,7 @@ object FloatingReplicaWindowManager {
     private var windowManager: WeakReference<WindowManager>? = null
 
     init {
-        FloatingReplicaMappingManager.setOverlayView(null)
+        ReplicaStateStore.setOverlayView(null)
     }
 
     fun getFloatingWindowManager(): FloatingWindowManager = floatingWindowManager
@@ -97,7 +97,7 @@ object FloatingReplicaWindowManager {
                 return@runReplicaCatching
             }
 
-            if (!isRestoring && sourceId.isNotBlank() && FloatingReplicaMappingManager.isInstanceBlocked(sourceId)) {
+            if (!isRestoring && sourceId.isNotBlank() && ReplicaTtlRegistry.isInstanceBlocked(sourceId)) {
                 Logger.i(TAG, "超级岛: instanceId=$sourceId 已在本轮会话中被屏蔽，忽略展示")
                 return@runReplicaCatching
             }
@@ -110,7 +110,7 @@ object FloatingReplicaWindowManager {
 
             CoroutineScope(Dispatchers.Main).launch {
                 runReplicaCatchingSuspend(TAG, "显示浮窗(协程)") {
-                    val taskVersion = FloatingReplicaMappingManager.nextVersion(sourceId)
+                    val taskVersion = ReplicaStateStore.nextVersion(sourceId)
 
                     if (overlayLifecycleOwner == null) {
                         overlayLifecycleOwner = FloatingWindowLifecycleOwner()
@@ -121,14 +121,14 @@ object FloatingReplicaWindowManager {
                             SuperIslandImageStore.internAll(context, sourceId, picMap)
                         }
 
-                    if (!FloatingReplicaMappingManager.isLatestVersion(sourceId, taskVersion)) {
+                    if (!ReplicaStateStore.isLatestVersion(sourceId, taskVersion)) {
                         return@runReplicaCatchingSuspend
                     }
 
                     // 竞态守卫：协程 nextVersion 可能在 dismissBySource 的 removeSourceIdMappings 之后执行，
                     // 导致版本被 computeIfAbsent 重建、isLatestVersion 误判通过。
                     // 此处复检 isSourceRecentlyClosed（dismissBySource 已 markSourceClosed），命中即中止。
-                    if (FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)) {
+                    if (ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId)) {
                         Logger.i(TAG, "超级岛: sourceId=$sourceId 在异步发送期间被关闭，中止显示")
                         return@runReplicaCatchingSuspend
                     }
@@ -171,7 +171,7 @@ object FloatingReplicaWindowManager {
                         appName = appName,
                     )
 
-                    FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey)
+                    ReplicaStateStore.addSourceIdMapping(sourceId, entryKey)
 
                     addOrUpdateEntry(context, entryKey, summaryOnly)
 
@@ -186,25 +186,25 @@ object FloatingReplicaWindowManager {
 
                     if (!isRestoring) {
                         // 注入模式变化时先取消旧通知并清理旧映射，再按新模式发送
-                        FloatingReplicaMappingManager.migrateInjectionModeIfChanged(context, sourceId, injectionModeOrdinal)
+                        ReplicaNotificationCloser.migrateInjectionModeIfChanged(context, sourceId, injectionModeOrdinal)
 
                         // 内容与上次成功发出的通知一致且通知仍在展示时，跳过系统通知刷新（不调用 notify），
                         // 仅保留上方 addOrUpdateEntry 对内部撤回计时器（autoDismiss）的重置。
                         // 指纹包含注入模式：模式变化时指纹随之变化，不会被误判为「内容无变更」。
                         val fingerprint =
-                            FloatingReplicaMappingManager.computeNotificationFingerprint(
+                            ReplicaStateStore.computeNotificationFingerprint(
                                 displayTitle,
                                 displayText,
                                 formattedData.paramV2Raw,
                                 formattedData.resolvedPicMap,
                                 injectionModeOrdinal,
                             )
-                        val previousNotificationIds = FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
+                        val previousNotificationIds = ReplicaStateStore.getNotificationIdsBySourceId(sourceId)
                         val canSkipRefresh =
                             entryExistedBefore &&
                                 !previousNotificationIds.isNullOrEmpty() &&
-                                FloatingReplicaMappingManager.isAnyNotificationActive(context, previousNotificationIds) &&
-                                fingerprint == FloatingReplicaMappingManager.getNotificationFingerprint(sourceId)
+                                ReplicaStateStore.isAnyNotificationActive(context, previousNotificationIds) &&
+                                fingerprint == ReplicaStateStore.getNotificationFingerprint(sourceId)
 
                         if (canSkipRefresh) {
                             Logger.i(TAG, "超级岛: 内容无变更，跳过系统通知刷新，仅重置内部撤回计时器: sourceId=$sourceId")
@@ -220,18 +220,18 @@ object FloatingReplicaWindowManager {
                                         formattedData,
                                     )
                                 val liveUpdateNotificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
-                                FloatingReplicaMappingManager.putNotificationId(entryKey, liveUpdateNotificationId)
-                                FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
+                                ReplicaStateStore.putNotificationId(entryKey, liveUpdateNotificationId)
+                                ReplicaStateStore.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
                                 // 仅在确认发出成功后记录指纹，发送异常被吞时留空，避免后续保活包被误跳过
                                 if (success) {
-                                    FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
+                                    ReplicaStateStore.setNotificationFingerprint(sourceId, fingerprint)
                                 }
                             }
                         } else {
                             val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, displayTitle, displayText, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, floatingWindowManager)
-                            FloatingReplicaMappingManager.addSourceIdMapping(sourceId, entryKey, notificationId)
+                            ReplicaStateStore.addSourceIdMapping(sourceId, entryKey, notificationId)
                             if (notificationId != null) {
-                                FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
+                                ReplicaStateStore.setNotificationFingerprint(sourceId, fingerprint)
                             }
                         }
                     }
@@ -259,20 +259,20 @@ object FloatingReplicaWindowManager {
         }
 
         runReplicaCatching(TAG, "切换浮窗状态") {
-            val entryKeys = FloatingReplicaMappingManager.getSourceIdEntryKeys(sourceId)
+            val entryKeys = ReplicaStateStore.getSourceIdEntryKeys(sourceId)
             val isShowing = entryKeys?.any { floatingWindowManager.getEntry(it) != null } == true
 
             if (isShowing) {
                 val entry = floatingWindowManager.getEntry(sourceId)
                 if (entry != null) {
-                    FloatingReplicaMappingManager.saveHiddenEntry(sourceId, entry)
+                    ReplicaStateStore.saveHiddenEntry(sourceId, entry)
                 }
 
                 dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.HIDDEN)
             } else {
-                FloatingReplicaMappingManager.removeBlockedInstance(sourceId)
+                ReplicaTtlRegistry.removeBlockedInstance(sourceId)
 
-                val existingEntry = FloatingReplicaMappingManager.getHiddenEntry(sourceId)
+                val existingEntry = ReplicaStateStore.getHiddenEntry(sourceId)
                 if (existingEntry != null) {
                     showFloatingInternal(
                         context,
@@ -285,7 +285,7 @@ object FloatingReplicaWindowManager {
                         isLocked = false,
                         isRestoring = true,
                     )
-                    FloatingReplicaMappingManager.removeHiddenEntry(sourceId)
+                    ReplicaStateStore.removeHiddenEntry(sourceId)
                 } else {
                     showFloatingInternal(
                         context,
@@ -308,40 +308,40 @@ object FloatingReplicaWindowManager {
         reason: FloatingWindowManager.RemovalReason = FloatingWindowManager.RemovalReason.REMOTE,
     ) {
         runReplicaCatching(TAG, "按来源关闭浮窗") {
-            if (FloatingReplicaMappingManager.isSourceRecentlyClosedWithinMinute(sourceId)) {
+            if (ReplicaTtlRegistry.isSourceRecentlyClosedWithinMinute(sourceId)) {
                 return@runReplicaCatching
             }
 
             if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
-                FloatingReplicaMappingManager.markSourceClosed(sourceId)
+                ReplicaTtlRegistry.markSourceClosed(sourceId)
                 // HIDDEN 保留缓存：隐藏是可恢复的临时状态，内容仍然活跃、切换通道时仍应展示
                 ReplicaDisplayCache.remove(sourceId)
             }
 
-            FloatingReplicaMappingManager.cancelTimeoutJob(sourceId)
+            ReplicaStateStore.cancelTimeoutJob(sourceId)
 
             NotificationGenerator.stopScrollUpdate(sourceId)
 
-            val ctx = FloatingReplicaMappingManager.getAppContext()
+            val ctx = ReplicaStateStore.getAppContext()
             if (ctx != null && !isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
                 FloatingReplicaListModeManager.dismissFromList(ctx, sourceId)
                 if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
-                    FloatingReplicaMappingManager.removeBlockedInstance(sourceId)
+                    ReplicaTtlRegistry.removeBlockedInstance(sourceId)
                 }
                 return@runReplicaCatching
             }
 
             val floatingEnabled = if (ctx != null) isFloatingWindowEnabled(ctx) else true
 
-            val notificationIdsBefore = FloatingReplicaMappingManager.getNotificationIdsBySourceId(sourceId)
-            val entryKeys = FloatingReplicaMappingManager.getSourceIdEntryKeys(sourceId)
+            val notificationIdsBefore = ReplicaStateStore.getNotificationIdsBySourceId(sourceId)
+            val entryKeys = ReplicaStateStore.getSourceIdEntryKeys(sourceId)
 
             if (floatingEnabled) {
                 if (entryKeys != null) {
                     entryKeys.forEach { entryKey ->
                         floatingWindowManager.removeEntry(entryKey, reason)
                     }
-                    FloatingReplicaMappingManager.removeSourceIdMappings(sourceId)
+                    ReplicaStateStore.removeSourceIdMappings(sourceId)
                 } else {
                     floatingWindowManager.removeEntry(sourceId, reason)
                 }
@@ -375,7 +375,7 @@ object FloatingReplicaWindowManager {
         overlayView = null
         overlayLayoutParams = null
         windowManager = null
-        FloatingReplicaMappingManager.setOverlayView(null)
+        ReplicaStateStore.setOverlayView(null)
     }
 
     private fun addOrUpdateEntry(
@@ -436,7 +436,7 @@ object FloatingReplicaWindowManager {
                         overlayView = WeakReference(composeContainer)
                         overlayLayoutParams = layoutParams
                         windowManager = WeakReference(wm)
-                        FloatingReplicaMappingManager.setOverlayView(composeContainer)
+                        ReplicaStateStore.setOverlayView(composeContainer)
                     }
                 }
             }

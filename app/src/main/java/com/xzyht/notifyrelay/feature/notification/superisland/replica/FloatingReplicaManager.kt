@@ -25,7 +25,7 @@ object FloatingReplicaManager {
 
     fun getAppContext(): Context? = appContext
 
-    fun isSourceRecentlyClosed(sourceId: String): Boolean = FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)
+    fun isSourceRecentlyClosed(sourceId: String): Boolean = ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId)
 
     fun showFloating(
         context: Context,
@@ -39,7 +39,7 @@ object FloatingReplicaManager {
         cacheForChannelSwitch: Boolean = true,
     ) {
         appContext = context.applicationContext
-        FloatingReplicaMappingManager.setAppContext(appContext)
+        ReplicaStateStore.setAppContext(appContext)
 
         // 登记「当前展示内容」，供通道切换时按新通道重建。
         // 远端媒体胶囊传 false：媒体有独立开关，不参与超级岛通道迁移。
@@ -49,7 +49,7 @@ object FloatingReplicaManager {
             }
         }
 
-        val isRecentlyClosed = FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)
+        val isRecentlyClosed = ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId)
 
         if (SuperIslandConfigUtils.isFloatingWindowEnabled(context)) {
             if (isRecentlyClosed) {
@@ -63,11 +63,11 @@ object FloatingReplicaManager {
             return
         } else if (SuperIslandConfigUtils.isNotificationListMode(context)) {
             cacheDisplay()
-            FloatingReplicaMappingManager.removeClosedSource(sourceId)
+            ReplicaTtlRegistry.removeClosedSource(sourceId)
             FloatingReplicaListModeManager.showFloatingListMode(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked)
         } else {
             cacheDisplay()
-            FloatingReplicaMappingManager.removeClosedSource(sourceId)
+            ReplicaTtlRegistry.removeClosedSource(sourceId)
             FloatingReplicaNotificationManager.sendNotification(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked)
         }
     }
@@ -115,7 +115,7 @@ object FloatingReplicaManager {
     fun dismissAllRemoteSuperIsland(context: Context) {
         runReplicaCatching(TAG, "关闭全部远端超级岛展示") {
             val ctx = context.applicationContext
-            val sourceIds = FloatingReplicaMappingManager.getAllSourceIds()
+            val sourceIds = ReplicaStateStore.getAllSourceIds()
 
             // Live Updates 通道（仅 Android 16+）：按 sourceId 关闭系统提升通知
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
@@ -141,7 +141,7 @@ object FloatingReplicaManager {
             FloatingReplicaWindowManager.getFloatingWindowManager().clearAllEntries()
 
             // 清空全部通道映射与内容指纹，保证后续远端包按当前通道重新建立映射
-            FloatingReplicaMappingManager.clearAllMappings()
+            ReplicaStateStore.clearAllMappings()
 
             ReplicaDisplayCache.clear()
 

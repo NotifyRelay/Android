@@ -65,7 +65,7 @@ object FloatingReplicaListModeManager {
     ) {
         CoroutineScope(Dispatchers.Main).launch {
             runReplicaCatchingSuspend(TAG, "发送列表模式通知") {
-                val taskVersion = FloatingReplicaMappingManager.nextVersion(entry.sourceId)
+                val taskVersion = ReplicaStateStore.nextVersion(entry.sourceId)
 
                 if (SuperIslandListManager.getActive()?.sourceId != entry.sourceId) {
                     return@runReplicaCatchingSuspend
@@ -75,7 +75,7 @@ object FloatingReplicaListModeManager {
                         SuperIslandImageStore.internAll(context, entry.sourceId, entry.picMap)
                     }
 
-                if (SuperIslandListManager.getActive()?.sourceId != entry.sourceId || !FloatingReplicaMappingManager.isLatestVersion(entry.sourceId, taskVersion)) {
+                if (SuperIslandListManager.getActive()?.sourceId != entry.sourceId || !ReplicaStateStore.isLatestVersion(entry.sourceId, taskVersion)) {
                     return@runReplicaCatchingSuspend
                 }
 
@@ -104,25 +104,25 @@ object FloatingReplicaListModeManager {
                 val injectionModeOrdinal = SuperIslandConfigUtils.getSpecInjectionMode(context).ordinal
 
                 // 注入模式变化时先取消旧通知并清理旧映射，避免切换后旧通道通知残留
-                FloatingReplicaMappingManager.migrateInjectionModeIfChanged(context, entry.sourceId, injectionModeOrdinal)
+                ReplicaNotificationCloser.migrateInjectionModeIfChanged(context, entry.sourceId, injectionModeOrdinal)
 
                 // 内容与上次成功发出的通知一致时，跳过系统通知刷新（不调用 notify），仅重置下方撤回计时器；
                 // 切换/移除后展示下一条（forceRefresh）时必须强制刷新，避免通知内容停留旧条目。
                 // 指纹包含注入模式：模式变化时指纹随之变化，不会被误判为「内容无变更」。
                 val fingerprint =
-                    FloatingReplicaMappingManager.computeNotificationFingerprint(
+                    ReplicaStateStore.computeNotificationFingerprint(
                         displayTitle,
                         displayText,
                         formattedData.paramV2Raw,
                         formattedData.resolvedPicMap,
                         injectionModeOrdinal,
                     )
-                val previousNotificationIds = FloatingReplicaMappingManager.getNotificationIdsBySourceId(entry.sourceId)
+                val previousNotificationIds = ReplicaStateStore.getNotificationIdsBySourceId(entry.sourceId)
                 val canSkipRefresh =
                     !forceRefresh &&
                         !previousNotificationIds.isNullOrEmpty() &&
-                        FloatingReplicaMappingManager.isAnyNotificationActive(context, previousNotificationIds) &&
-                        fingerprint == FloatingReplicaMappingManager.getNotificationFingerprint(entry.sourceId)
+                        ReplicaStateStore.isAnyNotificationActive(context, previousNotificationIds) &&
+                        fingerprint == ReplicaStateStore.getNotificationFingerprint(entry.sourceId)
 
                 if (canSkipRefresh) {
                     Logger.i(TAG, "超级岛: 内容无变更，跳过系统通知刷新，仅重置撤回计时器: sourceId=${entry.sourceId}")
@@ -138,11 +138,11 @@ object FloatingReplicaListModeManager {
                             overrideNotificationId = LIST_MODE_NOTIFICATION_ID,
                         )
                     if (success) {
-                        FloatingReplicaMappingManager.putNotificationId(entry.sourceId, LIST_MODE_NOTIFICATION_ID)
-                        FloatingReplicaMappingManager.addSourceIdMapping(entry.sourceId, entry.sourceId, LIST_MODE_NOTIFICATION_ID)
-                        FloatingReplicaMappingManager.setNotificationFingerprint(entry.sourceId, fingerprint)
+                        ReplicaStateStore.putNotificationId(entry.sourceId, LIST_MODE_NOTIFICATION_ID)
+                        ReplicaStateStore.addSourceIdMapping(entry.sourceId, entry.sourceId, LIST_MODE_NOTIFICATION_ID)
+                        ReplicaStateStore.setNotificationFingerprint(entry.sourceId, fingerprint)
                     } else {
-                        FloatingReplicaMappingManager.removeNotificationFingerprint(entry.sourceId)
+                        ReplicaStateStore.removeNotificationFingerprint(entry.sourceId)
                     }
                 } else {
                     val notificationId =
@@ -160,9 +160,9 @@ object FloatingReplicaListModeManager {
                             overrideNotificationId = LIST_MODE_NOTIFICATION_ID,
                         )
                     if (notificationId != null) {
-                        FloatingReplicaMappingManager.addSourceIdMapping(entry.sourceId, entry.sourceId, notificationId)
+                        ReplicaStateStore.addSourceIdMapping(entry.sourceId, entry.sourceId, notificationId)
                         // 仅在确认发出成功后记录指纹，失败时留空以便下次保活包重试
-                        FloatingReplicaMappingManager.setNotificationFingerprint(entry.sourceId, fingerprint)
+                        ReplicaStateStore.setNotificationFingerprint(entry.sourceId, fingerprint)
                     }
                 }
                 scheduleListModeTimeoutFor(entry.sourceId)
@@ -171,7 +171,7 @@ object FloatingReplicaListModeManager {
     }
 
     fun scheduleListModeTimeoutFor(sourceId: String) {
-        FloatingReplicaMappingManager.cancelTimeoutJob(sourceId)
+        ReplicaStateStore.cancelTimeoutJob(sourceId)
         val job =
             CoroutineScope(Dispatchers.Main).launch {
                 delay(30_000L)
@@ -179,7 +179,7 @@ object FloatingReplicaListModeManager {
                     FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
                 }
             }
-        FloatingReplicaMappingManager.setTimeoutJob(sourceId, job)
+        ReplicaStateStore.setTimeoutJob(sourceId, job)
     }
 
     fun switchNotificationInList(context: Context) {
@@ -196,7 +196,7 @@ object FloatingReplicaListModeManager {
         context: Context,
         sourceId: String,
     ) {
-        FloatingReplicaMappingManager.removeSourceIdMappings(sourceId)
+        ReplicaStateStore.removeSourceIdMappings(sourceId)
         val next = SuperIslandListManager.remove(sourceId)
         ListenerForegroundController.onSuperIslandListChanged()
         if (next != null) {

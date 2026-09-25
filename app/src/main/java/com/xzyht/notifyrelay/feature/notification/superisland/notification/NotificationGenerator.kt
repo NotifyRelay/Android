@@ -5,7 +5,7 @@ import android.content.Context
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaMappingManager
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaStateStore
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.CancellationException
 import notifyrelay.base.util.Logger
@@ -206,7 +206,7 @@ object NotificationGenerator {
             }
 
             // 保存entryKey到notificationId的映射
-            FloatingReplicaMappingManager
+            ReplicaStateStore
                 .putNotificationId(key, notificationId)
 
             return notificationId
@@ -228,7 +228,7 @@ object NotificationGenerator {
     ) {
         try {
             val notificationId =
-                FloatingReplicaMappingManager
+                ReplicaStateStore
                     .removeNotificationId(key)
             if (notificationId != null) {
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
@@ -251,7 +251,7 @@ object NotificationGenerator {
 
                 // 取消所有映射中的通知
                 val allIds =
-                    FloatingReplicaMappingManager
+                    ReplicaStateStore
                         .getAllNotificationIds()
                 allIds.forEach { (key, notificationId) ->
                     notificationManager.cancel(notificationId)
@@ -261,10 +261,10 @@ object NotificationGenerator {
             }
 
             // 清空映射
-            FloatingReplicaMappingManager
+            ReplicaStateStore
                 .clearAllNotificationIds()
             // 清空所有内容指纹
-            FloatingReplicaMappingManager
+            ReplicaStateStore
                 .clearAllNotificationFingerprints()
             // 清空所有滚动更新
             clearAllScrollUpdates()
