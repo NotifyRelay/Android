@@ -175,7 +175,7 @@ object FloatingReplicaManager {
                 runReplicaCatching(TAG, "关闭全部Live Updates通知") {
                     LiveUpdatesNotificationManager.initialize(ctx)
                     sourceIds.forEach { sourceId ->
-                        LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
+                        LiveUpdatesNotificationManager.dismiss(sourceId)
                     }
                 }
             }

@@ -40,7 +40,7 @@ object SuperIslandProcessor {
         ReplicaDisplayCache.remove(sourceId)
         FloatingReplicaManager.dismissBySource(sourceId)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-            LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
+            LiveUpdatesNotificationManager.dismiss(sourceId)
         }
     }
 

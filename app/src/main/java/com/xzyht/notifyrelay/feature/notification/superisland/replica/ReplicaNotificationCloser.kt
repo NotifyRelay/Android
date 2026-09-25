@@ -116,8 +116,7 @@ internal object ReplicaNotificationCloser {
             runReplicaCatching(TAG, "关闭Live Updates复合通知") {
                 val context = ReplicaStateStore.getOverlayContext()
                 if (context != null) {
-                    LiveUpdatesNotificationManager.initialize(context)
-                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
+                    LiveUpdatesNotificationManager.dismiss(sourceId, context)
                 } else {
                     Logger.w(TAG, "无法关闭Live Updates复合通知，上下文为空")
                 }

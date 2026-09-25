@@ -82,16 +82,9 @@ object FloatingReplicaNotificationManager {
         if (context != null) {
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                 runReplicaCatching(TAG, "关闭Live Updates通知") {
-                    LiveUpdatesNotificationManager.initialize(context)
-                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
-
-                    val liveUpdateNotificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
-                    val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-                    try {
-                        notificationManager.cancel(liveUpdateNotificationId)
-                    } catch (e: Exception) {
-                        Logger.w(TAG, "直接关闭Live Updates通知失败: ${e.message}")
-                    }
+                    // 单入口：dismiss 内部取消的正是 SuperIslandNotificationIds.liveUpdates(sourceId)，
+                    // 原实现在此处再直接 cancel 同一 id 属重复操作（D7）
+                    LiveUpdatesNotificationManager.dismiss(sourceId, context)
                 }
             }
 

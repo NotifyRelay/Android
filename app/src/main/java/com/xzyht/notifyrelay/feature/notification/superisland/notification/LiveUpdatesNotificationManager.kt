@@ -343,31 +343,49 @@ object LiveUpdatesNotificationManager {
     }
 
     /**
-     * 撤回指定 sourceId 的 Live Updates 提升通知。
+     * **Live Updates 通知撤回的唯一入口**（D5/D7 收敛）。
      *
-     * 该 sourceId 的取消入口只有这一处（原 `cancelLiveUpdate` 别名已删除）。
+     * 原先「撤回 Live Updates」散落在 4 处，其中两处（`closeNotificationsBySourceId`、
+     * `migrateInjectionModeIfChanged`）还在调用本方法之外**再直接 `notificationManager.cancel(id)`**
+     * 一次——本方法取消的正是同一个推导 id（[SuperIslandNotificationIds.liveUpdates]），
+     * 属重复操作。现全部收敛到此处：调方只需调用 [dismiss]，不再自行 cancel 该 id。
+     *
+     * 行为与拆分前逐字一致：版本门控 →（未初始化则尝试初始化）→ 取消推导 id；
+     * 失败只记日志、不抛出。
+     *
+     * @param context 可选的用于初始化 [notificationManager] 的 Context；
+     *   传入时先 [initialize]（幂等）。不传则沿用已初始化的单例状态。
+     * @return true 表示已实际执行取消（或无需取消），false 表示版本不满足而跳过。
      */
-    fun dismissLiveUpdateNotification(sourceId: String) {
+    fun dismiss(
+        sourceId: String,
+        context: Context? = null,
+    ): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
             Logger.w(TAG, "当前Android版本不支持Live Updates")
-            return
+            return false
         }
         try {
-            // 检查notificationManager是否已初始化，如果没有则尝试初始化
-            if (!::notificationManager.isInitialized) {
+            if (context != null) {
+                // initialize 内部同样做版本门控；此处已在上方确认版本满足
+                initialize(context)
+            } else if (!::notificationManager.isInitialized) {
+                // 检查notificationManager是否已初始化，如果没有则尝试初始化
                 Logger.w(TAG, "LiveUpdatesNotificationManager未初始化，尝试初始化")
                 // 如果有appContext，则使用appContext初始化
                 if (::appContext.isInitialized) {
                     initialize(appContext)
                 } else {
                     Logger.w(TAG, "无法初始化LiveUpdatesNotificationManager，缺少上下文")
-                    return
+                    return false
                 }
             }
             val notificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
             notificationManager.cancel(notificationId)
+            return true
         } catch (e: Exception) {
             Logger.e(TAG, "取消Live Update通知失败: ${e.message}")
+            return false
         }
     }
 

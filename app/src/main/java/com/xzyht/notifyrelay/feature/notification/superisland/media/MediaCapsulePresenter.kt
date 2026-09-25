@@ -3,9 +3,6 @@ package com.xzyht.notifyrelay.feature.notification.superisland.media
 import android.content.Context
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import github.xzynine.superislandui.builder.SuperIslandParamBuilder
-import github.xzynine.superislandui.common.TextSplitter
-import notifyrelay.base.util.DeviceUtils
-import notifyrelay.data.StorageManager
 import org.json.JSONObject
 
 object MediaCapsulePresenter {
@@ -18,32 +15,10 @@ object MediaCapsulePresenter {
         picMap: Map<String, String>? = null,
         coverUrl: String? = null,
     ) {
-        // 处理歌词拆分
-        val lyricText = title.orEmpty()
-        var capsuleText = lyricText
-        var iconText = ""
-
-        // 检查歌词分割模式设置
-        val lyricsSplitMode = StorageManager.getInt(context, "lyrics_split_mode", 0)
-        val shouldSplit =
-            when (lyricsSplitMode) {
-                1 -> true
-                2 -> false
-                else -> !DeviceUtils.isTablet(context)
-            }
-
-        if (shouldSplit) {
-            val threshold = 12
-            val textLength = TextSplitter.calculateTextLength(lyricText)
-            if (textLength > threshold) {
-                val (splitIconText, splitCapsuleText) = TextSplitter.splitLyric(lyricText, threshold)
-                iconText = splitIconText
-                capsuleText = splitCapsuleText
-            }
-        } else {
-            capsuleText = lyricText
-            iconText = ""
-        }
+        // 处理歌词拆分（逻辑统一在 LyricsSplitter，P3-1/D2）
+        val split = LyricsSplitter.split(context, title)
+        val iconText = split.iconText
+        val capsuleText = split.capsuleText
 
         val paramV2Raw = buildParamV2(title.orEmpty(), text.orEmpty(), iconText, capsuleText)
         val resolvedPicMap = picMap ?: buildDefaultPicMap(coverUrl)

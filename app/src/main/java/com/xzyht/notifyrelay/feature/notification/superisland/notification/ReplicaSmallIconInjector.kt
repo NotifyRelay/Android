@@ -109,6 +109,27 @@ internal object ReplicaSmallIconInjector {
     }
 
     /**
+     * 小图标兜底：下载 `miui.focus.pic_app_icon`（D4 合并的唯一「逐字相同」段）。
+     *
+     * 三处调用点（[resolveSmallIconBitmap] 的末级兜底、[MediaReplicaNotifier] 与
+     * [GeneralReplicaNotifier] 的进度分支）的这段逻辑逐字相同，故合并到此处；
+     * 它们**其余**的兜底链（A/B 区图片键、文本位图、进度位图）顺序与条件不同，
+     * 注释已明确「两路不可随意统一」，故不做进一步合并。
+     *
+     * @return 下载成功返回位图，URL 缺失 / 下载失败返回 null
+     */
+    suspend fun downloadAppIconBitmapOrNull(
+        context: Context,
+        picMap: Map<String, String>?,
+    ): Bitmap? {
+        val appIconKey = "miui.focus.pic_app_icon"
+        if (picMap.isNullOrEmpty() || !picMap.containsKey(appIconKey)) return null
+        val appIconUrl = picMap[appIconKey]
+        if (appIconUrl.isNullOrBlank()) return null
+        return downloadBitmap(context, appIconUrl)
+    }
+
+    /**
      * 解析小图标位图，遵循优先级：progress -> text -> picMap aPicKey/bPicKey -> appIconKey -> null
      */
     private suspend fun resolveSmallIconBitmap(
