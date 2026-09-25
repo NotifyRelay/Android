@@ -51,8 +51,6 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-private const val SUPER_ISLAND_SHOW_KEY = "superisland_show"
-
 private val DEFAULT_MIRROR_PACKAGES: List<String>
     get() = FilterConfigDefaults.defaultMirrorPackages
 
@@ -68,7 +66,7 @@ fun UISuperIslandSettings() {
     val context = LocalContext.current
 
     var enabled by remember { mutableStateOf(StorageManager.getBoolean(context, SuperIslandStorageKeys.ENABLED, true)) }
-    var showSuperIsland by remember { mutableStateOf(StorageManager.getBoolean(context, SUPER_ISLAND_SHOW_KEY, true)) }
+    var showSuperIsland by remember { mutableStateOf(SuperIslandConfigUtils.isRemoteSuperIslandDisplayEnabled(context)) }
     var floatingWindowEnabled by remember { mutableStateOf(SuperIslandConfigUtils.isFloatingWindowEnabled(context)) }
     var notificationListEnabled by remember { mutableStateOf(SuperIslandConfigUtils.isNotificationListMode(context)) }
 
@@ -139,8 +137,11 @@ fun UISuperIslandSettings() {
                 checked = showSuperIsland,
                 onCheckedChange = {
                     showSuperIsland = it
-                    StorageManager.putBoolean(context, SUPER_ISLAND_SHOW_KEY, it)
-                    ToastUtils.showShortToast(context, "功能开发中")
+                    SuperIslandConfigUtils.setRemoteSuperIslandDisplayEnabled(context, it)
+                    if (!it) {
+                        // 关闭显示：立即撤下已展示的远端超级岛（浮窗 / 列表 / 系统通知）
+                        FloatingReplicaManager.dismissAllRemoteSuperIsland(context)
+                    }
                 },
             )
 
@@ -162,8 +163,9 @@ fun UISuperIslandSettings() {
                 onCheckedChange = {
                     notificationListEnabled = it
                     if (it) {
+                        // 只同步 UI 状态；关浮窗由 setNotificationListMode 内部一次完成，
+                        // 避免先单独关浮窗触发一次多余的通道切换与重建
                         floatingWindowEnabled = false
-                        SuperIslandConfigUtils.setFloatingWindowEnabled(context, false)
                     }
                     SuperIslandConfigUtils.setNotificationListMode(context, it)
                 },

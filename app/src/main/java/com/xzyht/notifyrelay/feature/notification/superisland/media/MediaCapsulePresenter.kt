@@ -55,6 +55,8 @@ object MediaCapsulePresenter {
             paramV2Raw = paramV2Raw,
             picMap = resolvedPicMap,
             appName = appName,
+            // 远端媒体有独立开关，不参与超级岛通道切换的重建
+            cacheForChannelSwitch = false,
         )
     }
 

@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.ui.dialog
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.sync.MessageSender
 import kotlinx.coroutines.CoroutineScope
@@ -83,6 +84,8 @@ fun showTestNotification(
         }
     } else {
         // 发送开关关闭时，仅在本地显示通知
+        // 本地显示属主动展示，同样受「超级岛显示」开关约束：关闭时提示用户并中止
+        if (!SuperIslandConfigUtils.confirmManualRemoteSuperIslandDisplay(context)) return
         FloatingReplicaManager.showFloating(
             context = context,
             sourceId = sourceId,

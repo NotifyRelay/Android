@@ -11,6 +11,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslan
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaDisplayCache
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandRemoteStore
 import com.xzyht.notifyrelay.feature.notification.superisland.tracker.LocalSuperIslandTracker
 import com.xzyht.notifyrelay.nativecore.NativeCore
@@ -35,6 +36,8 @@ object SuperIslandProcessor {
         get() = FilterConfigDefaults.defaultMirrorPackages
 
     private fun dismissBySourceId(sourceId: String) {
+        // 结束包：同步移除「当前展示内容」缓存，避免切换通道时把已结束的条目重新展示出来
+        ReplicaDisplayCache.remove(sourceId)
         FloatingReplicaManager.dismissBySource(sourceId)
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
             LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
@@ -337,7 +340,10 @@ object SuperIslandProcessor {
             try {
                 // 仅在有实际可展示内容时才创建浮窗
                 val hasContent = !finalTitle.isNullOrBlank() || !finalText.isNullOrBlank() || !mParam2.isNullOrBlank() || (mPics.isNotEmpty())
-                if (hasContent) {
+                if (!SuperIslandConfigUtils.isRemoteSuperIslandDisplayEnabled(context)) {
+                    // 「超级岛显示」开关关闭：只跳过展示；解析、远端状态缓存与历史记录照常（历史仍可查）
+                    Logger.i("超级岛", "超级岛显示开关已关闭，跳过展示远端超级岛: sourceKey=$sourceKey")
+                } else if (hasContent) {
                     // 对于所有类型，都显示传统浮窗
                     // 复合通知将在浮窗创建时由FloatingReplicaManager处理
                     FloatingReplicaManager.showFloating(context, sourceKey, finalTitle, finalText, mParam2, mPics, appName, isLocked)

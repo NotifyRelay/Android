@@ -127,6 +127,27 @@ object FloatingReplicaMappingManager {
 
     fun getNotificationIdsBySourceId(sourceId: String): List<Int>? = sourceIdToNotificationIds[sourceId]?.toList()
 
+    /** 当前已登记的全部远端 sourceId（用于按通道批量关闭通知）。 */
+    fun getAllSourceIds(): List<String> = sourceIdToEntryKeyMap.keys.toList()
+
+    /**
+     * 清空全部映射与派生状态（关闭远端显示 / 列表模式通道切换时使用）。
+     *
+     * 保留 [closedSourceIds] 与 [blockedInstanceIds]：通道切换不应解除用户刚刚
+     * 表达过的关闭意图，两者仍按各自 TTL 自然过期。
+     */
+    fun clearAllMappings() {
+        timeoutJobs.values.forEach { it.cancel() }
+        timeoutJobs.clear()
+        sourceIdToEntryKeyMap.clear()
+        entryKeyToNotificationId.clear()
+        sourceIdToNotificationIds.clear()
+        sourceVersions.clear()
+        lastNotificationFingerprints.clear()
+        sourceIdToInjectionMode.clear()
+        hiddenEntries.clear()
+    }
+
     /**
      * 指纹命中时用于二次确认：此前发出的通知是否**确实仍在本应用的活动通知中**。
      *

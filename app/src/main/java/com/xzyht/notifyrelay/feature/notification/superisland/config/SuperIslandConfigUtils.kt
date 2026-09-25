@@ -8,6 +8,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.receiver.Notificat
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
+import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.StorageManager
 
 /**
@@ -27,6 +28,9 @@ object SuperIslandConfigUtils {
 
     /** 镜像应用过滤开关的存储 key。持久化契约，值不可改。 */
     internal const val MIRROR_FILTER_ENABLED_KEY = "super_island_mirror_filter_enabled"
+
+    /** 远端超级岛显示开关的存储 key。持久化契约，值不可改（原为设置页私有常量）。 */
+    internal const val SUPER_ISLAND_SHOW_KEY = "superisland_show"
 
     // 注入方式枚举
     enum class SpecInjectionMode {
@@ -51,18 +55,47 @@ object SuperIslandConfigUtils {
      */
     fun isFloatingWindowEnabled(context: Context): Boolean = StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, FloatingReplicaManager.getDefaultFloatingWindowEnabled())
 
+    /** 远端超级岛的展示通道：三者互斥，由浮窗 / 列表两个开关推导。 */
+    private enum class DisplayChannel {
+        FLOATING,
+        LIST,
+        NOTIFICATION,
+    }
+
+    /**
+     * 推导当前生效的展示通道。
+     *
+     * 注意 [isNotificationListMode] 的默认值依赖浮窗开关，故必须在**配置写入前后**各算一次，
+     * 才能得到真实的通道变化。
+     */
+    private fun resolveDisplayChannel(context: Context): DisplayChannel =
+        when {
+            isFloatingWindowEnabled(context) -> DisplayChannel.FLOATING
+            isNotificationListMode(context) -> DisplayChannel.LIST
+            else -> DisplayChannel.NOTIFICATION
+        }
+
     /**
      * 设置浮窗开关（与通知列表模式互斥）。
      * 开启浮窗时自动关闭通知列表模式。
+     *
+     * 展示通道发生变化时（含"开启浮窗 → 列表模式被互斥关闭"），撤下旧通道展示并按新通道
+     * 重建当前展示内容，见 [FloatingReplicaManager.switchSuperIslandChannel]。
      */
     fun setFloatingWindowEnabled(
         context: Context,
         enabled: Boolean,
     ) {
-        if (enabled && isNotificationListMode(context)) {
-            setNotificationListMode(context, false)
-        }
+        val previousChannel = resolveDisplayChannel(context)
+        // 列表模式是否开启必须在写入浮窗开关**之前**判定：平板默认值由「非浮窗」推导
+        val listModeWillClose = enabled && isNotificationListMode(context)
         StorageManager.putBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, enabled)
+        if (listModeWillClose) {
+            StorageManager.putBoolean(context, SUPER_ISLAND_NOTIFICATION_LIST_KEY, false)
+        }
+        if (resolveDisplayChannel(context) != previousChannel) {
+            FloatingReplicaManager.switchSuperIslandChannel(context)
+        }
     }
 
     /**
@@ -82,15 +115,59 @@ object SuperIslandConfigUtils {
     /**
      * 设置通知列表模式（与浮窗互斥）。
      * 开启通知列表模式时自动关闭浮窗。
+     *
+     * 展示通道发生变化时，撤下旧通道（列表聚合 / 普通复刻 / Live Updates）通知并按新通道
+     * 重建当前展示内容（见 [FloatingReplicaManager.switchSuperIslandChannel]）：
+     * 各通道的通知 ID 与渲染方式均不同，若不清理会出现旧通道通知残留或两条通知并存，
+     * 若不重建则内容会空到远端下一个包到来（一次性通知甚至不再出现）。
      */
     fun setNotificationListMode(
         context: Context,
         enabled: Boolean,
     ) {
+        val previousChannel = resolveDisplayChannel(context)
         if (enabled && isFloatingWindowEnabled(context)) {
-            setFloatingWindowEnabled(context, false)
+            StorageManager.putBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, false)
         }
         StorageManager.putBoolean(context, SUPER_ISLAND_NOTIFICATION_LIST_KEY, enabled)
+        if (resolveDisplayChannel(context) != previousChannel) {
+            FloatingReplicaManager.switchSuperIslandChannel(context)
+        }
+    }
+
+    /**
+     * 检查是否显示来自远端的超级岛（默认开启）。
+     *
+     * 关闭时只关闭「展示」：入站解析、远端状态缓存与历史记录照常进行，
+     * 由 SuperIslandProcessor 跳过浮窗 / 列表 / 通知的创建。
+     */
+    fun isRemoteSuperIslandDisplayEnabled(context: Context): Boolean = StorageManager.getBoolean(context, SUPER_ISLAND_SHOW_KEY, true)
+
+    /**
+     * 设置是否显示来自远端的超级岛。
+     *
+     * 仅写入配置；已展示的条目由调用方在关闭时调用
+     * [FloatingReplicaManager.dismissAllRemoteSuperIsland] 立即撤下。
+     */
+    fun setRemoteSuperIslandDisplayEnabled(
+        context: Context,
+        enabled: Boolean,
+    ) {
+        StorageManager.putBoolean(context, SUPER_ISLAND_SHOW_KEY, enabled)
+    }
+
+    /**
+     * 用户主动展示（历史重放 / 测试分支）前的开关校验。
+     *
+     * 与远端自动接收路径不同，主动展示属用户显式操作，被开关拦下时必须给出提示，
+     * 否则表现为「点了没反应」。
+     *
+     * @return true 表示允许展示；false 表示已提示用户，调用方应中止展示。
+     */
+    fun confirmManualRemoteSuperIslandDisplay(context: Context): Boolean {
+        if (isRemoteSuperIslandDisplayEnabled(context)) return true
+        ToastUtils.showShortToast(context, "超级岛显示开关已关闭")
+        return false
     }
 
     /**

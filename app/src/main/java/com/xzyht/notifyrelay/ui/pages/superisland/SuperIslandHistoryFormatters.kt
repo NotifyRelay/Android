@@ -3,6 +3,7 @@ package com.xzyht.notifyrelay.ui.pages.superisland
 import android.content.Context
 import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.ui.pages.formatTimestamp
@@ -72,6 +73,8 @@ internal fun triggerFloatingReplica(
     context: Context,
     entry: SuperIslandHistoryStoreEntry,
 ) {
+    // 主动展示同样受「超级岛显示」开关约束：关闭时提示用户并中止
+    if (!SuperIslandConfigUtils.confirmManualRemoteSuperIslandDisplay(context)) return
     val sourceId =
         entry.mappedPackage?.takeIf { it.isNotBlank() }
             ?: entry.originalPackage?.takeIf { it.isNotBlank() }

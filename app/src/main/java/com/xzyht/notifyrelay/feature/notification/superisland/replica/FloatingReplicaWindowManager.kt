@@ -46,6 +46,9 @@ object FloatingReplicaWindowManager {
                         FloatingReplicaMappingManager.removeNotificationId(key)
                     }
                     hiddenEntries.remove(key)
+                    // 浮窗自身的自动移除（12s/45s）不经过 dismissBySourceInternal，
+                    // 必须在此同步移除展示内容缓存，否则切换通道时会把已消失的条目重新展示出来
+                    ReplicaDisplayCache.remove(key)
                 }
 
                 val sourceIdsToBlock = FloatingReplicaMappingManager.removeSourceIdMapping(key)
@@ -320,6 +323,8 @@ object FloatingReplicaWindowManager {
 
             if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
                 FloatingReplicaMappingManager.markSourceClosed(sourceId)
+                // HIDDEN 保留缓存：隐藏是可恢复的临时状态，内容仍然活跃、切换通道时仍应展示
+                ReplicaDisplayCache.remove(sourceId)
             }
 
             FloatingReplicaMappingManager.cancelTimeoutJob(sourceId)
