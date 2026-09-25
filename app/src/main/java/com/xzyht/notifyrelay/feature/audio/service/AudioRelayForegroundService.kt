@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.feature.audio.service
 
 import android.R
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -10,7 +9,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.os.IBinder
+import androidx.core.app.NotificationCompat
 import androidx.core.app.ServiceCompat
+import com.xzyht.notifyrelay.feature.notification.superisland.data.SuperIslandStructuredDataHelper
 
 class AudioRelayForegroundService : Service() {
     override fun onCreate() {
@@ -44,6 +45,8 @@ class AudioRelayForegroundService : Service() {
             Intent(STOP_ACTION).apply {
                 setPackage(packageName)
                 putExtra(EXTRA_DEVICE_NAME, deviceName)
+                // 超级岛规范附录 2.1：触发广播的 PendingIntent 需要前台调度标志
+                addFlags(Intent.FLAG_RECEIVER_FOREGROUND)
             }
         val pendingIntent =
             PendingIntent.getBroadcast(
@@ -53,16 +56,28 @@ class AudioRelayForegroundService : Service() {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
             )
 
-        val notification =
-            Notification
+        val builder =
+            NotificationCompat
                 .Builder(this, CHANNEL_ID)
                 .setContentTitle(title)
                 .setContentText(text)
                 .setSmallIcon(R.drawable.ic_media_play)
                 .setOngoing(true)
                 .setShowWhen(false)
-                .addAction(R.drawable.ic_media_pause, "停止", pendingIntent)
-                .build()
+        // 按「设置 → 超级岛 → 规范信息注入方式」注入规范信息；按钮按模式互斥注册（超级岛走 miui.focus.actions，其余走原生 addAction）
+        SuperIslandStructuredDataHelper.applyLocalNotificationSpecInjection(
+            builder = builder,
+            context = this,
+            title = title,
+            text = text,
+            action =
+                SuperIslandStructuredDataHelper.LocalNotificationAction(
+                    iconRes = R.drawable.ic_media_pause,
+                    title = "停止",
+                    pendingIntent = pendingIntent,
+                ),
+        )
+        val notification = builder.build()
         val foregroundType =
             if (direction == "send") {
                 ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE

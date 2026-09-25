@@ -1,13 +1,14 @@
 package com.xzyht.notifyrelay.feature.media.service
 
 import android.R
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
+import androidx.core.app.NotificationCompat
+import com.xzyht.notifyrelay.feature.notification.superisland.data.SuperIslandStructuredDataHelper
 
 class MediaProjectionForegroundService : Service() {
     private var foregroundStarted = false
@@ -28,15 +29,23 @@ class MediaProjectionForegroundService : Service() {
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         nm.createNotificationChannel(channel)
 
-        val notification =
-            Notification
+        val title = "屏幕捕获"
+        val text = "正在通过屏幕捕获获取音频…"
+        val builder =
+            NotificationCompat
                 .Builder(this, channelId)
-                .setContentTitle("屏幕捕获")
-                .setContentText("正在通过屏幕捕获获取音频…")
+                .setContentTitle(title)
+                .setContentText(text)
                 .setSmallIcon(R.drawable.ic_menu_camera)
-                .build()
+        // 按「设置 → 超级岛 → 规范信息注入方式」注入规范信息（超级岛 / Live Updates 二选一）
+        SuperIslandStructuredDataHelper.applyLocalNotificationSpecInjection(
+            builder = builder,
+            context = this,
+            title = title,
+            text = text,
+        )
         try {
-            startForeground(1002, notification)
+            startForeground(1002, builder.build())
             foregroundStarted = true
         } catch (_: Exception) {
             stopSelf()

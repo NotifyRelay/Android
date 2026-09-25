@@ -1,16 +1,20 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.data
 
+import android.app.Notification
+import android.app.PendingIntent
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.Icon
 import android.os.Bundle
 import androidx.core.app.NotificationCompat
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import github.xzynine.superislandui.builder.SuperIslandExtras
 import github.xzynine.superislandui.builder.SuperIslandImageSpec
 import github.xzynine.superislandui.builder.SuperIslandParamBuilder
 import kotlinx.coroutines.CancellationException
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.ImageUtils
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 
@@ -504,4 +508,167 @@ object SuperIslandStructuredDataHelper {
         actionsBundle.putString("miui.focus.action_2", "dummy_action_2")
         extras.putBundle("miui.focus.actions", actionsBundle)
     }
+
+    /**
+     * 按「设置 → 超级岛 → 规范信息注入方式」为**本机自建通知**（前台服务通知等）注入规范信息。
+     *
+     * 与复刻链路不同，本机通知没有来源 `miui.focus.param` 可透传，故超级岛分支用
+     * [SuperIslandParamBuilder] 自建最小合规载荷（`business = music`，大岛/小岛均为文本组件）。
+     *
+     * - 仅超级岛模式：写入 `miui.focus.param` + 标准焦点标记；**不设** promoted 标记
+     *   （设置后 SystemUI 会误判为 Live Updates 类并用 custom 结构渲染，导致左岛空白）；
+     * - 仅 Live Updates 模式：promoted + 短文案 + ProgressStyle（与媒体复刻同口径；
+     *   本通知文案固定，不接 ReplicaScrollUpdater 滚动更新）。
+     *
+     * 按钮（[LocalNotificationAction]）按规范附录 2.1 与注入模式互斥注册，**只注册一份**
+     * （超级岛即特殊渲染的通知，按钮就是该通知的按钮）：
+     * - 超级岛模式：`Notification.Action` 写入 extras 的 `miui.focus.actions`，
+     *   并在 `param_v2.textButton`（文本按钮组件，数组形态）中以 key 引用，不再调用原生 addAction；
+     * - 其他模式（Live Updates / NONE 兜底）：仅原生 addAction，与媒体复刻口径一致。
+     *
+     * 两分支互斥由 [SuperIslandConfigUtils.getSpecInjectionMode] 保证；
+     * 调用方必须使用 [NotificationCompat.Builder] 构建（framework `Notification.Builder` 无这些 API）。
+     */
+    fun applyLocalNotificationSpecInjection(
+        builder: NotificationCompat.Builder,
+        context: Context,
+        title: String?,
+        text: String?,
+        action: LocalNotificationAction? = null,
+    ) {
+        try {
+            val superIslandEnabled = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
+
+            if (superIslandEnabled) {
+                val payload = buildLocalIslandPayload(title, text, action)
+                val issues = SuperIslandParamBuilder.validate(payload)
+                if (issues.isNotEmpty()) {
+                    Logger.w(TAG, "本机通知 param_v2 合规校验提示: $issues")
+                }
+                SuperIslandExtras.writeParam(builder.extras, payload)
+                SuperIslandExtras.writeStandardFlags(builder.extras, context.packageName)
+                if (action != null) {
+                    registerFocusAction(builder, context, action)
+                }
+                Logger.i(TAG, "本机通知已注入超级岛规范信息")
+            }
+
+            if (SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)) {
+                builder.setRequestPromotedOngoing(true)
+                builder.setShortCriticalText(text ?: title ?: "")
+                try {
+                    val segments = ArrayList<NotificationCompat.ProgressStyle.Segment>()
+                    segments.add(NotificationCompat.ProgressStyle.Segment(100))
+                    builder.setStyle(
+                        NotificationCompat
+                            .ProgressStyle()
+                            .setProgressSegments(segments)
+                            .setStyledByProgress(true)
+                            .setProgress(0),
+                    )
+                } catch (e: Exception) {
+                    Logger.e(TAG, "本机通知设置胶囊样式失败: ${e.message}")
+                }
+                Logger.i(TAG, "本机通知已注入 Live Updates 规范信息")
+            }
+
+            if (!superIslandEnabled && action != null) {
+                builder.addAction(action.iconRes, action.title, action.pendingIntent)
+            }
+        } catch (e: Exception) {
+            Logger.w(TAG, "本机通知规范信息注入失败: ${e.message}")
+        }
+    }
+
+    /**
+     * 按规范附录 2.1 注册超级岛按钮：`Notification.Action` 写入 extras 的 `miui.focus.actions`
+     * （key 见 [FOCUS_ACTION_KEY]，`param_v2.textButton` 的引用由 [buildLocalIslandPayload] 写入）。
+     */
+    private fun registerFocusAction(
+        builder: NotificationCompat.Builder,
+        context: Context,
+        action: LocalNotificationAction,
+    ) {
+        val focusAction =
+            Notification.Action
+                .Builder(
+                    Icon.createWithResource(context, action.iconRes),
+                    action.title,
+                    action.pendingIntent,
+                ).build()
+        val actionsBundle = Bundle()
+        actionsBundle.putParcelable(FOCUS_ACTION_KEY, focusAction)
+        builder.extras.putBoolean("miui.showAction", true)
+        builder.extras.putBundle(SuperIslandExtras.KEY_ACTIONS, actionsBundle)
+    }
+
+    /** 为本机自建通知构建最小合规 `miui.focus.param` 载荷（无封面图，大岛/小岛均用文本组件）。 */
+    private fun buildLocalIslandPayload(
+        title: String?,
+        text: String?,
+        action: LocalNotificationAction?,
+    ): String {
+        val resolvedTitle = title ?: ""
+        val resolvedText = text ?: ""
+        return SuperIslandParamBuilder
+            .business("music")
+            .island {
+                islandProperty(1)
+                islandOrder(false)
+                highlightColor("#FFFFFF")
+                bigIslandArea(JSONObject().apply { put("textInfo", localTextInfo(resolvedTitle, resolvedText)) })
+                smallIslandArea(JSONObject().apply { put("textInfo", localTextInfo(resolvedTitle, "")) })
+            }.focusType(SuperIslandParamBuilder.FOCUS_V3_TYPE)
+            .ticker(resolvedTitle)
+            .aodTitle(resolvedTitle)
+            .component(
+                "baseInfo",
+                JSONObject().apply {
+                    put("type", 2)
+                    put("title", resolvedTitle)
+                    put("content", resolvedText)
+                },
+            ).apply {
+                if (action != null) {
+                    // 文本按钮组件（模板库按钮组件4，数组形态；官方示例与项目测试样本均为直接数组）
+                    component(
+                        "textButton",
+                        JSONArray().apply {
+                            put(
+                                JSONObject().apply {
+                                    put("action", FOCUS_ACTION_KEY)
+                                    put("actionTitle", action.title)
+                                },
+                            )
+                        },
+                    )
+                }
+            }.build()
+    }
+
+    /**
+     * 本机通知的操作按钮：超级岛模式改写为 focus action 注册，其他模式用原生 action。
+     * 广播型 [pendingIntent] 由调用方按规范加上 `Intent.FLAG_RECEIVER_FOREGROUND`。
+     */
+    data class LocalNotificationAction(
+        val iconRes: Int,
+        val title: String,
+        val pendingIntent: PendingIntent,
+    )
+
+    /** 超级岛模式下本机通知按钮在 `miui.focus.actions` 中的注册 key（规范附录 2.1）。 */
+    private const val FOCUS_ACTION_KEY = "miui.focus.action_1"
+
+    /** 文本组件载荷（与媒体复刻的 textInfo 结构同口径）。 */
+    private fun localTextInfo(
+        title: String,
+        content: String,
+    ): JSONObject =
+        JSONObject().apply {
+            put("frontTitle", "")
+            put("title", title)
+            put("content", content)
+            put("narrowFont", false)
+            put("showHighlightColor", true)
+        }
 }
