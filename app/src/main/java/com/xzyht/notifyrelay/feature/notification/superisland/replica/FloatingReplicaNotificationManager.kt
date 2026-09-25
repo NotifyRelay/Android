@@ -3,6 +3,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland.replica
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
@@ -63,7 +64,7 @@ object FloatingReplicaNotificationManager {
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(30_000L)
                         runReplicaCatching(TAG, "超时自动移除通知") {
-                            FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
+                            FloatingReplicaManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
                         }
                     }
                 ReplicaStateStore.setTimeoutJob(sourceId, timeoutJob)
@@ -133,11 +134,11 @@ object FloatingReplicaNotificationManager {
     ) {
         val sourceIdToStop = ReplicaStateStore.findSourceIdByNotificationId(notificationId)
 
-        val isFloatingEnabled = FloatingReplicaWindowManager.isFloatingWindowEnabled(context)
+        val isFloatingEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
 
         if (!isFloatingEnabled) {
             if (sourceIdToStop != null) {
-                FloatingReplicaWindowManager.dismissBySourceInternal(sourceIdToStop, FloatingWindowManager.RemovalReason.MANUAL)
+                FloatingReplicaManager.dismissBySourceInternal(sourceIdToStop, FloatingWindowManager.RemovalReason.MANUAL)
             } else {
                 val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
                 try {

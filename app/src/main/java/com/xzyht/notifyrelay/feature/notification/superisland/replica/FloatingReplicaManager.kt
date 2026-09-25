@@ -92,7 +92,66 @@ object FloatingReplicaManager {
     }
 
     fun dismissBySource(sourceId: String) {
-        FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.REMOTE)
+        dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.REMOTE)
+    }
+
+    /**
+     * **关闭侧的统一分发门面**（P2-7：自 `FloatingReplicaWindowManager.dismissBySourceInternal` 上移）。
+     *
+     * 与展示侧的 [showFloating] 对称：两者都在本门面按通道分流。原先关闭侧藏在窗口管理器里
+     * 自判通道（列表 / 浮窗 / 通知），与展示侧的分支重复且使窗口管理器承担了不属于它的职责。
+     *
+     * 关闭全部展示的顺序契约见 [dismissAllRemoteSuperIsland]；本方法只处理单条 sourceId。
+     *
+     * @param reason 移除原因；`HIDDEN` 保留展示内容缓存（隐藏是可恢复的临时状态）。
+     */
+    fun dismissBySourceInternal(
+        sourceId: String,
+        reason: FloatingWindowManager.RemovalReason = FloatingWindowManager.RemovalReason.REMOTE,
+    ) {
+        runReplicaCatching(TAG, "按来源关闭浮窗") {
+            if (ReplicaTtlRegistry.isSourceRecentlyClosedWithinMinute(sourceId)) {
+                return@runReplicaCatching
+            }
+
+            if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
+                ReplicaTtlRegistry.markSourceClosed(sourceId)
+                // HIDDEN 保留缓存：隐藏是可恢复的临时状态，内容仍然活跃、切换通道时仍应展示
+                ReplicaDisplayCache.remove(sourceId)
+            }
+
+            ReplicaStateStore.cancelTimeoutJob(sourceId)
+
+            NotificationGenerator.stopScrollUpdate(sourceId)
+
+            val ctx = ReplicaStateStore.getAppContext()
+            // 列表模式通道：交由列表管理器摘除条目并切换下一条
+            if (ctx != null && !SuperIslandConfigUtils.isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
+                FloatingReplicaListModeManager.dismissFromList(ctx, sourceId)
+                if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
+                    ReplicaTtlRegistry.removeBlockedInstance(sourceId)
+                }
+                return@runReplicaCatching
+            }
+
+            val floatingEnabled = if (ctx != null) SuperIslandConfigUtils.isFloatingWindowEnabled(ctx) else true
+
+            val notificationIdsBefore = ReplicaStateStore.getNotificationIdsBySourceId(sourceId)
+            val entryKeys = ReplicaStateStore.getSourceIdEntryKeys(sourceId)
+
+            // 浮窗通道：移除 overlay 条目（含映射清理）
+            if (floatingEnabled) {
+                FloatingReplicaWindowManager.removeFloatingEntries(
+                    sourceId = sourceId,
+                    reason = reason,
+                    entryKeys = entryKeys,
+                    removeMappings = true,
+                )
+            }
+
+            // 系统通知通道（复刻 / Live Updates）由通知管理器关闭
+            FloatingReplicaNotificationManager.closeNotificationsBySourceId(sourceId, reason, notificationIdsBefore, entryKeys, ctx)
+        }
     }
 
     /**

@@ -7,7 +7,7 @@ import com.xzyht.notifyrelay.feature.notification.service.ListenerForegroundCont
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.pipeline.SuperIslandDisplayPipeline
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaWindowManager
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaStateStore
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.runReplicaCatching
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.runReplicaCatchingSuspend
@@ -107,7 +107,7 @@ object FloatingReplicaListModeManager {
             CoroutineScope(Dispatchers.Main).launch {
                 delay(30_000L)
                 runReplicaCatching(TAG, "列表模式超时移除") {
-                    FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
+                    FloatingReplicaManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
                 }
             }
         ReplicaStateStore.setTimeoutJob(sourceId, job)
@@ -145,7 +145,7 @@ object FloatingReplicaListModeManager {
         if (notificationId == LIST_MODE_NOTIFICATION_ID) {
             val active = SuperIslandListManager.getActive()
             if (active != null) {
-                FloatingReplicaWindowManager.dismissBySourceInternal(active.sourceId, FloatingWindowManager.RemovalReason.MANUAL)
+                FloatingReplicaManager.dismissBySourceInternal(active.sourceId, FloatingWindowManager.RemovalReason.MANUAL)
             }
         } else {
             val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

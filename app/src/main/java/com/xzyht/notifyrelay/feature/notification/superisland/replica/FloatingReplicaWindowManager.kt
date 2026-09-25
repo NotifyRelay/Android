@@ -64,7 +64,7 @@ object FloatingReplicaWindowManager {
 
     fun getFloatingWindowManager(): FloatingWindowManager = floatingWindowManager
 
-    fun isFloatingWindowEnabled(context: Context): Boolean = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
+    private fun isFloatingWindowEnabled(context: Context): Boolean = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
 
     fun canShowOverlay(context: Context): Boolean = PermissionHelper.checkOverlayPermission(context)
 
@@ -196,7 +196,7 @@ object FloatingReplicaWindowManager {
                     ReplicaStateStore.saveHiddenEntry(sourceId, entry)
                 }
 
-                dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.HIDDEN)
+                FloatingReplicaManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.HIDDEN)
             } else {
                 ReplicaTtlRegistry.removeBlockedInstance(sourceId)
 
@@ -231,51 +231,30 @@ object FloatingReplicaWindowManager {
         }
     }
 
-    fun dismissBySourceInternal(
+    /**
+     * 移除某 sourceId 的全部浮窗条目（**纯窗口侧操作**，不含通道判定与通知关闭）。
+     *
+     * 通道判定与通知关闭已上移至 [FloatingReplicaManager.dismissBySourceInternal]（P2-7），
+     * 本类自此只负责 overlay 窗口宿主与条目登记。
+     *
+     * @param removeMappings 条目移除后是否同时清空该 sourceId 的映射
+     *   （原实现在「有 entryKeys」分支清映射、「无 entryKeys」分支不清，故由调用方决定）。
+     */
+    fun removeFloatingEntries(
         sourceId: String,
-        reason: FloatingWindowManager.RemovalReason = FloatingWindowManager.RemovalReason.REMOTE,
+        reason: FloatingWindowManager.RemovalReason,
+        entryKeys: List<String>?,
+        removeMappings: Boolean,
     ) {
-        runReplicaCatching(TAG, "按来源关闭浮窗") {
-            if (ReplicaTtlRegistry.isSourceRecentlyClosedWithinMinute(sourceId)) {
-                return@runReplicaCatching
+        if (entryKeys != null) {
+            entryKeys.forEach { entryKey ->
+                floatingWindowManager.removeEntry(entryKey, reason)
             }
-
-            if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
-                ReplicaTtlRegistry.markSourceClosed(sourceId)
-                // HIDDEN 保留缓存：隐藏是可恢复的临时状态，内容仍然活跃、切换通道时仍应展示
-                ReplicaDisplayCache.remove(sourceId)
+            if (removeMappings) {
+                ReplicaStateStore.removeSourceIdMappings(sourceId)
             }
-
-            ReplicaStateStore.cancelTimeoutJob(sourceId)
-
-            NotificationGenerator.stopScrollUpdate(sourceId)
-
-            val ctx = ReplicaStateStore.getAppContext()
-            if (ctx != null && !isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
-                FloatingReplicaListModeManager.dismissFromList(ctx, sourceId)
-                if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
-                    ReplicaTtlRegistry.removeBlockedInstance(sourceId)
-                }
-                return@runReplicaCatching
-            }
-
-            val floatingEnabled = if (ctx != null) isFloatingWindowEnabled(ctx) else true
-
-            val notificationIdsBefore = ReplicaStateStore.getNotificationIdsBySourceId(sourceId)
-            val entryKeys = ReplicaStateStore.getSourceIdEntryKeys(sourceId)
-
-            if (floatingEnabled) {
-                if (entryKeys != null) {
-                    entryKeys.forEach { entryKey ->
-                        floatingWindowManager.removeEntry(entryKey, reason)
-                    }
-                    ReplicaStateStore.removeSourceIdMappings(sourceId)
-                } else {
-                    floatingWindowManager.removeEntry(sourceId, reason)
-                }
-            }
-
-            FloatingReplicaNotificationManager.closeNotificationsBySourceId(sourceId, reason, notificationIdsBefore, entryKeys, ctx)
+        } else {
+            floatingWindowManager.removeEntry(sourceId, reason)
         }
     }
 
