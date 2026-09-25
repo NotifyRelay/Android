@@ -4,6 +4,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
 import android.widget.Toast
+import com.xzyht.notifyrelay.feature.notification.service.ListenerForegroundController
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
@@ -58,6 +59,8 @@ object FloatingReplicaListModeManager {
             ),
         )
         scheduleListModeTimeoutFor(sourceId)
+        // 列表条目增减不在设备状态流/网络回调覆盖范围内，需主动刷新前台常驻通知的「可切换」提示
+        ListenerForegroundController.onSuperIslandListChanged()
         val active = SuperIslandListManager.getActive()
         if (active != null && active.sourceId == sourceId) {
             sendListModeNotification(context, active)
@@ -204,6 +207,7 @@ object FloatingReplicaListModeManager {
     ) {
         FloatingReplicaMappingManager.removeSourceIdMappings(sourceId)
         val next = SuperIslandListManager.remove(sourceId)
+        ListenerForegroundController.onSuperIslandListChanged()
         if (next != null) {
             sendListModeNotification(context, next, forceRefresh = true)
         } else {

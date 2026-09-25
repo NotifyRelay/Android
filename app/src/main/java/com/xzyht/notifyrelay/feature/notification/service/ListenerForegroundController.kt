@@ -8,12 +8,16 @@ import android.content.Context
 import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import android.os.Handler
+import android.os.Looper
 import android.os.PowerManager
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.R
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
+import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandListManager
 import notifyrelay.base.util.Logger
 
 /**
@@ -29,6 +33,29 @@ internal class ListenerForegroundController(
 ) {
     companion object {
         private const val TAG = "NotifyRelayNotificationListenerService"
+
+        /** 超级岛列表模式下「可切换」提示文案；仅在列表模式且可切换条目 ≥ 2 时参与轮换。 */
+        private const val SUPER_ISLAND_SWITCH_HINT = "点击超级岛通知切换通知外显"
+
+        /** 两段文案的轮换周期（毫秒）。 */
+        private const val ROTATE_INTERVAL_MS = 5_000L
+
+        /**
+         * 当前存活的前台控制器（弱生命周期：服务销毁时置空）。
+         *
+         * 超级岛列表条目增删不在已有的设备状态流 / 网络回调覆盖范围内，
+         * 由 replica 包在条目变化后通过 [onSuperIslandListChanged] 反向触发刷新。
+         */
+        @Volatile
+        private var activeController: ListenerForegroundController? = null
+
+        /**
+         * 超级岛列表条目增删/清空后调用：刷新前台通知并同步轮换状态。
+         * 前台服务未存活时静默忽略。
+         */
+        fun onSuperIslandListChanged() {
+            activeController?.updateNotification()
+        }
     }
 
     val channelId = "notifyrelay_foreground"
@@ -39,6 +66,29 @@ internal class ListenerForegroundController(
 
     // Wake Lock：锁屏期间保持 CPU 不休眠，确保心跳线程正常运行
     private var wakeLock: PowerManager.WakeLock? = null
+
+    // 正文轮换游标：0 = 设备/网络文案，1 = 超级岛切换提示；仅在可切换状态下推进
+    private val rotateHandler = Handler(Looper.getMainLooper())
+
+    @Volatile
+    private var rotateIndex = 0
+
+    @Volatile
+    private var rotationActive = false
+
+    private val rotateRunnable =
+        object : Runnable {
+            override fun run() {
+                if (!shouldShowSuperIslandHint()) {
+                    rotationActive = false
+                    rotateIndex = 0
+                    return
+                }
+                rotateIndex = (rotateIndex + 1) % 2
+                updateNotification()
+                rotateHandler.postDelayed(this, ROTATE_INTERVAL_MS)
+            }
+        }
 
     fun startForegroundService() {
         val channel =
@@ -52,15 +102,62 @@ internal class ListenerForegroundController(
         val notification = buildNotification()
         startForeground(notifyId, notification)
         acquireWakeLock()
+
+        activeController = this
+        syncRotation()
     }
 
     fun updateNotification() {
         try {
+            syncRotation()
             val notification = buildNotification()
             notificationManager.notify(notifyId, notification)
             Logger.d(TAG, "updateNotification: ${getNotificationText()}")
         } catch (e: Exception) {
             Logger.e(TAG, "更新通知失败", e)
+        }
+    }
+
+    /**
+     * 服务销毁时调用：停止轮换定时器并注销静态引用，
+     * 避免下一次列表变化打到已脱离前台服务、通知已不存在的控制器上。
+     */
+    fun dispose() {
+        rotationActive = false
+        rotateHandler.removeCallbacks(rotateRunnable)
+        if (activeController === this) {
+            activeController = null
+        }
+    }
+
+    /** 是否需要展示超级岛切换提示：列表模式开启且可切换条目 ≥ 2。 */
+    private fun shouldShowSuperIslandHint(): Boolean =
+        try {
+            !SuperIslandConfigUtils.isFloatingWindowEnabled(context) &&
+                SuperIslandConfigUtils.isNotificationListMode(context) &&
+                SuperIslandListManager.size() >= 2
+        } catch (_: Exception) {
+            false
+        }
+
+    /**
+     * 同步轮换定时器状态（每次刷新通知时调用）：
+     * 满足条件则确保定时器已排定，不满足则停止并把正文退回设备/网络文案。
+     */
+    private fun syncRotation() {
+        if (shouldShowSuperIslandHint()) {
+            if (!rotationActive) {
+                rotationActive = true
+                rotateHandler.postDelayed(rotateRunnable, ROTATE_INTERVAL_MS)
+            }
+        } else {
+            if (rotationActive) {
+                rotationActive = false
+                rotateHandler.removeCallbacks(rotateRunnable)
+            }
+            if (rotateIndex != 0) {
+                rotateIndex = 0
+            }
         }
     }
 
@@ -110,6 +207,8 @@ internal class ListenerForegroundController(
                 .setContentText(getNotificationText())
                 .setSmallIcon(R.drawable.ic_launcher_foreground)
                 .setOngoing(true)
+                // 轮换（5s 一换）会反复 notify；不加该标记会让 IMPORTANCE_HIGH 渠道每次都响铃/横幅
+                .setOnlyAlertOnce(true)
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
 
         // 为通知主体添加点击事件，实现剪贴板同步功能
@@ -134,6 +233,15 @@ internal class ListenerForegroundController(
     }
 
     private fun getNotificationText(): String {
+        // 列表模式且有多条超级岛可切换时，正文在「设备/网络文案」与「切换外显提示」之间轮换（5s）；
+        // 两段文案共用同一个通知，点击行为始终是原有的剪贴板同步，不随文案变化。
+        if (rotateIndex == 1 && shouldShowSuperIslandHint()) {
+            return SUPER_ISLAND_SWITCH_HINT
+        }
+        return getDeviceNotificationText()
+    }
+
+    private fun getDeviceNotificationText(): String {
         // 使用 DeviceConnectionManager 提供的线程安全方法获取在线且已认证的设备数量
         val onlineDevices =
             try {

@@ -3,6 +3,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland.replica
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import com.xzyht.notifyrelay.feature.notification.service.ListenerForegroundController
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
@@ -143,6 +144,9 @@ object FloatingReplicaManager {
             FloatingReplicaMappingManager.clearAllMappings()
 
             ReplicaDisplayCache.clear()
+
+            // 列表已被清空（含「超级岛显示」关闭），同步收起前台常驻通知的「可切换」提示
+            ListenerForegroundController.onSuperIslandListChanged()
         }
     }
 

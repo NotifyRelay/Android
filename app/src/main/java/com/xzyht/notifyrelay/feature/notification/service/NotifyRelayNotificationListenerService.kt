@@ -513,6 +513,10 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         Logger.i(TAG, "[NotifyListener] onDestroy called")
         // 释放 Wake Lock
         releaseWakeLock()
+        // 停止超级岛文案轮换并注销前台通知刷新入口
+        if (this::foregroundController.isInitialized) {
+            foregroundController.dispose()
+        }
         // 清空服务实例引用
         instance = null
         super.onDestroy()
