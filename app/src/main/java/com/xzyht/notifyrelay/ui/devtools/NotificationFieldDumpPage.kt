@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.pages.history.NotificationCard
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.data.StorageManager
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
@@ -49,6 +50,10 @@ private enum class LongPressAction(
 
 /** 下拉框选项；顺序即 [LongPressAction.ordinal]，`selectedIndex` 可直接互转。 */
 private val LONG_PRESS_ACTIONS = LongPressAction.entries.toList()
+
+/** 持久化 key（与其它设置页同用 [StorageManager]）。 */
+private const val KEY_LONG_PRESS_ACTION = "notification_dump_long_press_action"
+private const val KEY_INCLUDE_BINARY = "notification_dump_include_binary"
 
 /**
  * 通知字段转储页（开发者选项 → 通知字段转储）。
@@ -82,8 +87,14 @@ fun NotificationFieldDumpPage() {
         viewModel.loadActiveNotifications()
     }
 
-    var includeBinary by remember { mutableStateOf(false) }
-    var longPressActionIndex by remember { mutableStateOf(LONG_PRESS_ACTIONS.indexOf(LongPressAction.COPY)) }
+    var includeBinary by remember { mutableStateOf(StorageManager.getBoolean(context, KEY_INCLUDE_BINARY, false)) }
+    var longPressActionIndex by remember {
+        mutableStateOf(
+            StorageManager
+                .getInt(context, KEY_LONG_PRESS_ACTION, LONG_PRESS_ACTIONS.indexOf(LongPressAction.COPY))
+                .coerceIn(0, LONG_PRESS_ACTIONS.lastIndex),
+        )
+    }
     // 导出缓存占用（进入页面与每次清理后刷新）
     var cacheSummary by remember { mutableStateOf("") }
 
@@ -109,7 +120,10 @@ fun NotificationFieldDumpPage() {
                 summary = LONG_PRESS_ACTIONS[longPressActionIndex].summary,
                 items = LONG_PRESS_ACTIONS.map { it.label },
                 selectedIndex = longPressActionIndex,
-                onSelectedIndexChange = { longPressActionIndex = it },
+                onSelectedIndexChange = {
+                    longPressActionIndex = it
+                    StorageManager.putInt(context, KEY_LONG_PRESS_ACTION, it)
+                },
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             )
 
@@ -122,7 +136,10 @@ fun NotificationFieldDumpPage() {
                         "复制 / 分享均只保留二进制的类型与尺寸摘要"
                     },
                 checked = includeBinary,
-                onCheckedChange = { includeBinary = it },
+                onCheckedChange = {
+                    includeBinary = it
+                    StorageManager.putBoolean(context, KEY_INCLUDE_BINARY, it)
+                },
                 modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
             )
 

@@ -183,7 +183,7 @@ internal object NotificationFieldDump {
 
         val identity = System.identityHashCode(target)
         if (!visited.add(identity)) {
-            recordTruncation("循环引用", target.javaClass.name)
+            // 自引用不丢数据（对象字段已在父级完整输出），故只标记、不计入截断
             return "<循环引用 ${target.javaClass.simpleName}>"
         }
         try {
