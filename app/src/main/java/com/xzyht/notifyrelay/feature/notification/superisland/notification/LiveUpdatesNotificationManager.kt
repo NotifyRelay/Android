@@ -343,7 +343,12 @@ object LiveUpdatesNotificationManager {
         return builder
     }
 
-    fun cancelLiveUpdate(sourceId: String) {
+    /**
+     * 撤回指定 sourceId 的 Live Updates 提升通知。
+     *
+     * 该 sourceId 的取消入口只有这一处（原 `cancelLiveUpdate` 别名已删除）。
+     */
+    fun dismissLiveUpdateNotification(sourceId: String) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
             Logger.w(TAG, "当前Android版本不支持Live Updates")
             return
@@ -365,15 +370,6 @@ object LiveUpdatesNotificationManager {
         } catch (e: Exception) {
             Logger.e(TAG, "取消Live Update通知失败: ${e.message}")
         }
-    }
-
-    // 兼容旧方法名
-    fun dismissLiveUpdateNotification(sourceId: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
-            Logger.w(TAG, "当前Android版本不支持Live Updates")
-            return
-        }
-        cancelLiveUpdate(sourceId)
     }
 
     fun canUseLiveUpdates(): Boolean {

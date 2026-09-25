@@ -18,22 +18,12 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
-import org.json.JSONObject
 
 object FloatingReplicaListModeManager {
     private const val TAG = "超级岛列表模式"
     private const val LIST_MODE_NOTIFICATION_ID = 30000
 
     fun getNotificationId(): Int = LIST_MODE_NOTIFICATION_ID
-
-    fun isMediaType(paramV2Raw: String?): Boolean {
-        if (paramV2Raw.isNullOrBlank()) return false
-        return try {
-            JSONObject(paramV2Raw).optString("business", "") == "media"
-        } catch (_: Exception) {
-            false
-        }
-    }
 
     fun showFloatingListMode(
         context: Context,
@@ -45,7 +35,8 @@ object FloatingReplicaListModeManager {
         appName: String?,
         isLocked: Boolean,
     ) {
-        val isMedia = isMediaType(paramV2Raw)
+        // 媒体判定统一走 SuperIslandDataFormatter.isMediaType（含 raw 字符串兜底）
+        val isMedia = SuperIslandDataFormatter.isMediaType(null, paramV2Raw)
         SuperIslandListManager.addOrUpdate(
             SuperIslandListManager.ListEntry(
                 sourceId = sourceId,

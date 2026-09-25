@@ -14,7 +14,6 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingW
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import com.xzyht.notifyrelay.feature.notification.superisland.lifecycle.LifecycleManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
@@ -45,7 +44,6 @@ object FloatingReplicaWindowManager {
                     } else {
                         FloatingReplicaMappingManager.removeNotificationId(key)
                     }
-                    hiddenEntries.remove(key)
                     // 浮窗自身的自动移除（12s/45s）不经过 dismissBySourceInternal，
                     // 必须在此同步移除展示内容缓存，否则切换通道时会把已消失的条目重新展示出来
                     ReplicaDisplayCache.remove(key)
@@ -58,14 +56,11 @@ object FloatingReplicaWindowManager {
             }
         }
 
-    private val lifecycleManager = LifecycleManager()
     private var overlayLifecycleOwner: FloatingWindowLifecycleOwner? = null
 
     private var overlayView: WeakReference<View>? = null
     private var overlayLayoutParams: WindowManager.LayoutParams? = null
     private var windowManager: WeakReference<WindowManager>? = null
-
-    private val hiddenEntries = mutableMapOf<String, Any>()
 
     init {
         FloatingReplicaMappingManager.setOverlayView(null)
@@ -120,7 +115,6 @@ object FloatingReplicaWindowManager {
                     if (overlayLifecycleOwner == null) {
                         overlayLifecycleOwner = FloatingWindowLifecycleOwner()
                     }
-                    lifecycleManager.onShow()
 
                     val internedPicMap =
                         withContext(Dispatchers.IO) {
@@ -240,7 +234,6 @@ object FloatingReplicaWindowManager {
                                 FloatingReplicaMappingManager.setNotificationFingerprint(sourceId, fingerprint)
                             }
                         }
-                    } else {
                     }
                 }
             }
@@ -272,7 +265,6 @@ object FloatingReplicaWindowManager {
             if (isShowing) {
                 val entry = floatingWindowManager.getEntry(sourceId)
                 if (entry != null) {
-                    hiddenEntries[sourceId] = entry
                     FloatingReplicaMappingManager.saveHiddenEntry(sourceId, entry)
                 }
 
@@ -294,7 +286,6 @@ object FloatingReplicaWindowManager {
                         isRestoring = true,
                     )
                     FloatingReplicaMappingManager.removeHiddenEntry(sourceId)
-                    hiddenEntries.remove(sourceId)
                 } else {
                     showFloatingInternal(
                         context,
@@ -373,8 +364,6 @@ object FloatingReplicaWindowManager {
                 overlayLayoutParams = null
                 windowManager = null
 
-                lifecycleManager.onHide()
-
                 overlayLifecycleOwner?.let {
                     try {
                         it.onHide()
@@ -410,7 +399,6 @@ object FloatingReplicaWindowManager {
                         lifecycleOwner.onShow()
                     } catch (_: Exception) {
                     }
-                    lifecycleManager.onShow()
 
                     val density = context.resources.displayMetrics.density
                     val layoutParams =
@@ -436,9 +424,7 @@ object FloatingReplicaWindowManager {
                             this.windowManager = wm
                             this.windowLayoutParams = layoutParams
                             this.onEntryClick = { entryKey -> onEntryClicked(entryKey) }
-                            this.onContainerDragStart = { onContainerDragStarted() }
                             this.onContainerDragging = { }
-                            this.onContainerDragEnd = { onContainerDragEnded() }
                         }
 
                     var added = false
@@ -463,11 +449,5 @@ object FloatingReplicaWindowManager {
             return
         }
         floatingWindowManager.toggleEntryExpanded(key)
-    }
-
-    private fun onContainerDragStarted() {
-    }
-
-    private fun onContainerDragEnded() {
     }
 }
