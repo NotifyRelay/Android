@@ -189,18 +189,6 @@ fun SuperIslandTestDialog(
                 }
 
                 item {
-                    // 12306 车票超级岛样例（包名 com.MobileTicket，对齐 Apple Watch 转发链路）
-                    Button(
-                        onClick = {
-                            testTicket12306(context)
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                    ) {
-                        Text("测试 12306 车票超级岛 (com.MobileTicket)")
-                    }
-                }
-
-                item {
                     // 圆形进度组件
                     Button(
                         onClick = {

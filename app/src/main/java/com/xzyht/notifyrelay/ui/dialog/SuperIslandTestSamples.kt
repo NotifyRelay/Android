@@ -926,119 +926,7 @@ internal fun testCircularProgressInfo(
     )
 }
 
-/**
- * 测试 12306 车票超级岛样例。
- *
- * 数据按《AppleWatch超级岛转发链路.md》§3 的 `param_v2` 结构构造：
- * - `sourceId` 用真实包名 `com.MobileTicket`（milink 超级岛白名单 `watch_dynamic_island_app_list[1]`、
- *   图标 `ic_watch_di_12306`、protobuf appType `TICKET12306 = 48` 均按此包名匹配），
- *   便于验证接收端「按包名匹配 12306」的分支；注意接收端会为其写入超级岛历史
- *   （非 `test_` 前缀包名不跳过历史记录）。
- * - `paramV2Raw` 传**内层** `param_v2` 对象（不带 `{"param_v2": ...}` 外壳），
- *   与其余样例及本地解析/渲染链路（`parseParamV2` 直接读根字段）保持一致。
- * - `time` 取当前时间：系统 FocusNotifPreHandler 会拦截旧包，写死历史时间戳将无法投递。
- */
-internal fun testTicket12306(context: Context) {
-    val now = System.currentTimeMillis()
-
-    val paramV2Raw = """
-        {
-            "protocol": 1,
-            "business": "ticket",
-            "enableFloat": false,
-            "islandFirstFloat": true,
-            "updatable": true,
-            "reopen": "reopen",
-            "filterWhenNoPermission": false,
-            "timeout": 30,
-            "sequence": $now,
-            "ticker": "G1234 北京南→上海虹桥",
-            "tickerPic": "miui.focus.pic_train_ticker",
-            "aodTitle": "09:18 发车",
-            "aodPic": "miui.focus.pic_train_aod",
-            "param_island": {
-                "islandProperty": 1,
-                "expandedTime": 5,
-                "islandTimeout": 300,
-                "highlightColor": "#1DCD3A",
-                "bigIslandArea": {
-                    "imageTextInfoLeft": {
-                        "type": 1,
-                        "picInfo": {
-                            "type": 1,
-                            "pic": "miui.focus.pic_train"
-                        },
-                        "textInfo": {
-                            "title": "G1234",
-                            "content": "北京南→上海虹桥",
-                            "showHighlightColor": true
-                        }
-                    },
-                    "textInfo": {
-                        "title": "09:18",
-                        "content": "检票口12",
-                        "showHighlightColor": false
-                    }
-                },
-                "smallIslandArea": {
-                    "picInfo": {
-                        "type": 1,
-                        "pic": "miui.focus.pic_train"
-                    },
-                    "textInfo": {
-                        "title": "G1234"
-                    }
-                }
-            },
-            "iconTextInfo": {
-                "animIconInfo": {
-                    "type": 0,
-                    "src": "miui.focus.pic_train",
-                    "srcDark": "miui.focus.pic_train"
-                },
-                "title": "G1234 北京南→上海虹桥",
-                "content": "检票口12 · 09:18发车",
-                "subContent": "2车12F",
-                "colorTitle": "#000000",
-                "colorContent": "#66000000",
-                "colorTitleDark": "#FFFFFF",
-                "colorContentDark": "#80FFFFFF"
-            },
-            "baseInfo": {
-                "type": 2,
-                "title": "G1234 北京南→上海虹桥",
-                "content": "检票口12 · 09:18发车",
-                "colorTitle": "#1DCD3A"
-            },
-            "actions": [
-                {
-                    "type": 2,
-                    "action": "miui.focus.action_1",
-                    "actionTitle": "查看车票",
-                    "actionTitleColor": "#FFFFFF",
-                    "actionBgColor": "#3482FF",
-                    "actionIntentType": 2,
-                    "clickWithCollapse": true
-                }
-            ]
-        }
-    """
-
-    showTestNotification(
-        context = context,
-        sourceId = "com.MobileTicket",
-        appName = "铁路12306",
-        title = "G1234 北京南→上海虹桥",
-        text = "检票口12 · 09:18发车",
-        paramV2Raw = paramV2Raw,
-        picMap =
-            mapOf(
-                "miui.focus.pic_train" to createBlackBlockDataUrl(),
-                "miui.focus.pic_train_ticker" to createBlackBlockDataUrl(),
-                "miui.focus.pic_train_aod" to createBlackBlockDataUrl(),
-            ),
-    )
-}
+// 12306走的RemoteViews 预渲染 无转发意义
 
 /**
  * 调试入口：按样本 ID 直接触发对应的超级岛测试样本，免去手工点击测试对话框。
@@ -1050,7 +938,7 @@ internal fun testTicket12306(context: Context) {
  * ```
  * 追加 `--ez superIslandTestVariable true` 可使用可变进度（测试动画）。
  *
- * @param sampleId 样本 ID，取值见下方 `when` 分支（含 12306 样例 `ticket_12306`）
+ * @param sampleId 样本 ID，取值见下方 `when` 分支
  * @return 是否命中已知样本
  */
 fun triggerSuperIslandTestSample(
@@ -1070,7 +958,6 @@ fun triggerSuperIslandTestSample(
         "multi_progress_info" -> testMultiProgressInfo(context, isVariableProgress)
         "multi_progress_with_icons" -> testMultiProgressWithIcons(context, isVariableProgress)
         "circular_progress_info" -> testCircularProgressInfo(context, isVariableProgress)
-        "ticket_12306" -> testTicket12306(context)
         else -> return false
     }
     return true
