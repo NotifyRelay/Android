@@ -32,11 +32,12 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
     ) {
         val action = intent.action
         val floatingWindowEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
-        val notificationListMode = !floatingWindowEnabled && SuperIslandConfigUtils.isNotificationListMode(context)
+        // needClickIntent 的三判统一到配置类（D3）：此处与生产侧共用同一判定
+        val needClickIntent = SuperIslandConfigUtils.needClickIntent(context)
 
         when (action) {
             SuperIslandActions.CLOSE_NOTIFICATION -> {
-                if (!floatingWindowEnabled && !notificationListMode) {
+                if (!needClickIntent) {
                     Logger.i("超级岛", "浮窗/列表均未开启，不处理关闭通知广播")
                     return
                 }
@@ -46,7 +47,7 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
                 FloatingReplicaManager.closeByNotificationId(notificationId)
             }
             SuperIslandActions.TOGGLE_FLOATING -> {
-                if (!floatingWindowEnabled && !notificationListMode) {
+                if (!needClickIntent) {
                     Logger.i("超级岛", "浮窗/列表均未开启，不处理切换广播")
                     return
                 }
@@ -65,7 +66,8 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
                     }
                 }
 
-                Logger.i("超级岛", "接收到切换广播，浮窗=$floatingWindowEnabled, 列表=$notificationListMode, sourceId=$sourceId")
+                // 保持原日志文案：浮窗与列表的各自状态分开打印
+                Logger.i("超级岛", "接收到切换广播，浮窗=$floatingWindowEnabled, 列表=${SuperIslandConfigUtils.isNotificationListMode(context)}, sourceId=$sourceId")
                 FloatingReplicaManager.toggleFloating(
                     context,
                     sourceId,

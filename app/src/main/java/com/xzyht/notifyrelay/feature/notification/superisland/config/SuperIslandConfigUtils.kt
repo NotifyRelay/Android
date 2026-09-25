@@ -150,6 +150,17 @@ object SuperIslandConfigUtils {
     }
 
     /**
+     * 是否需要为通知设置点击/删除意图（D3 统一判定）。
+     *
+     * 原先该判定散落三处（`ReplicaIntentFactory.computeIntentFlags`、
+     * `LiveUpdatesNotificationManager.buildInitialNotification`、`LiveUpdatesIconLoader` 的图标更新路径），
+     * 三份逐字相同，现统一到配置类（纯配置推导，无副作用）。
+     *
+     * 口径（逐字保留）：浮窗开启 或 列表模式（列表模式仅在浮窗关闭时有效）。
+     */
+    fun needClickIntent(context: Context): Boolean = isFloatingWindowEnabled(context) || isNotificationListMode(context)
+
+    /**
      * 检查是否显示来自远端的超级岛（默认开启）。
      *
      * 关闭时只关闭「展示」：入站解析、远端状态缓存与历史记录照常进行，

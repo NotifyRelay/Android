@@ -30,15 +30,16 @@ import com.xzyht.notifyrelay.feature.notification.superisland.receiver.Notificat
  */
 object NotificationIntentFactory {
     /**
-     * 计算点击/删除意图所需的条件标志位。
+     * 计算点击/删除意图所需的条件标志位（D3）。
      *
-     * 判定口径（与拆分前逐字一致）：浮窗开启 或 列表模式（列表模式仅在浮窗关闭时有效）。
-     * 这是本工程唯一一处判定，[com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager]
-     * 与 [com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesIconLoader] 均调用本方法。
+     * 判定本身已统一到 [SuperIslandConfigUtils.needClickIntent]（配置类为唯一来源），
+     * 此处仅保留转发，使意图工厂的调用方无需自行 import 配置类。
+     *
+     * 注意：三处调用点（[createContentIntent] 的复刻通道路径、
+     * `LiveUpdatesNotificationManager.buildInitialNotification`、
+     * `LiveUpdatesIconLoader` 的图标更新路径）原先各自内联同一判定；现全部改为调用本方法。
      */
-    fun needClickIntent(context: Context): Boolean =
-        SuperIslandConfigUtils.isFloatingWindowEnabled(context) ||
-            SuperIslandConfigUtils.isNotificationListMode(context)
+    fun needClickIntent(context: Context): Boolean = SuperIslandConfigUtils.needClickIntent(context)
 
     /**
      * 创建并注册「超级岛复刻」通知渠道（幂等）
