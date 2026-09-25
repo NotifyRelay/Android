@@ -39,6 +39,9 @@ internal object SuperIslandDisplayPipeline {
     /** 列表模式聚合通知的固定 ID（原 `FloatingReplicaListModeManager.LIST_MODE_NOTIFICATION_ID`）。 */
     const val LIST_MODE_NOTIFICATION_ID = 30_000
 
+    /** 吞异常时 Live Updates 分支的动作名（浮窗与普通通知两通道原文案相同）。 */
+    private const val LIVE_UPDATE_ACTION_NAME = "发送LiveUpdates复合通知"
+
     /** 展示通道。仅用于推导 overrideNotificationId（超时调度仍由调用方薄壳负责）。 */
     enum class Channel {
         FLOATING,
@@ -112,13 +115,11 @@ internal object SuperIslandDisplayPipeline {
          * Live Updates 分支的异常是否向外传播。
          *
          * 浮窗 / 普通通知通道原实现以 `runReplicaCatchingSuspend(tag, "发送Live Updates复合通知")`
-         * 包裹（吞异常，动作名为上方文案）；列表模式通道原实现**直接调用、不包裹**，
+         * 包裹（吞异常）；列表模式通道原实现**直接调用、不包裹**，
          * 异常会冒泡到外层的 `runReplicaCatchingSuspend(tag, "发送列表模式通知")`，
          * 从而跳过其后的超时任务调度。此开关逐字保留该差异。
          */
         val liveUpdateErrorsPropagate: Boolean = false,
-        /** 吞异常时 Live Updates 分支的动作名（浮窗/普通通知均为该文案，与拆分前一致）。 */
-        val liveUpdateActionName: String = "发送Live Updates复合通知",
     )
 
     /**
@@ -265,7 +266,7 @@ internal object SuperIslandDisplayPipeline {
                 if (request.liveUpdateErrorsPropagate) {
                     showLiveUpdateBlock()
                 } else {
-                    runReplicaCatchingSuspend(request.tag, request.liveUpdateActionName) {
+                    runReplicaCatchingSuspend(request.tag, LIVE_UPDATE_ACTION_NAME) {
                         showLiveUpdateBlock()
                     }
                 }
