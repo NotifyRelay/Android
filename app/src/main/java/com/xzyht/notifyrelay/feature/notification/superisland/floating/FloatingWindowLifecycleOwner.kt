@@ -11,6 +11,14 @@ import androidx.savedstate.SavedStateRegistryOwner
  * 浮窗的自定义LifecycleOwner + SavedStateRegistryOwner
  * - 提供Lifecycle给Compose的WindowRecomposer
  * - 提供SavedStateRegistry给rememberSaveable等API
+ *
+ * **两套实现的唯一来源**：`FloatingComposeContainer` 内原先另有一个私有 `inner class`
+ * 实现（同为 LifecycleOwner + SavedStateRegistryOwner），两者同时生效——
+ * 包级实现供 `FloatingReplicaWindowManager.overlayLifecycleOwner` 使用（经
+ * `CompositionLocalProvider(LocalLifecycleOwner)` 注入 Compose），
+ * 内部类供 View 树（`setViewTreeLifecycleOwner`）使用。
+ * 现已合并到本类，事件序按原内部类对齐：
+ * CREATE→START→RESUME（构造 + [onShow]）/ PAUSE→STOP→DESTROY（[onHide] + [onDestroy]）。
  */
 class FloatingWindowLifecycleOwner :
     LifecycleOwner,
@@ -49,7 +57,7 @@ class FloatingWindowLifecycleOwner :
     }
 
     /**
-     * 标记浮窗已显示
+     * 标记浮窗已显示（对应 View 树的 onAttachedToWindow）
      */
     fun onShow() {
         handleLifecycleEvent(Lifecycle.Event.ON_START)
@@ -57,7 +65,7 @@ class FloatingWindowLifecycleOwner :
     }
 
     /**
-     * 标记浮窗已隐藏
+     * 标记浮窗已隐藏（对应 View 树的 onDetachedFromWindow 前半段）
      */
     fun onHide() {
         handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
@@ -65,9 +73,17 @@ class FloatingWindowLifecycleOwner :
     }
 
     /**
-     * 标记浮窗已销毁
+     * 标记浮窗已销毁（对应 View 树的 onDetachedFromWindow 收尾）。
+     *
+     * 与原 `FloatingComposeContainer` 内部类的行为一致：ON_DESTROY 后同步保存状态。
      */
     fun onDestroy() {
         handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+        if (isRestored) {
+            try {
+                savedStateController.performSave(android.os.Bundle())
+            } catch (_: Exception) {
+            }
+        }
     }
 }

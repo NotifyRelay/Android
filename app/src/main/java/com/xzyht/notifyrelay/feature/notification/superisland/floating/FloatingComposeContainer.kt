@@ -8,14 +8,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
-import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleOwner
-import androidx.lifecycle.LifecycleRegistry
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
-import androidx.savedstate.SavedStateRegistry
-import androidx.savedstate.SavedStateRegistryController
-import androidx.savedstate.SavedStateRegistryOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
@@ -37,51 +32,7 @@ class FloatingComposeContainer
         // 生命周期所有者
         var lifecycleOwner: LifecycleOwner? = null
 
-        // 内部LifecycleOwner实现，用于浮窗环境（非匿名对象，暴露生命周期控制方法）
-        private inner class FloatingWindowLifecycleOwner :
-            LifecycleOwner,
-            SavedStateRegistryOwner {
-            // 生命周期注册表
-            private val lifecycleRegistry = LifecycleRegistry(this)
-
-            // 状态保存控制器
-            private val savedStateController = SavedStateRegistryController.create(this)
-
-            init {
-                // 初始化SavedStateRegistry
-                savedStateController.performAttach()
-                // 传入空Bundle（若有保存的状态，需从浮窗的保存数据中获取真实Bundle）
-                savedStateController.performRestore(android.os.Bundle())
-                // 初始化生命周期到RESUMED状态
-                dispatchLifecycleEvent(Lifecycle.Event.ON_CREATE)
-                dispatchLifecycleEvent(Lifecycle.Event.ON_START)
-                dispatchLifecycleEvent(Lifecycle.Event.ON_RESUME)
-            }
-
-            // 对外暴露：分发生命周期事件（支持动态更新状态）
-            fun dispatchLifecycleEvent(event: Lifecycle.Event) {
-                lifecycleRegistry.handleLifecycleEvent(event)
-                // 若为ON_DESTROY，同步销毁SavedStateRegistry
-                if (event == Lifecycle.Event.ON_DESTROY) {
-                    savedStateController.performSave(android.os.Bundle())
-                }
-            }
-
-            // 对外暴露：保存当前状态（可在浮窗退后台时调用）
-            fun saveState(outState: android.os.Bundle) {
-                savedStateController.performSave(outState)
-            }
-
-            // 对外暴露：恢复状态（可在浮窗重建时调用）
-            fun restoreState(savedState: android.os.Bundle) {
-                savedStateController.performRestore(savedState)
-            }
-
-            override val lifecycle: Lifecycle get() = lifecycleRegistry
-            override val savedStateRegistry: SavedStateRegistry get() = savedStateController.savedStateRegistry
-        }
-
-        // 浮窗生命周期所有者实例
+        // 浮窗生命周期所有者：统一使用包级 FloatingWindowLifecycleOwner（原先的内部类实现已合并过去）
         private val internalLifecycleOwner = FloatingWindowLifecycleOwner()
 
         // 拖动相关变量
@@ -101,6 +52,11 @@ class FloatingComposeContainer
         }
 
         override fun onAttachedToWindow() {
+            // 先让生命周期进入 RESUMED（与原内部类「构造即 RESUMED」的行为对齐），
+            // 再设置 ViewTreeLifecycleOwner，最后才调 super（super 会触发首次组合）。
+            // 否则 Compose 的 WindowRecomposer 会停在 CREATED 而不运行帧时钟。
+            internalLifecycleOwner.onShow()
+
             // 先设置ViewTreeLifecycleOwner，再调用super.onAttachedToWindow()
             // 这样父类方法在调用时就能找到LifecycleOwner。
             // 二者均为 androidx 公开的 Kotlin 扩展（底层 setTag），直接调用即可，无需反射。
@@ -114,10 +70,9 @@ class FloatingComposeContainer
         override fun onDetachedFromWindow() {
             super.onDetachedFromWindow()
 
-            // 分发销毁生命周期事件
-            internalLifecycleOwner.dispatchLifecycleEvent(Lifecycle.Event.ON_PAUSE)
-            internalLifecycleOwner.dispatchLifecycleEvent(Lifecycle.Event.ON_STOP)
-            internalLifecycleOwner.dispatchLifecycleEvent(Lifecycle.Event.ON_DESTROY)
+            // 分发销毁生命周期事件（与原内部类事件序一致：PAUSE→STOP→DESTROY）
+            internalLifecycleOwner.onHide()
+            internalLifecycleOwner.onDestroy()
 
             // 清理LifecycleOwner和SavedStateRegistryOwner
             setViewTreeLifecycleOwner(null)

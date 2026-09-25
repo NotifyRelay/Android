@@ -6,26 +6,16 @@ import android.os.Build
 import com.xzyht.notifyrelay.feature.notification.service.ListenerForegroundController
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
+import com.xzyht.notifyrelay.feature.notification.superisland.list.FloatingReplicaListModeManager
+import com.xzyht.notifyrelay.feature.notification.superisland.list.SuperIslandListManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandListManager
 import notifyrelay.base.util.Logger
-import notifyrelay.base.util.PermissionHelper
 
 object FloatingReplicaManager {
     private const val TAG = "超级岛复刻实现骨架"
 
     private var appContext: Context? = null
-
-    fun getDefaultFloatingWindowEnabled(): Boolean {
-        val detailedOsVersion = PermissionHelper.getDetailedOsVersion()
-        val isGreater = PermissionHelper.isVersionGreaterThan(detailedOsVersion, "OS3.0.300")
-        return !isGreater
-    }
-
-    fun getAppContext(): Context? = appContext
-
-    fun isSourceRecentlyClosed(sourceId: String): Boolean = FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)
 
     fun showFloating(
         context: Context,
@@ -39,7 +29,7 @@ object FloatingReplicaManager {
         cacheForChannelSwitch: Boolean = true,
     ) {
         appContext = context.applicationContext
-        FloatingReplicaMappingManager.setAppContext(appContext)
+        ReplicaStateStore.setAppContext(appContext)
 
         // 登记「当前展示内容」，供通道切换时按新通道重建。
         // 远端媒体胶囊传 false：媒体有独立开关，不参与超级岛通道迁移。
@@ -49,7 +39,7 @@ object FloatingReplicaManager {
             }
         }
 
-        val isRecentlyClosed = FloatingReplicaMappingManager.isSourceRecentlyClosed(sourceId)
+        val isRecentlyClosed = ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId)
 
         if (SuperIslandConfigUtils.isFloatingWindowEnabled(context)) {
             if (isRecentlyClosed) {
@@ -63,12 +53,12 @@ object FloatingReplicaManager {
             return
         } else if (SuperIslandConfigUtils.isNotificationListMode(context)) {
             cacheDisplay()
-            FloatingReplicaMappingManager.removeClosedSource(sourceId)
+            ReplicaTtlRegistry.removeClosedSource(sourceId)
             FloatingReplicaListModeManager.showFloatingListMode(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked)
         } else {
             cacheDisplay()
-            FloatingReplicaMappingManager.removeClosedSource(sourceId)
-            FloatingReplicaNotificationManager.sendNotification(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked)
+            ReplicaTtlRegistry.removeClosedSource(sourceId)
+            FloatingReplicaNotificationManager.sendNotification(context, sourceId, title, text, paramV2Raw, picMap, appName)
         }
     }
 
@@ -98,7 +88,66 @@ object FloatingReplicaManager {
     }
 
     fun dismissBySource(sourceId: String) {
-        FloatingReplicaWindowManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.REMOTE)
+        dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.REMOTE)
+    }
+
+    /**
+     * **关闭侧的统一分发门面**（P2-7：自 `FloatingReplicaWindowManager.dismissBySourceInternal` 上移）。
+     *
+     * 与展示侧的 [showFloating] 对称：两者都在本门面按通道分流。原先关闭侧藏在窗口管理器里
+     * 自判通道（列表 / 浮窗 / 通知），与展示侧的分支重复且使窗口管理器承担了不属于它的职责。
+     *
+     * 关闭全部展示的顺序契约见 [dismissAllRemoteSuperIsland]；本方法只处理单条 sourceId。
+     *
+     * @param reason 移除原因；`HIDDEN` 保留展示内容缓存（隐藏是可恢复的临时状态）。
+     */
+    fun dismissBySourceInternal(
+        sourceId: String,
+        reason: FloatingWindowManager.RemovalReason = FloatingWindowManager.RemovalReason.REMOTE,
+    ) {
+        runReplicaCatching(TAG, "按来源关闭浮窗") {
+            if (ReplicaTtlRegistry.isSourceRecentlyClosedWithinMinute(sourceId)) {
+                return@runReplicaCatching
+            }
+
+            if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
+                ReplicaTtlRegistry.markSourceClosed(sourceId)
+                // HIDDEN 保留缓存：隐藏是可恢复的临时状态，内容仍然活跃、切换通道时仍应展示
+                ReplicaDisplayCache.remove(sourceId)
+            }
+
+            ReplicaStateStore.cancelTimeoutJob(sourceId)
+
+            NotificationGenerator.stopScrollUpdate(sourceId)
+
+            val ctx = ReplicaStateStore.getAppContext()
+            // 列表模式通道：交由列表管理器摘除条目并切换下一条
+            if (ctx != null && !SuperIslandConfigUtils.isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
+                FloatingReplicaListModeManager.dismissFromList(ctx, sourceId)
+                if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
+                    ReplicaTtlRegistry.removeBlockedInstance(sourceId)
+                }
+                return@runReplicaCatching
+            }
+
+            val floatingEnabled = if (ctx != null) SuperIslandConfigUtils.isFloatingWindowEnabled(ctx) else true
+
+            val notificationIdsBefore = ReplicaStateStore.getNotificationIdsBySourceId(sourceId)
+            val entryKeys = ReplicaStateStore.getSourceIdEntryKeys(sourceId)
+
+            // 浮窗通道：移除 overlay 条目（含映射清理）
+            if (floatingEnabled) {
+                FloatingReplicaWindowManager.removeFloatingEntries(
+                    sourceId = sourceId,
+                    reason = reason,
+                    entryKeys = entryKeys,
+                    removeMappings = true,
+                )
+            }
+
+            // 系统通知通道（复刻 / Live Updates）由通知管理器关闭
+            FloatingReplicaNotificationManager.closeNotificationsBySourceId(sourceId, reason, notificationIdsBefore, entryKeys, ctx)
+        }
     }
 
     /**
@@ -115,14 +164,14 @@ object FloatingReplicaManager {
     fun dismissAllRemoteSuperIsland(context: Context) {
         runReplicaCatching(TAG, "关闭全部远端超级岛展示") {
             val ctx = context.applicationContext
-            val sourceIds = FloatingReplicaMappingManager.getAllSourceIds()
+            val sourceIds = ReplicaStateStore.getAllSourceIds()
 
             // Live Updates 通道（仅 Android 16+）：按 sourceId 关闭系统提升通知
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
                 runReplicaCatching(TAG, "关闭全部Live Updates通知") {
                     LiveUpdatesNotificationManager.initialize(ctx)
                     sourceIds.forEach { sourceId ->
-                        LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
+                        LiveUpdatesNotificationManager.dismiss(sourceId)
                     }
                 }
             }
@@ -141,7 +190,7 @@ object FloatingReplicaManager {
             FloatingReplicaWindowManager.getFloatingWindowManager().clearAllEntries()
 
             // 清空全部通道映射与内容指纹，保证后续远端包按当前通道重新建立映射
-            FloatingReplicaMappingManager.clearAllMappings()
+            ReplicaStateStore.clearAllMappings()
 
             ReplicaDisplayCache.clear()
 

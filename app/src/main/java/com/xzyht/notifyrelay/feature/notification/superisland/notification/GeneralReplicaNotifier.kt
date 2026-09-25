@@ -202,19 +202,9 @@ internal object GeneralReplicaNotifier {
                     }
                 }
 
-                // 如果没有 A 区图标或B区图标，再使用应用图标
+                // 如果没有 A 区图标或B区图标，再使用应用图标（逐字相同段已合并入 downloadAppIconBitmapOrNull，D4）
                 if (smallIconBitmap == null) {
-                    val appIconKey = "miui.focus.pic_app_icon"
-                    if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
-                        val appIconUrl = picMap[appIconKey]
-                        if (!appIconUrl.isNullOrBlank()) {
-                            // 同步下载应用图标
-                            val bitmap = ReplicaSmallIconInjector.downloadBitmap(context, appIconUrl)
-                            if (bitmap != null) {
-                                smallIconBitmap = bitmap
-                            }
-                        }
-                    }
+                    smallIconBitmap = ReplicaSmallIconInjector.downloadAppIconBitmapOrNull(context, picMap)
                 }
 
                 // 注入小图标

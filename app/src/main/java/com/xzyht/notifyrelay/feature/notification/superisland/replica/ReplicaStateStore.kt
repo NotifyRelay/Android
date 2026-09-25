@@ -2,21 +2,30 @@ package com.xzyht.notifyrelay.feature.notification.superisland.replica
 
 import android.app.NotificationManager
 import android.content.Context
-import android.os.Build
 import android.view.View
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingEntry
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
 import kotlinx.coroutines.Job
 import notifyrelay.base.util.Logger
 import java.lang.ref.WeakReference
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.collections.iterator
 
-object FloatingReplicaMappingManager {
+/**
+ * 超级岛复刻通道的**纯状态**存储。
+ *
+ * 由原 `FloatingReplicaMappingManager`（God Object，446 行）拆分而来，本文件只保留状态读写：
+ * 三张映射表、内容指纹、注入模式记录、版本号、隐藏条目暂存、超时任务句柄与应用上下文。
+ *
+ * 拆出的另外两部分：
+ * - [ReplicaTtlRegistry]：`closedSourceIds` / `blockedInstanceIds` 两组 TTL；
+ * - [ReplicaNotificationCloser]：取消系统通知的**副作用**（注入模式迁移、按来源/按 id 关闭通知族）。
+ *
+ * 副作用从状态对象中剥离，是本拆分的核心目的：状态对象不再直接持有 Context 去 cancel 通知。
+ *
+ * 日志 TAG 沿用原值 `超级岛映射管理`，保证拆分前后日志逐字不变。
+ */
+internal object ReplicaStateStore {
     private const val TAG = "超级岛映射管理"
 
     private var appContextRef: Context? = null
@@ -33,17 +42,11 @@ object FloatingReplicaMappingManager {
 
     private val sourceIdToNotificationIds = ConcurrentHashMap<String, MutableSet<Int>>()
 
-    private val closedSourceIds = ConcurrentHashMap<String, Long>()
-    private val closedSourceVersions = ConcurrentHashMap<String, Long>()
-
     private val timeoutJobs = ConcurrentHashMap<String, Job>()
 
     private val hiddenEntries = ConcurrentHashMap<String, FloatingEntry>()
 
     private val sourceVersions = ConcurrentHashMap<String, AtomicLong>()
-
-    private val blockedInstanceIds = ConcurrentHashMap<String, Long>()
-    private const val BLOCK_EXPIRE_MS = 15_000L
 
     // 上次成功发出的系统通知内容指纹（sourceId → 指纹）。
     // 保活包内容无变更时跳过 notify()，仅重置内部撤回计时器；通知撤回时同步清理，保证撤回后会重新发出
@@ -59,6 +62,14 @@ object FloatingReplicaMappingManager {
     fun setOverlayView(view: View?) {
         overlayViewRef = if (view != null) WeakReference(view) else null
     }
+
+    /**
+     * 取浮窗容器 View 的 Context（由 [setOverlayView] 登记的弱引用）。
+     *
+     * 与 [getAppContext] 不是同一来源：原实现在关闭 Live Updates 通知时用的是浮窗 View 的
+     * Context，此处保持该来源不变。
+     */
+    fun getOverlayContext(): Context? = overlayViewRef?.get()?.context
 
     fun addSourceIdMapping(
         sourceId: String,
@@ -108,8 +119,6 @@ object FloatingReplicaMappingManager {
 
     fun getSourceIdEntryKeys(sourceId: String): List<String>? = sourceIdToEntryKeyMap[sourceId]?.toList()
 
-    fun getNotificationId(entryKey: String): Int? = entryKeyToNotificationId[entryKey]
-
     fun putNotificationId(
         entryKey: String,
         notificationId: Int,
@@ -133,8 +142,8 @@ object FloatingReplicaMappingManager {
     /**
      * 清空全部映射与派生状态（关闭远端显示 / 列表模式通道切换时使用）。
      *
-     * 保留 [closedSourceIds] 与 [blockedInstanceIds]：通道切换不应解除用户刚刚
-     * 表达过的关闭意图，两者仍按各自 TTL 自然过期。
+     * 保留 `closedSourceIds` 与 `blockedInstanceIds`（在 [ReplicaTtlRegistry] 中）：
+     * 通道切换不应解除用户刚刚表达过的关闭意图，两者仍按各自 TTL 自然过期。
      */
     fun clearAllMappings() {
         timeoutJobs.values.forEach { it.cancel() }
@@ -229,20 +238,6 @@ object FloatingReplicaMappingManager {
         lastNotificationFingerprints.remove(sourceId)
     }
 
-    /**
-     * 判断注入模式是否真的发生了变化。
-     *
-     * 首次发送（无记录）不算「变化」——此时没有旧通知需要迁移，
-     * 返回 false 让调用方直接按当前模式发送即可。
-     */
-    fun hasInjectionModeChanged(
-        sourceId: String,
-        currentModeOrdinal: Int,
-    ): Boolean {
-        val previous = sourceIdToInjectionMode[sourceId] ?: return false
-        return previous != currentModeOrdinal
-    }
-
     /** 记录本次发送所用的注入模式（发送成功后调用） */
     fun setInjectionMode(
         sourceId: String,
@@ -251,69 +246,7 @@ object FloatingReplicaMappingManager {
         sourceIdToInjectionMode[sourceId] = modeOrdinal
     }
 
-    fun removeInjectionMode(sourceId: String) {
-        sourceIdToInjectionMode.remove(sourceId)
-    }
-
-    /**
-     * 注入模式变化时的共享迁移逻辑：先取消该 sourceId 的旧通知并移除旧映射，
-     * 再允许调用方按新注入模式发送通知。
-     *
-     * 为什么必须迁移：超级岛通道与 Live Updates 通道使用**不同的 notificationId**
-     * （由 `SuperIslandNotificationIds` 按通道基址 + 16 位哈希推导，两通道基址间距大于哈希空间，
-     * 区间互不重叠；列表模式为固定 30000），
-     * 且渲染方式不同；若仅在旧通知上叠加，会出现旧通知残留、两条通知并存或旧模式内容不更新。
-     *
-     * 同时清理内容指纹：指纹只描述内容，不含模式，模式变化后若沿用旧指纹，
-     * 后续保活包会被 canSkipRefresh 误判为「无变更」而永不重发。
-     *
-     * @return 实际取消的旧通知数量
-     */
-    fun migrateInjectionModeIfChanged(
-        context: Context,
-        sourceId: String,
-        currentModeOrdinal: Int,
-    ): Int {
-        val previous = sourceIdToInjectionMode[sourceId]
-        if (previous == null || previous == currentModeOrdinal) {
-            // 首次发送或模式未变：仅确保记录存在
-            sourceIdToInjectionMode[sourceId] = currentModeOrdinal
-            return 0
-        }
-
-        // 取消旧通知：先按映射取实际通知 id，再兜底取消两个通道的推导 id，
-        // 避免映射缺失时旧通知残留在通知栏
-        var cancelled = 0
-        val notificationManager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val mappedIds = removeNotificationIdsBySourceId(sourceId)
-        // 兜底取消两个通道的推导 id，避免映射缺失时旧通知残留在通知栏。
-        // 统一走 SuperIslandNotificationIds，保证与发送侧使用完全相同的推导公式。
-        val fallbackIds =
-            listOf(
-                SuperIslandNotificationIds.liveUpdates(sourceId), // Live Updates 通道
-                SuperIslandNotificationIds.replica(sourceId), // 复刻通道路径
-            )
-        (mappedIds.orEmpty() + fallbackIds).distinct().forEach { id ->
-            try {
-                notificationManager.cancel(id)
-                cancelled++
-            } catch (e: Exception) {
-                Logger.w(TAG, "切换注入模式时取消旧通知失败: sourceId=$sourceId, id=$id, ${e.message}")
-            }
-        }
-
-        // 移除旧映射与旧指纹，保证后续按新模式重新建立映射、且不会被指纹跳过
-        removeSourceIdMappings(sourceId)
-        removeNotificationFingerprint(sourceId)
-        sourceIdToInjectionMode[sourceId] = currentModeOrdinal
-
-        Logger.i(TAG, "注入模式变化($previous→$currentModeOrdinal)，已取消旧通知 $cancelled 条并清理旧映射: sourceId=$sourceId")
-        return cancelled
-    }
-
-    fun clearAllInjectionModes() {
-        sourceIdToInjectionMode.clear()
-    }
+    fun getInjectionMode(sourceId: String): Int? = sourceIdToInjectionMode[sourceId]
 
     fun clearAllNotificationFingerprints() {
         lastNotificationFingerprints.clear()
@@ -326,71 +259,8 @@ object FloatingReplicaMappingManager {
         version: Long,
     ): Boolean = sourceVersions[sourceId]?.get() == version
 
-    fun handleRemovalReason(
-        sourceId: String,
-        reason: FloatingWindowManager.RemovalReason,
-    ) {
-        if (reason == FloatingWindowManager.RemovalReason.MANUAL || reason == FloatingWindowManager.RemovalReason.HIDDEN) {
-            blockInstance(sourceId)
-        }
-
-        if (reason != FloatingWindowManager.RemovalReason.HIDDEN && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-            runReplicaCatching(TAG, "关闭Live Updates复合通知") {
-                val context = overlayViewRef?.get()?.context
-                if (context != null) {
-                    LiveUpdatesNotificationManager.initialize(context)
-                    LiveUpdatesNotificationManager.dismissLiveUpdateNotification(sourceId)
-                } else {
-                    Logger.w(TAG, "无法关闭Live Updates复合通知，上下文为空")
-                }
-            }
-        }
-    }
-
-    fun isInstanceBlocked(instanceId: String?): Boolean {
-        if (instanceId.isNullOrBlank()) return false
-        val now = System.currentTimeMillis()
-        val ts = blockedInstanceIds[instanceId] ?: return false
-        if (now - ts > BLOCK_EXPIRE_MS) {
-            blockedInstanceIds.remove(instanceId)
-            Logger.i(TAG, "超级岛: 屏蔽过期，自动移除 instanceId=$instanceId")
-            return false
-        }
-        blockedInstanceIds[instanceId] = now
-        return true
-    }
-
-    fun blockInstance(instanceId: String?) {
-        if (instanceId.isNullOrBlank()) return
-        blockedInstanceIds[instanceId] = System.currentTimeMillis()
-        Logger.i(TAG, "超级岛: 会话级屏蔽 instanceId=$instanceId")
-    }
-
-    fun removeBlockedInstance(instanceId: String) {
-        blockedInstanceIds.remove(instanceId)
-    }
-
-    fun isSourceRecentlyClosed(sourceId: String): Boolean {
-        val lastClosed = closedSourceIds[sourceId]
-        return lastClosed != null && (System.currentTimeMillis() - lastClosed) < 30_000L
-    }
-
-    fun markSourceClosed(sourceId: String) {
-        closedSourceIds[sourceId] = System.currentTimeMillis()
-        sourceVersions[sourceId]?.get()?.let { closedSourceVersions[sourceId] = it }
-    }
-
-    fun removeClosedSource(sourceId: String) {
-        closedSourceIds.remove(sourceId)
-    }
-
-    fun isSourceRecentlyClosedWithinMinute(sourceId: String): Boolean {
-        val lastClosed = closedSourceIds[sourceId] ?: return false
-        if (System.currentTimeMillis() - lastClosed >= 60_000L) return false
-        val closedVersion = closedSourceVersions[sourceId] ?: return false
-        val currentVersion = sourceVersions[sourceId]?.get() ?: return false
-        return currentVersion == closedVersion
-    }
+    /** 当前版本号（供 [ReplicaTtlRegistry.markSourceClosed] 快照「关闭时的版本」）。 */
+    fun currentVersion(sourceId: String): Long? = sourceVersions[sourceId]?.get()
 
     fun cancelTimeoutJob(sourceId: String) {
         timeoutJobs.remove(sourceId)?.cancel()
@@ -430,15 +300,6 @@ object FloatingReplicaMappingManager {
                 if (keys.contains(entryKey)) {
                     return sourceId
                 }
-            }
-        }
-        return null
-    }
-
-    fun findSourceIdByEntryKey(entryKey: String): String? {
-        for ((sourceId, keys) in sourceIdToEntryKeyMap) {
-            if (keys.contains(entryKey)) {
-                return sourceId
             }
         }
         return null

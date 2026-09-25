@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.notification
+package com.xzyht.notifyrelay.feature.notification.superisland.list
 
 /**
  * 超级岛通知列表管理器。
@@ -142,10 +142,6 @@ object SuperIslandListManager {
     /** 指定 sourceId 是否在列表中 */
     @Synchronized
     fun containsSourceId(sourceId: String): Boolean = entries.any { it.sourceId == sourceId }
-
-    /** 列表是否为空 */
-    @Synchronized
-    fun isEmpty(): Boolean = entries.isEmpty()
 
     /** 条目数量 */
     @Synchronized

@@ -7,18 +7,16 @@ import android.graphics.Bitmap
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.data.SuperIslandStructuredDataHelper
+import com.xzyht.notifyrelay.feature.notification.superisland.media.LyricsSplitter
 import github.xzynine.superislandui.common.BitmapUtils
 import github.xzynine.superislandui.common.CapsuleScrollManager
-import github.xzynine.superislandui.common.TextSplitter
 import github.xzynine.superislandui.floating.smallisland.right.bProgress
 import github.xzynine.superislandui.floating.smallisland.right.bProgressColorReach
 import github.xzynine.superislandui.floating.smallisland.right.bProgressColorUnReach
 import github.xzynine.superislandui.floating.smallisland.right.bProgressIsCCW
 import github.xzynine.superislandui.floating.smallisland.right.textToRender
 import github.xzynine.superislandui.model.core.ParamV2
-import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
 
 /**
  * 媒体类型（business == "media"）复刻通知构建。
@@ -47,36 +45,10 @@ internal object MediaReplicaNotifier {
         val isSuperIslandEnabled = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
         val isLiveUpdatesEnabled = SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)
 
-        // 处理歌词拆分和显示
-        val lyricText = title ?: ""
-        var capsuleText = lyricText
-        var iconText = ""
-
-        // 检查歌词分割模式设置                // 0=默认（平板不分割，手机分割）1=分割 2=不分割
-        val lyricsSplitMode = StorageManager.getInt(context, "lyrics_split_mode", 0)
-        val shouldSplit =
-            when (lyricsSplitMode) {
-                1 -> true
-                2 -> false
-                else -> !DeviceUtils.isTablet(context)
-            }
-
-        if (shouldSplit) {
-            // 当歌词超过阈值时，拆分为图标文本和胶囊文本
-            // 远端和本地都保持6字符开始分割
-            val threshold = 12
-            val textLength = TextSplitter.calculateTextLength(lyricText)
-            if (textLength > threshold) {
-                // 使用TextSplitter工具类进行歌词拆分
-                val (splitIconText, splitCapsuleText) = TextSplitter.splitLyric(lyricText, threshold)
-                iconText = splitIconText
-                capsuleText = splitCapsuleText
-            }
-        } else {
-            // 不分割时，不进行任何截断和拆分，完整显示所有文本
-            capsuleText = lyricText
-            iconText = ""
-        }
+        // 处理歌词拆分和显示（逻辑统一在 LyricsSplitter，P3-1/D2）
+        val split = LyricsSplitter.split(context, title)
+        val iconText = split.iconText
+        val capsuleText = split.capsuleText
 
         // 使用CapsuleScrollManager处理胶囊文本滚动
         val scrollKey = "${key}_scroll"
@@ -202,20 +174,9 @@ internal object MediaReplicaNotifier {
                 }
             }
 
-            // 如果没有文本数据，尝试使用应用图标
+            // 如果没有文本数据，尝试使用应用图标（逐字相同段已合并入 downloadAppIconBitmapOrNull，D4）
             if (smallIconBitmap == null) {
-                // 优先使用应用图标（大图标的键值提供的图标）
-                val appIconKey = "miui.focus.pic_app_icon"
-                if (!picMap.isNullOrEmpty() && picMap.containsKey(appIconKey)) {
-                    val appIconUrl = picMap[appIconKey]
-                    if (!appIconUrl.isNullOrBlank()) {
-                        // 异步下载应用图标
-                        val bitmap = ReplicaSmallIconInjector.downloadBitmap(context, appIconUrl)
-                        if (bitmap != null) {
-                            smallIconBitmap = bitmap
-                        }
-                    }
-                }
+                smallIconBitmap = ReplicaSmallIconInjector.downloadAppIconBitmapOrNull(context, picMap)
             }
 
             // 注入小图标

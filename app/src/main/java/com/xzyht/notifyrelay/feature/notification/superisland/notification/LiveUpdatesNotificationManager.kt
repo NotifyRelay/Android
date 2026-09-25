@@ -13,6 +13,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIsland
 import com.xzyht.notifyrelay.feature.notification.superisland.data.SuperIslandStructuredDataHelper
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.FormattedSuperIslandData
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
+import com.xzyht.notifyrelay.feature.notification.superisland.intent.NotificationIntentFactory
 import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.util.Logger
 
@@ -175,16 +176,14 @@ object LiveUpdatesNotificationManager {
         paramV2: ParamV2?,
         notificationId: Int,
     ): Notification? {
-        // 检查浮窗功能是否开启
-        val floatingWindowEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(appContext)
-        // 列表模式（浮窗关闭时）也需要点击意图用于切换
-        val notificationListMode = !floatingWindowEnabled && SuperIslandConfigUtils.isNotificationListMode(appContext)
-        val needClickIntent = floatingWindowEnabled || notificationListMode
+        // 检查浮窗功能是否开启；列表模式（浮窗关闭时）也需要点击意图用于切换。
+        // 判定统一走 SuperIslandConfigUtils.needClickIntent（D3：唯一判定处）
+        val needClickIntent = SuperIslandConfigUtils.needClickIntent(appContext)
 
         // 创建删除意图，用于处理用户移除通知时关闭浮窗
         val deleteIntent =
             if (needClickIntent) {
-                LiveUpdatesIntentFactory.createDeleteIntent(appContext, notificationId)
+                NotificationIntentFactory.createDeleteIntent(appContext, notificationId)
             } else {
                 null
             }
@@ -192,7 +191,7 @@ object LiveUpdatesNotificationManager {
         // 创建点击意图，用于处理用户点击通知时切换浮窗或切换列表
         val contentIntent =
             if (needClickIntent) {
-                LiveUpdatesIntentFactory.createContentIntent(
+                NotificationIntentFactory.createPendingContentIntent(
                     context = appContext,
                     notificationId = notificationId,
                     sourceId = sourceId,
@@ -343,37 +342,51 @@ object LiveUpdatesNotificationManager {
         return builder
     }
 
-    fun cancelLiveUpdate(sourceId: String) {
+    /**
+     * **Live Updates 通知撤回的唯一入口**（D5/D7 收敛）。
+     *
+     * 原先「撤回 Live Updates」散落在 4 处，其中两处（`closeNotificationsBySourceId`、
+     * `migrateInjectionModeIfChanged`）还在调用本方法之外**再直接 `notificationManager.cancel(id)`**
+     * 一次——本方法取消的正是同一个推导 id（[SuperIslandNotificationIds.liveUpdates]），
+     * 属重复操作。现全部收敛到此处：调方只需调用 [dismiss]，不再自行 cancel 该 id。
+     *
+     * 行为与拆分前逐字一致：版本门控 →（未初始化则尝试初始化）→ 取消推导 id；
+     * 失败只记日志、不抛出。
+     *
+     * @param context 可选的用于初始化 [notificationManager] 的 Context；
+     *   传入时先 [initialize]（幂等）。不传则沿用已初始化的单例状态。
+     * @return true 表示已实际执行取消（或无需取消），false 表示版本不满足而跳过。
+     */
+    fun dismiss(
+        sourceId: String,
+        context: Context? = null,
+    ): Boolean {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
             Logger.w(TAG, "当前Android版本不支持Live Updates")
-            return
+            return false
         }
         try {
-            // 检查notificationManager是否已初始化，如果没有则尝试初始化
-            if (!::notificationManager.isInitialized) {
+            if (context != null) {
+                // initialize 内部同样做版本门控；此处已在上方确认版本满足
+                initialize(context)
+            } else if (!::notificationManager.isInitialized) {
+                // 检查notificationManager是否已初始化，如果没有则尝试初始化
                 Logger.w(TAG, "LiveUpdatesNotificationManager未初始化，尝试初始化")
                 // 如果有appContext，则使用appContext初始化
                 if (::appContext.isInitialized) {
                     initialize(appContext)
                 } else {
                     Logger.w(TAG, "无法初始化LiveUpdatesNotificationManager，缺少上下文")
-                    return
+                    return false
                 }
             }
             val notificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
             notificationManager.cancel(notificationId)
+            return true
         } catch (e: Exception) {
             Logger.e(TAG, "取消Live Update通知失败: ${e.message}")
+            return false
         }
-    }
-
-    // 兼容旧方法名
-    fun dismissLiveUpdateNotification(sourceId: String) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
-            Logger.w(TAG, "当前Android版本不支持Live Updates")
-            return
-        }
-        cancelLiveUpdate(sourceId)
     }
 
     fun canUseLiveUpdates(): Boolean {
