@@ -106,6 +106,11 @@ object FloatingReplicaWindowManager {
 
             CoroutineScope(Dispatchers.Main).launch {
                 runReplicaCatchingSuspend(TAG, "显示浮窗(协程)") {
+                    // 与原实现一致：overlay 生命周期所有者在协程起点（图片入库之前）即备好
+                    if (overlayLifecycleOwner == null) {
+                        overlayLifecycleOwner = FloatingWindowLifecycleOwner()
+                    }
+
                     // 展示管线（三通道共享）：本通道需额外保证「条目此前已存在」才允许跳过通知刷新
                     SuperIslandDisplayPipeline.dispatch(
                         context = context,
@@ -131,10 +136,6 @@ object FloatingReplicaWindowManager {
                                 abortMessage = "在异步发送期间被关闭，中止显示",
                                 skipRefreshMessage = "内容无变更，跳过系统通知刷新，仅重置内部撤回计时器",
                                 onContentReady = { content ->
-                                    if (overlayLifecycleOwner == null) {
-                                        overlayLifecycleOwner = FloatingWindowLifecycleOwner()
-                                    }
-
                                     // 记录更新前浮窗条目是否已存在：存在说明系统通知已发出过，保活包无变更时可跳过通知刷新
                                     val entryExistedBefore = floatingWindowManager.getEntry(sourceId) != null
 
