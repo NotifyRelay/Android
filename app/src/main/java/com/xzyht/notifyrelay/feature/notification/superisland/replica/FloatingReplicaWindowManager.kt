@@ -2,7 +2,6 @@ package com.xzyht.notifyrelay.feature.notification.superisland.replica
 
 import android.content.Context
 import android.graphics.PixelFormat
-import android.os.Build
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
@@ -12,16 +11,12 @@ import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIsland
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingComposeContainer
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowLifecycleOwner
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
-import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
-import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.feature.notification.superisland.list.FloatingReplicaListModeManager
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
+import com.xzyht.notifyrelay.feature.notification.superisland.pipeline.SuperIslandDisplayPipeline
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
@@ -111,131 +106,63 @@ object FloatingReplicaWindowManager {
 
             CoroutineScope(Dispatchers.Main).launch {
                 runReplicaCatchingSuspend(TAG, "显示浮窗(协程)") {
-                    val taskVersion = ReplicaStateStore.nextVersion(sourceId)
+                    // 展示管线（三通道共享）：本通道需额外保证「条目此前已存在」才允许跳过通知刷新
+                    SuperIslandDisplayPipeline.dispatch(
+                        context = context,
+                        request =
+                            SuperIslandDisplayPipeline.DisplayRequest(
+                                sourceId = sourceId,
+                                title = title,
+                                text = text,
+                                paramV2Raw = paramV2Raw,
+                                picMap = picMap,
+                                appName = appName,
+                                isLocked = isLocked,
+                                channel = SuperIslandDisplayPipeline.Channel.FLOATING,
+                                tag = TAG,
+                                isRestoring = isRestoring,
+                                requireEntryExistedBefore = true,
+                                titleFallback = null,
+                                textFallback = null,
+                                // 竞态守卫：协程 nextVersion 可能在 dismissBySource 的 removeSourceIdMappings 之后执行，
+                                // 导致版本被 computeIfAbsent 重建、isLatestVersion 误判通过。
+                                // 此处复检 isSourceRecentlyClosed（dismissBySource 已 markSourceClosed），命中即中止。
+                                extraGuard = { ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId) },
+                                abortMessage = "在异步发送期间被关闭，中止显示",
+                                skipRefreshMessage = "内容无变更，跳过系统通知刷新，仅重置内部撤回计时器",
+                                onContentReady = { content ->
+                                    if (overlayLifecycleOwner == null) {
+                                        overlayLifecycleOwner = FloatingWindowLifecycleOwner()
+                                    }
 
-                    if (overlayLifecycleOwner == null) {
-                        overlayLifecycleOwner = FloatingWindowLifecycleOwner()
-                    }
+                                    // 记录更新前浮窗条目是否已存在：存在说明系统通知已发出过，保活包无变更时可跳过通知刷新
+                                    val entryExistedBefore = floatingWindowManager.getEntry(sourceId) != null
 
-                    val internedPicMap =
-                        withContext(Dispatchers.IO) {
-                            SuperIslandImageStore.internAll(context, sourceId, picMap)
-                        }
-
-                    if (!ReplicaStateStore.isLatestVersion(sourceId, taskVersion)) {
-                        return@runReplicaCatchingSuspend
-                    }
-
-                    // 竞态守卫：协程 nextVersion 可能在 dismissBySource 的 removeSourceIdMappings 之后执行，
-                    // 导致版本被 computeIfAbsent 重建、isLatestVersion 误判通过。
-                    // 此处复检 isSourceRecentlyClosed（dismissBySource 已 markSourceClosed），命中即中止。
-                    if (ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId)) {
-                        Logger.i(TAG, "超级岛: sourceId=$sourceId 在异步发送期间被关闭，中止显示")
-                        return@runReplicaCatchingSuspend
-                    }
-
-                    val formattedData = SuperIslandDataFormatter.formatForDisplay(context, paramV2Raw, internedPicMap)
-                    val paramV2 = formattedData.paramV2
-
-                    val summaryOnly =
-                        when {
-                            paramV2?.business == "miui_flashlight" -> true
-                            paramV2Raw?.contains("miui_flashlight") == true -> true
-                            else -> false
-                        }
-
-                    val entryKey = sourceId
-
-                    val displayTitle =
-                        title?.takeIf { it.isNotBlank() }
-                            ?: paramV2?.highlightInfo?.title?.takeIf { it.isNotBlank() }
-                            ?: paramV2?.baseInfo?.title?.takeIf { it.isNotBlank() }
-
-                    val displayText =
-                        text?.takeIf { it.isNotBlank() }
-                            ?: paramV2?.highlightInfo?.content?.takeIf { it.isNotBlank() }
-                            ?: paramV2?.baseInfo?.content?.takeIf { it.isNotBlank() }
-
-                    // 记录更新前浮窗条目是否已存在：存在说明系统通知已发出过，保活包无变更时可跳过通知刷新
-                    val entryExistedBefore = floatingWindowManager.getEntry(entryKey) != null
-
-                    floatingWindowManager.addOrUpdateEntry(
-                        key = entryKey,
-                        paramV2 = paramV2,
-                        paramV2Raw = formattedData.paramV2Raw,
-                        picMap = formattedData.resolvedPicMap,
-                        isExpanded = if (isLocked) false else !summaryOnly,
-                        summaryOnly = summaryOnly,
-                        business = paramV2?.business,
-                        title = displayTitle,
-                        text = displayText,
-                        appName = appName,
-                    )
-
-                    ReplicaStateStore.addSourceIdMapping(sourceId, entryKey)
-
-                    addOrUpdateEntry(context, entryKey, summaryOnly)
-
-                    val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
-
-                    // 注入模式：超级岛模式优先于 Live Updates 模式（对齐媒体类型的既有分流范式）。
-                    // 超级岛模式下，即便含 progressInfo 也走超级岛通道；
-                    // 仅在「Live Updates 注入且非超级岛」时保留现有 Live Updates 通道。
-                    val superIslandMode = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
-                    val liveUpdatesMode = SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)
-                    val injectionModeOrdinal = SuperIslandConfigUtils.getSpecInjectionMode(context).ordinal
-
-                    if (!isRestoring) {
-                        // 注入模式变化时先取消旧通知并清理旧映射，再按新模式发送
-                        ReplicaNotificationCloser.migrateInjectionModeIfChanged(context, sourceId, injectionModeOrdinal)
-
-                        // 内容与上次成功发出的通知一致且通知仍在展示时，跳过系统通知刷新（不调用 notify），
-                        // 仅保留上方 addOrUpdateEntry 对内部撤回计时器（autoDismiss）的重置。
-                        // 指纹包含注入模式：模式变化时指纹随之变化，不会被误判为「内容无变更」。
-                        val fingerprint =
-                            ReplicaStateStore.computeNotificationFingerprint(
-                                displayTitle,
-                                displayText,
-                                formattedData.paramV2Raw,
-                                formattedData.resolvedPicMap,
-                                injectionModeOrdinal,
-                            )
-                        val previousNotificationIds = ReplicaStateStore.getNotificationIdsBySourceId(sourceId)
-                        val canSkipRefresh =
-                            entryExistedBefore &&
-                                !previousNotificationIds.isNullOrEmpty() &&
-                                ReplicaStateStore.isAnyNotificationActive(context, previousNotificationIds) &&
-                                fingerprint == ReplicaStateStore.getNotificationFingerprint(sourceId)
-
-                        if (canSkipRefresh) {
-                            Logger.i(TAG, "超级岛: 内容无变更，跳过系统通知刷新，仅重置内部撤回计时器: sourceId=$sourceId")
-                        } else if (liveUpdatesMode && !superIslandMode && isProgressType && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
-                            runReplicaCatchingSuspend(TAG, "发送Live Updates复合通知") {
-                                LiveUpdatesNotificationManager.initialize(context)
-                                val success =
-                                    LiveUpdatesNotificationManager.showLiveUpdate(
-                                        sourceId,
-                                        displayTitle,
-                                        displayText,
-                                        appName,
-                                        formattedData,
+                                    floatingWindowManager.addOrUpdateEntry(
+                                        key = sourceId,
+                                        paramV2 = content.paramV2,
+                                        paramV2Raw = content.formattedData.paramV2Raw,
+                                        picMap = content.formattedData.resolvedPicMap,
+                                        isExpanded = if (isLocked) false else !content.summaryOnly,
+                                        summaryOnly = content.summaryOnly,
+                                        business = content.paramV2?.business,
+                                        title = content.displayTitle,
+                                        text = content.displayText,
+                                        appName = appName,
                                     )
-                                val liveUpdateNotificationId = SuperIslandNotificationIds.liveUpdates(sourceId)
-                                ReplicaStateStore.putNotificationId(entryKey, liveUpdateNotificationId)
-                                ReplicaStateStore.addSourceIdMapping(sourceId, entryKey, liveUpdateNotificationId)
-                                // 仅在确认发出成功后记录指纹，发送异常被吞时留空，避免后续保活包被误跳过
-                                if (success) {
-                                    ReplicaStateStore.setNotificationFingerprint(sourceId, fingerprint)
-                                }
-                            }
-                        } else {
-                            val notificationId = NotificationGenerator.sendReplicaNotification(context, entryKey, displayTitle, displayText, appName, formattedData.paramV2, formattedData.paramV2Raw, formattedData.resolvedPicMap, sourceId, floatingWindowManager)
-                            ReplicaStateStore.addSourceIdMapping(sourceId, entryKey, notificationId)
-                            if (notificationId != null) {
-                                ReplicaStateStore.setNotificationFingerprint(sourceId, fingerprint)
-                            }
-                        }
-                    }
+
+                                    ReplicaStateStore.addSourceIdMapping(sourceId, sourceId)
+
+                                    addOrUpdateEntry(context, sourceId, content.summaryOnly)
+
+                                    entryExistedBefore
+                                },
+                                // 浮窗通道的 entry 映射已在 onContentReady 内登记
+                                registerMappingBeforeSend = false,
+                                registerMappingOnSendFailure = true,
+                                registerLiveUpdateMappingRegardlessOfSuccess = true,
+                            ),
+                    )
                 }
             }
         }
