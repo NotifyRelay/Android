@@ -143,10 +143,6 @@ object SuperIslandListManager {
     @Synchronized
     fun containsSourceId(sourceId: String): Boolean = entries.any { it.sourceId == sourceId }
 
-    /** 列表是否为空 */
-    @Synchronized
-    fun isEmpty(): Boolean = entries.isEmpty()
-
     /** 条目数量 */
     @Synchronized
     fun size(): Int = entries.size

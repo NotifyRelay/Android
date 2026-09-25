@@ -66,9 +66,9 @@ object FloatingReplicaWindowManager {
 
     private fun isFloatingWindowEnabled(context: Context): Boolean = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
 
-    fun canShowOverlay(context: Context): Boolean = PermissionHelper.checkOverlayPermission(context)
+    private fun canShowOverlay(context: Context): Boolean = PermissionHelper.checkOverlayPermission(context)
 
-    fun requestOverlayPermission(context: Context) {
+    private fun requestOverlayPermission(context: Context) {
         runReplicaCatching(TAG, "请求悬浮窗权限") {
             val intent = IntentUtils.createImplicitIntent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION)
             intent.data = "package:${context.packageName}".toUri()
@@ -106,7 +106,10 @@ object FloatingReplicaWindowManager {
 
             CoroutineScope(Dispatchers.Main).launch {
                 runReplicaCatchingSuspend(TAG, "显示浮窗(协程)") {
-                    // 与原实现一致：overlay 生命周期所有者在协程起点（图片入库之前）即备好
+                    // 与原实现一致：overlay 生命周期所有者在协程起点（图片入库之前）即备好。
+                    // 位置勿动：此处必须在 dispatch 之前、且与管线内首个挂起点（internAll）保持原有先后。
+                    // 当前 `FloatingWindowLifecycleOwner()` 构造是同步纯内存操作，故次序不可观测；
+                    // 但若将来其构造改为挂起或触碰 ReplicaStateStore，此位置即成为真实语义偏差。
                     if (overlayLifecycleOwner == null) {
                         overlayLifecycleOwner = FloatingWindowLifecycleOwner()
                     }
@@ -122,7 +125,6 @@ object FloatingReplicaWindowManager {
                                 paramV2Raw = paramV2Raw,
                                 picMap = picMap,
                                 appName = appName,
-                                isLocked = isLocked,
                                 channel = SuperIslandDisplayPipeline.Channel.FLOATING,
                                 tag = TAG,
                                 isRestoring = isRestoring,
@@ -259,7 +261,7 @@ object FloatingReplicaWindowManager {
         }
     }
 
-    fun removeOverlayContainer() {
+    private fun removeOverlayContainer() {
         runReplicaCatching(TAG, "移除浮窗容器") {
             val view = overlayView?.get()
             val wm = windowManager?.get()

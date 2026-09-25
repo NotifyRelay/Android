@@ -6,7 +6,6 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.contract.SuperIslandActions
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
@@ -29,18 +28,6 @@ import com.xzyht.notifyrelay.feature.notification.superisland.receiver.Notificat
  * 配置类回归纯配置读写。
  */
 object NotificationIntentFactory {
-    /**
-     * 计算点击/删除意图所需的条件标志位（D3）。
-     *
-     * 判定本身已统一到 [SuperIslandConfigUtils.needClickIntent]（配置类为唯一来源），
-     * 此处仅保留转发，使意图工厂的调用方无需自行 import 配置类。
-     *
-     * 注意：三处调用点（[createContentIntent] 的复刻通道路径、
-     * `LiveUpdatesNotificationManager.buildInitialNotification`、
-     * `LiveUpdatesIconLoader` 的图标更新路径）原先各自内联同一判定；现全部改为调用本方法。
-     */
-    fun needClickIntent(context: Context): Boolean = SuperIslandConfigUtils.needClickIntent(context)
-
     /**
      * 创建并注册「超级岛复刻」通知渠道（幂等）
      */

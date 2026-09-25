@@ -177,8 +177,8 @@ object LiveUpdatesNotificationManager {
         notificationId: Int,
     ): Notification? {
         // 检查浮窗功能是否开启；列表模式（浮窗关闭时）也需要点击意图用于切换。
-        // 判定统一走 NotificationIntentFactory.needClickIntent（原为本文件内的三判之一）
-        val needClickIntent = NotificationIntentFactory.needClickIntent(appContext)
+        // 判定统一走 SuperIslandConfigUtils.needClickIntent（D3：唯一判定处）
+        val needClickIntent = SuperIslandConfigUtils.needClickIntent(appContext)
 
         // 创建删除意图，用于处理用户移除通知时关闭浮窗
         val deleteIntent =

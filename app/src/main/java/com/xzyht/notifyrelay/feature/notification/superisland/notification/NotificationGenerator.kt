@@ -82,8 +82,8 @@ object NotificationGenerator {
             // ID 推导统一由 SuperIslandNotificationIds 提供，避免与 Live Updates 通道区间重叠
             val notificationId = overrideNotificationId ?: SuperIslandNotificationIds.replica(key)
 
-            // 计算点击/删除意图所需的条件标志位
-            val needClickIntent = NotificationIntentFactory.needClickIntent(context)
+            // 计算点击/删除意图所需的条件标志位（D3：唯一判定在 SuperIslandConfigUtils）
+            val needClickIntent = SuperIslandConfigUtils.needClickIntent(context)
 
             // 创建点击意图，用于处理用户点击通知时切换浮窗或切换列表
             val contentIntent =

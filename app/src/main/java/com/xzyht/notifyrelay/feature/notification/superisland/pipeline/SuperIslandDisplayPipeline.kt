@@ -39,8 +39,8 @@ internal object SuperIslandDisplayPipeline {
     /** 列表模式聚合通知的固定 ID（原 `FloatingReplicaListModeManager.LIST_MODE_NOTIFICATION_ID`）。 */
     const val LIST_MODE_NOTIFICATION_ID = 30_000
 
-    /** 吞异常时 Live Updates 分支的动作名（浮窗与普通通知两通道原文案相同）。 */
-    private const val LIVE_UPDATE_ACTION_NAME = "发送LiveUpdates复合通知"
+    /** 吞异常时 Live Updates 分支的动作名（浮窗与普通通知两通道原文案相同，含 "Live" 与 "Updates" 之间的空格）。 */
+    private const val LIVE_UPDATE_ACTION_NAME = "发送Live Updates复合通知"
 
     /** 展示通道。仅用于推导 overrideNotificationId（超时调度仍由调用方薄壳负责）。 */
     enum class Channel {
@@ -50,11 +50,14 @@ internal object SuperIslandDisplayPipeline {
     }
 
     /** 通道推导的通知 ID 覆盖值：列表模式用固定聚合 ID，其余为 null（由 sourceId 推导）。 */
-    fun overrideNotificationId(channel: Channel): Int? = if (channel == Channel.LIST) LIST_MODE_NOTIFICATION_ID else null
+    private fun overrideNotificationId(channel: Channel): Int? = if (channel == Channel.LIST) LIST_MODE_NOTIFICATION_ID else null
 
-    /** 规范化后的展示内容，交给 [DisplayRequest.onContentReady] 钩子。 */
+    /**
+     * 规范化后的展示内容，交给 [DisplayRequest.onContentReady] 钩子。
+     *
+     * 注意：不含 `sourceId`——钩子实现闭包内已持有 sourceId，无需再经本对象传递。
+     */
     class DisplayContent(
-        val sourceId: String,
         val formattedData: FormattedSuperIslandData,
         val paramV2: ParamV2?,
         val displayTitle: String?,
@@ -93,7 +96,6 @@ internal object SuperIslandDisplayPipeline {
         val paramV2Raw: String?,
         val picMap: Map<String, String>?,
         val appName: String?,
-        val isLocked: Boolean = false,
         val channel: Channel,
         val tag: String,
         val forceRefresh: Boolean = false,
@@ -186,7 +188,6 @@ internal object SuperIslandDisplayPipeline {
 
         val content =
             DisplayContent(
-                sourceId = sourceId,
                 formattedData = formattedData,
                 paramV2 = paramV2,
                 displayTitle = displayTitle,

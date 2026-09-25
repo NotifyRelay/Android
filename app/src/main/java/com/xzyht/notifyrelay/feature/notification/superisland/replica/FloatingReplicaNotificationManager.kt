@@ -26,7 +26,6 @@ object FloatingReplicaNotificationManager {
         paramV2Raw: String?,
         picMap: Map<String, String>?,
         appName: String?,
-        isLocked: Boolean = false,
     ) {
         CoroutineScope(Dispatchers.Main).launch {
             runReplicaCatchingSuspend(TAG, "发送通知") {
@@ -42,7 +41,6 @@ object FloatingReplicaNotificationManager {
                                 paramV2Raw = paramV2Raw,
                                 picMap = picMap,
                                 appName = appName,
-                                isLocked = isLocked,
                                 channel = SuperIslandDisplayPipeline.Channel.NOTIFICATION,
                                 tag = TAG,
                                 // 竞态守卫：协程 nextVersion 可能在 dismissBySource 的 removeSourceIdMappings 之后执行，

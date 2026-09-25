@@ -10,7 +10,6 @@ import java.lang.ref.WeakReference
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
-import kotlin.collections.iterator
 
 /**
  * 超级岛复刻通道的**纯状态**存储。
@@ -119,8 +118,6 @@ internal object ReplicaStateStore {
     }
 
     fun getSourceIdEntryKeys(sourceId: String): List<String>? = sourceIdToEntryKeyMap[sourceId]?.toList()
-
-    fun getNotificationId(entryKey: String): Int? = entryKeyToNotificationId[entryKey]
 
     fun putNotificationId(
         entryKey: String,
@@ -241,20 +238,6 @@ internal object ReplicaStateStore {
         lastNotificationFingerprints.remove(sourceId)
     }
 
-    /**
-     * 判断注入模式是否真的发生了变化。
-     *
-     * 首次发送（无记录）不算「变化」——此时没有旧通知需要迁移，
-     * 返回 false 让调用方直接按当前模式发送即可。
-     */
-    fun hasInjectionModeChanged(
-        sourceId: String,
-        currentModeOrdinal: Int,
-    ): Boolean {
-        val previous = sourceIdToInjectionMode[sourceId] ?: return false
-        return previous != currentModeOrdinal
-    }
-
     /** 记录本次发送所用的注入模式（发送成功后调用） */
     fun setInjectionMode(
         sourceId: String,
@@ -264,14 +247,6 @@ internal object ReplicaStateStore {
     }
 
     fun getInjectionMode(sourceId: String): Int? = sourceIdToInjectionMode[sourceId]
-
-    fun removeInjectionMode(sourceId: String) {
-        sourceIdToInjectionMode.remove(sourceId)
-    }
-
-    fun clearAllInjectionModes() {
-        sourceIdToInjectionMode.clear()
-    }
 
     fun clearAllNotificationFingerprints() {
         lastNotificationFingerprints.clear()
@@ -325,15 +300,6 @@ internal object ReplicaStateStore {
                 if (keys.contains(entryKey)) {
                     return sourceId
                 }
-            }
-        }
-        return null
-    }
-
-    fun findSourceIdByEntryKey(entryKey: String): String? {
-        for ((sourceId, keys) in sourceIdToEntryKeyMap) {
-            if (keys.contains(entryKey)) {
-                return sourceId
             }
         }
         return null

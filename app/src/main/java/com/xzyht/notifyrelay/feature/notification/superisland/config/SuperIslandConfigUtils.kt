@@ -69,8 +69,8 @@ object SuperIslandConfigUtils {
      */
     fun isFloatingWindowEnabled(context: Context): Boolean = StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, defaultFloatingWindowEnabled())
 
-    /** 远端超级岛的展示通道：三者互斥，由浮窗 / 列表两个开关推导。 */
-    enum class DisplayChannel {
+    /** 远端超级岛的展示通道：三者互斥，由浮窗 / 列表两个开关推导。仅本类内部使用。 */
+    private enum class DisplayChannel {
         FLOATING,
         LIST,
         NOTIFICATION,
@@ -82,7 +82,7 @@ object SuperIslandConfigUtils {
      * 注意 [isNotificationListMode] 的默认值依赖浮窗开关，故必须在**配置写入前后**各算一次，
      * 才能得到真实的通道变化。
      */
-    fun resolveDisplayChannel(context: Context): DisplayChannel =
+    private fun resolveDisplayChannel(context: Context): DisplayChannel =
         when {
             isFloatingWindowEnabled(context) -> DisplayChannel.FLOATING
             isNotificationListMode(context) -> DisplayChannel.LIST

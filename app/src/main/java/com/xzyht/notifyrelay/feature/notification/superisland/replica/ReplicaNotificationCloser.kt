@@ -23,12 +23,17 @@ internal object ReplicaNotificationCloser {
     /**
      * 按通知 id 逐个撤下（失败只记日志，不抛出）。
      *
-     * 原实现中有三处逐字相同的「遍历 id → cancel → catch 记日志」，
-     * 现统一到此处（注入模式迁移 / 传统复刻通知 / Live Updates 直撤路径共用）。
+     * 仅服务本文件的注入模式迁移路径：原 `migrateInjectionModeIfChanged` 内联的
+     * 「遍历 id → cancel → catch 记日志」，抽到此处以便该迁移逻辑复用同一套 id 兜底集合。
+     *
+     * 注意：另两处取消点**并非**逐字相同，故未并入——
+     * - [com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaNotificationManager.closeNotificationsBySourceId]
+     *   的「传统复刻通知」是**单个固定 id** + 独立的失败文案；
+     * - `LiveUpdatesNotificationManager.dismiss` 走的是另一条推导通道（见该方法的单入口说明）。
      *
      * @return 实际尝试取消的 id 数量（失败也计入，与原实现的 `cancelled++` 口径一致）
      */
-    fun cancelNotificationIds(
+    private fun cancelNotificationIds(
         context: Context,
         ids: List<Int>,
         failureMessage: String,
@@ -40,7 +45,9 @@ internal object ReplicaNotificationCloser {
                 notificationManager.cancel(id)
                 cancelled++
             } catch (e: Exception) {
-                Logger.w(TAG, "$failureMessage: id=$id, ${e.message}")
+                // 分隔符刻意用 ", "：基线原文为 "…失败: sourceId=$sourceId, id=$id, ${e.message}"，
+                // 前导部分由 [failureMessage] 提供，此处必须逐字还原，不得改成 ": "。
+                Logger.w(TAG, "$failureMessage, id=$id, ${e.message}")
             }
         }
         return cancelled

@@ -77,7 +77,6 @@ object FloatingReplicaListModeManager {
                                 paramV2Raw = entry.paramV2Raw,
                                 picMap = entry.picMap,
                                 appName = entry.appName,
-                                isLocked = entry.isLocked,
                                 channel = SuperIslandDisplayPipeline.Channel.LIST,
                                 tag = TAG,
                                 forceRefresh = forceRefresh,
@@ -101,7 +100,7 @@ object FloatingReplicaListModeManager {
         }
     }
 
-    fun scheduleListModeTimeoutFor(sourceId: String) {
+    private fun scheduleListModeTimeoutFor(sourceId: String) {
         ReplicaStateStore.cancelTimeoutJob(sourceId)
         val job =
             CoroutineScope(Dispatchers.Main).launch {

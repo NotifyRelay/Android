@@ -5,6 +5,7 @@ import android.os.Build
 import androidx.collection.LruCache
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
+import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.intent.NotificationIntentFactory
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.CoroutineScope
@@ -247,8 +248,8 @@ internal object LiveUpdatesIconLoader {
                 }
             updatedBuilder.setShortCriticalText(shortText)
 
-            // 检查浮窗功能是否开启；判定统一走 NotificationIntentFactory.needClickIntent
-            val needClickIntent = NotificationIntentFactory.needClickIntent(LiveUpdatesNotificationManager.appContext)
+            // 判定统一走 SuperIslandConfigUtils.needClickIntent（D3：唯一判定处）
+            val needClickIntent = SuperIslandConfigUtils.needClickIntent(LiveUpdatesNotificationManager.appContext)
 
             // 创建删除意图，用于处理用户移除通知时关闭浮窗
             val deleteIntent =

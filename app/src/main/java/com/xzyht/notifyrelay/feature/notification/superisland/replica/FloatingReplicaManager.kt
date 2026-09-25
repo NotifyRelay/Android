@@ -17,10 +17,6 @@ object FloatingReplicaManager {
 
     private var appContext: Context? = null
 
-    fun getAppContext(): Context? = appContext
-
-    fun isSourceRecentlyClosed(sourceId: String): Boolean = ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId)
-
     fun showFloating(
         context: Context,
         sourceId: String,
@@ -62,7 +58,7 @@ object FloatingReplicaManager {
         } else {
             cacheDisplay()
             ReplicaTtlRegistry.removeClosedSource(sourceId)
-            FloatingReplicaNotificationManager.sendNotification(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked)
+            FloatingReplicaNotificationManager.sendNotification(context, sourceId, title, text, paramV2Raw, picMap, appName)
         }
     }
 
