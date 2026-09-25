@@ -16,28 +16,22 @@ import notifyrelay.base.util.image.toBitmapOrDefault
 import org.json.JSONArray
 import org.json.JSONObject
 import java.lang.reflect.Field
+import java.lang.reflect.Method
 import java.lang.reflect.Modifier
 import java.lang.reflect.Array as ReflectArray
 
 internal object NotificationFieldDump {
     private const val INDENT = "  "
 
-    /** 递归最大深度。 */
     private const val MAX_DEPTH = 12
 
-    /** 单个集合 / 数组 / Bundle 最多展开的元素数。 */
     private const val MAX_ITEMS = 200
 
-    /** 单次 dump 内反射字段总数上限，防御极端对象图。 */
     private const val MAX_FIELDS = 4000
 
-    /** 截断事件最多记录条数，超出部分只计数。 */
     private const val MAX_TRUNCATION_EVENTS = 100
 
-    /** 反射跳过：这些字段无信息量（静态常量等）。 */
-    private val SKIPPED_FIELD_NAMES = setOf("CREATOR")
-
-    /** 反射跳过：这些类型不下钻（会牵出 Context / Handler / 进程级对象图）。 */
+    /** 这些类型不下钻，避免牵出进程级对象图。 */
     private val SKIPPED_VALUE_TYPES =
         setOf(
             "android.content.Context",
@@ -50,38 +44,26 @@ internal object NotificationFieldDump {
             "java.lang.ClassLoader",
         )
 
-    /** 本次 dump 剩余可反射字段数；每次 dump 重置。 */
     private var fieldBudget = MAX_FIELDS
 
-    /** 本次 dump 的截断 / 跳过事件；每次 dump 重置。 */
     private val truncations = mutableListOf<JSONObject>()
 
-    /** 超出 [MAX_TRUNCATION_EVENTS] 而未逐条记录的截断事件数。 */
+    /** 超出 [MAX_TRUNCATION_EVENTS] 未逐条记录的截断数。 */
     private var truncationsOmitted = 0
 
-    /** 当前遍历路径（字段名逐级入栈），用于让截断事件能定位到具体位置。 */
+    /** 遍历路径栈，供截断事件定位。 */
     private val pathStack = ArrayDeque<String>()
 
     /** 当前路径的可读形式。 */
     private fun currentPath(): String = if (pathStack.isEmpty()) "<root>" else pathStack.joinToString(".")
 
-    /**
-     * 数组 / 集合被截断时插入的标记元素。
-     *
-     * `JSONArray` 只有单参数 `put`，无法直接写入「键 + 值」，故用带 `__truncated` 键的对象承载，
-     * 既能在 JSON 中保留位置，也能在文本渲染里显式出现。
-     */
+    /** 数组 / 集合被截断时插入的标记元素（`JSONArray` 只有单参数 `put`）。 */
     private fun truncationMarker(detail: String): JSONObject =
         JSONObject().apply {
             put("__truncated", detail)
         }
 
-    /**
-     * 记录一次截断 / 跳过。
-     *
-     * **凡有上限被触及都必须调用本方法**：输出（剪贴板文本 / JSON 文件）会据此在开头给出
-     * 显式警告，避免使用者把不完整的 dump 当成完整数据。
-     */
+    /** 记录一次截断 / 跳过；输出会据此在开头给出显式警告。 */
     private fun recordTruncation(
         reason: String,
         detail: String,
@@ -114,13 +96,7 @@ internal object NotificationFieldDump {
     /**
      * 构造一条通知的完整字段 JSON 树。
      *
-     * 本对象为单例，而 [fieldBudget] / [truncations] / [pathStack] 是遍历期间的共享可变状态，
-     * 故整体加锁：并发调用（如快速连续长按两条通知）不会互相串数据。
-     *
-     * @param context 用于加载 [Icon] 位图（仅在 [includeBinary] 为 true 时使用）。
-     * @param sbn 目标通知。
-     * @param includeBinary 是否内联二进制内容（Bitmap / Icon / byte[]）。
-     * @param ranking 该通知的系统排序/渠道信息；`null` 时跳过。
+     * 单例上的 [fieldBudget] / [truncations] / [pathStack] 是遍历期共享状态，故整体加锁。
      */
     @Synchronized
     fun buildDumpJson(
@@ -140,7 +116,6 @@ internal object NotificationFieldDump {
         root.put("statusBarNotification", reflectObject(context, sbn, includeBinary, 0, HashSet()))
         ranking?.let { root.put("ranking", reflectObject(context, it, includeBinary, 0, HashSet())) }
 
-        // 截断报告置于根部：任何上限被触及都在输出里显式声明，绝不静默丢数据
         val truncated = truncations.isNotEmpty() || truncationsOmitted > 0
         root.put("truncated", truncated)
         if (truncated) {
@@ -154,11 +129,7 @@ internal object NotificationFieldDump {
         return root
     }
 
-    /**
-     * 把字段树渲染为可读文本（缩进结构，内嵌 JSON 字符串会展开为嵌套块）。
-     *
-     * 若 [root] 标记为已截断，**开头先输出醒目警告与截断位置清单**。
-     */
+    /** 把字段树渲染为可读文本；已截断时开头输出警告与截断位置清单。 */
     fun renderDumpText(root: JSONObject): String =
         buildString {
             if (root.optBoolean("truncated", false)) {
@@ -184,13 +155,14 @@ internal object NotificationFieldDump {
             appendJsonBlock(this, root, 0)
         }.trimEnd()
 
-    // ==================== 反射遍历核心 ====================
+    // ==================== 遍历核心 ====================
 
     /**
-     * 反射遍历 [target] 的全部实例字段（含继承链），返回 JSON 表示。
+     * 展开 [target]：先遍历公开 getter，再补充公开实例字段。
      *
-     * @param visited 已访问对象身份集合（IdentityHashMap 语义，用 `System.identityHashCode` 判定），
-     *   用于打断循环引用。
+     * hidden API 限制会在 `Class.getDeclaredFields()` 层剔除全部非 SDK 字段，
+     * 而 `StatusBarNotification` / `Ranking` 在 SDK 中除静态常量外没有 public 实例字段，
+     * 故必须以不受该限制的公开方法为骨架。
      */
     private fun reflectObject(
         context: Context,
@@ -209,7 +181,6 @@ internal object NotificationFieldDump {
             return "<$typeName 已跳过>"
         }
 
-        // 循环引用检测：同一对象在**当前路径**上再次出现即截断
         val identity = System.identityHashCode(target)
         if (!visited.add(identity)) {
             recordTruncation("循环引用", target.javaClass.name)
@@ -218,54 +189,106 @@ internal object NotificationFieldDump {
         try {
             val json = JSONObject()
             json.put("__class", typeName)
-            var count = 0
-            for (field in allFields(target.javaClass)) {
-                if (field.name in SKIPPED_FIELD_NAMES) continue
-                if (Modifier.isStatic(field.modifiers)) continue
+
+            // 1) 公开 getter
+            var getterCount = 0
+            for (method in publicGetters(target.javaClass)) {
                 if (fieldBudget <= 0) {
-                    recordTruncation("反射字段总数超上限", "MAX_FIELDS=$MAX_FIELDS，字段 ${field.name} 起未输出")
-                    json.put("__truncated", "反射字段数超过上限 $MAX_FIELDS")
+                    recordTruncation("字段总数超上限", "MAX_FIELDS=$MAX_FIELDS，方法 ${method.name} 起未输出")
+                    json.put("__truncated", "字段数超过上限 $MAX_FIELDS")
                     break
                 }
                 fieldBudget--
-                count++
+                getterCount++
+                val name = getterName(method.name)
                 val value =
                     try {
-                        field.isAccessible = true
+                        method.invoke(target)
+                    } catch (e: Exception) {
+                        recordTruncation("getter 调用失败", "${method.name}: ${e.javaClass.simpleName}")
+                        "<调用失败: ${e.javaClass.simpleName}>"
+                    }
+                json.put(name, withPath(name) { describeValue(context, value, includeBinary, depth + 1, visited) })
+            }
+
+            // 2) 公开实例字段补充
+            var fieldCount = 0
+            for (field in publicInstanceFields(target.javaClass)) {
+                if (fieldBudget <= 0) break
+                val name = field.name
+                if (json.has(name)) continue
+                fieldBudget--
+                fieldCount++
+                val value =
+                    try {
                         field.get(target)
                     } catch (e: Exception) {
-                        recordTruncation("反射读取失败", "${field.name}: ${e.javaClass.simpleName}")
-                        "<反射读取失败: ${e.javaClass.simpleName}>"
+                        recordTruncation("字段读取失败", "$name: ${e.javaClass.simpleName}")
+                        "<读取失败: ${e.javaClass.simpleName}>"
                     }
-                json.put(
-                    field.name,
-                    withPath(field.name) { describeValue(context, value, includeBinary, depth + 1, visited) },
-                )
+                json.put(name, withPath(name) { describeValue(context, value, includeBinary, depth + 1, visited) })
             }
-            if (count == 0) json.put("__note", "无实例字段")
+
+            if (getterCount == 0 && fieldCount == 0) {
+                recordTruncation("无可读字段", typeName)
+                json.put("__note", "无公开 getter 与公开实例字段")
+            }
             return json
         } finally {
             visited.remove(identity)
         }
     }
 
-    /** 取类及其父类的全部声明字段（不含 Object）。 */
-    private fun allFields(clazz: Class<*>): List<Field> {
+    /**
+     * 取类的公开无参 getter（`getXxx()` / 返回 boolean 的 `isXxx()`），含继承链。
+     *
+     * `isXxx` 限定返回 boolean，避免把 `islandOrder()` 这类普通方法误当字段。
+     */
+    private fun publicGetters(clazz: Class<*>): List<Method> {
+        val result = mutableListOf<Method>()
+        var current: Class<*>? = clazz
+        while (current != null && current != Any::class.java) {
+            for (method in current.declaredMethods) {
+                if (!Modifier.isPublic(method.modifiers)) continue
+                if (Modifier.isStatic(method.modifiers)) continue
+                if (method.parameterCount != 0) continue
+                if (method.returnType == Void.TYPE) continue
+                val name = method.name
+                val isGet = name.startsWith("get") && name.length > 3 && name[3].isUpperCase()
+                val returnsBoolean = method.returnType.name == "boolean" || method.returnType.name == "java.lang.Boolean"
+                val isIs =
+                    name.startsWith("is") && name.length > 2 && name[2].isUpperCase() && returnsBoolean
+                if (!isGet && !isIs) continue
+                if (name == "getClass") continue
+                result += method
+            }
+            current = current.superclass
+        }
+        return result.distinctBy { it.name }
+    }
+
+    /** `getFooBar` / `isFooBar` → `fooBar`。 */
+    private fun getterName(methodName: String): String {
+        val raw = if (methodName.startsWith("is")) methodName.substring(2) else methodName.substring(3)
+        return raw.replaceFirstChar { it.lowercaseChar() }
+    }
+
+    /** 取类的公开实例字段（含继承链）。 */
+    private fun publicInstanceFields(clazz: Class<*>): List<Field> {
         val result = mutableListOf<Field>()
         var current: Class<*>? = clazz
         while (current != null && current != Any::class.java) {
-            result += current.declaredFields
+            for (field in current.declaredFields) {
+                if (!Modifier.isPublic(field.modifiers)) continue
+                if (Modifier.isStatic(field.modifiers)) continue
+                result += field
+            }
             current = current.superclass
         }
         return result
     }
 
-    /**
-     * 把任意值转成 JSON 可承载的表示。
-     *
-     * 基本类型 / 字符串直接输出；已知叶子类型语义化描述；
-     * 其余对象（含 [Bundle]、[SparseArray]、集合、数组）继续递归。
-     */
+    /** 把任意值转成 JSON 可承载的表示；未知对象继续递归。 */
     private fun describeValue(
         context: Context,
         value: Any?,
@@ -303,7 +326,6 @@ internal object NotificationFieldDump {
             is Array<*> -> reflectIterable(context, value.toList(), includeBinary, depth, visited)
             is Collection<*> -> reflectIterable(context, value, includeBinary, depth, visited)
             is Map<*, *> -> reflectMap(context, value, includeBinary, depth, visited)
-            // 基本类型的包装类在反射字段上已覆盖；此处兜底处理剩余任意对象
             else -> {
                 val clazz = value.javaClass
                 if (clazz.isPrimitive || clazz.name.startsWith("java.lang.")) {
@@ -389,12 +411,7 @@ internal object NotificationFieldDump {
             }
         }
 
-    /**
-     * Bundle 逐键展开。
-     *
-     * `Bundle.get(String)` / `keySet()` 自 API 33 起废弃，但**枚举未知类型的 extras 键值
-     * 没有等价替代**，故整体抑制该废弃警告。
-     */
+    /** Bundle 逐键展开；`get` / `keySet` 自 API 33 废弃，但枚举未知类型 extras 无等价替代。 */
     @Suppress("DEPRECATION")
     private fun reflectBundle(
         context: Context,
@@ -452,12 +469,7 @@ internal object NotificationFieldDump {
             "<Bitmap ${bitmap.width}x${bitmap.height} ${bitmap.config}>"
         }
 
-    /**
-     * 描述 [Icon]。
-     *
-     * 必须按 [Icon.getType] 分别取字段：`getResId()` / `getResPackage()` 仅在 `TYPE_RESOURCE`
-     * 下合法，`getUri()` 仅在 URI 类型下合法，其余类型调用会抛 `IllegalStateException`。
-     */
+    /** `getResId` / `getResPackage` 仅 `TYPE_RESOURCE` 合法，`getUri` 仅 URI 类型合法。 */
     private fun describeIcon(
         context: Context,
         icon: Icon,

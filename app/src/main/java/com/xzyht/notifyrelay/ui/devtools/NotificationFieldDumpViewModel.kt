@@ -25,11 +25,9 @@ import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 
 /**
- * 通知字段转储页的内存状态（**不持久化**）。
- *
  * @param record 供通知历史页卡片展示的记录。
- * @param sbn 原始系统通知引用；字段树在复制 / 分享时按需反射构建。
- * @param ranking 系统侧排序/渠道信息（决定是否渲染），可为 null。
+ * @param sbn 原始系统通知引用；字段树在复制 / 分享时按需构建。
+ * @param ranking 系统侧排序/渠道信息，可为 null。
  * @param appIcon 应用图标（可能为 null）。
  */
 internal data class NotificationDumpEntry(
@@ -46,26 +44,17 @@ internal data class NotificationDumpUiState(
     val error: String? = null,
 )
 
-/**
- * 通知字段转储页 ViewModel。
- *
- * **数据仅内存留存**：状态只放在 [uiState] 中，进程结束即丢失；不写数据库、不写文件
- * （下载模式由用户通过系统文件选择器显式指定保存位置）。
- */
+/** 状态仅内存留存，进程结束即丢失。 */
 internal class NotificationFieldDumpViewModel(
     private val application: Application,
 ) : ViewModel() {
     private val _uiState = MutableStateFlow(NotificationDumpUiState())
     val uiState: StateFlow<NotificationDumpUiState> = _uiState.asStateFlow()
 
-    /** 包名 → (应用名, 图标)；仅内存，随本次载入重建。 */
+    /** 包名 → (应用名, 图标)。 */
     private val iconCache = mutableMapOf<String, Pair<String, Bitmap?>>()
 
-    /**
-     * 载入当前通知栏的活跃通知（仅内存）。
-     *
-     * 数据源是通知监听服务的 `activeNotifications`；服务未连接时给出错误提示而不是静默空列表。
-     */
+    /** 载入当前通知栏的活跃通知。 */
     fun loadActiveNotifications() {
         _uiState.update { it.copy(isLoading = true, error = null) }
         viewModelScope.launch(Dispatchers.IO) {
