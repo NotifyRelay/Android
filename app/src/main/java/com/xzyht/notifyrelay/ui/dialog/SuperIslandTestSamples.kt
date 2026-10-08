@@ -926,6 +926,8 @@ internal fun testCircularProgressInfo(
     )
 }
 
+// 12306走的RemoteViews 预渲染 无转发意义
+
 /**
  * 调试入口：按样本 ID 直接触发对应的超级岛测试样本，免去手工点击测试对话框。
  *

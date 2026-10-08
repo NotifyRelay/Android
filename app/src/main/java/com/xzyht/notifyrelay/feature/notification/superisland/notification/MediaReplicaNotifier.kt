@@ -110,11 +110,16 @@ internal object MediaReplicaNotifier {
                 originalBuilder = builder,
                 notificationManager,
                 progressStyle = progressStyle,
+                // 首次通知已由本方法写入 displayText，作为去重基线避免重复刷新
+                initialDisplayText = displayText,
             )
         }
 
         // 构建通知
         val notification = builder.build()
+
+        // 专辑图是否已作为小图标注入成功：成功后不得再被下方 B 区文本位图覆盖
+        var coverInjected = false
 
         // 生成并注入动态图标
         if (isSuperIslandEnabled) {
@@ -138,6 +143,9 @@ internal object MediaReplicaNotifier {
                     val bitmap = ReplicaSmallIconInjector.downloadBitmap(context, coverUrl)
                     if (bitmap != null) {
                         ReplicaSmallIconInjector.injectSmallIconWithCache(notification, bitmap, key)
+                        // 专辑图已注入：短文本（iconText 为空）时左岛应展示专辑图，
+                        // 不可再被下方 B 区文本位图覆盖成与右岛相同的文字
+                        coverInjected = true
                     }
                 }
             }
@@ -145,7 +153,8 @@ internal object MediaReplicaNotifier {
 
         // 检查是否已经有图标文本，如果有，就不再生成新的图标
         // 超级岛注入模式下不注入小图标（小图标会抢占左岛展示，左岛应由图文组件渲染专辑图）
-        if (!isSuperIslandEnabled && iconText.isEmpty()) {
+        // 专辑图已注入时同样跳过：否则 B 区文本位图会覆盖专辑图，左岛显示成与右岛相同的文字
+        if (!isSuperIslandEnabled && iconText.isEmpty() && !coverInjected) {
             // 尝试从A/B区数据中获取图标或生成位图
             var smallIconBitmap: Bitmap? = null
 

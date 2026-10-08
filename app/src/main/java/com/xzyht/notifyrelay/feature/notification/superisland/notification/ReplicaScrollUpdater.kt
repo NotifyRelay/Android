@@ -26,8 +26,15 @@ internal object ReplicaScrollUpdater {
     // 普通 MutableMap 的 forEach 期间修改会抛 ConcurrentModificationException（如 clearAllScrollUpdates）。
     private val scrollRunnable = java.util.concurrent.ConcurrentHashMap<String, Runnable>()
 
+    // 上一次经本类刷新时实际写入通知的文本（key → 文本）。
+    // 用于在滚动结束后跳过「内容完全相同」的重复 notify：原实现每 1.8 秒无条件下发一次，
+    // 短文本（CapsuleScrollManager 直接进入 DONE、文本恒定）会被持续重复刷新。
+    private val lastNotifiedTexts = java.util.concurrent.ConcurrentHashMap<String, String>()
+
     /**
      * 设置滚动更新
+     *
+     * @param initialDisplayText 调用方已写入首次通知的滚动文本，用于避免首次刷新下发相同内容。
      */
     fun setupScrollUpdate(
         key: String,
@@ -38,11 +45,14 @@ internal object ReplicaScrollUpdater {
         originalBuilder: NotificationCompat.Builder,
         notificationManager: NotificationManager,
         progressStyle: NotificationCompat.ProgressStyle? = null,
+        initialDisplayText: String? = null,
     ) {
         // 移除旧的滚动Runnable
         scrollRunnable.remove(key)?.let {
             mainHandler.removeCallbacks(it)
         }
+        // 以调用方已下发的文本作为基线，滚动未推进时不产生重复 notify
+        initialDisplayText?.let { lastNotifiedTexts[key] = it }
 
         // 创建新的滚动Runnable
         val runnable =
@@ -55,6 +65,20 @@ internal object ReplicaScrollUpdater {
 
                     // 获取当前应该显示的内容
                     val displayText = CapsuleScrollManager.getCurrentDisplayText(scrollKey, capsuleText)
+                    val scrollFinished = CapsuleScrollManager.isScrollFinished(scrollKey)
+
+                    // 文本与上次下发完全一致：内容无变化，跳过本次 notify（不产生无意义的重复刷新）。
+                    // 滚动已结束则直接终止循环——短文本必然走到这里，长文本滚到最后一屏后同理停止。
+                    if (displayText == lastNotifiedTexts[key]) {
+                        if (scrollFinished) {
+                            scrollRunnable.remove(key)
+                            return@Runnable
+                        }
+                        // 尚未推进到新文本：仅重排，不刷新通知
+                        val nextDelay = CapsuleScrollManager.getScrollDelay(scrollKey)
+                        scrollRunnable[key]?.let { mainHandler.postDelayed(it, nextDelay) }
+                        return@Runnable
+                    }
 
                     // 构建原始通知以获取其属性
                     val originalNotification = originalBuilder.build()
@@ -107,6 +131,13 @@ internal object ReplicaScrollUpdater {
 
                     // 发送更新后的通知
                     notificationManager.notify(notificationId, updatedNotification)
+                    lastNotifiedTexts[key] = displayText
+
+                    // 滚动结束（如短文本）后不再重排，避免周期性刷新内容不变的通知
+                    if (scrollFinished) {
+                        scrollRunnable.remove(key)
+                        return@Runnable
+                    }
 
                     // 继续调度下一次更新
                     val delay = CapsuleScrollManager.getScrollDelay(scrollKey)
@@ -141,6 +172,7 @@ internal object ReplicaScrollUpdater {
         scrollRunnable.remove(key)?.let {
             mainHandler.removeCallbacks(it)
         }
+        lastNotifiedTexts.remove(key)
         ReplicaIconCache.remove(key)
         CapsuleScrollManager.resetScrollState("${key}_scroll")
     }
@@ -153,6 +185,7 @@ internal object ReplicaScrollUpdater {
             mainHandler.removeCallbacks(it.value)
         }
         scrollRunnable.clear()
+        lastNotifiedTexts.clear()
         ReplicaIconCache.clear()
         CapsuleScrollManager.clearAll()
     }

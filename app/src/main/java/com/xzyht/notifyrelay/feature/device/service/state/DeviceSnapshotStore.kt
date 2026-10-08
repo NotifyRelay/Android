@@ -83,6 +83,7 @@ class DeviceSnapshotStore(
         java.util.concurrent.atomic
             .AtomicBoolean(false)
 
+    private var lastLoggedSignature: String? = null
     // ==================== 刷新入口 ====================
 
     /** 异步触发一次刷新（回调线程内安全）。 */
@@ -160,10 +161,20 @@ class DeviceSnapshotStore(
             // 回填装配方的派生表（如认证设备的 lastIp/deviceType）；回调失败不得影响本次刷新
             runCatching { onSnapshotRefreshed(newProjection) }
                 .onFailure { Logger.e(TAG, "[DeviceSnapshotStore] 快照刷新回调失败", it) }
-            Logger.d(
-                TAG,
-                "[DeviceSnapshotStore] 列表: ${newMap.size} 台, 在线: ${newMap.count { it.value.second }}, 已配对: ${newProjection.count { it.value.paired }}",
-            )
+            val signature =
+                newMap.keys
+                    .sorted()
+                    .joinToString(";") { uuid ->
+                        val snap = newProjection[uuid]
+                        "$uuid:${snap?.online}:${snap?.paired}:${snap?.name}:${snap?.ip}:${snap?.port}:${snap?.battery}:${snap?.deviceType}"
+                    }
+            if (signature != lastLoggedSignature) {
+                lastLoggedSignature = signature
+                Logger.d(
+                    TAG,
+                    "[DeviceSnapshotStore] 列表: ${newMap.size} 台, 在线: ${newMap.count { it.value.second }}, 已配对: ${newProjection.count { it.value.paired }}",
+                )
+            }
         } catch (e: Exception) {
             Logger.e(TAG, "[DeviceSnapshotStore] 解析设备快照失败", e)
         }

@@ -41,6 +41,9 @@ class DeviceEventCallbackHandler(
         private const val TAG = "CoreCb"
     }
 
+    private val lastDiscovered =
+        java.util.concurrent.ConcurrentHashMap<String, String>()
+
     /** TCP 扫描发现：core 已完成自身过滤/名称解码/状态登记，平台端仅触发一次快照刷新。 */
     fun buildDiscovered(): NotifyRelayCore.OnDeviceDiscoveredCb =
         object : NotifyRelayCore.OnDeviceDiscoveredCb {
@@ -56,10 +59,15 @@ class DeviceEventCallbackHandler(
                 Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
                 val remoteUuid = NotifyRelayCore.ptrToString(uuid) ?: return
                 try {
-                    Logger.d(
-                        "死神-NotifyRelay",
-                        "[on_device_discovered] uuid=$remoteUuid, ip=${NotifyRelayCore.ptrToString(ip) ?: ""}, port=$port, battery=$battery",
-                    )
+                    val remoteIp = NotifyRelayCore.ptrToString(ip) ?: ""
+                    // 仅在发现内容实际变化时打印（2s 广播周期会重复上抛同一内容）
+                    val signature = "$remoteIp:$port:$battery"
+                    if (lastDiscovered.put(remoteUuid, signature) != signature) {
+                        Logger.d(
+                            "死神-NotifyRelay",
+                            "[on_device_discovered] uuid=$remoteUuid, ip=$remoteIp, port=$port, battery=$battery",
+                        )
+                    }
                     // 运行在 Rust 扫描线程：不得同步调用 nrc_get_device_list（会与 core 重入），
                     // 交由协程异步刷新
                     host.triggerDeviceListRefresh()

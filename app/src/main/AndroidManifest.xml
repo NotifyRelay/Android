@@ -162,6 +162,17 @@
             android:exported="false"
             android:theme="@style/Theme.MaterialComponents.DayNight.NoActionBar" />
 
+        <!-- 通知字段转储页导出文件的分享用 FileProvider（仅 externalCacheDir/notification_dump/） -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.notificationdump"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/notification_dump_paths" />
+        </provider>
+
         <!-- 公平运行内存适配（小米 HyperOS / 金标联盟） -->
         <receiver
             android:name=".feature.device.receiver.FairMemoryReceiver"

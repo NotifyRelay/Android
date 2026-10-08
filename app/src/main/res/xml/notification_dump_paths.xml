@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    通知字段转储页导出文件的 FileProvider 路径声明。
+
+    导出文件集中放在 externalCacheDir/notification_dump/（见 NotificationDumpCache.DIR_NAME），
+    通过 FileProvider 授予临时读权限后交给系统分享面板。
+
+    external-cache-path 与 cache-path 都声明同名子目录：NotificationDumpCache 在
+    externalCacheDir 不可用（外部存储未挂载）时会回退到内部 cacheDir，
+    若只声明前者，回退路径下 getUriForFile 会抛 IllegalArgumentException 导致无法分享。
+-->
+<paths>
+    <external-cache-path
+        name="notification_dump"
+        path="notification_dump/" />
+    <cache-path
+        name="notification_dump_internal"
+        path="notification_dump/" />
+</paths>
