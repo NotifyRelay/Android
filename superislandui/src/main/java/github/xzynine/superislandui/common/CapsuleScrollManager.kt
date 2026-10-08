@@ -225,6 +225,19 @@ object CapsuleScrollManager {
     }
 
     /**
+     * 滚动是否已结束（短文本无需滚动，或长文本已滚到最后一屏）。
+     *
+     * 供调用方终止周期性刷新：原实现只按固定延迟无限重排，
+     * 短文本下内容恒定却仍会周期性地用相同内容重复刷新通知。
+     *
+     * 状态不存在时返回 false（保守判定为「未结束」），避免误终止尚未开始的滚动。
+     */
+    fun isScrollFinished(key: String): Boolean {
+        val scrollData = scrollDataMap[key] ?: return false
+        return scrollData.scrollState == ScrollState.DONE
+    }
+
+    /**
      * 重置滚动状态
      */
     fun resetScrollState(key: String) {
