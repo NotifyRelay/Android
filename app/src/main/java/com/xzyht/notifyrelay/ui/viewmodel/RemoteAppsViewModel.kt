@@ -9,6 +9,7 @@ import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppsState
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -103,7 +104,7 @@ class RemoteAppsViewModel : ViewModel() {
         viewModelScope.launch {
             _state.update { it.copy(isLoading = true, error = null) }
             try {
-                val deviceManager = DeviceConnectionManager.getInstance(context)
+                val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                 val deviceInfo = findDeviceInfo(deviceManager, deviceUuid)
 
                 if (deviceInfo != null) {

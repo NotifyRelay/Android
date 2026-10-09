@@ -10,7 +10,7 @@ import androidx.lifecycle.lifecycleScope
 import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.navigation.rememberNavigator
@@ -51,7 +51,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
 
         ShortcutLaunchActivity.setAppLaunchCallback { deviceIp, packageName, displayId ->
-            val deviceManager = DeviceConnectionManager.getInstance(this)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(this)
             val devices = deviceManager.getAuthenticatedOnlineDevices()
             val targetDevice = devices.find { it.ip == deviceIp }
             if (targetDevice != null) {
@@ -89,7 +89,7 @@ class MainActivity : FragmentActivity() {
 
         // 后台初始化，避免阻塞 UI 线程
         lifecycleScope.launch(Dispatchers.Default) {
-            val deviceManager = DeviceConnectionManager.getInstance(this@MainActivity)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(this@MainActivity)
             DeviceInfoManager.generateDeviceInfoFile(this@MainActivity, deviceManager.localUuid)
             LiveUpdatesNotificationManager.initialize(this@MainActivity)
             NotificationRepository.init(this@MainActivity)

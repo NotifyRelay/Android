@@ -37,8 +37,8 @@ internal object NotificationMemoryStore {
 
         // 添加已认证设备 UUID（来自 DeviceConnectionManager 内存态，Rust 库为准）
         try {
-            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-                .getInstance(context)
+            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+                .getDeviceManager(context)
                 .getAuthenticatedDevices()
                 .keys
                 .forEach { uuid ->

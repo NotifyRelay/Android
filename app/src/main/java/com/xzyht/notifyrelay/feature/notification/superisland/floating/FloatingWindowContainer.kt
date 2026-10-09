@@ -187,22 +187,22 @@ fun FloatingWindowContainer(
                                                         // 媒体控制按钮点击事件，由RemoteMediaSessionManager处理
                                                         RemoteMediaSessionManager.onPlayPause(
                                                             context,
-                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-                                                                .getInstance(context),
+                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+                                                                .getDeviceManager(context),
                                                         )
                                                     },
                                                     onPrevious = {
                                                         RemoteMediaSessionManager.onPrevious(
                                                             context,
-                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-                                                                .getInstance(context),
+                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+                                                                .getDeviceManager(context),
                                                         )
                                                     },
                                                     onNext = {
                                                         RemoteMediaSessionManager.onNext(
                                                             context,
-                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-                                                                .getInstance(context),
+                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+                                                                .getDeviceManager(context),
                                                         )
                                                     },
                                                     onClose = {

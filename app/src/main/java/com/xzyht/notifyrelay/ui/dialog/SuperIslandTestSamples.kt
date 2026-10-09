@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.ui.dialog
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.sync.MessageSender
@@ -52,7 +52,7 @@ fun showTestNotification(
         // 发送开关开启时，仅发送通知给其他端
         try {
             // 获取设备管理器实例
-            val deviceManager = DeviceConnectionManager.getInstance(context)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
 
             // 强制发送全量包：固定 featureId（同一测试源多次点击刷新原有卡片，
             // 对齐真实通知增量更新语义：全量重发走合并而非新建）

@@ -43,11 +43,6 @@ class DeviceConnectionManager(
     companion object {
         /** UDP 发现功能开关的存储 key */
         private const val UDP_DISCOVERY_ENABLED_KEY = "udp_discovery_enabled"
-
-        /**
-         * 获取单例实例
-         */
-        fun getInstance(context: Context): DeviceConnectionManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
     }
 
     // ==================== 握手请求处理 ====================
