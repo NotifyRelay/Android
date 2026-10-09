@@ -1,7 +1,5 @@
 package com.xzyht.notifyrelay.ui.pages.superisland
 
-import android.content.Context
-import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -27,6 +25,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.notification.ReplicaSmallIconInjector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.image.ImageUtils
@@ -66,7 +65,7 @@ internal fun SuperIslandHistoryImage(
                     val decoded =
                         when {
                             ImageUtils.isDataUrl(resolved) -> ImageUtils.decodeDataUrlToBitmap(context, resolved)
-                            resolved.startsWith("http", ignoreCase = true) -> downloadBitmap(context, resolved)
+                            resolved.startsWith("http", ignoreCase = true) -> ReplicaSmallIconInjector.downloadBitmap(context, resolved)
                             else -> null
                         }
                     decoded?.let { SuperIslandImageCache.put(data, it) }
@@ -192,13 +191,3 @@ internal fun SuperIslandAppIcon(
         }
     }
 }
-
-private suspend fun downloadBitmap(
-    context: Context,
-    urlString: String,
-): Bitmap? =
-    try {
-        ImageUtils.loadBitmap(context, urlString)
-    } catch (_: Exception) {
-        null
-    }
