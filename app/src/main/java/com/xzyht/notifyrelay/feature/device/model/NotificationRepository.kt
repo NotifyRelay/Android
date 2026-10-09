@@ -66,7 +66,7 @@ object NotificationRepository {
         // 只允许刷新 currentDevice 的内容，禁止外部刷新非 currentDevice
         val realKey = currentDevice
         try {
-            val store = NotifyRelayStoreProvider.getInstance(context)
+            val store = NotificationRecordStore.getInstance(context)
             val history = runBlocking { store.getAll(if (realKey == "本机") "local" else realKey) }
             val mapped =
                 history.map {
@@ -117,7 +117,7 @@ object NotificationRepository {
         val key = (time.toString() + packageName + device)
         // 使用传入的appName参数
         try {
-            val store = NotifyRelayStoreProvider.getInstance(context)
+            val store = NotificationRecordStore.getInstance(context)
             val fileKey = device // 远程设备uuid
             val oldList = runBlocking { store.getAll(fileKey) }.toMutableList()
             oldList.removeAll { it.key == key }
@@ -260,12 +260,11 @@ object NotificationRepository {
     fun init(context: Context) {
         try {
             scanDeviceList(context)
-            NotifyRelayStoreProvider.getInstance(context)
             // 主动加载本地历史到内存，保证判重有效
-            val store2 = NotifyRelayStoreProvider.getInstance(context)
+            val store = NotificationRecordStore.getInstance(context)
             val localList =
                 runBlocking {
-                    store2.readAll("本机").map {
+                    store.readAll("本机").map {
                         NotificationRecord(
                             key = it.key,
                             packageName = it.packageName,
@@ -310,7 +309,7 @@ object NotificationRepository {
         notifications.removeAll { it.key == key && it.device == currentDevice }
 
         // 调用Room数据库的删除方法
-        val store = NotifyRelayStoreProvider.getInstance(context)
+        val store = NotificationRecordStore.getInstance(context)
         runBlocking {
             store.deleteByKey(key, currentDevice)
         }
@@ -345,7 +344,7 @@ object NotificationRepository {
         notifications.removeAll { it.packageName == packageName && it.device == currentDevice }
 
         // 使用新添加的高效方法，直接从数据库中删除指定包名和设备的所有通知
-        val store = NotifyRelayStoreProvider.getInstance(context)
+        val store = NotificationRecordStore.getInstance(context)
         runBlocking {
             store.deleteByPackageAndDevice(packageName, currentDevice)
         }
@@ -375,7 +374,7 @@ object NotificationRepository {
         notifications.removeAll { it.device == deviceToClear }
 
         // 调用Room数据库的清除方法
-        val store = NotifyRelayStoreProvider.getInstance(context)
+        val store = NotificationRecordStore.getInstance(context)
         runBlocking {
             store.clearByDevice(deviceToClear)
         }

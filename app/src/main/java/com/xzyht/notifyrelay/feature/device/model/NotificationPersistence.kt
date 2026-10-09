@@ -31,7 +31,7 @@ internal object NotificationPersistence {
         val ctxHash = System.identityHashCode(context)
         Logger.i("NotifyRelay", "[syncToCache] contextType=$ctxType, hash=$ctxHash")
         try {
-            val store = NotifyRelayStoreProvider.getInstance(context)
+            val store = NotificationRecordStore.getInstance(context)
             // 只同步当前设备的通知，避免影响其他设备
             val currentDeviceNotifications = notifications.filter { it.device == currentDevice }
             val entities =
