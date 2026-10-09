@@ -107,7 +107,9 @@ class RemoteAppsViewModel : ViewModel() {
 
                 delay(2000)
 
-                appsMachine.load(context)
+                appsMachine.load(context) { e ->
+                    Logger.e("RemoteAppsViewModel", "刷新应用列表失败", e)
+                }
             } catch (e: Exception) {
                 Logger.e("RemoteAppsViewModel", "刷新应用列表失败", e)
                 appsMachine.update { it.copy(isLoading = false, error = e.message) }

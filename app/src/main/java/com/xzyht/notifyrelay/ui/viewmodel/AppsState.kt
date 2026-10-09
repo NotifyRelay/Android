@@ -43,13 +43,18 @@ internal class AppsStateMachine<T>(
      * 加载应用列表：置加载态、执行 [loader]、写回结果或错误。
      *
      * @param context Android 上下文，交给 [loader] 使用。
+     * @param onError 捕获到异常时的附加处理（如记录日志），在写入 [AppsState.error] 之前调用。
      */
-    suspend fun load(context: Context) {
+    suspend fun load(
+        context: Context,
+        onError: ((Exception) -> Unit)? = null,
+    ) {
         _state.update { it.copy(isLoading = true, error = null) }
         try {
             val apps = loader(context)
             _state.update { it.copy(apps = apps, isLoading = false) }
         } catch (e: Exception) {
+            onError?.invoke(e)
             _state.update { it.copy(isLoading = false, error = e.message) }
         }
     }
