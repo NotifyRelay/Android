@@ -4,7 +4,6 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.drawable.BitmapDrawable
 import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
@@ -13,9 +12,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.toBitmapOrDefault
+import notifyrelay.base.util.image.toPngByteArray
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
-import java.io.ByteArrayOutputStream
 
 /**
  * 应用图标仓库。
@@ -89,14 +88,7 @@ internal object AppIconRepository {
         AppDatabaseHolder.init(context)
 
         // 转换图标为字节数组
-        val iconBytes =
-            if (icon != null) {
-                val baos = ByteArrayOutputStream()
-                icon.compress(Bitmap.CompressFormat.PNG, 100, baos)
-                baos.toByteArray()
-            } else {
-                null
-            }
+        val iconBytes = icon?.toPngByteArray()
 
         // 检查应用是否已存在
         val existingApp = AppDatabaseHolder.get()?.getAppByPackageName(packageName)
@@ -208,16 +200,10 @@ internal object AppIconRepository {
         try {
             val pm = context.packageManager
             val appInfo = pm.getApplicationInfo(packageName, 0)
-            val bitmap =
-                when (val drawable = pm.getApplicationIcon(appInfo)) {
-                    is BitmapDrawable -> drawable.bitmap
-                    else -> drawable.toBitmapOrDefault(96)
-                }
+            val bitmap = pm.getApplicationIcon(appInfo).toBitmapOrDefault(96)
 
             // 将获取到的图标缓存到数据库
-            val baos = ByteArrayOutputStream()
-            bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
-            val iconBytes = baos.toByteArray()
+            val iconBytes = bitmap.toPngByteArray()
 
             val existingApp = AppDatabaseHolder.get()?.getAppByPackageName(packageName)
             val appEntity =

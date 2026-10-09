@@ -2,8 +2,6 @@ package com.xzyht.notifyrelay.feature.appslist
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,9 +9,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.toBitmapOrDefault
+import notifyrelay.base.util.image.toPngByteArray
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
-import java.io.ByteArrayOutputStream
 
 /**
  * 已安装应用仓库。
@@ -82,15 +80,9 @@ internal object InstalledAppsRepository {
                     // 获取应用图标
                     var iconBytes: ByteArray? = null
                     try {
-                        val bitmap =
-                            when (val drawable = pm.getApplicationIcon(appInfo)) {
-                                is BitmapDrawable -> drawable.bitmap
-                                else -> drawable.toBitmapOrDefault(96)
-                            }
+                        val bitmap = pm.getApplicationIcon(appInfo).toBitmapOrDefault(96)
                         // 将bitmap转换为字节数组
-                        val baos = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
-                        iconBytes = baos.toByteArray()
+                        iconBytes = bitmap.toPngByteArray()
                     } catch (e: Exception) {
                         Logger.w(TAG, "获取应用图标失败: ${appInfo.packageName}", e)
                     }

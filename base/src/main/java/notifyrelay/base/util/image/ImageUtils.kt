@@ -26,7 +26,8 @@ import java.io.ByteArrayOutputStream
  * - SuperIslandImageUtil：颜色解析、HTML 转义处理
  * - Coil 图片加载方法的统一封装
  *
- * 顶层另有 [notifyrelay.base.util.image.toBitmapOrDefault]（drawable→Bitmap 样板归一）。
+ * 顶层另有 [notifyrelay.base.util.image.toBitmapOrDefault]（drawable→Bitmap 样板归一）
+ * 与 [notifyrelay.base.util.image.toPngByteArray]（Bitmap→PNG 字节数组样板归一）。
  */
 object ImageUtils {
     private const val TAG = "ImageUtils"
@@ -74,11 +75,7 @@ object ImageUtils {
      * @param bitmap 待编码的位图。
      * @return 不含 `data:image/png;base64,` 前缀的 base64 文本。
      */
-    fun bitmapToBase64(bitmap: Bitmap): String {
-        val baos = ByteArrayOutputStream()
-        bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
-        return Base64.encodeToString(baos.toByteArray(), Base64.NO_WRAP)
-    }
+    fun bitmapToBase64(bitmap: Bitmap): String = Base64.encodeToString(bitmap.toPngByteArray(), Base64.NO_WRAP)
 
     /**
      * 把位图编码为 `data:image/png;base64,<b64>` 形式的 data URI。
@@ -232,4 +229,17 @@ fun Drawable.toBitmapOrDefault(fallbackSize: Int = 96): Bitmap {
     setBounds(0, 0, width, height)
     draw(canvas)
     return bmp
+}
+
+/**
+ * 把 [Bitmap] 编码为 PNG 字节数组（[Bitmap.CompressFormat.PNG] / quality 100）。
+ *
+ * 抛异常语义：本方法**不吞异常**，编码失败时异常向上抛出，由调用侧的 try/catch 决定兜底值。
+ *
+ * @return PNG 编码后的字节数组。
+ */
+fun Bitmap.toPngByteArray(): ByteArray {
+    val baos = ByteArrayOutputStream()
+    compress(Bitmap.CompressFormat.PNG, 100, baos)
+    return baos.toByteArray()
 }
