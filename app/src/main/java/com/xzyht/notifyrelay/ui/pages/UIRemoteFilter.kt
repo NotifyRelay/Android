@@ -25,7 +25,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import kotlinx.coroutines.launch
@@ -285,14 +286,14 @@ fun UIRemoteFilter(
                         horizontalArrangement = Arrangement.spacedBy(6.dp),
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
-                        // 监听AppRepository的状态，确保数据已加载
-                        val installedPkgs by remember { AppRepository.apps }.collectAsState()
+                        // 监听已安装应用仓库的状态，确保数据已加载
+                        val installedPkgs by remember { InstalledAppsRepository.apps }.collectAsState()
                         val installedPkgSet = installedPkgs.map { it.packageName }.toSet()
 
                         // 确保应用列表已加载
                         LaunchedEffect(Unit) {
-                            if (!AppRepository.isDataLoaded()) {
-                                AppRepository.loadApps(context)
+                            if (!InstalledAppsRepository.isDataLoaded()) {
+                                InstalledAppsRepository.loadApps(context)
                             }
                         }
 
@@ -305,7 +306,7 @@ fun UIRemoteFilter(
                             LaunchedEffect(pkg) {
                                 if (iconBitmap == null) {
                                     // 异步加载图标
-                                    val loadedIcon = AppRepository.getAppIconAsync(context, pkg)
+                                    val loadedIcon = AppIconRepository.getAppIconAsync(context, pkg)
                                     // 更新状态，触发UI重新渲染
                                     iconBitmap = loadedIcon
                                 }

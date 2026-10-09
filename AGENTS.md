@@ -28,16 +28,22 @@
 
 minSdk：`:app`（主应用）minSdk = 31（Android 12），其余库模块（`:base`、`:data`、`:superislandui`、`:core`、`:nativecore` 目录等）minSdk = 29（Android 10）；`:scrcpy` minSdk = 26（子模块自带配置）。请勿为任一模块声明的 minSdk 以下版本编写兼容性代码。
 
-> 模块命名：`:core` 现指 Android 原生核心（Rust FFI，源码目录 `nativecore/`，内含 `notify-relay-core` 子模块）；
-> 原先占用该名的 `notifyrelay.core` 工具库已并入 `:base`，包名为 `notifyrelay.base.util[.image]`。
+> 模块命名：`:core` 指 Android 原生核心（Rust FFI），其源码目录为 `nativecore/`，内含 `notify-relay-core` 子模块；
+> 该模块的 Gradle 模块名与源码目录不同名，由 `settings.gradle.kts` 重定向。
 
 - 代码风格遵循 Kotlin 官方规范（`kotlin.code.style=official`）。
 - 如需扩展功能或集成新依赖，优先查阅 `miuix-mcp` 与本项目现有实现。
   本应用不会上架 Google Play 等应用商店，仅限私有分发和自用，且没有对公网提供服务的计划。
 
+### 代码检索优先级（必须遵守）
+
+**本工作区已完成 CodeGraph 索引**，位于工作区根目录 `E:\GitHubCode\01Main\NotifyRelay\.codegraph\`；`Android/` 自身无索引。
+
+代码定位、理解、调用关系与改动影响面一类问题，**第一步加载 `codegraph-usage` skill 并按其规范使用 `codegraph_explore` MCP**。调用时 `projectPath` 传工作区根 `E:\GitHubCode\01Main\NotifyRelay`。
+
 ### 模块结构与文件用途
 
-模块划分、目录树、各模块类与方法的用途，统一以 **[`Docs/文件用途基础说明.md`](Docs/文件用途基础说明.md)** 为准，本文件不再单独列举。
+模块划分、各模块类与方法的用途，统一以 **[`Docs/文件用途基础说明.md`](Docs/文件用途基础说明.md)** 为准，本文件不再单独列举。该文档不再维护目录树与文件清单（此类内容由上述 CodeGraph 索引实时提供），只保留不可从代码推导的当前状态：模块清单与依赖、各模块包根、类与公开方法、单一入口等契约。
 
 在使用工具方法前，请先查阅该文档对应模块的说明，确认是否已有可用实现。
 

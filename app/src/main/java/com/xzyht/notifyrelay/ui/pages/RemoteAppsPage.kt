@@ -37,8 +37,9 @@ fun RemoteAppsPage(
     val localState by localViewModel.state.collectAsState()
 
     val pageState = rememberRemoteAppsPageState(isLocalMode = isLocalMode, context = context)
-    var searchQuery by pageState.searchQuery
     var showMenuForApp by pageState.showMenuForApp
+
+    val searchQuery = if (isLocalMode) localState.searchQuery else remoteState.searchQuery
 
     val displays = pageState.displays
     var selectedDisplayId by pageState.selectedDisplayId
@@ -68,7 +69,6 @@ fun RemoteAppsPage(
                 TextField(
                     value = searchQuery,
                     onValueChange = { newValue ->
-                        searchQuery = newValue
                         if (isLocalMode) {
                             localViewModel.searchApps(newValue)
                         } else {
@@ -108,14 +108,7 @@ fun RemoteAppsPage(
 
             if (isLocalMode) {
                 LocalAppsContent(
-                    apps =
-                        localState.apps.filter {
-                            searchQuery.isBlank() ||
-                                it.appName.contains(searchQuery, ignoreCase = true) ||
-                                it.packageName.contains(searchQuery, ignoreCase = true)
-                        },
-                    isLoading = localState.isLoading,
-                    error = localState.error,
+                    state = localState,
                     onAppClick = { app ->
                         openLocalApp(context, app, selectedDisplayId)
                     },
@@ -124,7 +117,6 @@ fun RemoteAppsPage(
             } else {
                 RemoteAppsContent(
                     state = remoteState,
-                    searchQuery = searchQuery,
                     onAppClick = { app ->
                         remoteViewModel.openApp(context, app, deviceIp!!, useScrcpyStartApp = true)
                     },

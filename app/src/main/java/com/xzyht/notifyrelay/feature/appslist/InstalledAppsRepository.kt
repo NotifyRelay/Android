@@ -2,18 +2,19 @@ package com.xzyht.notifyrelay.feature.appslist
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
+import com.xzyht.notifyrelay.feature.appslist.model.appMatchesQuery
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.toBitmapOrDefault
+import notifyrelay.base.util.image.toPngByteArray
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
-import java.io.ByteArrayOutputStream
+import notifyrelay.data.database.repository.DatabaseRepository
 
 /**
  * 已安装应用仓库。
@@ -22,8 +23,6 @@ import java.io.ByteArrayOutputStream
  * - [loadApps] 读取 PackageManager 并重建数据库中的应用表
  * - [getFilteredApps] 按关键字与系统应用开关过滤
  * - 包名集合的同步/异步查询
- *
- * [AppRepository] 作为门面转发本 object 的公开方法，保持既有调用方不变。
  */
 internal object InstalledAppsRepository {
     private const val TAG = "InstalledAppsRepository"
@@ -46,20 +45,13 @@ internal object InstalledAppsRepository {
      * @throws Exception 当 PackageManager 访问或数据库操作发生严重错误时向上抛出（调用方可选择捕获）。
      */
     suspend fun loadApps(context: Context) {
-        AppDatabaseHolder.init(context)
-
         _isLoading.value = true
         try {
             // Logger.d(TAG, "开始加载应用列表")
-            val apps =
-                AppListHelper.getInstalledApplications(context).sortedBy { appInfo ->
-                    try {
-                        context.packageManager.getApplicationLabel(appInfo).toString()
-                    } catch (e: Exception) {
-                        Logger.w(TAG, "获取应用标签失败，使用包名: ${appInfo.packageName}", e)
-                        appInfo.packageName
-                    }
-                }
+            val installedApps = AppListHelper.getInstalledApplications(context)
+            // 同一批应用只取一次标签，排序与后续入库共用
+            val appLabels = installedApps.associate { it.packageName to AppListHelper.getApplicationLabel(context, it) }
+            val apps = installedApps.sortedBy { appLabels.getValue(it.packageName) }
 
             _apps.value = apps
 
@@ -71,26 +63,15 @@ internal object InstalledAppsRepository {
             apps.forEach { appInfo ->
                 try {
                     val packageName = appInfo.packageName
-                    val appName =
-                        try {
-                            pm.getApplicationLabel(appInfo).toString()
-                        } catch (e: Exception) {
-                            packageName
-                        }
+                    val appName = appLabels.getValue(packageName)
                     val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
 
                     // 获取应用图标
                     var iconBytes: ByteArray? = null
                     try {
-                        val bitmap =
-                            when (val drawable = pm.getApplicationIcon(appInfo)) {
-                                is BitmapDrawable -> drawable.bitmap
-                                else -> drawable.toBitmapOrDefault(96)
-                            }
+                        val bitmap = pm.getApplicationIcon(appInfo).toBitmapOrDefault(96)
                         // 将bitmap转换为字节数组
-                        val baos = ByteArrayOutputStream()
-                        bitmap.compress(Bitmap.CompressFormat.PNG, 100, baos)
-                        iconBytes = baos.toByteArray()
+                        iconBytes = bitmap.toPngByteArray()
                     } catch (e: Exception) {
                         Logger.w(TAG, "获取应用图标失败: ${appInfo.packageName}", e)
                     }
@@ -125,23 +106,23 @@ internal object InstalledAppsRepository {
                 // 在保存应用之前，先获取所有现有的远程设备应用关联
                 // 因为 saveApps 使用 OnConflictStrategy.REPLACE，会先删除再插入，触发外键级联删除
                 val existingRemoteAssociations =
-                    AppDatabaseHolder
-                        .get()
-                        ?.getAllAppDeviceAssociations()
-                        ?.first()
-                        ?.filter { it.sourceDevice != "local" } ?: emptyList()
+                    DatabaseRepository
+                        .getInstance(context)
+                        .getAllAppDeviceAssociations()
+                        .first()
+                        .filter { it.sourceDevice != "local" }
 
-                AppDatabaseHolder.get()?.saveApps(appEntities)
+                DatabaseRepository.getInstance(context).saveApps(appEntities)
 
                 // 重新保存远程设备的应用关联（本机的关联会在后面重新创建）
                 if (existingRemoteAssociations.isNotEmpty()) {
-                    AppDatabaseHolder.get()?.saveAppDeviceAssociations(existingRemoteAssociations)
+                    DatabaseRepository.getInstance(context).saveAppDeviceAssociations(existingRemoteAssociations)
                 }
             }
 
             // 批量保存应用设备关联到数据库
             if (appDeviceEntities.isNotEmpty()) {
-                AppDatabaseHolder.get()?.saveAppDeviceAssociations(appDeviceEntities)
+                DatabaseRepository.getInstance(context).saveAppDeviceAssociations(appDeviceEntities)
             }
 
             // Logger.d(TAG, "应用列表加载成功，共 ${apps.size} 个应用")
@@ -183,37 +164,8 @@ internal object InstalledAppsRepository {
 
         // 搜索过滤
         return displayApps.filter { app ->
-            try {
-                val label = context.packageManager.getApplicationLabel(app).toString()
-                val matchesLabel = label.contains(query, ignoreCase = true)
-                val matchesPackage = app.packageName.contains(query, ignoreCase = true)
-                matchesLabel || matchesPackage
-            } catch (e: Exception) {
-                Logger.w(TAG, "搜索时获取应用标签失败: ${app.packageName}", e)
-                app.packageName.contains(query, ignoreCase = true)
-            }
+            appMatchesQuery(AppListHelper.getApplicationLabel(context, app), app.packageName, query)
         }
-    }
-
-    /**
-     * 清除所有缓存（数据库缓存）。
-     *
-     * 说明：该方法会清空数据库中的应用与图标缓存。
-     */
-    suspend fun clearCache(context: Context) {
-        AppDatabaseHolder.init(context)
-
-        // 清除应用数据
-        val apps = _apps.value
-        apps.forEach {
-            AppDatabaseHolder.get()?.deleteAppByPackageName(it.packageName)
-        }
-
-        // 清除远程应用列表
-        RemoteAppsCache.clearRemoteApps()
-
-        // 重置状态
-        _apps.value = emptyList()
     }
 
     /**
@@ -223,11 +175,10 @@ internal object InstalledAppsRepository {
      * @return 已安装和已缓存图标的包名集合
      */
     suspend fun getInstalledAndCachedPackageNames(context: Context): Set<String> {
-        AppDatabaseHolder.init(context)
         val installedPackages = getInstalledPackageNames(context)
         val cachedIconPackages = mutableSetOf<String>()
         // 从数据库获取所有应用包名
-        val apps = AppDatabaseHolder.get()?.getAllApps()?.first() ?: emptyList()
+        val apps = DatabaseRepository.getInstance(context).getAllApps().first()
         apps.forEach {
             cachedIconPackages.add(it.packageName)
         }
@@ -243,18 +194,6 @@ internal object InstalledAppsRepository {
         // 检查状态流是否有数据
         return _apps.value.isNotEmpty()
     }
-
-    /**
-     * 获取指定包名的应用标签（显示名）。
-     *
-     * @param context Android 上下文，用于访问 PackageManager（非空）。
-     * @param packageName 目标应用的包名（非空）。
-     * @return 应用的标签字符串；若无法获取则返回包名或空字符串，具体由 [AppListHelper.getApplicationLabel] 决定。
-     */
-    fun getAppLabel(
-        context: Context,
-        packageName: String,
-    ): String = AppListHelper.getApplicationLabel(context, packageName)
 
     /**
      * 获取已安装应用包名集合（同步返回）。

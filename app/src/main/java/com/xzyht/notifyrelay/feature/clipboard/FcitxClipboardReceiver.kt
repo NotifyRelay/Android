@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.clipboard
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import notifyrelay.base.util.Logger
 
 class FcitxClipboardReceiver : BroadcastReceiver() {
@@ -33,7 +33,7 @@ class FcitxClipboardReceiver : BroadcastReceiver() {
 
         val decryptedText = FcitxClipboardManager.decryptClipboardData(context, encryptedData)
         if (decryptedText != null) {
-            val deviceManager = DeviceConnectionManager.getInstance(context)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
             ClipboardSyncManager.syncTextDirectly(deviceManager, decryptedText, context)
             Logger.d(TAG, "Fcitx5 剪贴板已转发至远端设备")
         }

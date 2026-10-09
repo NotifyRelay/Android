@@ -9,7 +9,8 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import kotlinx.coroutines.Dispatchers
@@ -87,7 +88,7 @@ class NotificationHistoryViewModel(
         }
 
         viewModelScope.launch {
-            AppRepository.iconUpdates.collect { update ->
+            AppIconRepository.iconUpdates.collect { update ->
                 update?.let { (packageName, _) ->
                     _appIconCache.update { cache ->
                         cache - packageName
@@ -169,10 +170,10 @@ class NotificationHistoryViewModel(
     }
 
     private suspend fun loadInstalledPackages() {
-        val cached = AppRepository.getInstalledPackageNames(application)
+        val cached = InstalledAppsRepository.getInstalledPackageNames(application)
         installedPackages.value =
             cached.ifEmpty {
-                AppRepository.getInstalledPackageNamesAsync(application)
+                InstalledAppsRepository.getInstalledPackageNamesAsync(application)
             }
     }
 

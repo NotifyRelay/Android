@@ -1,24 +1,15 @@
 package com.xzyht.notifyrelay.ui.viewmodel
 
 import android.content.Context
-import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-
-data class LocalAppState(
-    val apps: List<LocalAppInfo> = emptyList(),
-    val isLoading: Boolean = false,
-    val error: String? = null,
-    val searchQuery: String = "",
-)
+import notifyrelay.base.util.AppListHelper
+import notifyrelay.base.util.InstalledAppsFilter
 
 data class LocalAppInfo(
     val appName: String,
@@ -26,43 +17,35 @@ data class LocalAppInfo(
     val isPinned: Boolean = false,
 )
 
+/**
+ * 本地已安装应用列表的 ViewModel。
+ *
+ * 状态机与加载/搜索流程统一由 [AppsStateMachine] 承担，本类只提供数据源实现。
+ */
 class LocalAppsViewModel : ViewModel() {
-    private val _state = MutableStateFlow(LocalAppState())
-    val state: StateFlow<LocalAppState> = _state.asStateFlow()
-
-    fun loadApps(context: Context) {
-        _state.update { it.copy(isLoading = true, error = null) }
-
-        viewModelScope.launch {
-            try {
-                val apps =
-                    withContext(Dispatchers.IO) {
-                        val packageManager = context.packageManager
-                        packageManager
-                            .getInstalledApplications(PackageManager.GET_META_DATA)
-                            .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }
-                            .map { appInfo ->
-                                val launchIntent = packageManager.getLaunchIntentForPackage(appInfo.packageName)
-                                if (launchIntent != null) {
-                                    LocalAppInfo(
-                                        appName = appInfo.loadLabel(packageManager).toString(),
-                                        packageName = appInfo.packageName,
-                                    )
-                                } else {
-                                    null
-                                }
-                            }.filterNotNull()
-                            .sortedBy { it.appName.lowercase() }
-                    }
-
-                _state.update { it.copy(apps = apps, isLoading = false) }
-            } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message) }
+    private val appsMachine =
+        AppsStateMachine<LocalAppInfo, Unit> { context, _ ->
+            withContext(Dispatchers.IO) {
+                val packageManager = context.packageManager
+                AppListHelper
+                    .queryInstalledApplications(
+                        context,
+                        PackageManager.GET_META_DATA,
+                        InstalledAppsFilter.LAUNCHABLE_USER_APPS,
+                    ).map { appInfo ->
+                        LocalAppInfo(
+                            appName = appInfo.loadLabel(packageManager).toString(),
+                            packageName = appInfo.packageName,
+                        )
+                    }.sortedBy { it.appName.lowercase() }
             }
         }
+
+    val state: StateFlow<AppsState<LocalAppInfo>> = appsMachine.state
+
+    fun loadApps(context: Context) {
+        viewModelScope.launch { appsMachine.load(context, Unit) }
     }
 
-    fun searchApps(query: String) {
-        _state.update { it.copy(searchQuery = query) }
-    }
+    fun searchApps(query: String) = appsMachine.searchApps(query)
 }

@@ -1,8 +1,8 @@
 package com.xzyht.notifyrelay.feature.appslist.sync
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.appslist.AppListHelper
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
+import com.xzyht.notifyrelay.feature.appslist.RemoteAppsCache
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.Logger
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
@@ -97,15 +98,9 @@ object AppListSyncManager {
                 }
 
             val appArray = JSONArray()
-            val pm = context.packageManager
             for (ai in userApps) {
                 try {
-                    val appName =
-                        try {
-                            pm.getApplicationLabel(ai).toString()
-                        } catch (_: Exception) {
-                            ai.packageName
-                        }
+                    val appName = AppListHelper.getApplicationLabel(context, ai)
                     val item = JSONObject()
                     item.put("packageName", ai.packageName)
                     item.put("appName", appName)
@@ -140,7 +135,7 @@ object AppListSyncManager {
 
     /**
      * 处理接收到的应用列表响应。
-     * 1. 解析响应数据，将应用列表缓存到 AppRepository
+     * 1. 解析响应数据，将应用列表缓存到 RemoteAppsCache
      * 2. 将应用包名与来源设备关联
      * 3. 检查并批量请求缺失的图标
      */
@@ -171,10 +166,10 @@ object AppListSyncManager {
                 }
             }
 
-            // 缓存到 AppRepository
+            // 缓存到 RemoteAppsCache
             val job =
                 ioScope.launch {
-                    AppRepository.cacheRemoteAppList(context, appsMap, deviceUuid)
+                    RemoteAppsCache.cacheRemoteAppList(context, appsMap, deviceUuid)
 
                     // 关联应用包名与设备（替代原 associateAppsWithDevice 方法）
                     val databaseRepository = DatabaseRepository.getInstance(context)
@@ -227,7 +222,7 @@ object AppListSyncManager {
                 }
 
                 // 过滤掉本机已安装的应用（本机已安装的应用图标可直接获取，无需请求）
-                val installedPackages = AppRepository.getInstalledPackageNames(context)
+                val installedPackages = InstalledAppsRepository.getInstalledPackageNames(context)
                 val needRequestIcons = missingIcons.filter { !installedPackages.contains(it) }
 
                 if (needRequestIcons.isEmpty()) {

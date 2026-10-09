@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.sync.notification
 
 import android.content.Context
 import android.os.Build
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
@@ -100,7 +100,7 @@ object SuperIslandProcessor {
             val pkg = json.optString("packageName")
             val time = json.optLong("time", System.currentTimeMillis())
 
-            val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
+            val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
             val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
 
             // 入站解析统一委托 core：字段抽取 + featureId + isEnd + sourceKey 一次完成

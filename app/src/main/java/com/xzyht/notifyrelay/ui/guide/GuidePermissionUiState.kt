@@ -7,8 +7,8 @@ import android.content.pm.PackageManager
 import android.os.Build
 import android.provider.Settings
 import androidx.core.content.ContextCompat
-import com.xzyht.notifyrelay.feature.appslist.AppListHelper
 import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
+import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.PermissionHelper
 
 internal data class GuidePermissionUiState(

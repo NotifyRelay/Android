@@ -82,7 +82,7 @@ object SuperIslandStructuredDataHelper {
                             Logger.w(TAG, "超级岛 param_v2 合规校验提示: $issues")
                         }
 
-                        SuperIslandExtras.writeParam(extras, payload)
+                        extras.putString(SuperIslandExtras.KEY_PARAM, payload)
                         Logger.i(TAG, "添加miui.focus.param成功（原样透传复刻数据）")
                     } catch (e: Exception) {
                         extras.putString(SuperIslandExtras.KEY_PARAM, rawData)
@@ -104,7 +104,11 @@ object SuperIslandStructuredDataHelper {
                     extras.putBoolean("android.showChronometer", true)
                 }
 
-                SuperIslandExtras.writeStandardFlags(extras, context.packageName)
+                extras.putBoolean(SuperIslandExtras.KEY_REDUCED_IMAGES, true)
+                extras.putString(SuperIslandExtras.KEY_SOURCE_PACKAGE, context.packageName)
+                extras.putString(SuperIslandExtras.KEY_APP_PACKAGE, context.packageName)
+                extras.putBoolean(SuperIslandExtras.KEY_IS_FOCUS_NOTIFICATION, true)
+                extras.putBoolean(SuperIslandExtras.KEY_SHOW_BADGE, false)
 
                 Logger.i(TAG, "添加超级岛结构化数据成功")
             }
@@ -230,7 +234,11 @@ object SuperIslandStructuredDataHelper {
             addActionBundlesToExtras(extras)
             addMediaPicMapToExtras(context, extras, picMap)
 
-            SuperIslandExtras.writeStandardFlags(extras, context.packageName)
+            extras.putBoolean(SuperIslandExtras.KEY_REDUCED_IMAGES, true)
+            extras.putString(SuperIslandExtras.KEY_SOURCE_PACKAGE, context.packageName)
+            extras.putString(SuperIslandExtras.KEY_APP_PACKAGE, context.packageName)
+            extras.putBoolean(SuperIslandExtras.KEY_IS_FOCUS_NOTIFICATION, true)
+            extras.putBoolean(SuperIslandExtras.KEY_SHOW_BADGE, false)
 
             Logger.i(TAG, "添加媒体类型超级岛结构化数据成功")
         } catch (e: CancellationException) {
@@ -305,7 +313,11 @@ object SuperIslandStructuredDataHelper {
             addActionBundlesToExtras(extras)
 
             // 应用/源包信息等标准焦点标记
-            SuperIslandExtras.writeStandardFlags(extras, context.packageName)
+            extras.putBoolean(SuperIslandExtras.KEY_REDUCED_IMAGES, true)
+            extras.putString(SuperIslandExtras.KEY_SOURCE_PACKAGE, context.packageName)
+            extras.putString(SuperIslandExtras.KEY_APP_PACKAGE, context.packageName)
+            extras.putBoolean(SuperIslandExtras.KEY_IS_FOCUS_NOTIFICATION, true)
+            extras.putBoolean(SuperIslandExtras.KEY_SHOW_BADGE, false)
 
             Logger.i(TAG, "添加非媒体类型超级岛结构化数据成功")
         } catch (e: Exception) {
@@ -545,8 +557,12 @@ object SuperIslandStructuredDataHelper {
                 if (issues.isNotEmpty()) {
                     Logger.w(TAG, "本机通知 param_v2 合规校验提示: $issues")
                 }
-                SuperIslandExtras.writeParam(builder.extras, payload)
-                SuperIslandExtras.writeStandardFlags(builder.extras, context.packageName)
+                builder.extras.putString(SuperIslandExtras.KEY_PARAM, payload)
+                builder.extras.putBoolean(SuperIslandExtras.KEY_REDUCED_IMAGES, true)
+                builder.extras.putString(SuperIslandExtras.KEY_SOURCE_PACKAGE, context.packageName)
+                builder.extras.putString(SuperIslandExtras.KEY_APP_PACKAGE, context.packageName)
+                builder.extras.putBoolean(SuperIslandExtras.KEY_IS_FOCUS_NOTIFICATION, true)
+                builder.extras.putBoolean(SuperIslandExtras.KEY_SHOW_BADGE, false)
                 if (action != null) {
                     registerFocusAction(builder, context, action)
                 }

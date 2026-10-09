@@ -1,7 +1,5 @@
 package com.xzyht.notifyrelay.ui.pages.superisland
 
-import android.content.Context
-import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -25,8 +23,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.feature.notification.superisland.notification.ReplicaSmallIconInjector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.image.ImageUtils
@@ -66,7 +65,7 @@ internal fun SuperIslandHistoryImage(
                     val decoded =
                         when {
                             ImageUtils.isDataUrl(resolved) -> ImageUtils.decodeDataUrlToBitmap(context, resolved)
-                            resolved.startsWith("http", ignoreCase = true) -> downloadBitmap(context, resolved)
+                            resolved.startsWith("http", ignoreCase = true) -> ReplicaSmallIconInjector.downloadBitmap(context, resolved)
                             else -> null
                         }
                     decoded?.let { SuperIslandImageCache.put(data, it) }
@@ -125,21 +124,21 @@ internal fun SuperIslandHistoryImage(
 internal fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
     val target = remember(packageName) { packageName?.takeIf { it.isNotBlank() } }
     val context = LocalContext.current
-    val iconUpdateKey by AppRepository.iconUpdates.collectAsState()
+    val iconUpdateKey by AppIconRepository.iconUpdates.collectAsState()
     val bitmapState =
         produceState<ImageBitmap?>(initialValue = null, key1 = target, key2 = iconUpdateKey) {
             if (target == null) {
                 value = null
                 return@produceState
             }
-            val cached = AppRepository.getExternalAppIcon(context, target)
+            val cached = AppIconRepository.getExternalAppIcon(context, target)
             if (cached != null) {
                 value = cached.asImageBitmap()
                 return@produceState
             }
             val fetched =
                 withContext(Dispatchers.IO) {
-                    AppRepository.getAppIconWithAutoRequest(context, target)
+                    AppIconRepository.getAppIconWithAutoRequest(context, target)
                 }
             value = fetched?.asImageBitmap()
         }
@@ -192,13 +191,3 @@ internal fun SuperIslandAppIcon(
         }
     }
 }
-
-private suspend fun downloadBitmap(
-    context: Context,
-    urlString: String,
-): Bitmap? =
-    try {
-        ImageUtils.loadBitmap(context, urlString)
-    } catch (_: Exception) {
-        null
-    }

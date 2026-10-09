@@ -7,7 +7,7 @@ import kotlinx.coroutines.withContext
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 
-class NotificationRecordStore(
+class NotificationRecordStore private constructor(
     private val context: Context,
 ) {
     // 数据库仓库实例
@@ -92,15 +92,14 @@ class NotificationRecordStore(
         val deviceUuid = if (device == "local") "本机" else device
         repository.deleteNotificationsByPackageAndDevice(packageName, deviceUuid)
     }
-}
 
-// 单例提供者
-object NotifyRelayStoreProvider {
-    @Volatile
-    private var instance: NotificationRecordStore? = null
+    companion object {
+        @Volatile
+        private var instance: NotificationRecordStore? = null
 
-    fun getInstance(context: Context): NotificationRecordStore =
-        instance ?: synchronized(this) {
-            instance ?: NotificationRecordStore(context.applicationContext).also { instance = it }
-        }
+        fun getInstance(context: Context): NotificationRecordStore =
+            instance ?: synchronized(this) {
+                instance ?: NotificationRecordStore(context.applicationContext).also { instance = it }
+            }
+    }
 }

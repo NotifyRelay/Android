@@ -11,6 +11,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.xzyht.notifyrelay.feature.appslist.model.appMatchesQuery
+import com.xzyht.notifyrelay.ui.viewmodel.AppsState
 import com.xzyht.notifyrelay.ui.viewmodel.LocalAppInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -26,9 +28,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun LocalAppsContent(
-    apps: List<LocalAppInfo>,
-    isLoading: Boolean,
-    error: String?,
+    state: AppsState<LocalAppInfo>,
     onAppClick: (LocalAppInfo) -> Unit,
     onAppLongClick: (LocalAppInfo) -> Unit,
 ) {
@@ -36,6 +36,8 @@ internal fun LocalAppsContent(
     val textStyles = MiuixTheme.textStyles
     val context = LocalContext.current
     val packageManager = context.packageManager
+
+    val apps = state.apps.filter { appMatchesQuery(it.appName, it.packageName, state.searchQuery) }
 
     val iconCache = remember { mutableStateMapOf<String, ImageBitmap?>() }
 
@@ -58,7 +60,7 @@ internal fun LocalAppsContent(
     }
 
     when {
-        error != null -> {
+        state.error != null -> {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,
@@ -72,13 +74,13 @@ internal fun LocalAppsContent(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = error,
+                        text = state.error,
                         color = colorScheme.error,
                     )
                 }
             }
         }
-        isLoading -> {
+        state.isLoading -> {
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center,

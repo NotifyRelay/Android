@@ -233,8 +233,6 @@ dependencies {
 
     // Coil: image loading (Kotlin + Coroutines friendly)
     implementation(libs.bundles.coil)
-    // DiskLruCache: stable disk-based LRU cache for icons
-    implementation(libs.disklrucache)
     // 添加Apache FtpServer依赖用于FTP服务器实现
     implementation(libs.apache.ftpserver)
 

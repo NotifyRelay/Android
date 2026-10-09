@@ -28,6 +28,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.SuperIslandStorageKeys
@@ -562,14 +563,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
     // 保留通知历史，不做移除处理
 
-    internal fun getAppName(packageName: String): String =
-        try {
-            val pm = applicationContext.packageManager
-            val appInfo = pm.getApplicationInfo(packageName, 0)
-            pm.getApplicationLabel(appInfo).toString()
-        } catch (_: Exception) {
-            packageName
-        }
+    internal fun getAppName(packageName: String): String = AppListHelper.getApplicationLabel(applicationContext, packageName)
 
     private fun getNotificationTitle(sbn: StatusBarNotification): String? = NotificationTextReader.getStringCompat(sbn.notification.extras, "android.title")
 

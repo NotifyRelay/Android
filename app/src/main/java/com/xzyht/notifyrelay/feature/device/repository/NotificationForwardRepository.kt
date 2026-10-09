@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.feature.device.repository
 
 import android.content.Context
 import androidx.compose.runtime.MutableState
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
 import kotlinx.coroutines.delay
 import notifyrelay.base.util.Logger
@@ -41,7 +41,7 @@ suspend fun replicateNotification(
         var appIcon: android.graphics.Bitmap? = null
         try {
             // 使用统一的图标获取方法，自动处理本地和外部应用
-            appIcon = AppRepository.getAppIconWithAutoRequest(context, pkg)
+            appIcon = AppIconRepository.getAppIconWithAutoRequest(context, pkg)
 
             // 如果初次没有获得图标，等待外部图标同步（最多等待2秒，每100ms轮询一次）。
             // 目的：在第一次获取不到远程同步到的图标时，给它短暂时间到达再复刻，避免某些情况下一直不复刻图标。
@@ -53,7 +53,7 @@ suspend fun replicateNotification(
                 try {
                     while (System.currentTimeMillis() - start < waitMaxMs) {
                         // 尝试从统一方法再次获取
-                        appIcon = AppRepository.getAppIconWithAutoRequest(context, pkg)
+                        appIcon = AppIconRepository.getAppIconWithAutoRequest(context, pkg)
                         if (appIcon != null) {
                             // Logger.d("NotifyRelay(狂鼠)", "等待期间获取到图标: $pkg")
                             break

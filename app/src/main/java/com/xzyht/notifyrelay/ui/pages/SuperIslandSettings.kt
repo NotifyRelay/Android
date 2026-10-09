@@ -20,7 +20,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils.SpecInjectionMode
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
@@ -219,7 +220,7 @@ fun UISuperIslandSettings() {
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
 
-            val installedPkgs = remember { AppRepository.getInstalledPackageNamesSync(context) }
+            val installedPkgs = remember { InstalledAppsRepository.getInstalledPackageNamesSync(context) }
 
             DEFAULT_MIRROR_PACKAGES.forEach { pkg ->
                 val isInstalled = installedPkgs.contains(pkg)
@@ -228,7 +229,7 @@ fun UISuperIslandSettings() {
 
                 LaunchedEffect(pkg) {
                     if (iconBitmap == null) {
-                        iconBitmap = AppRepository.getAppIconAsync(context, pkg)
+                        iconBitmap = AppIconRepository.getAppIconAsync(context, pkg)
                     }
                 }
 
@@ -270,7 +271,7 @@ fun UISuperIslandSettings() {
 
                     LaunchedEffect(pkg) {
                         if (iconBitmap == null) {
-                            iconBitmap = AppRepository.getAppIconAsync(context, pkg)
+                            iconBitmap = AppIconRepository.getAppIconAsync(context, pkg)
                         }
                     }
 

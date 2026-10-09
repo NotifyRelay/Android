@@ -32,8 +32,10 @@ import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.AppListHelper
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.InputField
@@ -65,22 +67,16 @@ fun AppPickerDialog(
 
     val showDialog = rememberSaveable { mutableStateOf(visible) }
 
-    // 监听 AppRepository 的状态
-    val isLoading by AppRepository.isLoading.collectAsState()
-    val allApps by AppRepository.apps.collectAsState()
-    val iconUpdateKey by AppRepository.iconUpdates.collectAsState()
+    // 监听已安装应用仓库的状态
+    val isLoading by InstalledAppsRepository.isLoading.collectAsState()
+    val allApps by InstalledAppsRepository.apps.collectAsState()
+    val iconUpdateKey by AppIconRepository.iconUpdates.collectAsState()
 
-    val appLabelMap by remember(allApps, pm) {
+    val appLabelMap by remember(allApps, context) {
         derivedStateOf {
             val result = mutableMapOf<String, String>()
             allApps.forEach { info ->
-                val label =
-                    try {
-                        pm.getApplicationLabel(info).toString()
-                    } catch (_: Exception) {
-                        info.packageName
-                    }
-                result[info.packageName] = label
+                result[info.packageName] = AppListHelper.getApplicationLabel(context, info)
             }
             result
         }
@@ -89,15 +85,15 @@ fun AppPickerDialog(
     // 计算过滤后的应用列表
     val filteredApps by remember(allApps, appSearchQuery, showSystemApps) {
         derivedStateOf {
-            AppRepository.getFilteredApps(appSearchQuery, showSystemApps, context)
+            InstalledAppsRepository.getFilteredApps(appSearchQuery, showSystemApps, context)
         }
     }
 
     LaunchedEffect(visible) {
         showDialog.value = visible
-        if (visible && !AppRepository.isDataLoaded()) {
+        if (visible && !InstalledAppsRepository.isDataLoaded()) {
             coroutineScope.launch {
-                AppRepository.loadApps(context)
+                InstalledAppsRepository.loadApps(context)
             }
         }
     }
@@ -187,7 +183,7 @@ fun AppPickerDialog(
 
                                 // 异步加载图标
                                 LaunchedEffect(iconUpdateKey, pkg) {
-                                    val loadedIcon = AppRepository.getAppIconAsync(context, pkg)
+                                    val loadedIcon = AppIconRepository.getAppIconAsync(context, pkg)
                                     iconBitmap = loadedIcon?.asImageBitmap()
                                 }
                                 Column(
