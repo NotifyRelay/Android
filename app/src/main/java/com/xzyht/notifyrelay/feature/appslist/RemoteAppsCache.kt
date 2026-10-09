@@ -5,6 +5,7 @@ import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
 import kotlinx.coroutines.flow.first
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
+import notifyrelay.data.database.repository.DatabaseRepository
 
 /**
  * 远程应用缓存。
@@ -26,14 +27,12 @@ internal object RemoteAppsCache {
         apps: Map<String, String>,
         deviceUuid: String,
     ) {
-        AppDatabaseHolder.init(context)
-
         val appEntities = mutableListOf<AppEntity>()
         val appDeviceEntities = mutableListOf<AppDeviceEntity>()
 
         apps.forEach { (packageName, appName) ->
             // 检查应用是否已存在
-            val existingApp = AppDatabaseHolder.get()?.getAppByPackageName(packageName)
+            val existingApp = DatabaseRepository.getInstance(context).getAppByPackageName(packageName)
             val appEntity =
                 if (existingApp != null) {
                     // 更新现有应用
@@ -66,10 +65,10 @@ internal object RemoteAppsCache {
 
         // 保存到数据库
         if (appEntities.isNotEmpty()) {
-            AppDatabaseHolder.get()?.saveApps(appEntities)
+            DatabaseRepository.getInstance(context).saveApps(appEntities)
         }
         if (appDeviceEntities.isNotEmpty()) {
-            AppDatabaseHolder.get()?.saveAppDeviceAssociations(appDeviceEntities)
+            DatabaseRepository.getInstance(context).saveAppDeviceAssociations(appDeviceEntities)
         }
         // Logger.d(TAG, "缓存远程应用列表成功，共 ${apps.size} 个应用")
     }
@@ -85,11 +84,10 @@ internal object RemoteAppsCache {
         context: Context,
         deviceUuid: String,
     ): List<RemoteAppInfo> {
-        AppDatabaseHolder.init(context)
-        val appDevices = AppDatabaseHolder.get()?.getAppDevicesByDeviceUuid(deviceUuid)?.first() ?: emptyList()
+        val appDevices = DatabaseRepository.getInstance(context).getAppDevicesByDeviceUuid(deviceUuid).first()
         val packageNames = appDevices.map { it.packageName }.distinct()
         if (packageNames.isEmpty()) return emptyList()
-        val apps = AppDatabaseHolder.get()?.getAppsByPackageNames(packageNames) ?: emptyList()
+        val apps = DatabaseRepository.getInstance(context).getAppsByPackageNames(packageNames)
         return apps
             .map { entity ->
                 RemoteAppInfo(
