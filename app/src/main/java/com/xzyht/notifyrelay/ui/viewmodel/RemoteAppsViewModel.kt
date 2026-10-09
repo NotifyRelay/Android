@@ -5,7 +5,6 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
-import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppsState
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
@@ -13,40 +12,34 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingl
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 
+/**
+ * 远程设备应用列表的 ViewModel。
+ *
+ * 状态机与搜索流程统一由 [AppsStateMachine] 承担，本类只提供远程数据源实现与设备侧刷新流程。
+ */
 class RemoteAppsViewModel : ViewModel() {
-    private val _state = MutableStateFlow(RemoteAppsState())
-    val state: StateFlow<RemoteAppsState> = _state.asStateFlow()
-
     private var currentDeviceUuid: String? = null
     private var iconUpdatesJob: Job? = null
+
+    private val appsMachine =
+        AppsStateMachine<RemoteAppInfo> { context ->
+            val deviceUuid = currentDeviceUuid ?: return@AppsStateMachine emptyList()
+            AppRepository.loadPinnedApps(context, deviceUuid)
+            AppRepository.getRemoteAppsList(context, deviceUuid)
+        }
+
+    val state: StateFlow<AppsState<RemoteAppInfo>> = appsMachine.state
 
     fun loadApps(
         context: Context,
         deviceUuid: String,
     ) {
         currentDeviceUuid = deviceUuid
-        viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
-            try {
-                AppRepository.loadPinnedApps(context, deviceUuid)
-                val apps = AppRepository.getRemoteAppsList(context, deviceUuid)
-                _state.update {
-                    it.copy(
-                        apps = apps,
-                        isLoading = false,
-                    )
-                }
-            } catch (e: Exception) {
-                _state.update { it.copy(isLoading = false, error = e.message) }
-            }
-        }
+        viewModelScope.launch { appsMachine.load(context) }
 
         observeIconUpdates(context, deviceUuid)
     }
@@ -74,7 +67,7 @@ class RemoteAppsViewModel : ViewModel() {
     ) {
         try {
             val updatedApps =
-                _state.value.apps.map { app ->
+                appsMachine.state.value.apps.map { app ->
                     if (app.packageName == packageName) {
                         val updatedApp =
                             AppRepository
@@ -85,7 +78,7 @@ class RemoteAppsViewModel : ViewModel() {
                         app
                     }
                 }
-            _state.update { it.copy(apps = updatedApps) }
+            appsMachine.update { it.copy(apps = updatedApps) }
         } catch (e: Exception) {
             Logger.w("RemoteAppsViewModel", "刷新单个应用图标失败: $packageName", e)
         }
@@ -94,7 +87,7 @@ class RemoteAppsViewModel : ViewModel() {
     fun refreshApps(context: Context) {
         val deviceUuid = currentDeviceUuid ?: return
         viewModelScope.launch {
-            _state.update { it.copy(isLoading = true, error = null) }
+            appsMachine.update { it.copy(isLoading = true, error = null) }
             try {
                 val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                 val deviceInfo = findDeviceInfo(deviceManager, deviceUuid)
@@ -108,23 +101,16 @@ class RemoteAppsViewModel : ViewModel() {
                     )
                 } else {
                     Logger.w("RemoteAppsViewModel", "未找到设备信息: $deviceUuid")
-                    _state.update { it.copy(isLoading = false, error = "设备未连接") }
+                    appsMachine.update { it.copy(isLoading = false, error = "设备未连接") }
                     return@launch
                 }
 
                 delay(2000)
 
-                AppRepository.loadPinnedApps(context, deviceUuid)
-                val apps = AppRepository.getRemoteAppsList(context, deviceUuid)
-                _state.update {
-                    it.copy(
-                        apps = apps,
-                        isLoading = false,
-                    )
-                }
+                appsMachine.load(context)
             } catch (e: Exception) {
                 Logger.e("RemoteAppsViewModel", "刷新应用列表失败", e)
-                _state.update { it.copy(isLoading = false, error = e.message) }
+                appsMachine.update { it.copy(isLoading = false, error = e.message) }
             }
         }
     }
@@ -137,9 +123,7 @@ class RemoteAppsViewModel : ViewModel() {
         return onlineDevices.find { it.uuid == deviceUuid }
     }
 
-    fun searchApps(query: String) {
-        _state.update { it.copy(searchQuery = query) }
-    }
+    fun searchApps(query: String) = appsMachine.searchApps(query)
 
     fun pinApp(
         context: Context,
@@ -166,10 +150,10 @@ class RemoteAppsViewModel : ViewModel() {
     private fun updatePinnedState(deviceUuid: String) {
         val pinnedSet = AppRepository.pinnedApps.value[deviceUuid] ?: emptySet()
         val updatedApps =
-            _state.value.apps.map { app ->
+            appsMachine.state.value.apps.map { app ->
                 app.copy(isPinned = pinnedSet.contains(app.packageName))
             }
-        _state.update { it.copy(apps = updatedApps) }
+        appsMachine.update { it.copy(apps = updatedApps) }
     }
 
     fun openApp(

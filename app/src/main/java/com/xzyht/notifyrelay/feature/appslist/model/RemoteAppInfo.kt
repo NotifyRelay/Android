@@ -24,16 +24,3 @@ data class RemoteAppInfo(
         return result
     }
 }
-
-data class RemoteAppsState(
-    val apps: List<RemoteAppInfo> = emptyList(),
-    val isLoading: Boolean = false,
-    val searchQuery: String = "",
-    val error: String? = null,
-) {
-    val hasApps: Boolean
-        get() = apps.isNotEmpty()
-
-    val isEmpty: Boolean
-        get() = !isLoading && !hasApps && error == null
-}

@@ -18,13 +18,14 @@ import notifyrelay.base.util.Logger
 private const val TAG = "RemoteAppsPage"
 
 /**
- * `RemoteAppsPage` 的页面级状态 holder：搜索词、上下文菜单目标、显示器列表与选中显示器。
+ * `RemoteAppsPage` 的页面级状态 holder：上下文菜单目标、显示器列表与选中显示器。
+ *
+ * 搜索词由 [com.xzyht.notifyrelay.ui.viewmodel.AppsState] 持有，不再属于页面级状态。
  *
  * 持有 Compose 的 [MutableState]，使页面可以继续用 `by` 委托读写这些状态。
  */
 @Stable
 internal class RemoteAppsPageState(
-    val searchQuery: MutableState<String>,
     val showMenuForApp: MutableState<Any?>,
     val selectedDisplayId: MutableIntState,
     val displays: SnapshotStateList<DisplayInfo>,
@@ -38,7 +39,6 @@ internal fun rememberRemoteAppsPageState(
     isLocalMode: Boolean,
     context: Context,
 ): RemoteAppsPageState {
-    val searchQuery = remember { mutableStateOf("") }
     val showMenuForApp = remember { mutableStateOf<Any?>(null) }
     val selectedDisplayId = remember { mutableIntStateOf(0) }
     val displays = remember { mutableStateListOf<DisplayInfo>() }
@@ -95,5 +95,5 @@ internal fun rememberRemoteAppsPageState(
         }
     }
 
-    return remember { RemoteAppsPageState(searchQuery, showMenuForApp, selectedDisplayId, displays) }
+    return remember { RemoteAppsPageState(showMenuForApp, selectedDisplayId, displays) }
 }

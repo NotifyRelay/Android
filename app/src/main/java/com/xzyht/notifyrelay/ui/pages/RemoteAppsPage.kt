@@ -7,7 +7,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.feature.appslist.model.appMatchesQuery
 import com.xzyht.notifyrelay.ui.pages.remoteapps.DisplayNavigationBar
 import com.xzyht.notifyrelay.ui.pages.remoteapps.LocalAppsContent
 import com.xzyht.notifyrelay.ui.pages.remoteapps.RemoteAppsContent
@@ -38,8 +37,9 @@ fun RemoteAppsPage(
     val localState by localViewModel.state.collectAsState()
 
     val pageState = rememberRemoteAppsPageState(isLocalMode = isLocalMode, context = context)
-    var searchQuery by pageState.searchQuery
     var showMenuForApp by pageState.showMenuForApp
+
+    val searchQuery = if (isLocalMode) localState.searchQuery else remoteState.searchQuery
 
     val displays = pageState.displays
     var selectedDisplayId by pageState.selectedDisplayId
@@ -69,7 +69,6 @@ fun RemoteAppsPage(
                 TextField(
                     value = searchQuery,
                     onValueChange = { newValue ->
-                        searchQuery = newValue
                         if (isLocalMode) {
                             localViewModel.searchApps(newValue)
                         } else {
@@ -109,9 +108,7 @@ fun RemoteAppsPage(
 
             if (isLocalMode) {
                 LocalAppsContent(
-                    apps = localState.apps.filter { appMatchesQuery(it.appName, it.packageName, searchQuery) },
-                    isLoading = localState.isLoading,
-                    error = localState.error,
+                    state = localState,
                     onAppClick = { app ->
                         openLocalApp(context, app, selectedDisplayId)
                     },
@@ -120,7 +117,6 @@ fun RemoteAppsPage(
             } else {
                 RemoteAppsContent(
                     state = remoteState,
-                    searchQuery = searchQuery,
                     onAppClick = { app ->
                         remoteViewModel.openApp(context, app, deviceIp!!, useScrcpyStartApp = true)
                     },

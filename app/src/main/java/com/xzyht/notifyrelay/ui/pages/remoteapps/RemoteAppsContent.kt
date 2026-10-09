@@ -11,8 +11,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
-import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppsState
 import com.xzyht.notifyrelay.feature.appslist.model.appMatchesQuery
+import com.xzyht.notifyrelay.ui.viewmodel.AppsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -26,8 +26,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 internal fun RemoteAppsContent(
-    state: RemoteAppsState,
-    searchQuery: String,
+    state: AppsState<RemoteAppInfo>,
     onAppClick: (RemoteAppInfo) -> Unit,
     onAppLongClick: (RemoteAppInfo) -> Unit,
     onRefresh: () -> Unit,
@@ -111,7 +110,7 @@ internal fun RemoteAppsContent(
             }
         }
         else -> {
-            val filteredApps = state.apps.filter { appMatchesQuery(it.appName, it.packageName, searchQuery) }
+            val filteredApps = state.apps.filter { appMatchesQuery(it.appName, it.packageName, state.searchQuery) }
 
             if (filteredApps.isEmpty()) {
                 Box(
