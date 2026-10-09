@@ -35,15 +35,6 @@ internal object AppIconRepository {
     val iconUpdates: StateFlow<Pair<String, Long>?> = _iconUpdates.asStateFlow()
 
     /**
-     * 通知UI层图标已更新
-     * @param packageName 应用包名
-     */
-    fun notifyIconUpdated(packageName: String) {
-        val updatedValue: Pair<String, Long> = Pair(packageName, System.currentTimeMillis())
-        _iconUpdates.value = updatedValue
-    }
-
-    /**
      * 异步获取应用图标（确保在返回前数据已加载）。
      *
      * @param context Android 上下文，用于在必要时加载应用列表与访问数据库。

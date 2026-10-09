@@ -32,16 +32,8 @@ object AppRepository {
 
     val apps: StateFlow<List<ApplicationInfo>> = InstalledAppsRepository.apps
 
-    val remoteApps: StateFlow<Map<String, String>> = RemoteAppsCache.remoteApps
-
     // 图标更新事件流，用于通知UI层图标已更新
     val iconUpdates: StateFlow<Pair<String, Long>?> = AppIconRepository.iconUpdates
-
-    /**
-     * 通知UI层图标已更新
-     * @param packageName 应用包名
-     */
-    fun notifyIconUpdated(packageName: String) = AppIconRepository.notifyIconUpdated(packageName)
 
     /**
      * 加载应用列表并缓存。
@@ -70,13 +62,6 @@ object AppRepository {
     ): List<ApplicationInfo> = InstalledAppsRepository.getFilteredApps(query, showSystemApps, context)
 
     /**
-     * 清除所有缓存（数据库缓存）。
-     *
-     * 说明：该方法会清空数据库中的应用与图标缓存。
-     */
-    suspend fun clearCache(context: Context) = InstalledAppsRepository.clearCache(context)
-
-    /**
      * 缓存远程应用列表。
      *
      * @param context Android 上下文，用于访问数据库（非空）。
@@ -90,31 +75,11 @@ object AppRepository {
     ) = RemoteAppsCache.cacheRemoteAppList(context, apps, deviceUuid)
 
     /**
-     * 获取本机已安装和已缓存图标的包名集合。
-     *
-     * @param context Android 上下文，用于获取已安装应用列表和访问数据库
-     * @return 已安装和已缓存图标的包名集合
-     */
-    suspend fun getInstalledAndCachedPackageNames(context: Context): Set<String> = InstalledAppsRepository.getInstalledAndCachedPackageNames(context)
-
-    /**
      * 检查应用数据（应用列表）是否已加载。
      *
      * @return 如果已加载返回 true，否则返回 false。
      */
     fun isDataLoaded(): Boolean = InstalledAppsRepository.isDataLoaded()
-
-    /**
-     * 获取指定包名的应用标签（显示名）。
-     *
-     * @param context Android 上下文，用于访问 PackageManager（非空）。
-     * @param packageName 目标应用的包名（非空）。
-     * @return 应用的标签字符串；若无法获取则返回包名或空字符串，具体由 [AppListHelper.getApplicationLabel] 决定。
-     */
-    fun getAppLabel(
-        context: Context,
-        packageName: String,
-    ): String = InstalledAppsRepository.getAppLabel(context, packageName)
 
     /**
      * 获取已安装应用包名集合（同步返回）。
@@ -248,18 +213,6 @@ object AppRepository {
         deviceUuid: String,
         packageName: String,
     ) = PinnedAppsRepository.unpinApp(context, deviceUuid, packageName)
-
-    /**
-     * 判断指定设备的某个应用是否已置顶。
-     *
-     * @param deviceUuid 设备 UUID。
-     * @param packageName 目标应用包名。
-     * @return 已置顶返回 true，否则返回 false。
-     */
-    fun isAppPinned(
-        deviceUuid: String,
-        packageName: String,
-    ): Boolean = PinnedAppsRepository.isAppPinned(deviceUuid, packageName)
 
     /**
      * 获取指定设备的远程应用列表（含置顶状态）。

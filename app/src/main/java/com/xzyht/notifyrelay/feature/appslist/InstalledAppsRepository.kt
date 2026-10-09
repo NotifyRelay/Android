@@ -171,27 +171,6 @@ internal object InstalledAppsRepository {
     }
 
     /**
-     * 清除所有缓存（数据库缓存）。
-     *
-     * 说明：该方法会清空数据库中的应用与图标缓存。
-     */
-    suspend fun clearCache(context: Context) {
-        AppDatabaseHolder.init(context)
-
-        // 清除应用数据
-        val apps = _apps.value
-        apps.forEach {
-            AppDatabaseHolder.get()?.deleteAppByPackageName(it.packageName)
-        }
-
-        // 清除远程应用列表
-        RemoteAppsCache.clearRemoteApps()
-
-        // 重置状态
-        _apps.value = emptyList()
-    }
-
-    /**
      * 获取本机已安装和已缓存图标的包名集合。
      *
      * @param context Android 上下文，用于获取已安装应用列表和访问数据库
@@ -218,18 +197,6 @@ internal object InstalledAppsRepository {
         // 检查状态流是否有数据
         return _apps.value.isNotEmpty()
     }
-
-    /**
-     * 获取指定包名的应用标签（显示名）。
-     *
-     * @param context Android 上下文，用于访问 PackageManager（非空）。
-     * @param packageName 目标应用的包名（非空）。
-     * @return 应用的标签字符串；若无法获取则返回包名或空字符串，具体由 [AppListHelper.getApplicationLabel] 决定。
-     */
-    fun getAppLabel(
-        context: Context,
-        packageName: String,
-    ): String = AppListHelper.getApplicationLabel(context, packageName)
 
     /**
      * 获取已安装应用包名集合（同步返回）。

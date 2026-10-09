@@ -2,9 +2,6 @@ package com.xzyht.notifyrelay.feature.appslist
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
@@ -12,23 +9,13 @@ import notifyrelay.data.database.entity.AppEntity
 /**
  * 远程应用缓存。
  *
- * 负责远端设备应用列表的内存缓存与数据库持久化，以及按设备维度读取远程应用明细：
- * - [cacheRemoteAppList] 缓存远端上报的应用列表（Map<包名, 应用名>）到内存与数据库
+ * 负责远端设备应用列表的数据库持久化，以及按设备维度读取远程应用明细：
+ * - [cacheRemoteAppList] 缓存远端上报的应用列表（Map<包名, 应用名>）到数据库
  * - [getRemoteAppsList] 按设备 UUID 从数据库读取远程应用并附带置顶状态
  *
  * [AppRepository] 作为门面转发本 object 的公开方法，保持既有调用方不变。
  */
 internal object RemoteAppsCache {
-    private val _remoteApps = MutableStateFlow<Map<String, String>>(emptyMap())
-    val remoteApps: StateFlow<Map<String, String>> = _remoteApps.asStateFlow()
-
-    /**
-     * 清空远程应用列表的内存缓存（供 [InstalledAppsRepository.clearCache] 调用）。
-     */
-    fun clearRemoteApps() {
-        _remoteApps.value = emptyMap()
-    }
-
     /**
      * 缓存远程应用列表。
      *
@@ -86,8 +73,6 @@ internal object RemoteAppsCache {
         if (appDeviceEntities.isNotEmpty()) {
             AppDatabaseHolder.get()?.saveAppDeviceAssociations(appDeviceEntities)
         }
-
-        _remoteApps.value = apps
         // Logger.d(TAG, "缓存远程应用列表成功，共 ${apps.size} 个应用")
     }
 
