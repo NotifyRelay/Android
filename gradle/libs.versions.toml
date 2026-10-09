@@ -43,7 +43,6 @@ okio = "3.18.2"
 jmdns = "3.6.3"
 coil = "2.7.0"
 coilCompose = "2.7.0"
-diskLruCache = "2.0.2"
 kotlinxCoroutines = "1.11.0"
 composeUi = "1.12.1"
 compileSdk = "37"
@@ -90,7 +89,6 @@ okio = { group = "com.squareup.okio", name = "okio", version.ref = "okio" }
 jmdns = { group = "org.jmdns", name = "jmdns", version.ref = "jmdns" }
 coil = { group = "io.coil-kt", name = "coil", version.ref = "coil" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose" }
-disklrucache = { group = "com.jakewharton", name = "disklrucache", version.ref = "diskLruCache" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "composeUi" }
