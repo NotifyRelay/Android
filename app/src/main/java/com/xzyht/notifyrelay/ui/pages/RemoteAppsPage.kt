@@ -7,6 +7,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.xzyht.notifyrelay.feature.appslist.model.appMatchesQuery
 import com.xzyht.notifyrelay.ui.pages.remoteapps.DisplayNavigationBar
 import com.xzyht.notifyrelay.ui.pages.remoteapps.LocalAppsContent
 import com.xzyht.notifyrelay.ui.pages.remoteapps.RemoteAppsContent
@@ -108,12 +109,7 @@ fun RemoteAppsPage(
 
             if (isLocalMode) {
                 LocalAppsContent(
-                    apps =
-                        localState.apps.filter {
-                            searchQuery.isBlank() ||
-                                it.appName.contains(searchQuery, ignoreCase = true) ||
-                                it.packageName.contains(searchQuery, ignoreCase = true)
-                        },
+                    apps = localState.apps.filter { appMatchesQuery(it.appName, it.packageName, searchQuery) },
                     isLoading = localState.isLoading,
                     error = localState.error,
                     onAppClick = { app ->

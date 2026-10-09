@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
 import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppsState
+import com.xzyht.notifyrelay.feature.appslist.model.appMatchesQuery
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -110,15 +111,7 @@ internal fun RemoteAppsContent(
             }
         }
         else -> {
-            val filteredApps =
-                if (searchQuery.isBlank()) {
-                    state.apps
-                } else {
-                    state.apps.filter {
-                        it.appName.contains(searchQuery, ignoreCase = true) ||
-                            it.packageName.contains(searchQuery, ignoreCase = true)
-                    }
-                }
+            val filteredApps = state.apps.filter { appMatchesQuery(it.appName, it.packageName, searchQuery) }
 
             if (filteredApps.isEmpty()) {
                 Box(
