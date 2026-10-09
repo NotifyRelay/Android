@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.feature.appslist
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import com.xzyht.notifyrelay.feature.appslist.model.appMatchesQuery
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -165,15 +166,7 @@ internal object InstalledAppsRepository {
 
         // 搜索过滤
         return displayApps.filter { app ->
-            try {
-                val label = context.packageManager.getApplicationLabel(app).toString()
-                val matchesLabel = label.contains(query, ignoreCase = true)
-                val matchesPackage = app.packageName.contains(query, ignoreCase = true)
-                matchesLabel || matchesPackage
-            } catch (e: Exception) {
-                Logger.w(TAG, "搜索时获取应用标签失败: ${app.packageName}", e)
-                app.packageName.contains(query, ignoreCase = true)
-            }
+            appMatchesQuery(AppListHelper.getApplicationLabel(context, app), app.packageName, query)
         }
     }
 
