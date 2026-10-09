@@ -9,7 +9,8 @@ import android.service.notification.StatusBarNotification
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationTextReader
 import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
@@ -74,7 +75,7 @@ internal class NotificationFieldDumpViewModel(
                     return@launch
                 }
                 val actives = listener.activeNotifications ?: emptyArray()
-                val installed = AppRepository.getInstalledPackageNamesSync(application)
+                val installed = InstalledAppsRepository.getInstalledPackageNamesSync(application)
                 iconCache.clear()
                 // 系统侧排序/渠道信息（importance / rank / suppressedVisualEffects / channel 等）
                 // 不在 sbn 与 notification 里，只能经 RankingMap 按 key 取；这些字段决定是否渲染
@@ -234,7 +235,7 @@ internal class NotificationFieldDumpViewModel(
 
     private suspend fun loadAppIcon(packageName: String): Bitmap? =
         try {
-            val icon = AppRepository.getAppIconAsync(application, packageName)
+            val icon = AppIconRepository.getAppIconAsync(application, packageName)
             iconCache[packageName] = getAppLabel(packageName) to icon
             icon
         } catch (e: Exception) {

@@ -26,7 +26,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.createBitmap
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.image.toBitmapOrDefault
@@ -176,7 +176,7 @@ fun FilterListSection(
             newPackageIcon = defaultAppIconBitmap
             coroutineScope.launch {
                 try {
-                    val bmp = AppRepository.getAppIconAsync(context, packageName)
+                    val bmp = AppIconRepository.getAppIconAsync(context, packageName)
                     newPackageIcon = bmp?.asImageBitmap() ?: defaultAppIconBitmap
                 } catch (_: Exception) {
                     newPackageIcon = defaultAppIconBitmap
@@ -204,7 +204,7 @@ fun FilterListSection(
                     LaunchedEffect(entry) {
                         if (entry.packageName.isNotBlank() && iconBitmap == null) {
                             iconBitmap = runCatching {
-                                AppRepository.getAppIconAsync(context, entry.packageName)?.asImageBitmap()
+                                AppIconRepository.getAppIconAsync(context, entry.packageName)?.asImageBitmap()
                             }.getOrNull() ?: defaultAppIconBitmap
                         }
                     }
@@ -247,7 +247,7 @@ fun FilterListSection(
                     LaunchedEffect(entry) {
                         if (entry.packageName.isNotBlank() && iconBitmap == null) {
                             iconBitmap = runCatching {
-                                AppRepository.getAppIconAsync(context, entry.packageName)?.asImageBitmap()
+                                AppIconRepository.getAppIconAsync(context, entry.packageName)?.asImageBitmap()
                             }.getOrNull() ?: defaultAppIconBitmap
                         }
                     }

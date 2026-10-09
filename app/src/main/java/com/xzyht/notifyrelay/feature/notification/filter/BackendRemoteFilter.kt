@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.feature.notification.filter
 
 import android.content.Context
 import com.sun.jna.Pointer
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
@@ -90,7 +90,7 @@ object BackendRemoteFilter {
             val text = json.optString("text")
             val isLocked = json.optBoolean("isLocked", false)
 
-            val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
+            val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
             val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg, installedPkgs)
 
             // 对等/黑白名单/锁屏(1) 过滤
@@ -127,7 +127,7 @@ object BackendRemoteFilter {
                     RemoteFilterConfig.loadBlocking(context)
                     RemoteFilterConfig.isLoaded = true
                     rustContext?.let { ctx ->
-                        val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
+                        val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
                         RemoteFilterConfig.syncToRust(ctx, installedPkgs)
                     }
                 } catch (e: Exception) {

@@ -12,7 +12,7 @@ import kotlinx.coroutines.flow.asStateFlow
  * - 内存：[pinnedApps]（供 UI 观察）
  * - 持久化：`remote_apps_prefs` 中的 `pinned_apps_<deviceUuid>` 字符串集合
  *
- * 该 object 是置顶状态的唯一持有者，[AppRepository] 仅作为门面转发，避免出现多份状态。
+ * 该 object 是置顶状态的唯一持有者。
  */
 internal object PinnedAppsRepository {
     private const val PREFS_NAME = "remote_apps_prefs"

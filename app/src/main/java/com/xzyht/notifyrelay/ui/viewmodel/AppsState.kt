@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.update
 /**
  * 应用列表页面的通用状态。
  *
- * 本地（`PackageManager`）与远程（`AppRepository.getRemoteAppsList`）两个数据源共用本状态，
+ * 本地（`PackageManager`）与远程（`RemoteAppsCache.getRemoteAppsList`）两个数据源共用本状态，
  * 差异只体现在 [T] 与各自的加载实现上。
  *
  * @param T 列表元素类型，需提供包名与应用名供搜索匹配使用。

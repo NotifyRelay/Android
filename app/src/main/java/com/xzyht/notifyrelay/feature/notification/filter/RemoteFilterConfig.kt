@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.feature.notification.filter
 
 import android.content.Context
 import com.sun.jna.Pointer
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -163,7 +163,7 @@ object RemoteFilterConfig {
                     // 保存后立即同步到 Rust 侧
                     val ctx = BackendRemoteFilter.rustContext
                     if (ctx != null) {
-                        val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
+                        val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
                         syncToRust(ctx, installedPkgs)
                     }
                 } catch (e: Exception) {

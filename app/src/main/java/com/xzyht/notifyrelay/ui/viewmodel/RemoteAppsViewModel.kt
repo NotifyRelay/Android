@@ -3,7 +3,9 @@ package com.xzyht.notifyrelay.ui.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
+import com.xzyht.notifyrelay.feature.appslist.PinnedAppsRepository
+import com.xzyht.notifyrelay.feature.appslist.RemoteAppsCache
 import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
@@ -28,8 +30,8 @@ class RemoteAppsViewModel : ViewModel() {
     private val appsMachine =
         AppsStateMachine<RemoteAppInfo> { context ->
             val deviceUuid = currentDeviceUuid ?: return@AppsStateMachine emptyList()
-            AppRepository.loadPinnedApps(context, deviceUuid)
-            AppRepository.getRemoteAppsList(context, deviceUuid)
+            PinnedAppsRepository.loadPinnedApps(context, deviceUuid)
+            RemoteAppsCache.getRemoteAppsList(context, deviceUuid)
         }
 
     val state: StateFlow<AppsState<RemoteAppInfo>> = appsMachine.state
@@ -51,7 +53,7 @@ class RemoteAppsViewModel : ViewModel() {
         iconUpdatesJob?.cancel()
         iconUpdatesJob =
             viewModelScope.launch {
-                AppRepository.iconUpdates.collect { update ->
+                AppIconRepository.iconUpdates.collect { update ->
                     if (update != null) {
                         val (packageName, _) = update
                         refreshSingleAppIcon(context, deviceUuid, packageName)
@@ -70,7 +72,7 @@ class RemoteAppsViewModel : ViewModel() {
                 appsMachine.state.value.apps.map { app ->
                     if (app.packageName == packageName) {
                         val updatedApp =
-                            AppRepository
+                            RemoteAppsCache
                                 .getRemoteAppsList(context, deviceUuid)
                                 .find { it.packageName == packageName }
                         updatedApp ?: app
@@ -133,7 +135,7 @@ class RemoteAppsViewModel : ViewModel() {
     ) {
         val deviceUuid = currentDeviceUuid ?: return
         viewModelScope.launch {
-            AppRepository.pinApp(context, deviceUuid, packageName)
+            PinnedAppsRepository.pinApp(context, deviceUuid, packageName)
             updatePinnedState(deviceUuid)
         }
     }
@@ -144,13 +146,13 @@ class RemoteAppsViewModel : ViewModel() {
     ) {
         val deviceUuid = currentDeviceUuid ?: return
         viewModelScope.launch {
-            AppRepository.unpinApp(context, deviceUuid, packageName)
+            PinnedAppsRepository.unpinApp(context, deviceUuid, packageName)
             updatePinnedState(deviceUuid)
         }
     }
 
     private fun updatePinnedState(deviceUuid: String) {
-        val pinnedSet = AppRepository.pinnedApps.value[deviceUuid] ?: emptySet()
+        val pinnedSet = PinnedAppsRepository.pinnedApps.value[deviceUuid] ?: emptySet()
         val updatedApps =
             appsMachine.state.value.apps.map { app ->
                 app.copy(isPinned = pinnedSet.contains(app.packageName))

@@ -22,8 +22,6 @@ import notifyrelay.data.database.entity.AppEntity
  * - [loadApps] 读取 PackageManager 并重建数据库中的应用表
  * - [getFilteredApps] 按关键字与系统应用开关过滤
  * - 包名集合的同步/异步查询
- *
- * [AppRepository] 作为门面转发本 object 的公开方法，保持既有调用方不变。
  */
 internal object InstalledAppsRepository {
     private const val TAG = "InstalledAppsRepository"

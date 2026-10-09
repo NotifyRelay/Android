@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.ui.viewmodel
 
 import android.app.Application
 import android.graphics.Bitmap
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +16,7 @@ import notifyrelay.base.util.AppListHelper
  * 由调用方以**组合**方式持有，并把各自的缓存 [MutableStateFlow] 与在途集合 [MutableSet] 注入进来，
  * 因此两个 ViewModel 的缓存与失效语义仍各自独立。
  *
- * **注意**：`AppRepository.iconUpdates` 的订阅**不在此处**，仍留在各 ViewModel 的 `init` 中
+ * **注意**：`AppIconRepository.iconUpdates` 的订阅**不在此处**，仍留在各 ViewModel 的 `init` 中
  * （失效动作的缓存归属不同，搬走会让两者的失效语义纠缠）。
  *
  * @param application 用于查询 `PackageManager` 与获取图标。
@@ -79,7 +79,7 @@ internal class AppIconPreloader(
         val name = AppListHelper.getApplicationLabel(application, packageName)
         val icon: Bitmap? =
             try {
-                AppRepository.getAppIconWithAutoRequest(application, packageName)
+                AppIconRepository.getAppIconWithAutoRequest(application, packageName)
             } catch (_: Exception) {
                 null
             }

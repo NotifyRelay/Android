@@ -5,7 +5,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import android.util.Base64
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
@@ -44,7 +45,7 @@ object IconSyncManager {
         sourceDevice: DeviceInfo,
     ) {
         // 检查本机已安装应用
-        val installedPackages = AppRepository.getInstalledPackageNames(context)
+        val installedPackages = InstalledAppsRepository.getInstalledPackageNames(context)
         if (installedPackages.contains(packageName)) {
             return
         }
@@ -58,7 +59,7 @@ object IconSyncManager {
         // 已缓存图标来源：与批量路径一致，Rust 据此过滤避免对已缓存图标重复发起 ICON_REQUEST
         val cachedPackages =
             runBlocking {
-                val iconMap = AppRepository.getExternalAppIcons(context, listOf(packageName))
+                val iconMap = AppIconRepository.getExternalAppIcons(context, listOf(packageName))
                 if (iconMap[packageName] != null) listOf(packageName) else emptyList()
             }
 
@@ -106,10 +107,10 @@ object IconSyncManager {
     ) {
         if (packageNames.size == 0) return
 
-        val installedPackages = AppRepository.getInstalledPackageNames(context)
+        val installedPackages = InstalledAppsRepository.getInstalledPackageNames(context)
 
         // 预获取已缓存图标与设备关联关系
-        val iconMap = AppRepository.getExternalAppIcons(context, packageNames)
+        val iconMap = AppIconRepository.getExternalAppIcons(context, packageNames)
         val cachedPackages = packageNames.filter { iconMap[it] != null }
 
         val databaseRepository = DatabaseRepository.getInstance(context)
@@ -324,7 +325,7 @@ object IconSyncManager {
             val bytes = Base64.decode(base64, Base64.DEFAULT)
             val bmp = BitmapFactory.decodeByteArray(bytes, 0, bytes.size) ?: return
             runBlocking {
-                AppRepository.cacheExternalAppIcon(context, packageName, bmp, "remote")
+                AppIconRepository.cacheExternalAppIcon(context, packageName, bmp, "remote")
             }
         } catch (e: Exception) {
             Logger.w(TAG, "图标解码失败：$packageName", e)
@@ -336,7 +337,7 @@ object IconSyncManager {
         packageName: String,
     ): Bitmap? =
         try {
-            AppRepository.getAppIconAsync(context, packageName) ?: run {
+            AppIconRepository.getAppIconAsync(context, packageName) ?: run {
                 val pm = context.packageManager
                 val appInfo = pm.getApplicationInfo(packageName, 0)
                 val drawable = pm.getApplicationIcon(appInfo)

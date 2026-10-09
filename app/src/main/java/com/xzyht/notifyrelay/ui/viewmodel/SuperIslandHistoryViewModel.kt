@@ -9,7 +9,7 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStore
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import kotlinx.coroutines.Dispatchers
@@ -57,7 +57,7 @@ class SuperIslandHistoryViewModel(
 
     init {
         viewModelScope.launch {
-            AppRepository.iconUpdates.collect { update ->
+            AppIconRepository.iconUpdates.collect { update ->
                 update?.let { (packageName, _) ->
                     _appIconCache.update { cache ->
                         cache - packageName

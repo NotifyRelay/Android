@@ -12,8 +12,6 @@ import notifyrelay.data.database.entity.AppEntity
  * 负责远端设备应用列表的数据库持久化，以及按设备维度读取远程应用明细：
  * - [cacheRemoteAppList] 缓存远端上报的应用列表（Map<包名, 应用名>）到数据库
  * - [getRemoteAppsList] 按设备 UUID 从数据库读取远程应用并附带置顶状态
- *
- * [AppRepository] 作为门面转发本 object 的公开方法，保持既有调用方不变。
  */
 internal object RemoteAppsCache {
     /**

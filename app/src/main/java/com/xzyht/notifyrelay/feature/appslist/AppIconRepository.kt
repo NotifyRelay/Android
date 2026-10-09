@@ -25,8 +25,6 @@ import notifyrelay.data.database.entity.AppEntity
  * - 从数据库读取图标（单个 / 批量 / 异步）
  * - 缓存外部（远端）应用图标并发布图标更新事件
  * - 本地与外部图标统一获取入口，支持缺失时自动向远端请求
- *
- * [AppRepository] 作为门面转发本 object 的公开方法，保持既有调用方不变。
  */
 internal object AppIconRepository {
     private const val TAG = "AppIconRepository"

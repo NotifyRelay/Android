@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.sync.notification
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.repository.remoteNotificationFilter
@@ -78,7 +78,7 @@ object NotificationProcessor {
                 val timeRaw = parsed.optLong("time", 0L)
                 val time = if (timeRaw == 0L) System.currentTimeMillis() else timeRaw
 
-                val installedPkgs = AppRepository.getInstalledPackageNamesSync(context)
+                val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
                 val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
 
                 try {

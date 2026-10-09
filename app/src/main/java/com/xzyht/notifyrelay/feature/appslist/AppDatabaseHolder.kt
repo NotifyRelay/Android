@@ -6,10 +6,8 @@ import notifyrelay.data.database.repository.DatabaseRepository
 /**
  * 应用列表相关仓库共享的 [DatabaseRepository] 懒加载单例持有者。
  *
- * 原先 `databaseRepository` + `databaseRepositoryLock` 由 `AppRepository` 独自持有；
- * 拆分出 `AppIconRepository` / `InstalledAppsRepository` / `RemoteAppsCache` 后，
- * 若各 object 各持一份实例会破坏单例与外键语义，故统一收敛到此处，保持原有的
- * `synchronized` 懒加载语义不变。
+ * `AppIconRepository` / `InstalledAppsRepository` / `RemoteAppsCache` 共用同一份实例，
+ * 避免各 object 各持一份而破坏单例与外键语义。
  */
 internal object AppDatabaseHolder {
     // @Volatile：写入在 synchronized 内完成，而 get() 为无同步读取。

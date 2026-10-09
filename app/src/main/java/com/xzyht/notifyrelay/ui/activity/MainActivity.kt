@@ -7,7 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.core.view.WindowCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.lifecycle.lifecycleScope
-import com.xzyht.notifyrelay.feature.appslist.AppRepository
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
@@ -93,7 +93,7 @@ class MainActivity : FragmentActivity() {
             DeviceInfoManager.generateDeviceInfoFile(this@MainActivity, deviceManager.localUuid)
             LiveUpdatesNotificationManager.initialize(this@MainActivity)
             NotificationRepository.init(this@MainActivity)
-            AppRepository.loadApps(this@MainActivity)
+            InstalledAppsRepository.loadApps(this@MainActivity)
             permissions.startServicesAndUpdateBanner()
         }
     }
