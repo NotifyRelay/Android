@@ -37,10 +37,6 @@ object BitmapUtils {
             color = "#00FF00".toColorInt()
         }
 
-    private var reusableBitmap: Bitmap? = null
-    private var reusableBitmapWidth = 0
-    private var reusableBitmapHeight = 0
-
     // Bitmap缓存池，支持不同尺寸的bitmap复用
     private val bitmapCache = mutableMapOf<Int, MutableList<Bitmap>>()
     private const val MAX_CACHE_SIZE = 10 // 最大缓存数量
@@ -298,25 +294,6 @@ object BitmapUtils {
         }
 
         return newBitmap
-    }
-
-    @Synchronized
-    fun releaseResources() {
-        reusableBitmap?.recycle()
-        reusableBitmap = null
-        reusableBitmapWidth = 0
-        reusableBitmapHeight = 0
-
-        // 清理缓存池
-        for (bitmaps in bitmapCache.values) {
-            for (bitmap in bitmaps) {
-                if (!bitmap.isRecycled) {
-                    bitmap.recycle()
-                }
-            }
-            bitmaps.clear()
-        }
-        bitmapCache.clear()
     }
 
     /**
