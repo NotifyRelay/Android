@@ -32,9 +32,6 @@ data class RemoteAppsState(
     val searchQuery: String = "",
     val error: String? = null,
 ) {
-    val filteredApps: List<RemoteAppInfo>
-        get() = apps.filter { appMatchesQuery(it.appName, it.packageName, searchQuery) }
-
     val hasApps: Boolean
         get() = apps.isNotEmpty() || pinnedApps.isNotEmpty()
 
