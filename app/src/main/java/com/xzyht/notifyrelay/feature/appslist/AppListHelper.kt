@@ -89,9 +89,7 @@ object AppListHelper {
             val result = apps.size > 2 // 简单的检查，至少有几个应用
             result
         } catch (e: Exception) {
-            {
-                Logger.e("AppListHelper", "检查是否可查询应用列表失败: ${e.message}", e)
-            }
+            Logger.e("AppListHelper", "检查是否可查询应用列表失败: ${e.message}", e)
             false
         }
 
