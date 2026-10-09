@@ -37,10 +37,6 @@ object BitmapUtils {
             color = "#00FF00".toColorInt()
         }
 
-    private var reusableBitmap: Bitmap? = null
-    private var reusableBitmapWidth = 0
-    private var reusableBitmapHeight = 0
-
     // Bitmap缓存池，支持不同尺寸的bitmap复用
     private val bitmapCache = mutableMapOf<Int, MutableList<Bitmap>>()
     private const val MAX_CACHE_SIZE = 10 // 最大缓存数量
