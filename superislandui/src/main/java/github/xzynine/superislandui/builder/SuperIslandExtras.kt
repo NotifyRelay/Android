@@ -34,29 +34,6 @@ object SuperIslandExtras {
     /** Action key 前缀（规范要求） */
     const val ACTION_KEY_PREFIX = "miui.focus.action_"
 
-    /** 写入 param_v2 载荷 */
-    fun writeParam(
-        extras: Bundle,
-        payload: String,
-    ) {
-        extras.putString(KEY_PARAM, payload)
-    }
-
-    /**
-     * 写入标准焦点通知标记（包名、缩略图、焦点/角标开关）。
-     * @param sourcePackage 超级岛源包名（一般为本应用包名）
-     */
-    fun writeStandardFlags(
-        extras: Bundle,
-        sourcePackage: String,
-    ) {
-        extras.putBoolean(KEY_REDUCED_IMAGES, true)
-        extras.putString(KEY_SOURCE_PACKAGE, sourcePackage)
-        extras.putString(KEY_APP_PACKAGE, sourcePackage)
-        extras.putBoolean(KEY_IS_FOCUS_NOTIFICATION, true)
-        extras.putBoolean(KEY_SHOW_BADGE, false)
-    }
-
     /**
      * 写入图片资源：仅接受 `miui.focus.pic_` 前缀的 key，同时写入独立 extra 与 [KEY_PICS] Bundle。
      * @return 实际写入的图片数量
