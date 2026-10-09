@@ -4,7 +4,65 @@ import android.content.Context
 import android.content.pm.ApplicationInfo
 import notifyrelay.base.util.Logger
 
+/**
+ * 已安装应用的过滤策略。
+ *
+ * 各策略的过滤条件互不包含，由调用点按自身需求显式选取。
+ */
+enum class InstalledAppsFilter {
+    /** 不施加任何过滤。 */
+    NONE,
+
+    /** 排除系统应用、已更新的系统应用与自身包名。 */
+    EXCLUDE_SYSTEM_AND_SELF,
+
+    /** 仅排除系统应用，并要求存在可启动入口（Launcher 可见）。 */
+    LAUNCHABLE_USER_APPS,
+    ;
+
+    /**
+     * 判断单个应用是否满足本策略。
+     *
+     * @param context 用于取得 PackageManager 与自身包名的 Context
+     * @param appInfo 待判定的应用信息
+     * @return 满足本策略返回 true
+     */
+    fun accepts(
+        context: Context,
+        appInfo: ApplicationInfo,
+    ): Boolean =
+        when (this) {
+            NONE -> true
+            EXCLUDE_SYSTEM_AND_SELF ->
+                (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) == 0 &&
+                    (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) == 0 &&
+                    appInfo.packageName != context.packageName
+            LAUNCHABLE_USER_APPS ->
+                (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) == 0 &&
+                    context.packageManager.getLaunchIntentForPackage(appInfo.packageName) != null
+        }
+}
+
 object AppListHelper {
+    /**
+     * 按策略枚举已安装应用。
+     *
+     * 本方法不吞异常，调用侧自行决定失败时的兜底值。
+     *
+     * @param context 用于访问 PackageManager 的 Context
+     * @param flags 传给 `PackageManager.getInstalledApplications` 的标志位
+     * @param filter 过滤策略
+     * @return 满足策略的应用列表
+     */
+    fun queryInstalledApplications(
+        context: Context,
+        flags: Int,
+        filter: InstalledAppsFilter,
+    ): List<ApplicationInfo> =
+        context.packageManager
+            .getInstalledApplications(flags)
+            .filter { filter.accepts(context, it) }
+
     /**
      * 获取已安装的应用列表（非系统应用且排除当前应用）
      *
@@ -13,15 +71,7 @@ object AppListHelper {
      */
     fun getInstalledApplications(context: Context): List<ApplicationInfo> =
         try {
-            val pm = context.packageManager
-            val apps = pm.getInstalledApplications(0)
-            // 过滤掉系统应用和自己
-            apps.filter { appInfo ->
-                val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
-                val isUpdatedSystemApp = (appInfo.flags and ApplicationInfo.FLAG_UPDATED_SYSTEM_APP) != 0
-                val isSelf = appInfo.packageName == context.packageName
-                !isSystemApp && !isUpdatedSystemApp && !isSelf
-            }
+            queryInstalledApplications(context, 0, InstalledAppsFilter.EXCLUDE_SYSTEM_AND_SELF)
         } catch (e: Exception) {
             Logger.e("AppListHelper", "获取已安装应用列表失败: ${e.message}", e)
             emptyList()
@@ -35,8 +85,7 @@ object AppListHelper {
      */
     fun canQueryApps(context: Context): Boolean =
         try {
-            val pm = context.packageManager
-            val apps = pm.getInstalledApplications(0)
+            val apps = queryInstalledApplications(context, 0, InstalledAppsFilter.NONE)
             val result = apps.size > 2 // 简单的检查，至少有几个应用
             result
         } catch (e: Exception) {

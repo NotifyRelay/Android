@@ -49,15 +49,10 @@ internal object InstalledAppsRepository {
         _isLoading.value = true
         try {
             // Logger.d(TAG, "开始加载应用列表")
-            val apps =
-                AppListHelper.getInstalledApplications(context).sortedBy { appInfo ->
-                    try {
-                        context.packageManager.getApplicationLabel(appInfo).toString()
-                    } catch (e: Exception) {
-                        Logger.w(TAG, "获取应用标签失败，使用包名: ${appInfo.packageName}", e)
-                        appInfo.packageName
-                    }
-                }
+            val installedApps = AppListHelper.getInstalledApplications(context)
+            // 同一批应用只取一次标签，排序与后续入库共用
+            val appLabels = installedApps.associate { it.packageName to applicationLabelOf(context, it) }
+            val apps = installedApps.sortedBy { appLabels.getValue(it.packageName) }
 
             _apps.value = apps
 
@@ -69,12 +64,7 @@ internal object InstalledAppsRepository {
             apps.forEach { appInfo ->
                 try {
                     val packageName = appInfo.packageName
-                    val appName =
-                        try {
-                            pm.getApplicationLabel(appInfo).toString()
-                        } catch (e: Exception) {
-                            packageName
-                        }
+                    val appName = appLabels.getValue(packageName)
                     val isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0
 
                     // 获取应用图标
@@ -144,6 +134,24 @@ internal object InstalledAppsRepository {
             _isLoading.value = false
         }
     }
+
+    /**
+     * 读取应用标签，失败时回退为包名。
+     *
+     * @param context Android 上下文，用于访问 PackageManager（非空）。
+     * @param appInfo 目标应用信息（非空）。
+     * @return 应用标签；读取失败时返回 [ApplicationInfo.packageName]。
+     */
+    private fun applicationLabelOf(
+        context: Context,
+        appInfo: ApplicationInfo,
+    ): String =
+        try {
+            context.packageManager.getApplicationLabel(appInfo).toString()
+        } catch (e: Exception) {
+            Logger.w(TAG, "获取应用标签失败，使用包名: ${appInfo.packageName}", e)
+            appInfo.packageName
+        }
 
     /**
      * 获取过滤后的应用列表。

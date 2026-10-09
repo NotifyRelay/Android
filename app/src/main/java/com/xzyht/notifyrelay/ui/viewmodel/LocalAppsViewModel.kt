@@ -1,10 +1,11 @@
 package com.xzyht.notifyrelay.ui.viewmodel
 
 import android.content.Context
-import android.content.pm.ApplicationInfo
 import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.xzyht.notifyrelay.feature.appslist.AppListHelper
+import com.xzyht.notifyrelay.feature.appslist.InstalledAppsFilter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -38,21 +39,17 @@ class LocalAppsViewModel : ViewModel() {
                 val apps =
                     withContext(Dispatchers.IO) {
                         val packageManager = context.packageManager
-                        packageManager
-                            .getInstalledApplications(PackageManager.GET_META_DATA)
-                            .filter { it.flags and ApplicationInfo.FLAG_SYSTEM == 0 }
-                            .map { appInfo ->
-                                val launchIntent = packageManager.getLaunchIntentForPackage(appInfo.packageName)
-                                if (launchIntent != null) {
-                                    LocalAppInfo(
-                                        appName = appInfo.loadLabel(packageManager).toString(),
-                                        packageName = appInfo.packageName,
-                                    )
-                                } else {
-                                    null
-                                }
-                            }.filterNotNull()
-                            .sortedBy { it.appName.lowercase() }
+                        AppListHelper
+                            .queryInstalledApplications(
+                                context,
+                                PackageManager.GET_META_DATA,
+                                InstalledAppsFilter.LAUNCHABLE_USER_APPS,
+                            ).map { appInfo ->
+                                LocalAppInfo(
+                                    appName = appInfo.loadLabel(packageManager).toString(),
+                                    packageName = appInfo.packageName,
+                                )
+                            }.sortedBy { it.appName.lowercase() }
                     }
 
                 _state.update { it.copy(apps = apps, isLoading = false) }
