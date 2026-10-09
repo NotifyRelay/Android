@@ -37,11 +37,9 @@ class RemoteAppsViewModel : ViewModel() {
             try {
                 AppRepository.loadPinnedApps(context, deviceUuid)
                 val apps = AppRepository.getRemoteAppsList(context, deviceUuid)
-                val pinnedApps = apps.filter { it.isPinned }
                 _state.update {
                     it.copy(
                         apps = apps,
-                        pinnedApps = pinnedApps,
                         isLoading = false,
                     )
                 }
@@ -87,13 +85,7 @@ class RemoteAppsViewModel : ViewModel() {
                         app
                     }
                 }
-            val pinnedApps = updatedApps.filter { it.isPinned }
-            _state.update {
-                it.copy(
-                    apps = updatedApps,
-                    pinnedApps = pinnedApps,
-                )
-            }
+            _state.update { it.copy(apps = updatedApps) }
         } catch (e: Exception) {
             Logger.w("RemoteAppsViewModel", "刷新单个应用图标失败: $packageName", e)
         }
@@ -124,11 +116,9 @@ class RemoteAppsViewModel : ViewModel() {
 
                 AppRepository.loadPinnedApps(context, deviceUuid)
                 val apps = AppRepository.getRemoteAppsList(context, deviceUuid)
-                val pinnedApps = apps.filter { it.isPinned }
                 _state.update {
                     it.copy(
                         apps = apps,
-                        pinnedApps = pinnedApps,
                         isLoading = false,
                     )
                 }
@@ -179,8 +169,7 @@ class RemoteAppsViewModel : ViewModel() {
             _state.value.apps.map { app ->
                 app.copy(isPinned = pinnedSet.contains(app.packageName))
             }
-        val pinnedApps = updatedApps.filter { it.isPinned }
-        _state.update { it.copy(apps = updatedApps, pinnedApps = pinnedApps) }
+        _state.update { it.copy(apps = updatedApps) }
     }
 
     fun openApp(
