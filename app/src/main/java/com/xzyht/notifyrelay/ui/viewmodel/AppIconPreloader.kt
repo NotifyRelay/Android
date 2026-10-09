@@ -8,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.AppListHelper
 
 /**
  * 应用图标批量预加载器，供 [NotificationHistoryViewModel] 与 [SuperIslandHistoryViewModel] 共用。
@@ -75,14 +76,7 @@ internal class AppIconPreloader(
     }
 
     private suspend fun getAppNameAndIcon(packageName: String): Pair<String, Bitmap?> {
-        var name: String
-        try {
-            val pm = application.packageManager
-            val appInfo = pm.getApplicationInfo(packageName, 0)
-            name = pm.getApplicationLabel(appInfo).toString()
-        } catch (_: Exception) {
-            name = packageName
-        }
+        val name = AppListHelper.getApplicationLabel(application, packageName)
         val icon: Bitmap? =
             try {
                 AppRepository.getAppIconWithAutoRequest(application, packageName)

@@ -3,6 +3,7 @@ package notifyrelay.data.database.migration
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.Logger
 import notifyrelay.data.PersistenceManager
 import notifyrelay.data.StorageManager
@@ -165,12 +166,7 @@ object MigrationHelper {
             installedApps.forEach { appInfo ->
                 try {
                     val packageName = appInfo.packageName
-                    val appName =
-                        try {
-                            pm.getApplicationLabel(appInfo).toString()
-                        } catch (e: Exception) {
-                            packageName
-                        }
+                    val appName = AppListHelper.getApplicationLabel(context, appInfo)
                     val isSystemApp = (appInfo.flags and android.content.pm.ApplicationInfo.FLAG_SYSTEM) != 0
 
                     // 获取应用图标

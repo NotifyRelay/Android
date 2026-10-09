@@ -20,6 +20,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.ClipboardUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
@@ -241,13 +242,7 @@ internal class NotificationFieldDumpViewModel(
             null
         }
 
-    private fun getAppLabel(packageName: String): String =
-        try {
-            val pm = application.packageManager
-            pm.getApplicationLabel(pm.getApplicationInfo(packageName, 0)).toString()
-        } catch (_: Exception) {
-            packageName
-        }
+    private fun getAppLabel(packageName: String): String = AppListHelper.getApplicationLabel(application, packageName)
 
     class Factory(
         private val application: Application,

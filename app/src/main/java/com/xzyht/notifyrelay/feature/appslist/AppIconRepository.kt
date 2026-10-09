@@ -10,6 +10,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.base.util.image.toPngByteArray
@@ -207,12 +208,7 @@ internal object AppIconRepository {
                 } else {
                     AppEntity(
                         packageName = packageName,
-                        appName =
-                            try {
-                                pm.getApplicationLabel(appInfo).toString()
-                            } catch (e: Exception) {
-                                packageName
-                            },
+                        appName = AppListHelper.getApplicationLabel(context, appInfo),
                         isSystemApp = (appInfo.flags and ApplicationInfo.FLAG_SYSTEM) != 0,
                         iconBytes = iconBytes,
                         isIconMissing = false,

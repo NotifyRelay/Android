@@ -4,8 +4,6 @@ import android.content.Context
 import android.content.pm.PackageManager
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.xzyht.notifyrelay.feature.appslist.AppListHelper
-import com.xzyht.notifyrelay.feature.appslist.InstalledAppsFilter
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -13,6 +11,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.AppListHelper
+import notifyrelay.base.util.InstalledAppsFilter
 
 data class LocalAppState(
     val apps: List<LocalAppInfo> = emptyList(),

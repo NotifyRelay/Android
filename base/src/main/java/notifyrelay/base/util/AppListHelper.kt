@@ -1,8 +1,7 @@
-package com.xzyht.notifyrelay.feature.appslist
+package notifyrelay.base.util
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import notifyrelay.base.util.Logger
 
 /**
  * 已安装应用的过滤策略。

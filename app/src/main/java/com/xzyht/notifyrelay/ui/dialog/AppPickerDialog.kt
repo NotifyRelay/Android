@@ -34,6 +34,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.AppListHelper
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.InputField
@@ -70,17 +71,11 @@ fun AppPickerDialog(
     val allApps by AppRepository.apps.collectAsState()
     val iconUpdateKey by AppRepository.iconUpdates.collectAsState()
 
-    val appLabelMap by remember(allApps, pm) {
+    val appLabelMap by remember(allApps, context) {
         derivedStateOf {
             val result = mutableMapOf<String, String>()
             allApps.forEach { info ->
-                val label =
-                    try {
-                        pm.getApplicationLabel(info).toString()
-                    } catch (_: Exception) {
-                        info.packageName
-                    }
-                result[info.packageName] = label
+                result[info.packageName] = AppListHelper.getApplicationLabel(context, info)
             }
             result
         }

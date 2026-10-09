@@ -10,6 +10,7 @@ import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecordDto
 import kotlinx.coroutines.runBlocking
+import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
 
@@ -170,14 +171,7 @@ object NotificationRepository {
         val device = "本机"
         // 本地通知的 key 也需要包含设备信息，确保不同设备的相同通知不会冲突
         val key = ((sbn.key ?: (sbn.id.toString() + sbn.packageName)) + "_" + time.toString()) + "_" + device
-        var appName: String? = null
-        try {
-            val pm = context.packageManager
-            val appInfo = pm.getApplicationInfo(packageName, 0)
-            appName = pm.getApplicationLabel(appInfo).toString()
-        } catch (_: Exception) {
-            appName = packageName
-        }
+        val appName: String = AppListHelper.getApplicationLabel(context, packageName)
         val record =
             NotificationRecord(
                 key = key,

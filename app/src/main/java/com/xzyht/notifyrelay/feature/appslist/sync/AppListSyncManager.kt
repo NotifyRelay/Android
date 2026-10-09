@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.feature.appslist.sync
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.appslist.AppListHelper
 import com.xzyht.notifyrelay.feature.appslist.AppRepository
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
@@ -12,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.Logger
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
@@ -97,15 +97,9 @@ object AppListSyncManager {
                 }
 
             val appArray = JSONArray()
-            val pm = context.packageManager
             for (ai in userApps) {
                 try {
-                    val appName =
-                        try {
-                            pm.getApplicationLabel(ai).toString()
-                        } catch (_: Exception) {
-                            ai.packageName
-                        }
+                    val appName = AppListHelper.getApplicationLabel(context, ai)
                     val item = JSONObject()
                     item.put("packageName", ai.packageName)
                     item.put("appName", appName)

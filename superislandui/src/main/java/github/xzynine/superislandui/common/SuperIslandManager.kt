@@ -10,6 +10,7 @@ import android.provider.Settings
 import android.service.notification.StatusBarNotification
 import androidx.core.graphics.drawable.toBitmap
 import github.xzynine.superislandui.model.core.SuperIslandData
+import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.ImageUtils
 import notifyrelay.data.StorageManager
@@ -308,12 +309,7 @@ object SuperIslandManager {
             rawExtras["pic_map"] = picMap
 
             // appName 尝试从包管理器获取
-            try {
-                val pm = context.packageManager
-                val ai = pm.getApplicationInfo(pkg, 0)
-                appName = pm.getApplicationLabel(ai).toString()
-            } catch (_: Exception) {
-            }
+            appName = AppListHelper.getApplicationLabel(context, pkg)
 
             // 验证码场景（此时 text 即真实验证码）不打印具体值，其余情况保持原样便于排查
             val isVerifyCodeLog = text != null && Regex("^[A-Za-z0-9]{4,8}$").matches(text.trim())
