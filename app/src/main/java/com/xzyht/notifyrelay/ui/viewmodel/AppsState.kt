@@ -1,6 +1,7 @@
 package com.xzyht.notifyrelay.ui.viewmodel
 
 import android.content.Context
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,29 +32,42 @@ data class AppsState<T>(
  * 加载态与错误处理流程由此处单点维护。
  *
  * @param T 列表元素类型。
- * @param loader 加载完整应用列表；抛出的异常由本类统一捕获并写入 [AppsState.error]。
+ * @param K 加载键类型，用于标识本次加载所属的数据源（如远程设备 UUID）。
+ * @param loader 加载完整应用列表，接收 [load] 传入的加载键；抛出的异常由本类统一捕获并写入 [AppsState.error]。
  */
-internal class AppsStateMachine<T>(
-    private val loader: suspend (Context) -> List<T>,
+internal class AppsStateMachine<T, K>(
+    private val loader: suspend (Context, K) -> List<T>,
 ) {
     private val _state = MutableStateFlow(AppsState<T>())
     val state: StateFlow<AppsState<T>> = _state.asStateFlow()
 
+    private var activeKey: K? = null
+
     /**
      * 加载应用列表：置加载态、执行 [loader]、写回结果或错误。
      *
+     * 本次加载的键记为 [activeKey]，[loader] 返回后键已变化时不写回状态，
+     * 避免上一数据源的结果覆盖当前数据源。
+     *
      * @param context Android 上下文，交给 [loader] 使用。
+     * @param key 本次加载所属数据源的标识，交给 [loader] 使用。
      * @param onError 捕获到异常时的附加处理（如记录日志），在写入 [AppsState.error] 之前调用。
      */
     suspend fun load(
         context: Context,
+        key: K,
         onError: ((Exception) -> Unit)? = null,
     ) {
+        activeKey = key
         _state.update { it.copy(isLoading = true, error = null) }
         try {
-            val apps = loader(context)
+            val apps = loader(context, key)
+            if (activeKey != key) return
             _state.update { it.copy(apps = apps, isLoading = false) }
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: Exception) {
+            if (activeKey != key) return
             onError?.invoke(e)
             _state.update { it.copy(isLoading = false, error = e.message) }
         }

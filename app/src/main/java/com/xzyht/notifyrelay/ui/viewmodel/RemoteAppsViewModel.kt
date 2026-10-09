@@ -12,6 +12,7 @@ import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
@@ -22,14 +23,15 @@ import notifyrelay.base.util.Logger
  * 远程设备应用列表的 ViewModel。
  *
  * 状态机与搜索流程统一由 [AppsStateMachine] 承担，本类只提供远程数据源实现与设备侧刷新流程。
+ * 同一时刻只保留一次加载：新的加载会取消上一次未完成的加载。
  */
 class RemoteAppsViewModel : ViewModel() {
     private var currentDeviceUuid: String? = null
+    private var loadJob: Job? = null
     private var iconUpdatesJob: Job? = null
 
     private val appsMachine =
-        AppsStateMachine<RemoteAppInfo> { context ->
-            val deviceUuid = currentDeviceUuid ?: return@AppsStateMachine emptyList()
+        AppsStateMachine<RemoteAppInfo, String> { context, deviceUuid ->
             PinnedAppsRepository.loadPinnedApps(context, deviceUuid)
             RemoteAppsCache.getRemoteAppsList(context, deviceUuid)
         }
@@ -41,7 +43,8 @@ class RemoteAppsViewModel : ViewModel() {
         deviceUuid: String,
     ) {
         currentDeviceUuid = deviceUuid
-        viewModelScope.launch { appsMachine.load(context) }
+        loadJob?.cancel()
+        loadJob = viewModelScope.launch { appsMachine.load(context, deviceUuid) }
 
         observeIconUpdates(context, deviceUuid)
     }
@@ -88,35 +91,39 @@ class RemoteAppsViewModel : ViewModel() {
 
     fun refreshApps(context: Context) {
         val deviceUuid = currentDeviceUuid ?: return
-        viewModelScope.launch {
-            appsMachine.update { it.copy(isLoading = true, error = null) }
-            try {
-                val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
-                val deviceInfo = findDeviceInfo(deviceManager, deviceUuid)
+        loadJob?.cancel()
+        loadJob =
+            viewModelScope.launch {
+                appsMachine.update { it.copy(isLoading = true, error = null) }
+                try {
+                    val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                    val deviceInfo = findDeviceInfo(deviceManager, deviceUuid)
 
-                if (deviceInfo != null) {
-                    Logger.d("RemoteAppsViewModel", "请求远程应用列表: ${deviceInfo.displayName}")
-                    AppListSyncManager.requestAppListFromDevice(
-                        context,
-                        deviceManager,
-                        deviceInfo,
-                    )
-                } else {
-                    Logger.w("RemoteAppsViewModel", "未找到设备信息: $deviceUuid")
-                    appsMachine.update { it.copy(isLoading = false, error = "设备未连接") }
-                    return@launch
-                }
+                    if (deviceInfo != null) {
+                        Logger.d("RemoteAppsViewModel", "请求远程应用列表: ${deviceInfo.displayName}")
+                        AppListSyncManager.requestAppListFromDevice(
+                            context,
+                            deviceManager,
+                            deviceInfo,
+                        )
+                    } else {
+                        Logger.w("RemoteAppsViewModel", "未找到设备信息: $deviceUuid")
+                        appsMachine.update { it.copy(isLoading = false, error = "设备未连接") }
+                        return@launch
+                    }
 
-                delay(2000)
+                    delay(2000)
 
-                appsMachine.load(context) { e ->
+                    appsMachine.load(context, deviceUuid) { e ->
+                        Logger.e("RemoteAppsViewModel", "刷新应用列表失败", e)
+                    }
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
                     Logger.e("RemoteAppsViewModel", "刷新应用列表失败", e)
+                    appsMachine.update { it.copy(isLoading = false, error = e.message) }
                 }
-            } catch (e: Exception) {
-                Logger.e("RemoteAppsViewModel", "刷新应用列表失败", e)
-                appsMachine.update { it.copy(isLoading = false, error = e.message) }
             }
-        }
     }
 
     private fun findDeviceInfo(

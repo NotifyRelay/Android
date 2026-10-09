@@ -24,7 +24,7 @@ data class LocalAppInfo(
  */
 class LocalAppsViewModel : ViewModel() {
     private val appsMachine =
-        AppsStateMachine<LocalAppInfo> { context ->
+        AppsStateMachine<LocalAppInfo, Unit> { context, _ ->
             withContext(Dispatchers.IO) {
                 val packageManager = context.packageManager
                 AppListHelper
@@ -44,7 +44,7 @@ class LocalAppsViewModel : ViewModel() {
     val state: StateFlow<AppsState<LocalAppInfo>> = appsMachine.state
 
     fun loadApps(context: Context) {
-        viewModelScope.launch { appsMachine.load(context) }
+        viewModelScope.launch { appsMachine.load(context, Unit) }
     }
 
     fun searchApps(query: String) = appsMachine.searchApps(query)
