@@ -105,11 +105,28 @@ object AppListHelper {
         packageName: String,
     ): String =
         try {
-            val pm = context.packageManager
-            val appInfo = pm.getApplicationInfo(packageName, 0)
-            pm.getApplicationLabel(appInfo).toString()
+            val appInfo = context.packageManager.getApplicationInfo(packageName, 0)
+            getApplicationLabel(context, appInfo)
         } catch (e: Exception) {
             Logger.w("AppListHelper", "获取应用名失败, 包名=$packageName, 错误=${e.message}", e)
             packageName // 如果获取失败，返回包名
+        }
+
+    /**
+     * 获取应用标签（名称）
+     *
+     * @param context 用于访问 PackageManager 的 Context
+     * @param appInfo 已取得的应用信息
+     * @return 应用的显示名称，若查询失败则返回 appInfo 的包名
+     */
+    fun getApplicationLabel(
+        context: Context,
+        appInfo: ApplicationInfo,
+    ): String =
+        try {
+            context.packageManager.getApplicationLabel(appInfo).toString()
+        } catch (e: Exception) {
+            Logger.w("AppListHelper", "获取应用名失败, 包名=${appInfo.packageName}, 错误=${e.message}", e)
+            appInfo.packageName // 如果获取失败，返回包名
         }
 }
