@@ -432,6 +432,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 getNotificationText(sbn),
                 sbn.postTime,
                 deviceManager,
+                getNotificationKey(sbn),
             )
         } catch (e: Exception) {
             Logger.e(TAG, "自动转发通知到远程设备失败", e)

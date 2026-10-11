@@ -101,6 +101,7 @@ object MessageSender {
      * @param text 通知内容
      * @param time 通知时间
      * @param deviceManager 设备管理器
+     * @param notificationKey 通知稳定标识键（NotificationListenerService 的 sbn.key），缺省时不写入 JSON
      */
     fun sendNotificationMessage(
         context: Context,
@@ -110,6 +111,7 @@ object MessageSender {
         text: String?,
         time: Long,
         deviceManager: DeviceConnectionManager,
+        notificationKey: String? = null,
     ) = ChatMessageBuilder.sendNotificationMessage(
         context,
         packageName,
@@ -118,6 +120,7 @@ object MessageSender {
         text,
         time,
         deviceManager,
+        notificationKey,
     )
 
     /**
