@@ -243,7 +243,7 @@ object NotificationRepository {
     /**
      * 扫描并刷新设备列表。
      *
-     * 设备信息由 Rust 私有库持有（uuid 仅平台端兜底），数据源为 [DeviceConnectionManager] 的已认证设备集合。
+     * 设备列表来自 [DeviceConnectionManager] 暴露的 core 快照投影（已配对 uuid 集合）。
      *
      * 注意：不加 `@Synchronized`（与拆分前一致）。[init] / [syncToCache] 在持锁状态下也会调用它，
      * 若在此加锁会与自身监视器重入叠加；`deviceList` 的 clear+addAll 非原子，仅影响 UI 展示瞬时一致性。
@@ -255,10 +255,9 @@ object NotificationRepository {
         try {
             com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
                 .getDeviceManager(context)
-                .getAuthenticatedDevices()
-                .keys
+                .getPairedDeviceUuids()
                 .forEach { uuid ->
-                    if (!uuid.isNullOrEmpty() && uuid != "本机") {
+                    if (uuid.isNotEmpty() && uuid != "本机") {
                         found.add(uuid)
                     }
                 }

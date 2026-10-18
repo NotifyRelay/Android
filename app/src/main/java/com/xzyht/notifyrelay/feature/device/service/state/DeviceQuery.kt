@@ -54,6 +54,9 @@ class DeviceQuery(
     /** 被用户拒绝的设备集合。 */
     fun rejected(): Set<String> = rejectedDeviceIds()
 
+    /** 已配对设备的 uuid 集合（core 快照投影，含离线）。 */
+    fun pairedUuids(): Set<String> = store.pairedSnapshots().map { it.uuid }.toSet()
+
     /** 在线且已配对的设备数量。 */
     fun onlineAuthenticatedCount(): Int = directory.onlineAuthenticatedCount()
 

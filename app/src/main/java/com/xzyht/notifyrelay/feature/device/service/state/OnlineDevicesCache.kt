@@ -20,27 +20,20 @@ class OnlineDevicesCache(
 
     fun update(
         deviceMap: Map<String, Pair<DeviceInfo, Boolean>>,
-        snapshots: Map<String, DeviceSnapshot>,
+        addressable: List<DeviceSnapshot>,
     ) {
         try {
             val onlineDevices =
-                deviceMap
-                    .filter { (uuid, pair) ->
-                        pair.second && snapshots[uuid]?.paired == true
-                    }.mapNotNull { (uuid, pair) ->
-                        val info = pair.first
-                        if (info.ip.isNotBlank() && info.ip != "0.0.0.0") {
-                            OnlineDeviceInfo(
-                                uuid = info.uuid,
-                                displayName = info.displayName,
-                                ip = info.ip,
-                                port = info.port,
-                                deviceType = snapshots[uuid]?.deviceType,
-                            )
-                        } else {
-                            null
-                        }
-                    }
+                addressable.mapNotNull { snapshot ->
+                    val info = deviceMap[snapshot.uuid]?.first ?: return@mapNotNull null
+                    OnlineDeviceInfo(
+                        uuid = info.uuid,
+                        displayName = info.displayName,
+                        ip = info.ip,
+                        port = info.port,
+                        deviceType = snapshot.deviceType,
+                    )
+                }
             val json =
                 com.google.gson
                     .Gson()

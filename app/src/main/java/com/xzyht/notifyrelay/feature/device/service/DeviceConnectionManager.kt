@@ -383,6 +383,11 @@ class DeviceConnectionManager(
     fun getAuthenticatedDevices(): Map<String, AuthInfo> = deviceQuery.authenticated()
 
     /**
+     * 已配对设备的 uuid 集合（core 快照投影，含离线）。
+     */
+    fun getPairedDeviceUuids(): Set<String> = deviceQuery.pairedUuids()
+
+    /**
      * 获取已拒绝设备列表
      */
     fun getRejectedDevices(): Set<String> = deviceQuery.rejected()
