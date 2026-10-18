@@ -6,7 +6,7 @@ import android.os.Looper
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandRemoteStore
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import github.xzynine.superislandui.model.components.MediaSessionData
@@ -314,7 +314,7 @@ object RemoteMediaSessionManager {
             // 取消复传任务（依赖同源 handler + 同源 mediaSessionCache）
             MediaSessionResender.cancelResendTask(handler, mediaSessionCache, deviceUuid)
             // 从Store中移除
-            SuperIslandRemoteStore.removeExact(sourceKey)
+            SuperIslandSourceStore.removeExact(sourceKey)
             // 关闭浮窗
             FloatingReplicaManager
                 .dismissBySource(sourceKey)

@@ -9,6 +9,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveU
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
 import com.xzyht.notifyrelay.feature.notification.superisland.pipeline.SuperIslandDisplayPipeline
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -57,7 +58,7 @@ object FloatingReplicaNotificationManager {
 
                 if (!dispatched) return@runReplicaCatchingSuspend
 
-                ReplicaStateStore.cancelTimeoutJob(sourceId)
+                SuperIslandSourceStore.cancelTimeoutJob(sourceId)
                 val timeoutJob =
                     CoroutineScope(Dispatchers.Main).launch {
                         delay(30_000L)
@@ -65,7 +66,7 @@ object FloatingReplicaNotificationManager {
                             FloatingReplicaManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
                         }
                     }
-                ReplicaStateStore.setTimeoutJob(sourceId, timeoutJob)
+                SuperIslandSourceStore.setTimeoutJob(sourceId, timeoutJob)
             }
         }
     }
@@ -104,15 +105,15 @@ object FloatingReplicaNotificationManager {
             }
         } else {
             Logger.w(TAG, "超级岛: 无法获取上下文，无法关闭通知: sourceId=$sourceId")
-            ReplicaStateStore.removeSourceIdMappings(sourceId)
+            SuperIslandSourceStore.removeSourceIdMappings(sourceId)
             val keys = entryKeys ?: listOf(sourceId)
             keys.forEach { entryKey ->
-                ReplicaStateStore.removeNotificationId(entryKey)
+                SuperIslandSourceStore.removeNotificationId(entryKey)
             }
         }
 
         // 通知已撤回，清理内容指纹，保证后续保活包（即使无变更）会重新发出通知
-        ReplicaStateStore.removeNotificationFingerprint(sourceId)
+        SuperIslandSourceStore.removeNotificationFingerprint(sourceId)
 
         if (reason == FloatingWindowManager.RemovalReason.REMOTE || reason == FloatingWindowManager.RemovalReason.TIMEOUT) {
             ReplicaTtlRegistry.removeBlockedInstance(sourceId)
@@ -123,7 +124,7 @@ object FloatingReplicaNotificationManager {
         context: Context,
         notificationId: Int,
     ) {
-        val sourceIdToStop = ReplicaStateStore.findSourceIdByNotificationId(notificationId)
+        val sourceIdToStop = SuperIslandSourceStore.findSourceIdByNotificationId(notificationId)
 
         val isFloatingEnabled = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
 
@@ -145,7 +146,7 @@ object FloatingReplicaNotificationManager {
             NotificationGenerator.stopScrollUpdate(sourceIdToStop)
         }
 
-        val entryKey = ReplicaStateStore.getEntryKeyByNotificationId(notificationId)
+        val entryKey = SuperIslandSourceStore.getEntryKeyByNotificationId(notificationId)
 
         if (entryKey != null) {
             FloatingReplicaWindowManager.getFloatingWindowManager().removeEntry(entryKey, FloatingWindowManager.RemovalReason.MANUAL)
