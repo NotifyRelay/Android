@@ -63,8 +63,7 @@ internal object SuperIslandSourceStore {
     /**
      * 取浮窗容器 View 的 Context（由 [setOverlayView] 登记的弱引用）。
      *
-     * 与 [getAppContext] 不是同一来源：原实现在关闭 Live Updates 通知时用的是浮窗 View 的
-     * Context，此处保持该来源不变。
+     * 与 [getAppContext] 不是同一来源：关闭 Live Updates 通知时使用浮窗 View 的 Context。
      */
     fun getOverlayContext(): Context? = overlayViewRef?.get()?.context
 
