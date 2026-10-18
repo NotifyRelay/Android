@@ -6,6 +6,7 @@ import android.os.Build
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import notifyrelay.base.util.Logger
 
 /**
@@ -13,7 +14,7 @@ import notifyrelay.base.util.Logger
  *
  * 由原 `FloatingReplicaMappingManager` 拆分而来：原实现在「状态对象」里直接持有 Context 并
  * cancel 系统通知（`migrateInjectionModeIfChanged` / `handleRemovalReason`），
- * 状态与副作用混杂。拆分后状态只留在 [ReplicaStateStore]，取消通知的副作用集中到本文件。
+ * 状态与副作用混杂。拆分后状态只留在 [SuperIslandSourceStore]，取消通知的副作用集中到本文件。
  *
  * 日志 TAG 沿用原值 `超级岛映射管理`，保证拆分前后日志逐字不变。
  */
@@ -72,16 +73,16 @@ internal object ReplicaNotificationCloser {
         sourceId: String,
         currentModeOrdinal: Int,
     ): Int {
-        val previous = ReplicaStateStore.getInjectionMode(sourceId)
+        val previous = SuperIslandSourceStore.getInjectionMode(sourceId)
         if (previous == null || previous == currentModeOrdinal) {
             // 首次发送或模式未变：仅确保记录存在
-            ReplicaStateStore.setInjectionMode(sourceId, currentModeOrdinal)
+            SuperIslandSourceStore.setInjectionMode(sourceId, currentModeOrdinal)
             return 0
         }
 
         // 取消旧通知：先按映射取实际通知 id，再兜底取消两个通道的推导 id，
         // 避免映射缺失时旧通知残留在通知栏
-        val mappedIds = ReplicaStateStore.removeNotificationIdsBySourceId(sourceId)
+        val mappedIds = SuperIslandSourceStore.removeNotificationIdsBySourceId(sourceId)
         // 兜底取消两个通道的推导 id，避免映射缺失时旧通知残留在通知栏。
         // 统一走 SuperIslandNotificationIds，保证与发送侧使用完全相同的推导公式。
         val fallbackIds =
@@ -97,9 +98,9 @@ internal object ReplicaNotificationCloser {
             )
 
         // 移除旧映射与旧指纹，保证后续按新模式重新建立映射、且不会被指纹跳过
-        ReplicaStateStore.removeSourceIdMappings(sourceId)
-        ReplicaStateStore.removeNotificationFingerprint(sourceId)
-        ReplicaStateStore.setInjectionMode(sourceId, currentModeOrdinal)
+        SuperIslandSourceStore.removeSourceIdMappings(sourceId)
+        SuperIslandSourceStore.removeNotificationFingerprint(sourceId)
+        SuperIslandSourceStore.setInjectionMode(sourceId, currentModeOrdinal)
 
         Logger.i(TAG, "注入模式变化($previous→$currentModeOrdinal)，已取消旧通知 $cancelled 条并清理旧映射: sourceId=$sourceId")
         return cancelled
@@ -109,7 +110,7 @@ internal object ReplicaNotificationCloser {
      * 浮窗条目被移除时的收尾：按原因做会话级屏蔽，并撤下对应的 Live Updates 复合通知。
      *
      * 取消 Live Updates 通知需要 Context，原实现从浮窗容器 View 的弱引用取（见
-     * [ReplicaStateStore.getOverlayContext]），此处保持同一来源。
+     * [SuperIslandSourceStore.getOverlayContext]），此处保持同一来源。
      */
     fun handleRemovalReason(
         sourceId: String,
@@ -121,7 +122,7 @@ internal object ReplicaNotificationCloser {
 
         if (reason != FloatingWindowManager.RemovalReason.HIDDEN && Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
             runReplicaCatching(TAG, "关闭Live Updates复合通知") {
-                val context = ReplicaStateStore.getOverlayContext()
+                val context = SuperIslandSourceStore.getOverlayContext()
                 if (context != null) {
                     LiveUpdatesNotificationManager.dismiss(sourceId, context)
                 } else {

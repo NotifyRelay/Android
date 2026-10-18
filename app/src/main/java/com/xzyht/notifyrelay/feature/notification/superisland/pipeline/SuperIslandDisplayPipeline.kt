@@ -11,8 +11,8 @@ import com.xzyht.notifyrelay.feature.notification.superisland.notification.Notif
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaNotificationCloser
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaStateStore
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.runReplicaCatchingSuspend
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -136,7 +136,7 @@ internal object SuperIslandDisplayPipeline {
         val sourceId = request.sourceId
 
         // ① 版本守卫的起点（原三份实现均在此调用 nextVersion）
-        val taskVersion = ReplicaStateStore.nextVersion(sourceId)
+        val taskVersion = SuperIslandSourceStore.nextVersion(sourceId)
 
         // 列表模式的前置守卫之一：active 条目已不是本条目则中止（在图片入库前）
         if (request.preGuard?.invoke() == false) {
@@ -148,7 +148,7 @@ internal object SuperIslandDisplayPipeline {
                 SuperIslandImageStore.internAll(context, sourceId, request.picMap)
             }
 
-        if (!ReplicaStateStore.isLatestVersion(sourceId, taskVersion)) {
+        if (!SuperIslandSourceStore.isLatestVersion(sourceId, taskVersion)) {
             return false
         }
         // 列表模式的前置守卫之二：与 isLatestVersion 合成 `active != x || !isLatest` 的原判定
@@ -199,7 +199,7 @@ internal object SuperIslandDisplayPipeline {
         val entryExistedBefore = request.onContentReady?.invoke(content) ?: false
 
         if (request.registerMappingBeforeSend) {
-            ReplicaStateStore.addSourceIdMapping(sourceId, sourceId)
+            SuperIslandSourceStore.addSourceIdMapping(sourceId, sourceId)
         }
 
         val isProgressType = SuperIslandDataFormatter.isProgressType(paramV2)
@@ -219,20 +219,20 @@ internal object SuperIslandDisplayPipeline {
             // （浮窗通道另由条目 addOrUpdateEntry 重置内部撤回计时器。）
             // 指纹包含注入模式：模式变化时指纹随之变化，不会被误判为「内容无变更」。
             val fingerprint =
-                ReplicaStateStore.computeNotificationFingerprint(
+                SuperIslandSourceStore.computeNotificationFingerprint(
                     displayTitle,
                     displayText,
                     formattedData.paramV2Raw,
                     formattedData.resolvedPicMap,
                     injectionModeOrdinal,
                 )
-            val previousNotificationIds = ReplicaStateStore.getNotificationIdsBySourceId(sourceId)
+            val previousNotificationIds = SuperIslandSourceStore.getNotificationIdsBySourceId(sourceId)
             val canSkipRefresh =
                 !request.forceRefresh &&
                     (!request.requireEntryExistedBefore || entryExistedBefore) &&
                     !previousNotificationIds.isNullOrEmpty() &&
-                    ReplicaStateStore.isAnyNotificationActive(context, previousNotificationIds) &&
-                    fingerprint == ReplicaStateStore.getNotificationFingerprint(sourceId)
+                    SuperIslandSourceStore.isAnyNotificationActive(context, previousNotificationIds) &&
+                    fingerprint == SuperIslandSourceStore.getNotificationFingerprint(sourceId)
 
             val overrideNotificationId = overrideNotificationId(request.channel)
 
@@ -253,15 +253,15 @@ internal object SuperIslandDisplayPipeline {
                         )
                     val liveUpdateNotificationId = overrideNotificationId ?: SuperIslandNotificationIds.liveUpdates(sourceId)
                     if (success) {
-                        ReplicaStateStore.putNotificationId(sourceId, liveUpdateNotificationId)
-                        ReplicaStateStore.addSourceIdMapping(sourceId, sourceId, liveUpdateNotificationId)
+                        SuperIslandSourceStore.putNotificationId(sourceId, liveUpdateNotificationId)
+                        SuperIslandSourceStore.addSourceIdMapping(sourceId, sourceId, liveUpdateNotificationId)
                         // 仅在确认发出成功后记录指纹，发送异常被吞时留空，避免后续保活包被误跳过
-                        ReplicaStateStore.setNotificationFingerprint(sourceId, fingerprint)
+                        SuperIslandSourceStore.setNotificationFingerprint(sourceId, fingerprint)
                     } else if (request.registerLiveUpdateMappingRegardlessOfSuccess) {
-                        ReplicaStateStore.putNotificationId(sourceId, liveUpdateNotificationId)
-                        ReplicaStateStore.addSourceIdMapping(sourceId, sourceId, liveUpdateNotificationId)
+                        SuperIslandSourceStore.putNotificationId(sourceId, liveUpdateNotificationId)
+                        SuperIslandSourceStore.addSourceIdMapping(sourceId, sourceId, liveUpdateNotificationId)
                     } else {
-                        ReplicaStateStore.removeNotificationFingerprint(sourceId)
+                        SuperIslandSourceStore.removeNotificationFingerprint(sourceId)
                     }
                 }
                 if (request.liveUpdateErrorsPropagate) {
@@ -287,11 +287,11 @@ internal object SuperIslandDisplayPipeline {
                         overrideNotificationId = overrideNotificationId,
                     )
                 if (notificationId != null) {
-                    ReplicaStateStore.addSourceIdMapping(sourceId, sourceId, notificationId)
+                    SuperIslandSourceStore.addSourceIdMapping(sourceId, sourceId, notificationId)
                     // 仅在确认发出成功后记录指纹，失败时留空以便下次保活包重试
-                    ReplicaStateStore.setNotificationFingerprint(sourceId, fingerprint)
+                    SuperIslandSourceStore.setNotificationFingerprint(sourceId, fingerprint)
                 } else if (request.registerMappingOnSendFailure) {
-                    ReplicaStateStore.addSourceIdMapping(sourceId, sourceId, null)
+                    SuperIslandSourceStore.addSourceIdMapping(sourceId, sourceId, null)
                 }
             }
         }

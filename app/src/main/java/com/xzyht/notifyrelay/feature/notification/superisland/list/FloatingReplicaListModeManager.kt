@@ -8,9 +8,9 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingW
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.pipeline.SuperIslandDisplayPipeline
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaStateStore
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.runReplicaCatching
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.runReplicaCatchingSuspend
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -101,7 +101,7 @@ object FloatingReplicaListModeManager {
     }
 
     private fun scheduleListModeTimeoutFor(sourceId: String) {
-        ReplicaStateStore.cancelTimeoutJob(sourceId)
+        SuperIslandSourceStore.cancelTimeoutJob(sourceId)
         val job =
             CoroutineScope(Dispatchers.Main).launch {
                 delay(30_000L)
@@ -109,7 +109,7 @@ object FloatingReplicaListModeManager {
                     FloatingReplicaManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
                 }
             }
-        ReplicaStateStore.setTimeoutJob(sourceId, job)
+        SuperIslandSourceStore.setTimeoutJob(sourceId, job)
     }
 
     fun switchNotificationInList(context: Context) {
@@ -126,7 +126,7 @@ object FloatingReplicaListModeManager {
         context: Context,
         sourceId: String,
     ) {
-        ReplicaStateStore.removeSourceIdMappings(sourceId)
+        SuperIslandSourceStore.removeSourceIdMappings(sourceId)
         val next = SuperIslandListManager.remove(sourceId)
         ListenerForegroundController.onSuperIslandListChanged()
         if (next != null) {

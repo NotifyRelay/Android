@@ -9,7 +9,7 @@ import android.os.Parcel
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.cache.SuperIslandBitmapCaches
-import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandRemoteStore
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import notifyrelay.base.util.Logger
 
 /**
@@ -117,9 +117,9 @@ class FairMemoryReceiver : BroadcastReceiver() {
 
         // 3. 清空超级岛远端状态存储
         try {
-            SuperIslandRemoteStore.clear()
+            SuperIslandSourceStore.clear()
         } catch (e: Exception) {
-            Logger.w(TAG, "清理 SuperIslandRemoteStore 失败", e)
+            Logger.w(TAG, "清理 SuperIslandSourceStore 失败", e)
         }
 
         // 4. 清理 BackendRemoteFilter 待处理列表
