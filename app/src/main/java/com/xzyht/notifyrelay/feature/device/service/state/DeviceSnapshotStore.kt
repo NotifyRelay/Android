@@ -110,6 +110,15 @@ class DeviceSnapshotStore(
     /** 已配对设备快照（含离线）。 */
     fun pairedSnapshots(): List<DeviceSnapshot> = projection.values.filter { it.paired }
 
+    /** 在线且已配对的设备 uuid（在线与配对均以 core 快照为准）。 */
+    fun onlinePairedUuids(): List<String> = projection.values.filter { it.online && it.paired }.map { it.uuid }
+
+    /** 在线且已配对且有可连接 IP 的设备快照（`ip` 非空且非 `0.0.0.0`）。 */
+    fun onlinePairedAddressableSnapshots(): List<DeviceSnapshot> =
+        projection.values.filter {
+            it.online && it.paired && it.ip.isNotBlank() && it.ip != "0.0.0.0"
+        }
+
     /** 指定设备是否已配对（core 判定）。 */
     fun isPaired(uuid: String): Boolean = projection[uuid]?.paired == true
 
@@ -157,7 +166,8 @@ class DeviceSnapshotStore(
             }
             synchronized(projectionLock) { projection = newProjection }
             _devices.value = newMap
-            onlineDevicesCache.update(newMap, newProjection)
+            // 须在本帧 projection 赋值之后读取
+            onlineDevicesCache.update(newMap, onlinePairedAddressableSnapshots())
             // 回填装配方的派生表（如认证设备的 lastIp/deviceType）；回调失败不得影响本次刷新
             runCatching { onSnapshotRefreshed(newProjection) }
                 .onFailure { Logger.e(TAG, "[DeviceSnapshotStore] 快照刷新回调失败", it) }
