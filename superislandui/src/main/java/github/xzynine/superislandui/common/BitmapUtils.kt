@@ -166,10 +166,15 @@ object BitmapUtils {
                 canvas.drawText(text, textX, baseline + 5f, localPaint)
                 Logger.d(TAG, "生成文本位图成功，尺寸: ${finalWidth}x$finalHeight")
                 return@measureTime image
-            } catch (e: Exception) {
-                Logger.w(TAG, "生成文本位图失败: ${e.message}")
-                e.printStackTrace()
+            } catch (e: IllegalArgumentException) {
+                Logger.w(TAG, "生成文本位图失败: ${e.message}", e)
                 return@measureTime null
+            } catch (e: IllegalStateException) {
+                Logger.w(TAG, "生成文本位图失败: ${e.message}", e)
+                return@measureTime null
+            } catch (e: Exception) {
+                Logger.e(TAG, "生成文本位图未预期异常", e)
+                throw e
             }
         }
     }
