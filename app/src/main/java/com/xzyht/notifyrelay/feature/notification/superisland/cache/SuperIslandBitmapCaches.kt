@@ -22,25 +22,25 @@ internal object SuperIslandBitmapCaches {
     fun clearAll() {
         try {
             LiveUpdatesNotificationManager.clearIconCache()
-        } catch (e: Exception) {
+        } catch (e: RuntimeException) {
             Logger.w(TAG, "清理 LiveUpdates 图标缓存失败", e)
         }
 
         try {
             BitmapUtils.clearCache()
-        } catch (e: Exception) {
+        } catch (e: RuntimeException) {
             Logger.w(TAG, "清理 BitmapUtils 缓存失败", e)
         }
 
         try {
             ReplicaIconCache.clear()
-        } catch (e: Exception) {
+        } catch (e: RuntimeException) {
             Logger.w(TAG, "清理 ReplicaIconCache 失败", e)
         }
 
         try {
             SuperIslandImageCache.clear()
-        } catch (e: Exception) {
+        } catch (e: RuntimeException) {
             Logger.w(TAG, "清理 SuperIslandImageCache 失败", e)
         }
     }

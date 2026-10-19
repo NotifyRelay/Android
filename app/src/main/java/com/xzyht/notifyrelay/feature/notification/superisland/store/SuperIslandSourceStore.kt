@@ -20,7 +20,7 @@ import java.util.concurrent.atomic.AtomicLong
  * - 本地生命周期：sourceId → entryKey 集合 / 通知 id / 版本号 / 内容指纹 / 注入模式 / 超时任务 / 隐藏条目，
  *   以及应用上下文与浮窗容器上下文的弱引用。
  *
- * [clear] 统一清理上述全部状态。
+ * [clear] 只清空可重建的远端载荷；本地生命周期状态由 [clearAllMappings] 清理。
  */
 internal object SuperIslandSourceStore {
     private const val TAG = "超级岛映射管理"
@@ -304,12 +304,13 @@ internal object SuperIslandSourceStore {
     private val store = ConcurrentHashMap<String, DiffSystem.State>()
 
     /**
-     * 清空全部状态：远端载荷与本地生命周期状态。
+     * 清空远端载荷（可由后续入站包重建）。
+     *
+     * 本地生命周期状态不在本方法范围内，由 [clearAllMappings] 清理。
      */
     @Synchronized
     fun clear() {
         store.clear()
-        clearAllMappings()
     }
 
     @Synchronized
@@ -336,7 +337,7 @@ internal object SuperIslandSourceStore {
     ): List<String> =
         try {
             val prefix = listOf(deviceUuid, mappedPkg).joinToString("|")
-            val toRemove = store.keys.filter { it.startsWith(prefix) }
+            val toRemove = store.keys.filter { it.startsWith("$prefix|") }
             toRemove.forEach { store.remove(it) }
             toRemove
         } catch (_: Exception) {
