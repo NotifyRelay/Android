@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.feature.notification.service
 
 import android.app.Notification
 import android.content.Intent
+import android.database.sqlite.SQLiteException
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -19,6 +20,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.tracker.LocalSuper
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import github.xzynine.superislandui.common.SuperIslandManager
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -94,28 +96,24 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             val isMediaNotification = sbn.notification.category == Notification.CATEGORY_TRANSPORT
             if (isMediaNotification) {
                 // 媒体通知被移除，发送媒体结束包
-                try {
-                    Logger.i(TAG, "媒体通知被移除，发送结束包: pkg=${sbn.packageName}")
-                    val appName = getAppName(sbn.packageName)
-                    // 发送媒体结束包
-                    MessageSender.sendMediaPlayEndNotification(
-                        applicationContext,
-                        sbn.packageName,
-                        appName,
-                        System.currentTimeMillis(),
-                        deviceManager,
-                    )
-                    // 更新全局最新媒体通知
-                    if (latestMediaSbn?.key == sbn.key) {
-                        latestMediaSbn = null
-                    }
-                    // 关闭对应的浮窗条目，像远程通知一样立即结束
-                    val sbnKey = getNotificationKey(sbn)
-                    FloatingReplicaManager.dismissBySource(sbnKey)
-                    Logger.i(TAG, "媒体通知被移除，关闭对应的浮窗条目: sbnKey=$sbnKey")
-                } catch (e: Exception) {
-                    Logger.e(TAG, "发送媒体结束包失败", e)
+                Logger.i(TAG, "媒体通知被移除，发送结束包: pkg=${sbn.packageName}")
+                val appName = getAppName(sbn.packageName)
+                // 发送媒体结束包
+                MessageSender.sendMediaPlayEndNotification(
+                    applicationContext,
+                    sbn.packageName,
+                    appName,
+                    System.currentTimeMillis(),
+                    deviceManager,
+                )
+                // 更新全局最新媒体通知
+                if (latestMediaSbn?.key == sbn.key) {
+                    latestMediaSbn = null
                 }
+                // 关闭对应的浮窗条目，像远程通知一样立即结束
+                val sbnKey = getNotificationKey(sbn)
+                FloatingReplicaManager.dismissBySource(sbnKey)
+                Logger.i(TAG, "媒体通知被移除，关闭对应的浮窗条目: sbnKey=$sbnKey")
             } else {
                 // 超级岛：发送终止包
                 try {
@@ -145,7 +143,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                             featureIdOverride = getNotificationKey(sbn, ""),
                         )
                     }
-                } catch (_: Exception) {
+                } catch (e: Exception) {
+                    Logger.e(TAG, "超级岛: 发送终止包失败", e)
                 }
             }
         }
@@ -397,7 +396,9 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
      * 写历史 + 转发（异步）。
      */
     private fun commitToHistoryAndForward(sbn: StatusBarNotification) {
-        CoroutineScope(Dispatchers.Default).launch {
+        CoroutineScope(
+            Dispatchers.Default + CoroutineExceptionHandler { _, e -> Logger.e(TAG, "[NotifyListener] 通知处理未预期异常", e) },
+        ).launch {
             try {
                 logSbnDetail("黑影 通过", sbn)
                 val added = NotificationRepository.addNotification(sbn, this@NotifyRelayNotificationListenerService)
@@ -406,8 +407,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 } else {
                     Logger.i(TAG, "[NotifyListener] 本地已存在该通知，未转发到远程设备: sbnKey=${sbn.key}, pkg=${sbn.packageName}")
                 }
-            } catch (e: Exception) {
-                Logger.e(TAG, "[NotifyListener] addNotification error", e)
+            } catch (e: SQLiteException) {
+                Logger.e(TAG, "[NotifyListener] 通知历史持久化失败", e)
             }
         }
     }
@@ -420,23 +421,19 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
 
     private fun forwardNotificationToRemoteDevices(sbn: StatusBarNotification) {
         Logger.i(TAG, "[NotifyListener] forwardNotificationToRemoteDevices called, sbnKey=${sbn.key}, pkg=${sbn.packageName}")
-        try {
-            val appName = getAppName(sbn.packageName)
+        val appName = getAppName(sbn.packageName)
 
-            // 使用整合的消息发送工具
-            MessageSender.sendNotificationMessage(
-                applicationContext,
-                sbn.packageName,
-                appName,
-                getNotificationTitle(sbn),
-                getNotificationText(sbn),
-                sbn.postTime,
-                deviceManager,
-                getNotificationKey(sbn),
-            )
-        } catch (e: Exception) {
-            Logger.e(TAG, "自动转发通知到远程设备失败", e)
-        }
+        // 使用整合的消息发送工具
+        MessageSender.sendNotificationMessage(
+            applicationContext,
+            sbn.packageName,
+            appName,
+            getNotificationTitle(sbn),
+            getNotificationText(sbn),
+            sbn.postTime,
+            deviceManager,
+            getNotificationKey(sbn),
+        )
     }
 
     override fun onListenerConnected() {
