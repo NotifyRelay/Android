@@ -8,9 +8,8 @@ import android.os.IBinder
 import android.os.Parcel
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
-import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandRemoteStore
-import github.xzynine.superislandui.common.BitmapUtils
+import com.xzyht.notifyrelay.feature.notification.superisland.cache.SuperIslandBitmapCaches
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import notifyrelay.base.util.Logger
 
 /**
@@ -102,42 +101,35 @@ class FairMemoryReceiver : BroadcastReceiver() {
         val typeName = if (notifyType == NOTIFY_TYPE_PHYSICAL_MEMORY) "物理内存" else "Java堆"
         Logger.i(TAG, "执行内存预警处理（$typeName）")
 
-        // 1. 清理 LiveUpdates 图标缓存（Bitmap，占用堆内存）
+        // 1. 清理超级岛位图与图标缓存
         try {
-            LiveUpdatesNotificationManager.clearIconCache()
+            SuperIslandBitmapCaches.clearAll()
         } catch (e: Exception) {
-            Logger.w(TAG, "清理 LiveUpdates 图标缓存失败", e)
+            Logger.w(TAG, "清理超级岛位图与图标缓存失败", e)
         }
 
-        // 2. 清理 BitmapUtils 缓存池
-        try {
-            BitmapUtils.clearCache()
-        } catch (e: Exception) {
-            Logger.w(TAG, "清理 BitmapUtils 缓存失败", e)
-        }
-
-        // 3. 清空聊天记忆（纯内存，重启后丢失）
+        // 2. 清空聊天记忆（纯内存，重启后丢失）
         try {
             ChatMemory.clear()
         } catch (e: Exception) {
             Logger.w(TAG, "清理 ChatMemory 失败", e)
         }
 
-        // 4. 清空超级岛远端状态存储
+        // 3. 清空超级岛远端状态存储
         try {
-            SuperIslandRemoteStore.clear()
+            SuperIslandSourceStore.clear()
         } catch (e: Exception) {
-            Logger.w(TAG, "清理 SuperIslandRemoteStore 失败", e)
+            Logger.w(TAG, "清理 SuperIslandSourceStore 失败", e)
         }
 
-        // 5. 清理 BackendRemoteFilter 待处理列表
+        // 4. 清理 BackendRemoteFilter 待处理列表
         try {
             BackendRemoteFilter.clearPending()
         } catch (e: Exception) {
             Logger.w(TAG, "清理 BackendRemoteFilter 失败", e)
         }
 
-        // 6. 触发 GC 回收
+        // 5. 触发 GC 回收
         System.gc()
 
         Logger.i(TAG, "内存预警处理完成")

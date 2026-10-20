@@ -10,6 +10,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.list.FloatingRepli
 import com.xzyht.notifyrelay.feature.notification.superisland.list.SuperIslandListManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import notifyrelay.base.util.Logger
 
 object FloatingReplicaManager {
@@ -29,7 +30,7 @@ object FloatingReplicaManager {
         cacheForChannelSwitch: Boolean = true,
     ) {
         appContext = context.applicationContext
-        ReplicaStateStore.setAppContext(appContext)
+        SuperIslandSourceStore.setAppContext(appContext)
 
         // 登记「当前展示内容」，供通道切换时按新通道重建。
         // 远端媒体胶囊传 false：媒体有独立开关，不参与超级岛通道迁移。
@@ -116,11 +117,11 @@ object FloatingReplicaManager {
                 ReplicaDisplayCache.remove(sourceId)
             }
 
-            ReplicaStateStore.cancelTimeoutJob(sourceId)
+            SuperIslandSourceStore.cancelTimeoutJob(sourceId)
 
             NotificationGenerator.stopScrollUpdate(sourceId)
 
-            val ctx = ReplicaStateStore.getAppContext()
+            val ctx = SuperIslandSourceStore.getAppContext()
             // 列表模式通道：交由列表管理器摘除条目并切换下一条
             if (ctx != null && !SuperIslandConfigUtils.isFloatingWindowEnabled(ctx) && SuperIslandConfigUtils.isNotificationListMode(ctx)) {
                 FloatingReplicaListModeManager.dismissFromList(ctx, sourceId)
@@ -132,8 +133,8 @@ object FloatingReplicaManager {
 
             val floatingEnabled = if (ctx != null) SuperIslandConfigUtils.isFloatingWindowEnabled(ctx) else true
 
-            val notificationIdsBefore = ReplicaStateStore.getNotificationIdsBySourceId(sourceId)
-            val entryKeys = ReplicaStateStore.getSourceIdEntryKeys(sourceId)
+            val notificationIdsBefore = SuperIslandSourceStore.getNotificationIdsBySourceId(sourceId)
+            val entryKeys = SuperIslandSourceStore.getSourceIdEntryKeys(sourceId)
 
             // 浮窗通道：移除 overlay 条目（含映射清理）
             if (floatingEnabled) {
@@ -157,14 +158,14 @@ object FloatingReplicaManager {
      * - 「超级岛显示」开关关闭：立即关闭浮窗、列表与系统通知，不再展示远端超级岛；
      * - 通道切换的撤下阶段（见 [switchSuperIslandChannel]）。
      *
-     * 只清理展示与通道状态：远端状态缓存（SuperIslandRemoteStore）与历史记录不受影响。
+     * 只清理展示与通道状态：远端状态缓存（SuperIslandSourceStore）与历史记录不受影响。
      * 「当前展示内容」缓存（[ReplicaDisplayCache]）也被清空——通道切换会在撤下前先取快照，
      * 重建时再经 [showFloating] 重新登记。
      */
     fun dismissAllRemoteSuperIsland(context: Context) {
         runReplicaCatching(TAG, "关闭全部远端超级岛展示") {
             val ctx = context.applicationContext
-            val sourceIds = ReplicaStateStore.getAllSourceIds()
+            val sourceIds = SuperIslandSourceStore.getAllSourceIds()
 
             // Live Updates 通道（仅 Android 16+）：按 sourceId 关闭系统提升通知
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
@@ -190,7 +191,7 @@ object FloatingReplicaManager {
             FloatingReplicaWindowManager.getFloatingWindowManager().clearAllEntries()
 
             // 清空全部通道映射与内容指纹，保证后续远端包按当前通道重新建立映射
-            ReplicaStateStore.clearAllMappings()
+            SuperIslandSourceStore.clearAllMappings()
 
             ReplicaDisplayCache.clear()
 

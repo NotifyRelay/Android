@@ -1,9 +1,10 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.replica
+package com.xzyht.notifyrelay.feature.notification.superisland.store
 
 import android.app.NotificationManager
 import android.content.Context
 import android.view.View
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingEntry
+import github.xzynine.superislandui.diff.DiffSystem
 import kotlinx.coroutines.Job
 import notifyrelay.base.util.Logger
 import java.lang.ref.WeakReference
@@ -12,20 +13,16 @@ import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicLong
 
 /**
- * 超级岛复刻通道的**纯状态**存储。
+ * 超级岛按 sourceId 聚合的状态存储。
  *
- * 由原 `FloatingReplicaMappingManager`（God Object，446 行）拆分而来，本文件只保留状态读写：
- * 三张映射表、内容指纹、注入模式记录、版本号、隐藏条目暂存、超时任务句柄与应用上下文。
+ * 两类状态同处一个对象：
+ * - 远端载荷：sourceId → [DiffSystem.State]，由差异合并写入；
+ * - 本地生命周期：sourceId → entryKey 集合 / 通知 id / 版本号 / 内容指纹 / 注入模式 / 超时任务 / 隐藏条目，
+ *   以及应用上下文与浮窗容器上下文的弱引用。
  *
- * 拆出的另外两部分：
- * - [ReplicaTtlRegistry]：`closedSourceIds` / `blockedInstanceIds` 两组 TTL；
- * - [ReplicaNotificationCloser]：取消系统通知的**副作用**（注入模式迁移、按来源/按 id 关闭通知族）。
- *
- * 副作用从状态对象中剥离，是本拆分的核心目的：状态对象不再直接持有 Context 去 cancel 通知。
- *
- * 日志 TAG 沿用原值 `超级岛映射管理`，保证拆分前后日志逐字不变。
+ * [clear] 只清空可重建的远端载荷；本地生命周期状态由 [clearAllMappings] 清理。
  */
-internal object ReplicaStateStore {
+internal object SuperIslandSourceStore {
     private const val TAG = "超级岛映射管理"
 
     private var appContextRef: Context? = null
@@ -66,8 +63,7 @@ internal object ReplicaStateStore {
     /**
      * 取浮窗容器 View 的 Context（由 [setOverlayView] 登记的弱引用）。
      *
-     * 与 [getAppContext] 不是同一来源：原实现在关闭 Live Updates 通知时用的是浮窗 View 的
-     * Context，此处保持该来源不变。
+     * 与 [getAppContext] 不是同一来源：关闭 Live Updates 通知时使用浮窗 View 的 Context。
      */
     fun getOverlayContext(): Context? = overlayViewRef?.get()?.context
 
@@ -304,4 +300,82 @@ internal object ReplicaStateStore {
         }
         return null
     }
+
+    private val store = ConcurrentHashMap<String, DiffSystem.State>()
+
+    /**
+     * 清空远端载荷（可由后续入站包重建）。
+     *
+     * 本地生命周期状态不在本方法范围内，由 [clearAllMappings] 清理。
+     */
+    @Synchronized
+    fun clear() {
+        store.clear()
+    }
+
+    @Synchronized
+    fun applyIncoming(
+        sourceId: String,
+        title: String?,
+        text: String?,
+        paramV2Raw: String?,
+        pics: Map<String, String>,
+    ): DiffSystem.State? {
+        val state = DiffSystem.State(title, text, paramV2Raw, pics.toMutableMap())
+        store[sourceId] = state
+        return state
+    }
+
+    /**
+     * 根据 deviceUuid 和 mappedPkg 前缀寻找并移除匹配的 sourceId 条目，返回被移除的 sourceId 列表。
+     * 用于在接收到结束包但 featureId 无法可靠重算时，清理存储并告知上层进行浮窗关闭。
+     */
+    @Synchronized
+    fun removeByDeviceAndPkgPrefix(
+        deviceUuid: String,
+        mappedPkg: String,
+    ): List<String> =
+        try {
+            val prefix = listOf(deviceUuid, mappedPkg).joinToString("|")
+            val toRemove = store.keys.filter { it.startsWith("$prefix|") }
+            toRemove.forEach { store.remove(it) }
+            toRemove
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+    /**
+     * 根据 featureKey（特征 ID）后缀查找并移除匹配的 sourceId，返回被移除的 sourceId 列表。
+     * 兼容只传入 featureKey 的结束包（例如仅包含 featureKeyValue），用于定位完整的 sourceId。
+     */
+    @Synchronized
+    fun removeByFeatureKey(featureKey: String): List<String> =
+        try {
+            val suffix = "|$featureKey"
+            val toRemove = store.keys.filter { it.endsWith(suffix) || it == featureKey }
+            toRemove.forEach { store.remove(it) }
+            toRemove
+        } catch (_: Exception) {
+            emptyList()
+        }
+
+    /**
+     * 精确移除指定的 sourceId（如果存在），返回是否成功移除。
+     */
+    fun removeExact(sourceId: String): Boolean =
+        try {
+            store.remove(sourceId) != null
+        } catch (_: Exception) {
+            false
+        }
+
+    /**
+     * 获取指定sourceId的状态，用于外部查询当前状态
+     */
+    fun getState(sourceId: String): DiffSystem.State? =
+        try {
+            store[sourceId]
+        } catch (_: Exception) {
+            null
+        }
 }

@@ -58,7 +58,7 @@ class DeviceDirectory(
     /** 在线且已配对的设备数量。 */
     fun onlineAuthenticatedCount(): Int =
         try {
-            store.devices.value.count { (uuid, pair) -> pair.second && store.isPaired(uuid) }
+            store.onlinePairedUuids().size
         } catch (_: Exception) {
             0
         }
@@ -66,8 +66,9 @@ class DeviceDirectory(
     /** 在线且已配对的设备列表。 */
     fun onlineAuthenticated(): List<DeviceInfo> =
         try {
+            val uuids = store.onlinePairedUuids().toSet()
             store.devices.value
-                .filter { (uuid, pair) -> pair.second && store.isPaired(uuid) }
+                .filterKeys { it in uuids }
                 .map { it.value.first }
                 .also { Logger.d(TAG, "[onlineAuthenticated] 返回结果: ${it.size} 个设备") }
         } catch (e: Exception) {

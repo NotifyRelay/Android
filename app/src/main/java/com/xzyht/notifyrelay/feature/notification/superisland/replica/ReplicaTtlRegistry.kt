@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.replica
 
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import notifyrelay.base.util.Logger
 import java.util.concurrent.ConcurrentHashMap
 
@@ -10,7 +11,7 @@ import java.util.concurrent.ConcurrentHashMap
  * - `closedSourceIds` / `closedSourceVersions`：sourceId 被关闭后的 30s / 60s 屏蔽窗口；
  * - `blockedInstanceIds`：会话级屏蔽，15s 内被重复访问则续期。
  *
- * 这两组状态在 [ReplicaStateStore.clearAllMappings] 中**刻意不被清理**：
+ * 这两组状态在 [SuperIslandSourceStore.clearAllMappings] 中**刻意不被清理**：
  * 通道切换不应解除用户刚刚表达过的关闭意图，两者仍按各自 TTL 自然过期。
  */
 internal object ReplicaTtlRegistry {
@@ -52,7 +53,7 @@ internal object ReplicaTtlRegistry {
 
     fun markSourceClosed(sourceId: String) {
         closedSourceIds[sourceId] = System.currentTimeMillis()
-        ReplicaStateStore.currentVersion(sourceId)?.let { closedSourceVersions[sourceId] = it }
+        SuperIslandSourceStore.currentVersion(sourceId)?.let { closedSourceVersions[sourceId] = it }
     }
 
     fun removeClosedSource(sourceId: String) {
@@ -63,7 +64,7 @@ internal object ReplicaTtlRegistry {
         val lastClosed = closedSourceIds[sourceId] ?: return false
         if (System.currentTimeMillis() - lastClosed >= 60_000L) return false
         val closedVersion = closedSourceVersions[sourceId] ?: return false
-        val currentVersion = ReplicaStateStore.currentVersion(sourceId) ?: return false
+        val currentVersion = SuperIslandSourceStore.currentVersion(sourceId) ?: return false
         return currentVersion == closedVersion
     }
 }

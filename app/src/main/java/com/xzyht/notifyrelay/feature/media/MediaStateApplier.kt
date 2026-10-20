@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.feature.media
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.notification.superisland.media.MediaCapsulePresenter
-import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandRemoteStore
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import github.xzynine.superislandui.diff.DiffSystem
 
 /**
@@ -39,7 +39,7 @@ internal object MediaStateApplier {
         context: Context,
     ) {
         // 以全量形式写入远端存储，保持 store 语义（结束包/清理时仍可移除）
-        SuperIslandRemoteStore.applyIncoming(
+        SuperIslandSourceStore.applyIncoming(
             sourceKey,
             currentState.title,
             currentState.text,

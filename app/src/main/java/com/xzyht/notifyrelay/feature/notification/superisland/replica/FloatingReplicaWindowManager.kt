@@ -14,6 +14,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingW
 import com.xzyht.notifyrelay.feature.notification.superisland.list.FloatingReplicaListModeManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.pipeline.SuperIslandDisplayPipeline
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -38,14 +39,14 @@ object FloatingReplicaWindowManager {
                     if (context != null) {
                         NotificationGenerator.cancelReplicaNotification(context, key)
                     } else {
-                        ReplicaStateStore.removeNotificationId(key)
+                        SuperIslandSourceStore.removeNotificationId(key)
                     }
                     // 浮窗自身的自动移除（12s/45s）不经过 dismissBySourceInternal，
                     // 必须在此同步移除展示内容缓存，否则切换通道时会把已消失的条目重新展示出来
                     ReplicaDisplayCache.remove(key)
                 }
 
-                val sourceIdsToBlock = ReplicaStateStore.removeSourceIdMapping(key)
+                val sourceIdsToBlock = SuperIslandSourceStore.removeSourceIdMapping(key)
                 sourceIdsToBlock?.forEach { sourceId ->
                     ReplicaNotificationCloser.handleRemovalReason(sourceId, reason)
                 }
@@ -59,7 +60,7 @@ object FloatingReplicaWindowManager {
     private var windowManager: WeakReference<WindowManager>? = null
 
     init {
-        ReplicaStateStore.setOverlayView(null)
+        SuperIslandSourceStore.setOverlayView(null)
     }
 
     fun getFloatingWindowManager(): FloatingWindowManager = floatingWindowManager
@@ -109,7 +110,7 @@ object FloatingReplicaWindowManager {
                     // 与原实现一致：overlay 生命周期所有者在协程起点（图片入库之前）即备好。
                     // 位置勿动：此处必须在 dispatch 之前、且与管线内首个挂起点（internAll）保持原有先后。
                     // 当前 `FloatingWindowLifecycleOwner()` 构造是同步纯内存操作，故次序不可观测；
-                    // 但若将来其构造改为挂起或触碰 ReplicaStateStore，此位置即成为真实语义偏差。
+                    // 但若将来其构造改为挂起或触碰 SuperIslandSourceStore，此位置即成为真实语义偏差。
                     if (overlayLifecycleOwner == null) {
                         overlayLifecycleOwner = FloatingWindowLifecycleOwner()
                     }
@@ -154,7 +155,7 @@ object FloatingReplicaWindowManager {
                                         appName = appName,
                                     )
 
-                                    ReplicaStateStore.addSourceIdMapping(sourceId, sourceId)
+                                    SuperIslandSourceStore.addSourceIdMapping(sourceId, sourceId)
 
                                     addOrUpdateEntry(context, sourceId, content.summaryOnly)
 
@@ -190,20 +191,20 @@ object FloatingReplicaWindowManager {
         }
 
         runReplicaCatching(TAG, "切换浮窗状态") {
-            val entryKeys = ReplicaStateStore.getSourceIdEntryKeys(sourceId)
+            val entryKeys = SuperIslandSourceStore.getSourceIdEntryKeys(sourceId)
             val isShowing = entryKeys?.any { floatingWindowManager.getEntry(it) != null } == true
 
             if (isShowing) {
                 val entry = floatingWindowManager.getEntry(sourceId)
                 if (entry != null) {
-                    ReplicaStateStore.saveHiddenEntry(sourceId, entry)
+                    SuperIslandSourceStore.saveHiddenEntry(sourceId, entry)
                 }
 
                 FloatingReplicaManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.HIDDEN)
             } else {
                 ReplicaTtlRegistry.removeBlockedInstance(sourceId)
 
-                val existingEntry = ReplicaStateStore.getHiddenEntry(sourceId)
+                val existingEntry = SuperIslandSourceStore.getHiddenEntry(sourceId)
                 if (existingEntry != null) {
                     showFloatingInternal(
                         context,
@@ -216,7 +217,7 @@ object FloatingReplicaWindowManager {
                         isLocked = false,
                         isRestoring = true,
                     )
-                    ReplicaStateStore.removeHiddenEntry(sourceId)
+                    SuperIslandSourceStore.removeHiddenEntry(sourceId)
                 } else {
                     showFloatingInternal(
                         context,
@@ -254,7 +255,7 @@ object FloatingReplicaWindowManager {
                 floatingWindowManager.removeEntry(entryKey, reason)
             }
             if (removeMappings) {
-                ReplicaStateStore.removeSourceIdMappings(sourceId)
+                SuperIslandSourceStore.removeSourceIdMappings(sourceId)
             }
         } else {
             floatingWindowManager.removeEntry(sourceId, reason)
@@ -285,7 +286,7 @@ object FloatingReplicaWindowManager {
         overlayView = null
         overlayLayoutParams = null
         windowManager = null
-        ReplicaStateStore.setOverlayView(null)
+        SuperIslandSourceStore.setOverlayView(null)
     }
 
     private fun addOrUpdateEntry(
@@ -346,7 +347,7 @@ object FloatingReplicaWindowManager {
                         overlayView = WeakReference(composeContainer)
                         overlayLayoutParams = layoutParams
                         windowManager = WeakReference(wm)
-                        ReplicaStateStore.setOverlayView(composeContainer)
+                        SuperIslandSourceStore.setOverlayView(composeContainer)
                     }
                 }
             }

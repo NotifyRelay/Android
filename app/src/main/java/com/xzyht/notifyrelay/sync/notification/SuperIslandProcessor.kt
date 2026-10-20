@@ -12,7 +12,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslan
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaDisplayCache
-import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandRemoteStore
+import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import com.xzyht.notifyrelay.feature.notification.superisland.tracker.LocalSuperIslandTracker
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
@@ -184,14 +184,14 @@ object SuperIslandProcessor {
                             // 如果显式值看起来像完整的 sourceId（包含分隔符），直接移除
                             if (explicitFeatureKey.contains("|")) {
                                 dismissBySourceId(explicitFeatureKey)
-                                SuperIslandRemoteStore.removeExact(explicitFeatureKey)
+                                SuperIslandSourceStore.removeExact(explicitFeatureKey)
                                 clearDedupBySource(manager, sourceKey)
                                 Logger.i("超级岛", "收到终止通知(显式完整 sourceId)，移除去重缓存: $dedupKey -> source=$explicitFeatureKey")
                                 return true
                             }
 
                             // 否则将其视为 featureId 后缀，尝试按后缀查找并移除匹配的完整 sourceId
-                            val matched = SuperIslandRemoteStore.removeByFeatureKey(explicitFeatureKey)
+                            val matched = SuperIslandSourceStore.removeByFeatureKey(explicitFeatureKey)
                             if (matched.isNotEmpty()) {
                                 matched.forEach { rid ->
                                     try {
@@ -209,7 +209,7 @@ object SuperIslandProcessor {
                     }
 
                     // 如果没有显式 featureKey，尝试在远端存储中查找可能已存在的 sourceId（按 deviceUuid|mappedPkg 前缀匹配）
-                    val removedKeys = SuperIslandRemoteStore.removeByDeviceAndPkgPrefix(remoteUuid, mappedPkg)
+                    val removedKeys = SuperIslandSourceStore.removeByDeviceAndPkgPrefix(remoteUuid, mappedPkg)
                     if (removedKeys.isNotEmpty()) {
                         removedKeys.forEach { rid ->
                             try {
@@ -280,7 +280,7 @@ object SuperIslandProcessor {
                     if (!v.isNullOrEmpty()) siPics[k] = v
                 }
             }
-            val merged = SuperIslandRemoteStore.applyIncoming(sourceKey, title, text, paramV2Raw, siPics)
+            val merged = SuperIslandSourceStore.applyIncoming(sourceKey, title, text, paramV2Raw, siPics)
 
             var mParam2 = merged?.paramV2Raw ?: paramV2Raw
 

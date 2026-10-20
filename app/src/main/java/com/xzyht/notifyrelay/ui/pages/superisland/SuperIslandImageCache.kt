@@ -33,6 +33,17 @@ internal object SuperIslandImageCache {
         return normalized
     }
 
+    /**
+     * 清空缓存条目。
+     *
+     * 只移除映射，不回收 Bitmap 本体。
+     */
+    fun clear() {
+        synchronized(this) {
+            cache.clear()
+        }
+    }
+
     private fun normalizeBitmap(source: Bitmap): Bitmap {
         if (source.isRecycled) return source
         val width = source.width
