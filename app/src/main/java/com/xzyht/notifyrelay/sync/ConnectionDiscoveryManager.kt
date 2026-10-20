@@ -5,6 +5,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.net.wifi.WifiManager
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
@@ -47,6 +48,52 @@ class ConnectionDiscoveryManager(
 
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
     private var reconnectRefreshJob: Job? = null
+
+    /**
+     * 组播/广播接收锁。
+     *
+     * Wi‑Fi 固件默认过滤组播与广播帧，仅在持有该锁期间放行；不持有时 UDP 广播在
+     * 内核/固件层即被丢弃，表现为「对端广播完全收不到、也无任何应用层日志」。
+     * 锁由平台独占持有，不引用计数，与发现线程的启停同生命周期。
+     */
+    private var multicastLock: WifiManager.MulticastLock? = null
+    private var multicastLockHeld = false
+
+    /** 获取组播接收锁（重复调用无副作用）。 */
+    private fun acquireMulticastLock() {
+        if (multicastLockHeld) return
+        try {
+            val wifiManager =
+                context.applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager
+                    ?: run {
+                        Logger.w(TAG, "[multicastLock] WifiManager 不可用，跳过")
+                        return
+                    }
+            val lock =
+                multicastLock ?: wifiManager.createMulticastLock("notifyrelay-discovery").also {
+                    it.setReferenceCounted(false)
+                    multicastLock = it
+                }
+            lock.acquire()
+            multicastLockHeld = true
+            Logger.i(TAG, "[multicastLock] 已获取组播接收锁")
+        } catch (e: Exception) {
+            Logger.e(TAG, "[multicastLock] 获取组播接收锁失败", e)
+        }
+    }
+
+    /** 释放组播接收锁（未持有时无副作用）。 */
+    private fun releaseMulticastLock() {
+        if (!multicastLockHeld) return
+        try {
+            multicastLock?.release()
+            Logger.i(TAG, "[multicastLock] 已释放组播接收锁")
+        } catch (e: Exception) {
+            Logger.e(TAG, "[multicastLock] 释放组播接收锁失败", e)
+        } finally {
+            multicastLockHeld = false
+        }
+    }
 
     /**
      * 连接到已认证设备
@@ -203,6 +250,8 @@ class ConnectionDiscoveryManager(
             Logger.i(TAG, "[syncHeartbeatMode] isLocked=$isLocked, isWifiDirect=$isWifiDirect, discoveryEnabled=${deviceManager.discoveryEnabled}")
             // 根据开关控制 TCP 扫描发现的启停（不影响已认证设备的重连）
             if (deviceManager.discoveryEnabled) {
+                // 广播收发都依赖 Wi‑Fi 固件放行广播帧：先取锁再启动发现线程
+                acquireMulticastLock()
                 val displayName = deviceManager.localDisplayName()
                 val battery = getSignedBatteryLevel()
                 Logger.i(TAG, "[syncHeartbeatMode] 调用 periodicBroadcast 启动扫描发现: uuid=${deviceManager.uuid}, name=$displayName, battery=$battery")
@@ -212,6 +261,7 @@ class ConnectionDiscoveryManager(
                 // 用户关闭发现时停止扫描（已认证设备的重连由 Rust 重连状态机处理）
                 Logger.i(TAG, "[syncHeartbeatMode] 发现已关闭，停止扫描")
                 NativeCore.periodicBroadcast(ctx, 0)
+                releaseMulticastLock()
             }
         } catch (e: Exception) {
             Logger.e(TAG, "[syncHeartbeatMode] 异常", e)
@@ -223,6 +273,7 @@ class ConnectionDiscoveryManager(
         if (ctx != null) {
             NativeCore.periodicBroadcast(ctx, 0)
         }
+        releaseMulticastLock()
     }
 
     fun startDiscovery() {
