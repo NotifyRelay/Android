@@ -183,7 +183,7 @@ object IconSyncManager {
                 requestJson,
                 ICON_REQUEST_TIMEOUT_MS,
             )
-        if (result != ProtocolSender.EnqueueResult.SUCCESS) {
+        if (result != ProtocolSender.EnqueueResult.SUCCESS && result != ProtocolSender.EnqueueResult.DEDUPED) {
             // 入队失败时抛异常，使调用方进入 catch 分支清理 pending 状态，避免后续无法重新请求
             throw IllegalStateException("图标请求入队失败: $result")
         }

@@ -16,7 +16,7 @@ object ProtocolSender {
     private const val TAG = "ProtocolSender"
 
     /** 入队结果 */
-    enum class EnqueueResult { SUCCESS, QUEUE_UNINITIALIZED, MISSING_CONTEXT, AUTH_FAILED, NATIVE_ERROR }
+    enum class EnqueueResult { SUCCESS, DEDUPED, QUEUE_UNINITIALIZED, MISSING_CONTEXT, AUTH_FAILED, NATIVE_ERROR }
 
     fun sendEncrypted(
         deviceManager: DeviceConnectionManager,
@@ -24,7 +24,6 @@ object ProtocolSender {
         header: String,
         plaintext: String,
         timeoutMs: Long = 10000L,
-        dedupKey: String? = null,
     ): EnqueueResult {
         val auth =
             synchronized(deviceManager.authenticatedDevices) {
@@ -40,8 +39,11 @@ object ProtocolSender {
 
         val ctx = NativeCore.getContext() ?: return EnqueueResult.MISSING_CONTEXT
         return try {
-            NativeCore.enqueueMessage(ctx, queuePtr, target.uuid, header, plaintext, dedupKey)
-            EnqueueResult.SUCCESS
+            when (NativeCore.enqueueMessage(ctx, queuePtr, target.uuid, header, plaintext)) {
+                1 -> EnqueueResult.SUCCESS
+                0 -> EnqueueResult.DEDUPED
+                else -> EnqueueResult.NATIVE_ERROR
+            }
         } catch (e: Exception) {
             Logger.w(TAG, "入队失败 $header -> ${target.displayName}", e)
             EnqueueResult.NATIVE_ERROR

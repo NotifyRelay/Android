@@ -155,11 +155,6 @@ object NativeCore {
     fun clearPairingCode(ctx: Pointer) = lib.nrc_clear_pairing_code(ctx)
 
     // ======== Utility functions ========
-    fun computeDedupKey(
-        deviceUuid: String,
-        data: String,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_dedup_key(deviceUuid, data))
-
     fun computeFeatureId(
         superPkg: String,
         paramV2Raw: String,
@@ -190,6 +185,14 @@ object NativeCore {
         arg1Ms: Long = 0L,
         arg2Ms: Long = 0L,
     ): Int = lib.nrc_dedup(ctx, action, dedupKey, arg1Ms, arg2Ms)
+
+    // ======== 入站内容去重（10s 窗口；键与 TTL 由 core 持有）========
+    fun contentDedup(
+        ctx: Pointer?,
+        action: Int,
+        title: String,
+        text: String,
+    ): Int = ctx?.let { lib.nrc_content_dedup(it, action, title, text) } ?: -1
 
     // ======== Text similarity & dedup ========
     fun shouldDeduplicate(
@@ -253,8 +256,7 @@ object NativeCore {
         deviceUuid: String,
         header: String,
         plaintext: String,
-        dedupKey: String? = null,
-    ) = lib.nrc_enqueue_message(ctx, queuePtr, deviceUuid, header, plaintext, dedupKey)
+    ): Int = lib.nrc_enqueue_message(ctx, queuePtr, deviceUuid, header, plaintext)
 
     // ======== Clipboard ========
 

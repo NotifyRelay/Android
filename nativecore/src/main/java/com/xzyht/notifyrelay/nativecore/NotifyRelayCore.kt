@@ -163,11 +163,15 @@ interface NotifyRelayCore : Library {
         arg2Ms: Long,
     ): Int
 
+    // ======== 入站内容去重（10s 窗口；键与 TTL 由 core 持有）========
+    fun nrc_content_dedup(
+        ctx: Pointer,
+        action: Int,
+        title: String,
+        text: String,
+    ): Int
+
     // ======== Utility functions ========
-    fun nrc_compute_dedup_key(
-        deviceUuid: String,
-        data: String,
-    ): Pointer
 
     fun nrc_compute_feature_id(
         superPkg: String,
@@ -387,8 +391,7 @@ interface NotifyRelayCore : Library {
         deviceUuid: String,
         header: String,
         plaintext: String,
-        dedupKey: String?,
-    )
+    ): Int
 
     // ======== Clipboard ========
     fun nrc_clipboard_on_changed(
