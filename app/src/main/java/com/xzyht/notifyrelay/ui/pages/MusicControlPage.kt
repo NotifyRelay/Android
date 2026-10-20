@@ -316,7 +316,7 @@ fun MusicControlPage() {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"previous\"}"
                             val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
-                            if (result == ProtocolSender.EnqueueResult.SUCCESS || result == ProtocolSender.EnqueueResult.DEDUPED) {
+                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
                                 ToastUtils.showShortToast(context, "已发送上一首指令到${selectedDevice.displayName}")
                             } else {
                                 ToastUtils.showShortToast(context, "发送上一首指令失败")
@@ -343,7 +343,7 @@ fun MusicControlPage() {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"playPause\"}"
                             val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
-                            if (result == ProtocolSender.EnqueueResult.SUCCESS || result == ProtocolSender.EnqueueResult.DEDUPED) {
+                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
                                 ToastUtils.showShortToast(context, "已发送播放/暂停指令到${selectedDevice.displayName}")
                             } else {
                                 ToastUtils.showShortToast(context, "发送播放/暂停指令失败")
@@ -370,7 +370,7 @@ fun MusicControlPage() {
                             val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"next\"}"
                             val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
-                            if (result == ProtocolSender.EnqueueResult.SUCCESS || result == ProtocolSender.EnqueueResult.DEDUPED) {
+                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
                                 ToastUtils.showShortToast(context, "已发送下一首指令到${selectedDevice.displayName}")
                             } else {
                                 ToastUtils.showShortToast(context, "发送下一首指令失败")

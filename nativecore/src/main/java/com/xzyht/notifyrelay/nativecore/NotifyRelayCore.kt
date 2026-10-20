@@ -385,6 +385,8 @@ interface NotifyRelayCore : Library {
     ): Pointer
 
     // ======== Sender queue ========
+    // header 规范化、通知类发送去重（仅 DATA_NOTIFICATION）与 ts 注入由 core 内部完成
+    // 返回：1=已入队 0=命中去重丢弃（仅通知类） -1=参数无效或队列未初始化
     fun nrc_enqueue_message(
         ctx: Pointer,
         queuePtr: Long,

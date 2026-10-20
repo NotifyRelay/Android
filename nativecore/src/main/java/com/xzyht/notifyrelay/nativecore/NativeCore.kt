@@ -250,6 +250,8 @@ object NativeCore {
     ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_device_list(ctx, authedTimeoutMs, unauthedTimeoutMs))
 
     // ======== Sender queue ========
+
+    /** 入队：header 规范化、通知类发送去重（仅 DATA_NOTIFICATION）与 ts 注入由 core 内部完成 */
     fun enqueueMessage(
         ctx: Pointer,
         queuePtr: Long,
