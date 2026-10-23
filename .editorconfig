@@ -16,3 +16,9 @@ ktlint_standard_function-naming = disabled
 ktlint_standard_backing-property-naming = disabled
 # Compose 代码惯用通配导入（foundation.layout.* / runtime.* 等），豁免通配导入规则
 ktlint_standard_no-wildcard-imports = disabled
+
+# UniFFI 生成物（nativecore/build/generated/uniffi）：文件名与代码风格由生成器模板决定，
+# 且每次构建都会被覆盖重写，故按路径豁免文件名规则（PascalCase）。
+# 生成器产出的类名带下划线，不符合 Kotlin 文件名惯例。
+[**/generated/uniffi/**/*.{kt,kts}]
+ktlint_standard_filename = disabled

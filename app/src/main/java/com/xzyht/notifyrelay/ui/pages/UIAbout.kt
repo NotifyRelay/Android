@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.BuildConfig
+import com.xzyht.notifyrelay.core.ffi.abiProbe
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.ui.dialog.UpdateDialog
 import com.xzyht.notifyrelay.util.ApkArchMatcher
@@ -156,6 +157,18 @@ fun UIAbout() {
 
         Text(
             text = "Rust Core: ${NativeCore.getGitHash() ?: "未加载"}",
+            style = textStyles.body2,
+            color = colorScheme.onSurfaceSecondary,
+            modifier =
+                Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 4.dp),
+        )
+
+        // UniFFI 生成的绑定调用：与 NativeCore 走同一条 Rust 库的不同绑定路径，
+        // 用于显示由 UniFFI 元数据直接读取的 crate 版本。
+        Text(
+            text = "UniFFI ABI: ${runCatching { abiProbe() }.getOrElse { "未加载" }}",
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary,
             modifier =

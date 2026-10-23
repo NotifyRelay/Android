@@ -44,6 +44,8 @@ jmdns = "3.6.3"
 coil = "2.7.0"
 coilCompose = "2.7.0"
 kotlinxCoroutines = "1.11.0"
+# UniFFI 生成的绑定内部使用 kotlinx.atomicfu（UniffiHandleMap 的原子计数器）
+atomicfu = "0.28.0"
 composeUi = "1.12.1"
 compileSdk = "37"
 targetSdk = "37"
@@ -91,6 +93,7 @@ coil = { group = "io.coil-kt", name = "coil", version.ref = "coil" }
 coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coilCompose" }
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
+atomicfu = { group = "org.jetbrains.kotlinx", name = "atomicfu", version.ref = "atomicfu" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "composeUi" }
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }
