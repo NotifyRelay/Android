@@ -63,9 +63,9 @@ object IconSyncManager {
                 if (iconMap[packageName] != null) listOf(packageName) else emptyList()
             }
 
-        // Rust 内部完成过滤（缓存/已安装/pending/设备关联）并构造请求报文
+        // Rust 内部解除旧登记并完成过滤（缓存/已安装/pending/设备关联）、构造请求报文
         val requestJson =
-            NativeCore.appSyncPrepareIconRequest(
+            NativeCore.appSyncRequestIcons(
                 NativeCore.getContext(),
                 listOf(packageName),
                 installedPackages.toList(),
@@ -88,10 +88,8 @@ object IconSyncManager {
                         lastUpdated = System.currentTimeMillis(),
                     )
                 databaseRepository.saveAppDeviceAssociations(listOf(appDeviceEntity))
-                NativeCore.appSyncClearIconPending(NativeCore.getContext(), listOf(packageName))
             } catch (e: Exception) {
                 Logger.e(TAG, "请求图标失败：$packageName", e)
-                NativeCore.appSyncClearIconPending(NativeCore.getContext(), listOf(packageName))
             }
         }
     }
@@ -120,9 +118,9 @@ object IconSyncManager {
                 .groupBy { it.packageName }
                 .mapValues { (_, entities) -> entities.map { it.sourceDevice } }
 
-        // Rust 内部完成过滤（缓存/已安装/pending/设备关联）并构造请求报文
+        // Rust 内部解除旧登记并完成过滤（缓存/已安装/pending/设备关联）、构造请求报文
         val requestJson =
-            NativeCore.appSyncPrepareIconRequest(
+            NativeCore.appSyncRequestIcons(
                 NativeCore.getContext(),
                 packageNames,
                 installedPackages.toList(),
@@ -147,10 +145,8 @@ object IconSyncManager {
                     )
                 }
             databaseRepository.saveAppDeviceAssociations(appDeviceEntities)
-            NativeCore.appSyncClearIconPending(NativeCore.getContext(), need)
         } catch (e: Exception) {
             Logger.e(TAG, "批量请求失败：$packageNames", e)
-            NativeCore.appSyncClearIconPending(NativeCore.getContext(), parseRequestedPackages(requestJson))
         }
     }
 

@@ -70,6 +70,27 @@ object NativeCore {
         deviceUuid: String,
     ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_decrypt_local_state(ctx, encryptedB64, deviceUuid))
 
+    /**
+     * 本地状态反序列化聚合入口：解密与导入由 core 内部配对完成。
+     *
+     * @param encrypted 0=payload 为明文状态 JSON，其它=payload 为密文
+     * @return true 表示状态已导入
+     */
+    fun deserializeLocalState(
+        ctx: Pointer,
+        payload: String,
+        deviceUuid: String,
+        encrypted: Int,
+    ): Boolean {
+        val result = NotifyRelayCore.ptrToStringAndFree(lib.nrc_deserialize_local_state(ctx, payload, deviceUuid, encrypted))
+        if (result.isNullOrEmpty()) return false
+        return try {
+            JSONObject(result).optBoolean("ok", false)
+        } catch (e: Exception) {
+            false
+        }
+    }
+
     fun exportDeviceKey(
         ctx: Pointer,
         deviceUuid: String,
@@ -315,6 +336,30 @@ object NativeCore {
                 }.toString()
         return NotifyRelayCore.ptrToStringAndFree(
             lib.nrc_app_sync_prepare_icon_request(c, JSONArray(packages).toString(), JSONArray(installed).toString(), JSONArray(cached).toString(), appDeviceJson, sourceDeviceUuid, nowMs),
+        )
+    }
+
+    /**
+     * 图标请求聚合入口：先按同批包名解除旧登记，再构造图标请求报文。
+     * 返回 ICON_REQUEST 报文 JSON；无需请求时返回 {}。
+     */
+    fun appSyncRequestIcons(
+        ctx: Pointer?,
+        packages: List<String>,
+        installed: List<String>,
+        cached: List<String>,
+        appDeviceMap: Map<String, List<String>>,
+        sourceDeviceUuid: String,
+        nowMs: Long,
+    ): String? {
+        val c = ctx ?: return null
+        val appDeviceJson =
+            JSONObject()
+                .apply {
+                    appDeviceMap.forEach { (k, v) -> put(k, JSONArray(v)) }
+                }.toString()
+        return NotifyRelayCore.ptrToStringAndFree(
+            lib.nrc_app_sync_request_icons(c, JSONArray(packages).toString(), JSONArray(installed).toString(), JSONArray(cached).toString(), appDeviceJson, sourceDeviceUuid, nowMs),
         )
     }
 

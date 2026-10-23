@@ -333,6 +333,13 @@ interface NotifyRelayCore : Library {
         deviceUuid: String,
     ): Pointer
 
+    fun nrc_deserialize_local_state(
+        ctx: Pointer,
+        payload: String,
+        deviceUuid: String,
+        encrypted: Int,
+    ): Pointer
+
     fun nrc_export_device_key(
         ctx: Pointer,
         deviceUuid: String,
@@ -414,6 +421,16 @@ interface NotifyRelayCore : Library {
 
     // ======== App sync (app list & icons) ========
     fun nrc_app_sync_prepare_icon_request(
+        ctx: Pointer,
+        packagesJson: String,
+        installedJson: String,
+        cachedJson: String,
+        appDeviceJson: String,
+        sourceDeviceUuid: String,
+        nowMs: Long,
+    ): Pointer
+
+    fun nrc_app_sync_request_icons(
         ctx: Pointer,
         packagesJson: String,
         installedJson: String,

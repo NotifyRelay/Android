@@ -34,7 +34,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *     S->>Core: nrc_init()
  *     Core-->>S: ctx
  *     S->>Core: nrc_get_local_uuid()（旧 uuid 作迁移种子）
- *     S->>Core: nrc_decrypt_local_state / nrc_import_state（旧平台 blob）
+ *     S->>Core: nrc_deserialize_local_state（旧平台 blob，解密与导入配对）
  *     S->>Core: nrc_ecdh_has_keypair / generate_keypair / get_public_key
  *     S->>Cb: install(ctx, host)
  *     S-->>App: InitResult(ctx, uuid, pubKey, legacyStateEnc)
@@ -98,7 +98,7 @@ class RustCoreSession(
             // 旧平台存储迁移：加密状态 blob（含本机密钥与设备 AES）导入 Rust 内存
             // （空数据不迁移；核心库自动 load 优先，blob 仅补充/引导导入）
             if (legacyStateEnc.isNotEmpty()) {
-                NativeCore.decryptLocalState(ctx, legacyStateEnc, localUuid)?.let { NativeCore.importState(ctx, it) }
+                NativeCore.deserializeLocalState(ctx, legacyStateEnc, localUuid, encrypted = 1)
             }
             if (!NativeCore.hasKeypair(ctx)) {
                 NativeCore.generateKeypair(ctx)
