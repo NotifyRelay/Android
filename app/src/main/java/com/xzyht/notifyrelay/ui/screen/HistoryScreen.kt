@@ -74,7 +74,7 @@ fun HistoryScreen(
                 1 -> UISuperIslandHistory()
                 2 ->
                     UIChatTest(
-                        deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context),
+                        deviceManager = DeviceConnectionManagerSingleton.getDeviceChat(context),
                     )
             }
         }

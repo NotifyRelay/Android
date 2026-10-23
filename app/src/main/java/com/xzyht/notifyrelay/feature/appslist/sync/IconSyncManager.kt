@@ -8,7 +8,7 @@ import android.util.Base64
 import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceMessagePort
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
@@ -41,7 +41,7 @@ object IconSyncManager {
     fun checkAndSyncIcon(
         context: Context,
         packageName: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         sourceDevice: DeviceInfo,
     ) {
         // 检查本机已安装应用
@@ -100,7 +100,7 @@ object IconSyncManager {
     suspend fun requestIconsBatch(
         context: Context,
         packageNames: List<String>,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         sourceDevice: DeviceInfo,
     ) {
         if (packageNames.size == 0) return
@@ -168,7 +168,7 @@ object IconSyncManager {
     private suspend fun requestIconsFromDevice(
         context: Context,
         requestJson: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         sourceDevice: DeviceInfo,
     ) {
         val result =
@@ -190,7 +190,7 @@ object IconSyncManager {
      */
     fun handleIconRequest(
         requestData: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         sourceDevice: DeviceInfo,
         context: Context,
     ) {

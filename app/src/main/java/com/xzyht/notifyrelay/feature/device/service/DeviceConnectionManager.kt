@@ -11,6 +11,11 @@ import com.xzyht.notifyrelay.feature.device.model.PendingPairing
 import com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController
 import com.xzyht.notifyrelay.feature.device.service.callback.DeviceCallbackHost
 import com.xzyht.notifyrelay.feature.device.service.callback.HandshakeRequestHandler
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAdminPort
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceChatPort
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceDiscoveryPort
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceMessagePort
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceSendPort
 import com.xzyht.notifyrelay.feature.device.service.core.RustCoreSession
 import com.xzyht.notifyrelay.feature.device.service.pairing.HandshakeWaiterRegistry
 import com.xzyht.notifyrelay.feature.device.service.pairing.PairingCoordinator
@@ -39,7 +44,12 @@ import notifyrelay.data.StorageManager
 // =================== 设备连接管理器主类 ===================
 class DeviceConnectionManager(
     private val context: Context,
-) : DeviceCallbackHost {
+) : DeviceCallbackHost,
+    DeviceAdminPort,
+    DeviceChatPort,
+    DeviceDiscoveryPort,
+    DeviceMessagePort,
+    DeviceSendPort {
     companion object {
         /** UDP 发现功能开关的存储 key */
         private const val UDP_DISCOVERY_ENABLED_KEY = "udp_discovery_enabled"
@@ -126,14 +136,14 @@ class DeviceConnectionManager(
     /**
      * 注册通知数据接收回调
      */
-    fun registerOnNotificationDataReceived(callback: (String) -> Unit) {
+    override fun registerOnNotificationDataReceived(callback: (String) -> Unit) {
         notificationDataReceivedCallbacks.add(callback)
     }
 
     /**
      * 注销通知数据接收回调
      */
-    fun unregisterOnNotificationDataReceived(callback: (String) -> Unit) {
+    override fun unregisterOnNotificationDataReceived(callback: (String) -> Unit) {
         notificationDataReceivedCallbacks.remove(callback)
     }
 
@@ -142,7 +152,7 @@ class DeviceConnectionManager(
      *
      * 数据由 [DeviceSnapshotStore] 从 core 快照派生，平台端不再维护第二份真相。
      */
-    val devices: StateFlow<Map<String, Pair<DeviceInfo, Boolean>>> get() = snapshotStore.devices
+    override val devices: StateFlow<Map<String, Pair<DeviceInfo, Boolean>>> get() = snapshotStore.devices
 
     internal var uuid: String
 
@@ -306,16 +316,16 @@ class DeviceConnectionManager(
     internal fun lookupDevice(uuid: String): DeviceInfo? = getDeviceInfo(uuid)
 
     /** 启动设备发现（转发到内部 [discoveryManager]，替代外部反射调用）。 */
-    internal fun startDiscovery() = discoveryManager.startDiscovery()
+    override fun startDiscovery() = discoveryManager.startDiscovery()
 
     /** 停止设备发现（转发到内部 [discoveryManager]，替代外部反射调用）。 */
-    internal fun stopDiscovery() = discoveryManager.stopDiscovery()
+    override fun stopDiscovery() = discoveryManager.stopDiscovery()
 
     // Rust 原生上下文（由 RustCoreSession 创建并持有）
     private var rustContext: Pointer? = null
 
     // UI全局开关：是否启用设备发现，使用内存缓存避免频繁数据库访问
-    var discoveryEnabled: Boolean
+    override var discoveryEnabled: Boolean
         get() = StorageManager.getBoolean(context, UDP_DISCOVERY_ENABLED_KEY, true)
         set(value) {
             StorageManager.putBoolean(context, UDP_DISCOVERY_ENABLED_KEY, value)
@@ -380,17 +390,20 @@ class DeviceConnectionManager(
     /**
      * 获取已配对设备列表（展示元数据来自 core 快照）。
      */
-    fun getAuthenticatedDevices(): Map<String, AuthInfo> = deviceQuery.authenticated()
+    override fun getAuthenticatedDevices(): Map<String, AuthInfo> = deviceQuery.authenticated()
 
     /**
      * 已配对设备的 uuid 集合（core 快照投影，含离线）。
      */
-    fun getPairedDeviceUuids(): Set<String> = deviceQuery.pairedUuids()
+    override fun getPairedDeviceUuids(): Set<String> = deviceQuery.pairedUuids()
+
+    /** 已认证设备表快照（同一把锁内复制，供发送链路判定认证状态）。 */
+    override fun authenticatedSnapshot(): Map<String, AuthInfo> = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
 
     /**
      * 获取已拒绝设备列表
      */
-    fun getRejectedDevices(): Set<String> = deviceQuery.rejected()
+    override fun getRejectedDevices(): Set<String> = deviceQuery.rejected()
 
     /**
      * 从已拒绝集合中恢复（移除）指定设备，返回移除后的完整已拒绝集合。
@@ -398,7 +411,7 @@ class DeviceConnectionManager(
      * 用于「已拒绝设备」对话框的手动恢复。加锁方式与 [rejectedDeviceIds] 的既有读写一致
      * （`synchronized(rejectedDevices)`），替换原先外部反射私有字段的做法。
      */
-    fun restoreRejectedDevices(uuids: Collection<String>): Set<String> =
+    override fun restoreRejectedDevices(uuids: Collection<String>): Set<String> =
         synchronized(rejectedDevices) {
             uuids.forEach { rejectedDevices.remove(it) }
             rejectedDevices.toSet()
@@ -414,7 +427,7 @@ class DeviceConnectionManager(
     /**
      * 取消当前待处理的配对请求。
      */
-    fun cancelPendingPairing() = pairingCoordinator.cancelPendingPairing()
+    override fun cancelPendingPairing() = pairingCoordinator.cancelPendingPairing()
 
     /**
      * 使用长期 ECDH 密钥完成标准密钥交换。
@@ -436,10 +449,10 @@ class DeviceConnectionManager(
     /**
      * 公开解析设备信息：优先使用快照，缺失IP时使用提供的回退IP。
      */
-    fun resolveDeviceInfo(
+    override fun resolveDeviceInfo(
         uuid: String,
         fallbackIp: String?,
-        fallbackPort: Int = 23333,
+        fallbackPort: Int,
     ): DeviceInfo? = deviceQuery.resolve(uuid, fallbackIp, fallbackPort)
 
     // 连接设备
@@ -470,7 +483,7 @@ class DeviceConnectionManager(
      * 公开API：请求远端设备转发音频。
      * @return 是否成功发送请求
      */
-    fun requestAudioForwarding(device: DeviceInfo): Boolean {
+    override fun requestAudioForwarding(device: DeviceInfo): Boolean {
         try {
             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"audioRequest\"}"
             ProtocolSender.sendEncrypted(this, device, "DATA_MEDIA_CONTROL", raw, 10000L)
@@ -504,12 +517,12 @@ class DeviceConnectionManager(
      * 获取在线且已配对的设备数量（线程安全）。
      * 在线判定与配对状态均来自 core 快照。
      */
-    fun getAuthenticatedOnlineCount(): Int = deviceQuery.onlineAuthenticatedCount()
+    override fun getAuthenticatedOnlineCount(): Int = deviceQuery.onlineAuthenticatedCount()
 
     /**
      * 获取在线且已配对的设备列表（线程安全）。
      */
-    fun getAuthenticatedOnlineDevices(): List<DeviceInfo> = deviceQuery.onlineAuthenticated()
+    override fun getAuthenticatedOnlineDevices(): List<DeviceInfo> = deviceQuery.onlineAuthenticated()
 
     /**
      * 公开API：移除已认证设备（线程安全）。
@@ -519,9 +532,9 @@ class DeviceConnectionManager(
      * - 从内存中移除设备信息并刷新快照
      * 返回 true 表示存在并已移除，false 表示没有该uuid 或 Rust 持久化删除未完成
      */
-    suspend fun removeAuthenticatedDevice(
+    override suspend fun removeAuthenticatedDevice(
         uuid: String,
-        deleteHistory: Boolean = false,
+        deleteHistory: Boolean,
     ): Boolean {
         val removed = deviceRemover.remove(uuid, deleteHistory)
         if (removed) {

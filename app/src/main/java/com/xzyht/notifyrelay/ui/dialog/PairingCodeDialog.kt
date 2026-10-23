@@ -23,9 +23,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.device.service.callback.PairingCallbackHandler
+import com.xzyht.notifyrelay.feature.device.service.contract.DevicePairingPort
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -59,7 +59,7 @@ private fun pairingFailureMessage(
 @Composable
 fun PairingCodeDialog(
     mode: PairingMode,
-    deviceManager: DeviceConnectionManager,
+    deviceManager: DevicePairingPort,
     targetDevice: DeviceInfo? = null,
     pairingCode: String = "",
     show: Boolean,
@@ -102,7 +102,7 @@ fun PairingCodeDialog(
                                     notifyrelay.base.util.BatteryUtils
                                         .isCharging(context)
                                 val battery = if (isCharging) batteryLevel else -batteryLevel
-                                NativeCore.sendPairingInit(ctx, deviceManager.uuid, targetDevice!!.uuid, displayCode, battery, "android") == 0
+                                NativeCore.sendPairingInit(ctx, deviceManager.localUuid, targetDevice!!.uuid, displayCode, battery, "android") == 0
                             }
                         }
                     if (!initSuccess) {

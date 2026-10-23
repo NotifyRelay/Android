@@ -140,7 +140,7 @@ fun ParamIslandCompose(
                                             ToastUtils.showShortToast(context, "复制失败")
                                         } else {
                                             try {
-                                                val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                                                val deviceManager = DeviceConnectionManagerSingleton.getDeviceQuery(context)
                                                 ClipboardSyncManager.syncTextDirectly(deviceManager, code, context)
                                                 ToastUtils.showShortToast(context, "验证码已复制")
                                             } catch (e: Exception) {

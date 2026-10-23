@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.sync
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceMessagePort
 import com.xzyht.notifyrelay.feature.notification.HighPriorityNotifier
 import com.xzyht.notifyrelay.sync.builder.ChatMessageBuilder
 import com.xzyht.notifyrelay.sync.builder.MediaMessageBuilder
@@ -47,7 +47,7 @@ object MessageSender {
     fun sendChatMessage(
         context: Context,
         message: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
     ) = ChatMessageBuilder.sendChatMessage(context, message, deviceManager)
 
     /**
@@ -63,7 +63,7 @@ object MessageSender {
         text: String?,
         coverUrl: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
     ) = MediaMessageBuilder.sendMediaPlayNotification(
         context,
         packageName,
@@ -83,7 +83,7 @@ object MessageSender {
         packageName: String,
         appName: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
     ) = MediaMessageBuilder.sendMediaPlayEndNotification(
         context,
         packageName,
@@ -110,7 +110,7 @@ object MessageSender {
         title: String?,
         text: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         notificationKey: String? = null,
     ) = ChatMessageBuilder.sendNotificationMessage(
         context,
@@ -162,7 +162,7 @@ object MessageSender {
         time: Long,
         paramV2Raw: String?,
         picMap: Map<String, String>?,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         featureIdOverride: String? = null,
     ) = SuperIslandMessageBuilder.sendSuperIslandData(
         context,
@@ -188,7 +188,7 @@ object MessageSender {
         paramV2Raw: String?,
         title: String?,
         text: String?,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         featureIdOverride: String? = null,
     ) = SuperIslandMessageBuilder.sendSuperIslandEnd(
         context,
@@ -220,7 +220,7 @@ object MessageSender {
      * @param deviceManager 设备管理器
      * @return 是否有可用的设备
      */
-    fun hasAvailableDevices(deviceManager: DeviceConnectionManager): Boolean = deviceManager.devices.value.isNotEmpty()
+    fun hasAvailableDevices(deviceManager: DeviceMessagePort): Boolean = deviceManager.devices.value.isNotEmpty()
 
     /**
      * 检查消息是否有效

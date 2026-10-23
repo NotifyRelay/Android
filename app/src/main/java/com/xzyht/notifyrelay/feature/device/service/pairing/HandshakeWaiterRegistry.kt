@@ -1,5 +1,6 @@
 package com.xzyht.notifyrelay.feature.device.service.pairing
 
+import com.xzyht.notifyrelay.feature.device.service.contract.HandshakeWaiterPort
 import kotlinx.coroutines.CompletableDeferred
 
 /**
@@ -11,7 +12,7 @@ import kotlinx.coroutines.CompletableDeferred
  * 同一 uuid 只保留最新的等待器：重复注册会取消上一个（`CompletableDeferred.cancel()`），
  * 避免迟到结果误唤醒旧等待者。
  */
-class HandshakeWaiterRegistry {
+class HandshakeWaiterRegistry : HandshakeWaiterPort {
     private val pending = mutableMapOf<String, CompletableDeferred<Boolean>>()
 
     /**
@@ -23,7 +24,7 @@ class HandshakeWaiterRegistry {
     private val failureReasons = mutableMapOf<String, String>()
 
     /** 注册等待握手结果（同一 uuid 的旧等待器会被取消）。 */
-    fun register(uuid: String): CompletableDeferred<Boolean> {
+    override fun register(uuid: String): CompletableDeferred<Boolean> {
         val deferred = CompletableDeferred<Boolean>()
         synchronized(pending) {
             pending[uuid]?.cancel()
@@ -54,10 +55,10 @@ class HandshakeWaiterRegistry {
     }
 
     /** 读取该 uuid 最近一次失败原因（不清除；由 [register] 在下次注册时清理）。 */
-    fun failureReason(uuid: String): String? = synchronized(pending) { failureReasons[uuid] }
+    override fun failureReason(uuid: String): String? = synchronized(pending) { failureReasons[uuid] }
 
     /** 按 Deferred 实例清理等待器，防止迟到请求完成或移除其他等待器。 */
-    fun cancel(
+    override fun cancel(
         uuid: String,
         deferred: CompletableDeferred<Boolean>,
     ) {

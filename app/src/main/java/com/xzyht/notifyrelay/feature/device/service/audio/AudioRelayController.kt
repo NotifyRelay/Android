@@ -9,6 +9,7 @@ import android.os.Looper
 import com.xzyht.notifyrelay.feature.audio.AudioRelayPlayer
 import com.xzyht.notifyrelay.feature.audio.service.AudioRelayForegroundService
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
+import com.xzyht.notifyrelay.feature.device.service.contract.AudioRelayPort
 import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundService
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
@@ -55,7 +56,7 @@ class AudioRelayController(
     private val resolveDeviceInfo: (uuid: String) -> DeviceInfo?,
     /** 发送一条 DATA_MEDIA_CONTROL 明文报文。 */
     private val sendMediaControl: (target: DeviceInfo, plaintext: String) -> Unit,
-) {
+) : AudioRelayPort {
     companion object {
         const val HEADER_MEDIA_CONTROL = "DATA_MEDIA_CONTROL"
 
@@ -65,14 +66,14 @@ class AudioRelayController(
         private const val ACTION_AUDIO_RESPONSE = "audioResponse"
     }
 
-    /** 供 UI 直接操作播放器（启停收发）。 */
-    val player by lazy { AudioRelayPlayer(context) }
+    /** 音频播放/采集器（模块内部装配，对外仅暴露 [AudioRelayPort] 的行为）。 */
+    internal val player by lazy { AudioRelayPlayer(context) }
 
     /**
      * 屏幕捕获授权请求回调。由 UI 层（MainActivity）注入，
      * 在需要发起投送会话时触发系统授权流程。
      */
-    var onRequestMediaProjection: (() -> Unit)? = null
+    override var onRequestMediaProjection: (() -> Unit)? = null
 
     private var currentRemoteUuid: String? = null
     private var stopReceiver: BroadcastReceiver? = null
@@ -88,7 +89,7 @@ class AudioRelayController(
     // ==================== UI 入口 ====================
 
     /** 发起向指定设备的音频投送：先请求屏幕捕获授权，授权后由 [startPendingSend] 启动。 */
-    fun requestSendTo(
+    override fun requestSendTo(
         deviceIp: String,
         deviceName: String,
         remoteUuid: String,
@@ -98,7 +99,7 @@ class AudioRelayController(
     }
 
     /** 屏幕捕获授权成功后调用，启动挂起的投送会话。 */
-    fun startPendingSend() {
+    override fun startPendingSend() {
         val pending = pendingSend ?: return
         pendingSend = null
         val projection = NativeCore.mediaProjection ?: return
@@ -114,7 +115,7 @@ class AudioRelayController(
     }
 
     /** 主动停止中继（UI 入口）：先通知远端，再本地清理。 */
-    fun stop() {
+    override fun stop() {
         val uuid = currentRemoteUuid
         if (!uuid.isNullOrEmpty()) {
             resolveDeviceInfo(uuid)?.let {
@@ -156,7 +157,7 @@ class AudioRelayController(
     }
 
     /** 远端开始推送音频（`audioStart`）：启动接收侧播放并展示前台通知。 */
-    fun startReceive(
+    override fun startReceive(
         remoteUuid: String,
         sampleRate: Int,
         channels: Int,
@@ -189,12 +190,17 @@ class AudioRelayController(
     }
 
     /** 停止并清空屏幕投影，避免下次授权时 stop 旧投影触发 onStop 回调干扰新会话。 */
-    fun cleanupMediaProjection() {
+    override fun cleanupMediaProjection() {
         try {
             NativeCore.mediaProjection?.stop()
         } catch (_: Exception) {
         }
         NativeCore.mediaProjection = null
+    }
+
+    /** 停止发送侧采集。 */
+    override fun stopSendCapture() {
+        player.stopSendCapture()
     }
 
     // ==================== 前台通知与停止广播 ====================

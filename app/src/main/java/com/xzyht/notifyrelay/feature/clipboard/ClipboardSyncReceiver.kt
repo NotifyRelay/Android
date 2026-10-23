@@ -41,7 +41,7 @@ class ClipboardSyncReceiver : BroadcastReceiver() {
         Logger.d(TAG, "执行手动同步")
 
         try {
-            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceQuery(context)
             val onlineDevices = deviceManager.getAuthenticatedOnlineCount()
 
             if (onlineDevices == 0) {

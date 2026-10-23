@@ -254,7 +254,7 @@ object NotificationRepository {
 
         try {
             com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-                .getDeviceManager(context)
+                .getDeviceQuery(context)
                 .getPairedDeviceUuids()
                 .forEach { uuid ->
                     if (uuid.isNotEmpty() && uuid != "本机") {

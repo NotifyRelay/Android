@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.sync.builder
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceMessagePort
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.sync.SendGateway
 import notifyrelay.base.util.Logger
@@ -26,7 +26,7 @@ object ChatMessageBuilder {
     fun sendChatMessage(
         context: Context,
         message: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
     ) {
         // 设备查找
         val allDevices =
@@ -87,7 +87,7 @@ object ChatMessageBuilder {
         title: String?,
         text: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         notificationKey: String? = null,
     ) {
         // 设备查找

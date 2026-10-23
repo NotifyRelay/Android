@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.sync.builder
 
 import android.content.Context
 import android.net.Uri
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAuthTablePort
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.SendGateway
 import kotlinx.coroutines.Dispatchers
@@ -116,7 +116,7 @@ object SuperIslandMessageBuilder {
         time: Long,
         paramV2Raw: String?,
         picMap: Map<String, String>?,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
         featureIdOverride: String? = null,
     ) {
         try {
@@ -167,7 +167,7 @@ object SuperIslandMessageBuilder {
         paramV2Raw: String?,
         title: String?,
         text: String?,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
         featureIdOverride: String? = null,
     ) {
         try {

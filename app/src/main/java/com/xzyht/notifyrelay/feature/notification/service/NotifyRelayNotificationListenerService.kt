@@ -11,8 +11,8 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationTextReader
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceDiscoveryPort
 import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.filter.BackendLocalFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
@@ -176,7 +176,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         // 确保本地历史缓存已加载，避免首次拉取时判重失效
         NotificationRepository.init(applicationContext)
         // 初始化设备连接管理器并启动发现
-        connectionManager = DeviceConnectionManagerSingleton.getDeviceManager(applicationContext)
+        connectionManager = DeviceConnectionManagerSingleton.getDeviceDiscovery(applicationContext)
         foregroundController =
             ListenerForegroundController(applicationContext, connectionManager) { id, notification ->
                 startForeground(id, notification)
@@ -238,8 +238,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     private lateinit var foregroundController: ListenerForegroundController
 
     // 设备连接管理器
-    private lateinit var connectionManager: DeviceConnectionManager
-    internal val deviceManager by lazy { DeviceConnectionManagerSingleton.getDeviceManager(applicationContext) }
+    private lateinit var connectionManager: DeviceDiscoveryPort
+    internal val deviceManager by lazy { DeviceConnectionManagerSingleton.getDeviceMessage(applicationContext) }
 
     // 网络监听器
     private var networkCallback: ConnectivityManager.NetworkCallback? = null

@@ -1,7 +1,8 @@
 package com.xzyht.notifyrelay.sync
 
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAuthTablePort
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceQueryPort
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.util.Logger
 
@@ -18,22 +19,19 @@ internal object SendGateway {
     /**
      * 获取已认证的设备列表（不含本机）。
      *
-     * 直接使用 [DeviceConnectionManager] 的 `internal` 访问器（`authenticatedDevices` / `uuid` /
-     * `lookupDevice`），不再反射私有字段与方法。
-     * uuid 快照在同一把锁下取出（与 `DeviceQuery` / `PairingCallbackHandler` 的既有约定一致），
-     * 避免遍历期间被其它线程增删导致 ConcurrentModificationException。
+     * 经 [DeviceAuthTablePort] 的只读快照读取已认证 uuid，再逐个解析设备信息；
+     * 快照在实现方同一把锁内复制，遍历期间不会被其它线程增删。
      */
-    fun getAuthenticatedDevices(deviceManager: DeviceConnectionManager): List<DeviceInfo> =
+    fun getAuthenticatedDevices(deviceManager: DeviceAuthTablePort): List<DeviceInfo> =
         try {
-            val authedUuids =
-                synchronized(deviceManager.authenticatedDevices) {
-                    deviceManager.authenticatedDevices.keys.toList()
-                }
+            val snapshot = deviceManager.authenticatedSnapshot()
+            val localUuid = deviceManager.localUuid
+            val query = deviceManager as? DeviceQueryPort
 
             val authenticatedDevices = mutableListOf<DeviceInfo>()
-            for (uuid in authedUuids) {
-                if (uuid == deviceManager.uuid) continue
-                deviceManager.lookupDevice(uuid)?.let { authenticatedDevices.add(it) }
+            for (uuid in snapshot.keys) {
+                if (uuid == localUuid) continue
+                query?.resolveDeviceInfo(uuid, null, 23333)?.let { authenticatedDevices.add(it) }
             }
 
             authenticatedDevices
@@ -48,7 +46,7 @@ internal object SendGateway {
     fun enqueueNotification(
         deviceInfo: DeviceInfo,
         json: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
         tag: String = "",
     ): Boolean {
         val ctx = NativeCore.getContext()

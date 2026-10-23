@@ -90,7 +90,7 @@ internal class ScreenCaptureCoordinator(
             if (projection != null) {
                 pendingScreenCapture = null
                 val audioRelay = DeviceConnectionManagerSingleton.getAudioRelay(activity)
-                audioRelay.player.stopSendCapture()
+                audioRelay.stopSendCapture()
                 NativeCore.mediaProjection?.stop()
                 NativeCore.mediaProjection = projection
                 projection.registerCallback(

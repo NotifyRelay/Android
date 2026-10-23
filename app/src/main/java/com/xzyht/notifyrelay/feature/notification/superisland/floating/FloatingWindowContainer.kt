@@ -188,21 +188,21 @@ fun FloatingWindowContainer(
                                                         RemoteMediaSessionManager.onPlayPause(
                                                             context,
                                                             com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-                                                                .getDeviceManager(context),
+                                                                .getDeviceMessage(context),
                                                         )
                                                     },
                                                     onPrevious = {
                                                         RemoteMediaSessionManager.onPrevious(
                                                             context,
                                                             com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-                                                                .getDeviceManager(context),
+                                                                .getDeviceMessage(context),
                                                         )
                                                     },
                                                     onNext = {
                                                         RemoteMediaSessionManager.onNext(
                                                             context,
                                                             com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-                                                                .getDeviceManager(context),
+                                                                .getDeviceMessage(context),
                                                         )
                                                     },
                                                     onClose = {

@@ -36,7 +36,7 @@ fun DeviceListScreen(
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
-    val deviceManager = remember { DeviceConnectionManagerSingleton.getDeviceManager(context) }
+    val deviceManager = remember { DeviceConnectionManagerSingleton.getDeviceAdmin(context) }
     val coroutineScope = rememberCoroutineScope()
 
     var authedDeviceUuids by rememberSaveable { mutableStateOf(setOf<String>()) }

@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.sync
 
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAuthTablePort
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.util.Logger
 
@@ -19,16 +19,13 @@ object ProtocolSender {
     enum class EnqueueResult { SUCCESS, DEDUPED, QUEUE_UNINITIALIZED, MISSING_CONTEXT, AUTH_FAILED, NATIVE_ERROR }
 
     fun sendEncrypted(
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
         target: DeviceInfo,
         header: String,
         plaintext: String,
         timeoutMs: Long = 10000L,
     ): EnqueueResult {
-        val auth =
-            synchronized(deviceManager.authenticatedDevices) {
-                deviceManager.authenticatedDevices[target.uuid]
-            }
+        val auth = deviceManager.authenticatedSnapshot()[target.uuid]
         if (auth == null || !auth.isAccepted) return EnqueueResult.AUTH_FAILED
 
         val queuePtr = NativeCore.senderQueuePtr

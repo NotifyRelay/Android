@@ -119,7 +119,7 @@ fun MusicControlPage() {
                     }
 
                     try {
-                        val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                        val deviceManager = DeviceConnectionManagerSingleton.getDeviceSend(context)
                         val audioRelay = DeviceConnectionManagerSingleton.getAudioRelay(context)
                         val relayMode = StorageManager.getInt(context, "audio_relay_mode", 0)
 
@@ -313,7 +313,7 @@ fun MusicControlPage() {
                             MediaControlUtil.previous()
                             ToastUtils.showShortToast(context, "已发送上一首指令到本机")
                         } else {
-                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"previous\"}"
                             val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
                             if (result == ProtocolSender.EnqueueResult.SUCCESS) {
@@ -340,7 +340,7 @@ fun MusicControlPage() {
                             MediaControlUtil.playPause()
                             ToastUtils.showShortToast(context, "已发送播放/暂停指令到本机")
                         } else {
-                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"playPause\"}"
                             val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
                             if (result == ProtocolSender.EnqueueResult.SUCCESS) {
@@ -367,7 +367,7 @@ fun MusicControlPage() {
                             MediaControlUtil.next()
                             ToastUtils.showShortToast(context, "已发送下一首指令到本机")
                         } else {
-                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(context)
                             val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"next\"}"
                             val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
                             if (result == ProtocolSender.EnqueueResult.SUCCESS) {

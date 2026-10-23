@@ -8,8 +8,8 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceQueryPort
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -93,7 +93,7 @@ object ClipboardSyncManager {
         context: Context,
     ) {
         try {
-            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceQuery(context)
             val resultJson =
                 NativeCore.clipboardOnReceived(
                     NativeCore.getContext(),
@@ -251,7 +251,7 @@ object ClipboardSyncManager {
      * 此方法忽略前台检测，直接获取并发送当前剪贴板内容（force=true 跳过内容未变检查）
      */
     fun manualSyncClipboard(
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceQueryPort,
         context: Context,
     ) {
         Logger.d(TAG, "手动触发剪贴板同步")
@@ -315,7 +315,7 @@ object ClipboardSyncManager {
      * 不触发系统剪贴板读取，不检查前台状态，用于特定场景（如验证码复制）
      */
     fun syncTextDirectly(
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceQueryPort,
         text: String,
         context: Context,
     ) {

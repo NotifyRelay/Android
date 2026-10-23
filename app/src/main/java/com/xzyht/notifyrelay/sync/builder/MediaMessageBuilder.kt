@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.sync.builder
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAuthTablePort
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.SendGateway
 import notifyrelay.base.util.Logger
@@ -58,7 +58,7 @@ object MediaMessageBuilder {
         text: String?,
         coverUrl: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
     ) {
         try {
             // 推送「全量」媒体状态：差异计算（FULL/DELTA）、合并与 ACK 均由 Rust 合并引擎负责。
@@ -98,7 +98,7 @@ object MediaMessageBuilder {
         packageName: String,
         appName: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
     ) {
         try {
             // 推送结束标记：Rust 合并引擎会回传 terminateValue="__END__" 全量，接收端据此移除媒体卡片。

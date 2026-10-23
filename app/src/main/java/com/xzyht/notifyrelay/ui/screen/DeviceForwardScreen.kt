@@ -53,7 +53,7 @@ fun DeviceForwardScreen() {
     val selectedTabIndex = pagerState.currentPage
     val colorScheme = MiuixTheme.colorScheme
 
-    val deviceManager = remember { DeviceConnectionManagerSingleton.getDeviceManager(context) }
+    val deviceManager = remember { DeviceConnectionManagerSingleton.getDeviceAdmin(context) }
     val selectedDeviceState = GlobalSelectedDeviceHolder.current()
     val selectedDevice = selectedDeviceState.value
 

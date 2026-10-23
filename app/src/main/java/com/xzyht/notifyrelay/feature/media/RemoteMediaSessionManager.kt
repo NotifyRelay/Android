@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAuthTablePort
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import com.xzyht.notifyrelay.nativecore.NativeCore
@@ -338,7 +338,7 @@ object RemoteMediaSessionManager {
 
     fun sendMediaControl(
         context: Context,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
         action: String,
     ) {
         val device = currentDevice ?: return
@@ -359,21 +359,21 @@ object RemoteMediaSessionManager {
 
     fun onPlayPause(
         context: Context,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
     ) {
         sendMediaControl(context, deviceManager, "playPause")
     }
 
     fun onPrevious(
         context: Context,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
     ) {
         sendMediaControl(context, deviceManager, "previous")
     }
 
     fun onNext(
         context: Context,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
     ) {
         sendMediaControl(context, deviceManager, "next")
     }

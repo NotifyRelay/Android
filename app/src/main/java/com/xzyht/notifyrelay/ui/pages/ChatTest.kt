@@ -23,7 +23,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceChatPort
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.sync.MessageSender
 import notifyrelay.base.util.ClipboardUtils
@@ -40,7 +40,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  */
 @Composable
 fun UIChatTest(
-    deviceManager: DeviceConnectionManager,
+    deviceManager: DeviceChatPort,
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current

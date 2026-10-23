@@ -51,7 +51,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
 
         ShortcutLaunchActivity.setAppLaunchCallback { deviceIp, packageName, displayId ->
-            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(this)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(this)
             val devices = deviceManager.getAuthenticatedOnlineDevices()
             val targetDevice = devices.find { it.ip == deviceIp }
             if (targetDevice != null) {
@@ -89,7 +89,7 @@ class MainActivity : FragmentActivity() {
 
         // 后台初始化，避免阻塞 UI 线程
         lifecycleScope.launch(Dispatchers.Default) {
-            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(this@MainActivity)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(this@MainActivity)
             DeviceInfoManager.generateDeviceInfoFile(this@MainActivity, deviceManager.localUuid)
             LiveUpdatesNotificationManager.initialize(this@MainActivity)
             NotificationRepository.init(this@MainActivity)

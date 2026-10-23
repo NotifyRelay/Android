@@ -5,7 +5,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAuthTablePort
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
@@ -15,7 +15,7 @@ object AppLaunchManager {
 
     fun handleAppLaunchRequest(
         decrypted: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
         source: DeviceInfo,
         context: Context,
     ) {
@@ -60,7 +60,7 @@ object AppLaunchManager {
 
     fun sendAppLaunchRequest(
         context: Context,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceAuthTablePort,
         target: DeviceInfo,
         packageName: String,
         displayId: Int = -1,

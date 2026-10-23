@@ -14,7 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAdminPort
 import com.xzyht.notifyrelay.ui.dialog.PairingCodeDialog
 import com.xzyht.notifyrelay.ui.dialog.PairingMode
 import com.xzyht.notifyrelay.ui.dialog.RejectedDevicesDialog
@@ -34,7 +34,7 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 @Composable
 internal fun DeviceListPairingCodeDialog(
     state: DeviceListScreenState,
-    deviceManager: DeviceConnectionManager,
+    deviceManager: DeviceAdminPort,
     onAuthedUuidsChange: (Set<String>) -> Unit,
 ) {
     // 配对码对话框 - 服务端模式
@@ -97,7 +97,7 @@ internal fun DeviceListPairingCodeDialog(
 @Composable
 internal fun RejectedDeviceRestoreDialog(
     state: DeviceListScreenState,
-    deviceManager: DeviceConnectionManager,
+    deviceManager: DeviceAdminPort,
     rejectedDevices: List<DeviceInfo>,
     findOtherUuidsWithSameIp: (ip: String, exceptUuid: String) -> List<String>,
     onRejectedUuidsChange: (Set<String>) -> Unit,
@@ -129,7 +129,7 @@ internal fun RejectedDeviceRestoreDialog(
 internal fun DeleteDeviceConfirmDialog(
     show: Boolean,
     device: DeviceInfo,
-    deviceManager: DeviceConnectionManager,
+    deviceManager: DeviceAdminPort,
     coroutineScope: CoroutineScope,
     onRemoveAuthedUuid: (String) -> Unit,
     onClose: () -> Unit,

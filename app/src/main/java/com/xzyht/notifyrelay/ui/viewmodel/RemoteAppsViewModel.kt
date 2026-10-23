@@ -9,8 +9,8 @@ import com.xzyht.notifyrelay.feature.appslist.RemoteAppsCache
 import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.feature.device.service.contract.DeviceQueryPort
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -96,7 +96,7 @@ class RemoteAppsViewModel : ViewModel() {
             viewModelScope.launch {
                 appsMachine.update { it.copy(isLoading = true, error = null) }
                 try {
-                    val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+                    val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(context)
                     val deviceInfo = findDeviceInfo(deviceManager, deviceUuid)
 
                     if (deviceInfo != null) {
@@ -127,7 +127,7 @@ class RemoteAppsViewModel : ViewModel() {
     }
 
     private fun findDeviceInfo(
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceQueryPort,
         deviceUuid: String,
     ): DeviceInfo? {
         val onlineDevices = deviceManager.getAuthenticatedOnlineDevices()
