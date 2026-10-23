@@ -163,11 +163,15 @@ interface NotifyRelayCore : Library {
         arg2Ms: Long,
     ): Int
 
+    // ======== 入站内容去重（10s 窗口；键与 TTL 由 core 持有）========
+    fun nrc_content_dedup(
+        ctx: Pointer,
+        action: Int,
+        title: String,
+        text: String,
+    ): Int
+
     // ======== Utility functions ========
-    fun nrc_compute_dedup_key(
-        deviceUuid: String,
-        data: String,
-    ): Pointer
 
     fun nrc_compute_feature_id(
         superPkg: String,
@@ -381,14 +385,15 @@ interface NotifyRelayCore : Library {
     ): Pointer
 
     // ======== Sender queue ========
+    // header 规范化、通知类发送去重（仅 DATA_NOTIFICATION）与 ts 注入由 core 内部完成
+    // 返回：1=已入队 0=命中去重丢弃（仅通知类） -1=参数无效或队列未初始化
     fun nrc_enqueue_message(
         ctx: Pointer,
         queuePtr: Long,
         deviceUuid: String,
         header: String,
         plaintext: String,
-        dedupKey: String?,
-    )
+    ): Int
 
     // ======== Clipboard ========
     fun nrc_clipboard_on_changed(

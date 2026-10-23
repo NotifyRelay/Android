@@ -20,7 +20,6 @@ import org.json.JSONObject
  * 过滤决策委托给 Rust NativeCore
  *
  * 拆分后本 object 仅作为外部调用门面（facade）：
- * - 去重缓存 → [RemoteFilterDedupCache]
  * - 延迟复刻占位队列 → [RemoteFilterPlaceholderQueue]
  * - 待撤回监控队列与超时协程 → [RemoteFilterPendingMonitor]
  * 内部数据类与逻辑一字未改，仅搬迁至对应文件。
@@ -33,9 +32,6 @@ object BackendRemoteFilter {
     // 结构化协程作用域，替代 GlobalScope
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
-    // 延迟去重缓存（10秒内）- 用于智能去重机制
-    private val dedupCache = RemoteFilterDedupCache
-
     // 延迟复刻占位队列（用于锁屏延迟复刻的占位，15s 可被本机入队取消）
     private val placeholders = RemoteFilterPlaceholderQueue()
 
@@ -43,7 +39,7 @@ object BackendRemoteFilter {
     private val pendingMonitor =
         RemoteFilterPendingMonitor(
             scope = scope,
-            onDedupCache = { title, text -> dedupCache.add(title, text) },
+            onDedupCache = { title, text -> markContentSeen(title, text) },
             onClearExpiredPlaceholders = { placeholders.clearExpired() },
         )
 
@@ -51,9 +47,38 @@ object BackendRemoteFilter {
      * 清空待处理列表（供公平运行内存回调使用）。
      */
     fun clearPending() {
-        dedupCache.clear()
+        clearContentWindow()
         pendingMonitor.clear()
         placeholders.clear()
+    }
+
+    // ======== 入站内容去重（10s 窗口；键与 TTL 由 core 持有）========
+    private const val CONTENT_DEDUP_QUERY = 0
+    private const val CONTENT_DEDUP_MARK = 1
+    private const val CONTENT_DEDUP_CLEAR = 2
+
+    /** 内容窗口查询：core 持有 10s 窗口与键；无 ctx 时按未见过处理（fail-open） */
+    private fun contentSeen(
+        title: String,
+        text: String,
+    ): Boolean {
+        val ctx = rustContext ?: return false
+        return NativeCore.contentDedup(ctx, CONTENT_DEDUP_QUERY, title, text) == 1
+    }
+
+    /** 内容窗口标记：core 持有 10s 窗口与键；无 ctx 时跳过 */
+    private fun markContentSeen(
+        title: String,
+        text: String,
+    ) {
+        val ctx = rustContext ?: return
+        NativeCore.contentDedup(ctx, CONTENT_DEDUP_MARK, title, text)
+    }
+
+    /** 清空内容窗口 */
+    private fun clearContentWindow() {
+        val ctx = rustContext ?: return
+        NativeCore.contentDedup(ctx, CONTENT_DEDUP_CLEAR, "", "")
     }
 
     /**
@@ -214,8 +239,8 @@ object BackendRemoteFilter {
             return null
         }
 
-        // 1. 快速缓存检查（10秒内）
-        if (dedupCache.containsRecent(title, text)) {
+        // 1. 10 秒内容窗口查询（core 持有窗口与键）
+        if (contentSeen(title, text)) {
             // 撤回匹配的待监控通知（按原始标题/文本匹配，与缓存写入口径一致）。
             // 保持基线语义：命中缓存只撤回，不刷新去重窗口。
             pendingMonitor.cancelMatchingRaw(title, text)
@@ -282,13 +307,13 @@ object BackendRemoteFilter {
     }
 
     /**
-     * 添加到去重缓存
+     * 标记内容已见（core 10 秒窗口）
      */
     fun addToDedupCache(
         title: String,
         text: String,
     ) {
-        dedupCache.add(title, text)
+        markContentSeen(title, text)
     }
 
     /**
@@ -340,8 +365,8 @@ object BackendRemoteFilter {
         val pendingText = text ?: ""
         // 先处理占位匹配（用于延迟复刻的占位）——在单独的锁上操作以避免并发问题
         placeholders.removeMatching(title, text, packageName) { ph ->
-            // 命中占位（阻止延迟复刻）：将其写入去重缓存
-            dedupCache.add(ph.title, ph.text)
+            // 命中占位（阻止延迟复刻）：将其标记为内容已见
+            markContentSeen(ph.title, ph.text)
         }
 
         // 再处理已发送但在可撤回期的通知
@@ -350,8 +375,8 @@ object BackendRemoteFilter {
             val titlePreview = if ((title?.length ?: 0) > 10) "${title?.take(10)}..." else (title ?: "")
             Logger.d("智能去重", "被动命中待撤回通知 - 包名:$packageName, 标题预览:$titlePreview, 匹配数量:${matches.size}")
         }
-        // 对于命中的通知，也可以把本地这条记录记入去重缓存，避免短时间内再次复刻
-        matches.forEach { dedupCache.add(it.title, it.text) }
+        // 对于命中的通知，也可以把本地这条记录记入内容窗口，避免短时间内再次复刻
+        matches.forEach { markContentSeen(it.title, it.text) }
     }
 
     /**

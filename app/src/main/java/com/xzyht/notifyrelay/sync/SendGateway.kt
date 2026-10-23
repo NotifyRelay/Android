@@ -56,15 +56,17 @@ internal object SendGateway {
             Logger.w(TAG, "Rust 未初始化，跳过入队: ${deviceInfo.displayName}")
             return false
         }
-        val dedupKey = NativeCore.computeDedupKey(deviceInfo.uuid, json) ?: return false
         val result =
             ProtocolSender.sendEncrypted(
                 deviceManager,
                 deviceInfo,
                 "DATA_NOTIFICATION",
                 json,
-                dedupKey = dedupKey,
             )
+        if (result == ProtocolSender.EnqueueResult.DEDUPED) {
+            Logger.d(TAG, "命中去重丢弃: ${deviceInfo.displayName}")
+            return true
+        }
         if (result != ProtocolSender.EnqueueResult.SUCCESS) {
             Logger.w(TAG, "加入${tag}发送队列失败: ${deviceInfo.displayName}, result=$result")
             return false
