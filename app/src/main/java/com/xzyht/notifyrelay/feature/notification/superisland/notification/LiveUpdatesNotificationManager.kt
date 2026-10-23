@@ -43,13 +43,6 @@ object LiveUpdatesNotificationManager {
     internal lateinit var appContext: Context
         private set
 
-    /**
-     * 清空图标缓存（供公平运行内存回调使用）。
-     */
-    fun clearIconCache() {
-        LiveUpdatesIconLoader.clearIconCache()
-    }
-
     fun initialize(context: Context) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.BAKLAVA) {
             Logger.w(TAG, "当前Android版本不支持Live Updates")

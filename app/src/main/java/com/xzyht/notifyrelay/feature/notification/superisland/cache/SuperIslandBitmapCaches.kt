@@ -1,6 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.cache
 
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
+import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesIconLoader
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.ReplicaIconCache
 import com.xzyht.notifyrelay.ui.pages.superisland.SuperIslandImageCache
 import github.xzynine.superislandui.common.BitmapUtils
@@ -21,7 +21,7 @@ internal object SuperIslandBitmapCaches {
      */
     fun clearAll() {
         try {
-            LiveUpdatesNotificationManager.clearIconCache()
+            LiveUpdatesIconLoader.clearIconCache()
         } catch (e: RuntimeException) {
             Logger.w(TAG, "清理 LiveUpdates 图标缓存失败", e)
         }

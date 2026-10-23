@@ -1,7 +1,8 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.image
 
 import android.content.Context
-import android.os.Looper
+import android.database.sqlite.SQLiteException
+import android.graphics.Bitmap
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
@@ -9,10 +10,9 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.async
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import notifyrelay.base.util.Logger
+import notifyrelay.base.util.image.ImageUtils
 import notifyrelay.base.util.sha256
 import notifyrelay.data.StorageManager
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
@@ -109,19 +109,29 @@ object SuperIslandImageStore {
         return DatabaseRepository.getInstance(context).resolveSuperIslandImageById(imageId) ?: value
     }
 
-    fun resolve(
-        context: Context?,
+    /**
+     * 解析图片ID并解码为位图。
+     *
+     * 取值不是图片ID时按原值解码：data URL 直接解码，http 地址下载后解码。
+     *
+     * @param value 图片ID或图片原始取值（data URL / http 地址）。
+     * @return 解码成功返回位图；取值不可识别或解码失败返回 null。
+     */
+    suspend fun decodeBitmap(
+        context: Context,
         value: String?,
-    ): String? {
-        val imageId = resolveId(value) ?: return value
-        if (imageId <= 0 || context == null || isMainThread()) {
-            if (isMainThread()) {
-                Logger.w("SuperIslandImageStore", "resolve在主线程调用，无法解析图片ID: $imageId，请使用resolveSuspend或resolvePicMap")
+    ): Bitmap? {
+        if (value.isNullOrBlank()) return null
+        val data =
+            try {
+                resolveSuspend(context, value) ?: return null
+            } catch (_: SQLiteException) {
+                value
             }
-            return value
-        }
-        return runBlocking(Dispatchers.IO) {
-            DatabaseRepository.getInstance(context).resolveSuperIslandImageById(imageId) ?: value
+        return when {
+            ImageUtils.isDataUrl(data) -> ImageUtils.decodeDataUrlToBitmap(context, data)
+            data.startsWith("http", ignoreCase = true) -> ImageUtils.loadBitmap(context, data)
+            else -> null
         }
     }
 
@@ -157,8 +167,6 @@ object SuperIslandImageStore {
         val trimmed = packageName?.trim().orEmpty()
         return if (trimmed.isBlank()) DEFAULT_PACKAGE_NAME else trimmed
     }
-
-    private fun isMainThread(): Boolean = Looper.myLooper() == Looper.getMainLooper()
 
     private suspend fun ensureMigrated(context: Context) {
         if (StorageManager.getBoolean(context, MIGRATION_FLAG_KEY, false)) return

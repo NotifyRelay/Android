@@ -25,10 +25,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.ReplicaSmallIconInjector
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import notifyrelay.base.util.image.ImageUtils
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Locale
@@ -54,24 +52,8 @@ internal fun SuperIslandHistoryImage(
 
         val loaded =
             withContext(Dispatchers.IO) {
-                try {
-                    val resolved =
-                        try {
-                            SuperIslandImageStore.resolve(context, data) ?: data
-                        } catch (_: Exception) {
-                            data
-                        }
-
-                    val decoded =
-                        when {
-                            ImageUtils.isDataUrl(resolved) -> ImageUtils.decodeDataUrlToBitmap(context, resolved)
-                            resolved.startsWith("http", ignoreCase = true) -> ReplicaSmallIconInjector.downloadBitmap(context, resolved)
-                            else -> null
-                        }
-                    decoded?.let { SuperIslandImageCache.put(data, it) }
-                } catch (_: Exception) {
-                    null
-                }
+                val bitmap = SuperIslandImageStore.decodeBitmap(context, data)
+                bitmap?.let { SuperIslandImageCache.put(data, it) }
             }
 
         value = loaded
