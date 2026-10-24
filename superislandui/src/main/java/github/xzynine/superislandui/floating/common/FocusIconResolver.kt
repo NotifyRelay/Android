@@ -87,7 +87,6 @@ fun getFocusIconUrl(
 fun resolveIconUrl(
     picMap: Map<String, String>?,
     iconKey: String?,
-    context: android.content.Context? = null,
 ): String? {
     if (iconKey.isNullOrEmpty() || picMap == null) return null
 
@@ -102,5 +101,4 @@ fun resolveFocusIconUrl(
     picMap: Map<String, String>?,
     primaryKey: String?,
     isDarkTheme: Boolean = false,
-    context: android.content.Context? = null,
 ): String? = getFocusIconUrl(picMap, primaryKey, isDarkTheme)

@@ -1,7 +1,7 @@
 package github.xzynine.superislandui.floating.bigisland.components
 
-import android.content.res.Configuration
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -12,14 +12,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.templates.CoverInfo
 import notifyrelay.base.util.image.ImageUtils
@@ -35,8 +34,7 @@ fun CoverInfoCompose(
     coverInfo: CoverInfo,
     picMap: Map<String, String>? = null,
 ) {
-    val uiMode = LocalConfiguration.current.uiMode
-    val preferDark = (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    val preferDark = isSystemInDarkTheme()
 
     Row(
         modifier = Modifier.padding(8.dp),
@@ -44,14 +42,13 @@ fun CoverInfoCompose(
     ) {
         // 封面图：与文本整体纵向居中
         val coverKey = coverInfo.picCover
-        val context = LocalContext.current
-        var finalCoverUrl: String? = resolveIconUrl(picMap, coverKey, context)
+        var finalCoverUrl: String? = resolveIconUrl(picMap, coverKey)
         if (finalCoverUrl.isNullOrEmpty() && picMap != null) {
             finalCoverUrl = SuperIslandImageUtil.resolveFallbackIconUrl(picMap)
         }
 
         if (!finalCoverUrl.isNullOrEmpty()) {
-            val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(finalCoverUrl)
+            val painter = rememberSuperIslandImagePainter(finalCoverUrl)
             painter?.let {
                 Image(
                     painter = it,

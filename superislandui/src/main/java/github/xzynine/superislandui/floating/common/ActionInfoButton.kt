@@ -1,8 +1,8 @@
 package github.xzynine.superislandui.floating.common
 
-import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -13,8 +13,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.components.ActionInfo
@@ -30,14 +28,12 @@ fun ActionInfoButton(
     action: ActionInfo,
     picMap: Map<String, String>? = null,
 ) {
-    val uiMode = LocalConfiguration.current.uiMode
-    val preferDark = (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    val preferDark = isSystemInDarkTheme()
 
-    val context = LocalContext.current
     val iconKey = if (preferDark) action.actionIconDark ?: action.actionIcon else action.actionIcon
-    var iconUrl: String? = resolveIconUrl(picMap, iconKey, context)
+    var iconUrl: String? = resolveIconUrl(picMap, iconKey)
     if (iconUrl.isNullOrEmpty()) {
-        iconUrl = resolveIconUrl(picMap, action.actionIcon, context)
+        iconUrl = resolveIconUrl(picMap, action.actionIcon)
     }
 
     val titleColor =
@@ -61,7 +57,7 @@ fun ActionInfoButton(
         horizontalArrangement = Arrangement.Center,
     ) {
         if (!iconUrl.isNullOrEmpty()) {
-            val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(iconUrl)
+            val painter = rememberSuperIslandImagePainter(iconUrl)
             painter?.let {
                 Image(
                     painter = it,

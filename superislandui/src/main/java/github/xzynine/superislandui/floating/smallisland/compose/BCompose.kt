@@ -14,7 +14,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.common.PreviewData
@@ -22,9 +21,9 @@ import github.xzynine.superislandui.floating.common.CircularProgressCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.CommonImagePlaceholder
 import github.xzynine.superislandui.floating.common.CommonTextBlockCompose
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.floating.common.parseColorSafe
+import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.floating.smallisland.right.BComponent
 import github.xzynine.superislandui.floating.smallisland.right.BEmpty
@@ -46,7 +45,6 @@ fun BCompose(
     bComp: BComponent,
     picMap: Map<String, String>?,
 ) {
-    val context = LocalContext.current
     Row(
         modifier = Modifier.wrapContentWidth(),
         verticalAlignment = Alignment.CenterVertically,
@@ -114,10 +112,10 @@ fun BCompose(
             }
             is BImageText6 -> {
                 // 图标 - 只加载data URL格式的图片
-                val iconUrl = resolveIconUrl(picMap, bComp.picKey, context)
+                val iconUrl = resolveIconUrl(picMap, bComp.picKey)
                 // 只处理data URL格式的图片
                 if (iconUrl?.startsWith("data:", ignoreCase = true) == true) {
-                    val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(iconUrl, picMap, bComp.picKey)
+                    val painter = rememberSuperIslandImagePainter(iconUrl, picMap, bComp.picKey)
 
                     if (painter != null) {
                         Image(
@@ -221,8 +219,8 @@ fun BCompose(
 
                     // 中心图标
                     bComp.picKey?.let { picKey ->
-                        val iconUrl = resolveIconUrl(picMap, picKey, context)
-                        val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(iconUrl, picMap, picKey)
+                        val iconUrl = resolveIconUrl(picMap, picKey)
+                        val painter = rememberSuperIslandImagePainter(iconUrl, picMap, picKey)
 
                         if (painter != null) {
                             Image(

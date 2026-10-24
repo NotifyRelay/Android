@@ -1,7 +1,7 @@
-﻿package github.xzynine.superislandui.floating.bigisland.components
+package github.xzynine.superislandui.floating.bigisland.components
 
-import android.content.res.Configuration
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
@@ -12,8 +12,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -21,6 +19,7 @@ import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.formatTimerInfo
+import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.components.AnimTextInfo
 import kotlinx.coroutines.delay
@@ -35,17 +34,12 @@ fun AnimTextInfoCompose(
     animTextInfo: AnimTextInfo,
     picMap: Map<String, String>? = null,
 ) {
-    val uiMode = LocalConfiguration.current.uiMode
-    val nightMask = uiMode and Configuration.UI_MODE_NIGHT_MASK
-    val preferDark = nightMask == Configuration.UI_MODE_NIGHT_YES
+    val preferDark = isSystemInDarkTheme()
 
     Row(modifier = Modifier.padding(8.dp)) {
         // 左侧图标
         val iconSize = 40.dp
         var finalIconUrl: String?
-
-        // 获取上下文
-        val context = LocalContext.current
 
         // 复用图标选择和解析逻辑
         val iconKey =
@@ -59,7 +53,7 @@ fun AnimTextInfoCompose(
             }
 
         // 1. 优先尝试直接用图标 key 加载，使用统一的URL解析工具
-        finalIconUrl = resolveIconUrl(picMap, iconKey, context)
+        finalIconUrl = resolveIconUrl(picMap, iconKey)
 
         // 2. 如果失败，尝试 picMap 中以 "miui.focus.pic_" 开头的第二个 key
         if (finalIconUrl.isNullOrEmpty() && picMap != null) {
@@ -68,7 +62,7 @@ fun AnimTextInfoCompose(
 
         // 显示图标，使用统一的图片加载工具
         if (!finalIconUrl.isNullOrEmpty()) {
-            val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(finalIconUrl)
+            val painter = rememberSuperIslandImagePainter(finalIconUrl)
             painter?.let {
                 Image(
                     painter = it,

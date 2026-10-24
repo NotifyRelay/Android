@@ -1,4 +1,4 @@
-﻿package github.xzynine.superislandui.floating.bigisland.components
+package github.xzynine.superislandui.floating.bigisland.components
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CircularProgressCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.util.image.ImageUtils
 import top.yukonga.miuix.kmp.basic.Text
@@ -53,7 +54,7 @@ fun ChatInfoCompose(
         if (!avatarUrl.isNullOrEmpty() || !badgeUrl.isNullOrEmpty()) {
             Box(modifier = Modifier.size(48.dp)) {
                 if (!avatarUrl.isNullOrEmpty()) {
-                    SuperIslandImageUtil.rememberSuperIslandImagePainter(avatarUrl)?.let {
+                    rememberSuperIslandImagePainter(avatarUrl)?.let {
                         Image(
                             painter = it,
                             contentDescription = null,
@@ -65,7 +66,7 @@ fun ChatInfoCompose(
                     }
                 }
                 if (!badgeUrl.isNullOrEmpty()) {
-                    SuperIslandImageUtil.rememberSuperIslandImagePainter(badgeUrl)?.let {
+                    rememberSuperIslandImagePainter(badgeUrl)?.let {
                         Image(
                             painter = it,
                             contentDescription = null,

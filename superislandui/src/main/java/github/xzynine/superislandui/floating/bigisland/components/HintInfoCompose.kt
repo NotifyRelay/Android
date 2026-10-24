@@ -1,8 +1,8 @@
 package github.xzynine.superislandui.floating.bigisland.components
 
-import android.content.res.Configuration
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,14 +16,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.ActionInfoButton
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.templates.HintInfo
 import notifyrelay.base.util.image.ImageUtils
@@ -40,8 +39,7 @@ fun HintInfoCompose(
     hintInfo: HintInfo,
     picMap: Map<String, String>? = null,
 ) {
-    val uiMode = LocalConfiguration.current.uiMode
-    val preferDark = (uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
+    val preferDark = isSystemInDarkTheme()
 
     fun colorOf(
         light: String?,
@@ -82,9 +80,9 @@ fun HintInfoCompose(
                                 .padding(horizontal = 6.dp, vertical = 2.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        val iconUrl = resolveIconUrl(picMap, hintInfo.picContent, LocalContext.current)
+                        val iconUrl = resolveIconUrl(picMap, hintInfo.picContent)
                         if (!iconUrl.isNullOrEmpty()) {
-                            SuperIslandImageUtil.rememberSuperIslandImagePainter(iconUrl)?.let {
+                            rememberSuperIslandImagePainter(iconUrl)?.let {
                                 Image(
                                     painter = it,
                                     contentDescription = null,

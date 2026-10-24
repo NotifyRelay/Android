@@ -27,7 +27,7 @@ import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoFitText
 import github.xzynine.superislandui.common.AutoScrollText
 import github.xzynine.superislandui.common.PreviewData
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
+import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.model.components.MediaSessionData
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -72,7 +72,7 @@ private fun ExpandedMediaIsland(
             verticalAlignment = Alignment.Top,
         ) {
             val painter =
-                SuperIslandImageUtil.rememberSuperIslandImagePainter(
+                rememberSuperIslandImagePainter(
                     url = mediaSession.coverUrl,
                 )
 

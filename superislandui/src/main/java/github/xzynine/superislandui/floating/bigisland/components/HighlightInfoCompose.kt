@@ -22,6 +22,7 @@ import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.formatTimerInfo
+import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.model.templates.HighlightInfo
 import kotlinx.coroutines.delay
@@ -116,10 +117,10 @@ fun HighlightInfoCompose(
             val rightImageUrl = highlightInfo.bigImageRight?.let { picMap?.get(it) }
             if (leftImageUrl != null || rightImageUrl != null) {
                 Spacer(modifier = Modifier.width(8.dp))
-                leftImageUrl?.let { SuperIslandImageUtil.rememberSuperIslandImagePainter(it) }?.let {
+                leftImageUrl?.let { rememberSuperIslandImagePainter(it) }?.let {
                     BigAreaImage(it)
                 }
-                rightImageUrl?.let { SuperIslandImageUtil.rememberSuperIslandImagePainter(it) }?.let {
+                rightImageUrl?.let { rememberSuperIslandImagePainter(it) }?.let {
                     BigAreaImage(it, showLeftMargin = true)
                 }
             }

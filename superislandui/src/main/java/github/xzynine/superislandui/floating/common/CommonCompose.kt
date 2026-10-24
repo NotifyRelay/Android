@@ -14,7 +14,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -50,12 +49,11 @@ fun CommonImageCompose(
     // 获取当前主题
     val isDarkTheme = isSystemInDarkTheme()
 
-    val context = LocalContext.current
     val iconUrl =
         if (isFocusIcon) {
-            resolveFocusIconUrl(picMap, picKey, isDarkTheme, context)
+            resolveFocusIconUrl(picMap, picKey, isDarkTheme)
         } else {
-            resolveIconUrl(picMap, picKey, context)
+            resolveIconUrl(picMap, picKey)
         }
 
     // 预览模式下：只有在有有效URL时才显示占位符
@@ -70,7 +68,7 @@ fun CommonImageCompose(
         return
     }
 
-    val painter = SuperIslandImageUtil.rememberSuperIslandImagePainter(iconUrl, picMap)
+    val painter = rememberSuperIslandImagePainter(iconUrl, picMap)
 
     if (painter != null) {
         Image(
