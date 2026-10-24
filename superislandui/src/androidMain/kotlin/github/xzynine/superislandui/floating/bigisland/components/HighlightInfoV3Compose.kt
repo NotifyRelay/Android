@@ -23,7 +23,7 @@ import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.ActionInfoButton
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.model.templates.HighlightInfoV3
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -40,12 +40,12 @@ fun HighlightInfoV3Compose(
 
     val primaryColor =
         Color(
-            (if (preferDark) ImageUtils.parseColor(highlightInfoV3.primaryColorDark) else ImageUtils.parseColor(highlightInfoV3.primaryColor))
+            (if (preferDark) ColorUtils.parseColor(highlightInfoV3.primaryColorDark) else ColorUtils.parseColor(highlightInfoV3.primaryColor))
                 ?: 0xFFFFFFFF.toInt(),
         )
     val secondaryColor =
         Color(
-            (if (preferDark) ImageUtils.parseColor(highlightInfoV3.secondaryColorDark) else ImageUtils.parseColor(highlightInfoV3.secondaryColor))
+            (if (preferDark) ColorUtils.parseColor(highlightInfoV3.secondaryColorDark) else ColorUtils.parseColor(highlightInfoV3.secondaryColor))
                 ?: 0xFFDDDDDD.toInt(),
         )
 
@@ -91,12 +91,12 @@ fun HighlightInfoV3Compose(
             highlightInfoV3.highLightText?.let { label ->
                 val labelTextColor =
                     Color(
-                        (if (preferDark) ImageUtils.parseColor(highlightInfoV3.highLightTextColorDark) else ImageUtils.parseColor(highlightInfoV3.highLightTextColor))
+                        (if (preferDark) ColorUtils.parseColor(highlightInfoV3.highLightTextColorDark) else ColorUtils.parseColor(highlightInfoV3.highLightTextColor))
                             ?: 0xFFFFFFFF.toInt(),
                     )
                 val labelBgColor =
                     Color(
-                        (if (preferDark) ImageUtils.parseColor(highlightInfoV3.highLightbgColorDark) else ImageUtils.parseColor(highlightInfoV3.highLightbgColor))
+                        (if (preferDark) ColorUtils.parseColor(highlightInfoV3.highLightbgColorDark) else ColorUtils.parseColor(highlightInfoV3.highLightbgColor))
                             ?: 0x333482FF,
                     )
                 Text(

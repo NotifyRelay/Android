@@ -1,4 +1,4 @@
-﻿package github.xzynine.superislandui.floating.bigisland.components
+package github.xzynine.superislandui.floating.bigisland.components
 
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -16,7 +16,7 @@ import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.model.templates.PicInfo
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -49,7 +49,7 @@ fun PicInfoCompose(
             Spacer(modifier = Modifier.width(8.dp))
             Text(
                 text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                color = Color(ImageUtils.parseColor(picInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
+                color = Color(ColorUtils.parseColor(picInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
                 fontSize = 14.sp,
             )
         }

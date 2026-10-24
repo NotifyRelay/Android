@@ -24,7 +24,7 @@ import github.xzynine.superislandui.floating.common.CircularProgressCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.model.core.ParamV2
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -88,9 +88,9 @@ fun ChatInfoCompose(
         if (progressInfo != null) {
             Spacer(modifier = Modifier.width(8.dp))
 
-            val progressColor = ImageUtils.parseColor(progressInfo.colorProgress) ?: 0xFF3482FF.toInt()
+            val progressColor = ColorUtils.parseColor(progressInfo.colorProgress) ?: 0xFF3482FF.toInt()
             val trackColor =
-                ImageUtils.parseColor(progressInfo.colorProgressEnd)
+                ColorUtils.parseColor(progressInfo.colorProgressEnd)
                     ?: ((progressColor and 0x00FFFFFF) or (0x33 shl 24))
 
             CircularProgressCompose(
@@ -108,7 +108,7 @@ fun ChatInfoCompose(
             chatInfo.title?.let {
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                    color = Color(ImageUtils.parseColor(chatInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
+                    color = Color(ColorUtils.parseColor(chatInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -119,7 +119,7 @@ fun ChatInfoCompose(
             chatInfo.content?.let {
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                    color = Color(ImageUtils.parseColor(chatInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
+                    color = Color(ColorUtils.parseColor(chatInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                     fontSize = 12.sp,
                     maxLines = 1,
                     modifier = Modifier.padding(start = 8.dp),

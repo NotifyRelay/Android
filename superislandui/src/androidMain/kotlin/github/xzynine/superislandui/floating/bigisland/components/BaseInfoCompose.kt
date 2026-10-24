@@ -24,7 +24,7 @@ import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.model.templates.BaseInfo
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -82,7 +82,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
         baseInfo.title?.let {
             Text(
                 text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                color = Color(ImageUtils.parseColor(baseInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
+                color = Color(ColorUtils.parseColor(baseInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
@@ -105,7 +105,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
         baseInfo.subTitle?.let {
             Text(
                 text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                color = Color(ImageUtils.parseColor(baseInfo.colorSubTitle) ?: 0xFFFFFFFF.toInt()),
+                color = Color(ColorUtils.parseColor(baseInfo.colorSubTitle) ?: 0xFFFFFFFF.toInt()),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
@@ -120,7 +120,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
             }
             Text(
                 text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                color = Color(ImageUtils.parseColor(baseInfo.colorExtraTitle) ?: 0xFFFFFFFF.toInt()),
+                color = Color(ColorUtils.parseColor(baseInfo.colorExtraTitle) ?: 0xFFFFFFFF.toInt()),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
@@ -135,7 +135,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
             }
             Text(
                 text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                color = Color(ImageUtils.parseColor(baseInfo.colorSpecialTitle) ?: 0xFFFFFFFF.toInt()),
+                color = Color(ColorUtils.parseColor(baseInfo.colorSpecialTitle) ?: 0xFFFFFFFF.toInt()),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Normal,
                 maxLines = 1,
@@ -144,7 +144,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
                     Modifier
                         .wrapContentWidth()
                         .background(
-                            color = Color(ImageUtils.parseColor(baseInfo.colorSpecialBg) ?: 0xFFDDDDDD.toInt()),
+                            color = Color(ColorUtils.parseColor(baseInfo.colorSpecialBg) ?: 0xFFDDDDDD.toInt()),
                             shape = RoundedCornerShape(4.dp),
                         ).padding(horizontal = 6.dp, vertical = 2.dp),
             )
@@ -167,7 +167,7 @@ private fun SecondaryTextRow(
         baseInfo.content?.let {
             Text(
                 text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                color = Color(ImageUtils.parseColor(baseInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
+                color = Color(ColorUtils.parseColor(baseInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -181,7 +181,7 @@ private fun SecondaryTextRow(
             }
             Text(
                 text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                color = Color(ImageUtils.parseColor(baseInfo.colorSubContent) ?: 0xFFDDDDDD.toInt()),
+                color = Color(ColorUtils.parseColor(baseInfo.colorSubContent) ?: 0xFFDDDDDD.toInt()),
                 fontSize = 12.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,

@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.model.components.ActionInfo
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -38,12 +38,12 @@ fun ActionInfoButton(
 
     val titleColor =
         Color(
-            (if (preferDark) ImageUtils.parseColor(action.actionTitleColorDark) else ImageUtils.parseColor(action.actionTitleColor))
+            (if (preferDark) ColorUtils.parseColor(action.actionTitleColorDark) else ColorUtils.parseColor(action.actionTitleColor))
                 ?: 0xFFFFFFFF.toInt(),
         )
     val bgColor =
         Color(
-            (if (preferDark) ImageUtils.parseColor(action.actionBgColorDark) else ImageUtils.parseColor(action.actionBgColor))
+            (if (preferDark) ColorUtils.parseColor(action.actionBgColorDark) else ColorUtils.parseColor(action.actionBgColor))
                 ?: 0xFF3482FF.toInt(),
         )
 

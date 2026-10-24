@@ -1,4 +1,4 @@
-﻿package github.xzynine.superislandui.floating.bigisland.components
+package github.xzynine.superislandui.floating.bigisland.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -33,7 +33,7 @@ import androidx.compose.ui.zIndex
 import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.MultiProgressInfo
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 import kotlin.math.max
 
@@ -58,7 +58,7 @@ fun MultiProgressCompose(
     business: String? = null,
 ) {
     val colorValue: Int =
-        ImageUtils.parseColor(multiProgressInfo.color) ?: DEFAULT_PRIMARY_COLOR.toInt()
+        ColorUtils.parseColor(multiProgressInfo.color) ?: DEFAULT_PRIMARY_COLOR.toInt()
     val primaryColor = Color(colorValue)
     val requestedPoints = multiProgressInfo.points ?: DEFAULT_NODE_COUNT
     val nodeCount = if (requestedPoints == 0) 0 else maxOf(1, requestedPoints) // 处理节点数量为0的情况

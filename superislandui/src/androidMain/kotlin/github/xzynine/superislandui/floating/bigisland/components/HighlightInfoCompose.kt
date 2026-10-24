@@ -26,7 +26,7 @@ import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePain
 import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.model.templates.HighlightInfo
 import kotlinx.coroutines.delay
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -43,8 +43,8 @@ fun HighlightInfoCompose(
     val hasIcon = !iconKey.isNullOrEmpty()
 
     val primaryColor =
-        ImageUtils.parseColor(highlightInfo.colorTitle)
-            ?: ImageUtils.parseColor(highlightInfo.colorContent)
+        ColorUtils.parseColor(highlightInfo.colorTitle)
+            ?: ColorUtils.parseColor(highlightInfo.colorContent)
             ?: 0xFFFFFFFF.toInt()
     val primaryText =
         listOfNotNull(highlightInfo.title, highlightInfo.content, highlightInfo.subContent)
@@ -81,7 +81,7 @@ fun HighlightInfoCompose(
             ?.let {
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                    color = Color(ImageUtils.parseColor(highlightInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
+                    color = Color(ColorUtils.parseColor(highlightInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(start = 8.dp),
                 )
@@ -105,7 +105,7 @@ fun HighlightInfoCompose(
             ?.let {
                 Text(
                     text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
-                    color = Color(ImageUtils.parseColor(highlightInfo.colorSubContent) ?: 0xFF9EA3FF.toInt()),
+                    color = Color(ColorUtils.parseColor(highlightInfo.colorSubContent) ?: 0xFF9EA3FF.toInt()),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(start = 8.dp),
                 )

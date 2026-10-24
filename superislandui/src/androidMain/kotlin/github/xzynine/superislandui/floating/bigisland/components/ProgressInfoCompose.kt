@@ -1,4 +1,4 @@
-﻿package github.xzynine.superislandui.floating.bigisland.components
+package github.xzynine.superislandui.floating.bigisland.components
 
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -10,7 +10,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.model.components.ProgressInfo
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 
@@ -21,7 +21,7 @@ import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 fun ProgressInfoCompose(
     progressInfo: ProgressInfo,
 ) {
-    val progressColor = ImageUtils.parseColor(progressInfo.colorProgress)?.let { Color(it) } ?: Color(0xFF00FF00)
+    val progressColor = ColorUtils.parseColor(progressInfo.colorProgress)?.let { Color(it) } ?: Color(0xFF00FF00)
 
     LinearProgressIndicator(
         progress = progressInfo.progress.toFloat() / 100f,

@@ -25,7 +25,7 @@ import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.templates.HintInfo
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -45,7 +45,7 @@ fun HintInfoCompose(
         light: String?,
         dark: String?,
         fallback: Int,
-    ): Color = Color((if (preferDark) ImageUtils.parseColor(dark) else ImageUtils.parseColor(light)) ?: fallback)
+    ): Color = Color((if (preferDark) ColorUtils.parseColor(dark) else ColorUtils.parseColor(light)) ?: fallback)
 
     Row(
         modifier =
@@ -70,7 +70,7 @@ fun HintInfoCompose(
                 }
                 // 图文特殊标签（图标 + 文本 + 背景色）
                 hintInfo.content?.let { label ->
-                    val labelBg = Color(ImageUtils.parseColor(hintInfo.colorContentBg) ?: 0x333482FF)
+                    val labelBg = Color(ColorUtils.parseColor(hintInfo.colorContentBg) ?: 0x333482FF)
                     Row(
                         modifier =
                             Modifier

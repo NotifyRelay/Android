@@ -48,9 +48,6 @@ kotlin {
 
         androidMain.dependencies {
             implementation(libs.compose.multiplatform.ui.tooling)
-            implementation(project(":base"))
-            // Android-only 图片加载：coil 与 coil-compose 仅可在 androidMain 使用。
-            implementation(libs.bundles.coil)
         }
     }
 }

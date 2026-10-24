@@ -21,7 +21,7 @@ import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.templates.IconTextInfo
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -82,7 +82,7 @@ fun IconTextInfoCompose(
                     fontWeight = FontWeight.SemiBold,
                     color =
                         Color(
-                            (if (preferDark) ImageUtils.parseColor(iconTextInfo.colorTitleDark) else ImageUtils.parseColor(iconTextInfo.colorTitle))
+                            (if (preferDark) ColorUtils.parseColor(iconTextInfo.colorTitleDark) else ColorUtils.parseColor(iconTextInfo.colorTitle))
                                 ?: 0xFFFFFFFF.toInt(),
                         ),
                     maxLines = 1,
@@ -98,7 +98,7 @@ fun IconTextInfoCompose(
                             fontSize = 12.sp,
                             color =
                                 Color(
-                                    (if (preferDark) ImageUtils.parseColor(iconTextInfo.colorContentDark) else ImageUtils.parseColor(iconTextInfo.colorContent))
+                                    (if (preferDark) ColorUtils.parseColor(iconTextInfo.colorContentDark) else ColorUtils.parseColor(iconTextInfo.colorContent))
                                         ?: 0xFFDDDDDD.toInt(),
                                 ),
                             maxLines = 1,
@@ -110,7 +110,7 @@ fun IconTextInfoCompose(
                             fontSize = 12.sp,
                             color =
                                 Color(
-                                    (if (preferDark) ImageUtils.parseColor(iconTextInfo.colorContentDark) else ImageUtils.parseColor(iconTextInfo.colorContent))
+                                    (if (preferDark) ColorUtils.parseColor(iconTextInfo.colorContentDark) else ColorUtils.parseColor(iconTextInfo.colorContent))
                                         ?: 0xFFDDDDDD.toInt(),
                                 ),
                             maxLines = 1,

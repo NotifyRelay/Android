@@ -1,4 +1,4 @@
-﻿package github.xzynine.superislandui.floating.bigisland.components
+package github.xzynine.superislandui.floating.bigisland.components
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
@@ -23,7 +23,7 @@ import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.ProgressInfo
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.LinearProgressIndicator
 import top.yukonga.miuix.kmp.basic.ProgressIndicatorDefaults
 import kotlin.math.max
@@ -54,7 +54,7 @@ fun ProgressCompose(
 
     // 进度组件2：无任何图标，仅进度条
     if (!hasNodes) {
-        val progressColor = Color(ImageUtils.parseColor(progressInfo.colorProgress) ?: 0xFF00FF00.toInt())
+        val progressColor = Color(ColorUtils.parseColor(progressInfo.colorProgress) ?: 0xFF00FF00.toInt())
         LinearProgressIndicator(
             progress = progressInfo.progress.toFloat() / 100f,
             modifier =
@@ -70,9 +70,9 @@ fun ProgressCompose(
     }
 
     // 进度组件1：带前进图形/中间节点/目标点
-    val progressColor = Color(ImageUtils.parseColor(progressInfo.colorProgress) ?: 0xFF3482FF.toInt())
+    val progressColor = Color(ColorUtils.parseColor(progressInfo.colorProgress) ?: 0xFF3482FF.toInt())
     val trackColor =
-        ImageUtils.parseColor(progressInfo.colorProgressEnd)?.let { Color(it) }
+        ColorUtils.parseColor(progressInfo.colorProgressEnd)?.let { Color(it) }
             ?: progressColor.copy(alpha = 0.3f)
     val progressValue = progressInfo.progress.coerceIn(0, 100)
     val ratio = progressValue / 100f

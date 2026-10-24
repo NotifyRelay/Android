@@ -23,7 +23,7 @@ import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePain
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.components.AnimTextInfo
 import kotlinx.coroutines.delay
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -107,8 +107,8 @@ fun AnimTextInfoCompose(
             val majorText = animTextInfo.title ?: timerState.value
             val majorColor =
                 when {
-                    preferDark -> ImageUtils.parseColor(animTextInfo.colorTitleDark)
-                    else -> ImageUtils.parseColor(animTextInfo.colorTitle)
+                    preferDark -> ColorUtils.parseColor(animTextInfo.colorTitleDark)
+                    else -> ColorUtils.parseColor(animTextInfo.colorTitle)
                 } ?: 0xFFFFFFFF.toInt()
             majorText?.let { text ->
                 val isTimeLike = text.matches(Regex("[0-9: ]{2,}"))
@@ -127,8 +127,8 @@ fun AnimTextInfoCompose(
                 }
             val secondaryColor =
                 when {
-                    preferDark -> ImageUtils.parseColor(animTextInfo.colorContentDark)
-                    else -> ImageUtils.parseColor(animTextInfo.colorContent)
+                    preferDark -> ColorUtils.parseColor(animTextInfo.colorContentDark)
+                    else -> ColorUtils.parseColor(animTextInfo.colorContent)
                 } ?: 0xFFDDDDDD.toInt()
             secondaryText?.let { text ->
                 Text(

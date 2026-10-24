@@ -21,7 +21,7 @@ import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.templates.CoverInfo
-import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -70,7 +70,7 @@ fun CoverInfoCompose(
                     fontWeight = FontWeight.SemiBold,
                     color =
                         Color(
-                            (if (preferDark) ImageUtils.parseColor(coverInfo.colorTitleDark) else ImageUtils.parseColor(coverInfo.colorTitle))
+                            (if (preferDark) ColorUtils.parseColor(coverInfo.colorTitleDark) else ColorUtils.parseColor(coverInfo.colorTitle))
                                 ?: 0xFFFFFFFF.toInt(),
                         ),
                     maxLines = 1,
@@ -82,7 +82,7 @@ fun CoverInfoCompose(
                     fontSize = 12.sp,
                     color =
                         Color(
-                            (if (preferDark) ImageUtils.parseColor(coverInfo.colorContentDark) else ImageUtils.parseColor(coverInfo.colorContent))
+                            (if (preferDark) ColorUtils.parseColor(coverInfo.colorContentDark) else ColorUtils.parseColor(coverInfo.colorContent))
                                 ?: 0xFFDDDDDD.toInt(),
                         ),
                     maxLines = 1,
@@ -95,7 +95,7 @@ fun CoverInfoCompose(
                     fontSize = 12.sp,
                     color =
                         Color(
-                            (if (preferDark) ImageUtils.parseColor(coverInfo.colorSubContentDark) else ImageUtils.parseColor(coverInfo.colorSubContent))
+                            (if (preferDark) ColorUtils.parseColor(coverInfo.colorSubContentDark) else ColorUtils.parseColor(coverInfo.colorSubContent))
                                 ?: 0xFFDDDDDD.toInt(),
                         ),
                     maxLines = 1,
