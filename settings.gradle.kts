@@ -24,6 +24,8 @@ dependencyResolutionManagement {
 
 rootProject.name = "NotifyRelay"
 include(":app")
+// KMP 公共端（Compose Multiplatform 公共代码）
+include(":shared")
 include(":data")
 include(":base")
 include(":checkupdata")

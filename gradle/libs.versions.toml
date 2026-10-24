@@ -13,10 +13,8 @@ junitVersion = "1.3.0"
 espressoCore = "3.7.0"
 appcompat = "1.8.0"
 material = "1.14.0"
-# miuix 0.9.4-rc01：两项目取高者；且 WebDAVPass 依赖的 miuix-nav-android 仅在该版本发布
-miuix = "0.9.4-rc01"
-# 上游 miuix-navigation3-ui-android 最高只发布到 0.9.3（0.9.4-rc01 未发布该构件），
-# 因此单独钉住，等上游发布 0.9.4 正式版后再合并回 miuix
+miuix = "0.9.4"
+# 上游 miuix-navigation3-ui-android 只发布到 0.9.3，因此单独钉住
 miuixNavigation3 = "0.9.3"
 navigation3 = "1.1.7"
 lifecycle = "2.11.0"
@@ -62,6 +60,15 @@ libxposed = "102.0.0"
 dexkit = "2.2.0"
 ezhooktool = "1.2.2"
 ktlint = "14.2.0"
+# KMP 公共端（:shared）来源
+kotlinMultiplatform = "2.4.20"
+agpKmpLibrary = "9.4.1"
+composeMultiplatform = "1.12.2"
+kotlinxSerialization = "1.9.0"
+# AndroidX Compose 1.12.1 系列（对应 compose-bom 2026.09.00 的 ui/foundation/runtime 锁定版本）
+composeFoundation = "1.12.1"
+# AndroidX material-icons-extended（对应 compose-bom 2026.09.00 的锁定版本）
+composeMaterialIconsExtended = "1.7.8"
 
 
 [libraries]
@@ -113,11 +120,11 @@ semver = { group = "io.github.z4kn4fein", name = "semver", version.ref = "semver
 androidx-paging-runtime = { group = "androidx.paging", name = "paging-runtime", version.ref = "paging" }
 androidx-paging-compose = { group = "androidx.paging", name = "paging-compose", version.ref = "paging" }
 androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "activityCompose" }
-androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
-androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+androidx-compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling", version.ref = "composeUi" }
+androidx-compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview", version.ref = "composeUi" }
 androidx-compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
 androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
-androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended" }
+androidx-compose-material-icons-extended = { group = "androidx.compose.material", name = "material-icons-extended", version.ref = "composeMaterialIconsExtended" }
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
@@ -126,6 +133,25 @@ dexkit = { module = "org.luckypray:dexkit", version.ref = "dexkit" }
 ezhooktool-core = { group = "io.github.lingqiqi5211.ezhooktool", name = "core", version.ref = "ezhooktool" }
 ezhooktool-xposed102 = { group = "io.github.lingqiqi5211.ezhooktool", name = "hook-xposed-102", version.ref = "ezhooktool" }
 androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycle" }
+
+# KMP 公共端（:shared）依赖
+miuix-nav = { group = "top.yukonga.miuix.kmp", name = "miuix-nav", version.ref = "miuix" }
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
+compose-multiplatform-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime", version.ref = "composeMultiplatform" }
+compose-multiplatform-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "composeMultiplatform" }
+compose-multiplatform-foundation-layout = { group = "org.jetbrains.compose.foundation", name = "foundation-layout", version.ref = "composeMultiplatform" }
+compose-multiplatform-ui = { group = "org.jetbrains.compose.ui", name = "ui", version.ref = "composeMultiplatform" }
+compose-multiplatform-ui-text = { group = "org.jetbrains.compose.ui", name = "ui-text", version.ref = "composeMultiplatform" }
+compose-multiplatform-ui-tooling = { group = "org.jetbrains.compose.ui", name = "ui-tooling", version.ref = "composeMultiplatform" }
+compose-multiplatform-ui-tooling-preview = { group = "org.jetbrains.compose.ui", name = "ui-tooling-preview", version.ref = "composeMultiplatform" }
+compose-multiplatform-components-resources = { group = "org.jetbrains.compose.components", name = "components-resources", version.ref = "composeMultiplatform" }
+# org.jetbrains.compose.material3:material3 的 CMP 版本线止于 1.12.0-alpha03；
+# org.jetbrains.compose.material:material-icons-extended 止于 1.7.3，均不覆盖 1.12.2。
+# Android 侧 material3 / material-icons-extended 使用 androidx 条目（libs.androidx.material3、libs.androidx.compose.material.icons.extended）。
+
+# app 侧 AndroidX Compose 显式版本（:app 现有实现使用）
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "composeFoundation" }
+androidx-compose-runtime-livedata = { group = "androidx.compose.runtime", name = "runtime-livedata", version.ref = "runtime" }
 
 
 
@@ -144,3 +170,7 @@ kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "ko
 android-library = { id = "com.android.library", version.ref = "agp" }
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 ktlint = { id = "org.jlleitschuh.gradle.ktlint", version.ref = "ktlint" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlinMultiplatform" }
+android-kotlin-multiplatform-library = { id = "com.android.kotlin.multiplatform.library", version.ref = "agpKmpLibrary" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "composeMultiplatform" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlinMultiplatform" }
