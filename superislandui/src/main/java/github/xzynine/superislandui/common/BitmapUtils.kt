@@ -8,7 +8,7 @@ import android.graphics.Typeface
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
 import notifyrelay.base.util.Logger
-import notifyrelay.base.util.measureTime
+import notifyrelay.shared.util.measureTime
 
 /**
  * 位图工具类，用于处理文本到位图的转换等操作

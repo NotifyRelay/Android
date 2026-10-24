@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.filter
 
 import notifyrelay.base.util.Logger
-import notifyrelay.base.util.TextUtils
+import notifyrelay.shared.util.TextUtils
 
 /**
  * 延迟复刻占位队列（用于锁屏延迟复刻的占位，15s 可被本机入队取消）。

@@ -250,6 +250,8 @@ dependencies {
     implementation(project(":superislandui"))
     // 依赖scrcpy模块
     implementation(project(":scrcpy"))
+    // KMP 公共端（平台标识、文本/摘要工具、存储 key、过滤默认常量）
+    implementation(project(":shared"))
 }
 
 tasks.register("printVersionName") {

@@ -19,9 +19,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.data.FilterConfigDefaults
 import notifyrelay.data.StorageManager
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.config.FilterConfigDefaults
 import org.json.JSONObject
 
 object SuperIslandProcessor {

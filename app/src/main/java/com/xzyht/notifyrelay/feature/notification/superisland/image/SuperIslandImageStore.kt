@@ -13,10 +13,10 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import notifyrelay.base.util.image.ImageUtils
-import notifyrelay.base.util.sha256
 import notifyrelay.data.StorageManager
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.util.sha256
 import java.io.File
 
 /**

@@ -9,12 +9,12 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
-import notifyrelay.data.FilterConfigDefaults
 import notifyrelay.data.StorageManager
 import notifyrelay.data.database.entity.BlackListEntryEntity
 import notifyrelay.data.database.entity.PackageGroupEntity
 import notifyrelay.data.database.entity.WhiteListEntryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.config.FilterConfigDefaults
 import org.json.JSONArray
 import org.json.JSONObject
 

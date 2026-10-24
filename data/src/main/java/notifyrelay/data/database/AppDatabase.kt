@@ -46,7 +46,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
-import notifyrelay.data.FilterConfigDefaults
 import notifyrelay.data.database.dao.AppConfigDao
 import notifyrelay.data.database.dao.AppDao
 import notifyrelay.data.database.dao.AppDeviceDao
@@ -69,6 +68,7 @@ import notifyrelay.data.database.entity.SuperIslandImageEntity
 import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
 import notifyrelay.data.database.entity.WhiteListEntryEntity
 import notifyrelay.data.database.migration.MigrationHelper
+import notifyrelay.shared.config.FilterConfigDefaults
 
 /**
  * Room数据库核心类

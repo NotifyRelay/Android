@@ -42,7 +42,7 @@ kotlin {
             implementation(libs.androidx.material3)
             implementation(libs.androidx.compose.material.icons.extended)
             implementation(libs.miuix.nav)
-            implementation(libs.miuix.ui)
+            implementation(libs.miuix.ui.kmp)
             implementation(libs.kotlinx.serialization.json)
         }
 

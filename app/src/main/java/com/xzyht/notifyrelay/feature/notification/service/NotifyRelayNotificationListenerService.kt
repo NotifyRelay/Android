@@ -33,8 +33,8 @@ import kotlinx.coroutines.sync.withLock
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.base.util.SuperIslandStorageKeys
 import notifyrelay.data.StorageManager
+import notifyrelay.shared.SuperIslandStorageKeys
 
 class NotifyRelayNotificationListenerService : NotificationListenerService() {
     companion object {

@@ -10,7 +10,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import notifyrelay.base.util.Logger
-import notifyrelay.base.util.TextUtils
+import notifyrelay.shared.util.TextUtils
 import org.json.JSONObject
 
 /**

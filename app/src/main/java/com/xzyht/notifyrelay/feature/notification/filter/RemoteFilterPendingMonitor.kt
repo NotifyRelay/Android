@@ -7,7 +7,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
-import notifyrelay.base.util.TextUtils
+import notifyrelay.shared.util.TextUtils
 import kotlin.time.Duration.Companion.milliseconds
 
 /**

@@ -214,7 +214,7 @@ object ImageUtils {
  * 对 `null` 的 Drawable 不做兜底 —— 可空语义由调用侧用 `?.` 自行处理
  * （例如 `drawable?.toBitmapOrDefault(48) ?: <原兜底>`）。
  *
- * 以**顶层扩展**形式提供（与 `notifyrelay.base.util.toHex` 风格一致），
+ * 以**顶层扩展**形式提供（与 `notifyrelay.shared.util.toHex` 风格一致），
  * 使调用侧可直接写 `drawable.toBitmapOrDefault(96)` 而不必经由 `ImageUtils` 接收者作用域。
  *
  * @param fallbackSize intrinsic 宽或高非正数时使用的兜底边长（默认 96；默认图标场景可用 48，极小占位可用 1）。

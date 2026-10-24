@@ -1,6 +1,6 @@
 package github.xzynine.superislandui.common
 
-import notifyrelay.base.util.measureTime
+import notifyrelay.shared.util.measureTime
 import kotlin.math.min
 
 /**

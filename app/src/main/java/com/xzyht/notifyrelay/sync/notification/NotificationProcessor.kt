@@ -16,7 +16,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.base.util.TextUtils
+import notifyrelay.shared.util.TextUtils
 import org.json.JSONObject
 
 /**
