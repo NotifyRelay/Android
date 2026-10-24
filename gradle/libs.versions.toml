@@ -46,6 +46,8 @@ coilCompose = "2.7.0"
 kotlinxCoroutines = "1.11.0"
 # UniFFI 生成的绑定内部使用 kotlinx.atomicfu（UniffiHandleMap 的原子计数器）
 atomicfu = "0.28.0"
+# UniFFI 生成的 Android 绑定使用 androidx.annotation.RequiresApi
+androidxAnnotation = "1.9.1"
 composeUi = "1.12.1"
 compileSdk = "37"
 targetSdk = "37"
@@ -94,6 +96,7 @@ coil-compose = { group = "io.coil-kt", name = "coil-compose", version.ref = "coi
 kotlinx-coroutines-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-core", version.ref = "kotlinxCoroutines" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "kotlinxCoroutines" }
 atomicfu = { group = "org.jetbrains.kotlinx", name = "atomicfu", version.ref = "atomicfu" }
+androidx-annotation = { group = "androidx.annotation", name = "annotation", version.ref = "androidxAnnotation" }
 androidx-compose-ui = { group = "androidx.compose.ui", name = "ui", version.ref = "composeUi" }
 androidx-room-runtime = { group = "androidx.room", name = "room-runtime", version.ref = "room" }
 androidx-room-compiler = { group = "androidx.room", name = "room-compiler", version.ref = "room" }

@@ -58,6 +58,9 @@ val uniffiBindgen =
                 .asFile
         inputs.file(configFile)
         inputs.files(rustCoreDir.resolve("Cargo.lock"))
+        // .so 是真正的输入：Rust 侧导出面变化时其内容随之改变，
+        // 未声明会导致本任务被判定 UP-TO-DATE 而沿用旧绑定。
+        inputs.file(soFile)
         outputs.dir(outDir)
         doFirst {
             require(soFile.exists()) { "Rust 产物缺失：$soFile（请先执行 :core:rustBuild）" }
@@ -121,6 +124,9 @@ dependencies {
 
     // UniFFI 生成的绑定（UniffiHandleMap）依赖 kotlinx.atomicfu 的原子类型
     implementation(libs.atomicfu)
+
+    // UniFFI 生成的 Android 绑定使用 @RequiresApi（AndroidSystemCleaner，API 34+）
+    implementation(libs.androidx.annotation)
 
     implementation(project(":base"))
 }

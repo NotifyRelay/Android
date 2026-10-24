@@ -1,8 +1,5 @@
 package com.xzyht.notifyrelay.feature.device.service.callback
 
-import com.sun.jna.Native
-import com.sun.jna.Pointer
-import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
 import notifyrelay.base.util.Logger
 
 /**
@@ -45,104 +42,68 @@ class DeviceEventCallbackHandler(
         java.util.concurrent.ConcurrentHashMap<String, String>()
 
     /** TCP 扫描发现：core 已完成自身过滤/名称解码/状态登记，平台端仅触发一次快照刷新。 */
-    fun buildDiscovered(): NotifyRelayCore.OnDeviceDiscoveredCb =
-        object : NotifyRelayCore.OnDeviceDiscoveredCb {
-            override fun invoke(
-                uuid: Pointer?,
-                name: Pointer?,
-                port: Short,
-                battery: Int,
-                deviceType: Pointer?,
-                ip: Pointer?,
-                userData: Pointer?,
-            ) {
-                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val remoteUuid = NotifyRelayCore.ptrToString(uuid) ?: return
-                try {
-                    val remoteIp = NotifyRelayCore.ptrToString(ip) ?: ""
-                    // 仅在发现内容实际变化时打印（2s 广播周期会重复上抛同一内容）
-                    val signature = "$remoteIp:$port:$battery"
-                    if (lastDiscovered.put(remoteUuid, signature) != signature) {
-                        Logger.d(
-                            "死神-NotifyRelay",
-                            "[on_device_discovered] uuid=$remoteUuid, ip=$remoteIp, port=$port, battery=$battery",
-                        )
-                    }
-                    // 运行在 Rust 扫描线程：不得同步调用 nrc_get_device_list（会与 core 重入），
-                    // 交由协程异步刷新
-                    host.triggerDeviceListRefresh()
-                } catch (e: Exception) {
-                    Logger.e(TAG, "on_device_discovered error", e)
-                }
+    fun handleDiscovered(
+        remoteUuid: String,
+        nameB64: String,
+        port: Int,
+        battery: Int,
+        deviceType: String,
+        remoteIp: String,
+    ) {
+        try {
+            // 仅在发现内容实际变化时打印（2s 广播周期会重复上抛同一内容）
+            val signature = "$remoteIp:$port:$battery"
+            if (lastDiscovered.put(remoteUuid, signature) != signature) {
+                Logger.d(
+                    "死神-NotifyRelay",
+                    "[on_device_discovered] uuid=$remoteUuid, ip=$remoteIp, port=$port, battery=$battery",
+                )
             }
+            // 运行在 Rust 扫描线程：不得同步调用设备快照接口（会与 core 重入），
+            // 交由协程异步刷新
+            host.triggerDeviceListRefresh()
+        } catch (e: Exception) {
+            Logger.e(TAG, "on_device_discovered error", e)
         }
+    }
 
     /** 心跳超时：重新登记重连目标并刷新快照，让 UI 立即反映离线状态。 */
-    fun buildTimeout(): NotifyRelayCore.OnDeviceTimeoutCb =
-        object : NotifyRelayCore.OnDeviceTimeoutCb {
-            override fun invoke(
-                uuid: Pointer?,
-                userData: Pointer?,
-            ) {
-                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val uuidStr = NotifyRelayCore.ptrToString(uuid) ?: return
-                // 超时离线状态由 Rust DeviceRegistry 维护，此处仅重新登记重连目标
-                val auth = synchronized(host.authenticatedDeviceTable) { host.authenticatedDeviceTable[uuidStr] }
-                if (auth != null) host.registerReconnectTarget(uuidStr, auth.lastIp ?: "")
-                // 触发快照刷新，UI 立即反映离线状态（替代原 1s 轮询的离线更新职责）
-                host.triggerDeviceListRefresh()
-            }
-        }
+    fun handleTimeout(uuidStr: String) {
+        val auth = synchronized(host.authenticatedDeviceTable) { host.authenticatedDeviceTable[uuidStr] }
+        if (auth != null) host.registerReconnectTarget(uuidStr, auth.lastIp ?: "")
+        host.triggerDeviceListRefresh()
+    }
 
     /** TCP 连接建立：回填连接来源 IP 并刷新快照。 */
-    fun buildConnected(): NotifyRelayCore.OnDeviceConnectedCb =
-        object : NotifyRelayCore.OnDeviceConnectedCb {
-            override fun invoke(
-                uuid: Pointer?,
-                ip: Pointer?,
-                userData: Pointer?,
-            ) {
-                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val uuidStr = NotifyRelayCore.ptrToString(uuid) ?: return
-                if (uuidStr == host.localUuid) return
-                // 连接来源 IP 由 core registry 维护，此处只需触发快照刷新
-                // （替代原 1s 轮询的在线更新职责）
-                host.triggerDeviceListRefresh()
-            }
-        }
+    fun handleConnected(
+        uuidStr: String,
+        ip: String,
+    ) {
+        if (uuidStr == host.localUuid) return
+        host.triggerDeviceListRefresh()
+    }
 
     /** TCP 断开：立即刷新快照，UI 无需等 12 秒离线超时。 */
-    fun buildDisconnected(): NotifyRelayCore.OnDeviceDisconnectedCb =
-        object : NotifyRelayCore.OnDeviceDisconnectedCb {
-            override fun invoke(
-                uuid: Pointer?,
-                userData: Pointer?,
-            ) {
-                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val uuidStr = NotifyRelayCore.ptrToString(uuid) ?: return
-                if (uuidStr == host.localUuid) return
-                host.triggerDeviceListRefresh()
-            }
-        }
+    fun handleDisconnected(uuidStr: String) {
+        if (uuidStr == host.localUuid) return
+        host.triggerDeviceListRefresh()
+    }
+
+    /** TCP 层错误：记录日志（无额外平台动作）。 */
+    fun handleTcpError(error: String) {
+        Logger.w(TAG, "on_tcp_error: $error")
+    }
 
     /** 超级岛/媒体心跳查询：必须同步返回 0/1/2。 */
-    fun buildStateQuery(): NotifyRelayCore.OnStateQueryCb =
-        object : NotifyRelayCore.OnStateQueryCb {
-            override fun invoke(
-                uuid: Pointer?,
-                featureId: Pointer?,
-                isMedia: Int,
-                userData: Pointer?,
-            ): Int {
-                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val remoteUuid = NotifyRelayCore.ptrToString(uuid) ?: return 0
-                val featureIdStr = NotifyRelayCore.ptrToString(featureId) ?: return 0
-                return try {
-                    host.stateQueryResponder.handle(remoteUuid, featureIdStr, isMedia != 0)
-                } catch (e: Exception) {
-                    Logger.e(TAG, "on_state_query error: ${e.message}")
-                    1 // 异常保守保活，等待下一次查询
-                }
-            }
+    fun handleStateQuery(
+        remoteUuid: String,
+        featureIdStr: String,
+        isMedia: Boolean,
+    ): Int =
+        try {
+            host.stateQueryResponder.handle(remoteUuid, featureIdStr, isMedia)
+        } catch (e: Exception) {
+            Logger.e(TAG, "on_state_query error: ${e.message}")
+            1 // 异常保守保活，等待下一次查询
         }
 }

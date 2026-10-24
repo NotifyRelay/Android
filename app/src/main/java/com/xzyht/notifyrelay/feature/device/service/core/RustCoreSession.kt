@@ -163,7 +163,7 @@ class RustCoreSession(
 
     /** 解析本机 uuid：core 优先，失败时沿用旧平台 uuid 兜底（仅本次进程，不持久化）。 */
     private fun resolveLocalUuid(
-        ctx: Pointer,
+        ctx: Pointer?,
         legacyUuid: String,
     ): String =
         try {

@@ -2,12 +2,9 @@ package com.xzyht.notifyrelay.feature.device.service.callback
 
 import android.os.Handler
 import android.os.Looper
-import com.sun.jna.Native
-import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.model.PendingPairing
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
 import com.xzyht.notifyrelay.sync.HeartbeatProcessor
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
@@ -60,37 +57,28 @@ class PairingCallbackHandler(
         const val REASON_VERSION_MISMATCH = "version_mismatch"
     }
 
-    fun build(): NotifyRelayCore.OnPairingCb =
-        object : NotifyRelayCore.OnPairingCb {
-            override fun invoke(
-                uuid: Pointer?,
-                messageType: Pointer?,
-                data: Pointer?,
-                intValue: Int,
-                extra: Pointer?,
-                userData: Pointer?,
-            ) {
-                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val uuidStr = NotifyRelayCore.ptrToString(uuid) ?: return
-                val messageTypeStr = NotifyRelayCore.ptrToString(messageType) ?: return
-                val dataStr = NotifyRelayCore.ptrToString(data)
-                val extraStr = NotifyRelayCore.ptrToString(extra)
-
-                try {
-                    when (messageTypeStr) {
-                        "HANDSHAKE" -> handleHandshake(uuidStr, dataStr)
-                        "PAIRING_INIT" -> handlePairingInit(uuidStr, dataStr)
-                        "PAIRING_RESP" -> Logger.w(TAG, "收到意外的 PAIRING_RESP: $uuidStr")
-                        "ACCEPT" -> handleAccept(uuidStr, dataStr)
-                        "REJECT" -> handleReject(uuidStr, dataStr, extraStr)
-                        "RESULT" -> handleResult(uuidStr, intValue, extraStr)
-                        "HEARTBEAT_TCP" -> handleHeartbeatTcp(uuidStr, dataStr, extraStr, intValue)
-                    }
-                } catch (e: Exception) {
-                    Logger.e(TAG, "on_pairing error: ${e.message}")
-                }
+    /** 配对/握手消息入口。 */
+    fun handle(
+        uuidStr: String,
+        messageTypeStr: String,
+        dataStr: String,
+        intValue: Int,
+        extraStr: String,
+    ) {
+        try {
+            when (messageTypeStr) {
+                "HANDSHAKE" -> handleHandshake(uuidStr, dataStr)
+                "PAIRING_INIT" -> handlePairingInit(uuidStr, dataStr)
+                "PAIRING_RESP" -> Logger.w(TAG, "收到意外的 PAIRING_RESP: $uuidStr")
+                "ACCEPT" -> handleAccept(uuidStr, dataStr)
+                "REJECT" -> handleReject(uuidStr, dataStr, extraStr)
+                "RESULT" -> handleResult(uuidStr, intValue, extraStr)
+                "HEARTBEAT_TCP" -> handleHeartbeatTcp(uuidStr, dataStr, extraStr, intValue)
             }
+        } catch (e: Exception) {
+            Logger.e(TAG, "on_pairing error: ${e.message}")
         }
+    }
 
     /** 对端发起握手：登记元数据、重连目标与已知设备；按需回 ACCEPT/REJECT。 */
     private fun handleHandshake(

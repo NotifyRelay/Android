@@ -1,8 +1,6 @@
 package com.xzyht.notifyrelay.feature.device.service.callback
 
 import android.os.Build
-import com.sun.jna.Native
-import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
@@ -10,7 +8,6 @@ import com.xzyht.notifyrelay.feature.clipboard.ClipboardProcessor
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.media.MediaControlUtil
 import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
-import com.xzyht.notifyrelay.nativecore.NotifyRelayCore
 import com.xzyht.notifyrelay.sync.FtpServerManager
 import com.xzyht.notifyrelay.sync.FtpServerManager.StartResult
 import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
@@ -42,79 +39,72 @@ class DataCallbackHandler(
         private const val TAG = "CoreCb"
     }
 
-    fun build(): NotifyRelayCore.OnDataCb =
-        object : NotifyRelayCore.OnDataCb {
-            override fun invoke(
-                uuid: Pointer?,
-                messageType: Pointer?,
-                plaintext: Pointer?,
-                userData: Pointer?,
-            ) {
-                Native.detach(false) // JNA 附加线程回调返回时不 detach，避免嵌套调用 JNA 时 abort
-                val uuidStr = NotifyRelayCore.ptrToString(uuid) ?: return
-                val messageTypeStr = NotifyRelayCore.ptrToString(messageType) ?: return
-                val text = NotifyRelayCore.ptrToString(plaintext) ?: return
-                val authed =
-                    synchronized(host.authenticatedDeviceTable) {
-                        host.authenticatedDeviceTable[uuidStr]?.isAccepted == true
-                    }
-                Logger.d(TAG, "on_data: type=$messageTypeStr, authed=$authed, text_len=${text.length}")
-                if (!authed && messageTypeStr != "DATA_UNKNOWN") return
-
-                try {
-                    when (messageTypeStr) {
-                        "NOTIFICATION" ->
-                            NotificationProcessor.process(
-                                host.callbackContext,
-                                host.deviceManager,
-                                host.callbackScope,
-                                NotificationProcessor.NotificationInput("DATA_NOTIFICATION", text, uuidStr),
-                                host.notificationDataReceivedCallbacks,
-                            )
-                        "MEDIAPLAY" -> {
-                            val json = JSONObject(text)
-                            host.resolveDevice(uuidStr)?.let {
-                                RemoteMediaSessionManager.onMediaMessageReceived(host.callbackContext, json, it)
-                            }
-                        }
-                        "ICON_REQUEST" -> {
-                            host.resolveDevice(uuidStr)?.let {
-                                IconSyncManager.handleIconRequest(text, host.deviceManager, it, host.callbackContext)
-                            }
-                        }
-                        "ICON_RESPONSE" -> IconSyncManager.handleIconResponse(text, host.callbackContext)
-                        "APP_LIST_REQUEST" -> {
-                            host.resolveDevice(uuidStr)?.let {
-                                AppListSyncManager.handleAppListRequest(text, host.deviceManager, it, host.callbackContext)
-                            }
-                        }
-                        "APP_LIST_RESPONSE" ->
-                            AppListSyncManager.handleAppListResponse(text, host.callbackContext, uuidStr, host.deviceManager)
-                        "MEDIA_CONTROL" -> handleMediaControl(uuidStr, text)
-                        "FTP" -> handleFtp(uuidStr, text)
-                        "CLIPBOARD" ->
-                            ClipboardProcessor.process(host.callbackContext, ClipboardProcessor.ClipboardInput("DATA_CLIPBOARD", text, ""))
-                        "STATUS" ->
-                            StatusProcessor.process(
-                                host.callbackContext,
-                                host.deviceManager,
-                                host.callbackScope,
-                                StatusProcessor.StatusInput("DATA_STATUS", text, uuidStr),
-                                host.notificationDataReceivedCallbacks,
-                            )
-                        "APP_LAUNCH" -> {
-                            host.resolveDevice(uuidStr)?.let {
-                                AppLaunchManager.handleAppLaunchRequest(text, host.deviceManager, it, host.callbackContext)
-                            }
-                        }
-                        "SUPERISLAND" -> SuperIslandProcessor.process(host.callbackContext, host.deviceManager, text, uuidStr)
-                        else -> Logger.d(TAG, "未知DATA通道: type=$messageTypeStr, uuid=$uuidStr, size=${text.length}")
-                    }
-                } catch (e: Exception) {
-                    Logger.e(TAG, "on_data error: ${e.message}")
-                }
+    /** 入站数据报文入口。 */
+    fun handle(
+        uuidStr: String,
+        messageTypeStr: String,
+        text: String,
+    ) {
+        val authed =
+            synchronized(host.authenticatedDeviceTable) {
+                host.authenticatedDeviceTable[uuidStr]?.isAccepted == true
             }
+        Logger.d(TAG, "on_data: type=$messageTypeStr, authed=$authed, text_len=${text.length}")
+        if (!authed && messageTypeStr != "DATA_UNKNOWN") return
+
+        try {
+            when (messageTypeStr) {
+                "NOTIFICATION" ->
+                    NotificationProcessor.process(
+                        host.callbackContext,
+                        host.deviceManager,
+                        host.callbackScope,
+                        NotificationProcessor.NotificationInput("DATA_NOTIFICATION", text, uuidStr),
+                        host.notificationDataReceivedCallbacks,
+                    )
+                "MEDIAPLAY" -> {
+                    val json = JSONObject(text)
+                    host.resolveDevice(uuidStr)?.let {
+                        RemoteMediaSessionManager.onMediaMessageReceived(host.callbackContext, json, it)
+                    }
+                }
+                "ICON_REQUEST" -> {
+                    host.resolveDevice(uuidStr)?.let {
+                        IconSyncManager.handleIconRequest(text, host.deviceManager, it, host.callbackContext)
+                    }
+                }
+                "ICON_RESPONSE" -> IconSyncManager.handleIconResponse(text, host.callbackContext)
+                "APP_LIST_REQUEST" -> {
+                    host.resolveDevice(uuidStr)?.let {
+                        AppListSyncManager.handleAppListRequest(text, host.deviceManager, it, host.callbackContext)
+                    }
+                }
+                "APP_LIST_RESPONSE" ->
+                    AppListSyncManager.handleAppListResponse(text, host.callbackContext, uuidStr, host.deviceManager)
+                "MEDIA_CONTROL" -> handleMediaControl(uuidStr, text)
+                "FTP" -> handleFtp(uuidStr, text)
+                "CLIPBOARD" ->
+                    ClipboardProcessor.process(host.callbackContext, ClipboardProcessor.ClipboardInput("DATA_CLIPBOARD", text, ""))
+                "STATUS" ->
+                    StatusProcessor.process(
+                        host.callbackContext,
+                        host.deviceManager,
+                        host.callbackScope,
+                        StatusProcessor.StatusInput("DATA_STATUS", text, uuidStr),
+                        host.notificationDataReceivedCallbacks,
+                    )
+                "APP_LAUNCH" -> {
+                    host.resolveDevice(uuidStr)?.let {
+                        AppLaunchManager.handleAppLaunchRequest(text, host.deviceManager, it, host.callbackContext)
+                    }
+                }
+                "SUPERISLAND" -> SuperIslandProcessor.process(host.callbackContext, host.deviceManager, text, uuidStr)
+                else -> Logger.d(TAG, "未知DATA通道: type=$messageTypeStr, uuid=$uuidStr, size=${text.length}")
+            }
+        } catch (e: Exception) {
+            Logger.e(TAG, "on_data error: ${e.message}")
         }
+    }
 
     /** 媒体控制：播放控制直达本机媒体，音频中继动作交由 [DeviceCallbackHost.audioRelay]。 */
     private fun handleMediaControl(

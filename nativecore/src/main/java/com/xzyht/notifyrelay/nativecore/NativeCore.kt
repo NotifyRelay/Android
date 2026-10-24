@@ -2,73 +2,121 @@ package com.xzyht.notifyrelay.nativecore
 
 import android.media.projection.MediaProjection
 import android.util.Log
-import com.sun.jna.Native
 import com.sun.jna.Pointer
+import com.xzyht.notifyrelay.core.ffi.Core
+import com.xzyht.notifyrelay.core.ffi.CoreCallbacks
+import com.xzyht.notifyrelay.core.ffi.abiProbe
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.concurrent.atomic.AtomicReference
 import notifyrelay.base.util.Logger as AppLogger
 
+/**
+ * Rust 核心门面。
+ *
+ * 全部能力经 UniFFI 生成的绑定调用（[Core]），不再使用手写 JNA 声明。
+ * 保留 `Pointer` 形参仅为兼容既有调用点：上下文由 [Core] 单一持有，
+ * 形参值不参与定位（传 null 亦可）。
+ */
 object NativeCore {
     private const val TAG = "NativeCore"
-    val lib = NotifyRelayCore.instance()
 
-    @Volatile
-    private var _rustContext: Pointer? = null
+    private val coreRef = AtomicReference<Core?>(null)
+
+    /** 当前核心实例；未创建时为 null。 */
+    val core: Core?
+        get() = coreRef.get()
+
     var mediaProjection: MediaProjection? = null
 
-    // 网络层新特性的内部状态（发送队列句柄由 startCore 返回）
-    @Volatile
-    var senderQueuePtr: Long = 0L
-        private set
+    /**
+     * 发送队列句柄。
+     *
+     * 队列由 core 内部持有，平台侧不再需要句柄值；保留本属性仅为兼容既有调用点，
+     * 非 0 表示队列已就绪。
+     */
+    val senderQueuePtr: Long
+        get() = if (coreRef.get()?.isSenderQueueReady() == true) 1L else 0L
 
-    fun createContext(): Pointer {
-        val ctx = lib.nrc_init()
-        _rustContext = ctx
-        return ctx
+    /** 发送队列是否已就绪（由 [startCore] 建立）。 */
+    val senderQueueReady: Boolean
+        get() = coreRef.get()?.isSenderQueueReady() ?: false
+
+    /** 创建核心上下文；重复调用返回既有实例。 */
+    fun createContext(): Pointer? {
+        if (coreRef.get() == null) {
+            synchronized(this) {
+                if (coreRef.get() == null) {
+                    coreRef.set(Core())
+                }
+            }
+        }
+        return rawContextPointer()
     }
 
-    fun generateKeypair(ctx: Pointer): Boolean = lib.nrc_ecdh_generate_keypair(ctx) == 0
+    /** 上下文地址（仅用于日志/兼容），无实例时为 null。 */
+    private fun rawContextPointer(): Pointer? {
+        val c = coreRef.get() ?: return null
+        return Pointer(c.rawContextPtr().toLong())
+    }
 
-    fun getPublicKey(ctx: Pointer): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_ecdh_get_public_key(ctx))
+    fun getContext(): Pointer? = rawContextPointer()
 
-    fun hasKeypair(ctx: Pointer): Boolean = lib.nrc_ecdh_has_keypair(ctx) != 0
+    fun setContext(ctx: Pointer?) {
+        // 上下文由 Core 持有，此处仅为兼容旧调用点保留
+    }
+
+    /** 绑定是否已初始化。 */
+    fun isReady(): Boolean = coreRef.get() != null
+
+    /** UniFFI ABI 版本（绑定链路自检用）。 */
+    fun getAbiProbe(): String = abiProbe()
+
+    // ======== ECDH ========
+
+    fun generateKeypair(ctx: Pointer?): Boolean = coreRef.get()?.ecdhGenerateKeypair() ?: false
+
+    fun getPublicKey(ctx: Pointer?): String? = coreRef.get()?.ecdhGetPublicKey()
+
+    fun hasKeypair(ctx: Pointer?): Boolean = coreRef.get()?.ecdhHasKeypair() ?: false
 
     fun deriveSharedSecret(
-        ctx: Pointer,
+        ctx: Pointer?,
         peerUuid: String,
         peerPubKey: String,
-    ): Boolean = lib.nrc_ecdh_derive_shared_secret(ctx, peerUuid, peerPubKey) == 0
+    ): Boolean = coreRef.get()?.ecdhDeriveSharedSecret(peerUuid, peerPubKey) ?: false
 
     fun migrateSharedSecret(
-        ctx: Pointer,
+        ctx: Pointer?,
         deviceUuid: String,
         secret: ByteArray,
-    ): Boolean = lib.nrc_migrate_shared_secret(ctx, deviceUuid, secret, secret.size) == 0
+    ): Boolean = coreRef.get()?.migrateSharedSecret(deviceUuid, secret) ?: false
 
     fun removeDevice(
-        ctx: Pointer,
+        ctx: Pointer?,
         deviceUuid: String,
-    ): Boolean = lib.nrc_remove_device(ctx, deviceUuid) == 0
+    ): Boolean = coreRef.get()?.removeDevice(deviceUuid) ?: false
 
     // ======== State ========
-    fun exportState(ctx: Pointer): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_export_state(ctx))
+
+    fun exportState(ctx: Pointer?): String? = coreRef.get()?.exportState()
 
     fun importState(
-        ctx: Pointer,
+        ctx: Pointer?,
         json: String,
-    ): Boolean = lib.nrc_import_state(ctx, json) == 0
+    ): Boolean = coreRef.get()?.importState(json) ?: false
 
     fun encryptLocalState(
-        ctx: Pointer,
+        ctx: Pointer?,
         plaintext: String,
         deviceUuid: String,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_encrypt_local_state(ctx, plaintext, deviceUuid))
+    ): String? = coreRef.get()?.encryptLocalState(plaintext, deviceUuid)
 
     fun decryptLocalState(
-        ctx: Pointer,
+        ctx: Pointer?,
         encryptedB64: String,
         deviceUuid: String,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_decrypt_local_state(ctx, encryptedB64, deviceUuid))
+    ): String? = coreRef.get()?.decryptLocalState(encryptedB64, deviceUuid)
 
     /**
      * 本地状态反序列化聚合入口：解密与导入由 core 内部配对完成。
@@ -77,13 +125,14 @@ object NativeCore {
      * @return true 表示状态已导入
      */
     fun deserializeLocalState(
-        ctx: Pointer,
+        ctx: Pointer?,
         payload: String,
         deviceUuid: String,
         encrypted: Int,
     ): Boolean {
-        val result = NotifyRelayCore.ptrToStringAndFree(lib.nrc_deserialize_local_state(ctx, payload, deviceUuid, encrypted))
-        if (result.isNullOrEmpty()) return false
+        val c = coreRef.get() ?: return false
+        val result = c.deserializeLocalState(payload, deviceUuid, encrypted != 0)
+        if (result.isEmpty()) return false
         return try {
             JSONObject(result).optBoolean("ok", false)
         } catch (e: Exception) {
@@ -92,194 +141,244 @@ object NativeCore {
     }
 
     fun exportDeviceKey(
-        ctx: Pointer,
+        ctx: Pointer?,
         deviceUuid: String,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_export_device_key(ctx, deviceUuid))
+    ): String? = coreRef.get()?.exportDeviceKey(deviceUuid)
 
     // ======== Persistence（Rust 私有库：uuid/密钥由 Rust 持有）=======
-    fun getLocalUuid(ctx: Pointer): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_local_uuid(ctx))
+
+    fun getLocalUuid(ctx: Pointer?): String? = coreRef.get()?.getLocalUuid()
 
     fun renameDevice(
-        ctx: Pointer,
+        ctx: Pointer?,
         deviceUuid: String,
         name: String,
-    ): Boolean = lib.nrc_rename_device(ctx, deviceUuid, name) == 0
+    ): Boolean = coreRef.get()?.renameDevice(deviceUuid, name) ?: false
 
     // ======== Process ========
+
     fun periodicBroadcast(
-        ctx: Pointer,
+        ctx: Pointer?,
         action: Int,
         uuid: String? = null,
         name: String? = null,
         battery: Int = -1,
         deviceType: String? = null,
-    ): Int = lib.nrc_periodic_broadcast(ctx, action, uuid, name, battery, deviceType)
+    ): Int =
+        coreRef.get()?.periodicBroadcast(action, uuid ?: "", name ?: "", battery, deviceType ?: "")
+            ?: -1
 
     // ======== Send functions ========
+
     fun sendHandshake(
-        ctx: Pointer,
+        ctx: Pointer?,
         uuid: String,
         pubKey: String,
         localIp: String,
         targetIp: String,
         battery: Int,
         deviceType: String,
-    ): Int = lib.nrc_send_handshake(ctx, uuid, pubKey, localIp, targetIp, battery, deviceType)
+    ): Int = coreRef.get()?.sendHandshake(uuid, localIp, targetIp, battery, deviceType) ?: -1
 
     fun connectDevice(
-        ctx: Pointer,
+        ctx: Pointer?,
         uuid: String,
         targetIp: String,
         battery: Int,
         deviceType: String,
-    ): Int = lib.nrc_connect_device(ctx, uuid, targetIp, battery, deviceType)
+    ): Int = coreRef.get()?.connectDevice(uuid, targetIp, battery, deviceType) ?: -1
 
     fun sendPairingInit(
-        ctx: Pointer,
+        ctx: Pointer?,
         localUuid: String,
         targetUuid: String,
         expectedCode: String,
         battery: Int,
         deviceType: String,
-    ): Int = lib.nrc_send_pairing_init(ctx, localUuid, targetUuid, expectedCode, battery, deviceType)
+    ): Int =
+        coreRef.get()?.sendPairingInit(localUuid, targetUuid, expectedCode, battery, deviceType)
+            ?: -1
 
     fun sendPairingResp(
-        ctx: Pointer,
+        ctx: Pointer?,
         uuid: String,
         ltPub: String,
         pairingCode: String,
         ip: String,
         battery: Int,
         deviceType: String,
-    ): Int = lib.nrc_send_pairing_resp(ctx, uuid, ltPub, pairingCode, ip, battery, deviceType)
+    ): Int = coreRef.get()?.sendPairingResp(uuid, ltPub, pairingCode, ip, battery, deviceType) ?: -1
 
     fun sendAccept(
-        ctx: Pointer,
+        ctx: Pointer?,
         uuid: String,
         ltPubKey: String,
         ip: String,
         battery: Int,
         deviceType: String,
-    ) = lib.nrc_send_accept(ctx, uuid, ltPubKey, ip, battery, deviceType)
+    ) {
+        coreRef.get()?.sendAccept(uuid, ltPubKey, ip, battery, deviceType)
+    }
 
     fun sendReject(
-        ctx: Pointer,
+        ctx: Pointer?,
         uuid: String,
-    ) = lib.nrc_send_reject(ctx, uuid)
+    ) {
+        coreRef.get()?.sendReject(uuid)
+    }
 
     // ======== Pairing code management (Rust-generated) ========
-    fun generatePairingCode(
-        ctx: Pointer,
-        ttlSecs: Int = 300,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_generate_pairing_code(ctx, ttlSecs))
 
-    fun clearPairingCode(ctx: Pointer) = lib.nrc_clear_pairing_code(ctx)
+    fun generatePairingCode(
+        ctx: Pointer?,
+        ttlSecs: Int = 300,
+    ): String? = coreRef.get()?.generatePairingCode(ttlSecs.toUInt())
+
+    fun clearPairingCode(ctx: Pointer?) {
+        coreRef.get()?.clearPairingCode()
+    }
 
     // ======== Utility functions ========
+
     fun computeFeatureId(
         superPkg: String,
         paramV2Raw: String,
         title: String,
         text: String,
         instanceId: String,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_compute_feature_id(superPkg, paramV2Raw, title, text, instanceId))
+    ): String? =
+        com.xzyht.notifyrelay.core.ffi.computeFeatureId(
+            superPkg,
+            paramV2Raw,
+            title,
+            text,
+            instanceId,
+        )
 
     fun parseSuperIslandInbound(
         deviceUuid: String,
         pkg: String,
         fullJson: String,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_superisland_inbound(deviceUuid, pkg, fullJson))
+    ): String? =
+        com.xzyht.notifyrelay.core.ffi
+            .parseSuperislandInbound(deviceUuid, pkg, fullJson)
 
     fun parseNotificationInbound(
         fullJson: String,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_notification_inbound(fullJson))
+    ): String? =
+        com.xzyht.notifyrelay.core.ffi
+            .parseNotificationInbound(fullJson)
 
     fun parseMediaInbound(
         fullJson: String,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_parse_media_inbound(fullJson))
+    ): String? =
+        com.xzyht.notifyrelay.core.ffi
+            .parseMediaInbound(fullJson)
 
     // ======== Dedup engine ========
+
     fun dedup(
-        ctx: Pointer,
+        ctx: Pointer?,
         action: Int,
         dedupKey: String,
         arg1Ms: Long = 0L,
         arg2Ms: Long = 0L,
-    ): Int = lib.nrc_dedup(ctx, action, dedupKey, arg1Ms, arg2Ms)
+    ): Int = coreRef.get()?.dedup(action, dedupKey, arg1Ms, arg2Ms) ?: -1
 
     // ======== 入站内容去重（10s 窗口；键与 TTL 由 core 持有）========
+
     fun contentDedup(
         ctx: Pointer?,
         action: Int,
         title: String,
         text: String,
-    ): Int = ctx?.let { lib.nrc_content_dedup(it, action, title, text) } ?: -1
+    ): Int = coreRef.get()?.contentDedup(action, title, text) ?: -1
 
     // ======== Text similarity & dedup ========
+
     fun shouldDeduplicate(
         newTitle: String,
         newText: String,
         oldTitle: String,
         oldText: String,
-    ): Boolean = lib.nrc_should_deduplicate(newTitle, newText, oldTitle, oldText) != 0
+    ): Boolean =
+        com.xzyht.notifyrelay.core.ffi
+            .shouldDeduplicate(newTitle, newText, oldTitle, oldText)
 
     // ======== Filter ========
+
     fun setFilterConfig(
-        ctx: Pointer,
+        ctx: Pointer?,
         configJson: String,
-    ): Int = lib.nrc_set_filter_config(ctx, configJson)
+    ): Int = coreRef.get()?.setFilterConfig(configJson) ?: -1
 
     fun mapLocalPackage(
-        ctx: Pointer,
+        ctx: Pointer?,
         pkg: String,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_map_local_package(ctx, pkg))
+    ): String? = coreRef.get()?.mapLocalPackage(pkg)
 
     fun checkFilterMode(
-        ctx: Pointer,
+        ctx: Pointer?,
         mappedPkg: String,
         originalPkg: String,
         title: String,
         text: String,
-    ): Boolean = lib.nrc_check_filter_mode(ctx, mappedPkg, originalPkg, title, text) != 0
+    ): Boolean = (coreRef.get()?.checkFilterMode(mappedPkg, originalPkg, title, text) ?: 1) != 0
 
     // ======== Network layer ========
+
     fun removeDeviceSession(
-        ctx: Pointer,
+        ctx: Pointer?,
         uuid: String,
-    ): Int = lib.nrc_remove_device_session(ctx, uuid)
+    ): Int = coreRef.get()?.removeDeviceSession(uuid) ?: -1
 
     // ======== FTP credential derivation ========
-    fun deriveFtpCredentials(sharedSecretB64: String): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_derive_ftp_credentials(sharedSecretB64))
 
-    fun derivePasswordHash(password: String): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_derive_password_hash(password))
+    fun deriveFtpCredentials(sharedSecretB64: String): String? =
+        com.xzyht.notifyrelay.core.ffi
+            .deriveFtpCredentials(sharedSecretB64)
 
-    fun generateRandomPassword(): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_generate_random_password())
+    fun derivePasswordHash(password: String): String? =
+        com.xzyht.notifyrelay.core.ffi
+            .derivePasswordHash(password)
+
+    fun generateRandomPassword(): String? =
+        com.xzyht.notifyrelay.core.ffi
+            .generateRandomPassword()
 
     // ======== Heartbeat scheduler params (电量/名称变化) ========
+
     fun updateHeartbeatSchedulerParams(
-        ctx: Pointer,
+        ctx: Pointer?,
         name: String,
         battery: Int,
         deviceType: String,
-    ) = lib.nrc_update_heartbeat_scheduler_params(ctx, name, battery, deviceType)
+    ) {
+        coreRef.get()?.updateHeartbeatSchedulerParams(name, battery, deviceType)
+    }
 
     // ======== Device state snapshot ========
+
     fun getDeviceList(
-        ctx: Pointer,
+        ctx: Pointer?,
         authedTimeoutMs: Long,
         unauthedTimeoutMs: Long,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_device_list(ctx, authedTimeoutMs, unauthedTimeoutMs))
+    ): String? = coreRef.get()?.getDeviceList(authedTimeoutMs, unauthedTimeoutMs)
 
     // ======== Sender queue ========
 
     /** 入队：header 规范化、通知类发送去重（仅 DATA_NOTIFICATION）与 ts 注入由 core 内部完成 */
     fun enqueueMessage(
-        ctx: Pointer,
+        ctx: Pointer?,
         queuePtr: Long,
         deviceUuid: String,
         header: String,
         plaintext: String,
-    ): Int = lib.nrc_enqueue_message(ctx, queuePtr, deviceUuid, header, plaintext)
+    ): Int {
+        val c = coreRef.get() ?: return -1
+        if (!c.isSenderQueueReady()) return -1
+        return if (c.enqueueMessage(deviceUuid, header, plaintext)) 1 else 0
+    }
 
     // ======== Clipboard ========
 
@@ -295,10 +394,7 @@ object NativeCore {
         content: String,
         nowMs: Long,
         force: Boolean,
-    ): String? {
-        val c = ctx ?: return null
-        return NotifyRelayCore.ptrToStringAndFree(lib.nrc_clipboard_on_changed(c, queuePtr, targetsJson, mime, content, nowMs, if (force) 1 else 0))
-    }
+    ): String? = coreRef.get()?.clipboardOnChanged(targetsJson, mime, content, nowMs, force)
 
     /**
      * 收到远程剪贴板报文入口。Rust 解析/归一化并登记防循环时间窗。
@@ -308,10 +404,7 @@ object NativeCore {
         ctx: Pointer?,
         payloadJson: String,
         nowMs: Long,
-    ): String? {
-        val c = ctx ?: return null
-        return NotifyRelayCore.ptrToStringAndFree(lib.nrc_clipboard_on_received(c, payloadJson, nowMs))
-    }
+    ): String? = coreRef.get()?.clipboardOnReceived(payloadJson, nowMs)
 
     // ======== App sync (app list & icons) ========
 
@@ -328,14 +421,18 @@ object NativeCore {
         sourceDeviceUuid: String,
         nowMs: Long,
     ): String? {
-        val c = ctx ?: return null
+        val c = coreRef.get() ?: return null
         val appDeviceJson =
             JSONObject()
-                .apply {
-                    appDeviceMap.forEach { (k, v) -> put(k, JSONArray(v)) }
-                }.toString()
-        return NotifyRelayCore.ptrToStringAndFree(
-            lib.nrc_app_sync_prepare_icon_request(c, JSONArray(packages).toString(), JSONArray(installed).toString(), JSONArray(cached).toString(), appDeviceJson, sourceDeviceUuid, nowMs),
+                .apply { appDeviceMap.forEach { (k, v) -> put(k, JSONArray(v)) } }
+                .toString()
+        return c.appSyncPrepareIconRequest(
+            JSONArray(packages).toString(),
+            JSONArray(installed).toString(),
+            JSONArray(cached).toString(),
+            appDeviceJson,
+            sourceDeviceUuid,
+            nowMs,
         )
     }
 
@@ -352,14 +449,18 @@ object NativeCore {
         sourceDeviceUuid: String,
         nowMs: Long,
     ): String? {
-        val c = ctx ?: return null
+        val c = coreRef.get() ?: return null
         val appDeviceJson =
             JSONObject()
-                .apply {
-                    appDeviceMap.forEach { (k, v) -> put(k, JSONArray(v)) }
-                }.toString()
-        return NotifyRelayCore.ptrToStringAndFree(
-            lib.nrc_app_sync_request_icons(c, JSONArray(packages).toString(), JSONArray(installed).toString(), JSONArray(cached).toString(), appDeviceJson, sourceDeviceUuid, nowMs),
+                .apply { appDeviceMap.forEach { (k, v) -> put(k, JSONArray(v)) } }
+                .toString()
+        return c.appSyncRequestIcons(
+            JSONArray(packages).toString(),
+            JSONArray(installed).toString(),
+            JSONArray(cached).toString(),
+            appDeviceJson,
+            sourceDeviceUuid,
+            nowMs,
         )
     }
 
@@ -367,104 +468,123 @@ object NativeCore {
         ctx: Pointer?,
         packages: List<String>,
     ) {
-        val c = ctx ?: return
-        lib.nrc_app_sync_clear_icon_pending(c, JSONArray(packages).toString())
+        coreRef.get()?.appSyncClearIconPending(JSONArray(packages).toString())
     }
 
     /** 解析图标响应报文，返回 {"icons":[...],"missing":[...]} */
-    fun appSyncParseIconResponse(payload: String): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_app_sync_parse_icon_response(payload))
+    fun appSyncParseIconResponse(payload: String): String? =
+        com.xzyht.notifyrelay.core.ffi
+            .appSyncParseIconResponse(payload)
 
     /** 构造应用列表请求报文 */
     fun appSyncBuildApplistRequest(
         scope: String,
         nowMs: Long,
-    ): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_app_sync_build_applist_request(scope, nowMs))
+    ): String? =
+        com.xzyht.notifyrelay.core.ffi
+            .appSyncBuildApplistRequest(scope, nowMs)
 
-    /** 解析应用列表响应报文，返回 {"apps":[...],"scope":"..","total":N} */
-    fun appSyncParseApplistResponse(payload: String): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_app_sync_parse_applist_response(payload))
+    /** 解析应用列表响应报文 */
+    fun appSyncParseApplistResponse(payload: String): String? =
+        com.xzyht.notifyrelay.core.ffi
+            .appSyncParseApplistResponse(payload)
 
-    // 推送「全量」超级岛/媒体状态；Rust 内部计算差异、合并、ACK 与心跳，接收端经 on_data 回传全量。
-    // isQuery：true=查询回调响应推送（心跳查询发现变更后由平台推送），false=正常主动推送。
+    // ======== State merge (superisland / media) ========
 
-    /** @return true=入队成功；false=上下文/队列不可用或原生入队失败（调用方可重试） */
+    /** 推送超级岛全量状态；isQuery 为真表示响应状态查询。 */
     fun pushSuperislandState(
         ctx: Pointer?,
         queuePtr: Long,
         deviceUuid: String,
         fullJson: String,
         isEnd: Boolean,
-        isQuery: Boolean = false,
-    ): Boolean {
-        val c = ctx ?: return false
-        if (queuePtr == 0L) return false
-        return lib.nrc_push_superisland_state(c, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0) == 0
-    }
+        isQuery: Boolean,
+    ): Boolean = coreRef.get()?.pushSuperislandState(deviceUuid, fullJson, isEnd, isQuery) ?: false
 
-    /** @return true=入队成功；false=上下文/队列不可用或原生入队失败（调用方可重试） */
+    /** 推送媒体全量状态；isQuery 为真表示响应状态查询。 */
     fun pushMediaState(
         ctx: Pointer?,
         queuePtr: Long,
         deviceUuid: String,
         fullJson: String,
         isEnd: Boolean,
-        isQuery: Boolean = false,
-    ): Boolean {
-        val c = ctx ?: return false
-        if (queuePtr == 0L) return false
-        return lib.nrc_push_media_state(c, queuePtr, deviceUuid, fullJson, if (isEnd) 1 else 0, if (isQuery) 1 else 0) == 0
-    }
+        isQuery: Boolean,
+    ): Boolean = coreRef.get()?.pushMediaState(deviceUuid, fullJson, isEnd, isQuery) ?: false
 
-    // 注册状态查询回调（Rust 心跳线程锁外调用，返回 0=不存在 / 1=存在无变更 / 2=存在有变更）
-    private var stateQueryCallbackRef: Any? = null
+    // ======== Callbacks ========
 
-    fun setOnStateQueryCallback(
-        ctx: Pointer,
-        cb: NotifyRelayCore.OnStateQueryCb?,
-    ) {
-        stateQueryCallbackRef = cb
-        lib.nrc_set_on_state_query_cb(ctx, cb)
+    private var callbacksRef: CoreCallbacks? = null
+
+    /** 注册全部回调（配对/数据/设备事件/状态查询/音频/日志）。 */
+    fun setCallbacks(callbacks: CoreCallbacks) {
+        callbacksRef = callbacks
+        coreRef.get()?.setCallbacks(callbacks)
     }
 
     // ======== Network change ========
+
     fun onNetworkChanged(
-        ctx: Pointer,
+        ctx: Pointer?,
         localIp: String?,
-    ) = lib.nrc_on_network_changed(ctx, localIp)
+    ) {
+        coreRef.get()?.onNetworkChanged(localIp ?: "")
+    }
 
     // ======== Local IP ========
-    fun getLocalIp(): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_local_ip())
+
+    fun getLocalIp(): String? =
+        com.xzyht.notifyrelay.core.ffi
+            .getLocalIp()
 
     // ======== Discovery ========
+
     fun addKnownDevice(
-        ctx: Pointer,
+        ctx: Pointer?,
         uuid: String,
         ip: String,
-    ) = lib.nrc_add_known_device(ctx, uuid, ip)
+    ) {
+        coreRef.get()?.addKnownDevice(uuid, ip)
+    }
 
     fun removeKnownDevice(
-        ctx: Pointer,
+        ctx: Pointer?,
         uuid: String,
-    ) = lib.nrc_remove_known_device(ctx, uuid)
+    ) {
+        coreRef.get()?.removeKnownDevice(uuid)
+    }
 
     // ======== Reconnect ========
+
     fun reconnectAddTarget(
-        ctx: Pointer,
+        ctx: Pointer?,
         uuid: String,
         ip: String,
-    ) = lib.nrc_reconnect_add_target(ctx, uuid, ip)
+    ) {
+        coreRef.get()?.reconnectAddTarget(uuid, ip)
+    }
 
     fun reconnectRemoveTarget(
-        ctx: Pointer,
+        ctx: Pointer?,
         uuid: String,
-    ) = lib.nrc_reconnect_remove_target(ctx, uuid)
+    ) {
+        coreRef.get()?.reconnectRemoveTarget(uuid)
+    }
 
     // ======== Audio stream ========
+
     private var audioDataCallback: ((ByteArray, Int, Int) -> Unit)? = null
-    private var audioDataCallbackRef: Any? = null
-    private var audioEventCallbackRef: Any? = null
 
     fun registerAudioDataCallback(cb: (ByteArray, Int, Int) -> Unit) {
         audioDataCallback = cb
+    }
+
+    /** 音频数据回调入口（由 [setCallbacks] 的实现转发）。 */
+    fun dispatchAudioData(
+        pcm: ByteArray,
+        sampleRate: Int,
+        channels: Int,
+    ) {
+        audioDataCallback?.invoke(pcm, sampleRate, channels)
     }
 
     fun audioStart(
@@ -473,105 +593,39 @@ object NativeCore {
         sampleRate: Int,
         channels: Int,
         remoteUuid: String = "",
-    ): Int {
-        val ctx = getContext() ?: return -1
-        setupAudioCallbacks()
-        return lib.nrc_audio_start(ctx, direction, port, sampleRate, channels, remoteUuid)
-    }
+    ): Int = coreRef.get()?.audioStart(direction, port, sampleRate, channels, remoteUuid) ?: -1
 
-    fun audioWriteFrame(pcmData: ByteArray): Int {
-        val ctx = getContext() ?: return -1
-        return lib.nrc_audio_write_frame(ctx, pcmData, pcmData.size)
-    }
+    fun audioWriteFrame(pcmData: ByteArray): Int = coreRef.get()?.audioWriteFrame(pcmData) ?: -1
 
-    fun audioStop(): Int {
-        val ctx = getContext() ?: return -1
-        return lib.nrc_audio_stop(ctx)
-    }
+    fun audioStop(): Int = coreRef.get()?.audioStop() ?: -1
 
-    fun audioIsActive(): Boolean {
-        val ctx = getContext() ?: return false
-        return lib.nrc_audio_is_active(ctx) != 0
-    }
+    fun audioIsActive(): Boolean = (coreRef.get()?.audioIsActive() ?: 0) != 0
 
-    private fun setupAudioCallbacks() {
-        synchronized(this) {
-            if (audioDataCallbackRef != null) return
-            val dataCb =
-                object : NotifyRelayCore.OnAudioDataCb {
-                    override fun invoke(
-                        deviceUuid: Pointer?,
-                        pcmData: Pointer?,
-                        pcmLen: Int,
-                        sampleRate: Int,
-                        channels: Int,
-                        userData: Pointer?,
-                    ) {
-                        Native.detach(false)
-                        if (pcmData == null || pcmLen <= 0) return
-                        val arr = pcmData.getByteArray(0, pcmLen)
-                        audioDataCallback?.invoke(arr, sampleRate, channels)
-                    }
-                }
-            val eventCb =
-                object : NotifyRelayCore.OnAudioEventCb {
-                    override fun invoke(
-                        deviceUuid: Pointer?,
-                        event: Pointer?,
-                        errorMsg: Pointer?,
-                        userData: Pointer?,
-                    ) {
-                        Native.detach(false)
-                        val evt = NotifyRelayCore.ptrToString(event) ?: "null"
-                        val err = NotifyRelayCore.ptrToString(errorMsg) ?: ""
-                        AppLogger.d(TAG, "音频事件: $evt, 错误: $err")
-                    }
-                }
-            val ctx = getContext() ?: return
-            lib.nrc_register_audio_data_cb(ctx, dataCb)
-            lib.nrc_register_audio_event_cb(ctx, eventCb)
-            audioDataCallbackRef = dataCb
-            audioEventCallbackRef = eventCb
+    // ======== Log callback ========
+
+    /** 日志入口（由 [setCallbacks] 的实现转发）。 */
+    fun dispatchLog(
+        level: Int,
+        msg: String,
+    ) {
+        when (level) {
+            1 -> AppLogger.e("Rust", msg)
+            2 -> AppLogger.w("Rust", msg)
+            3 -> AppLogger.i("Rust", msg)
+            4 -> AppLogger.d("Rust", msg)
+            5 -> AppLogger.v("Rust", msg)
+            else -> AppLogger.d("Rust", msg)
         }
     }
 
-    fun setContext(ctx: Pointer?) {
-        _rustContext = ctx
-    }
-
-    fun getContext(): Pointer? = _rustContext
-
-    // ======== Log callback ========
-    private var logCallbackRef: Any? = null
-
-    fun setLogCallback(ctx: Pointer) {
-        val cb =
-            object : NotifyRelayCore.OnLogCb {
-                override fun invoke(
-                    level: Int,
-                    message: Pointer?,
-                ) {
-                    val msg = NotifyRelayCore.ptrToString(message) ?: return
-                    when (level) {
-                        1 -> AppLogger.e("Rust", msg)
-                        2 -> AppLogger.w("Rust", msg)
-                        3 -> AppLogger.i("Rust", msg)
-                        4 -> AppLogger.d("Rust", msg)
-                        5 -> AppLogger.v("Rust", msg)
-                        else -> AppLogger.d("Rust", msg)
-                    }
-                }
-            }
-        lib.nrc_set_log_callback(cb)
-        logCallbackRef = cb
-    }
-
     // ======== Version ========
-    fun getGitHash(): String? = NotifyRelayCore.ptrToStringAndFree(lib.nrc_get_git_hash())
+
+    fun getGitHash(): String? = coreRef.get()?.gitHash()
 
     // ======== Initialize core (统一启动 TCP、心跳、离线检测、发送队列、扫描、重连) ========
+
     fun startCore(
-        ctx: Pointer,
+        ctx: Pointer?,
         uuid: String,
         name: String,
         battery: Int,
@@ -584,13 +638,24 @@ object NativeCore {
         reconnectIntervalSecs: Long = 10,
         reconnectMaxRetries: Int = 5,
     ): Boolean {
-        val queue = lib.nrc_start_core(ctx, uuid, name, battery, deviceType, tcpPort, pubkey, heartbeatIntervalMs, offlineTimeoutSec, offlineCheckIntervalMs, reconnectIntervalSecs, reconnectMaxRetries)
-        if (queue == 0L) {
-            Log.e(TAG, "nrc_start_core 启动失败，返回句柄: $queue")
-            senderQueuePtr = 0L
+        val c = coreRef.get() ?: return false
+        val queue =
+            c.startCore(
+                uuid,
+                name,
+                battery,
+                deviceType,
+                tcpPort.toUShort(),
+                heartbeatIntervalMs.toULong(),
+                offlineTimeoutSec,
+                offlineCheckIntervalMs.toULong(),
+                reconnectIntervalSecs.toULong(),
+                reconnectMaxRetries.toUInt(),
+            )
+        if (queue.toLong() == 0L) {
+            Log.e(TAG, "startCore 启动失败，返回句柄: $queue")
             return false
         }
-        senderQueuePtr = queue
         return true
     }
 }
