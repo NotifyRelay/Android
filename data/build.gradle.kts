@@ -49,6 +49,8 @@ dependencies {
 
     // 依赖base模块
     implementation(project(":base"))
+    // KMP 公共端（过滤配置默认常量）
+    implementation(project(":shared"))
 
     // Room Database
     implementation(libs.androidx.room.runtime)

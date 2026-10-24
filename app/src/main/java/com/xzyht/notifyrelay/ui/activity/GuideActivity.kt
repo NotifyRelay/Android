@@ -13,7 +13,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
-import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.guide.GuideScreen
 import notifyrelay.base.util.GuidePermissionRequester
@@ -87,51 +86,49 @@ class GuideActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
-            ProvideNavigationEventDispatcherOwner {
-                val appContext = LocalContext.current
-                val systemDarkTheme = isSystemInDarkTheme()
-                var themeBaseIndex by remember {
-                    mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(appContext))
+            val appContext = LocalContext.current
+            val systemDarkTheme = isSystemInDarkTheme()
+            var themeBaseIndex by remember {
+                mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(appContext))
+            }
+            val isDarkTheme =
+                when (themeBaseIndex) {
+                    ThemeSettingsManager.THEME_LIGHT -> false
+                    ThemeSettingsManager.THEME_DARK -> true
+                    else -> systemDarkTheme
                 }
-                val isDarkTheme =
-                    when (themeBaseIndex) {
-                        ThemeSettingsManager.THEME_LIGHT -> false
-                        ThemeSettingsManager.THEME_DARK -> true
-                        else -> systemDarkTheme
-                    }
 
-                NotifyRelayTheme(darkTheme = isDarkTheme) {
-                    SetupSystemBars(isDarkTheme)
-                    GuideScreen(
-                        permissionRequester = permissionRequester,
-                        themeBaseIndex = themeBaseIndex,
-                        reauth = debugReauth,
-                        needConsent = debugNeedConsent,
-                        onThemeChanged = { newIndex ->
-                            ThemeSettingsManager.setThemeBaseIndex(appContext, newIndex)
-                            themeBaseIndex = newIndex
-                        },
-                        onContinue = {
-                            // 首次启动后标记为已启动
-                            StorageManager.putBoolean(this@GuideActivity, "isFirstLaunch", false, StorageManager.PrefsType.GENERAL)
-                            // 记录当前已声明的权限集合，作为「已同意」基线，供后续版本更新比对新增权限。
-                            StorageManager.putStringSet(
-                                this@GuideActivity,
-                                "agreedManifestPermissions",
-                                declaredPermissions,
-                                StorageManager.PrefsType.GENERAL,
-                            )
+            NotifyRelayTheme(darkTheme = isDarkTheme) {
+                SetupSystemBars(isDarkTheme)
+                GuideScreen(
+                    permissionRequester = permissionRequester,
+                    themeBaseIndex = themeBaseIndex,
+                    reauth = debugReauth,
+                    needConsent = debugNeedConsent,
+                    onThemeChanged = { newIndex ->
+                        ThemeSettingsManager.setThemeBaseIndex(appContext, newIndex)
+                        themeBaseIndex = newIndex
+                    },
+                    onContinue = {
+                        // 首次启动后标记为已启动
+                        StorageManager.putBoolean(this@GuideActivity, "isFirstLaunch", false, StorageManager.PrefsType.GENERAL)
+                        // 记录当前已声明的权限集合，作为「已同意」基线，供后续版本更新比对新增权限。
+                        StorageManager.putStringSet(
+                            this@GuideActivity,
+                            "agreedManifestPermissions",
+                            declaredPermissions,
+                            StorageManager.PrefsType.GENERAL,
+                        )
 
-                            if (fromftp) {
-                                // 如果是从 FTP 请求跳转过来的，尝试重新启动 FTP 服务
-                                Logger.d("GuideActivity", "从 FTP 请求跳转，尝试重新启动 FTP 服务")
-                            }
+                        if (fromftp) {
+                            // 如果是从 FTP 请求跳转过来的，尝试重新启动 FTP 服务
+                            Logger.d("GuideActivity", "从 FTP 请求跳转，尝试重新启动 FTP 服务")
+                        }
 
-                            startActivity(Intent(this@GuideActivity, MainActivity::class.java))
-                            finish()
-                        },
-                    )
-                }
+                        startActivity(Intent(this@GuideActivity, MainActivity::class.java))
+                        finish()
+                    },
+                )
             }
         }
     }

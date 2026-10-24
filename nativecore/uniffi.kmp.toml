@@ -1,0 +1,15 @@
+# 供 :core:uniffiBindgenKmp 使用：以 KMP 形态产出绑定，产物不参与 :core 编译。
+# Gobley 的 KotlinBindingGenerator::new_config 直接把配置文件的根表按扁平结构反序列化，
+# 不读取 [bindings.kotlin] 子表（与官方 uniffi-bindgen 不同）。故所有键写在顶层。
+
+package_name = "com.xzyht.notifyrelay.core.ffi"
+
+# 生成的 Kotlin 绑定以此为动态库名进行 JNA 加载，
+# 与 .cargo/config.toml 及 cargo-ndk 产出的 libnotify_relay_core.so 对应。
+cdylib_name = "notify_relay_core"
+
+# true：common 源集只产出 expect 声明，函数实现仅在目标源集中产出。
+kotlin_multiplatform = true
+
+# 指定产出目标源集：与 true 组合时输出 commonMain 与 androidMain 双目录。
+kotlin_targets = ["android"]

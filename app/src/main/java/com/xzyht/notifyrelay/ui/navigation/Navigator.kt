@@ -1,16 +1,24 @@
 package com.xzyht.notifyrelay.ui.navigation
 
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.saveable.Saver
-import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.navigation3.runtime.NavKey
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.serialization.builtins.ListSerializer
+import kotlinx.serialization.json.Json
+import top.yukonga.miuix.kmp.nav.core.NavBackStack
+import top.yukonga.miuix.kmp.nav.core.NavController
+import top.yukonga.miuix.kmp.nav.core.NavKey
+import top.yukonga.miuix.kmp.nav.core.navBackStackOf
+
+/** 返回栈的持久化编码，与 miuix-nav 的 NavBackStack Saver 口径一致（kotlinx.serialization JSON）。 */
+private val navigatorJson = Json { ignoreUnknownKeys = true }
+
+/** `Route` 是工程内唯一的 `NavKey` 实现。 */
+private val routeListSerializer = ListSerializer(Route.serializer())
 
 /**
  * 导航器类，管理导航栈和结果传递
@@ -19,7 +27,9 @@ import kotlinx.coroutines.flow.SharedFlow
 class Navigator(
     initialKey: NavKey,
 ) {
-    val backStack: SnapshotStateList<NavKey> = mutableStateListOf(initialKey)
+    val backStack: NavBackStack = navBackStackOf(initialKey)
+
+    private val controller = NavController(backStack)
 
     private val resultBus = mutableMapOf<String, MutableSharedFlow<Any>>()
 
@@ -28,7 +38,7 @@ class Navigator(
      * Push a new route onto the navigation stack
      */
     fun push(key: NavKey) {
-        backStack.add(key)
+        controller.push(key)
     }
 
     /**
@@ -36,11 +46,7 @@ class Navigator(
      * Replace the current route
      */
     fun replace(key: NavKey) {
-        if (backStack.isNotEmpty()) {
-            backStack[backStack.lastIndex] = key
-        } else {
-            backStack.add(key)
-        }
+        controller.replace(key)
     }
 
     /**
@@ -116,10 +122,11 @@ class Navigator(
     private fun ensureChannel(key: String): MutableSharedFlow<Any> = resultBus.getOrPut(key) { MutableSharedFlow(replay = 1, extraBufferCapacity = 0) }
 
     companion object {
-        val Saver: Saver<Navigator, Any> =
-            listSaver(
-                save = { navigator -> navigator.backStack.toList() },
-                restore = { savedList ->
+        val Saver: Saver<Navigator, String> =
+            Saver(
+                save = { navigator -> navigatorJson.encodeToString(routeListSerializer, navigator.backStack.filterIsInstance<Route>()) },
+                restore = { encoded ->
+                    val savedList = navigatorJson.decodeFromString(routeListSerializer, encoded)
                     val initialKey = savedList.firstOrNull() ?: Route.Main
                     val navigator = Navigator(initialKey)
                     navigator.backStack.clear()

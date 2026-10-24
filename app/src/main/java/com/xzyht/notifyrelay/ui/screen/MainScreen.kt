@@ -30,9 +30,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.navigationevent.NavigationEventInfo
-import androidx.navigationevent.compose.NavigationBackHandler
-import androidx.navigationevent.compose.rememberNavigationEventState
 import com.xzyht.notifyrelay.ui.activity.MainActivity
 import com.xzyht.notifyrelay.ui.navigation.Navigator
 import com.xzyht.notifyrelay.ui.navigation.Route
@@ -54,6 +51,7 @@ import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Community
 import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.icon.extended.Tune
+import top.yukonga.miuix.kmp.nav.gesture.PredictiveBackHandler
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
@@ -250,12 +248,10 @@ private fun MainScreenBackHandler(
         }
     }
 
-    val navEventState = rememberNavigationEventState(NavigationEventInfo.None)
-
-    NavigationBackHandler(
-        state = navEventState,
-        isBackEnabled = isBackHandlerEnabled,
-        onBackCompleted = {
+    PredictiveBackHandler(
+        enabled = isBackHandlerEnabled,
+        onProgress = {},
+        onCommit = {
             if (deviceListState.hasAnyDialogShowing()) {
                 deviceListState.dismissAllDialogs()
             } else if (selectedTab != 0) {
@@ -267,10 +263,11 @@ private fun MainScreenBackHandler(
                 if (currentTime - backPressedTime < exitInterval) {
                     activity?.finish()
                 } else {
-                    ToastUtils.showShortToast(activity ?: return@NavigationBackHandler, "再次返回以退出应用")
+                    ToastUtils.showShortToast(activity ?: return@PredictiveBackHandler, "再次返回以退出应用")
                     backPressedTime = currentTime
                 }
             }
         },
+        onCancel = {},
     )
 }

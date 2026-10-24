@@ -83,6 +83,43 @@ tasks.named("preBuild") {
     dependsOn(rustBuild, uniffiBindgen)
 }
 
+// KMP 形态绑定生成：以 kotlin_multiplatform = true 的配置产出 commonMain（expect 声明）
+// 与 androidMain（actual 实现）双目录结构，供公共端在 KMP 模块中消费。
+// 该任务不参与 :core 编译（:core 为单源集模块，同一 compilation 内 expect 与 actual 不能共存），
+// 也不挂到 preBuild；仅在显式调用时执行。
+val uniffiBindgenKmp =
+    tasks.register<Exec>("uniffiBindgenKmp") {
+        description = "以 KMP 配置生成 UniFFI Kotlin 双源集绑定（不参与 :core 编译）"
+        group = "rust"
+        dependsOn(rustBuild)
+        val soFile = rustCoreDir.resolve("build/target/aarch64-linux-android/release/libnotify_relay_core.so")
+        // 配置文件位于本模块目录（仓库侧），不写入 notify-relay-core 子模块
+        val kmpConfigFile = project.projectDir.resolve("uniffi.kmp.toml")
+        val outDir =
+            project.layout.buildDirectory
+                .dir("generated/uniffi-kmp")
+                .get()
+                .asFile
+        inputs.file(kmpConfigFile)
+        inputs.files(rustCoreDir.resolve("Cargo.lock"))
+        inputs.file(soFile)
+        outputs.dir(outDir)
+        doFirst {
+            require(soFile.exists()) { "Rust 产物缺失：$soFile（请先执行 :core:rustBuild）" }
+            outDir.deleteRecursively()
+            outDir.mkdirs()
+        }
+        commandLine(
+            "gobley-uniffi-bindgen",
+            "--library",
+            "--config",
+            kmpConfigFile.absolutePath,
+            "--out-dir",
+            outDir.absolutePath,
+            soFile.absolutePath,
+        )
+    }
+
 android {
     namespace = "com.xzyht.notifyrelay.nativecore"
     compileSdk =

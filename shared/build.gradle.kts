@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.kotlin.multiplatform)
     alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 kotlin {
@@ -30,9 +31,23 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
             implementation(libs.compose.multiplatform.runtime)
+            implementation(libs.compose.multiplatform.foundation)
+            implementation(libs.compose.multiplatform.foundation.layout)
+            implementation(libs.compose.multiplatform.ui)
+            implementation(libs.compose.multiplatform.ui.text)
+            implementation(libs.compose.multiplatform.ui.tooling.preview)
+            implementation(libs.compose.multiplatform.components.resources)
+            // material3 与 material-icons-extended 使用 androidx 条目：其 Gradle 模块含 metadata 变体，
+            // org.jetbrains.compose 侧对应版本线不覆盖 1.12.2。
+            implementation(libs.androidx.material3)
+            implementation(libs.androidx.compose.material.icons.extended)
+            implementation(libs.miuix.nav)
+            implementation(libs.miuix.ui)
+            implementation(libs.kotlinx.serialization.json)
         }
 
         androidMain.dependencies {
+            implementation(libs.compose.multiplatform.ui.tooling)
         }
     }
 }

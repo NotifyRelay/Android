@@ -17,7 +17,10 @@ ktlint_standard_backing-property-naming = disabled
 # Compose 代码惯用通配导入（foundation.layout.* / runtime.* 等），豁免通配导入规则
 ktlint_standard_no-wildcard-imports = disabled
 
-# UniFFI 生成物（nativecore/build/generated/uniffi）：文件名、类名与缩进均由生成器模板决定，
+# UniFFI 生成物（nativecore/build/generated/uniffi 与 uniffi-kmp）：文件名、类名与缩进均由生成器模板决定，
 # 且每次构建都会被覆盖重写，故整目录豁免 ktlint。
 [**/generated/uniffi/**/*.{kt,kts}]
+ktlint = disabled
+
+[**/generated/uniffi-kmp/**/*.{kt,kts}]
 ktlint = disabled

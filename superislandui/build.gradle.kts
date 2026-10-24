@@ -50,17 +50,18 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
 
-    // Jetpack Compose BOM 统一管理版本
-    implementation(platform(libs.androidx.compose.bom))
+    // Compose 运行时与 UI 采用 Compose Multiplatform 坐标（版本由 CMP 统一决定）
+    implementation(libs.compose.multiplatform.runtime)
+    implementation(libs.compose.multiplatform.foundation)
+    implementation(libs.compose.multiplatform.ui)
+    implementation(libs.compose.multiplatform.ui.tooling.preview)
+    debugImplementation(libs.compose.multiplatform.ui.tooling)
 
-    // Jetpack Compose 依赖（通过 BOM 统一管理版本）
-    implementation("androidx.activity:activity-compose")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.runtime:runtime")
+    // material3 保留 androidx 坐标（提供 KMP 元数据变体）
+    implementation(libs.androidx.material3)
+
+    // Android-only Compose 依赖
+    implementation(libs.androidx.activity.compose)
 
     // AndroidX Lifecycle
     implementation(libs.bundles.lifecycle)
@@ -76,6 +77,8 @@ dependencies {
     // 依赖其他模块（原 :core 工具类已并入 :base）
     implementation(project(":base"))
     implementation(project(":data"))
+    // KMP 公共端（平台标识、文本与计时工具、存储 key 常量）
+    implementation(project(":shared"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

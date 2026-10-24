@@ -15,6 +15,7 @@ appcompat = "1.8.0"
 material = "1.14.0"
 miuix = "0.9.4"
 # 上游 miuix-navigation3-ui-android 只发布到 0.9.3，因此单独钉住
+# 保留给 :scrcpy 子模块消费；:app 侧不再使用。
 miuixNavigation3 = "0.9.3"
 navigation3 = "1.1.7"
 lifecycle = "2.11.0"
@@ -64,6 +65,7 @@ ktlint = "14.2.0"
 kotlinMultiplatform = "2.4.20"
 agpKmpLibrary = "9.4.1"
 composeMultiplatform = "1.12.2"
+# 声明值为下限；:shared 中实际由 miuix-nav 0.9.4 的传递依赖提升到 1.11.0（不加 constraint）
 kotlinxSerialization = "1.9.0"
 # AndroidX Compose 1.12.1 系列（对应 compose-bom 2026.09.00 的 ui/foundation/runtime 锁定版本）
 composeFoundation = "1.12.1"
@@ -79,9 +81,15 @@ androidx-espresso-core = { group = "androidx.test.espresso", name = "espresso-co
 androidx-appcompat = { group = "androidx.appcompat", name = "appcompat", version.ref = "appcompat" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 miuix-ui = { group = "top.yukonga.miuix.kmp", name = "miuix-ui-android", version.ref = "miuix" }
+# 上游 miuix-navigation3-ui-android 只发布到 0.9.3；保留给 :scrcpy 子模块消费。
+# :app 侧已迁移至 miuix-nav，见下文条目。
 miuix-preference = { group = "top.yukonga.miuix.kmp", name = "miuix-preference-android", version.ref = "miuix" }
+# 上游 miuix-navigation3-ui-android 只发布到 0.9.3；保留给 :scrcpy 子模块消费。
+# :app 侧已迁移至 miuix-nav，见下文条目。
 miuix-navigation3-ui = { group = "top.yukonga.miuix.kmp", name = "miuix-navigation3-ui-android", version.ref = "miuixNavigation3" }
+# androidx.navigation3-runtime：:app 侧已迁移至 miuix-nav；保留给 :scrcpy 子模块消费。
 androidx-navigation3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "navigation3" }
+# lifecycle-viewmodel-navigation3：:app 侧不再使用；保留给 :scrcpy 子模块消费（如果它用）。
 androidx-lifecycle-viewmodel-navigation3 = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-navigation3", version.ref = "lifecycle" }
 androidx-ui-text = { group = "androidx.compose.ui", name = "ui-text", version.ref = "uiText" }
 androidx-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
@@ -91,7 +99,12 @@ apache-ftpserver = { group = "org.apache.ftpserver", name = "ftpserver-core", ve
 androidx-remote-creation-compose = { group = "androidx.compose.remote", name = "remote-creation-compose", version.ref = "remoteCreationCompose" }
 runtime = { group = "androidx.compose.runtime", name = "runtime", version.ref = "runtimeVersion" }
 miuix-icons = { group = "top.yukonga.miuix.kmp", name = "miuix-icons", version.ref = "miuix" }
+# navigationevent-compose：:app 侧不再使用；保留给 :scrcpy 子模块消费（如果它用）。
 androidx-navigationevent-compose = { group = "androidx.navigationevent", name = "navigationevent-compose", version.ref = "navigationEventCompose" }
+# miuix-nav：KMP 导航运行时，为 :shared commonMain 提供统一返回栈与路由 DSL。
+# 依赖：navigationevent-compose（runtime）、foundation、lifecycle-*, kotlinx-serialization-json。
+# :app 的 build.gradle.kts 已删除旧的 navigation3 / navigationevent/miuix-navigation3-ui，改用此库。
+miuix-nav = { group = "top.yukonga.miuix.kmp", name = "miuix-nav", version.ref = "miuix" }
 androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "datastorePreferences" }
 androidx-datastore = { group = "androidx.datastore", name = "datastore", version.ref = "datastore" }
 gson = { group = "com.google.code.gson", name = "gson", version.ref = "gson" }
@@ -135,7 +148,11 @@ ezhooktool-xposed102 = { group = "io.github.lingqiqi5211.ezhooktool", name = "ho
 androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "lifecycle" }
 
 # KMP 公共端（:shared）依赖
-miuix-nav = { group = "top.yukonga.miuix.kmp", name = "miuix-nav", version.ref = "miuix" }
+# miuix-ui 的 KMP 坐标（不带 -android 后缀，含 metadata 变体，可供 commonMain 使用）；
+# libs.miuix.ui 是 miuix-ui-android 构件，仅限 Android 源集。
+miuix-ui-kmp = { group = "top.yukonga.miuix.kmp", name = "miuix-ui", version.ref = "miuix" }
+# kotlinx-serialization-json 为 commonMain @Serializable 提供序列化支持；
+# app 的 Route.kt 也依赖它。
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }
 compose-multiplatform-runtime = { group = "org.jetbrains.compose.runtime", name = "runtime", version.ref = "composeMultiplatform" }
 compose-multiplatform-foundation = { group = "org.jetbrains.compose.foundation", name = "foundation", version.ref = "composeMultiplatform" }

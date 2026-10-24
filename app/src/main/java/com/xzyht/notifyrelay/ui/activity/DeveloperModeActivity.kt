@@ -20,7 +20,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
-import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.devtools.NotificationFieldDumpPage
@@ -63,34 +62,32 @@ class DeveloperModeActivity : AppCompatActivity() {
         this.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
 
         setContent {
-            ProvideNavigationEventDispatcherOwner {
-                val isDarkTheme = isSystemInDarkTheme()
-                // 使用统一的主题
-                NotifyRelayTheme(darkTheme = isDarkTheme) {
-                    // 设置系统栏外观
-                    SetupSystemBars(isDarkTheme)
-                    // 页内切换：主设置页 ↔ 通知字段转储页（不新增 Activity 与 Manifest 条目）
-                    var showNotificationDump by remember { mutableStateOf(false) }
-                    // 系统返回键：在转储页时先回到开发者选项主页面，而不是直接退出 Activity
-                    androidx.activity.compose.BackHandler(enabled = showNotificationDump) {
-                        showNotificationDump = false
-                    }
-                    // 使用标准 TopAppBar 页面容器（内容区 colorScheme.background）
-                    ScrollableTopAppBarPage(
-                        title = if (showNotificationDump) "通知字段转储" else "开发者选项",
-                        onBack = {
-                            if (showNotificationDump) {
-                                showNotificationDump = false
-                            } else {
-                                finish()
-                            }
-                        },
-                    ) {
+            val isDarkTheme = isSystemInDarkTheme()
+            // 使用统一的主题
+            NotifyRelayTheme(darkTheme = isDarkTheme) {
+                // 设置系统栏外观
+                SetupSystemBars(isDarkTheme)
+                // 页内切换：主设置页 ↔ 通知字段转储页（不新增 Activity 与 Manifest 条目）
+                var showNotificationDump by remember { mutableStateOf(false) }
+                // 系统返回键：在转储页时先回到开发者选项主页面，而不是直接退出 Activity
+                androidx.activity.compose.BackHandler(enabled = showNotificationDump) {
+                    showNotificationDump = false
+                }
+                // 使用标准 TopAppBar 页面容器（内容区 colorScheme.background）
+                ScrollableTopAppBarPage(
+                    title = if (showNotificationDump) "通知字段转储" else "开发者选项",
+                    onBack = {
                         if (showNotificationDump) {
-                            NotificationFieldDumpPage()
+                            showNotificationDump = false
                         } else {
-                            DeveloperModeScreen(onOpenNotificationDump = { showNotificationDump = true })
+                            finish()
                         }
+                    },
+                ) {
+                    if (showNotificationDump) {
+                        NotificationFieldDumpPage()
+                    } else {
+                        DeveloperModeScreen(onOpenNotificationDump = { showNotificationDump = true })
                     }
                 }
             }
