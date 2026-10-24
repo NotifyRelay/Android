@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.filter
 
 import android.content.Context
-import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
@@ -161,10 +160,9 @@ object RemoteFilterConfig {
                     savePackageGroups(context)
 
                     // 保存后立即同步到 Rust 侧
-                    val ctx = BackendRemoteFilter.rustContext
-                    if (ctx != null) {
+                    if (NativeCore.isReady()) {
                         val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
-                        syncToRust(ctx, installedPkgs)
+                        syncToRust(installedPkgs)
                     }
                 } catch (e: Exception) {
                     Logger.e("RemoteFilterConfig", "Failed to save configuration", e)
@@ -234,12 +232,9 @@ object RemoteFilterConfig {
     }
 
     /** 将当前配置同步到 Rust Core */
-    fun syncToRust(
-        ctx: Pointer,
-        installedPkgs: Set<String>,
-    ): Boolean {
+    fun syncToRust(installedPkgs: Set<String>): Boolean {
         val json = buildRustConfigJson(installedPkgs)
-        return NativeCore.setFilterConfig(ctx, json) == 0
+        return NativeCore.setFilterConfig(json) == 0
     }
 
     // ---------- 黑白名单操作（按当前 filterMode 生效） ----------
@@ -328,7 +323,7 @@ object RemoteFilterConfig {
         save(context)
     }
 
-    /** 构建 Rust nrc_set_filter_config 所需的 JSON */
+    /** 构建 Rust `NativeCore.setFilterConfig()` 所需的 JSON */
     private fun buildRustConfigJson(installedPkgs: Set<String>): String {
         val root = JSONObject()
 
@@ -404,8 +399,8 @@ object RemoteFilterConfig {
         pkg: String,
         installedPkgs: Set<String>,
     ): String {
-        val ctx = BackendRemoteFilter.rustContext ?: return pkg
-        return NativeCore.mapLocalPackage(ctx, pkg) ?: pkg
+        if (!NativeCore.isReady()) return pkg
+        return NativeCore.mapLocalPackage(pkg) ?: pkg
     }
 
     /** 检查过滤模式（含关键词匹配）— 委托给 Rust Core */
@@ -414,7 +409,7 @@ object RemoteFilterConfig {
         title: String,
         text: String,
     ): Boolean {
-        val ctx = BackendRemoteFilter.rustContext ?: return true
-        return NativeCore.checkFilterMode(ctx, pkg, pkg, title, text)
+        if (!NativeCore.isReady()) return true
+        return NativeCore.checkFilterMode(pkg, pkg, title, text)
     }
 }

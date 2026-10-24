@@ -49,8 +49,7 @@ internal object SendGateway {
         deviceManager: DeviceAuthTablePort,
         tag: String = "",
     ): Boolean {
-        val ctx = NativeCore.getContext()
-        if (ctx == null) {
+        if (!NativeCore.isReady()) {
             Logger.w(TAG, "Rust 未初始化，跳过入队: ${deviceInfo.displayName}")
             return false
         }

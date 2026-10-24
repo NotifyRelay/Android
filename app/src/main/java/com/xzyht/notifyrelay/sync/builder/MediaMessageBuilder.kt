@@ -62,9 +62,8 @@ object MediaMessageBuilder {
     ) {
         try {
             // 推送「全量」媒体状态：差异计算（FULL/DELTA）、合并与 ACK 均由 Rust 合并引擎负责。
-            val ctx = NativeCore.getContext() ?: return
-            val queuePtr = NativeCore.senderQueuePtr
-            if (queuePtr == 0L) return
+            if (!NativeCore.isReady()) return
+            if (!NativeCore.senderQueueReady) return
 
             val content =
                 buildMediaFullContent(
@@ -80,7 +79,7 @@ object MediaMessageBuilder {
 
             SendGateway.getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
-                    NativeCore.pushMediaState(ctx, queuePtr, device.uuid, content, false, false)
+                    NativeCore.pushMediaState(device.uuid, content, false, false)
                 } catch (e: Exception) {
                     Logger.w(TAG, "推送媒体状态失败: ${device.displayName}", e)
                 }
@@ -102,13 +101,12 @@ object MediaMessageBuilder {
     ) {
         try {
             // 推送结束标记：Rust 合并引擎会回传 terminateValue="__END__" 全量，接收端据此移除媒体卡片。
-            val ctx = NativeCore.getContext() ?: return
-            val queuePtr = NativeCore.senderQueuePtr
-            if (queuePtr == 0L) return
+            if (!NativeCore.isReady()) return
+            if (!NativeCore.senderQueueReady) return
 
             SendGateway.getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
-                    NativeCore.pushMediaState(ctx, queuePtr, device.uuid, "{}", true, false)
+                    NativeCore.pushMediaState(device.uuid, "{}", true, false)
                 } catch (e: Exception) {
                     Logger.w(TAG, "推送媒体结束失败: ${device.displayName}", e)
                 }

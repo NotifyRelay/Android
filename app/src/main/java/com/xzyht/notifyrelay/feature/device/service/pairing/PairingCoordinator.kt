@@ -15,7 +15,7 @@ import notifyrelay.base.util.Logger
  * - 取消待处理配对（同时清理 core 侧配对码）；
  * - 配对码校验通过后，用**长期** ECDH 密钥完成密钥交换并登记设备目标。
  *
- * 说明：密钥派生与持有全部在 core（`nrc_ecdh_derive_shared_secret` + Keystore），
+ * 说明：密钥派生与持有全部在 core（`NativeCore.deriveSharedSecret()` + Keystore），
  * 平台端只在 [authenticatedDeviceTable] 中记录 `isAccepted` / `publicKey` 用于「公钥变更需重新配对」判定。
  */
 class PairingCoordinator(
@@ -47,7 +47,7 @@ class PairingCoordinator(
             Logger.d(TAG, "取消配对: ${current.remoteUuid}")
         }
         pendingPairing = null
-        NativeCore.getContext()?.let { NativeCore.clearPairingCode(it) }
+        if (NativeCore.isReady()) NativeCore.clearPairingCode()
     }
 
     /**
@@ -66,12 +66,11 @@ class PairingCoordinator(
         lastIp: String?,
     ): Boolean {
         return try {
-            val ctx = NativeCore.getContext()
-            if (ctx == null) {
+            if (!NativeCore.isReady()) {
                 Logger.e(TAG, "Rust core 上下文不可用，长期密钥配对失败: $uuid")
                 return false
             }
-            if (!NativeCore.deriveSharedSecret(ctx, uuid, remoteLtPubKey)) {
+            if (!NativeCore.deriveSharedSecret(uuid, remoteLtPubKey)) {
                 Logger.e(TAG, "长期密钥派生失败: $uuid")
                 return false
             }
@@ -87,8 +86,8 @@ class PairingCoordinator(
             }
             onAuthChanged()
             registry.registerReconnectTarget(uuid, lastIp ?: "")
-            // 不能同步刷新——本方法可能从 Rust nrc_connect_device 的回调中触发，
-            // 同步调用 nrc_get_device_list 会导致 Rust 核心重入崩溃
+            // 不能同步刷新——本方法可能从 `NativeCore.connectDevice()` 的回调中触发，
+            // 同步调用 `NativeCore.getDeviceList()` 会导致 Rust 核心重入崩溃
             snapshotStore.requestRefresh()
             Logger.d(TAG, "长期密钥配对完成: $uuid")
             true

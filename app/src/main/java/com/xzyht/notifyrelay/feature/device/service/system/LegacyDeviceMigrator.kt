@@ -11,10 +11,10 @@ import notifyrelay.data.database.repository.DatabaseRepository
  * 旧平台存储 → Rust 私有库的一次性迁移。
  *
  * 迁移内容：
- * - `device_migration` 表设备行：名称 → `nrc_rename_device`；base64 AES 密钥 → `nrc_migrate_shared_secret`；
- *   旧版明文密钥（与 Rust HKDF 不兼容）→ `nrc_remove_device` 清除配对；
- * - 旧加密状态 blob（SP `rust_core_state`）经 `nrc_import_state` 已导入内存，
- *   由 `nrc_get_local_uuid` 校验落盘成功后清除。
+ * - `device_migration` 表设备行：名称 → `NativeCore.renameDevice()`；base64 AES 密钥 → `NativeCore.migrateSharedSecret()`；
+ *   旧版明文密钥（与 Rust HKDF 不兼容）→ `NativeCore.removeDevice()` 清除配对；
+ * - 旧加密状态 blob（SP `rust_core_state`）经 `NativeCore.deserializeLocalState()` 已导入内存，
+ *   由 `NativeCore.getLocalUuid()` 校验落盘成功后清除。
  *
  * 原则：空数据一律不传入 Rust；任一行迁移失败则保留旧存储，下次启动重试。
  */
@@ -35,7 +35,7 @@ object LegacyDeviceMigrator {
         legacyStateEnc: String,
         currentUuid: String,
     ): String? {
-        val ctx = NativeCore.getContext() ?: return null
+        if (!NativeCore.isReady()) return null
         try {
             val rows = DatabaseRepository.getInstance(context).queryDeviceMigrationRows()
             var migratedAny = false
@@ -43,7 +43,7 @@ object LegacyDeviceMigrator {
             for (row in rows) {
                 if (row.uuid.isBlank() || row.uuid == "本机") continue
                 if (row.displayName.isNotBlank()) {
-                    if (!NativeCore.renameDevice(ctx, row.uuid, row.displayName)) {
+                    if (!NativeCore.renameDevice(row.uuid, row.displayName)) {
                         Logger.w(TAG, "设备名称迁移失败 ${row.uuid}，暂缓清理旧平台存储")
                         migrationFailed = true
                     }
@@ -57,14 +57,14 @@ object LegacyDeviceMigrator {
                             null
                         }
                     if (keyBytes != null && keyBytes.size == AES_KEY_BYTES) {
-                        if (!NativeCore.migrateSharedSecret(ctx, row.uuid, keyBytes)) {
+                        if (!NativeCore.migrateSharedSecret(row.uuid, keyBytes)) {
                             Logger.w(TAG, "设备密钥迁移失败 ${row.uuid}，暂缓清理旧平台存储")
                             migrationFailed = true
                         }
                         migratedAny = true
                     } else {
                         // 旧版明文密钥（C#/Kotlin ECDH），与 Rust HKDF 不兼容，清除配对
-                        if (!NativeCore.removeDevice(ctx, row.uuid)) {
+                        if (!NativeCore.removeDevice(row.uuid)) {
                             Logger.w(TAG, "旧明文密钥设备清除失败 ${row.uuid}，暂缓清理旧平台存储")
                             migrationFailed = true
                         }
@@ -73,7 +73,7 @@ object LegacyDeviceMigrator {
                 }
                 if (row.lastIp.isNotBlank()) {
                     try {
-                        NativeCore.addKnownDevice(ctx, row.uuid, row.lastIp)
+                        NativeCore.addKnownDevice(row.uuid, row.lastIp)
                     } catch (e: Exception) {
                         // 登记失败同样视为迁移未完成，保留 device_migration 表以便下次启动重试
                         Logger.w(TAG, "已知设备登记失败 ${row.uuid}，暂缓清理旧平台存储", e)
@@ -83,7 +83,7 @@ object LegacyDeviceMigrator {
             }
 
             // 触发落盘并校验（读取接口前自动 flush；flush 失败返回 null）
-            val persistedUuid = NativeCore.getLocalUuid(ctx)
+            val persistedUuid = NativeCore.getLocalUuid()
             if (persistedUuid.isNullOrEmpty()) {
                 Logger.w(TAG, "Rust 持久化未就绪，暂缓清理旧平台存储")
                 return null

@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.filter
 
 import android.content.Context
-import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.nativecore.NativeCore
@@ -25,10 +24,6 @@ import org.json.JSONObject
  * 内部数据类与逻辑一字未改，仅搬迁至对应文件。
  */
 object BackendRemoteFilter {
-    /** Rust 上下文指针，由 DeviceConnectionManager 创建时设置、在过滤路径跨线程读取 */
-    @Volatile
-    var rustContext: Pointer? = null
-
     // 结构化协程作用域，替代 GlobalScope
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
@@ -57,28 +52,28 @@ object BackendRemoteFilter {
     private const val CONTENT_DEDUP_MARK = 1
     private const val CONTENT_DEDUP_CLEAR = 2
 
-    /** 内容窗口查询：core 持有 10s 窗口与键；无 ctx 时按未见过处理（fail-open） */
+    /** 内容窗口查询：core 持有 10s 窗口与键；core 未就绪时按未见过处理（fail-open） */
     private fun contentSeen(
         title: String,
         text: String,
     ): Boolean {
-        val ctx = rustContext ?: return false
-        return NativeCore.contentDedup(ctx, CONTENT_DEDUP_QUERY, title, text) == 1
+        if (!NativeCore.isReady()) return false
+        return NativeCore.contentDedup(CONTENT_DEDUP_QUERY, title, text) == 1
     }
 
-    /** 内容窗口标记：core 持有 10s 窗口与键；无 ctx 时跳过 */
+    /** 内容窗口标记：core 持有 10s 窗口与键；core 未就绪时跳过 */
     private fun markContentSeen(
         title: String,
         text: String,
     ) {
-        val ctx = rustContext ?: return
-        NativeCore.contentDedup(ctx, CONTENT_DEDUP_MARK, title, text)
+        if (!NativeCore.isReady()) return
+        NativeCore.contentDedup(CONTENT_DEDUP_MARK, title, text)
     }
 
     /** 清空内容窗口 */
     private fun clearContentWindow() {
-        val ctx = rustContext ?: return
-        NativeCore.contentDedup(ctx, CONTENT_DEDUP_CLEAR, "", "")
+        if (!NativeCore.isReady()) return
+        NativeCore.contentDedup(CONTENT_DEDUP_CLEAR, "", "")
     }
 
     /**
@@ -151,9 +146,9 @@ object BackendRemoteFilter {
                 try {
                     RemoteFilterConfig.loadBlocking(context)
                     RemoteFilterConfig.isLoaded = true
-                    rustContext?.let { ctx ->
+                    if (NativeCore.isReady()) {
                         val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
-                        RemoteFilterConfig.syncToRust(ctx, installedPkgs)
+                        RemoteFilterConfig.syncToRust(installedPkgs)
                     }
                 } catch (e: Exception) {
                     Logger.e("NotifyRelay(狂鼠)", "远程过滤配置加载失败", e)

@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.feature.device.service.callback
 
-import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.nativecore.NativeCore
 
 /**
@@ -16,13 +15,9 @@ object RustCallbackInstaller {
     /**
      * 注册全部回调。
      *
-     * @param ctx core 上下文（保留以对齐既有调用点；上下文由 core 单一持有）
      * @param host 回调宿主（提供状态与操作能力）
      */
-    fun install(
-        ctx: Pointer?,
-        host: DeviceCallbackHost,
-    ) {
+    fun install(host: DeviceCallbackHost) {
         val adapter = adapterRef ?: CoreCallbacksAdapter(host).also { adapterRef = it }
         NativeCore.setCallbacks(adapter)
     }

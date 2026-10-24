@@ -23,7 +23,7 @@ import org.json.JSONObject
 
 /**
  * 剪贴板同步管理器
- * 去重、防循环、频率限制与发送全部由 Rust core 内部闭环（nrc_clipboard_on_changed / nrc_clipboard_on_received），
+ * 去重、防循环、频率限制与发送全部由 Rust core 内部闭环（`NativeCore.clipboardOnChanged()` / `NativeCore.clipboardOnReceived()`），
  * 平台端仅负责系统剪贴板读写与前台/Fcitx 权限判定。
  */
 object ClipboardSyncManager {
@@ -96,7 +96,6 @@ object ClipboardSyncManager {
             val deviceManager = DeviceConnectionManagerSingleton.getDeviceQuery(context)
             val resultJson =
                 NativeCore.clipboardOnReceived(
-                    NativeCore.getContext(),
                     jsonData,
                     System.currentTimeMillis(),
                 )
@@ -283,8 +282,6 @@ object ClipboardSyncManager {
                             handleSendResult(
                                 context,
                                 NativeCore.clipboardOnChanged(
-                                    NativeCore.getContext(),
-                                    NativeCore.senderQueuePtr,
                                     buildTargetsJson(devices.map { it.uuid }),
                                     if (type == CLIPBOARD_TYPE_IMAGE) MIME_IMAGE else MIME_TEXT,
                                     content,
@@ -332,8 +329,6 @@ object ClipboardSyncManager {
                 handleSendResult(
                     context,
                     NativeCore.clipboardOnChanged(
-                        NativeCore.getContext(),
-                        NativeCore.senderQueuePtr,
                         buildTargetsJson(devices.map { it.uuid }),
                         MIME_TEXT,
                         text,

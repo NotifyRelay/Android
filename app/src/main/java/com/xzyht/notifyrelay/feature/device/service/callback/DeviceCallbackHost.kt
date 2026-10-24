@@ -11,14 +11,14 @@ import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryRespond
 import kotlinx.coroutines.CoroutineScope
 
 /**
- * Rust/JNA 回调处理器所需的宿主能力。
+ * Rust 回调处理器所需的宿主能力。
  *
  * 由 [DeviceConnectionManager] 实现。回调处理器只通过本接口访问宿主状态，
  * 不直接依赖宿主的具体实现细节。
  *
- * 注意：所有 `on_*` 回调都运行在 **JNA 附加线程**（非主线程、非协程），因此：
- * - 回调首行必须调用 `Native.detach(false)`；
- * - 回调内同步调用 `nrc_get_device_list` 会与 core 重入，优先走 [triggerDeviceListRefresh]（协程异步）；
+ * 注意：所有 `CoreCallbacks` 回调都运行在 **JNA 附加线程**（非主线程、非协程），因此：
+ * - 回调内禁止执行阻塞或重入操作；
+ * - 回调内同步调用 `NativeCore.getDeviceList()` 会与 core 重入，优先走 [triggerDeviceListRefresh]（协程异步）；
  *   [updateDeviceListNow] 为同步版本，仅用于沿用既有语义的超时/连接/断开回调。
  */
 interface DeviceCallbackHost {
@@ -85,7 +85,7 @@ interface DeviceCallbackHost {
     /**
      * 同步刷新设备快照（沿用既有语义，供超时/连接/断开回调使用）。
      *
-     * ⚠ 会同步调用 `nrc_get_device_list`；仅在与既有行为一致处使用，
+     * ⚠ 会同步调用 `NativeCore.getDeviceList()`；仅在与既有行为一致处使用，
      * 新代码优先使用 [triggerDeviceListRefresh]。
      */
     fun updateDeviceListNow()

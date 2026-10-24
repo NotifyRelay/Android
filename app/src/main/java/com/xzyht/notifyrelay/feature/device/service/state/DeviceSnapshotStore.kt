@@ -12,7 +12,7 @@ import notifyrelay.base.util.Logger
 import org.json.JSONArray
 
 /**
- * 设备状态的**唯一真源消费端**：把 Rust core 的 `nrc_get_device_list` 快照转换为
+ * 设备状态的**唯一真源消费端**：把 Rust core 的 `NativeCore.getDeviceList()` 快照转换为
  * - [devices]：UI 直接订阅的 `Map<uuid, (DeviceInfo, isOnline)>`
  * - 内部只读投影 [snapshot] / [snapshots]：供同步查询（`getDeviceInfo`/`resolveDeviceInfo`）使用
  *
@@ -27,13 +27,13 @@ import org.json.JSONArray
  * sequenceDiagram
  *     participant T as 触发方（回调/心跳/网络变化/UI）
  *     participant S as DeviceSnapshotStore
- *     participant Core as Rust Core
+ *     participant Core as NativeCore
  *     participant C as OnlineDevicesCache
  *     participant UI as devices StateFlow
  *
  *     T->>S: requestRefresh()（异步）
  *     S->>S: refreshBusy 节流判定（并发触发直接跳过）
- *     S->>Core: nrc_get_device_list(ctx, 0, 0)
+ *     S->>Core: getDeviceList(0, 0)
  *     Core-->>S: [{uuid,name,ip,port,battery,deviceType,online,paired,...}]
  *     S->>S: 解析 + name/deviceType 兜底 → 更新只读投影
  *     S->>C: update(map, 投影)
@@ -141,12 +141,12 @@ class DeviceSnapshotStore(
     // ==================== 内部实现 ====================
 
     private fun doRefresh() {
-        val ctx = NativeCore.getContext() ?: return
+        if (!NativeCore.isReady()) return
         val localUuid = localUuidProvider()
         val json =
             try {
                 // 传 0/0：使用 Rust core 内建在线阈值（已认证 12s / 未认证 20s），判定完全归 core
-                NativeCore.getDeviceList(ctx, 0L, 0L)
+                NativeCore.getDeviceList(0L, 0L)
             } catch (_: Exception) {
                 null
             } ?: return

@@ -12,7 +12,7 @@ import notifyrelay.data.database.repository.DatabaseRepository
  *
  * 顺序（顺序即一致性保证）：
  * 1. 清除协议不兼容标记与状态查询缓存；
- * 2. `nrc_remove_device` 删除 core 侧密钥与 registry 状态 —— **落库失败则中止**，
+ * 2. `NativeCore.removeDevice()` 删除 core 侧密钥与 registry 状态 —— **落库失败则中止**，
  *    否则内存已删但库未同步，重启后设备会经旧 state/行复活，造成两端不一致；
  * 3. 断开会话、移除重连与扫描目标（心跳调度随之停止）；
  * 4. 可等待地清理关联数据（迁移残留行 / 通知历史 / 应用关联），全部成功后才移除内存记录与快照投影；
@@ -46,8 +46,7 @@ class PairedDeviceRemover(
             } catch (_: Exception) {
             }
 
-            val ctx = NativeCore.getContext()
-            if (ctx == null || !NativeCore.removeDevice(ctx, uuid)) {
+            if (!NativeCore.isReady() || !NativeCore.removeDevice(uuid)) {
                 Logger.w(TAG, "removeAuthenticatedDevice: Rust 删除未完成，中止平台侧清理: $uuid")
                 return false
             }

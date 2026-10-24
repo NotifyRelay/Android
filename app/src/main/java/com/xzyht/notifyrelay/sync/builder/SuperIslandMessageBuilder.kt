@@ -126,9 +126,8 @@ object SuperIslandMessageBuilder {
                 return
             }
 
-            val ctx = NativeCore.getContext() ?: return
-            val queuePtr = NativeCore.senderQueuePtr
-            if (queuePtr == 0L) return
+            if (!NativeCore.isReady()) return
+            if (!NativeCore.senderQueueReady) return
 
             // 组装「全量」超级岛状态：差异计算（FULL/DELTA）、合并、ACK 与心跳均由 Rust 合并引擎负责。
             val content =
@@ -146,7 +145,7 @@ object SuperIslandMessageBuilder {
 
             authenticatedDevices.forEach { device ->
                 try {
-                    NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, false, false)
+                    NativeCore.pushSuperislandState(device.uuid, content, false, false)
                 } catch (e: Exception) {
                     Logger.e(TAG, "超级岛: 推送超级岛状态失败: ${device.displayName}", e)
                 }
@@ -172,9 +171,8 @@ object SuperIslandMessageBuilder {
     ) {
         try {
             // 推送结束标记：Rust 合并引擎会回传 terminateValue="__END__" 全量，接收端据此移除该超级岛卡片。
-            val ctx = NativeCore.getContext() ?: return
-            val queuePtr = NativeCore.senderQueuePtr
-            if (queuePtr == 0L) return
+            if (!NativeCore.isReady()) return
+            if (!NativeCore.senderQueueReady) return
 
             val content =
                 JSONObject()
@@ -190,7 +188,7 @@ object SuperIslandMessageBuilder {
 
             SendGateway.getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
-                    NativeCore.pushSuperislandState(ctx, queuePtr, device.uuid, content, true, false)
+                    NativeCore.pushSuperislandState(device.uuid, content, true, false)
                 } catch (e: Exception) {
                     Logger.e(TAG, "超级岛: 推送超级岛结束失败: ${device.displayName}", e)
                 }

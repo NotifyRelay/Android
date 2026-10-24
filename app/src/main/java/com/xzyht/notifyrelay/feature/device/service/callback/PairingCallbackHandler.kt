@@ -10,7 +10,7 @@ import notifyrelay.base.util.Logger
 import org.json.JSONObject
 
 /**
- * `nrc_set_on_pairing_cb` 回调处理器。
+ * `CoreCallbacks.onPairing` 回调处理器。
  *
  * 负责配对/握手相关的全部消息类型：
  * - `HANDSHAKE`     对端发起握手（已配对设备由 Rust 自动 ACCEPT，平台只登记元数据）
@@ -31,13 +31,13 @@ import org.json.JSONObject
  *     participant W as HandshakeWaiterRegistry
  *
  *     Remote->>Core: PAIRING_INIT(spake2_pub, ip)
- *     Core->>H: on_pairing(uuid, "PAIRING_INIT", data)
+ *     Core->>H: onPairing(uuid, "PAIRING_INIT", data)
  *     H->>H: pendingPairing = PendingPairing(...)
  *     H->>UI: handshakeRequestHandler.onPairingInitRequest()
  *     UI->>W: register(uuid)
  *     Remote->>Core: RESULT(ok)
- *     Core->>H: on_pairing(uuid, "RESULT", intValue)
- *     H->>Core: nrc_export_device_key(uuid)
+ *     Core->>H: onPairing(uuid, "RESULT", intValue)
+ *     H->>Core: NativeCore.exportDeviceKey(uuid)
  *     H->>H: completePairingWithLongTermKeys(uuid, ltPub)
  *     H->>W: resolve(uuid, true)
  * ```
@@ -247,7 +247,7 @@ class PairingCallbackHandler(
             return
         }
         Logger.d(TAG, "配对成功: $uuid")
-        val keyJson = NativeCore.getContext()?.let { NativeCore.exportDeviceKey(it, uuid) }
+        val keyJson = if (NativeCore.isReady()) NativeCore.exportDeviceKey(uuid) else null
         val ltPub =
             keyJson
                 ?.let { runCatching { JSONObject(it).optString("remote_pub_key", "") }.getOrDefault("") }

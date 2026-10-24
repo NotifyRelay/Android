@@ -76,7 +76,7 @@ fun PairingCodeDialog(
         val scope = rememberCoroutineScope()
         val displayCode =
             remember {
-                NativeCore.getContext()?.let { NativeCore.generatePairingCode(it) }
+                if (NativeCore.isReady()) NativeCore.generatePairingCode() else null
             }
 
         LaunchedEffect(show) {
@@ -91,8 +91,7 @@ fun PairingCodeDialog(
                 try {
                     val initSuccess =
                         withContext(Dispatchers.IO) {
-                            val ctx = NativeCore.getContext()
-                            if (ctx == null) {
+                            if (!NativeCore.isReady()) {
                                 false
                             } else {
                                 val batteryLevel =
@@ -102,7 +101,7 @@ fun PairingCodeDialog(
                                     notifyrelay.base.util.BatteryUtils
                                         .isCharging(context)
                                 val battery = if (isCharging) batteryLevel else -batteryLevel
-                                NativeCore.sendPairingInit(ctx, deviceManager.localUuid, targetDevice!!.uuid, displayCode, battery, "android") == 0
+                                NativeCore.sendPairingInit(deviceManager.localUuid, targetDevice!!.uuid, displayCode, battery, "android") == 0
                             }
                         }
                     if (!initSuccess) {
@@ -185,7 +184,7 @@ fun PairingCodeDialog(
                     TextButton(
                         text = "取消",
                         onClick = {
-                            NativeCore.getContext()?.let { NativeCore.clearPairingCode(it) }
+                            if (NativeCore.isReady()) NativeCore.clearPairingCode()
                             onDismiss()
                         },
                     )
@@ -272,8 +271,7 @@ fun PairingCodeDialog(
                                         val result =
                                             withContext(Dispatchers.IO) {
                                                 try {
-                                                    val ctx = NativeCore.getContext()
-                                                    if (ctx == null) return@withContext "配对失败：未初始化"
+                                                    if (!NativeCore.isReady()) return@withContext "配对失败：未初始化"
                                                     val ltPubKey = deviceManager.localPublicKey
                                                     // 与发起方/保活/扫描路径一致：上报本机真实带符号电量（正=充电，负=放电）
                                                     val batteryLevel =
@@ -283,7 +281,7 @@ fun PairingCodeDialog(
                                                         notifyrelay.base.util.BatteryUtils
                                                             .isCharging(context)
                                                     val battery = if (isCharging) batteryLevel else -batteryLevel
-                                                    val sendOk = NativeCore.sendPairingResp(ctx, remoteUuid, ltPubKey, code, remoteIp, battery, "android")
+                                                    val sendOk = NativeCore.sendPairingResp(remoteUuid, ltPubKey, code, remoteIp, battery, "android")
                                                     if (sendOk != 0) return@withContext "配对失败：发送响应失败"
                                                     val success =
                                                         withTimeoutOrNull(30_000L) {

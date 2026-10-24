@@ -28,15 +28,14 @@ object ProtocolSender {
         val auth = deviceManager.authenticatedSnapshot()[target.uuid]
         if (auth == null || !auth.isAccepted) return EnqueueResult.AUTH_FAILED
 
-        val queuePtr = NativeCore.senderQueuePtr
-        if (queuePtr == 0L) {
+        if (!NativeCore.senderQueueReady) {
             Logger.w(TAG, "发送队列未初始化，丢弃消息: $header -> ${target.displayName}")
             return EnqueueResult.QUEUE_UNINITIALIZED
         }
 
-        val ctx = NativeCore.getContext() ?: return EnqueueResult.MISSING_CONTEXT
+        if (!NativeCore.isReady()) return EnqueueResult.MISSING_CONTEXT
         return try {
-            when (NativeCore.enqueueMessage(ctx, queuePtr, target.uuid, header, plaintext)) {
+            when (NativeCore.enqueueMessage(target.uuid, header, plaintext)) {
                 1 -> EnqueueResult.SUCCESS
                 0 -> EnqueueResult.DEDUPED
                 else -> EnqueueResult.NATIVE_ERROR

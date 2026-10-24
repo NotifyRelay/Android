@@ -119,7 +119,7 @@ kotlin {
 // 其文件名规则豁免由根 .editorconfig 的路径段配置，见 `[**/generated/uniffi/**/*.{kt,kts}]`。
 
 dependencies {
-    // JNA 用于 Rust FFI 调用（api 传递给消费模块，如 app 直接使用 Pointer/Callback）
+    // JNA 由 UniFFI 生成的绑定在运行时使用（api 传递给消费模块）
     api(libs.jna) { artifact { type = "aar" } }
 
     // UniFFI 生成的绑定（UniffiHandleMap）依赖 kotlinx.atomicfu 的原子类型

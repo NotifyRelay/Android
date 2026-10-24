@@ -21,7 +21,7 @@ import notifyrelay.base.util.PermissionHelper
 import org.json.JSONObject
 
 /**
- * `nrc_set_on_data_cb` 回调处理器（统一数据通道分发）。
+ * `CoreCallbacks.onData` 回调处理器（统一数据通道分发）。
  *
  * 支持的通道：`NOTIFICATION` / `MEDIAPLAY` / `ICON_REQUEST` / `ICON_RESPONSE` /
  * `APP_LIST_REQUEST` / `APP_LIST_RESPONSE` / `MEDIA_CONTROL` / `FTP` / `CLIPBOARD` /
@@ -30,7 +30,7 @@ import org.json.JSONObject
  * 约束：
  * - 未认证设备的数据包一律丢弃（`DATA_UNKNOWN` 除外）；
  * - 回调运行在 JNA 附加线程，耗时/阻塞操作必须投递到 [DeviceCallbackHost.callbackScope]；
- * - 回调内禁止同步调用 `nrc_get_device_list`（core 重入崩溃）。
+ * - 回调内禁止同步调用 `NativeCore.getDeviceList()`（core 重入崩溃）。
  */
 class DataCallbackHandler(
     private val host: DeviceCallbackHost,

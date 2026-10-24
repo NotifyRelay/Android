@@ -14,7 +14,7 @@ import java.io.ByteArrayOutputStream
 /**
  * Rust 心跳「状态查询」的响应器。
  *
- * 差分/合并/ACK 与保活全部由 Rust 合并引擎完成（`nrc_push_*_state`），
+ * 差分/合并/ACK 与保活全部由 Rust 合并引擎完成（`NativeCore.pushMediaState()` / `NativeCore.pushSuperislandState()`），
  * 平台端只负责：按 featureId 找到对应会话 → 组装 full JSON → 以 `isQuery=1` 推回。
  *
  * 返回码约定（必须同步返回，无法异步）：
@@ -202,14 +202,13 @@ class StateQueryResponder(
         isMedia: Boolean,
     ): Boolean =
         try {
-            val ctx = NativeCore.getContext() ?: return false
-            val queuePtr = NativeCore.senderQueuePtr
-            if (queuePtr == 0L) return false
+            if (!NativeCore.isReady()) return false
+            if (!NativeCore.senderQueueReady) return false
             val ok =
                 if (isMedia) {
-                    NativeCore.pushMediaState(ctx, queuePtr, remoteUuid, fullJson, false, true)
+                    NativeCore.pushMediaState(remoteUuid, fullJson, false, true)
                 } else {
-                    NativeCore.pushSuperislandState(ctx, queuePtr, remoteUuid, fullJson, false, true)
+                    NativeCore.pushSuperislandState(remoteUuid, fullJson, false, true)
                 }
             if (!ok) Logger.w(TAG, "查询响应入队失败: $remoteUuid fid=$featureId")
             ok

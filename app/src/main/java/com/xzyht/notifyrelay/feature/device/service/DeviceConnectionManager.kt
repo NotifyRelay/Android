@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.feature.device.service
 
 import android.content.Context
-import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.feature.device.model.AuthInfo
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
@@ -290,18 +289,18 @@ class DeviceConnectionManager(
     override fun deviceInfoOf(uuid: String): DeviceInfo? = directory.find(uuid)
 
     override fun sendReject() {
-        val ctx = rustContext ?: return
+        if (!NativeCore.isReady()) return
         val local = uuid
-        coroutineScope.launch { NativeCore.sendReject(ctx, local) }
+        coroutineScope.launch { NativeCore.sendReject(local) }
     }
 
     override fun sendAccept(deviceType: String) {
-        val ctx = rustContext ?: return
+        if (!NativeCore.isReady()) return
         val local = uuid
         val pubKey = localPublicKey
         val localIp = getLocalIpAddress()
         val battery = BatteryUtils.getBatteryLevel(context)
-        coroutineScope.launch { NativeCore.sendAccept(ctx, local, pubKey, localIp, battery, deviceType) }
+        coroutineScope.launch { NativeCore.sendAccept(local, pubKey, localIp, battery, deviceType) }
     }
 
     override fun sendDataMessage(
@@ -320,9 +319,6 @@ class DeviceConnectionManager(
 
     /** 停止设备发现（转发到内部 [discoveryManager]，替代外部反射调用）。 */
     override fun stopDiscovery() = discoveryManager.stopDiscovery()
-
-    // Rust 原生上下文（由 RustCoreSession 创建并持有）
-    private var rustContext: Pointer? = null
 
     // UI全局开关：是否启用设备发现，使用内存缓存避免频繁数据库访问
     override var discoveryEnabled: Boolean
@@ -344,14 +340,13 @@ class DeviceConnectionManager(
 
         // 初始化 Rust 上下文、密钥与回调（持久化由 Rust 私有库管理）
         val init = rustSession.initialize(this, legacyUuid)
-        rustContext = init.rustContext
         uuid = init.localUuid
         localPublicKey = init.localPublicKey
         loadAuthedDevices()
 
         // 统一启动核心：TCP、心跳调度、离线检测、发送队列、已知设备扫描、重连状态机
         val battery = SystemStateMonitor.signedBatteryLevel(context)
-        rustSession.startCore(rustContext, uuid, localPublicKey, getLocalDisplayName(), battery, listenPort)?.let {
+        rustSession.startCore(uuid, localPublicKey, getLocalDisplayName(), battery, listenPort)?.let {
             systemStateMonitor.seedSignedBattery(it)
         }
 
@@ -468,7 +463,7 @@ class DeviceConnectionManager(
                     return@launch
                 }
 
-                // 重试行为由 Rust nrc_connect_device 内部固定次数控制（3次/5s超时/1s间隔）
+                // 重试行为由 Rust `NativeCore.connectDevice()` 内部固定次数控制（3次/5s超时/1s间隔）
                 val result = keepAlive.performDeviceConnectionWithRetry(device)
                 callback?.invoke(result.first, result.second)
             } catch (e: Exception) {

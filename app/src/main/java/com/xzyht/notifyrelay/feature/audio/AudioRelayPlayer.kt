@@ -49,8 +49,7 @@ class AudioRelayPlayer(
 
         when (direction) {
             "recv" -> {
-                val ctx = NativeCore.getContext()
-                if (ctx == null) {
+                if (!NativeCore.isReady()) {
                     isRunning = false
                     return false
                 }
@@ -106,8 +105,7 @@ class AudioRelayPlayer(
                 }
             }
             "send" -> {
-                val ctx = NativeCore.getContext()
-                if (ctx == null) {
+                if (!NativeCore.isReady()) {
                     isRunning = false
                     return false
                 }

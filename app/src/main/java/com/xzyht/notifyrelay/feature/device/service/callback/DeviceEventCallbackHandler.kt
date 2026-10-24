@@ -3,16 +3,16 @@ package com.xzyht.notifyrelay.feature.device.service.callback
 import notifyrelay.base.util.Logger
 
 /**
- * 设备生命周期与状态查询类 Rust 回调处理器：
- * `on_device_discovered` / `on_device_timeout` / `on_device_connected` /
- * `on_device_disconnected` / `on_state_query`。
+ * 设备生命周期与状态查询类回调处理器：
+ * `onDeviceDiscovered` / `onDeviceTimeout` / `onDeviceConnected` /
+ * `onDeviceDisconnected` / `onStateQuery`。
  *
  * 关键约束：
- * - 这些回调运行在 Rust 扫描/心跳/连接线程上，同步调用 `nrc_get_device_list` 会与 core 重入，
- *   因此 `on_device_discovered` 通过 [DeviceCallbackHost.triggerDeviceListRefresh] 切到协程异步刷新。
- * - `on_device_timeout` / `on_device_connected` / `on_device_disconnected` 同样通过
+ * - 这些回调运行在 Rust 扫描/心跳/连接线程上，同步调用 `NativeCore.getDeviceList()` 会与 core 重入，
+ *   因此 `onDeviceDiscovered` 通过 [DeviceCallbackHost.triggerDeviceListRefresh] 切到协程异步刷新。
+ * - `onDeviceTimeout` / `onDeviceConnected` / `onDeviceDisconnected` 同样通过
  *   [DeviceCallbackHost.triggerDeviceListRefresh] 切到协程**异步**刷新，避免在 Rust 回调线程同步调用 core 造成重入。
- * - `on_state_query` 是唯一必须**同步**返回 0/1/2 的回调，
+ * - `onStateQuery` 是唯一必须**同步**返回 0/1/2 的回调，
  *   因此直接委托给 [DeviceCallbackHost.stateQueryResponder]。
  *
  * 时序：
@@ -23,10 +23,10 @@ import notifyrelay.base.util.Logger
  *     participant Host as DeviceCallbackHost
  *     participant Store as 设备快照刷新
  *
- *     Core->>H: on_device_discovered / timeout / connected / disconnected
+ *     Core->>H: onDeviceDiscovered / onDeviceTimeout / onDeviceConnected / onDeviceDisconnected
  *     H->>Host: triggerDeviceListRefresh()（异步，禁止同步调 core）
- *     Host->>Store: 协程内 nrc_get_device_list
- *     Core->>H: on_state_query（必须同步返回）
+ *     Host->>Store: 协程内 NativeCore.getDeviceList()
+ *     Core->>H: onStateQuery（必须同步返回）
  *     H->>Host: stateQueryResponder.handle()
  *     Host-->>Core: 0=不存在 / 1=无变更 / 2=有变更
  * ```

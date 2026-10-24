@@ -49,8 +49,8 @@ object SuperIslandProcessor {
         manager: DeviceConnectionManager,
         dedupKey: String,
     ): Boolean {
-        val ctx = NativeCore.getContext() ?: return false
-        return NativeCore.dedup(ctx, 0, dedupKey, SI_DEDUP_TTL_MS, 0L) == 0
+        if (!NativeCore.isReady()) return false
+        return NativeCore.dedup(0, dedupKey, SI_DEDUP_TTL_MS, 0L) == 0
     }
 
     /** 清除锁屏去重登记（结束包 / 合并失败时调用） */
@@ -58,9 +58,9 @@ object SuperIslandProcessor {
         manager: DeviceConnectionManager,
         dedupKey: String,
     ) {
-        val ctx = NativeCore.getContext() ?: return
+        if (!NativeCore.isReady()) return
         try {
-            NativeCore.dedup(ctx, 2, dedupKey, 0L, 0L)
+            NativeCore.dedup(2, dedupKey, 0L, 0L)
         } catch (_: Exception) {
         }
     }

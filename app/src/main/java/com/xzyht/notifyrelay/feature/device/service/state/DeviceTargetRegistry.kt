@@ -10,7 +10,7 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
  * **不落盘**，因此每次进程启动后必须由平台读首帧快照重新登记 —— 这是平台端必须保留的职责
  * （见 [rehydrateFromCore]）。
  *
- * 除本类外，任何模块都不得直接调用 `nrc_reconnect_add_target` / `nrc_add_known_device`。
+ * 除本类外，任何模块都不得直接调用 `NativeCore.reconnectAddTarget` / `NativeCore.addKnownDevice`。
  */
 class DeviceTargetRegistry(
     private val localUuidProvider: () -> String,
@@ -38,10 +38,10 @@ class DeviceTargetRegistry(
     ) {
         try {
             if (uuid == localUuidProvider()) return
-            val ctx = NativeCore.getContext() ?: return
+            if (!NativeCore.isReady()) return
             if (ip in INVALID_IPS) return
-            NativeCore.reconnectRemoveTarget(ctx, uuid)
-            NativeCore.reconnectAddTarget(ctx, uuid, ip)
+            NativeCore.reconnectRemoveTarget(uuid)
+            NativeCore.reconnectAddTarget(uuid, ip)
         } catch (_: Exception) {
         }
     }
@@ -53,10 +53,10 @@ class DeviceTargetRegistry(
     ) {
         try {
             if (uuid == localUuidProvider()) return
-            val ctx = NativeCore.getContext() ?: return
+            if (!NativeCore.isReady()) return
             if (ip in INVALID_IPS) return
-            NativeCore.removeKnownDevice(ctx, uuid)
-            NativeCore.addKnownDevice(ctx, uuid, ip)
+            NativeCore.removeKnownDevice(uuid)
+            NativeCore.addKnownDevice(uuid, ip)
         } catch (_: Exception) {
         }
     }
@@ -64,8 +64,8 @@ class DeviceTargetRegistry(
     /** 从重连状态机移除目标。 */
     fun removeReconnectTarget(uuid: String) {
         try {
-            val ctx = NativeCore.getContext() ?: return
-            NativeCore.reconnectRemoveTarget(ctx, uuid)
+            if (!NativeCore.isReady()) return
+            NativeCore.reconnectRemoveTarget(uuid)
         } catch (_: Exception) {
         }
     }
@@ -73,8 +73,8 @@ class DeviceTargetRegistry(
     /** 从已知设备扫描器移除（调度器随之停止该设备心跳）。 */
     fun removeKnownDevice(uuid: String) {
         try {
-            val ctx = NativeCore.getContext() ?: return
-            NativeCore.removeKnownDevice(ctx, uuid)
+            if (!NativeCore.isReady()) return
+            NativeCore.removeKnownDevice(uuid)
         } catch (_: Exception) {
         }
     }
@@ -82,8 +82,8 @@ class DeviceTargetRegistry(
     /** 断开 core 侧会话并移除全部目标登记（设备被删除时调用）。 */
     fun removeAllTargets(uuid: String) {
         try {
-            val ctx = NativeCore.getContext() ?: return
-            NativeCore.removeDeviceSession(ctx, uuid)
+            if (!NativeCore.isReady()) return
+            NativeCore.removeDeviceSession(uuid)
         } catch (_: Exception) {
         }
         removeReconnectTarget(uuid)

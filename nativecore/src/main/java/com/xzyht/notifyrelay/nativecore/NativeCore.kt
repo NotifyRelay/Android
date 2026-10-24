@@ -2,7 +2,6 @@ package com.xzyht.notifyrelay.nativecore
 
 import android.media.projection.MediaProjection
 import android.util.Log
-import com.sun.jna.Pointer
 import com.xzyht.notifyrelay.core.ffi.Core
 import com.xzyht.notifyrelay.core.ffi.CoreCallbacks
 import com.xzyht.notifyrelay.core.ffi.abiProbe
@@ -14,9 +13,8 @@ import notifyrelay.base.util.Logger as AppLogger
 /**
  * Rust 核心门面。
  *
- * 全部能力经 UniFFI 生成的绑定调用（[Core]），不再使用手写 JNA 声明。
- * 保留 `Pointer` 形参仅为兼容既有调用点：上下文由 [Core] 单一持有，
- * 形参值不参与定位（传 null 亦可）。
+ * 全部能力经 UniFFI 生成的绑定调用（[Core]），上下文由 [Core] 单一持有，
+ * 平台侧不再传递上下文句柄与发送队列句柄。
  */
 object NativeCore {
     private const val TAG = "NativeCore"
@@ -29,21 +27,12 @@ object NativeCore {
 
     var mediaProjection: MediaProjection? = null
 
-    /**
-     * 发送队列句柄。
-     *
-     * 队列由 core 内部持有，平台侧不再需要句柄值；保留本属性仅为兼容既有调用点，
-     * 非 0 表示队列已就绪。
-     */
-    val senderQueuePtr: Long
-        get() = if (coreRef.get()?.isSenderQueueReady() == true) 1L else 0L
-
     /** 发送队列是否已就绪（由 [startCore] 建立）。 */
     val senderQueueReady: Boolean
         get() = coreRef.get()?.isSenderQueueReady() ?: false
 
-    /** 创建核心上下文；重复调用返回既有实例。 */
-    fun createContext(): Pointer? {
+    /** 创建核心实例；重复调用返回既有实例。返回是否已就绪。 */
+    fun createContext(): Boolean {
         if (coreRef.get() == null) {
             synchronized(this) {
                 if (coreRef.get() == null) {
@@ -51,19 +40,7 @@ object NativeCore {
                 }
             }
         }
-        return rawContextPointer()
-    }
-
-    /** 上下文地址（仅用于日志/兼容），无实例时为 null。 */
-    private fun rawContextPointer(): Pointer? {
-        val c = coreRef.get() ?: return null
-        return Pointer(c.rawContextPtr().toLong())
-    }
-
-    fun getContext(): Pointer? = rawContextPointer()
-
-    fun setContext(ctx: Pointer?) {
-        // 上下文由 Core 持有，此处仅为兼容旧调用点保留
+        return coreRef.get() != null
     }
 
     /** 绑定是否已初始化。 */
@@ -74,46 +51,36 @@ object NativeCore {
 
     // ======== ECDH ========
 
-    fun generateKeypair(ctx: Pointer?): Boolean = coreRef.get()?.ecdhGenerateKeypair() ?: false
+    fun generateKeypair(): Boolean = coreRef.get()?.ecdhGenerateKeypair() ?: false
 
-    fun getPublicKey(ctx: Pointer?): String? = coreRef.get()?.ecdhGetPublicKey()
+    fun getPublicKey(): String? = coreRef.get()?.ecdhGetPublicKey()
 
-    fun hasKeypair(ctx: Pointer?): Boolean = coreRef.get()?.ecdhHasKeypair() ?: false
+    fun hasKeypair(): Boolean = coreRef.get()?.ecdhHasKeypair() ?: false
 
     fun deriveSharedSecret(
-        ctx: Pointer?,
         peerUuid: String,
         peerPubKey: String,
     ): Boolean = coreRef.get()?.ecdhDeriveSharedSecret(peerUuid, peerPubKey) ?: false
 
     fun migrateSharedSecret(
-        ctx: Pointer?,
         deviceUuid: String,
         secret: ByteArray,
     ): Boolean = coreRef.get()?.migrateSharedSecret(deviceUuid, secret) ?: false
 
-    fun removeDevice(
-        ctx: Pointer?,
-        deviceUuid: String,
-    ): Boolean = coreRef.get()?.removeDevice(deviceUuid) ?: false
+    fun removeDevice(deviceUuid: String): Boolean = coreRef.get()?.removeDevice(deviceUuid) ?: false
 
     // ======== State ========
 
-    fun exportState(ctx: Pointer?): String? = coreRef.get()?.exportState()
+    fun exportState(): String? = coreRef.get()?.exportState()
 
-    fun importState(
-        ctx: Pointer?,
-        json: String,
-    ): Boolean = coreRef.get()?.importState(json) ?: false
+    fun importState(json: String): Boolean = coreRef.get()?.importState(json) ?: false
 
     fun encryptLocalState(
-        ctx: Pointer?,
         plaintext: String,
         deviceUuid: String,
     ): String? = coreRef.get()?.encryptLocalState(plaintext, deviceUuid)
 
     fun decryptLocalState(
-        ctx: Pointer?,
         encryptedB64: String,
         deviceUuid: String,
     ): String? = coreRef.get()?.decryptLocalState(encryptedB64, deviceUuid)
@@ -125,7 +92,6 @@ object NativeCore {
      * @return true 表示状态已导入
      */
     fun deserializeLocalState(
-        ctx: Pointer?,
         payload: String,
         deviceUuid: String,
         encrypted: Int,
@@ -140,17 +106,13 @@ object NativeCore {
         }
     }
 
-    fun exportDeviceKey(
-        ctx: Pointer?,
-        deviceUuid: String,
-    ): String? = coreRef.get()?.exportDeviceKey(deviceUuid)
+    fun exportDeviceKey(deviceUuid: String): String? = coreRef.get()?.exportDeviceKey(deviceUuid)
 
     // ======== Persistence（Rust 私有库：uuid/密钥由 Rust 持有）=======
 
-    fun getLocalUuid(ctx: Pointer?): String? = coreRef.get()?.getLocalUuid()
+    fun getLocalUuid(): String? = coreRef.get()?.getLocalUuid()
 
     fun renameDevice(
-        ctx: Pointer?,
         deviceUuid: String,
         name: String,
     ): Boolean = coreRef.get()?.renameDevice(deviceUuid, name) ?: false
@@ -158,7 +120,6 @@ object NativeCore {
     // ======== Process ========
 
     fun periodicBroadcast(
-        ctx: Pointer?,
         action: Int,
         uuid: String? = null,
         name: String? = null,
@@ -171,7 +132,6 @@ object NativeCore {
     // ======== Send functions ========
 
     fun sendHandshake(
-        ctx: Pointer?,
         uuid: String,
         pubKey: String,
         localIp: String,
@@ -181,7 +141,6 @@ object NativeCore {
     ): Int = coreRef.get()?.sendHandshake(uuid, localIp, targetIp, battery, deviceType) ?: -1
 
     fun connectDevice(
-        ctx: Pointer?,
         uuid: String,
         targetIp: String,
         battery: Int,
@@ -189,7 +148,6 @@ object NativeCore {
     ): Int = coreRef.get()?.connectDevice(uuid, targetIp, battery, deviceType) ?: -1
 
     fun sendPairingInit(
-        ctx: Pointer?,
         localUuid: String,
         targetUuid: String,
         expectedCode: String,
@@ -200,7 +158,6 @@ object NativeCore {
             ?: -1
 
     fun sendPairingResp(
-        ctx: Pointer?,
         uuid: String,
         ltPub: String,
         pairingCode: String,
@@ -210,7 +167,6 @@ object NativeCore {
     ): Int = coreRef.get()?.sendPairingResp(uuid, ltPub, pairingCode, ip, battery, deviceType) ?: -1
 
     fun sendAccept(
-        ctx: Pointer?,
         uuid: String,
         ltPubKey: String,
         ip: String,
@@ -220,21 +176,15 @@ object NativeCore {
         coreRef.get()?.sendAccept(uuid, ltPubKey, ip, battery, deviceType)
     }
 
-    fun sendReject(
-        ctx: Pointer?,
-        uuid: String,
-    ) {
+    fun sendReject(uuid: String) {
         coreRef.get()?.sendReject(uuid)
     }
 
     // ======== Pairing code management (Rust-generated) ========
 
-    fun generatePairingCode(
-        ctx: Pointer?,
-        ttlSecs: Int = 300,
-    ): String? = coreRef.get()?.generatePairingCode(ttlSecs.toUInt())
+    fun generatePairingCode(ttlSecs: Int = 300): String? = coreRef.get()?.generatePairingCode(ttlSecs.toUInt())
 
-    fun clearPairingCode(ctx: Pointer?) {
+    fun clearPairingCode() {
         coreRef.get()?.clearPairingCode()
     }
 
@@ -278,7 +228,6 @@ object NativeCore {
     // ======== Dedup engine ========
 
     fun dedup(
-        ctx: Pointer?,
         action: Int,
         dedupKey: String,
         arg1Ms: Long = 0L,
@@ -288,7 +237,6 @@ object NativeCore {
     // ======== 入站内容去重（10s 窗口；键与 TTL 由 core 持有）========
 
     fun contentDedup(
-        ctx: Pointer?,
         action: Int,
         title: String,
         text: String,
@@ -307,18 +255,11 @@ object NativeCore {
 
     // ======== Filter ========
 
-    fun setFilterConfig(
-        ctx: Pointer?,
-        configJson: String,
-    ): Int = coreRef.get()?.setFilterConfig(configJson) ?: -1
+    fun setFilterConfig(configJson: String): Int = coreRef.get()?.setFilterConfig(configJson) ?: -1
 
-    fun mapLocalPackage(
-        ctx: Pointer?,
-        pkg: String,
-    ): String? = coreRef.get()?.mapLocalPackage(pkg)
+    fun mapLocalPackage(pkg: String): String? = coreRef.get()?.mapLocalPackage(pkg)
 
     fun checkFilterMode(
-        ctx: Pointer?,
         mappedPkg: String,
         originalPkg: String,
         title: String,
@@ -327,10 +268,7 @@ object NativeCore {
 
     // ======== Network layer ========
 
-    fun removeDeviceSession(
-        ctx: Pointer?,
-        uuid: String,
-    ): Int = coreRef.get()?.removeDeviceSession(uuid) ?: -1
+    fun removeDeviceSession(uuid: String): Int = coreRef.get()?.removeDeviceSession(uuid) ?: -1
 
     // ======== FTP credential derivation ========
 
@@ -349,7 +287,6 @@ object NativeCore {
     // ======== Heartbeat scheduler params (电量/名称变化) ========
 
     fun updateHeartbeatSchedulerParams(
-        ctx: Pointer?,
         name: String,
         battery: Int,
         deviceType: String,
@@ -360,7 +297,6 @@ object NativeCore {
     // ======== Device state snapshot ========
 
     fun getDeviceList(
-        ctx: Pointer?,
         authedTimeoutMs: Long,
         unauthedTimeoutMs: Long,
     ): String? = coreRef.get()?.getDeviceList(authedTimeoutMs, unauthedTimeoutMs)
@@ -369,8 +305,6 @@ object NativeCore {
 
     /** 入队：header 规范化、通知类发送去重（仅 DATA_NOTIFICATION）与 ts 注入由 core 内部完成 */
     fun enqueueMessage(
-        ctx: Pointer?,
-        queuePtr: Long,
         deviceUuid: String,
         header: String,
         plaintext: String,
@@ -387,8 +321,6 @@ object NativeCore {
      * 返回 JSON：{"action": "sent"|"skipped"|"file_transfer", "reason": "..."}
      */
     fun clipboardOnChanged(
-        ctx: Pointer?,
-        queuePtr: Long,
         targetsJson: String,
         mime: String,
         content: String,
@@ -401,7 +333,6 @@ object NativeCore {
      * 返回 JSON：{"type": "text"|"image", "content": "..."}
      */
     fun clipboardOnReceived(
-        ctx: Pointer?,
         payloadJson: String,
         nowMs: Long,
     ): String? = coreRef.get()?.clipboardOnReceived(payloadJson, nowMs)
@@ -413,7 +344,6 @@ object NativeCore {
      * 返回 ICON_REQUEST 报文 JSON；无需请求时返回 {}。
      */
     fun appSyncPrepareIconRequest(
-        ctx: Pointer?,
         packages: List<String>,
         installed: List<String>,
         cached: List<String>,
@@ -441,7 +371,6 @@ object NativeCore {
      * 返回 ICON_REQUEST 报文 JSON；无需请求时返回 {}。
      */
     fun appSyncRequestIcons(
-        ctx: Pointer?,
         packages: List<String>,
         installed: List<String>,
         cached: List<String>,
@@ -464,10 +393,7 @@ object NativeCore {
         )
     }
 
-    fun appSyncClearIconPending(
-        ctx: Pointer?,
-        packages: List<String>,
-    ) {
+    fun appSyncClearIconPending(packages: List<String>) {
         coreRef.get()?.appSyncClearIconPending(JSONArray(packages).toString())
     }
 
@@ -493,8 +419,6 @@ object NativeCore {
 
     /** 推送超级岛全量状态；isQuery 为真表示响应状态查询。 */
     fun pushSuperislandState(
-        ctx: Pointer?,
-        queuePtr: Long,
         deviceUuid: String,
         fullJson: String,
         isEnd: Boolean,
@@ -503,8 +427,6 @@ object NativeCore {
 
     /** 推送媒体全量状态；isQuery 为真表示响应状态查询。 */
     fun pushMediaState(
-        ctx: Pointer?,
-        queuePtr: Long,
         deviceUuid: String,
         fullJson: String,
         isEnd: Boolean,
@@ -523,10 +445,7 @@ object NativeCore {
 
     // ======== Network change ========
 
-    fun onNetworkChanged(
-        ctx: Pointer?,
-        localIp: String?,
-    ) {
+    fun onNetworkChanged(localIp: String?) {
         coreRef.get()?.onNetworkChanged(localIp ?: "")
     }
 
@@ -539,34 +458,26 @@ object NativeCore {
     // ======== Discovery ========
 
     fun addKnownDevice(
-        ctx: Pointer?,
         uuid: String,
         ip: String,
     ) {
         coreRef.get()?.addKnownDevice(uuid, ip)
     }
 
-    fun removeKnownDevice(
-        ctx: Pointer?,
-        uuid: String,
-    ) {
+    fun removeKnownDevice(uuid: String) {
         coreRef.get()?.removeKnownDevice(uuid)
     }
 
     // ======== Reconnect ========
 
     fun reconnectAddTarget(
-        ctx: Pointer?,
         uuid: String,
         ip: String,
     ) {
         coreRef.get()?.reconnectAddTarget(uuid, ip)
     }
 
-    fun reconnectRemoveTarget(
-        ctx: Pointer?,
-        uuid: String,
-    ) {
+    fun reconnectRemoveTarget(uuid: String) {
         coreRef.get()?.reconnectRemoveTarget(uuid)
     }
 
@@ -625,7 +536,6 @@ object NativeCore {
     // ======== Initialize core (统一启动 TCP、心跳、离线检测、发送队列、扫描、重连) ========
 
     fun startCore(
-        ctx: Pointer?,
         uuid: String,
         name: String,
         battery: Int,

@@ -191,10 +191,9 @@ class ConnectionDiscoveryManager(
 
     private fun updateLocalIpAndRestartDiscovery() {
         val newIp = getLocalIpAddressInternal()
-        // 本机 IP 由 core 维护（nrc_get_local_ip）；此处只需告知 core 网络变化
-        val ctx = NativeCore.getContext()
-        if (ctx != null) {
-            NativeCore.onNetworkChanged(ctx, newIp)
+        // 本机 IP 由 core 维护（NativeCore.getLocalIp）；此处只需告知 core 网络变化
+        if (NativeCore.isReady()) {
+            NativeCore.onNetworkChanged(newIp)
         }
         stopDiscovery()
         startDiscovery()
@@ -238,9 +237,8 @@ class ConnectionDiscoveryManager(
     }
 
     internal fun syncHeartbeatMode() {
-        val ctx = NativeCore.getContext()
-        if (ctx == null) {
-            Logger.w(TAG, "[syncHeartbeatMode] rustContext 为 null，跳过")
+        if (!NativeCore.isReady()) {
+            Logger.w(TAG, "[syncHeartbeatMode] core 未就绪，跳过")
             return
         }
         try {
@@ -255,12 +253,12 @@ class ConnectionDiscoveryManager(
                 val displayName = deviceManager.localDisplayName()
                 val battery = getSignedBatteryLevel()
                 Logger.i(TAG, "[syncHeartbeatMode] 调用 periodicBroadcast 启动扫描发现: uuid=${deviceManager.uuid}, name=$displayName, battery=$battery")
-                val result = NativeCore.periodicBroadcast(ctx, 1, deviceManager.uuid, displayName, battery, "android")
+                val result = NativeCore.periodicBroadcast(1, deviceManager.uuid, displayName, battery, "android")
                 Logger.i(TAG, "[syncHeartbeatMode] periodicBroadcast 返回: $result")
             } else {
                 // 用户关闭发现时停止扫描（已认证设备的重连由 Rust 重连状态机处理）
                 Logger.i(TAG, "[syncHeartbeatMode] 发现已关闭，停止扫描")
-                NativeCore.periodicBroadcast(ctx, 0)
+                NativeCore.periodicBroadcast(0)
                 releaseMulticastLock()
             }
         } catch (e: Exception) {
@@ -269,9 +267,8 @@ class ConnectionDiscoveryManager(
     }
 
     fun stopDiscovery() {
-        val ctx = NativeCore.getContext()
-        if (ctx != null) {
-            NativeCore.periodicBroadcast(ctx, 0)
+        if (NativeCore.isReady()) {
+            NativeCore.periodicBroadcast(0)
         }
         releaseMulticastLock()
     }

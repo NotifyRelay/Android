@@ -4,7 +4,7 @@ package com.xzyht.notifyrelay.feature.device.model
  * 设备展示信息。
  *
  * 仅描述「平台侧用于展示与寻址」的最小集合：
- * 在线状态、配对状态、设备类型等一律以 Rust core 的 `nrc_get_device_list` 快照为准
+ * 在线状态、配对状态、设备类型等一律以 Rust core 的 `NativeCore.getDeviceList()` 快照为准
  * （见 `DeviceSnapshot`），平台端不再自行维护第二份真相。
  */
 data class DeviceInfo(

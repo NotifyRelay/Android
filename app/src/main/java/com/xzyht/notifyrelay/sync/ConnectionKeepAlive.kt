@@ -32,13 +32,12 @@ class ConnectionKeepAlive(
 ) {
     /**
      * 封装设备连接握手与重试逻辑：
-     * - 重试与超时由 Rust `nrc_connect_device` 内部完成（3次/5s超时/1s间隔）
+     * - 重试与超时由 Rust `NativeCore.connectDevice()` 内部完成（3次/5s超时/1s间隔）
      * - 认证成功后更新 AuthInfo/deviceInfoCache（心跳由 Rust 调度器接管）
      * - 失败原因通过 (Boolean, String?) 形式返回
      */
     suspend fun performDeviceConnectionWithRetry(device: DeviceInfo): Pair<Boolean, String?> {
-        val ctx = NativeCore.getContext()
-        if (ctx == null) return Pair(false, "未初始化")
+        if (!NativeCore.isReady()) return Pair(false, "未初始化")
         // 无效 IP 直接快速失败，避免 Rust 侧按重试与超时消耗更长时间后才失败
         if (device.ip.isBlank() || device.ip == "0.0.0.0") return Pair(false, "设备 IP 无效")
         val batteryLevel = BatteryUtils.getBatteryLevel(context)
@@ -47,7 +46,7 @@ class ConnectionKeepAlive(
 
         val result =
             withContext(Dispatchers.IO) {
-                NativeCore.connectDevice(ctx, device.uuid, device.ip, battery, "android")
+                NativeCore.connectDevice(device.uuid, device.ip, battery, "android")
             }
         if (result == 0) {
             try {
@@ -56,7 +55,7 @@ class ConnectionKeepAlive(
             }
             return Pair(true, null)
         }
-        // nrc_connect_device 约定：0=收到 ACCEPT(成功)，-1=被拒绝或重试耗尽；无其他返回码
+        // NativeCore.connectDevice() 约定：0=收到 ACCEPT(成功)，-1=被拒绝或重试耗尽；无其他返回码
         Logger.e("死神-NotifyRelay", "connectToDevice 连接失败: ${device.displayName}, result=$result")
         return Pair(false, "连接失败")
     }

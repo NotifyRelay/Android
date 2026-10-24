@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.feature.device.model
 
 /**
- * Rust core `nrc_get_device_list` 快照条目（平台端的只读投影）。
+ * Rust core `NativeCore.getDeviceList()` 快照条目（平台端的只读投影）。
  *
  * 字段与 FFI 返回一一对应，**平台端不再自行维护第二份真相**：
  * 在线/离线、`lastSeen`、配对状态、可见性过滤全部由 core 决定。

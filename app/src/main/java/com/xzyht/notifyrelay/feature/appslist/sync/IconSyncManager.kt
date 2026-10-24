@@ -28,7 +28,7 @@ import org.json.JSONObject
  * 图标同步管理器
  *
  * 负责在已认证的设备之间同步应用图标，以避免重复传输并降低网络与性能开销。
- * 请求过滤（已缓存/已安装/pending/设备关联）与报文构造由 Rust core（nrc_app_sync_*）处理，
+ * 请求过滤（已缓存/已安装/pending/设备关联）与报文构造由 Rust core（`NativeCore.appSyncRequestIcons()` 等）处理，
  * 平台端仅负责位图编解码与本地缓存。
  */
 object IconSyncManager {
@@ -66,7 +66,6 @@ object IconSyncManager {
         // Rust 内部解除旧登记并完成过滤（缓存/已安装/pending/设备关联）、构造请求报文
         val requestJson =
             NativeCore.appSyncRequestIcons(
-                NativeCore.getContext(),
                 listOf(packageName),
                 installedPackages.toList(),
                 cachedPackages,
@@ -121,7 +120,6 @@ object IconSyncManager {
         // Rust 内部解除旧登记并完成过滤（缓存/已安装/pending/设备关联）、构造请求报文
         val requestJson =
             NativeCore.appSyncRequestIcons(
-                NativeCore.getContext(),
                 packageNames,
                 installedPackages.toList(),
                 cachedPackages,

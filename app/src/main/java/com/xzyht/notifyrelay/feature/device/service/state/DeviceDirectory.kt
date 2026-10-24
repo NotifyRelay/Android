@@ -7,7 +7,7 @@ import notifyrelay.base.util.Logger
 /**
  * 设备信息的**同步查询**入口，全部数据来自 [DeviceSnapshotStore] 的只读投影。
  *
- * 之所以需要它：`nrc_get_device_list` 是异步快照，而业务侧（通知/图标/应用列表等）
+ * 之所以需要它：`NativeCore.getDeviceList()` 取得的是异步刷新的快照，而业务侧（通知/图标/应用列表等）
  * 需要在任意线程**同步**按 uuid 反查设备信息。本类只读取投影，不写任何状态。
  */
 class DeviceDirectory(

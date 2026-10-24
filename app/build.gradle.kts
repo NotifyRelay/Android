@@ -238,7 +238,7 @@ dependencies {
 
     // 依赖数据模块
     implementation(project(":data"))
-    // 依赖core模块（Rust FFI 绑定 + JNA，源码目录 nativecore/）
+    // 依赖 core 模块（Rust 核心，UniFFI 绑定；源码目录 nativecore/）
     implementation(project(":core"))
     // 依赖base模块
     implementation(project(":base"))
