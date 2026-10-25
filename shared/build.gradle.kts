@@ -48,6 +48,8 @@ kotlin {
 
         androidMain.dependencies {
             implementation(libs.compose.multiplatform.ui.tooling)
+            // Android 侧日志通道：DebugTree 输出与级别过滤
+            implementation(libs.timber)
         }
     }
 }

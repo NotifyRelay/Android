@@ -7,7 +7,7 @@ import android.graphics.Paint
 import android.graphics.Typeface
 import androidx.core.graphics.createBitmap
 import androidx.core.graphics.toColorInt
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 import notifyrelay.shared.util.measureTime
 
 /**

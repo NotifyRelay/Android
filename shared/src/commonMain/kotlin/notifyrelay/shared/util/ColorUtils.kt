@@ -26,4 +26,22 @@ object ColorUtils {
         val value = expanded.toLongOrNull(16) ?: return null
         return if (expanded.length == 6) (value or 0xFF000000L).toInt() else value.toInt()
     }
+
+    /**
+     * 解析不带 `#` 前缀的十六进制颜色文本，按不透明色（`0xFF000000 or 值`）返回。
+     *
+     * 用于超级岛协议直接携带 `RRGGBB` / `AARRGGBB` 文本的场景；空白或非法输入返回 [fallback]。
+     *
+     * @param colorString 十六进制文本，可为 null。
+     * @param fallback 无法解析时返回的兜底颜色。
+     * @return ARGB 整数。
+     */
+    fun parseColorOr(
+        colorString: String?,
+        fallback: Int,
+    ): Int {
+        if (colorString.isNullOrBlank()) return fallback
+        val parsed = colorString.toIntOrNull(16) ?: return fallback
+        return 0xFF000000.toInt() or parsed
+    }
 }

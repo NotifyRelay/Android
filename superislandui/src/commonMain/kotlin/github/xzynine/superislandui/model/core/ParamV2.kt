@@ -1,6 +1,5 @@
 package github.xzynine.superislandui.model.core
 
-import github.xzynine.superislandui.Logger
 import github.xzynine.superislandui.floating.smallisland.core.parseBigIslandArea
 import github.xzynine.superislandui.json.optArrayOrNull
 import github.xzynine.superislandui.json.optObjectOrNull
@@ -35,6 +34,7 @@ import github.xzynine.superislandui.model.templates.parsePicInfo
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import notifyrelay.shared.log.Logger
 
 // 摘要态组件解析
 

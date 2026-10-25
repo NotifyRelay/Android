@@ -8,7 +8,6 @@ import android.graphics.drawable.BitmapDrawable
 import android.graphics.drawable.Drawable
 import android.util.Base64
 import androidx.core.graphics.drawable.toBitmap
-import androidx.core.graphics.toColorInt
 import coil.Coil
 import coil.request.ErrorResult
 import coil.request.ImageRequest
@@ -16,6 +15,9 @@ import coil.request.SuccessResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
+import notifyrelay.shared.util.ColorUtils
+import notifyrelay.shared.util.DataUrlUtils
+import notifyrelay.shared.util.TextUtils
 import java.io.ByteArrayOutputStream
 
 /**
@@ -31,11 +33,11 @@ import java.io.ByteArrayOutputStream
  */
 object ImageUtils {
     private const val TAG = "ImageUtils"
-    private const val DATA_PREFIX = "data:"
 
     // ==================== Data URL 相关 ====================
 
-    fun isDataUrl(text: String): Boolean = text.trim().startsWith(DATA_PREFIX, ignoreCase = true)
+    /** 判断文本是否为 data URL；实现位于 [DataUrlUtils]。 */
+    fun isDataUrl(text: String): Boolean = DataUrlUtils.isDataUrl(text)
 
     suspend fun decodeDataUrlToBitmap(
         context: Context,
@@ -110,7 +112,7 @@ object ImageUtils {
         context: Context,
         uri: Any,
     ): Bitmap? {
-        if (uri is String && uri.trim().startsWith(DATA_PREFIX, ignoreCase = true)) {
+        if (uri is String && DataUrlUtils.isDataUrl(uri)) {
             return decodeDataUrlToBitmap(context, uri)
         }
         return withContext(Dispatchers.IO) {
@@ -145,25 +147,11 @@ object ImageUtils {
 
     // ==================== 颜色与文本工具 ====================
 
-    fun parseColor(colorString: String?): Int? =
-        try {
-            colorString?.toColorInt()
-        } catch (e: Exception) {
-            null
-        }
+    /** 解析 `#RGB` / `#ARGB` / `#RRGGBB` / `#AARRGGBB` 颜色文本；实现位于 [ColorUtils]。 */
+    fun parseColor(colorString: String?): Int? = ColorUtils.parseColor(colorString)
 
-    fun unescapeHtml(input: String): String =
-        input
-            .replace("\\u003c", "<")
-            .replace("\\u003e", ">")
-            .replace("\\u0027", "'")
-            .replace("\\u0022", "\"")
-            .replace("\\u0026", "&")
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", "\"")
-            .replace("&apos;", "'")
-            .replace("&amp;", "&")
+    /** 还原转义序列与 HTML 实体；实现位于 [TextUtils]。 */
+    fun unescapeHtml(input: String): String = TextUtils.unescapeHtml(input)
 
     // ==================== 位图转换 ====================
 
@@ -188,24 +176,7 @@ object ImageUtils {
 
     // ==================== 私有辅助方法 ====================
 
-    private fun cleanDataUrl(dataUrl: String): String? {
-        var candidate = dataUrl.trim()
-        if (candidate.length >= 2 && candidate.first() == '"' && candidate.last() == '"') {
-            candidate = candidate.substring(1, candidate.length - 1)
-        }
-        candidate = candidate.replace("\\/", "/")
-        candidate = candidate.replace("\\\\", "")
-        if (!candidate.startsWith(DATA_PREFIX, ignoreCase = true)) {
-            Logger.w(TAG, "cleanDataUrl: 不以 data: 开头，原始前64字符: ${dataUrl.take(64)}")
-            return null
-        }
-        val comma = candidate.indexOf(',')
-        if (comma <= 0) {
-            Logger.w(TAG, "cleanDataUrl: 未找到逗号分隔符，清理后前64字符: ${candidate.take(64)}")
-            return null
-        }
-        return candidate
-    }
+    private fun cleanDataUrl(dataUrl: String): String? = DataUrlUtils.cleanDataUrl(dataUrl)
 }
 
 /**

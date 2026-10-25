@@ -1,5 +1,7 @@
 package github.xzynine.superislandui.builder
 
+import kotlin.math.roundToLong
+
 /**
  * 超级岛图片资源约束（依据《小米澎湃OS 超级岛通知 API》）。
  *
@@ -87,10 +89,21 @@ object SuperIslandImageSpec {
         if (width > 0 && height > 0) {
             val ratio = aspectRatio(width, height)
             if (ratio > MAX_ASPECT_RATIO + 0.01f) {
-                issues += "图片宽高比 ${"%.2f".format(ratio)} 超出 1:1 ~ 16:9"
+                issues += "图片宽高比 ${formatTwoDecimals(ratio)} 超出 1:1 ~ 16:9"
             }
         }
         return issues
+    }
+
+    /**
+     * 两位小数文本，等价于 JVM 的 `"%.2f".format(value)`（四舍五入，固定保留两位）。
+     *
+     * commonMain 无 `String.format`，故按百分位取整后拆分整数与小数部分拼接；[value] 为非负宽高比。
+     */
+    private fun formatTwoDecimals(value: Float): String {
+        val hundredths = (value * 100.0).roundToLong()
+        val fraction = (hundredths % 100).toInt()
+        return "${hundredths / 100}.${fraction.toString().padStart(2, '0')}"
     }
 
     /** 宽高比（长边 / 短边） */

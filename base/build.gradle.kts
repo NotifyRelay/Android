@@ -45,7 +45,8 @@ kotlin {
 dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
-    implementation(libs.timber)
+    // 日志实现位于 :shared
+    implementation(project(":shared"))
     implementation(libs.androidx.lifecycle.process)
 
     // 原 :core 迁移而来：BatteryIconConverter.getBatteryColor 返回 Compose Color

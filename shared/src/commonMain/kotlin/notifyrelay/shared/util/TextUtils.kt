@@ -21,4 +21,25 @@ object TextUtils {
         if (title == null) return ""
         return title.replace(TITLE_PREFIX_PATTERN, "").trim()
     }
+
+    /**
+     * 还原 `\uXXXX` 形式的转义序列与 HTML 实体。
+     *
+     * 处理顺序固定为转义序列在前、实体在后。
+     *
+     * @param input 原始文本。
+     * @return 还原后的文本。
+     */
+    fun unescapeHtml(input: String): String =
+        input
+            .replace("\\u003c", "<")
+            .replace("\\u003e", ">")
+            .replace("\\u0027", "'")
+            .replace("\\u0022", "\"")
+            .replace("\\u0026", "&")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&quot;", "\"")
+            .replace("&apos;", "'")
+            .replace("&amp;", "&")
 }

@@ -6,6 +6,7 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import notifyrelay.shared.util.ColorUtils
+import notifyrelay.shared.util.TextUtils
 
 /**
  * 超级岛图片与文本工具类（平台无关部分）。
@@ -50,7 +51,7 @@ object SuperIslandImageUtil {
      */
     fun parseSimpleHtmlToAnnotatedString(html: String): AnnotatedString {
         val builder = AnnotatedString.Builder()
-        val unescapedHtml = unescapeHtml(html)
+        val unescapedHtml = TextUtils.unescapeHtml(html)
 
         var index = 0
         var fontStyleDepth = 0
@@ -105,22 +106,6 @@ object SuperIslandImageUtil {
 
         return builder.toAnnotatedString()
     }
-
-    /**
-     * 还原文本中的转义序列与 HTML 实体。
-     */
-    private fun unescapeHtml(input: String): String =
-        input
-            .replace("\\u003c", "<")
-            .replace("\\u003e", ">")
-            .replace("\\u0027", "'")
-            .replace("\\u0022", "\"")
-            .replace("\\u0026", "&")
-            .replace("&lt;", "<")
-            .replace("&gt;", ">")
-            .replace("&quot;", "\"")
-            .replace("&apos;", "'")
-            .replace("&amp;", "&")
 }
 
 /**

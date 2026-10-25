@@ -1,8 +1,26 @@
-package github.xzynine.superislandui
+package notifyrelay.shared.log
 
-// 跨源集日志门面：公共端不能引用 android.util.Log 与 Timber，
-// 日志输出由各平台源集的 platformLogXxx 实现提供，对外 API 为 5 个级别 × 2 个重载。
+/**
+ * 全仓唯一日志入口。
+ *
+ * 级别状态（currentLevel）与过滤通知日志开关在此持有；输出通道由各目标源集的
+ * platformLogXxx 提供，对外 API 为 5 个级别 × 2 个重载。
+ */
 object Logger {
+    enum class Level {
+        VERBOSE,
+        DEBUG,
+        INFO,
+        WARN,
+        ERROR,
+        NONE,
+    }
+
+    var currentLevel = Level.INFO
+
+    // 过滤通知日志开关（默认开启）
+    var enableFilteredNotificationLog = true
+
     fun v(
         tag: String,
         message: String,

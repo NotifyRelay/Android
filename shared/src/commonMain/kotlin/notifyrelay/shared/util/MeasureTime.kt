@@ -1,18 +1,11 @@
 package notifyrelay.shared.util
 
+import notifyrelay.shared.log.Logger
 import kotlin.time.TimeSource
 
 /**
- * 公共端 WARN 级日志出口。
- *
- * platform 无关源码不能依赖 Timber 等平台日志库，由各目标源集提供实现。
+ * 计时并记录超过 16ms 的操作，日志经 notifyrelay.shared.log.Logger 输出。
  */
-@PublishedApi
-internal expect fun sharedLogW(
-    tag: String,
-    message: String,
-)
-
 inline fun <T> measureTime(
     tag: String,
     operation: String,
@@ -24,7 +17,7 @@ inline fun <T> measureTime(
     } finally {
         val duration = mark.elapsedNow().inWholeMilliseconds
         if (duration > 16) {
-            sharedLogW(tag, "$operation 耗时 ${duration}ms")
+            Logger.w(tag, "$operation 耗时 ${duration}ms")
         }
     }
 }

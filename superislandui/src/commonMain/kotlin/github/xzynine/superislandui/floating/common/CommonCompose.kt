@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoScrollText
 import github.xzynine.superislandui.currentTimeMillis
 import github.xzynine.superislandui.model.components.TimerInfo
+import notifyrelay.shared.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -202,17 +203,12 @@ fun CircularProgressCompose(
 }
 
 /**
- * 安全解析颜色
+ * 安全解析不带 `#` 前缀的十六进制颜色文本；空白或非法输入返回 [default]。
  */
 fun parseColorSafe(
     s: String?,
     default: Int,
-): Int =
-    try {
-        if (s.isNullOrBlank()) default else s.toIntOrNull(16)?.let { 0xFF000000.toInt() or it } ?: default
-    } catch (_: IllegalArgumentException) {
-        default
-    }
+): Int = ColorUtils.parseColorOr(s, default)
 
 /**
  * 格式化计时器信息

@@ -1,6 +1,5 @@
 package github.xzynine.superislandui.parser
 
-import github.xzynine.superislandui.Logger
 import github.xzynine.superislandui.floating.smallisland.right.BComponent
 import github.xzynine.superislandui.floating.smallisland.right.BEmpty
 import github.xzynine.superislandui.floating.smallisland.right.BFixedWidthDigitInfo
@@ -18,6 +17,7 @@ import github.xzynine.superislandui.json.optObjectOrNull
 import github.xzynine.superislandui.json.optStringOr
 import github.xzynine.superislandui.model.components.TimerInfo
 import kotlinx.serialization.json.JsonObject
+import notifyrelay.shared.log.Logger
 
 /**
  * 解析 B区（优先识别 imageTextInfoRight 的 type，其次识别 text/digit/progress/pic）。

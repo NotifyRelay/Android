@@ -11,11 +11,10 @@ import android.service.notification.StatusBarNotification
 import androidx.core.graphics.drawable.toBitmap
 import github.xzynine.superislandui.model.core.SuperIslandData
 import notifyrelay.base.util.AppListHelper
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.ImageUtils
 import notifyrelay.data.StorageManager
 import notifyrelay.shared.SuperIslandStorageKeys
-import org.json.JSONObject
+import notifyrelay.shared.log.Logger
 
 /**
  * 基于小米超级岛文档（miui.focus.param）进行精确解析的实现。
@@ -101,53 +100,16 @@ object SuperIslandManager {
 
             if (!islandParamStr.isNullOrEmpty()) {
                 try {
-                    val root = JSONObject(islandParamStr)
-                    val pv = if (root.has("param_v2")) root.getJSONObject("param_v2") else root
-
-                    // 锁屏态验证码在 param_v2 中会被系统替换为 ******，这里用 verify_code 的真实值回填 raw，
-                    // 使接收端（PC/其他设备）直接按 raw 渲染即可显示真实验证码，而不依赖各自本地替换
-                    if (!verifyCode.isNullOrEmpty()) {
-                        replaceVerifyCodePlaceholder(pv, verifyCode)
-                    }
-
-                    // 提取 baseInfo (焦点通知数据) 中的 title/content
-                    if (pv.has("baseInfo")) {
-                        val base = pv.getJSONObject("baseInfo")
-                        val tBaseTitle = base.optString("title", "")
-                        if (tBaseTitle.isNotEmpty()) title = tBaseTitle
-                        val tBaseContent = base.optString("content", "")
-                        if (tBaseContent.isNotEmpty()) text = tBaseContent
-                    }
-
-                    // aodTitle 优先用于息屏场景的摘要
-                    if (pv.has("aodTitle") && (title == null || title.isEmpty())) {
-                        val tAod = pv.optString("aodTitle", "")
-                        if (tAod.isNotEmpty()) title = tAod
-                    }
-
-                    // param_island 中可能包含更丰富的摘要数据
-                    if (pv.has("param_island")) {
-                        val island = pv.getJSONObject("param_island")
-                        rawExtras["param_island"] = island.toString()
-                        // 尝试从 island 的 summary 区或 smallIslandArea 提取简单文本
-                        if (island.has("smallIslandArea")) {
-                            val small = island.getJSONObject("smallIslandArea")
-                            if (small.has("title") && title.isNullOrEmpty()) {
-                                val tSmallTitle = small.optString("title", "")
-                                if (tSmallTitle.isNotEmpty()) title = tSmallTitle
-                            }
-                            if (small.has("content") && text.isNullOrEmpty()) {
-                                val tSmallContent = small.optString("content", "")
-                                if (tSmallContent.isNotEmpty()) text = tSmallContent
-                            }
-                        }
-                        if (island.has("bigIslandArea")) rawExtras["bigIslandArea"] = island.getJSONObject("bigIslandArea").toString()
-                    }
-
+                    // 纯解析件位于 commonMain：字段优先级、验证码回填与 raw 文本输出与迁移前一致
+                    val summary = extractIslandSummary(islandParamStr, verifyCode)
+                    title = summary.title
+                    text = summary.text
+                    summary.paramIslandRaw?.let { rawExtras["param_island"] = it }
+                    summary.bigIslandAreaRaw?.let { rawExtras["bigIslandArea"] = it }
                     // 记录 param_v2 原始内容
-                    rawExtras["param_v2"] = pv.toString()
+                    rawExtras["param_v2"] = summary.paramV2Raw
                     // 保留 param_v2 原始字符串以便发送
-                    rawExtras["param_v2_raw"] = pv.toString()
+                    rawExtras["param_v2_raw"] = summary.paramV2Raw
                 } catch (e: Exception) {
                     Logger.w("超级岛", "超级岛: 解析 miui.focus.param 失败: ${e.message}")
                 }
@@ -339,44 +301,6 @@ object SuperIslandManager {
         } catch (e: Exception) {
             Logger.w("超级岛", "超级岛: 提取超级岛数据时发生错误: ${e.message}")
             return null
-        }
-    }
-
-    /**
-     * 将 param_v2 中的 ****** 占位符替换为真实验证码。
-     * 锁屏态系统短信App会把验证码显示为 ******，真实值位于 verify_code 字段；
-     * 回填后 raw 直接携带真实验证码，接收端无需再做替换。
-     */
-    private fun replaceVerifyCodePlaceholder(
-        paramV2: JSONObject,
-        verifyCode: String,
-    ) {
-        try {
-            // iconTextInfo.title
-            paramV2.optJSONObject("iconTextInfo")?.let { iconTextInfo ->
-                val title = iconTextInfo.optString("title", "")
-                if (title.contains("******") || title.contains("****")) {
-                    val replaced = title.replace("******", verifyCode).replace("****", verifyCode)
-                    iconTextInfo.put("title", replaced)
-                    Logger.i("超级岛", "超级岛: 已回填 iconTextInfo.title 中的验证码占位符")
-                }
-            }
-
-            // param_island.bigIslandArea.textInfo.title
-            paramV2
-                .optJSONObject("param_island")
-                ?.optJSONObject("bigIslandArea")
-                ?.optJSONObject("textInfo")
-                ?.let { textInfo ->
-                    val title = textInfo.optString("title", "")
-                    if (title.contains("******") || title.contains("****")) {
-                        val replaced = title.replace("******", verifyCode).replace("****", verifyCode)
-                        textInfo.put("title", replaced)
-                        Logger.i("超级岛", "超级岛: 已回填 bigIslandArea.textInfo.title 中的验证码占位符")
-                    }
-                }
-        } catch (e: Exception) {
-            Logger.w("超级岛", "超级岛: 验证码回填失败: ${e.message}")
         }
     }
 }
