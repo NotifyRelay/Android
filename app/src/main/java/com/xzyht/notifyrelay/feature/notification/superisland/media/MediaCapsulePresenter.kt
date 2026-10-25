@@ -3,7 +3,9 @@ package com.xzyht.notifyrelay.feature.notification.superisland.media
 import android.content.Context
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import github.xzynine.superislandui.builder.SuperIslandParamBuilder
-import org.json.JSONObject
+import github.xzynine.superislandui.json.toOrgJsonString
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 object MediaCapsulePresenter {
     fun show(
@@ -42,15 +44,15 @@ object MediaCapsulePresenter {
         capsuleText: String = "",
     ): String {
         val bigIslandArea =
-            JSONObject().apply {
+            buildJsonObject {
                 // 左侧：图文组件1（图+歌词左）
                 put(
                     "imageTextInfoLeft",
-                    JSONObject().apply {
+                    buildJsonObject {
                         put("type", 1)
                         put(
                             "picInfo",
-                            JSONObject().apply {
+                            buildJsonObject {
                                 put("type", 1)
                                 put("pic", "miui.focus.pic_cover")
                             },
@@ -59,7 +61,7 @@ object MediaCapsulePresenter {
                         if (iconText.isNotEmpty()) {
                             put(
                                 "textInfo",
-                                JSONObject().apply {
+                                buildJsonObject {
                                     put("title", iconText)
                                     put("content", "")
                                     put("narrowFont", false)
@@ -72,7 +74,7 @@ object MediaCapsulePresenter {
                 // 右侧：文本组件（歌词右）
                 put(
                     "textInfo",
-                    JSONObject().apply {
+                    buildJsonObject {
                         put("frontTitle", "")
                         put("title", capsuleText)
                         put("content", "")
@@ -83,10 +85,10 @@ object MediaCapsulePresenter {
             }
         // 小岛：封面图（规范必传 smallIslandArea）
         val smallIslandArea =
-            JSONObject().apply {
+            buildJsonObject {
                 put(
                     "picInfo",
-                    JSONObject().apply {
+                    buildJsonObject {
                         put("type", 1)
                         put("pic", "miui.focus.pic_cover")
                     },
@@ -102,12 +104,12 @@ object MediaCapsulePresenter {
                 smallIslandArea(smallIslandArea)
             }.component(
                 "baseInfo",
-                JSONObject().apply {
+                buildJsonObject {
                     put("title", title)
                     put("content", text)
                 },
             ).buildParamV2()
-            .toString()
+            .toOrgJsonString()
     }
 
     private fun buildDefaultPicMap(coverUrl: String?): Map<String, String>? {

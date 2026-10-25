@@ -12,9 +12,13 @@ import github.xzynine.superislandui.builder.SuperIslandExtras
 import github.xzynine.superislandui.builder.SuperIslandImageSpec
 import github.xzynine.superislandui.builder.SuperIslandParamBuilder
 import kotlinx.coroutines.CancellationException
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.ImageUtils
-import org.json.JSONArray
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 
@@ -136,6 +140,22 @@ object SuperIslandStructuredDataHelper {
     }
 
     /**
+     * 把右胶囊文本写入 param_island.bigIslandArea.imageTextInfoRight（层级缺失时创建）。
+     * 键序与原 org.json 就地修改一致：已有键保持原位置，新键追加在末尾。
+     */
+    private fun JsonObject.withRightCapsuleText(
+        bTitle: String?,
+        bContent: String?,
+    ): JsonObject {
+        val bigIslandArea = LinkedHashMap(this["bigIslandArea"] as? JsonObject ?: JsonObject(emptyMap()))
+        val right = LinkedHashMap(bigIslandArea["imageTextInfoRight"] as? JsonObject ?: JsonObject(emptyMap()))
+        if (bTitle != null) right["title"] = JsonPrimitive(bTitle)
+        if (bContent != null) right["content"] = JsonPrimitive(bContent)
+        bigIslandArea["imageTextInfoRight"] = JsonObject(right)
+        return JsonObject(LinkedHashMap(this).apply { put("bigIslandArea", JsonObject(bigIslandArea)) })
+    }
+
+    /**
      * 为媒体类型通知添加超级岛结构化数据
      * @param builder 通知构建器
      * @param context 上下文
@@ -159,14 +179,14 @@ object SuperIslandStructuredDataHelper {
 
             // 按小米超级岛模板库「a图文组件1 + b文本组件」构建
             val bigIslandArea =
-                JSONObject().apply {
+                buildJsonObject {
                     put(
                         "imageTextInfoLeft",
-                        JSONObject().apply {
+                        buildJsonObject {
                             put("type", 1)
                             put(
                                 "picInfo",
-                                JSONObject().apply {
+                                buildJsonObject {
                                     put("type", 1)
                                     put("pic", PIC_COVER)
                                 },
@@ -175,7 +195,7 @@ object SuperIslandStructuredDataHelper {
                             if (!iconText.isNullOrEmpty()) {
                                 put(
                                     "textInfo",
-                                    JSONObject().apply {
+                                    buildJsonObject {
                                         put("title", iconText)
                                         put("content", "")
                                         put("narrowFont", false)
@@ -187,7 +207,7 @@ object SuperIslandStructuredDataHelper {
                     )
                     put(
                         "textInfo",
-                        JSONObject().apply {
+                        buildJsonObject {
                             put("frontTitle", "")
                             put("title", capsuleText ?: "")
                             put("content", "")
@@ -197,10 +217,10 @@ object SuperIslandStructuredDataHelper {
                     )
                 }
             val smallIslandArea =
-                JSONObject().apply {
+                buildJsonObject {
                     put(
                         "picInfo",
-                        JSONObject().apply {
+                        buildJsonObject {
                             put("type", 1)
                             put("pic", PIC_COVER)
                         },
@@ -222,7 +242,7 @@ object SuperIslandStructuredDataHelper {
                     .aodTitle(title ?: "")
                     .component(
                         "baseInfo",
-                        JSONObject().apply {
+                        buildJsonObject {
                             put("type", 2)
                             put("title", title ?: "")
                             put("content", text ?: "")
@@ -279,22 +299,18 @@ object SuperIslandStructuredDataHelper {
                     val island = SuperIslandParamBuilder.paramIslandOf(raw)
 
                     // 右胶囊文本写入规范路径 param_island.bigIslandArea.imageTextInfoRight
-                    if (bTitle != null || bContent != null) {
-                        val bigIslandArea =
-                            island.optJSONObject("bigIslandArea")
-                                ?: JSONObject().also { island.put("bigIslandArea", it) }
-                        val right =
-                            bigIslandArea.optJSONObject("imageTextInfoRight")
-                                ?: JSONObject().also { bigIslandArea.put("imageTextInfoRight", it) }
-                        if (bTitle != null) right.put("title", bTitle)
-                        if (bContent != null) right.put("content", bContent)
-                    }
+                    val patchedIsland =
+                        if (bTitle != null || bContent != null) {
+                            island.withRightCapsuleText(bTitle, bContent)
+                        } else {
+                            island
+                        }
 
                     // 复刻：business 与 param_island 为编译期必传项
                     val payload =
                         SuperIslandParamBuilder
                             .replica(raw, SuperIslandParamBuilder.businessOf(raw))
-                            .island(island)
+                            .island(patchedIsland)
                             .tickerIfBlank(title)
                             .build()
                     val issues = SuperIslandParamBuilder.validate(payload)
@@ -632,14 +648,14 @@ object SuperIslandStructuredDataHelper {
                 islandProperty(1)
                 islandOrder(false)
                 highlightColor("#FFFFFF")
-                bigIslandArea(JSONObject().apply { put("textInfo", localTextInfo(resolvedTitle, resolvedText)) })
-                smallIslandArea(JSONObject().apply { put("textInfo", localTextInfo(resolvedTitle, "")) })
+                bigIslandArea(buildJsonObject { put("textInfo", localTextInfo(resolvedTitle, resolvedText)) })
+                smallIslandArea(buildJsonObject { put("textInfo", localTextInfo(resolvedTitle, "")) })
             }.focusType(SuperIslandParamBuilder.FOCUS_V3_TYPE)
             .ticker(resolvedTitle)
             .aodTitle(resolvedTitle)
             .component(
                 "baseInfo",
-                JSONObject().apply {
+                buildJsonObject {
                     put("type", 2)
                     put("title", resolvedTitle)
                     put("content", resolvedText)
@@ -649,9 +665,9 @@ object SuperIslandStructuredDataHelper {
                     // 文本按钮组件（模板库按钮组件4，数组形态；官方示例与项目测试样本均为直接数组）
                     component(
                         "textButton",
-                        JSONArray().apply {
-                            put(
-                                JSONObject().apply {
+                        buildJsonArray {
+                            add(
+                                buildJsonObject {
                                     put("action", FOCUS_ACTION_KEY)
                                     put("actionTitle", action.title)
                                 },
@@ -679,8 +695,8 @@ object SuperIslandStructuredDataHelper {
     private fun localTextInfo(
         title: String,
         content: String,
-    ): JSONObject =
-        JSONObject().apply {
+    ): JsonObject =
+        buildJsonObject {
             put("frontTitle", "")
             put("title", title)
             put("content", content)

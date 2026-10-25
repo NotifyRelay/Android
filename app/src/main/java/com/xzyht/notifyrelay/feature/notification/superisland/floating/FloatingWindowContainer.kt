@@ -48,6 +48,8 @@ import github.xzynine.superislandui.floating.common.SuperIslandComposeRoot
 import github.xzynine.superislandui.floating.smallisland.compose.BigIslandCollapsedCompose
 import github.xzynine.superislandui.model.components.MediaSessionData
 import github.xzynine.superislandui.model.core.ParamV2
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.jsonObject
 import notifyrelay.base.util.Logger
 import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.Text
@@ -412,7 +414,8 @@ fun FloatingWindowContainer(
                                 }
                             }
 
-                        // 从parsedRoot中提取bigIslandJson
+                        // 从parsedRoot中提取bigIslandArea，并转换为 UI 侧入参的 kotlinx JSON 树；
+                        // 转换失败按 null 处理，与原实现的兜底一致
                         val bigIslandJson =
                             remember(parsedRoot) {
                                 parsedRoot?.let { root ->
@@ -420,9 +423,13 @@ fun FloatingWindowContainer(
                                         root.optJSONObject("param_island")
                                             ?: root.optJSONObject("paramIsland")
                                             ?: root.optJSONObject("islandParam")
-                                    island?.optJSONObject("bigIslandArea") ?: island?.optJSONObject(
-                                        "bigIsland",
-                                    )
+                                    val bigIslandArea =
+                                        island?.optJSONObject("bigIslandArea") ?: island?.optJSONObject(
+                                            "bigIsland",
+                                        )
+                                    bigIslandArea?.let {
+                                        runCatching { Json.parseToJsonElement(it.toString()).jsonObject }.getOrNull()
+                                    }
                                 }
                             }
 
