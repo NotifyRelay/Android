@@ -1,5 +1,7 @@
 package github.xzynine.superislandui.common
 
+import notifyrelay.shared.util.nowMillis
+
 /**
  * 胶囊文本滚动管理器，用于处理超长文本的滚动显示
  */
@@ -41,22 +43,33 @@ object CapsuleScrollManager {
 
     private val adaptiveDataMap = mutableMapOf<String, AdaptiveData>()
 
-    /** 按 CJK 判定使用的 Unicode 区块集合。 */
-    private val CJK_BLOCKS =
-        setOf(
-            Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS,
-            Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A,
-            Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B,
-            Character.UnicodeBlock.CJK_COMPATIBILITY_IDEOGRAPHS,
-            Character.UnicodeBlock.HIRAGANA,
-            Character.UnicodeBlock.KATAKANA,
-            Character.UnicodeBlock.HANGUL_SYLLABLES,
-        )
-
     /**
      * 计算字符的视觉权重（CJK=2，西文=1）
      */
-    fun charWeight(c: Char): Int = if (Character.UnicodeBlock.of(c) in CJK_BLOCKS) 2 else 1
+    fun charWeight(c: Char): Int = if (isCjk(c)) 2 else 1
+
+    /**
+     * 是否为 CJK 字符。
+     *
+     * 区间取自 java.lang.Character.UnicodeBlock 的区块定义，逐字等价：
+     * 区块本身即连续码点区间，且 char 维度下 UTF-16 代理区不属于上述任一区块。
+     */
+    private fun isCjk(c: Char): Boolean {
+        val code = c.code
+        return CJK_CODE_RANGES.any { code in it }
+    }
+
+    /** CJK 码点区间，取自 java.lang.Character.UnicodeBlock 的区块定义。 */
+    private val CJK_CODE_RANGES =
+        listOf(
+            0x4E00..0x9FFF, // CJK 统一表意文字
+            0x3400..0x4DBF, // CJK 统一表意文字扩展 A
+            0x20000..0x2A6DF, // CJK 统一表意文字扩展 B
+            0xF900..0xFAFF, // CJK 兼容表意文字
+            0x3040..0x309F, // 平假名
+            0x30A0..0x30FF, // 片假名
+            0xAC00..0xD7AF, // 谚文音节
+        )
 
     /**
      * 计算字符串的总视觉权重
@@ -151,7 +164,7 @@ object CapsuleScrollManager {
             scrollData.lastText = text
             scrollData.scrollOffset = 0
             scrollData.scrollState = ScrollState.SCROLLING
-            scrollData.initialPauseStartTime = System.currentTimeMillis()
+            scrollData.initialPauseStartTime = nowMillis()
         }
 
         val totalWeight = calculateWeight(text)
@@ -172,12 +185,12 @@ object CapsuleScrollManager {
                 if (remainingWeight <= COMPENSATION_THRESHOLD) {
                     // 显示所有剩余内容（即使>最大显示权重）
                     scrollData.scrollState = ScrollState.FINAL_PAUSE
-                    scrollData.initialPauseStartTime = System.currentTimeMillis()
+                    scrollData.initialPauseStartTime = nowMillis()
                     extractByWeight(text, scrollData.scrollOffset, remainingWeight)
                 } else if (remainingWeight <= MAX_DISPLAY_WEIGHT) {
                     // 最后完整片段：切换到FINAL_PAUSE
                     scrollData.scrollState = ScrollState.FINAL_PAUSE
-                    scrollData.initialPauseStartTime = System.currentTimeMillis()
+                    scrollData.initialPauseStartTime = nowMillis()
                     extractByWeight(text, scrollData.scrollOffset, MAX_DISPLAY_WEIGHT)
                 } else {
                     // 主动滚动
@@ -195,7 +208,7 @@ object CapsuleScrollManager {
                 val remainingWeight = totalWeight - scrollData.scrollOffset
                 val displayText = extractByWeight(text, scrollData.scrollOffset, maxOf(remainingWeight, MAX_DISPLAY_WEIGHT))
 
-                val pauseElapsed = System.currentTimeMillis() - scrollData.initialPauseStartTime
+                val pauseElapsed = nowMillis() - scrollData.initialPauseStartTime
                 if (pauseElapsed >= FINAL_PAUSE_DURATION) {
                     scrollData.scrollState = ScrollState.DONE
                 }
@@ -216,7 +229,7 @@ object CapsuleScrollManager {
      */
     fun shouldUpdateNotification(key: String): Boolean {
         val scrollData = scrollDataMap[key] ?: return false
-        val now = System.currentTimeMillis()
+        val now = nowMillis()
 
         // 节流：50ms限制
         if (now - scrollData.lastUpdateTime < 50) return false

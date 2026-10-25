@@ -1,7 +1,5 @@
 package github.xzynine.superislandui.model.core
 
-import android.os.Bundle
-
 data class SuperIslandData(
     val sourcePackage: String?,
     val appName: String?,
@@ -10,5 +8,5 @@ data class SuperIslandData(
     val rawExtras: Map<String, Any?>,
     val paramV2Raw: String? = null,
     val picMap: Map<String, String>? = null,
-    val pics: Bundle? = null,
+    val pics: Map<String, Any?>? = null,
 )

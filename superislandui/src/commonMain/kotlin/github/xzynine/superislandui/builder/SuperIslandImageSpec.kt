@@ -42,7 +42,7 @@ object SuperIslandImageSpec {
     private fun extractScheme(url: String): String? = SCHEME_REGEX.find(url)?.value
 
     /**
-     * 图片条目是否合法（供 [SuperIslandExtras.writePicMap] 集中过滤使用）：
+     * 图片条目是否合法（供 [SuperIslandExtrasCore.writePicMap] 集中过滤使用）：
      * - 非空；
      * - 无 scheme 的本地路径视为合法；
      * - 有 scheme 但不在白名单（如 `ftp:`、`http:`）视为非法。

@@ -22,6 +22,8 @@ kotlin {
 
         compilerOptions {
             jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_11)
+            // PlatformBitmap 以 expect/actual class 承载（Kotlin 官方 Beta 特性）
+            freeCompilerArgs.add("-Xexpect-actual-classes")
         }
 
         // 发布给库使用方的 keep 规则文件
@@ -67,6 +69,9 @@ kotlin {
 
             // commonMain 的 JSON 解析/构建统一使用 kotlinx.serialization.json（替代 org.json）
             implementation(libs.kotlinx.serialization.json)
+
+            // BitmapUtils 缓存池使用 atomicfu 的同步原语
+            implementation(libs.atomicfu)
 
             // KMP 公共端（平台标识、文本与计时工具、颜色工具、存储 key 常量）
             implementation(project(":shared"))
