@@ -39,6 +39,9 @@ kotlin {
         commonMain.dependencies {
             // 日志实现
             implementation(project(":shared"))
+
+            // BatteryIconConverter 返回 Compose Color（CMP 公共端坐标）
+            implementation(libs.compose.multiplatform.ui)
         }
 
         androidMain.dependencies {
