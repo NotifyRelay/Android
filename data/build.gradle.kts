@@ -53,6 +53,9 @@ kotlin {
 
             // DAO 的 Flow 返回类型
             implementation(libs.kotlinx.coroutines.core)
+
+            // KMP 公共端：日志（StorageManagerCore 使用 shared 的 Logger）与过滤配置默认常量
+            implementation(project(":shared"))
         }
 
         androidMain.dependencies {

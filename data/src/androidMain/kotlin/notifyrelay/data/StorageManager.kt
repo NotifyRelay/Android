@@ -1,8 +1,6 @@
 package notifyrelay.data
 
 import android.content.Context
-import com.google.gson.Gson
-import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
@@ -13,25 +11,13 @@ import notifyrelay.data.database.repository.DatabaseRepository
  * 它将偏好设置按用途分为三类：通用（GENERAL）、设备（DEVICE）和过滤器（FILTER），
  * 并提供了一系列便捷的读写方法（支持字符串、布尔、整数、长整数、字符串集合以及批量写入）。
  * 所有方法内部均包含异常保护，避免因异常导致应用崩溃。
+ *
+ * 本类为 Android 侧门面：Context 获取、runBlocking 阻塞与线程中断适配在此完成，
+ * 业务逻辑位于 commonMain 的 StorageManagerCore。
  */
 object StorageManager {
-    /**
-     * 根据 [PrefsType] 为键名添加前缀，避免不同类型的偏好键名冲突。
-     *
-     * @param key 原始键名。
-     * @param prefsType 偏好集合类型。
-     * @return 添加前缀后的键名。
-     */
-    private fun getPrefixedKey(
-        key: String,
-        prefsType: PrefsType,
-    ): String =
-        when (prefsType) {
-            PrefsType.GENERAL -> "general_$key"
-            PrefsType.DEVICE -> "device_$key"
-            PrefsType.FILTER -> "filter_$key"
-            PrefsType.SCRCPY -> "scrcpy_$key"
-        }
+    /** 偏好集合类型，与 commonMain 的 [notifyrelay.data.PrefsType] 为同一类型 */
+    typealias PrefsType = notifyrelay.data.PrefsType
 
     /**
      * 从Room数据库中读取字符串值，带异常保护。
@@ -49,10 +35,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): String =
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                repository.getConfig(prefixedKey, default)
+                core.getString(key, default, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -80,10 +65,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                repository.setConfig(prefixedKey, value)
+                core.putString(key, value, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -111,10 +95,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): Boolean =
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                repository.getConfig(prefixedKey, default.toString()).toBoolean()
+                core.getBoolean(key, default, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -142,10 +125,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                repository.setConfig(prefixedKey, value.toString())
+                core.putBoolean(key, value, prefsType)
             }
         } catch (e: Exception) {
             Logger.w("StorageManager", "写入布尔值失败，键: $key", e)
@@ -165,12 +147,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                for ((key, value) in values) {
-                    val prefixedKey = getPrefixedKey(key, prefsType)
-                    repository.setConfig(prefixedKey, value.toString())
-                }
+                core.putBooleans(values, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -198,10 +177,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): Int =
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                repository.getConfig(prefixedKey, default.toString()).toInt()
+                core.getInt(key, default, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -229,10 +207,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                repository.setConfig(prefixedKey, value.toString())
+                core.putInt(key, value, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -260,10 +237,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): Float =
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                repository.getConfig(prefixedKey, default.toString()).toFloat()
+                core.getFloat(key, default, prefsType)
             }
         } catch (e: InterruptedException) {
             Logger.w("StorageManager", "获取浮点数时线程被中断，键: $key", e)
@@ -289,10 +265,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                repository.setConfig(prefixedKey, value.toString())
+                core.putFloat(key, value, prefsType)
             }
         } catch (e: InterruptedException) {
             Logger.w("StorageManager", "写入浮点数时线程被中断，键: $key", e)
@@ -318,10 +293,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): Long =
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                repository.getConfig(prefixedKey, default.toString()).toLong()
+                core.getLong(key, default, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -349,10 +323,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                repository.setConfig(prefixedKey, value.toString())
+                core.putLong(key, value, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -377,12 +350,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                for ((key, value) in values) {
-                    val prefixedKey = getPrefixedKey(key, prefsType)
-                    repository.setConfig(prefixedKey, value)
-                }
+                core.putStrings(values, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -407,12 +377,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                for ((key, value) in values) {
-                    val prefixedKey = getPrefixedKey(key, prefsType)
-                    repository.setConfig(prefixedKey, value.toString())
-                }
+                core.putInts(values, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -440,15 +407,10 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): Set<String> =
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
-            val json =
-                runBlocking {
-                    repository.getConfig(prefixedKey, "[]")
-                }
-            val gson = Gson()
-            val type = TypeToken.getParameterized(Set::class.java, String::class.java).type
-            gson.fromJson(json, type) ?: default
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
+            runBlocking {
+                core.getStringSet(key, default, prefsType)
+            }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "获取字符串集合时线程被中断，键: $key", e)
@@ -475,12 +437,9 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val gson = Gson()
-            val json = gson.toJson(value)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             runBlocking {
-                repository.setConfig(prefixedKey, json)
+                core.putStringSet(key, value, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -505,11 +464,10 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val prefixedKey = getPrefixedKey(key, prefsType)
-            val repository = DatabaseRepository.getInstance(context)
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
             // Room中没有直接删除的方法，我们可以设置为空字符串表示删除
             runBlocking {
-                repository.setConfig(prefixedKey, "")
+                core.remove(key, prefsType)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -558,33 +516,9 @@ object StorageManager {
         try {
             // 使用 fromVersion 参数以避免编译时的未使用参数警告，并记录调用意图
             fromVersion // 显式读取参数，确保不会被诊断为未使用
-            // Logger.d("StorageManager", "migrateData 被调用: fromVersion=${_from}, toVersion=$toVersion")
-
-            val repository = DatabaseRepository.getInstance(context)
-            val currentVersion =
-                runBlocking {
-                    repository.getConfig("general_data_version", "0").toInt()
-                }
-
-            if (currentVersion < toVersion) {
-                // 执行数据迁移逻辑
-                Logger.i("StorageManager", "正在迁移数据: 从 v$currentVersion 到 v$toVersion")
-
-                // 示例迁移：重命名键
-                if (currentVersion < 1) {
-                    // 迁移逻辑示例
-                    val oldValue = getString(context, "old_key")
-                    if (oldValue.isNotEmpty()) {
-                        putString(context, "new_key", oldValue)
-                        remove(context, "old_key")
-                    }
-                }
-
-                // 更新版本号
-                runBlocking {
-                    repository.setConfig("general_data_version", toVersion.toString())
-                }
-                Logger.i("StorageManager", "数据迁移完成")
+            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
+            runBlocking {
+                core.migrateData(toVersion)
             }
         } catch (e: InterruptedException) {
             // 处理线程中断，记录日志但不抛出异常
@@ -594,22 +528,5 @@ object StorageManager {
         } catch (e: Exception) {
             Logger.e("StorageManager", "数据迁移失败", e)
         }
-    }
-
-    /**
-     * 偏好集合类型枚举：用于区分不同用途的 Room 数据库存储。
-     */
-    enum class PrefsType {
-        /** 通用偏好（应用范围） */
-        GENERAL,
-
-        /** 设备相关偏好 */
-        DEVICE,
-
-        /** 过滤器相关偏好 */
-        FILTER,
-
-        /** Scrcpy 模块偏好 */
-        SCRCPY,
     }
 }
