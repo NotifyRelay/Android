@@ -89,8 +89,8 @@ object PersistenceManager {
     /**
      * 获取本地设备的 UUID。
      *
-     * @param context 用于访问 StorageManager 的 Context
+     * @param context 用于访问文件目录的 Context
      * @return 本地设备的 UUID，若不存在则返回空字符串
      */
-    fun getLocalDeviceUuid(context: Context): String = StorageManager.getString(context, DEVICE_UUID_KEY, prefsType = StorageManager.PrefsType.GENERAL)
+    fun getLocalDeviceUuid(context: Context): String = Storage.getString(DEVICE_UUID_KEY, prefsType = Storage.PrefsType.GENERAL)
 }

@@ -43,7 +43,7 @@ object Storage {
     /** 存储后端是否已初始化。 */
     fun isInitialized(): Boolean = repository != null
 
-    private fun core(): StorageManagerCore = StorageManagerCore(repository ?: error("存储层未初始化：请先调用 Storage.initialize(repository)"))
+    private fun core(): StorageCore = StorageCore(repository ?: error("存储层未初始化：请先调用 Storage.initialize(repository)"))
 
     /** 读取字符串值，键不存在时返回 [default]。 */
     fun getString(

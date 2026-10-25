@@ -4,12 +4,12 @@ import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.shared.log.Logger
 
 /**
- * StorageManager 的业务核心（commonMain）。
+ * 存储业务核心（commonMain）。
  *
  * 仅依赖 [DatabaseRepository] 与 shared 模块的 Logger；
- * Context 获取、阻塞调用与线程中断适配由 androidMain 的 StorageManager 门面负责。
+ * Context 获取、阻塞调用与线程中断适配由平台侧的 Storage 入口负责。
  */
-class StorageManagerCore(
+class StorageCore(
     private val repository: DatabaseRepository,
 ) {
     /**
@@ -226,6 +226,6 @@ class StorageManagerCore(
     }
 
     companion object {
-        private const val TAG = "StorageManager"
+        private const val TAG = "Storage"
     }
 }

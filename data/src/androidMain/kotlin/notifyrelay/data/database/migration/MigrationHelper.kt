@@ -6,7 +6,7 @@ import com.google.gson.reflect.TypeToken
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.Logger
 import notifyrelay.data.PersistenceManager
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.data.database.dao.AppDao
 import notifyrelay.data.database.dao.AppDeviceDao
 import notifyrelay.data.database.dao.NotificationRecordDao
@@ -229,12 +229,12 @@ object MigrationHelper {
         }
 
         // 标记迁移完成
-        StorageManager.putBoolean(context, "migration_completed", true)
+        Storage.putBoolean("migration_completed", true)
         // Logger.d("MigrationHelper", "清理旧存储文件完成")
     }
 
     /**
      * 检查是否需要迁移
      */
-    fun shouldMigrate(context: Context): Boolean = !StorageManager.getBoolean(context, "migration_completed", false)
+    fun shouldMigrate(context: Context): Boolean = !Storage.getBoolean("migration_completed", false)
 }

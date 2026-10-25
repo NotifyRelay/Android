@@ -5,7 +5,7 @@ import androidx.room.PrimaryKey
 
 /**
  * 应用配置实体类
- * 对应原StorageManager中的PREFS_GENERAL和部分设备配置
+ * 对应键值配置表中的通用与设备偏好项
  */
 @Entity(tableName = "app_config")
 data class AppConfigEntity(
