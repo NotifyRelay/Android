@@ -24,8 +24,8 @@ import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.devtools.NotificationFieldDumpPage
 import notifyrelay.base.util.IntentUtils
-import notifyrelay.base.util.Logger
 import notifyrelay.data.Storage
+import notifyrelay.shared.log.Logger
 import top.yukonga.miuix.kmp.basic.DropdownEntry
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.preference.ArrowPreference

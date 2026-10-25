@@ -17,8 +17,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.log.Logger
 import org.json.JSONObject
 import java.io.ByteArrayOutputStream
 

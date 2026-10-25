@@ -18,8 +18,8 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.shared.log.Logger
 
 class AudioRelayPlayer(
     private val context: Context,

@@ -4,8 +4,8 @@ import android.content.Context
 import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAuthTablePort
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.SendGateway
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.shared.log.Logger
 import org.json.JSONObject
 
 /**

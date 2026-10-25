@@ -3,9 +3,9 @@ package com.xzyht.notifyrelay.feature.device.service.system
 import android.content.Context
 import android.util.Base64
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import notifyrelay.base.util.Logger
 import notifyrelay.data.Storage
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.log.Logger
 
 /**
  * 旧平台存储 → Rust 私有库的一次性迁移。

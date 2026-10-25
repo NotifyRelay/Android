@@ -26,9 +26,9 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.pages.superisland.SuperIslandHistoryListBlock
 import com.xzyht.notifyrelay.ui.viewmodel.SuperIslandHistoryViewModel
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.Storage
+import notifyrelay.shared.log.Logger
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
 import top.yukonga.miuix.kmp.basic.Scaffold

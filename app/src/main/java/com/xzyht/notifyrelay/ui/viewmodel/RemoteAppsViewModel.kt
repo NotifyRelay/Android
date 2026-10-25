@@ -17,7 +17,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 远程设备应用列表的 ViewModel。

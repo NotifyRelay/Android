@@ -4,7 +4,7 @@ import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAuthTablePort
 import com.xzyht.notifyrelay.feature.device.service.contract.DeviceQueryPort
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 发送网关（抽取自 [MessageSender]）。

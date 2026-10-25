@@ -10,7 +10,7 @@ import github.xzynine.superislandui.floating.smallisland.right.BComponent
 import github.xzynine.superislandui.floating.smallisland.right.BSameWidthDigitInfo
 import github.xzynine.superislandui.floating.smallisland.right.bPicKey
 import github.xzynine.superislandui.model.core.ParamV2
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 非媒体类型复刻通知构建。

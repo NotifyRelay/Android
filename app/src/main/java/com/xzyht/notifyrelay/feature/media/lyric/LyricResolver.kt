@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.media.lyric
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.os.Handler
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 import java.util.concurrent.ConcurrentHashMap
 
 /**

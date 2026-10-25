@@ -31,10 +31,10 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import notifyrelay.base.util.AppListHelper
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.Storage
 import notifyrelay.shared.SuperIslandStorageKeys
+import notifyrelay.shared.log.Logger
 
 class NotifyRelayNotificationListenerService : NotificationListenerService() {
     companion object {

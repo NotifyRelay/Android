@@ -8,9 +8,9 @@ import com.xzyht.notifyrelay.feature.device.model.NotificationTextReader
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import notifyrelay.base.util.Logger
 import notifyrelay.data.database.entity.FilterEntryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.log.Logger
 
 /**
  * 后端本机通知过滤器

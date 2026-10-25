@@ -1,7 +1,7 @@
 package notifyrelay.data.config
 
 import android.content.Context
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 import java.io.File
 
 object DeviceInfoManager {

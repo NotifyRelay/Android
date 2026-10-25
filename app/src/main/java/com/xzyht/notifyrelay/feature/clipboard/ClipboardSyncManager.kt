@@ -14,10 +14,10 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.log.Logger
 import org.json.JSONArray
 import org.json.JSONObject
 

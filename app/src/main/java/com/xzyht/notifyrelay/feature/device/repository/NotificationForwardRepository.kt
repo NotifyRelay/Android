@@ -5,8 +5,8 @@ import androidx.compose.runtime.MutableState
 import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
 import kotlinx.coroutines.delay
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.toBitmapOrDefault
+import notifyrelay.shared.log.Logger
 
 // 延迟去重缓存（10秒内）
 // private val dedupCache = mutableListOf<Triple<String, String, Long>>() // title, text, time

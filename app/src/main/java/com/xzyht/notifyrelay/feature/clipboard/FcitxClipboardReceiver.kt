@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 class FcitxClipboardReceiver : BroadcastReceiver() {
     companion object {

@@ -17,9 +17,9 @@ import com.xzyht.notifyrelay.ui.navigation.rememberNavigator
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.config.DeviceInfoManager
+import notifyrelay.shared.log.Logger
 
 class MainActivity : FragmentActivity() {
     internal val showAutoStartBanner = mutableStateOf(false)

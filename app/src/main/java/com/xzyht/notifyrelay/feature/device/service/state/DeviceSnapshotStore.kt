@@ -8,7 +8,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 import org.json.JSONArray
 
 /**

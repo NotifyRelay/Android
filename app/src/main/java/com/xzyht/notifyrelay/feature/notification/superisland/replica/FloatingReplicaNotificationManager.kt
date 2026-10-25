@@ -14,7 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 object FloatingReplicaNotificationManager {
     private const val TAG = "超级岛通知管理"

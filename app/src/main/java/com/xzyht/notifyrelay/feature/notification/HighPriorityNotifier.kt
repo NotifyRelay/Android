@@ -6,7 +6,7 @@ import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Color
 import android.os.Handler
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 本地高优先级悬浮通知（抽取自 [com.xzyht.notifyrelay.sync.MessageSender]）。

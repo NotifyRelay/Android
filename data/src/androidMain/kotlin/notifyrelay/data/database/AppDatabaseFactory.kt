@@ -12,9 +12,9 @@ import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
 import notifyrelay.data.database.migration.MigrationHelper
 import notifyrelay.shared.config.FilterConfigDefaults
+import notifyrelay.shared.log.Logger
 
 /**
  * AppDatabase 的 Android 侧构建入口

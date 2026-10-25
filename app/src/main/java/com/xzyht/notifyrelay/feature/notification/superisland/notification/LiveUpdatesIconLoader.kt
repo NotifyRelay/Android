@@ -12,8 +12,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.log.Logger
 
 /**
  * 超级岛进度通知的图标加载器。

@@ -16,7 +16,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandS
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 超级岛三通道共享的「展示一跳」。

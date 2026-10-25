@@ -12,8 +12,8 @@ import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecordDto
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.AppListHelper
-import notifyrelay.base.util.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.log.Logger
 
 /**
  * 通知历史仓库（原 NotificationData.kt）。

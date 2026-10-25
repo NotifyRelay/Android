@@ -2,10 +2,10 @@ package com.xzyht.notifyrelay.feature.notification.superisland.config
 
 import android.content.Context
 import notifyrelay.base.util.DeviceUtils
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.Storage
+import notifyrelay.shared.log.Logger
 
 /**
  * 超级岛配置工具类：**只做纯配置读写与推导**。

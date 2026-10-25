@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.device.model
 import android.app.Notification
 import android.os.Bundle
 import android.service.notification.StatusBarNotification
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 通知文本 / 验证码读取工具。

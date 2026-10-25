@@ -1,8 +1,8 @@
 package com.xzyht.notifyrelay.feature.device.model
 
 import android.content.Context
-import notifyrelay.base.util.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.log.Logger
 
 /**
  * 缓存清理 + 历史老化清理单元。

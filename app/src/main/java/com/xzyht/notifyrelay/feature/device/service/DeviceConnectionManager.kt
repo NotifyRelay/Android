@@ -37,8 +37,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.BatteryUtils
 import notifyrelay.base.util.DeviceUtils
-import notifyrelay.base.util.Logger
 import notifyrelay.data.Storage
+import notifyrelay.shared.log.Logger
 
 // =================== 设备连接管理器主类 ===================
 class DeviceConnectionManager(

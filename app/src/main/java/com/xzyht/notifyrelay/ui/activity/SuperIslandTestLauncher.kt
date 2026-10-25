@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.ui.activity
 import android.app.Activity
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.ui.dialog.triggerSuperIslandTestSample
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 超级岛测试样本的调试入口。

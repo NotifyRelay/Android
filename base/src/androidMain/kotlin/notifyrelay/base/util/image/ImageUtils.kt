@@ -14,7 +14,7 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 import notifyrelay.shared.util.ColorUtils
 import notifyrelay.shared.util.DataUrlUtils
 import notifyrelay.shared.util.TextUtils

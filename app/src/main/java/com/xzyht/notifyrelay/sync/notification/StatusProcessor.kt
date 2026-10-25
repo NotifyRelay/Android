@@ -6,8 +6,8 @@ import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.shared.log.Logger
 import org.json.JSONObject
 
 /**

@@ -16,8 +16,8 @@ import com.xzyht.notifyrelay.ui.viewmodel.AppsState
 import com.xzyht.notifyrelay.ui.viewmodel.LocalAppInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.toBitmapOrDefault
+import notifyrelay.shared.log.Logger
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text

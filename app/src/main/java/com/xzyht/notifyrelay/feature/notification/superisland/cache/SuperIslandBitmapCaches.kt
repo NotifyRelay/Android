@@ -4,7 +4,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveU
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.ReplicaIconCache
 import com.xzyht.notifyrelay.ui.pages.superisland.SuperIslandImageCache
 import github.xzynine.superislandui.common.BitmapUtils
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 超级岛位图与图标缓存的统一回收入口。

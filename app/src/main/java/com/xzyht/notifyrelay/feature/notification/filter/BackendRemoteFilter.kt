@@ -9,7 +9,7 @@ import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 import notifyrelay.shared.util.TextUtils
 import org.json.JSONObject
 

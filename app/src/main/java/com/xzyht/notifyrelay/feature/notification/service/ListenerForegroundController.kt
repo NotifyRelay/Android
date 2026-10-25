@@ -18,7 +18,7 @@ import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncReceiver
 import com.xzyht.notifyrelay.feature.device.service.contract.DeviceDiscoveryPort
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.list.SuperIslandListManager
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 通知监听服务的前台常驻通知与 WakeLock 控制器。

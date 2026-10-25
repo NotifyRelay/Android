@@ -5,7 +5,7 @@ import android.content.Intent
 import androidx.core.content.FileProvider
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 import java.io.File
 
 /**

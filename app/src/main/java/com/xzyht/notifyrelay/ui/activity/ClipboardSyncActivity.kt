@@ -8,7 +8,7 @@ import androidx.appcompat.app.AppCompatActivity
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.device.service.contract.DeviceQueryPort
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 透明Activity，用于解决Android 10+的剪贴板访问限制

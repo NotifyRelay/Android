@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.device.receiver
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 class RemoteNotificationClickReceiver : BroadcastReceiver() {
     override fun onReceive(

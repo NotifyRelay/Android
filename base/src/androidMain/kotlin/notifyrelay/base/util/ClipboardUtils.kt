@@ -3,6 +3,7 @@ package notifyrelay.base.util
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
+import notifyrelay.shared.log.Logger
 
 /**
  * 剪贴板工具类

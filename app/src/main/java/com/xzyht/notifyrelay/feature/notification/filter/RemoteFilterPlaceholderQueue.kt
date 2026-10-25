@@ -1,6 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.filter
 
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 import notifyrelay.shared.util.TextUtils
 
 /**

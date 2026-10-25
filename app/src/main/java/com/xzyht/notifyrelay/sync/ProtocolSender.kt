@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.sync
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAuthTablePort
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 统一加密发送器

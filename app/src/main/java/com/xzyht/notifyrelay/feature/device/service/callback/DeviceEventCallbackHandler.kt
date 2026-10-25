@@ -1,6 +1,6 @@
 package com.xzyht.notifyrelay.feature.device.service.callback
 
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 设备生命周期与状态查询类回调处理器：

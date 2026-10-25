@@ -11,8 +11,8 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import github.xzynine.superislandui.model.components.MediaSessionData
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
-import notifyrelay.base.util.Logger
 import notifyrelay.data.Storage
+import notifyrelay.shared.log.Logger
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 

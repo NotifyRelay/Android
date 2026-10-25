@@ -8,8 +8,8 @@ import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslan
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.ui.pages.formatTimestamp
 import notifyrelay.base.util.ClipboardUtils
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.shared.log.Logger
 
 internal fun buildEntryCopyText(
     entry: SuperIslandHistoryStoreEntry,

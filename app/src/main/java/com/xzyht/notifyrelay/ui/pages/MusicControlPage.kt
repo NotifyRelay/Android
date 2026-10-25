@@ -25,9 +25,9 @@ import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import com.xzyht.notifyrelay.ui.common.MiuixSpinnerPreference
 import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.Storage
+import notifyrelay.shared.log.Logger
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.SwitchPreference

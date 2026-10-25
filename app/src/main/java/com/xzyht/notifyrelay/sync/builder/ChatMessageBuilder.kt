@@ -5,7 +5,7 @@ import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.contract.DeviceMessagePort
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.sync.SendGateway
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 import org.json.JSONException
 import org.json.JSONObject
 

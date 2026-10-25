@@ -9,7 +9,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.intent.Notificatio
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.CancellationException
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 通知生成器，负责处理超级岛通知的生成和注入

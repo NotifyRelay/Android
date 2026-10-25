@@ -1,6 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.replica
 
-import notifyrelay.base.util.Logger
+import notifyrelay.shared.log.Logger
 
 /**
  * 超级岛复刻包的统一异常吞没包装。

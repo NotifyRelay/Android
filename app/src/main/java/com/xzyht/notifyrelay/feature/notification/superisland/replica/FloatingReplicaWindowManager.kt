@@ -19,8 +19,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.IntentUtils
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.shared.log.Logger
 import java.lang.ref.WeakReference
 
 object FloatingReplicaWindowManager {

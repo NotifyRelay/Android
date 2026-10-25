@@ -23,8 +23,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.ClipboardUtils
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.shared.log.Logger
 
 /**
  * @param record 供通知历史页卡片展示的记录。
