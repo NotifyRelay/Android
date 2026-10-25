@@ -1,60 +1,43 @@
 package notifyrelay.data
 
-import notifyrelay.data.database.repository.DatabaseRepositoryBase
+import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.shared.log.Logger
-
-/**
- * 偏好集合类型枚举：用于区分不同用途的 Room 数据库存储。
- */
-enum class PrefsType {
-    /** 通用偏好（应用范围） */
-    GENERAL,
-
-    /** 设备相关偏好 */
-    DEVICE,
-
-    /** 过滤器相关偏好 */
-    FILTER,
-
-    /** Scrcpy 模块偏好 */
-    SCRCPY,
-}
 
 /**
  * StorageManager 的业务核心（commonMain）。
  *
- * 仅依赖 [DatabaseRepositoryBase] 与 shared 模块的 Logger；
+ * 仅依赖 [DatabaseRepository] 与 shared 模块的 Logger；
  * Context 获取、阻塞调用与线程中断适配由 androidMain 的 StorageManager 门面负责。
  */
 class StorageManagerCore(
-    private val repository: DatabaseRepositoryBase,
+    private val repository: DatabaseRepository,
 ) {
     /**
-     * 根据 [PrefsType] 为键名添加前缀，避免不同类型的偏好键名冲突。
+     * 根据 [Storage.PrefsType] 为键名添加前缀，避免不同类型的偏好键名冲突。
      */
     private fun getPrefixedKey(
         key: String,
-        prefsType: PrefsType,
+        prefsType: Storage.PrefsType,
     ): String =
         when (prefsType) {
-            PrefsType.GENERAL -> "general_$key"
-            PrefsType.DEVICE -> "device_$key"
-            PrefsType.FILTER -> "filter_$key"
-            PrefsType.SCRCPY -> "scrcpy_$key"
+            Storage.PrefsType.GENERAL -> "general_$key"
+            Storage.PrefsType.DEVICE -> "device_$key"
+            Storage.PrefsType.FILTER -> "filter_$key"
+            Storage.PrefsType.SCRCPY -> "scrcpy_$key"
         }
 
     /** 读取字符串值，键不存在时返回 [default]。 */
     suspend fun getString(
         key: String,
         default: String = "",
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ): String = repository.getConfig(getPrefixedKey(key, prefsType), default)
 
     /** 写入字符串值。 */
     suspend fun putString(
         key: String,
         value: String,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ) {
         repository.setConfig(getPrefixedKey(key, prefsType), value)
     }
@@ -63,14 +46,14 @@ class StorageManagerCore(
     suspend fun getBoolean(
         key: String,
         default: Boolean = false,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ): Boolean = repository.getConfig(getPrefixedKey(key, prefsType), default.toString()).toBoolean()
 
     /** 写入布尔值。 */
     suspend fun putBoolean(
         key: String,
         value: Boolean,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ) {
         repository.setConfig(getPrefixedKey(key, prefsType), value.toString())
     }
@@ -78,7 +61,7 @@ class StorageManagerCore(
     /** 批量写入布尔值。 */
     suspend fun putBooleans(
         values: Map<String, Boolean>,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ) {
         for ((key, value) in values) {
             repository.setConfig(getPrefixedKey(key, prefsType), value.toString())
@@ -89,14 +72,14 @@ class StorageManagerCore(
     suspend fun getInt(
         key: String,
         default: Int = 0,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ): Int = repository.getConfig(getPrefixedKey(key, prefsType), default.toString()).toInt()
 
     /** 写入整数。 */
     suspend fun putInt(
         key: String,
         value: Int,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ) {
         repository.setConfig(getPrefixedKey(key, prefsType), value.toString())
     }
@@ -105,14 +88,14 @@ class StorageManagerCore(
     suspend fun getFloat(
         key: String,
         default: Float = 0f,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ): Float = repository.getConfig(getPrefixedKey(key, prefsType), default.toString()).toFloat()
 
     /** 写入浮点数。 */
     suspend fun putFloat(
         key: String,
         value: Float,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ) {
         repository.setConfig(getPrefixedKey(key, prefsType), value.toString())
     }
@@ -121,14 +104,14 @@ class StorageManagerCore(
     suspend fun getLong(
         key: String,
         default: Long = 0L,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ): Long = repository.getConfig(getPrefixedKey(key, prefsType), default.toString()).toLong()
 
     /** 写入长整数。 */
     suspend fun putLong(
         key: String,
         value: Long,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ) {
         repository.setConfig(getPrefixedKey(key, prefsType), value.toString())
     }
@@ -136,7 +119,7 @@ class StorageManagerCore(
     /** 批量写入字符串键值对。 */
     suspend fun putStrings(
         values: Map<String, String>,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ) {
         for ((key, value) in values) {
             repository.setConfig(getPrefixedKey(key, prefsType), value)
@@ -146,7 +129,7 @@ class StorageManagerCore(
     /** 批量写入整数键值对。 */
     suspend fun putInts(
         values: Map<String, Int>,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ) {
         for ((key, value) in values) {
             repository.setConfig(getPrefixedKey(key, prefsType), value.toString())
@@ -160,7 +143,7 @@ class StorageManagerCore(
     suspend fun getStringSet(
         key: String,
         default: Set<String> = emptySet(),
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ): Set<String> {
         val json = repository.getConfig(getPrefixedKey(key, prefsType), "[]")
         // 解析失败时由 androidMain 门面的异常分支记录日志并返回 default，与历史 Gson 解析异常行为一致
@@ -171,7 +154,7 @@ class StorageManagerCore(
     suspend fun putStringSet(
         key: String,
         value: Set<String>,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ) {
         repository.setConfig(getPrefixedKey(key, prefsType), StringSetJsonCodec.encode(value))
     }
@@ -179,7 +162,7 @@ class StorageManagerCore(
     /** 移除指定键（写入空字符串表示删除）。 */
     suspend fun remove(
         key: String,
-        prefsType: PrefsType = PrefsType.GENERAL,
+        prefsType: Storage.PrefsType = Storage.PrefsType.GENERAL,
     ) {
         repository.setConfig(getPrefixedKey(key, prefsType), "")
     }

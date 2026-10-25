@@ -27,7 +27,7 @@ import com.xzyht.notifyrelay.ui.common.MiuixSpinnerPreference
 import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -54,13 +54,13 @@ fun MusicControlPage() {
     }
 
     // 胶囊歌词开关状态
-    var capsuleLyricsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "capsule_lyrics_enabled")) }
+    var capsuleLyricsEnabled by remember { mutableStateOf(Storage.getBoolean("capsule_lyrics_enabled")) }
 
     // 发送媒体通知到对端
-    var sendMediaNotificationsEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, "send_media_notifications_enabled", true)) }
+    var sendMediaNotificationsEnabled by remember { mutableStateOf(Storage.getBoolean("send_media_notifications_enabled", true)) }
 
     // 音频转发方式（0: scrcpy, 1: 中继）
-    var audioRelayMode by remember { mutableStateOf(StorageManager.getInt(context, "audio_relay_mode", 0)) }
+    var audioRelayMode by remember { mutableStateOf(Storage.getInt("audio_relay_mode", 0)) }
 
     Column(
         modifier =
@@ -121,7 +121,7 @@ fun MusicControlPage() {
                     try {
                         val deviceManager = DeviceConnectionManagerSingleton.getDeviceSend(context)
                         val audioRelay = DeviceConnectionManagerSingleton.getAudioRelay(context)
-                        val relayMode = StorageManager.getInt(context, "audio_relay_mode", 0)
+                        val relayMode = Storage.getInt("audio_relay_mode", 0)
 
                         if (relayMode == 1) {
                             // 中继模式：先请求 MediaProjection 授权，再启动发送
@@ -154,7 +154,7 @@ fun MusicControlPage() {
                     }
 
                     try {
-                        val relayMode = StorageManager.getInt(context, "audio_relay_mode", 0)
+                        val relayMode = Storage.getInt("audio_relay_mode", 0)
 
                         if (relayMode == 1) {
                             // 中继模式：通过控制器启动接收（设置 currentRemoteUuid、注册停止广播并显示中继前台通知）
@@ -214,7 +214,7 @@ fun MusicControlPage() {
             selectedIndex = audioRelayMode,
             onSelectedIndexChange = { index ->
                 audioRelayMode = index
-                StorageManager.putInt(context, "audio_relay_mode", index)
+                Storage.putInt("audio_relay_mode", index)
             },
         )
 
@@ -252,7 +252,7 @@ fun MusicControlPage() {
             checked = capsuleLyricsEnabled,
             onCheckedChange = { enabled ->
                 capsuleLyricsEnabled = enabled
-                StorageManager.putBoolean(context, "capsule_lyrics_enabled", enabled)
+                Storage.putBoolean("capsule_lyrics_enabled", enabled)
             },
         )
 
@@ -263,12 +263,12 @@ fun MusicControlPage() {
             checked = sendMediaNotificationsEnabled,
             onCheckedChange = { enabled ->
                 sendMediaNotificationsEnabled = enabled
-                StorageManager.putBoolean(context, "send_media_notifications_enabled", enabled)
+                Storage.putBoolean("send_media_notifications_enabled", enabled)
             },
         )
 
         // 歌词分割模式设置
-        var lyricsSplitMode by remember { mutableStateOf(StorageManager.getInt(context, "lyrics_split_mode", 0)) }
+        var lyricsSplitMode by remember { mutableStateOf(Storage.getInt("lyrics_split_mode", 0)) }
 
         MiuixSpinnerPreference(
             title = "歌词分割模式",
@@ -282,7 +282,7 @@ fun MusicControlPage() {
             selectedIndex = lyricsSplitMode,
             onSelectedIndexChange = { index ->
                 lyricsSplitMode = index
-                StorageManager.putInt(context, "lyrics_split_mode", index)
+                Storage.putInt("lyrics_split_mode", index)
             },
         )
 

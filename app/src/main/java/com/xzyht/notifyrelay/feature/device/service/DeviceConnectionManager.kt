@@ -38,7 +38,7 @@ import kotlinx.coroutines.launch
 import notifyrelay.base.util.BatteryUtils
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 
 // =================== 设备连接管理器主类 ===================
 class DeviceConnectionManager(
@@ -322,9 +322,9 @@ class DeviceConnectionManager(
 
     // UI全局开关：是否启用设备发现，使用内存缓存避免频繁数据库访问
     override var discoveryEnabled: Boolean
-        get() = StorageManager.getBoolean(context, UDP_DISCOVERY_ENABLED_KEY, true)
+        get() = Storage.getBoolean(UDP_DISCOVERY_ENABLED_KEY, true)
         set(value) {
-            StorageManager.putBoolean(context, UDP_DISCOVERY_ENABLED_KEY, value)
+            Storage.putBoolean(UDP_DISCOVERY_ENABLED_KEY, value)
         }
 
     init {
@@ -334,8 +334,8 @@ class DeviceConnectionManager(
         val legacyUuid = rustSession.readLegacyUuid()
         uuid = legacyUuid
         // 兼容旧用户：首次运行时如无保存则默认true
-        if (!StorageManager.getBoolean(context, UDP_DISCOVERY_ENABLED_KEY, true)) {
-            StorageManager.putBoolean(context, UDP_DISCOVERY_ENABLED_KEY, true)
+        if (!Storage.getBoolean(UDP_DISCOVERY_ENABLED_KEY, true)) {
+            Storage.putBoolean(UDP_DISCOVERY_ENABLED_KEY, true)
         }
 
         // 初始化 Rust 上下文、密钥与回调（持久化由 Rust 私有库管理）

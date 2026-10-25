@@ -43,7 +43,7 @@ import kotlinx.coroutines.launch
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.base.util.image.toBitmapOrDefault
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
@@ -74,10 +74,10 @@ fun UIAbout() {
     var hasUpdate by remember { mutableStateOf(false) }
     var allReleases by remember { mutableStateOf<List<ReleaseInfo>>(emptyList()) }
     var includePrerelease by remember {
-        mutableStateOf(StorageManager.getBoolean(context, "check_update_include_prerelease", false))
+        mutableStateOf(Storage.getBoolean("check_update_include_prerelease", false))
     }
     var proxyUrl by remember {
-        mutableStateOf(StorageManager.getString(context, PROXY_URL_KEY, DEFAULT_PROXY_URL))
+        mutableStateOf(Storage.getString(PROXY_URL_KEY, DEFAULT_PROXY_URL))
     }
 
     val checkUpdateManager = remember { CheckUpdateManager(context.applicationContext) }
@@ -86,7 +86,7 @@ fun UIAbout() {
         snapshotFlow { proxyUrl }
             .debounce(SAVE_DEBOUNCE_MS.milliseconds)
             .onEach { url ->
-                StorageManager.putString(context, PROXY_URL_KEY, url)
+                Storage.putString(PROXY_URL_KEY, url)
             }.launchIn(this)
     }
 
@@ -148,7 +148,7 @@ fun UIAbout() {
                     ToastUtils.showShortToast(context, "再点击 ${5 - clickCount} 次进入开发者模式")
                 } else if (clickCount >= 5) {
                     ToastUtils.showShortToast(context, "开发者模式已激活")
-                    StorageManager.putBoolean(context, "developer_mode_enabled", true)
+                    Storage.putBoolean("developer_mode_enabled", true)
                     clickCount = 0
                 }
             },
@@ -236,7 +236,7 @@ fun UIAbout() {
             summary = "检测更新时包含预发布版本(极其不稳定)",
             onCheckedChange = {
                 includePrerelease = it
-                StorageManager.putBoolean(context, "check_update_include_prerelease", it)
+                Storage.putBoolean("check_update_include_prerelease", it)
             },
             modifier = Modifier.padding(horizontal = 16.dp),
         )

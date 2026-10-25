@@ -58,7 +58,7 @@ class PairedDeviceRemover(
                 // 先完成数据库清理（可等待）：迁移残留行与 deleteHistory=true 的通知/关联数据全部成功后，
                 // 才移除内存记录与快照投影，避免 db 失败时内存已删但库未同步（重启后经旧行复活）
                 try {
-                    val repository = DatabaseRepository.getInstance(context)
+                    val repository = DatabaseRepository.getInstance()
                     repository.deleteDeviceMigrationByUuid(uuid)
                     if (deleteHistory) {
                         repository.deleteNotificationsByDevice(uuid)

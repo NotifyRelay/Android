@@ -122,7 +122,7 @@ class SuperIslandHistoryViewModel(
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(SuperIslandHistoryViewModel::class.java)) {
-                val repository = DatabaseRepository.getInstance(application)
+                val repository = DatabaseRepository.getInstance()
                 @Suppress("UNCHECKED_CAST")
                 return SuperIslandHistoryViewModel(application, repository) as T
             }

@@ -19,7 +19,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.shared.config.FilterConfigDefaults
 import org.json.JSONObject
@@ -125,11 +125,11 @@ object SuperIslandProcessor {
                     ""
                 }
 
-            val mirrorFilterEnabled = StorageManager.getBoolean(context, SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, true)
+            val mirrorFilterEnabled = Storage.getBoolean(SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, true)
             if (mirrorFilterEnabled) {
                 val isMirrorEnabled =
                     runBlocking(Dispatchers.IO) {
-                        val repo = DatabaseRepository.getInstance(context)
+                        val repo = DatabaseRepository.getInstance()
                         val all = repo.getAllMirrorFilterPackages()
                         val entry = all.find { it.packageName == mappedPkg }
                         when {

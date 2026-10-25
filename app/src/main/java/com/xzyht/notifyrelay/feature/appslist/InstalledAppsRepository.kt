@@ -107,22 +107,22 @@ internal object InstalledAppsRepository {
                 // 因为 saveApps 使用 OnConflictStrategy.REPLACE，会先删除再插入，触发外键级联删除
                 val existingRemoteAssociations =
                     DatabaseRepository
-                        .getInstance(context)
+                        .getInstance()
                         .getAllAppDeviceAssociations()
                         .first()
                         .filter { it.sourceDevice != "local" }
 
-                DatabaseRepository.getInstance(context).saveApps(appEntities)
+                DatabaseRepository.getInstance().saveApps(appEntities)
 
                 // 重新保存远程设备的应用关联（本机的关联会在后面重新创建）
                 if (existingRemoteAssociations.isNotEmpty()) {
-                    DatabaseRepository.getInstance(context).saveAppDeviceAssociations(existingRemoteAssociations)
+                    DatabaseRepository.getInstance().saveAppDeviceAssociations(existingRemoteAssociations)
                 }
             }
 
             // 批量保存应用设备关联到数据库
             if (appDeviceEntities.isNotEmpty()) {
-                DatabaseRepository.getInstance(context).saveAppDeviceAssociations(appDeviceEntities)
+                DatabaseRepository.getInstance().saveAppDeviceAssociations(appDeviceEntities)
             }
 
             // Logger.d(TAG, "应用列表加载成功，共 ${apps.size} 个应用")
@@ -178,7 +178,7 @@ internal object InstalledAppsRepository {
         val installedPackages = getInstalledPackageNames(context)
         val cachedIconPackages = mutableSetOf<String>()
         // 从数据库获取所有应用包名
-        val apps = DatabaseRepository.getInstance(context).getAllApps().first()
+        val apps = DatabaseRepository.getInstance().getAllApps().first()
         apps.forEach {
             cachedIconPackages.add(it.packageName)
         }

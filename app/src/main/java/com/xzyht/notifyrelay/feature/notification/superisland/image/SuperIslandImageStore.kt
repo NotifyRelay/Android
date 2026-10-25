@@ -13,7 +13,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import notifyrelay.base.util.image.ImageUtils
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.shared.util.sha256
@@ -45,7 +45,7 @@ object SuperIslandImageStore {
     ): Map<String, String> {
         if (input.isNullOrEmpty()) return emptyMap()
         ensureMigrated(context)
-        val repo = DatabaseRepository.getInstance(context)
+        val repo = DatabaseRepository.getInstance()
         val normalizedPackage = normalizePackageName(packageName)
         val now = System.currentTimeMillis()
         for ((key, value) in input) {
@@ -63,7 +63,7 @@ object SuperIslandImageStore {
     ): Map<String, String> {
         if (input.isNullOrEmpty()) return emptyMap()
         ensureMigrated(context)
-        val repo = DatabaseRepository.getInstance(context)
+        val repo = DatabaseRepository.getInstance()
         val normalizedPackage = normalizePackageName(packageName)
         val now = System.currentTimeMillis()
         val out = mutableMapOf<String, String>()
@@ -84,7 +84,7 @@ object SuperIslandImageStore {
     ): Map<String, String> {
         if (picMap.isNullOrEmpty()) return emptyMap()
         ensureMigrated(context)
-        val repo = DatabaseRepository.getInstance(context)
+        val repo = DatabaseRepository.getInstance()
         val out = mutableMapOf<String, String>()
         for ((key, value) in picMap) {
             if (value.isBlank()) continue
@@ -106,7 +106,7 @@ object SuperIslandImageStore {
         val imageId = resolveId(value) ?: return value
         if (imageId <= 0 || context == null) return value
         ensureMigrated(context)
-        return DatabaseRepository.getInstance(context).resolveSuperIslandImageById(imageId) ?: value
+        return DatabaseRepository.getInstance().resolveSuperIslandImageById(imageId) ?: value
     }
 
     /**
@@ -155,12 +155,12 @@ object SuperIslandImageStore {
         maxAgeDays: Int = 30,
     ) {
         ensureMigrated(context)
-        DatabaseRepository.getInstance(context).pruneSuperIslandImages(maxEntries, maxAgeDays)
+        DatabaseRepository.getInstance().pruneSuperIslandImages(maxEntries, maxAgeDays)
     }
 
     suspend fun clearAll(context: Context) {
         ensureMigrated(context)
-        DatabaseRepository.getInstance(context).clearSuperIslandImages()
+        DatabaseRepository.getInstance().clearSuperIslandImages()
     }
 
     private fun normalizePackageName(packageName: String?): String {
@@ -169,11 +169,11 @@ object SuperIslandImageStore {
     }
 
     private suspend fun ensureMigrated(context: Context) {
-        if (StorageManager.getBoolean(context, MIGRATION_FLAG_KEY, false)) return
+        if (Storage.getBoolean(MIGRATION_FLAG_KEY, false)) return
 
         val deferredToAwait: Deferred<Unit>? =
             migrationMutex.withLock {
-                if (StorageManager.getBoolean(context, MIGRATION_FLAG_KEY, false)) return@withLock null
+                if (Storage.getBoolean(MIGRATION_FLAG_KEY, false)) return@withLock null
 
                 migrationDeferred?.let { return@withLock it }
 
@@ -181,7 +181,7 @@ object SuperIslandImageStore {
                     .async {
                         try {
                             migrateLegacyData(context)
-                            StorageManager.putBoolean(context, MIGRATION_FLAG_KEY, true)
+                            Storage.putBoolean(MIGRATION_FLAG_KEY, true)
                         } catch (_: Exception) {
                             migrationMutex.withLock {
                                 migrationDeferred = null
@@ -195,7 +195,7 @@ object SuperIslandImageStore {
 
     private suspend fun migrateLegacyData(context: Context) {
         val legacyImages = readLegacyImageStore(context)
-        val repo = DatabaseRepository.getInstance(context)
+        val repo = DatabaseRepository.getInstance()
         val now = System.currentTimeMillis()
 
         for ((hash, data) in legacyImages) {

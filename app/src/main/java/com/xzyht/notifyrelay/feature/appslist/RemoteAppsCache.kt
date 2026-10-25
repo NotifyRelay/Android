@@ -32,7 +32,7 @@ internal object RemoteAppsCache {
 
         apps.forEach { (packageName, appName) ->
             // 检查应用是否已存在
-            val existingApp = DatabaseRepository.getInstance(context).getAppByPackageName(packageName)
+            val existingApp = DatabaseRepository.getInstance().getAppByPackageName(packageName)
             val appEntity =
                 if (existingApp != null) {
                     // 更新现有应用
@@ -65,10 +65,10 @@ internal object RemoteAppsCache {
 
         // 保存到数据库
         if (appEntities.isNotEmpty()) {
-            DatabaseRepository.getInstance(context).saveApps(appEntities)
+            DatabaseRepository.getInstance().saveApps(appEntities)
         }
         if (appDeviceEntities.isNotEmpty()) {
-            DatabaseRepository.getInstance(context).saveAppDeviceAssociations(appDeviceEntities)
+            DatabaseRepository.getInstance().saveAppDeviceAssociations(appDeviceEntities)
         }
         // Logger.d(TAG, "缓存远程应用列表成功，共 ${apps.size} 个应用")
     }
@@ -84,10 +84,10 @@ internal object RemoteAppsCache {
         context: Context,
         deviceUuid: String,
     ): List<RemoteAppInfo> {
-        val appDevices = DatabaseRepository.getInstance(context).getAppDevicesByDeviceUuid(deviceUuid).first()
+        val appDevices = DatabaseRepository.getInstance().getAppDevicesByDeviceUuid(deviceUuid).first()
         val packageNames = appDevices.map { it.packageName }.distinct()
         if (packageNames.isEmpty()) return emptyList()
-        val apps = DatabaseRepository.getInstance(context).getAppsByPackageNames(packageNames)
+        val apps = DatabaseRepository.getInstance().getAppsByPackageNames(packageNames)
         return apps
             .map { entity ->
                 RemoteAppInfo(

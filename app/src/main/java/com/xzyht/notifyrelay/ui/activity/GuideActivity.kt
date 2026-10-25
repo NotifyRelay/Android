@@ -19,7 +19,7 @@ import notifyrelay.base.util.GuidePermissionRequester
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ThemeSettingsManager
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 
 class GuideActivity : ComponentActivity() {
     private val permissionRequester =
@@ -30,7 +30,7 @@ class GuideActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val isFirstLaunch = StorageManager.getBoolean(this, "isFirstLaunch", true, StorageManager.PrefsType.GENERAL)
+        val isFirstLaunch = Storage.getBoolean("isFirstLaunch", true, Storage.PrefsType.GENERAL)
         val fromInternal = intent.getBooleanExtra("fromInternal", false)
         val fromftp = intent.getBooleanExtra("fromftp", false)
         val reauthExtra = intent.getBooleanExtra("reauth", false)
@@ -41,11 +41,10 @@ class GuideActivity : ComponentActivity() {
         // 读取上次已同意的权限集合，与当前声明的权限集合做差集，得到「本次更新新增、需重新同意」的权限。
         val declaredPermissions = PermissionHelper.getApplicableDeclaredPermissions(this)
         val agreedPermissions =
-            StorageManager.getStringSet(
-                this,
+            Storage.getStringSet(
                 "agreedManifestPermissions",
                 emptySet(),
-                StorageManager.PrefsType.GENERAL,
+                Storage.PrefsType.GENERAL,
             )
         val newPermissions = declaredPermissions - agreedPermissions
 
@@ -111,13 +110,12 @@ class GuideActivity : ComponentActivity() {
                     },
                     onContinue = {
                         // 首次启动后标记为已启动
-                        StorageManager.putBoolean(this@GuideActivity, "isFirstLaunch", false, StorageManager.PrefsType.GENERAL)
+                        Storage.putBoolean("isFirstLaunch", false, Storage.PrefsType.GENERAL)
                         // 记录当前已声明的权限集合，作为「已同意」基线，供后续版本更新比对新增权限。
-                        StorageManager.putStringSet(
-                            this@GuideActivity,
+                        Storage.putStringSet(
                             "agreedManifestPermissions",
                             declaredPermissions,
-                            StorageManager.PrefsType.GENERAL,
+                            Storage.PrefsType.GENERAL,
                         )
 
                         if (fromftp) {

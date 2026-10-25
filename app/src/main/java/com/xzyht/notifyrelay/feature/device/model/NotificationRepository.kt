@@ -135,7 +135,7 @@ object NotificationRepository {
             Logger.i("秩序之光 狂鼠 NotifyRelay", "写入远端历史 device=$device, size=${oldList.size}")
 
             // 限制每个包名的通知数量为80
-            val repository = DatabaseRepository.getInstance(context)
+            val repository = DatabaseRepository.getInstance()
             runBlocking {
                 repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
             }
@@ -227,7 +227,7 @@ object NotificationRepository {
             // 原有唯一调用方（NotifyRelayNotificationListenerService.commitToHistoryAndForward）本身
             // 已捕获并记录本方法的异常，故此处置为记录后继续，实际对外行为不变。
             try {
-                val repository = DatabaseRepository.getInstance(context)
+                val repository = DatabaseRepository.getInstance()
                 runBlocking {
                     repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
                 }

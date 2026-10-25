@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.device.service.state
 import android.content.Context
 import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.model.DeviceSnapshot
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyPreferenceKeys
 import notifyrelay.data.model.OnlineDeviceInfo
 
@@ -41,11 +41,10 @@ class OnlineDevicesCache(
 
             // 只有当内容实际变化时才执行存储和快捷方式更新
             if (json == lastCacheJson) return
-            StorageManager.putString(
-                context,
+            Storage.putString(
                 ScrcpyPreferenceKeys.ONLINE_DEVICES_CACHE,
                 json,
-                StorageManager.PrefsType.SCRCPY,
+                Storage.PrefsType.SCRCPY,
             )
             try {
                 io.github.miuzarte.scrcpyforandroid.services.DynamicShortcutManager

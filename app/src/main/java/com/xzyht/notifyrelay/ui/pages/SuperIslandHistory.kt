@@ -28,7 +28,7 @@ import com.xzyht.notifyrelay.ui.pages.superisland.SuperIslandHistoryListBlock
 import com.xzyht.notifyrelay.ui.viewmodel.SuperIslandHistoryViewModel
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -40,7 +40,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun UISuperIslandHistory() {
     val context = LocalContext.current
-    var includeImageDataOnCopy by remember { mutableStateOf(StorageManager.getBoolean(context, "superisland_copy_image_data", false)) }
+    var includeImageDataOnCopy by remember { mutableStateOf(Storage.getBoolean("superisland_copy_image_data", false)) }
 
     val viewModel: SuperIslandHistoryViewModel =
         viewModel(
@@ -120,7 +120,7 @@ fun UISuperIslandHistory() {
                     checked = includeImageDataOnCopy,
                     onCheckedChange = {
                         includeImageDataOnCopy = it
-                        StorageManager.putBoolean(context, "superisland_copy_image_data", it)
+                        Storage.putBoolean("superisland_copy_image_data", it)
                     },
                     modifier = Modifier.padding(bottom = 8.dp),
                 )

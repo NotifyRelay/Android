@@ -47,7 +47,7 @@ internal object NotificationCacheCleaner {
     ) {
         try {
             Logger.i("NotifyRelay", "开始清理历史通知")
-            val repository = DatabaseRepository.getInstance(context)
+            val repository = DatabaseRepository.getInstance()
 
             // 获取所有设备的列表
             val devices = deviceList

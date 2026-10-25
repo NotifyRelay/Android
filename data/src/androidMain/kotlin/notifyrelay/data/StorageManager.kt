@@ -1,33 +1,23 @@
 package notifyrelay.data
 
 import android.content.Context
-import kotlinx.coroutines.runBlocking
-import notifyrelay.base.util.Logger
-import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.log.Logger
 
 /**
- * StorageManager 是一个用于统一管理应用配置的工具单例，现在使用Room数据库存储。
+ * 兼容外壳：保留带 [Context] 形参的旧存储入口（供 :scrcpy 等既有调用方使用）。
  *
- * 它将偏好设置按用途分为三类：通用（GENERAL）、设备（DEVICE）和过滤器（FILTER），
- * 并提供了一系列便捷的读写方法（支持字符串、布尔、整数、长整数、字符串集合以及批量写入）。
- * 所有方法内部均包含异常保护，避免因异常导致应用崩溃。
- *
- * 本类为 Android 侧门面：Context 获取、runBlocking 阻塞与线程中断适配在此完成，
- * 业务逻辑位于 commonMain 的 StorageManagerCore。
+ * 业务实现位于 commonMain 的 [Storage]；本对象只负责「用 Context 确保数据层已初始化」并转发调用。
+ * 新代码请直接使用 [Storage]（无 Context）。
  */
 object StorageManager {
-    /** 偏好集合类型，与 commonMain 的 [notifyrelay.data.PrefsType] 为同一类型 */
-    typealias PrefsType = notifyrelay.data.PrefsType
+    /** 偏好集合类型，与 [Storage.PrefsType] 为同一类型。 */
+    typealias PrefsType = Storage.PrefsType
 
-    /**
-     * 从Room数据库中读取字符串值，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param default 值不存在时返回的默认字符串，默认空字符串。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     * @return 存储的字符串，若出现异常或值为 null 则返回 [default]。
-     */
+    private fun ensureInitialized(context: Context) {
+        DataLayerAndroid.ensureInitialized(context)
+    }
+
+    /** 读取字符串值，键不存在时返回 [default]。 */
     fun getString(
         context: Context,
         key: String,
@@ -35,14 +25,10 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): String =
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.getString(key, default, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.getString(key, default, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "获取字符串时线程被中断，键: $key", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
             default
         } catch (e: Exception) {
@@ -50,14 +36,7 @@ object StorageManager {
             default
         }
 
-    /**
-     * 将字符串写入Room数据库，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param value 要写入的字符串值。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     */
+    /** 写入字符串值。 */
     fun putString(
         context: Context,
         key: String,
@@ -65,29 +44,17 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.putString(key, value, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.putString(key, value, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "写入字符串时线程被中断，键: $key", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
         } catch (e: Exception) {
             Logger.w("StorageManager", "写入字符串失败，键: $key", e)
         }
     }
 
-    /**
-     * 从Room数据库中读取布尔值，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param default 键不存在时返回的默认值，默认为 false。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     * @return 存储的布尔值，若出现异常则返回 [default]。
-     */
+    /** 读取布尔值，键不存在时返回 [default]。 */
     fun getBoolean(
         context: Context,
         key: String,
@@ -95,14 +62,10 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): Boolean =
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.getBoolean(key, default, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.getBoolean(key, default, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "获取布尔值时线程被中断，键: $key", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
             default
         } catch (e: Exception) {
@@ -110,14 +73,7 @@ object StorageManager {
             default
         }
 
-    /**
-     * 将布尔值写入Room数据库，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param value 要写入的布尔值。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     */
+    /** 写入布尔值。 */
     fun putBoolean(
         context: Context,
         key: String,
@@ -125,51 +81,34 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.putBoolean(key, value, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.putBoolean(key, value, prefsType)
+        } catch (e: InterruptedException) {
+            Logger.w("StorageManager", "写入布尔值时线程被中断，键: $key", e)
+            Thread.currentThread().interrupt()
         } catch (e: Exception) {
             Logger.w("StorageManager", "写入布尔值失败，键: $key", e)
         }
     }
 
-    /**
-     * 批量写入布尔值到Room数据库。
-     *
-     * @param context 任意 Context 实例。
-     * @param values 要写入的键值对集合。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     */
+    /** 批量写入布尔值。 */
     fun putBooleans(
         context: Context,
         values: Map<String, Boolean>,
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.putBooleans(values, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.putBooleans(values, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "批量写入布尔值时线程被中断", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
         } catch (e: Exception) {
             Logger.w("StorageManager", "批量写入布尔值失败", e)
         }
     }
 
-    /**
-     * 从Room数据库中读取整数，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param default 键不存在时返回的默认值，默认为 0。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     * @return 存储的整数，若出现异常则返回 [default]。
-     */
+    /** 读取整数，键不存在时返回 [default]。 */
     fun getInt(
         context: Context,
         key: String,
@@ -177,14 +116,10 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): Int =
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.getInt(key, default, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.getInt(key, default, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "获取整数时线程被中断，键: $key", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
             default
         } catch (e: Exception) {
@@ -192,14 +127,7 @@ object StorageManager {
             default
         }
 
-    /**
-     * 将整数写入Room数据库，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param value 要写入的整数值。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     */
+    /** 写入整数。 */
     fun putInt(
         context: Context,
         key: String,
@@ -207,29 +135,17 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.putInt(key, value, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.putInt(key, value, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "写入整数时线程被中断，键: $key", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
         } catch (e: Exception) {
             Logger.w("StorageManager", "写入整数失败，键: $key", e)
         }
     }
 
-    /**
-     * 从Room数据库中读取浮点数（Float），带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param default 键不存在时返回的默认值，默认为 0f。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     * @return 存储的浮点数，若出现异常则返回 [default]。
-     */
+    /** 读取浮点数，键不存在时返回 [default]。 */
     fun getFloat(
         context: Context,
         key: String,
@@ -237,10 +153,8 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): Float =
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.getFloat(key, default, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.getFloat(key, default, prefsType)
         } catch (e: InterruptedException) {
             Logger.w("StorageManager", "获取浮点数时线程被中断，键: $key", e)
             Thread.currentThread().interrupt()
@@ -250,14 +164,7 @@ object StorageManager {
             default
         }
 
-    /**
-     * 将浮点数（Float）写入Room数据库，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param value 要写入的浮点数值。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     */
+    /** 写入浮点数。 */
     fun putFloat(
         context: Context,
         key: String,
@@ -265,10 +172,8 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.putFloat(key, value, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.putFloat(key, value, prefsType)
         } catch (e: InterruptedException) {
             Logger.w("StorageManager", "写入浮点数时线程被中断，键: $key", e)
             Thread.currentThread().interrupt()
@@ -277,15 +182,7 @@ object StorageManager {
         }
     }
 
-    /**
-     * 从Room数据库中读取长整数（Long），带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param default 键不存在时返回的默认值，默认为 0L。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     * @return 存储的长整数，若出现异常则返回 [default]。
-     */
+    /** 读取长整数，键不存在时返回 [default]。 */
     fun getLong(
         context: Context,
         key: String,
@@ -293,14 +190,10 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): Long =
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.getLong(key, default, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.getLong(key, default, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "获取长整数时线程被中断，键: $key", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
             default
         } catch (e: Exception) {
@@ -308,14 +201,7 @@ object StorageManager {
             default
         }
 
-    /**
-     * 将长整数（Long）写入Room数据库，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param value 要写入的长整数值。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     */
+    /** 写入长整数。 */
     fun putLong(
         context: Context,
         key: String,
@@ -323,83 +209,51 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.putLong(key, value, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.putLong(key, value, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "写入长整数时线程被中断，键: $key", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
         } catch (e: Exception) {
             Logger.w("StorageManager", "写入长整数失败，键: $key", e)
         }
     }
 
-    /**
-     * 批量写入字符串键值对到Room数据库。
-     *
-     * @param context 任意 Context 实例。
-     * @param values 要写入的字符串键值对集合。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     */
+    /** 批量写入字符串键值对。 */
     fun putStrings(
         context: Context,
         values: Map<String, String>,
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.putStrings(values, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.putStrings(values, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "批量写入字符串时线程被中断", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
         } catch (e: Exception) {
             Logger.w("StorageManager", "批量写入字符串失败", e)
         }
     }
 
-    /**
-     * 批量写入整数键值对到Room数据库。
-     *
-     * @param context 任意 Context 实例。
-     * @param values 要写入的整数键值对集合。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     */
+    /** 批量写入整数键值对。 */
     fun putInts(
         context: Context,
         values: Map<String, Int>,
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.putInts(values, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.putInts(values, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "批量写入整数时线程被中断", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
         } catch (e: Exception) {
             Logger.w("StorageManager", "批量写入整数失败", e)
         }
     }
 
-    /**
-     * 从Room数据库中读取字符串集合，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param default 键不存在时返回的默认集合，默认为空集合。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     * @return 存储的字符串集合，若出现异常或为 null 则返回 [default]。
-     */
+    /** 读取字符串集合，键不存在或内容无法解析时返回 [default]。 */
     fun getStringSet(
         context: Context,
         key: String,
@@ -407,14 +261,10 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ): Set<String> =
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.getStringSet(key, default, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.getStringSet(key, default, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "获取字符串集合时线程被中断，键: $key", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
             default
         } catch (e: Exception) {
@@ -422,14 +272,7 @@ object StorageManager {
             default
         }
 
-    /**
-     * 将字符串集合写入Room数据库，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 键名。
-     * @param value 要写入的字符串集合。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     */
+    /** 写入字符串集合（JSON 数组字符串，与历史 Gson 输出一致）。 */
     fun putStringSet(
         context: Context,
         key: String,
@@ -437,76 +280,46 @@ object StorageManager {
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.putStringSet(key, value, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.putStringSet(key, value, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "写入字符串集合时线程被中断，键: $key", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
         } catch (e: Exception) {
             Logger.w("StorageManager", "写入字符串集合失败，键: $key", e)
         }
     }
 
-    /**
-     * 从Room数据库中移除指定键，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param key 要移除的键名。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     */
+    /** 移除指定键。 */
     fun remove(
         context: Context,
         key: String,
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            // Room中没有直接删除的方法，我们可以设置为空字符串表示删除
-            runBlocking {
-                core.remove(key, prefsType)
-            }
+            ensureInitialized(context)
+            Storage.remove(key, prefsType)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.w("StorageManager", "移除键时线程被中断，键: $key", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
         } catch (e: Exception) {
             Logger.w("StorageManager", "移除键失败: $key", e)
         }
     }
 
-    /**
-     * 清空指定偏好集合中的所有键值对，带异常保护。
-     *
-     * @param context 任意 Context 实例。
-     * @param prefsType 指定使用哪个偏好集合，默认 [PrefsType.GENERAL]。
-     */
+    /** 清空指定偏好集合（当前后端不支持，记录告警）。 */
     fun clear(
         context: Context,
         prefsType: PrefsType = PrefsType.GENERAL,
     ) {
         try {
-            // 目前不支持清空整个集合，因为Room中没有批量删除的方法
-            Logger.w("StorageManager", "clear方法目前不支持，因为Room中没有批量删除的方法")
+            Storage.clear(prefsType)
         } catch (e: Exception) {
             Logger.w("StorageManager", "清空偏好失败", e)
         }
     }
 
-    /**
-     * 执行偏好数据的迁移操作。此方法会读取当前存储的版本号，若低于目标版本则按需执行迁移逻辑并更新版本号。
-     * 该方法内部包含异常保护，迁移失败会写入错误日志，但不抛出异常。
-     *
-     * 示例：当当前版本 < 1 时，会把键 "old_key" 的值迁移到 "new_key" 并移除旧键。
-     *
-     * @param context 任意 Context 实例。
-     * @param fromVersion 当前代码的起始版本（通常用于决定执行哪些迁移步骤）。
-     * @param toVersion 目标版本号，迁移完成后会写入到偏好中作为当前版本。
-     */
+    /** 执行偏好数据迁移。 */
     @Suppress("UNUSED_PARAMETER")
     fun migrateData(
         context: Context,
@@ -514,16 +327,11 @@ object StorageManager {
         toVersion: Int,
     ) {
         try {
-            // 使用 fromVersion 参数以避免编译时的未使用参数警告，并记录调用意图
-            fromVersion // 显式读取参数，确保不会被诊断为未使用
-            val core = StorageManagerCore(DatabaseRepository.getInstance(context))
-            runBlocking {
-                core.migrateData(toVersion)
-            }
+            fromVersion // 显式读取参数，保持既有告警口径
+            ensureInitialized(context)
+            Storage.migrateData(fromVersion, toVersion)
         } catch (e: InterruptedException) {
-            // 处理线程中断，记录日志但不抛出异常
             Logger.e("StorageManager", "数据迁移时线程被中断", e)
-            // 恢复中断状态
             Thread.currentThread().interrupt()
         } catch (e: Exception) {
             Logger.e("StorageManager", "数据迁移失败", e)

@@ -25,7 +25,7 @@ import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyPreferenceKeys
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -255,11 +255,10 @@ internal fun GuideScrcpyPage(
                     Intent.FLAG_GRANT_READ_URI_PERMISSION,
                 )
                 val uriString = uri.toString()
-                StorageManager.putString(
-                    context,
+                Storage.putString(
                     ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
                     uriString,
-                    StorageManager.PrefsType.SCRCPY,
+                    Storage.PrefsType.SCRCPY,
                 )
                 val app = context.applicationContext as android.app.Application
                 ScrcpyUiViewModel.getInstance(app).customServerUri = uriString

@@ -12,7 +12,7 @@ import androidx.core.graphics.drawable.toBitmap
 import github.xzynine.superislandui.model.core.SuperIslandData
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.image.ImageUtils
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.shared.SuperIslandStorageKeys
 import notifyrelay.shared.log.Logger
 
@@ -32,7 +32,7 @@ object SuperIslandManager {
      */
     private fun isEnabled(context: Context): Boolean =
         try {
-            StorageManager.getBoolean(context, STORAGE_KEY, true)
+            Storage.getBoolean(STORAGE_KEY, true)
         } catch (_: Exception) {
             true
         }

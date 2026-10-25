@@ -33,7 +33,7 @@ object SuperIslandHistoryStore {
         context: Context,
         id: Long,
     ): SuperIslandHistoryStoreEntry? {
-        val repo = DatabaseRepository.getInstance(context)
+        val repo = DatabaseRepository.getInstance()
         val entity =
             try {
                 repo.getSuperIslandHistoryById(id)
@@ -79,7 +79,7 @@ object SuperIslandHistoryStore {
             try {
                 val boundPicMap = SuperIslandImageStore.bindAll(context, packageName, entry.picMap)
                 val sanitizedEntry = entry.copy(picMap = boundPicMap)
-                val repository = DatabaseRepository.getInstance(context)
+                val repository = DatabaseRepository.getInstance()
                 val entity =
                     SuperIslandHistoryEntity(
                         id = sanitizedEntry.id,
@@ -105,7 +105,7 @@ object SuperIslandHistoryStore {
     fun clearAll(context: Context) {
         CoroutineScope(Dispatchers.IO).launch {
             try {
-                val repository = DatabaseRepository.getInstance(context)
+                val repository = DatabaseRepository.getInstance()
                 repository.clearSuperIslandHistory()
             } catch (_: Exception) {
             }

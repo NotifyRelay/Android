@@ -5,7 +5,7 @@ import com.xzyht.notifyrelay.feature.device.service.callback.DeviceCallbackHost
 import com.xzyht.notifyrelay.feature.device.service.callback.RustCallbackInstaller
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**
@@ -79,7 +79,7 @@ class RustCoreSession(
         host: DeviceCallbackHost,
         legacyUuid: String,
     ): InitResult {
-        val legacyStateEnc = StorageManager.getString(context, PREF_LEGACY_STATE)
+        val legacyStateEnc = Storage.getString(PREF_LEGACY_STATE)
         var localUuid = legacyUuid
         var pubKey = ""
         try {
@@ -175,5 +175,5 @@ class RustCoreSession(
         }
 
     /** 旧平台 uuid 的 SP 键（供调用方读取迁移种子）。 */
-    fun readLegacyUuid(): String = StorageManager.getString(context, PREF_LEGACY_UUID)
+    fun readLegacyUuid(): String = Storage.getString(PREF_LEGACY_UUID)
 }

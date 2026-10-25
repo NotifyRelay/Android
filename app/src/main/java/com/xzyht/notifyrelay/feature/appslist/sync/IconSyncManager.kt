@@ -51,7 +51,7 @@ object IconSyncManager {
         }
         val appDeviceUuids =
             runBlocking {
-                val databaseRepository = DatabaseRepository.getInstance(context)
+                val databaseRepository = DatabaseRepository.getInstance()
                 val appDevices = databaseRepository.getAppDevicesByPackageName(packageName).first()
                 appDevices.map { appDevice -> appDevice.sourceDevice }
             }
@@ -79,7 +79,7 @@ object IconSyncManager {
             try {
                 requestIconsFromDevice(context, requestJson, deviceManager, sourceDevice)
                 // 请求成功，关联应用包名与当前设备
-                val databaseRepository = DatabaseRepository.getInstance(context)
+                val databaseRepository = DatabaseRepository.getInstance()
                 val appDeviceEntity =
                     AppDeviceEntity(
                         packageName = packageName,
@@ -110,7 +110,7 @@ object IconSyncManager {
         val iconMap = AppIconRepository.getExternalAppIcons(context, packageNames)
         val cachedPackages = packageNames.filter { iconMap[it] != null }
 
-        val databaseRepository = DatabaseRepository.getInstance(context)
+        val databaseRepository = DatabaseRepository.getInstance()
         val appDevices = databaseRepository.getAppDevicesByPackageNames(packageNames)
         val appDeviceMap =
             appDevices
@@ -299,7 +299,7 @@ object IconSyncManager {
                     val missingPkg = missingArray.optString(i)
                     if (missingPkg.isNotEmpty()) {
                         runBlocking {
-                            val databaseRepository = DatabaseRepository.getInstance(context)
+                            val databaseRepository = DatabaseRepository.getInstance()
                             databaseRepository.markAppIconAsMissing(missingPkg)
                         }
                     }

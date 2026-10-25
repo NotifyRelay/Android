@@ -5,7 +5,7 @@ import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 
 /**
  * 超级岛配置工具类：**只做纯配置读写与推导**。
@@ -67,7 +67,7 @@ object SuperIslandConfigUtils {
     /**
      * 检查浮窗功能是否开启
      */
-    fun isFloatingWindowEnabled(context: Context): Boolean = StorageManager.getBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, defaultFloatingWindowEnabled())
+    fun isFloatingWindowEnabled(context: Context): Boolean = Storage.getBoolean(SUPER_ISLAND_FLOATING_WINDOW_KEY, defaultFloatingWindowEnabled())
 
     /** 远端超级岛的展示通道：三者互斥，由浮窗 / 列表两个开关推导。仅本类内部使用。 */
     private enum class DisplayChannel {
@@ -106,9 +106,9 @@ object SuperIslandConfigUtils {
         val previousChannel = resolveDisplayChannel(context)
         // 列表模式是否开启必须在写入浮窗开关**之前**判定：平板默认值由「非浮窗」推导
         val listModeWillClose = enabled && isNotificationListMode(context)
-        StorageManager.putBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, enabled)
+        Storage.putBoolean(SUPER_ISLAND_FLOATING_WINDOW_KEY, enabled)
         if (listModeWillClose) {
-            StorageManager.putBoolean(context, SUPER_ISLAND_NOTIFICATION_LIST_KEY, false)
+            Storage.putBoolean(SUPER_ISLAND_NOTIFICATION_LIST_KEY, false)
         }
         return resolveDisplayChannel(context) != previousChannel
     }
@@ -120,8 +120,7 @@ object SuperIslandConfigUtils {
      */
     fun isNotificationListMode(context: Context): Boolean {
         val defaultListMode = DeviceUtils.isTablet(context) && !isFloatingWindowEnabled(context)
-        return StorageManager.getBoolean(
-            context,
+        return Storage.getBoolean(
             SUPER_ISLAND_NOTIFICATION_LIST_KEY,
             defaultListMode,
         )
@@ -143,9 +142,9 @@ object SuperIslandConfigUtils {
     ): Boolean {
         val previousChannel = resolveDisplayChannel(context)
         if (enabled && isFloatingWindowEnabled(context)) {
-            StorageManager.putBoolean(context, SUPER_ISLAND_FLOATING_WINDOW_KEY, false)
+            Storage.putBoolean(SUPER_ISLAND_FLOATING_WINDOW_KEY, false)
         }
-        StorageManager.putBoolean(context, SUPER_ISLAND_NOTIFICATION_LIST_KEY, enabled)
+        Storage.putBoolean(SUPER_ISLAND_NOTIFICATION_LIST_KEY, enabled)
         return resolveDisplayChannel(context) != previousChannel
     }
 
@@ -166,7 +165,7 @@ object SuperIslandConfigUtils {
      * 关闭时只关闭「展示」：入站解析、远端状态缓存与历史记录照常进行，
      * 由 SuperIslandProcessor 跳过浮窗 / 列表 / 通知的创建。
      */
-    fun isRemoteSuperIslandDisplayEnabled(context: Context): Boolean = StorageManager.getBoolean(context, SUPER_ISLAND_SHOW_KEY, true)
+    fun isRemoteSuperIslandDisplayEnabled(context: Context): Boolean = Storage.getBoolean(SUPER_ISLAND_SHOW_KEY, true)
 
     /**
      * 设置是否显示来自远端的超级岛。
@@ -178,7 +177,7 @@ object SuperIslandConfigUtils {
         context: Context,
         enabled: Boolean,
     ) {
-        StorageManager.putBoolean(context, SUPER_ISLAND_SHOW_KEY, enabled)
+        Storage.putBoolean(SUPER_ISLAND_SHOW_KEY, enabled)
     }
 
     /**
@@ -207,7 +206,7 @@ object SuperIslandConfigUtils {
      * - 存储为显式 SUPER_ISLAND / LIVE_UPDATES / NONE → 保持用户修改
      */
     fun getSpecInjectionMode(context: Context): SpecInjectionMode {
-        val storedCode = StorageManager.getInt(context, SPEC_INJECTION_MODE_KEY, -1)
+        val storedCode = Storage.getInt(SPEC_INJECTION_MODE_KEY, -1)
         // 先解码 NONE：它是独立编码，不得落入下方的历史值判定
         if (storedCode == CODE_NONE) return SpecInjectionMode.NONE
         if (storedCode == -1 || storedCode == LEGACY_BOTH_ORDINAL) {
@@ -238,7 +237,7 @@ object SuperIslandConfigUtils {
                 SpecInjectionMode.LIVE_UPDATES -> CODE_LIVE_UPDATES
                 SpecInjectionMode.NONE -> CODE_NONE
             }
-        StorageManager.putInt(context, SPEC_INJECTION_MODE_KEY, code)
+        Storage.putInt(SPEC_INJECTION_MODE_KEY, code)
     }
 
     /**

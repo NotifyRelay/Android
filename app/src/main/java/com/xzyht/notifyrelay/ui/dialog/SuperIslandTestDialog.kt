@@ -14,7 +14,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.layout.DialogDefaults
@@ -33,7 +33,7 @@ fun SuperIslandTestDialog(
     var isVariableProgress by remember { mutableStateOf(false) }
     // 发送开关状态，从持久化存储中读取
     var isSendEnabled by remember {
-        mutableStateOf(StorageManager.getBoolean(context, "superisland_send_to_other_devices", false))
+        mutableStateOf(Storage.getBoolean("superisland_send_to_other_devices", false))
     }
 
     WindowDialog(show = show.value, modifier = Modifier, title = "超级岛测试", titleColor = DialogDefaults.titleColor(), summary = "点击下方按钮测试不同分支下的超级岛效果", summaryColor = DialogDefaults.summaryColor(), backgroundColor = DialogDefaults.backgroundColor(), enableWindowDim = true, onDismissRequest = { show.value = false }, onDismissFinished = null, outsideMargin = DialogDefaults.outsideMargin, insideMargin = DialogDefaults.insideMargin, defaultWindowInsetsPadding = true, content = {
@@ -59,7 +59,7 @@ fun SuperIslandTestDialog(
                 checked = isSendEnabled,
                 onCheckedChange = {
                     isSendEnabled = it
-                    StorageManager.putBoolean(context, "superisland_send_to_other_devices", it)
+                    Storage.putBoolean("superisland_send_to_other_devices", it)
                 },
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
             )

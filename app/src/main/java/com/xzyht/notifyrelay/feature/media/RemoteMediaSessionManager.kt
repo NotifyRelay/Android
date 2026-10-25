@@ -12,7 +12,7 @@ import com.xzyht.notifyrelay.sync.ProtocolSender
 import github.xzynine.superislandui.model.components.MediaSessionData
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
@@ -95,7 +95,7 @@ object RemoteMediaSessionManager {
     fun getReceiveMode(context: Context): MediaMessageReceiveMode {
         val stored =
             try {
-                StorageManager.getInt(context, KEY_RECEIVE_MODE, -1)
+                Storage.getInt(KEY_RECEIVE_MODE, -1)
             } catch (_: Exception) {
                 -1
             }
@@ -103,7 +103,7 @@ object RemoteMediaSessionManager {
         if (stored == -1) {
             val enabled =
                 try {
-                    StorageManager.getBoolean(context, KEY_ENABLED, DEFAULT_ENABLED)
+                    Storage.getBoolean(KEY_ENABLED, DEFAULT_ENABLED)
                 } catch (_: Exception) {
                     DEFAULT_ENABLED
                 }
@@ -128,8 +128,8 @@ object RemoteMediaSessionManager {
                     MediaMessageReceiveMode.Off -> MODE_OFF
                     MediaMessageReceiveMode.AudioOnly -> MODE_AUDIO_ONLY
                 }
-            StorageManager.putInt(context, KEY_RECEIVE_MODE, value)
-            StorageManager.putBoolean(context, KEY_ENABLED, mode != MediaMessageReceiveMode.Off)
+            Storage.putInt(KEY_RECEIVE_MODE, value)
+            Storage.putBoolean(KEY_ENABLED, mode != MediaMessageReceiveMode.Off)
             isEnabled = mode != MediaMessageReceiveMode.Off
             if (mode == MediaMessageReceiveMode.Off) {
                 clearSession()
@@ -155,7 +155,7 @@ object RemoteMediaSessionManager {
         // 惰性初始化：init() 无外部调用点，首次收到消息时兜底执行，
         // 保证 MediaSessionTimeoutCleaner.bind() 必然触发（host 非空），避免清理链路静默失效。
         // init() 内部操作幂等（设 applicationContext + bind + 读 receiveMode + 日志），重复调用无害。
-        // 刻意放在 handler.post 之外：init() 含 StorageManager 读盘，留在调用方线程可避免主线程 I/O 阻塞；
+        // 刻意放在 handler.post 之外：init() 含 Storage 读盘，留在调用方线程可避免主线程 I/O 阻塞；
         // 代价是两个并发首帧可能各执行一次 init()（幂等，bind 结果相同），故不引入同步。
         if (applicationContext == null) {
             init(context)

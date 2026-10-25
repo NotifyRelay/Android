@@ -182,7 +182,7 @@ class NotificationHistoryViewModel(
     ) : ViewModelProvider.Factory {
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             if (modelClass.isAssignableFrom(NotificationHistoryViewModel::class.java)) {
-                val repository = DatabaseRepository.getInstance(application)
+                val repository = DatabaseRepository.getInstance()
                 @Suppress("UNCHECKED_CAST")
                 return NotificationHistoryViewModel(application, repository) as T
             }

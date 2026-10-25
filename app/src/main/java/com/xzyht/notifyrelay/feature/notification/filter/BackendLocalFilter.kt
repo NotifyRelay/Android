@@ -87,7 +87,7 @@ object BackendLocalFilter {
         enabled: Boolean,
     ) {
         saveLock.withLock {
-            val repo = DatabaseRepository.getInstance(context)
+            val repo = DatabaseRepository.getInstance()
             val rows = repo.getLocalFilterEntries().toMutableList()
             val idx = rows.indexOfFirst { it.keyword == entry.keyword && it.packageName == entry.packageName }
             if (idx >= 0) {
@@ -107,7 +107,7 @@ object BackendLocalFilter {
     ) {
         saveLock.withLock {
             val entry = FilterEntry(keyword.trim(), packageName.trim())
-            val repo = DatabaseRepository.getInstance(context)
+            val repo = DatabaseRepository.getInstance()
             val rows = repo.getLocalFilterEntries().toMutableList()
             if (rows.none { it.keyword == entry.keyword && it.packageName == entry.packageName }) {
                 rows.add(FilterEntryEntity(entry.keyword, entry.packageName, true))
@@ -125,7 +125,7 @@ object BackendLocalFilter {
         // 内置条目不可删除（包括内置文本关键词和默认包名）
         if ((packageName.isBlank() && builtinFilterEntries.any { it.keyword == keyword && it.keyword.isNotBlank() }) || (keyword.isBlank() && builtinFilterEntries.any { it.packageName == packageName && it.packageName.isNotBlank() })) return
         saveLock.withLock {
-            val repo = DatabaseRepository.getInstance(context)
+            val repo = DatabaseRepository.getInstance()
             val rows = repo.getLocalFilterEntries().filterNot { it.keyword == keyword && it.packageName == packageName }
             repo.replaceLocalFilterEntries(rows)
             invalidateCache()
@@ -135,7 +135,7 @@ object BackendLocalFilter {
     private suspend fun rowsCached(context: Context): List<FilterEntryEntity> {
         return saveLock.withLock {
             cachedRows?.let { return@withLock it }
-            val repo = DatabaseRepository.getInstance(context)
+            val repo = DatabaseRepository.getInstance()
             val rows = repo.getLocalFilterEntries()
             if (rows.isEmpty()) {
                 val builtins = builtinFilterEntries.map { FilterEntryEntity(it.keyword, it.packageName, true) }

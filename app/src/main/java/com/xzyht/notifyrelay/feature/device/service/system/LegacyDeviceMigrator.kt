@@ -4,7 +4,7 @@ import android.content.Context
 import android.util.Base64
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.data.database.repository.DatabaseRepository
 
 /**
@@ -37,7 +37,7 @@ object LegacyDeviceMigrator {
     ): String? {
         if (!NativeCore.isReady()) return null
         try {
-            val rows = DatabaseRepository.getInstance(context).queryDeviceMigrationRows()
+            val rows = DatabaseRepository.getInstance().queryDeviceMigrationRows()
             var migratedAny = false
             var migrationFailed = false
             for (row in rows) {
@@ -98,10 +98,10 @@ object LegacyDeviceMigrator {
             }
             // 迁移完成：清理旧平台存储（密钥已由 Rust 私有库持有）
             if (legacyStateEnc.isNotEmpty()) {
-                StorageManager.remove(context, PREF_LEGACY_STATE)
+                Storage.remove(PREF_LEGACY_STATE)
             }
             if (rows.isNotEmpty()) {
-                DatabaseRepository.getInstance(context).dropDeviceMigrationTable()
+                DatabaseRepository.getInstance().dropDeviceMigrationTable()
             }
             if (migratedAny) {
                 Logger.i(TAG, "旧设备数据已迁移至 Rust 持久化")

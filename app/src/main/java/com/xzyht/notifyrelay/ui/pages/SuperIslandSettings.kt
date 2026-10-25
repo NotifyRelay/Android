@@ -33,7 +33,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.shared.SuperIslandStorageKeys
@@ -66,7 +66,7 @@ val specInjectionOptions =
 fun UISuperIslandSettings() {
     val context = LocalContext.current
 
-    var enabled by remember { mutableStateOf(StorageManager.getBoolean(context, SuperIslandStorageKeys.ENABLED, true)) }
+    var enabled by remember { mutableStateOf(Storage.getBoolean(SuperIslandStorageKeys.ENABLED, true)) }
     var showSuperIsland by remember { mutableStateOf(SuperIslandConfigUtils.isRemoteSuperIslandDisplayEnabled(context)) }
     var floatingWindowEnabled by remember { mutableStateOf(SuperIslandConfigUtils.isFloatingWindowEnabled(context)) }
     var notificationListEnabled by remember { mutableStateOf(SuperIslandConfigUtils.isNotificationListMode(context)) }
@@ -74,13 +74,13 @@ fun UISuperIslandSettings() {
     val savedInjectionMode = SuperIslandConfigUtils.getSpecInjectionMode(context)
     var specInjectionMode by remember { mutableStateOf(savedInjectionMode) }
 
-    val hasFloatingWindowSetting = StorageManager.getString(context, SuperIslandConfigUtils.SUPER_ISLAND_FLOATING_WINDOW_KEY, "") != ""
+    val hasFloatingWindowSetting = Storage.getString(SuperIslandConfigUtils.SUPER_ISLAND_FLOATING_WINDOW_KEY, "") != ""
 
     val defaultFloatingWindowEnabled = SuperIslandConfigUtils.defaultFloatingWindowEnabled()
 
     val showTestDialog = remember { mutableStateOf(false) }
 
-    var mirrorFilterEnabled by remember { mutableStateOf(StorageManager.getBoolean(context, SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, true)) }
+    var mirrorFilterEnabled by remember { mutableStateOf(Storage.getBoolean(SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, true)) }
     var customPackages by remember { mutableStateOf<List<SuperIslandMirrorFilterEntity>>(emptyList()) }
     var showAppPicker by remember { mutableStateOf(false) }
     var showCustomPkgInput by remember { mutableStateOf(false) }
@@ -99,7 +99,7 @@ fun UISuperIslandSettings() {
         }
 
     suspend fun loadCustomPackages() {
-        val repo = DatabaseRepository.getInstance(context)
+        val repo = DatabaseRepository.getInstance()
         customPackages =
             withContext(Dispatchers.IO) {
                 repo.getAllMirrorFilterPackages()
@@ -128,7 +128,7 @@ fun UISuperIslandSettings() {
                 checked = enabled,
                 onCheckedChange = {
                     enabled = it
-                    StorageManager.putBoolean(context, SuperIslandStorageKeys.ENABLED, it)
+                    Storage.putBoolean(SuperIslandStorageKeys.ENABLED, it)
                 },
             )
 
@@ -209,7 +209,7 @@ fun UISuperIslandSettings() {
                 checked = mirrorFilterEnabled,
                 onCheckedChange = {
                     mirrorFilterEnabled = it
-                    StorageManager.putBoolean(context, SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, it)
+                    Storage.putBoolean(SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, it)
                 },
             )
 
@@ -242,7 +242,7 @@ fun UISuperIslandSettings() {
                     checked = isEnabled,
                     onCheckedChange = { v ->
                         kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                            DatabaseRepository.getInstance(context).upsertMirrorFilterPackage(
+                            DatabaseRepository.getInstance().upsertMirrorFilterPackage(
                                 SuperIslandMirrorFilterEntity(pkg, enabled = v),
                             )
                             withContext(Dispatchers.Main) {
@@ -285,7 +285,7 @@ fun UISuperIslandSettings() {
                         onCheckedChange = { v ->
                             pkgEnabled = v
                             kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                                DatabaseRepository.getInstance(context).setMirrorFilterEnabled(pkg, v)
+                                DatabaseRepository.getInstance().setMirrorFilterEnabled(pkg, v)
                             }
                         },
                         startAction = {
@@ -300,7 +300,7 @@ fun UISuperIslandSettings() {
                         endActions = {
                             IconButton(onClick = {
                                 kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                                    DatabaseRepository.getInstance(context).deleteMirrorFilterPackage(pkg)
+                                    DatabaseRepository.getInstance().deleteMirrorFilterPackage(pkg)
                                     withContext(Dispatchers.Main) {
                                         loadCustomPackages()
                                     }
@@ -339,7 +339,7 @@ fun UISuperIslandSettings() {
             onAppSelected = { pkg ->
                 showAppPicker = false
                 kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                    DatabaseRepository.getInstance(context).upsertMirrorFilterPackage(
+                    DatabaseRepository.getInstance().upsertMirrorFilterPackage(
                         SuperIslandMirrorFilterEntity(pkg, enabled = true),
                     )
                     withContext(Dispatchers.Main) {

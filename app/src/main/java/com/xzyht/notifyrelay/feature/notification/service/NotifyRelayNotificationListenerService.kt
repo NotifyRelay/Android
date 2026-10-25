@@ -33,7 +33,7 @@ import kotlinx.coroutines.sync.withLock
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.shared.SuperIslandStorageKeys
 
 class NotifyRelayNotificationListenerService : NotificationListenerService() {
@@ -577,7 +577,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         defaultValue: Boolean,
     ): Boolean =
         try {
-            StorageManager.getBoolean(applicationContext, key, defaultValue)
+            Storage.getBoolean(key, defaultValue)
         } catch (_: Exception) {
             defaultValue
         }

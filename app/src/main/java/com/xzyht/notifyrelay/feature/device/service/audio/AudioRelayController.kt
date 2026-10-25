@@ -14,7 +14,7 @@ import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundServ
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyDefaults
 
 /**
@@ -136,7 +136,7 @@ class AudioRelayController(
      */
     fun handleAudioRequest(remoteUuid: String) {
         val device = resolveDeviceInfo(remoteUuid) ?: return
-        val relayMode = StorageManager.getInt(context, "audio_relay_mode", 0)
+        val relayMode = Storage.getInt("audio_relay_mode", 0)
         if (relayMode == RELAY_MODE) {
             pendingSend = PendingSend(device.ip, device.displayName, remoteUuid)
             onRequestMediaProjection?.invoke()

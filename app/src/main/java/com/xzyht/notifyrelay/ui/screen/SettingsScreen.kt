@@ -33,7 +33,7 @@ import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyPreferenceKeys
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -49,7 +49,7 @@ fun SettingsScreen() {
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
     var isDeveloperModeEnabled by remember {
-        mutableStateOf(StorageManager.getBoolean(context, "developer_mode_enabled", false))
+        mutableStateOf(Storage.getBoolean("developer_mode_enabled", false))
     }
 
     // 问题 7 修复：开发者模式入口在"关于"子页激活后返回时不会刷新。
@@ -57,7 +57,7 @@ fun SettingsScreen() {
     // 不改变 Activity lifecycle）下无效。改用 LaunchedEffect 监听 backStack.size：
     // 从"关于"返回时栈大小变小，触发重新读取 developer_mode_enabled。
     LaunchedEffect(navigator.backStack.size) {
-        isDeveloperModeEnabled = StorageManager.getBoolean(context, "developer_mode_enabled", false)
+        isDeveloperModeEnabled = Storage.getBoolean("developer_mode_enabled", false)
     }
 
     Column(
@@ -170,11 +170,10 @@ fun SettingsScrcpyScreen() {
             }
             runCatching {
                 val uriString = uri.toString()
-                StorageManager.putString(
-                    context,
+                Storage.putString(
                     ScrcpyPreferenceKeys.CUSTOM_SERVER_URI,
                     uriString,
-                    StorageManager.PrefsType.SCRCPY,
+                    Storage.PrefsType.SCRCPY,
                 )
                 val app = context.applicationContext as android.app.Application
                 ScrcpyUiViewModel.getInstance(app).customServerUri = uriString

@@ -172,7 +172,7 @@ object AppListSyncManager {
                     RemoteAppsCache.cacheRemoteAppList(context, appsMap, deviceUuid)
 
                     // 关联应用包名与设备（替代原 associateAppsWithDevice 方法）
-                    val databaseRepository = DatabaseRepository.getInstance(context)
+                    val databaseRepository = DatabaseRepository.getInstance()
                     val appDeviceEntities =
                         packageNames.map {
                             AppDeviceEntity(
@@ -210,7 +210,7 @@ object AppListSyncManager {
         val job =
             ioScope.launch {
                 // 检查缺失的图标（替代原 getMissingIconsForPackages 方法）
-                val databaseRepository = DatabaseRepository.getInstance(context)
+                val databaseRepository = DatabaseRepository.getInstance()
                 val missingIcons =
                     packageNames.filter { pkg ->
                         val app = databaseRepository.getAppByPackageName(pkg)

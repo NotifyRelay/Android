@@ -24,9 +24,26 @@ import notifyrelay.data.database.entity.WhiteListEntryEntity
  * 数据库仓库基类：封装 Room 数据库的访问逻辑
  * Android 侧入口为 androidMain 的 DatabaseRepository（单例与 Context 获取在其伴生对象中）
  */
-open class DatabaseRepositoryBase(
+open class DatabaseRepository(
     private val database: AppDatabase,
 ) {
+    companion object {
+        /** 进程内唯一实例：由平台侧在启动时注入。 */
+        @Volatile
+        private var instance: DatabaseRepository? = null
+
+        /** 注入进程内唯一实例。 */
+        fun initialize(repository: DatabaseRepository) {
+            instance = repository
+        }
+
+        /** 是否已注入实例。 */
+        fun isInitialized(): Boolean = instance != null
+
+        /** 获取进程内唯一实例；未初始化时抛出异常。 */
+        fun getInstance(): DatabaseRepository = instance ?: error("数据层未初始化：请先调用 Storage.initialize(repository)")
+    }
+
     // 应用配置相关
     private val appConfigDao = database.appConfigDao()
 

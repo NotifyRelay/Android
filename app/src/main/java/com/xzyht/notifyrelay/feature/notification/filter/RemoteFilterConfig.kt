@@ -9,7 +9,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 import notifyrelay.data.database.entity.BlackListEntryEntity
 import notifyrelay.data.database.entity.PackageGroupEntity
 import notifyrelay.data.database.entity.WhiteListEntryEntity
@@ -86,11 +86,11 @@ object RemoteFilterConfig {
     // 加载设置
     suspend fun load(context: Context) {
         withContext(Dispatchers.IO) {
-            enablePackageGroupMapping = StorageManager.getBoolean(context, "enable_package_group_mapping", true, StorageManager.PrefsType.FILTER)
-            filterMode = StorageManager.getString(context, KEY_FILTER_MODE, "none", StorageManager.PrefsType.FILTER)
-            enableDeduplication = StorageManager.getBoolean(context, KEY_ENABLE_DEDUP, true, StorageManager.PrefsType.FILTER)
-            enablePeerMode = StorageManager.getBoolean(context, KEY_ENABLE_PEER, false, StorageManager.PrefsType.FILTER)
-            enableLockScreenOnly = StorageManager.getBoolean(context, "enable_lock_screen_only", true, StorageManager.PrefsType.FILTER)
+            enablePackageGroupMapping = Storage.getBoolean("enable_package_group_mapping", true, Storage.PrefsType.FILTER)
+            filterMode = Storage.getString(KEY_FILTER_MODE, "none", Storage.PrefsType.FILTER)
+            enableDeduplication = Storage.getBoolean(KEY_ENABLE_DEDUP, true, Storage.PrefsType.FILTER)
+            enablePeerMode = Storage.getBoolean(KEY_ENABLE_PEER, false, Storage.PrefsType.FILTER)
+            enableLockScreenOnly = Storage.getBoolean("enable_lock_screen_only", true, Storage.PrefsType.FILTER)
             loadFilterLists(context)
             loadPackageGroups(context)
             isLoaded = true
@@ -104,7 +104,7 @@ object RemoteFilterConfig {
         withContext(Dispatchers.IO) {
             val repo =
                 DatabaseRepository
-                    .getInstance(context)
+                    .getInstance()
             val blackRows = repo.getBlackList()
             blackList = blackRows.map { it.packageName to it.keyword.takeIf { k -> k.isNotBlank() } }
             blackListEnabled =
@@ -126,7 +126,7 @@ object RemoteFilterConfig {
         withContext(Dispatchers.IO) {
             val repo =
                 DatabaseRepository
-                    .getInstance(context)
+                    .getInstance()
             val groups = repo.getPackageGroups()
             val items =
                 repo
@@ -151,11 +151,11 @@ object RemoteFilterConfig {
         saveLock.withLock {
             withContext(Dispatchers.IO) {
                 try {
-                    StorageManager.putBoolean(context, "enable_package_group_mapping", enablePackageGroupMapping, StorageManager.PrefsType.FILTER)
-                    StorageManager.putString(context, KEY_FILTER_MODE, filterMode, StorageManager.PrefsType.FILTER)
-                    StorageManager.putBoolean(context, KEY_ENABLE_DEDUP, enableDeduplication, StorageManager.PrefsType.FILTER)
-                    StorageManager.putBoolean(context, KEY_ENABLE_PEER, enablePeerMode, StorageManager.PrefsType.FILTER)
-                    StorageManager.putBoolean(context, "enable_lock_screen_only", enableLockScreenOnly, StorageManager.PrefsType.FILTER)
+                    Storage.putBoolean("enable_package_group_mapping", enablePackageGroupMapping, Storage.PrefsType.FILTER)
+                    Storage.putString(KEY_FILTER_MODE, filterMode, Storage.PrefsType.FILTER)
+                    Storage.putBoolean(KEY_ENABLE_DEDUP, enableDeduplication, Storage.PrefsType.FILTER)
+                    Storage.putBoolean(KEY_ENABLE_PEER, enablePeerMode, Storage.PrefsType.FILTER)
+                    Storage.putBoolean("enable_lock_screen_only", enableLockScreenOnly, Storage.PrefsType.FILTER)
                     saveFilterLists(context)
                     savePackageGroups(context)
 
@@ -178,7 +178,7 @@ object RemoteFilterConfig {
         withContext(Dispatchers.IO) {
             val repo =
                 DatabaseRepository
-                    .getInstance(context)
+                    .getInstance()
             repo.replaceBlackList(
                 blackList.map {
                     BlackListEntryEntity(
@@ -204,7 +204,7 @@ object RemoteFilterConfig {
         withContext(Dispatchers.IO) {
             val repo =
                 DatabaseRepository
-                    .getInstance(context)
+                    .getInstance()
             val groups = mutableListOf<PackageGroupEntity>()
             val itemPackages = mutableListOf<List<String>>()
             defaultPackageGroups.forEachIndexed { idx, pkgs ->
