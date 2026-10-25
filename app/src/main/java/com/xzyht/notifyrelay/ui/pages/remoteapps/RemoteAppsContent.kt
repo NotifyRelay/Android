@@ -62,7 +62,7 @@ internal fun RemoteAppsContent(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = state.error ?: "加载失败",
+                        text = state.error,
                         color = colorScheme.error,
                     )
                     Spacer(modifier = Modifier.height(8.dp))

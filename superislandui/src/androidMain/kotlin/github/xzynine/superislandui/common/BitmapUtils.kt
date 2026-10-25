@@ -145,7 +145,7 @@ object BitmapUtils {
                 var textX = 10f
                 if (shouldAddAlbum) {
                     val albumHeight = height - 10
-                    val scaleFactor = albumHeight.toFloat() / albumBitmap!!.height
+                    val scaleFactor = albumHeight.toFloat() / albumBitmap.height
                     val scaledWidth = (albumBitmap.width * scaleFactor).toInt()
 
                     val scaledAlbumBitmap =

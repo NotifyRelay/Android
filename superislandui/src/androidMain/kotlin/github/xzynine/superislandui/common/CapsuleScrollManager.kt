@@ -41,11 +41,9 @@ object CapsuleScrollManager {
 
     private val adaptiveDataMap = mutableMapOf<String, AdaptiveData>()
 
-    /**
-     * 计算字符的视觉权重（CJK=2，西文=1）
-     */
-    fun charWeight(c: Char): Int =
-        when (Character.UnicodeBlock.of(c)) {
+    /** 按 CJK 判定使用的 Unicode 区块集合。 */
+    private val CJK_BLOCKS =
+        setOf(
             Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS,
             Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_A,
             Character.UnicodeBlock.CJK_UNIFIED_IDEOGRAPHS_EXTENSION_B,
@@ -53,9 +51,12 @@ object CapsuleScrollManager {
             Character.UnicodeBlock.HIRAGANA,
             Character.UnicodeBlock.KATAKANA,
             Character.UnicodeBlock.HANGUL_SYLLABLES,
-            -> 2 // CJK字符
-            else -> 1 // 西文字符、数字、符号
-        }
+        )
+
+    /**
+     * 计算字符的视觉权重（CJK=2，西文=1）
+     */
+    fun charWeight(c: Char): Int = if (Character.UnicodeBlock.of(c) in CJK_BLOCKS) 2 else 1
 
     /**
      * 计算字符串的总视觉权重

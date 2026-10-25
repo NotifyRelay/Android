@@ -48,7 +48,7 @@ fun RemoteAppsPage(
         if (isLocalMode) {
             localViewModel.loadApps(context)
         } else {
-            remoteViewModel.loadApps(context, deviceUuid!!)
+            remoteViewModel.loadApps(context, deviceUuid)
         }
     }
 
@@ -118,7 +118,7 @@ fun RemoteAppsPage(
                 RemoteAppsContent(
                     state = remoteState,
                     onAppClick = { app ->
-                        remoteViewModel.openApp(context, app, deviceIp!!, useScrcpyStartApp = true)
+                        remoteViewModel.openApp(context, app, deviceIp, useScrcpyStartApp = true)
                     },
                     onAppLongClick = { showMenuForApp = it },
                     onRefresh = { remoteViewModel.refreshApps(context) },

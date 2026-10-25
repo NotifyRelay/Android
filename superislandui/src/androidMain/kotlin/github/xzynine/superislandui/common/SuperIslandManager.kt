@@ -278,7 +278,7 @@ object SuperIslandManager {
             val isVerifyCodeLog = text != null && Regex("^[A-Za-z0-9]{4,8}$").matches(text.trim())
             val titleTextLog =
                 if (isVerifyCodeLog) {
-                    "title=[已隐藏 len=${title?.length ?: 0}], text=[已隐藏 len=${text?.length ?: 0}]"
+                    "title=[已隐藏 len=${title?.length ?: 0}], text=[已隐藏 len=${text.length}]"
                 } else {
                     "title=$title, text=$text"
                 }

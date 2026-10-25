@@ -327,7 +327,6 @@ object StorageManager {
         toVersion: Int,
     ) {
         try {
-            fromVersion // 显式读取参数，保持既有告警口径
             ensureInitialized(context)
             Storage.migrateData(fromVersion, toVersion)
         } catch (e: InterruptedException) {

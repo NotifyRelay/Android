@@ -204,8 +204,8 @@ class DataCallbackHandler(
         uuid: String,
         json: JSONObject,
     ) {
-        val pcUser = json.optString("username", null)
-        val pcPass = json.optString("password", null)
+        val pcUser: String? = if (json.has("username")) json.optString("username") else null
+        val pcPass: String? = if (json.has("password")) json.optString("password") else null
         val result = FtpServerManager.start(host.localDisplayName(), host.callbackContext, pcUser, pcPass)
         when (result.status) {
             StartResult.SUCCESS, StartResult.ALREADY_RUNNING -> {

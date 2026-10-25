@@ -101,7 +101,7 @@ fun PairingCodeDialog(
                                     notifyrelay.base.util.BatteryUtils
                                         .isCharging(context)
                                 val battery = if (isCharging) batteryLevel else -batteryLevel
-                                NativeCore.sendPairingInit(deviceManager.localUuid, targetDevice!!.uuid, displayCode, battery, "android") == 0
+                                NativeCore.sendPairingInit(deviceManager.localUuid, targetDevice.uuid, displayCode, battery, "android") == 0
                             }
                         }
                     if (!initSuccess) {

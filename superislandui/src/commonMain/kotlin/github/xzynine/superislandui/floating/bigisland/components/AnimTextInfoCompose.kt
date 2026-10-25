@@ -94,7 +94,7 @@ fun AnimTextInfoCompose(
                 }
             if (hasTimer) {
                 // 仅计时进行中（正计时 timerType=1 / 倒计时 timerType=-1）才每秒刷新，暂停/无效类型静态显示
-                val isTimerRunning = animTextInfo.timerInfo?.timerType == 1 || animTextInfo.timerInfo?.timerType == -1
+                val isTimerRunning = animTextInfo.timerInfo.timerType == 1 || animTextInfo.timerInfo.timerType == -1
                 LaunchedEffect(animTextInfo.timerInfo) {
                     if (!isTimerRunning) return@LaunchedEffect
                     while (true) {

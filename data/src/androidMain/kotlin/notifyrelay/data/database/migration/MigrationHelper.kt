@@ -66,14 +66,8 @@ object MigrationHelper {
                         ),
                     )
                 }
-
-                {
-                    // Logger.d("MigrationHelper", "迁移文件 $fileName 完成，共${oldRecords.size}条通知")
-                }
             } catch (e: Exception) {
-                {
-                    Logger.e("MigrationHelper", "迁移文件 ${file.name} 失败: ${e.message}", e)
-                }
+                Logger.e("MigrationHelper", "迁移文件 ${file.name} 失败: ${e.message}", e)
             }
         }
 
@@ -86,10 +80,6 @@ object MigrationHelper {
                 val batch = notificationEntities.subList(i, endIndex)
                 notificationRecordDao.insertAll(batch)
             }
-
-            {
-                // Logger.d("MigrationHelper", "迁移通知记录完成，共${notificationEntities.size}条")
-            }
         }
     }
 
@@ -100,10 +90,6 @@ object MigrationHelper {
         context: Context,
         superIslandHistoryDao: SuperIslandHistoryDao,
     ) {
-        {
-            // Logger.d("MigrationHelper", "开始迁移超级岛历史记录")
-        }
-
         try {
             // 从旧存储读取超级岛历史记录
             val oldHistoryTypeToken = object : TypeToken<List<Map<String, Any>>>() {}
@@ -239,11 +225,7 @@ object MigrationHelper {
         // 删除通知记录JSON文件
         val files = PersistenceManager.getAllNotificationFiles(context)
         for (file in files) {
-            if (file.delete()) {
-                {
-                    // Logger.d("MigrationHelper", "删除旧通知文件 ${file.name}")
-                }
-            }
+            file.delete()
         }
 
         // 标记迁移完成
