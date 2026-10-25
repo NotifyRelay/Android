@@ -1,73 +1,87 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kotlin.multiplatform.library)
     alias(libs.plugins.ksp)
 }
 
-android {
-    namespace = "notifyrelay.data"
-    compileSdk =
-        libs.versions.compileSdk
-            .get()
-            .toInt()
+kotlin {
+    // AGP 9 的 KMP 库插件：Android 目标配置位于 kotlin 块内的 android 块。
+    android {
+        namespace = "notifyrelay.data"
+        compileSdk =
+            libs.versions.compileSdk
+                .get()
+                .toInt()
 
-    defaultConfig {
         minSdk =
             libs.versions.minSdk
                 .get()
                 .toInt()
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        consumerProguardFiles("consumer-rules.pro")
-    }
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
+        }
 
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
+        // 发布给库使用方的 keep 规则文件
+        optimization {
+            consumerKeepRules.file("consumer-rules.pro")
+        }
+
+        lint {
+            targetSdk = 36
+        }
+
+        // 启用测试编译，使 KGP 默认创建的 commonTest 源集被挂到 Android 目标的 compilation 上
+        withHostTest {
+        }
+
+        withDeviceTest {
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-}
 
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_11)
+    sourceSets {
+        commonMain.dependencies {
+            // Room 注解与运行时：实体与 DAO 位于 commonMain
+            implementation(libs.androidx.room.runtime)
+            implementation(libs.androidx.room.ktx)
+            implementation(libs.androidx.room.paging)
+
+            // Paging 公共端：DAO 的 PagingSource 返回类型
+            implementation(libs.androidx.paging.common)
+
+            // DAO 的 Flow 返回类型
+            implementation(libs.kotlinx.coroutines.core)
+        }
+
+        androidMain.dependencies {
+            implementation(libs.androidx.core.ktx)
+            implementation(libs.androidx.appcompat)
+
+            // 依赖base模块
+            implementation(project(":base"))
+            // KMP 公共端（过滤配置默认常量）
+            implementation(project(":shared"))
+
+            // Room Database
+            implementation(libs.androidx.room.runtime)
+            implementation(libs.androidx.room.ktx)
+            implementation(libs.androidx.room.paging)
+
+            // Paging 3 (DAO PagingSource)
+            implementation(libs.androidx.paging.runtime)
+
+            // Gson
+            implementation(libs.gson)
+
+            // Kotlin Coroutines
+            implementation(libs.bundles.kotlinx.coroutines)
+        }
     }
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-
-    // 依赖base模块
-    implementation(project(":base"))
-    // KMP 公共端（过滤配置默认常量）
-    implementation(project(":shared"))
-
-    // Room Database
-    implementation(libs.androidx.room.runtime)
-    implementation(libs.androidx.room.ktx)
-    implementation(libs.androidx.room.paging)
-    ksp(libs.androidx.room.compiler)
-
-    // Paging 3 (DAO PagingSource)
-    implementation(libs.androidx.paging.runtime)
-
-    // Gson
-    implementation(libs.gson)
-
-    // Kotlin Coroutines
-    implementation(libs.bundles.kotlinx.coroutines)
-
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
+    // Room 注解处理器：注册到 Android 目标源集的 KSP 编译
+    add("kspAndroid", libs.androidx.room.compiler)
 }

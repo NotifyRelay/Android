@@ -5,6 +5,7 @@ import androidx.paging.PagingSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.data.database.AppDatabase
+import notifyrelay.data.database.AppDatabaseFactory
 import notifyrelay.data.database.dao.PackageCount
 import notifyrelay.data.database.entity.AppConfigEntity
 import notifyrelay.data.database.entity.AppDeviceEntity
@@ -717,7 +718,7 @@ class DatabaseRepository(
          */
         fun getInstance(context: Context): DatabaseRepository =
             instance ?: synchronized(this) {
-                instance ?: DatabaseRepository(AppDatabase.getDatabase(context)).also { instance = it }
+                instance ?: DatabaseRepository(AppDatabaseFactory.getDatabase(context)).also { instance = it }
             }
     }
 }
