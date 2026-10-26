@@ -46,7 +46,7 @@ class AndroidLocalFilterPort(
     ) {
         BackendLocalFilter.setFilterEntryEnabled(
             context,
-            BackendLocalFilter.FilterEntry(entry.keyword, entry.packageName),
+            FilterEntry(entry.keyword, entry.packageName),
             enabled,
         )
     }

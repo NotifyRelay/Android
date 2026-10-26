@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.feature.device.service
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
-import notifyrelay.domain.feature.device.service.contract.AudioRelayPort
+import notifyrelay.domain.feature.device.service.contract.AudioRelayControlPort
 import notifyrelay.domain.feature.device.service.contract.DeviceAdminPort
 import notifyrelay.domain.feature.device.service.contract.DeviceChatPort
 import notifyrelay.domain.feature.device.service.contract.DeviceDiscoveryPort
@@ -60,7 +60,7 @@ object DeviceConnectionManagerSingleton {
     /**
      * 音频中继端口。
      */
-    fun getAudioRelay(context: Context): AudioRelayPort = shared(context).audioRelay
+    fun getAudioRelay(context: Context): AudioRelayControlPort = shared(context).audioRelay
 
     /**
      * 握手结果等待器登记表。

@@ -24,7 +24,7 @@ interface HandshakeWaiterPort {
 /**
  * 音频中继契约：UI 发起/停止投送与接收。
  */
-interface AudioRelayPort {
+interface AudioRelayControlPort {
     /** 屏幕捕获授权请求回调（由 UI 注入）。 */
     var onRequestMediaProjection: (() -> Unit)?
 

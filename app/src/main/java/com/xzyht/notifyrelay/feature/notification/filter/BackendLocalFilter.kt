@@ -11,6 +11,7 @@ import kotlinx.coroutines.sync.withLock
 import notifyrelay.base.log.Logger
 import notifyrelay.data.database.entity.FilterEntryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.notification.filter.FilterEntry
 
 /**
  * 后端本机通知过滤器
@@ -54,12 +55,6 @@ object BackendLocalFilter {
             // 默认包名作为内置条目
             FilterEntry("", "com.miui.systemAdSolution"),
         )
-
-    // FilterEntry 表示一条复合过滤规则：keyword 可空，packageName 可空
-    data class FilterEntry(
-        val keyword: String,
-        val packageName: String,
-    )
 
     private val saveLock = Mutex()
 

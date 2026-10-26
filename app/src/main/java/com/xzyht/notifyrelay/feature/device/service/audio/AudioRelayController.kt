@@ -15,7 +15,7 @@ import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyDefaults
 import notifyrelay.domain.feature.device.model.DeviceInfo
-import notifyrelay.domain.feature.device.service.contract.AudioRelayPort
+import notifyrelay.domain.feature.device.service.contract.AudioRelayControlPort
 
 /**
  * 音频中继（投送/接收）的完整生命周期控制。
@@ -56,7 +56,7 @@ class AudioRelayController(
     private val resolveDeviceInfo: (uuid: String) -> DeviceInfo?,
     /** 发送一条 DATA_MEDIA_CONTROL 明文报文。 */
     private val sendMediaControl: (target: DeviceInfo, plaintext: String) -> Unit,
-) : AudioRelayPort {
+) : AudioRelayControlPort {
     companion object {
         const val HEADER_MEDIA_CONTROL = "DATA_MEDIA_CONTROL"
 

@@ -72,9 +72,6 @@ kotlin {
 
             // BitmapUtils 缓存池使用 atomicfu 的同步原语
             implementation(libs.atomicfu)
-
-            // KMP 公共端（平台标识、文本与计时工具、颜色工具、存储 key 常量）
-            implementation(project(":shared"))
         }
 
         androidMain.dependencies {
@@ -98,8 +95,6 @@ kotlin {
             // 依赖其他模块（原 :core 工具类已并入 :base）
             implementation(project(":base"))
             implementation(project(":data"))
-            // KMP 公共端：Android 侧的提取/构建代码同样使用其工具
-            implementation(project(":shared"))
         }
     }
 }
