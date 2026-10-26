@@ -31,10 +31,14 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.activity.MainActivity
+import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
+import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
 import com.xzyht.notifyrelay.ui.pages.UIChatTest
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreenContent
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -42,6 +46,7 @@ import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
+import notifyrelay.shared.ui.screen.DeviceForwardScreen
 import notifyrelay.shared.ui.screen.DeviceListScreen
 import notifyrelay.shared.ui.screen.DeviceListScreenState
 import notifyrelay.shared.ui.screen.HistoryScreen
@@ -64,6 +69,19 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun MainScreen(navigator: Navigator) {
+    val filterViewModel =
+        androidx.lifecycle.viewmodel.compose.viewModel<notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel>(
+            factory =
+                object : androidx.lifecycle.ViewModelProvider.Factory {
+                    @Suppress("UNCHECKED_CAST")
+                    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
+                        notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel(
+                            notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry.current ?: error("RemoteFilterPort 未注册"),
+                            notifyrelay.shared.feature.appslist.LocalAppsPortRegistry.current ?: error("LocalAppsPort 未注册"),
+                            notifyrelay.shared.feature.appslist.AppIconPortRegistry.current ?: error("AppIconPort 未注册"),
+                        ) as T
+                },
+        )
     val colorScheme = MiuixTheme.colorScheme
 
     val configuration = LocalConfiguration.current
@@ -226,7 +244,26 @@ fun MainScreen(navigator: Navigator) {
                                     superIslandHistory = { UISuperIslandHistory() },
                                     chatTest = { UIChatTest(deviceManager = devicePortsViewModel().chatPort()) },
                                 )
-                            1 -> DeviceForwardScreen()
+                            1 ->
+                                DeviceForwardScreen(
+                                    filterViewModel = filterViewModel,
+                                    clipboardSync = { ClipboardSyncPage() },
+                                    musicControl = { MusicControlPage() },
+                                    scrcpyScreen = { device, onAdvanced ->
+                                        ScrcpyScreenHost(
+                                            startScreen = ScrcpyRootScreen.Device,
+                                            selectedDevice =
+                                                device?.let {
+                                                    notifyrelay.data.model.SelectedDeviceInfo(
+                                                        displayName = it.displayName,
+                                                        ip = it.ip,
+                                                        deviceType = it.deviceType,
+                                                    )
+                                                },
+                                            onOpenAdvanced = onAdvanced,
+                                        )
+                                    },
+                                )
                             2 -> SettingsScreen()
                         }
                     }
@@ -273,7 +310,26 @@ fun MainScreen(navigator: Navigator) {
                                     superIslandHistory = { UISuperIslandHistory() },
                                     chatTest = { UIChatTest(deviceManager = devicePortsViewModel().chatPort()) },
                                 )
-                            1 -> DeviceForwardScreen()
+                            1 ->
+                                DeviceForwardScreen(
+                                    filterViewModel = filterViewModel,
+                                    clipboardSync = { ClipboardSyncPage() },
+                                    musicControl = { MusicControlPage() },
+                                    scrcpyScreen = { device, onAdvanced ->
+                                        ScrcpyScreenHost(
+                                            startScreen = ScrcpyRootScreen.Device,
+                                            selectedDevice =
+                                                device?.let {
+                                                    notifyrelay.data.model.SelectedDeviceInfo(
+                                                        displayName = it.displayName,
+                                                        ip = it.ip,
+                                                        deviceType = it.deviceType,
+                                                    )
+                                                },
+                                            onOpenAdvanced = onAdvanced,
+                                        )
+                                    },
+                                )
                             2 -> SettingsScreen()
                         }
                     }

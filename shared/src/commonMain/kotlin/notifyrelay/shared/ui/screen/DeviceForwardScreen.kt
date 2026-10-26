@@ -1,6 +1,5 @@
-package com.xzyht.notifyrelay.ui.screen
+package notifyrelay.shared.ui.screen
 
-import android.app.Application
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -15,19 +14,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
-import com.xzyht.notifyrelay.ui.pages.MusicControlPage
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyAdvancedPage
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyVirtualButtonOrderPage
 import kotlinx.coroutines.launch
 import notifyrelay.shared.ui.navigation.LocalNavigator
-import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
 import notifyrelay.shared.ui.pages.RemoteAppsPage
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
@@ -41,9 +30,11 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun DeviceForwardScreen(
     portsViewModel: DevicePortsViewModel = devicePortsViewModel(),
-    filterViewModel: RemoteFilterViewModel = viewModel(),
+    filterViewModel: RemoteFilterViewModel,
+    clipboardSync: @Composable () -> Unit,
+    musicControl: @Composable () -> Unit,
+    scrcpyScreen: @Composable (notifyrelay.domain.feature.device.model.SelectedDeviceInfo?, () -> Unit) -> Unit,
 ) {
-    val context = LocalContext.current
     val navigator = LocalNavigator.current
     val coroutineScope = rememberCoroutineScope()
 
@@ -65,7 +56,7 @@ fun DeviceForwardScreen(
     val selectedDeviceInfo =
         selectedDevice?.let {
             val authInfo = deviceManager.getAuthenticatedDevices()[it.uuid]
-            notifyrelay.data.model.SelectedDeviceInfo(
+            notifyrelay.domain.feature.device.model.SelectedDeviceInfo(
                 displayName = it.displayName,
                 ip = it.ip,
                 deviceType = authInfo?.deviceType,
@@ -112,14 +103,9 @@ fun DeviceForwardScreen(
                 contentAlignment = Alignment.TopStart,
             ) {
                 when (page) {
-                    0 -> ClipboardSyncPage()
-                    1 -> MusicControlPage()
-                    2 ->
-                        ScrcpyScreenHost(
-                            startScreen = ScrcpyRootScreen.Device,
-                            selectedDevice = selectedDeviceInfo,
-                            onOpenAdvanced = { navigator.push(Route.ScrcpyAdvanced) },
-                        )
+                    0 -> clipboardSync()
+                    1 -> musicControl()
+                    2 -> scrcpyScreen(selectedDeviceInfo) { navigator.push(Route.ScrcpyAdvanced) }
                     3 -> {
                         RemoteAppsPage(
                             deviceUuid = selectedDevice?.uuid,
@@ -130,26 +116,4 @@ fun DeviceForwardScreen(
             }
         }
     }
-}
-
-@Composable
-fun ScrcpyAdvancedScreen(
-    navigator: Navigator,
-) {
-    val context = LocalContext.current
-    val app = context.applicationContext as Application
-    val scrcpyViewModel = remember { ScrcpyUiViewModel.getInstance(app) }
-    ScrcpyAdvancedPage(
-        onBack = { navigator.pop() },
-        viewModel = scrcpyViewModel,
-    )
-}
-
-@Composable
-fun ScrcpyVirtualButtonOrderScreen(
-    navigator: Navigator,
-) {
-    ScrcpyVirtualButtonOrderPage(
-        onBack = { navigator.pop() },
-    )
 }
