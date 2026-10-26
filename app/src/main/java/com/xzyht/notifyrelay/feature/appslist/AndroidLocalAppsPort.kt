@@ -2,6 +2,8 @@ package com.xzyht.notifyrelay.feature.appslist
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -9,7 +11,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import notifyrelay.base.util.AppListHelper
+import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.domain.feature.appslist.model.LocalAppInfo
 import notifyrelay.shared.feature.appslist.LocalAppsPort
 
@@ -44,6 +48,15 @@ class AndroidLocalAppsPort(
         query: String,
         showSystemApps: Boolean,
     ): List<LocalAppInfo> = _apps.value.filterBy(query, showSystemApps)
+
+    override suspend fun iconFor(packageName: String): ImageBitmap? =
+        withContext(Dispatchers.IO) {
+            runCatching {
+                val appInfo = context.packageManager.getApplicationInfo(packageName, 0)
+                val drawable = appInfo.loadIcon(context.packageManager)
+                drawable.toBitmapOrDefault(1).asImageBitmap()
+            }.getOrNull()
+        }
 
     override fun isDataLoaded(): Boolean = InstalledAppsRepository.isDataLoaded()
 

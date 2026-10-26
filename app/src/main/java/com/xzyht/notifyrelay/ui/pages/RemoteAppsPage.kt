@@ -9,10 +9,10 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.pages.remoteapps.LocalAppsContent
 import com.xzyht.notifyrelay.ui.pages.remoteapps.RemoteAppsContent
-import com.xzyht.notifyrelay.ui.pages.remoteapps.RemoteAppsMenuHost
 import com.xzyht.notifyrelay.ui.pages.remoteapps.openLocalApp
 import com.xzyht.notifyrelay.ui.pages.remoteapps.rememberRemoteAppsPageState
 import notifyrelay.shared.ui.pages.remoteapps.DisplayNavigationBar
+import notifyrelay.shared.ui.pages.remoteapps.RemoteAppsMenuHost
 import notifyrelay.shared.ui.viewmodel.LocalAppsViewModel
 import notifyrelay.shared.ui.viewmodel.RemoteAppsViewModel
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -141,7 +141,6 @@ fun RemoteAppsPage(
 
     RemoteAppsMenuHost(
         showMenuForApp = showMenuForApp,
-        context = context,
         remoteViewModel = remoteViewModel,
         onDismiss = { showMenuForApp = null },
     )

@@ -1,6 +1,5 @@
-package com.xzyht.notifyrelay.ui.pages.remoteapps
+package notifyrelay.shared.ui.pages.remoteapps
 
-import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -20,9 +19,8 @@ import top.yukonga.miuix.kmp.window.WindowDialog
  * 按三类 `when` 分支下转型后交给 [AppContextMenu]。
  */
 @Composable
-internal fun RemoteAppsMenuHost(
+fun RemoteAppsMenuHost(
     showMenuForApp: Any?,
-    context: Context,
     remoteViewModel: RemoteAppsViewModel,
     onDismiss: () -> Unit,
 ) {
@@ -64,7 +62,7 @@ internal fun RemoteAppsMenuHost(
 }
 
 @Composable
-internal fun AppContextMenu(
+fun AppContextMenu(
     appName: String,
     packageName: String,
     isPinned: Boolean,

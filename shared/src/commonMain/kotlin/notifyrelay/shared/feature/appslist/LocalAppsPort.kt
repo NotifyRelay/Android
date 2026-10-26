@@ -1,5 +1,6 @@
 package notifyrelay.shared.feature.appslist
 
+import androidx.compose.ui.graphics.ImageBitmap
 import kotlinx.coroutines.flow.StateFlow
 import notifyrelay.domain.feature.appslist.model.LocalAppInfo
 
@@ -23,6 +24,9 @@ interface LocalAppsPort {
         query: String,
         showSystemApps: Boolean,
     ): List<LocalAppInfo>
+
+    /** 取指定包名的应用图标；失败返回 null。 */
+    suspend fun iconFor(packageName: String): ImageBitmap?
 
     /** 数据是否已加载。 */
     fun isDataLoaded(): Boolean
