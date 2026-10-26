@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages
+package notifyrelay.shared.ui.pages
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -11,9 +11,8 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import notifyrelay.base.util.ThemeSettingsManager
+import notifyrelay.shared.ui.port.LocalThemePort
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 
 private val THEME_BASE_OPTIONS =
@@ -37,9 +36,9 @@ fun UIAppearance(
     onThemeSelected: ((Int) -> Unit)? = null,
     scrollable: Boolean = true,
 ) {
-    val context = LocalContext.current
+    val themePort = LocalThemePort.current
     var localThemeBaseIndex by remember {
-        mutableIntStateOf(themeBaseIndex ?: ThemeSettingsManager.getThemeBaseIndex(context))
+        mutableIntStateOf(themeBaseIndex ?: themePort.currentIndex())
     }
     // 外部受控时以外部传入值为准
     val selectedIndex = themeBaseIndex ?: localThemeBaseIndex
@@ -66,7 +65,7 @@ fun UIAppearance(
                     onThemeSelected(newIndex)
                 } else {
                     localThemeBaseIndex = newIndex
-                    ThemeSettingsManager.setThemeBaseIndex(context, newIndex)
+                    themePort.setIndex(newIndex)
                 }
             },
         )
