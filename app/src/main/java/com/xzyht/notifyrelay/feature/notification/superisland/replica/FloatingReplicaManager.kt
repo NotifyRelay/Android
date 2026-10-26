@@ -13,6 +13,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandS
 import notifyrelay.base.log.Logger
 import notifyrelay.domain.feature.notification.superisland.list.SuperIslandListManager
 import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatching
+import notifyrelay.shared.feature.notification.superisland.replica.ReplicaDisplayCache
 
 object FloatingReplicaManager {
     private const val TAG = "超级岛复刻实现骨架"

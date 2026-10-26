@@ -2,7 +2,6 @@ package com.xzyht.notifyrelay.feature.device.service
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
-import com.xzyht.notifyrelay.feature.device.model.DeviceNameCache
 import com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController
 import com.xzyht.notifyrelay.feature.device.service.callback.DeviceCallbackHost
 import com.xzyht.notifyrelay.feature.device.service.core.RustCoreSession
@@ -30,6 +29,7 @@ import notifyrelay.base.util.DeviceUtils
 import notifyrelay.data.Storage
 import notifyrelay.domain.feature.device.model.AuthInfo
 import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceNameCache
 import notifyrelay.domain.feature.device.model.DeviceSnapshot
 import notifyrelay.domain.feature.device.model.PendingPairing
 import notifyrelay.domain.feature.device.service.callback.HandshakeRequestHandler

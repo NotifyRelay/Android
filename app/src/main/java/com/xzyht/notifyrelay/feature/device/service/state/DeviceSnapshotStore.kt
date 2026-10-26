@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.feature.device.service.state
 
-import com.xzyht.notifyrelay.feature.device.model.DeviceNameCache
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -8,6 +7,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
 import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceNameCache
 import notifyrelay.domain.feature.device.model.DeviceSnapshot
 import org.json.JSONArray
 

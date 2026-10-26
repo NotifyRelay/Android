@@ -1,6 +1,6 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.replica
+package notifyrelay.shared.feature.notification.superisland.replica
 
-import java.util.concurrent.ConcurrentHashMap
+import notifyrelay.base.util.nowMillis
 
 /**
  * 远端超级岛「当前展示内容」缓存。
@@ -21,7 +21,7 @@ import java.util.concurrent.ConcurrentHashMap
  * 仅保存内容本身，不持有通知与视图引用；重建一律走 [FloatingReplicaManager.showFloating]，
  * 由它按当时的通道配置分流。
  */
-internal object ReplicaDisplayCache {
+object ReplicaDisplayCache {
     /** 缓存条目：与 [FloatingReplicaManager.showFloating] 的展示入参一一对应。 */
     data class Entry(
         val sourceId: String,
@@ -34,7 +34,7 @@ internal object ReplicaDisplayCache {
         val updatedAt: Long,
     )
 
-    private val entries = ConcurrentHashMap<String, Entry>()
+    private val entries = mutableMapOf<String, Entry>()
 
     fun put(
         sourceId: String,
@@ -55,7 +55,7 @@ internal object ReplicaDisplayCache {
                 picMap = picMap,
                 appName = appName,
                 isLocked = isLocked,
-                updatedAt = System.currentTimeMillis(),
+                updatedAt = nowMillis(),
             )
     }
 

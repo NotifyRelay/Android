@@ -23,6 +23,7 @@ import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatching
 import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatchingSuspend
+import notifyrelay.shared.feature.notification.superisland.replica.ReplicaDisplayCache
 import java.lang.ref.WeakReference
 
 object FloatingReplicaWindowManager {

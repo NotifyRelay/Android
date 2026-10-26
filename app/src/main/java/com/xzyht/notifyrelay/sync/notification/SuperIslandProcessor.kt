@@ -11,9 +11,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslan
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaDisplayCache
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
-import com.xzyht.notifyrelay.feature.notification.superisland.tracker.LocalSuperIslandTracker
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
@@ -22,6 +20,8 @@ import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.Storage
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.feature.notification.superisland.replica.ReplicaDisplayCache
+import notifyrelay.shared.feature.notification.superisland.tracker.LocalSuperIslandTracker
 import org.json.JSONObject
 
 object SuperIslandProcessor {

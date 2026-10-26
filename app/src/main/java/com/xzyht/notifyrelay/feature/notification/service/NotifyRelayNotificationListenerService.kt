@@ -15,7 +15,6 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingl
 import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.filter.BackendLocalFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.tracker.LocalSuperIslandTracker
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import github.xzynine.superislandui.common.SuperIslandManager
@@ -35,6 +34,7 @@ import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.Storage
 import notifyrelay.domain.feature.device.service.contract.DeviceDiscoveryPort
+import notifyrelay.shared.feature.notification.superisland.tracker.LocalSuperIslandTracker
 
 class NotifyRelayNotificationListenerService : NotificationListenerService() {
     companion object {
