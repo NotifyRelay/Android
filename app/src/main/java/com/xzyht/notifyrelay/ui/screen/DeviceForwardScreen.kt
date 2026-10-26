@@ -22,7 +22,6 @@ import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
 import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import com.xzyht.notifyrelay.ui.pages.RemoteAppsPage
 import com.xzyht.notifyrelay.ui.viewmodel.DevicePortsViewModel
-import com.xzyht.notifyrelay.ui.viewmodel.RemoteFilterViewModel
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyAdvancedPage
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
@@ -33,6 +32,7 @@ import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
+import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -47,8 +47,8 @@ fun DeviceForwardScreen(
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        if (!filterViewModel.isLoaded()) {
-            filterViewModel.ensureLoaded(context)
+        if (!filterViewModel.isConfigLoaded()) {
+            filterViewModel.ensureLoaded()
         }
     }
 

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages
+package notifyrelay.shared.ui.pages
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -20,14 +20,18 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.viewmodel.RemoteFilterViewModel
+import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
+import notifyrelay.shared.feature.appslist.AppIconPortRegistry
+import notifyrelay.shared.feature.appslist.LocalAppsPortRegistry
 import notifyrelay.shared.ui.dialog.AppPickerDialog
 import notifyrelay.shared.ui.pages.FilterEntryItem
 import notifyrelay.shared.ui.pages.FilterListSection
 import notifyrelay.shared.ui.viewmodel.AppIconViewModel
+import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
@@ -44,11 +48,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun UIRemoteFilter(
     modifier: Modifier = Modifier,
-    viewModel: RemoteFilterViewModel = viewModel(),
+    viewModel: RemoteFilterViewModel = remoteFilterViewModel(),
     iconViewModel: AppIconViewModel = viewModel(),
 ) {
-    val context = LocalContext.current
-
     val filterMode = viewModel.filterMode
     val enableDedup = viewModel.enableDedup
     val enablePackageGroupMapping = viewModel.enablePackageGroupMapping
@@ -59,7 +61,7 @@ fun UIRemoteFilter(
     val enabledKeys = viewModel.enabledKeys
 
     LaunchedEffect(Unit) {
-        viewModel.load(context)
+        viewModel.load()
     }
 
     var showAppPickerForGroup by remember { mutableStateOf<Pair<Boolean, Int>>(false to -1) }
@@ -82,7 +84,7 @@ fun UIRemoteFilter(
             checked = enableDedup,
             summary = "智能去重，避免重复通知",
             onCheckedChange = {
-                viewModel.setEnableDedup(context, it)
+                viewModel.updateEnableDedup(it)
             },
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
@@ -93,7 +95,7 @@ fun UIRemoteFilter(
             checked = enableLockScreenOnly,
             summary = "仅复刻锁屏状态的通知到通知栏",
             onCheckedChange = {
-                viewModel.setEnableLockScreenOnly(context, it)
+                viewModel.updateEnableLockScreenOnly(it)
             },
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
@@ -110,7 +112,7 @@ fun UIRemoteFilter(
             onSelectedIndexChange = { idx ->
                 val safeIdx = idx.coerceIn(0, modes.lastIndex)
                 val (value, _) = modes[safeIdx]
-                viewModel.setFilterMode(context, value)
+                viewModel.updateFilterMode(value)
             },
         )
 
@@ -120,13 +122,13 @@ fun UIRemoteFilter(
                 manualEntries = filterItems.map { FilterEntryItem(it.second ?: "", it.first) },
                 entryEnabled = { item -> enabledKeys.contains("${item.packageName}|${item.keyword}") },
                 onEntryEnabledChange = { item, enabled ->
-                    viewModel.setEntryEnabled(context, item.packageName, item.keyword, enabled)
+                    viewModel.updateEntryEnabled(item.packageName, item.keyword, enabled)
                 },
                 onAddEntry = { keyword, pkg ->
-                    viewModel.addEntry(context, pkg, keyword)
+                    viewModel.addEntry(pkg, keyword)
                 },
                 onRemoveEntry = { item ->
-                    viewModel.removeEntry(context, item.packageName, item.keyword)
+                    viewModel.removeEntry(item.packageName, item.keyword)
                 },
             )
         }
@@ -136,7 +138,7 @@ fun UIRemoteFilter(
             checked = enablePackageGroupMapping,
             summary = "启用包名等价映射功能",
             onCheckedChange = {
-                viewModel.setEnablePackageGroupMapping(context, it)
+                viewModel.updateEnablePackageGroupMapping(it)
             },
             modifier = Modifier.padding(top = 16.dp),
         )
@@ -160,7 +162,7 @@ fun UIRemoteFilter(
                             checked = allGroupEnabled[idx],
                             onCheckedChange = { v ->
                                 val newEnabled = allGroupEnabled.toMutableList().apply { set(idx, v) }
-                                viewModel.setGroupEnabled(context, newEnabled)
+                                viewModel.updateGroupEnabled(newEnabled)
                             },
                             enabled = enablePackageGroupMapping,
                             modifier = Modifier.weight(1f),
@@ -184,7 +186,7 @@ fun UIRemoteFilter(
                                     onClick = {
                                         val newGroups = allGroups.toMutableList().apply { removeAt(idx) }
                                         val newEnabled = allGroupEnabled.toMutableList().apply { removeAt(idx) }
-                                        viewModel.setCustomGroups(context, newGroups, newEnabled)
+                                        viewModel.updateCustomGroups(newGroups, newEnabled)
                                     },
                                     modifier = Modifier.defaultMinSize(minWidth = 28.dp, minHeight = 28.dp).padding(start = 2.dp),
                                     enabled = enablePackageGroupMapping,
@@ -208,7 +210,7 @@ fun UIRemoteFilter(
                         // 确保应用列表已加载
                         LaunchedEffect(Unit) {
                             if (!viewModel.isDataLoaded()) {
-                                viewModel.loadApps(context)
+                                viewModel.loadApps()
                             }
                         }
 
@@ -248,7 +250,7 @@ fun UIRemoteFilter(
             onClick = {
                 val newGroups = allGroups.toMutableList().apply { add(mutableListOf()) }
                 val newEnabled = allGroupEnabled.toMutableList().apply { add(true) }
-                viewModel.setCustomGroups(context, newGroups, newEnabled)
+                viewModel.updateCustomGroups(newGroups, newEnabled)
             },
             modifier = Modifier.padding(vertical = 2.dp),
             enabled = enablePackageGroupMapping,
@@ -271,11 +273,26 @@ fun UIRemoteFilter(
                             }
                         }
                     // 更新后端状态
-                    viewModel.setCustomGroups(context, newGroups, allGroupEnabled)
+                    viewModel.updateCustomGroups(newGroups, allGroupEnabled)
                     showAppPickerForGroup = false to -1
                 },
                 title = "选择应用",
             )
         }
     }
+}
+
+/** 以已注册端口构造 [RemoteFilterViewModel]。 */
+@Composable
+private fun remoteFilterViewModel(): RemoteFilterViewModel {
+    val filterPort = RemoteFilterPortRegistry.current ?: error("RemoteFilterPort 未注册")
+    val appsPort = LocalAppsPortRegistry.current ?: error("LocalAppsPort 未注册")
+    val iconPort = AppIconPortRegistry.current ?: error("AppIconPort 未注册")
+    return viewModel(
+        factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T = RemoteFilterViewModel(filterPort, appsPort, iconPort) as T
+            },
+    )
 }

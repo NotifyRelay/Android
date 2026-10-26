@@ -5,8 +5,10 @@ import com.xzyht.notifyrelay.feature.appslist.AndroidAppIconPort
 import com.xzyht.notifyrelay.feature.appslist.AndroidLocalAppsPort
 import com.xzyht.notifyrelay.feature.appslist.AndroidPinnedAppsPort
 import com.xzyht.notifyrelay.feature.notification.filter.AndroidLocalFilterPort
+import com.xzyht.notifyrelay.feature.notification.filter.AndroidRemoteFilterPort
 import notifyrelay.data.DataLayerAndroid
 import notifyrelay.domain.feature.notification.filter.LocalFilterPortRegistry
+import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 import notifyrelay.shared.feature.appslist.AppIconPortRegistry
 import notifyrelay.shared.feature.appslist.LocalAppsPortRegistry
 import notifyrelay.shared.feature.appslist.PinnedAppsPortRegistry
@@ -27,5 +29,6 @@ class NotifyRelayApplication : Application() {
         LocalAppsPortRegistry.install(AndroidLocalAppsPort(this))
         PinnedAppsPortRegistry.install(AndroidPinnedAppsPort(this))
         LocalFilterPortRegistry.install(AndroidLocalFilterPort(this))
+        RemoteFilterPortRegistry.install(AndroidRemoteFilterPort(this))
     }
 }
