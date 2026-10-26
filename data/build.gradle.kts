@@ -64,6 +64,9 @@ kotlin {
 
             // 依赖base模块
             implementation(project(":base"))
+
+            // 领域模型：SelectedDeviceInfo 以 typealias 复用，避免同类双份定义
+            api(project(":domain"))
             // KMP 公共端（过滤配置默认常量）
             implementation(project(":shared"))
 
