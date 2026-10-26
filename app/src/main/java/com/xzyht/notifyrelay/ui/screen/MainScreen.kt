@@ -31,6 +31,7 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.activity.MainActivity
+import com.xzyht.notifyrelay.ui.screen.DeviceListScreenContent
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -38,6 +39,7 @@ import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
+import notifyrelay.shared.ui.screen.DeviceListScreen
 import notifyrelay.shared.ui.screen.DeviceListScreenState
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -184,7 +186,24 @@ fun MainScreen(navigator: Navigator) {
                                 .fillMaxHeight()
                                 .background(colorScheme.background),
                     ) {
-                        DeviceListScreen(navigator, deviceListState)
+                        DeviceListScreen(navigator, deviceListState, content = { args ->
+                            DeviceListScreenContent(
+                                isLandscape = args.isLandscape,
+                                discoveryEnabled = args.discoveryEnabled,
+                                onDiscoveryChange = args.onDiscoveryChange,
+                                allDevices = args.allDevices,
+                                authedDeviceUuids = args.authedDeviceUuids,
+                                deviceStates = args.deviceStates,
+                                unauthedDevices = args.unauthedDevices,
+                                selectedDevice = args.selectedDevice,
+                                onSelectDevice = args.onSelectDevice,
+                                onRequestDelete = args.onRequestDelete,
+                                onShowRejectedDialog = args.onShowRejectedDialog,
+                                localBatteryLevel = args.localBatteryLevel,
+                                colorScheme = MiuixTheme.colorScheme,
+                                textStyles = MiuixTheme.textStyles,
+                            )
+                        })
                     }
                     HorizontalPager(
                         state = pagerState,
@@ -209,7 +228,24 @@ fun MainScreen(navigator: Navigator) {
                             .background(colorScheme.background)
                             .padding(paddingValues),
                 ) {
-                    DeviceListScreen(navigator, deviceListState)
+                    DeviceListScreen(navigator, deviceListState, content = { args ->
+                        DeviceListScreenContent(
+                            isLandscape = args.isLandscape,
+                            discoveryEnabled = args.discoveryEnabled,
+                            onDiscoveryChange = args.onDiscoveryChange,
+                            allDevices = args.allDevices,
+                            authedDeviceUuids = args.authedDeviceUuids,
+                            deviceStates = args.deviceStates,
+                            unauthedDevices = args.unauthedDevices,
+                            selectedDevice = args.selectedDevice,
+                            onSelectDevice = args.onSelectDevice,
+                            onRequestDelete = args.onRequestDelete,
+                            onShowRejectedDialog = args.onShowRejectedDialog,
+                            localBatteryLevel = args.localBatteryLevel,
+                            colorScheme = MiuixTheme.colorScheme,
+                            textStyles = MiuixTheme.textStyles,
+                        )
+                    })
                     HorizontalPager(
                         state = pagerState,
                         modifier =

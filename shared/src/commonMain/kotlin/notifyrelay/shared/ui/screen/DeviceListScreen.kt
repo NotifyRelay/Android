@@ -1,8 +1,5 @@
-package com.xzyht.notifyrelay.ui.screen
+package notifyrelay.shared.ui.screen
 
-import android.content.res.Configuration
-import android.os.Handler
-import android.os.Looper
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -13,11 +10,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.viewmodel.devicePortsViewModel
-import notifyrelay.base.util.BatteryUtils
+import kotlinx.coroutines.launch
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.service.callback.HandshakeRequestHandler
 import notifyrelay.shared.ui.dialog.PairingMode
@@ -26,8 +20,10 @@ import notifyrelay.shared.ui.screen.DeviceListScreenState
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
 import notifyrelay.shared.ui.screen.devicelist.DeleteDeviceConfirmDialog
 import notifyrelay.shared.ui.screen.devicelist.DeviceListPairingCodeDialog
+import notifyrelay.shared.ui.screen.devicelist.LocalDeviceListPort
 import notifyrelay.shared.ui.screen.devicelist.RejectedDeviceRestoreDialog
 import notifyrelay.shared.ui.viewmodel.DevicePortsViewModel
+import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -40,8 +36,9 @@ fun DeviceListScreen(
     navigator: Navigator,
     state: DeviceListScreenState = remember { DeviceListScreenState() },
     viewModel: DevicePortsViewModel = devicePortsViewModel(),
+    content: @Composable (DeviceListContentArgs) -> Unit,
 ) {
-    val context = LocalContext.current
+    val deviceListPort = LocalDeviceListPort.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
     val deviceManager = remember { viewModel.adminPort() }
@@ -60,7 +57,7 @@ fun DeviceListScreen(
 
     val localBatteryLevel =
         remember {
-            BatteryUtils.getBatteryLevel(context)
+            deviceListPort?.localBatteryLevel() ?: 0
         }
 
     val allDevices: List<DeviceInfo?> = listOf<DeviceInfo?>(null) + devices
@@ -94,7 +91,7 @@ fun DeviceListScreen(
     }
 
     // 有未认证设备连接时：生成配对码并弹出显示
-    val mainHandler = remember { Handler(Looper.getMainLooper()) }
+
     DisposableEffect(deviceManager) {
         val handler =
             object : HandshakeRequestHandler {
@@ -102,7 +99,7 @@ fun DeviceListScreen(
                     deviceInfo: DeviceInfo,
                     tmpPublicKey: String,
                 ) {
-                    mainHandler.post {
+                    coroutineScope.launch {
                         state.pendingConnectDevice = deviceInfo
                         state.pairingCodeDialogMode = PairingMode.SERVER_MODE
                         state.showPairingCodeDialog = true
@@ -117,8 +114,7 @@ fun DeviceListScreen(
         }
     }
 
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val isLandscape = deviceListPort?.isLandscape() ?: false
 
     val onSelectDevice: (DeviceInfo?) -> Unit = { deviceInfo ->
         if (deviceInfo == null) {
@@ -139,21 +135,21 @@ fun DeviceListScreen(
         showDeleteHistoryDialog = true
     }
 
-    DeviceListScreenContent(
-        isLandscape = isLandscape,
-        discoveryEnabled = discoveryEnabled,
-        onDiscoveryChange = { discoveryEnabled = it },
-        allDevices = allDevices,
-        authedDeviceUuids = authedDeviceUuids,
-        deviceStates = deviceStates,
-        unauthedDevices = unauthedDevices,
-        selectedDevice = selectedDevice,
-        onSelectDevice = onSelectDevice,
-        onRequestDelete = onRequestDelete,
-        onShowRejectedDialog = { state.showRejectedDialog = true },
-        localBatteryLevel = localBatteryLevel,
-        colorScheme = colorScheme,
-        textStyles = textStyles,
+    content(
+        DeviceListContentArgs(
+            isLandscape = isLandscape,
+            discoveryEnabled = discoveryEnabled,
+            onDiscoveryChange = { discoveryEnabled = it },
+            allDevices = allDevices,
+            authedDeviceUuids = authedDeviceUuids,
+            deviceStates = deviceStates,
+            unauthedDevices = unauthedDevices,
+            selectedDevice = selectedDevice,
+            onSelectDevice = onSelectDevice,
+            onRequestDelete = onRequestDelete,
+            onShowRejectedDialog = { state.showRejectedDialog = true },
+            localBatteryLevel = localBatteryLevel,
+        ),
     )
 
     DeviceListPairingCodeDialog(

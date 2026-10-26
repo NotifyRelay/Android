@@ -16,10 +16,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
 import com.xzyht.notifyrelay.ui.pages.UIChatTest
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
-import com.xzyht.notifyrelay.ui.viewmodel.devicePortsViewModel
 import kotlinx.coroutines.launch
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.viewmodel.DevicePortsViewModel
+import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme

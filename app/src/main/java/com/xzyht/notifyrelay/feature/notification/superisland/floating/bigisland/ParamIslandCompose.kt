@@ -16,7 +16,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
-import com.xzyht.notifyrelay.ui.viewmodel.devicePortsViewModel
 import github.xzynine.superislandui.floating.bigisland.components.ProgressInfoCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.ActionInfo
@@ -25,6 +24,7 @@ import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ClipboardUtils
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.shared.ui.viewmodel.DevicePortsViewModel
+import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 

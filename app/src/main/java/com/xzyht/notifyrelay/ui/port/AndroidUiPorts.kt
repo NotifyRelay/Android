@@ -7,6 +7,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import com.xzyht.notifyrelay.feature.appslist.launch.AndroidAppLaunchPort
+import com.xzyht.notifyrelay.feature.device.AndroidDeviceListPort
+import com.xzyht.notifyrelay.feature.device.service.AndroidDevicePortsProvider
 import com.xzyht.notifyrelay.feature.display.AndroidDisplayPort
 import notifyrelay.base.util.ClipboardUtils
 import notifyrelay.base.util.IntentUtils
@@ -28,6 +30,8 @@ import notifyrelay.shared.ui.port.LocalToastPort
 import notifyrelay.shared.ui.port.SystemBarPort
 import notifyrelay.shared.ui.port.ThemePort
 import notifyrelay.shared.ui.port.ToastPort
+import notifyrelay.shared.ui.screen.devicelist.LocalDeviceListPort
+import notifyrelay.shared.ui.viewmodel.LocalDevicePortsProvider
 
 private class AndroidToastPort(
     private val context: Context,
@@ -125,6 +129,8 @@ fun ProvideAndroidUiPorts(content: @Composable () -> Unit) {
         LocalBitmapPort provides AndroidBitmapPort,
         LocalDisplayPort provides AndroidDisplayPort(context),
         LocalAppLaunchPort provides AndroidAppLaunchPort(context),
+        LocalDeviceListPort provides AndroidDeviceListPort(context),
+        LocalDevicePortsProvider provides AndroidDevicePortsProvider(context),
         content = content,
     )
 }
