@@ -129,6 +129,8 @@ androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifec
 androidx-lifecycle-viewmodel-compose = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 # lifecycle-viewmodel 的 KMP 坐标（含 metadata 变体，可供 commonMain 使用）
 androidx-lifecycle-viewmodel = { group = "androidx.lifecycle", name = "lifecycle-viewmodel", version.ref = "lifecycle" }
+# lifecycle-viewmodel-compose 的 KMP 坐标（含 common metadata 与全平台变体）
+androidx-lifecycle-viewmodel-compose-kmp = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-compose", version.ref = "lifecycle" }
 androidx-compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "composeBom" }
 accompanist-pager-indicators = { group = "com.google.accompanist", name = "accompanist-pager-indicators", version.ref = "accompanistPager" }
 semver = { group = "io.github.z4kn4fein", name = "semver", version.ref = "semver" }
