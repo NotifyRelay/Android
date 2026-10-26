@@ -22,15 +22,14 @@ import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.xzyht.notifyrelay.feature.device.pairing.NativePairingCorePort
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.feature.device.service.callback.PairingCallbackHandler
-import com.xzyht.notifyrelay.nativecore.NativeCore
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeoutOrNull
 import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.pairing.PairingViewModel
 import notifyrelay.shared.feature.device.service.contract.DevicePairingPort
 import notifyrelay.shared.ui.dialog.PairingCodeInputField
 import notifyrelay.shared.ui.dialog.PairingMode
@@ -40,21 +39,22 @@ import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
 
-/**
- * 把 core 上抛的失败原因码转换为用户可读提示。
- *
- * 版本不兼容是最容易"查不到原因"的失败：core 会拒绝连接，但若平台只显示
- * 泛化的"配对超时/验证失败"，用户无法得知需要升级对端。此处显式区分。
- */
-private fun pairingFailureMessage(
-    reason: String?,
-    fallback: String,
-): String =
-    when (reason) {
-        PairingCallbackHandler.REASON_VERSION_MISMATCH ->
-            "core 版本不兼容：两端需升级到同一版本（major.minor 一致）"
-        else -> fallback
+/** 构造 [PairingViewModel]，注入核心端口与握手等待器。 */
+@Composable
+private fun pairingViewModelFactory(deviceManager: DevicePairingPort): ViewModelProvider.Factory {
+    val context = LocalContext.current.applicationContext
+    return remember(deviceManager, context) {
+        object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                PairingViewModel(
+                    core = NativePairingCorePort,
+                    pairingPort = deviceManager,
+                    handshakePort = DeviceConnectionManagerSingleton.getHandshakeWaiters(context),
+                ) as T
+        }
     }
+}
 
 @Composable
 fun PairingCodeDialog(
@@ -65,6 +65,7 @@ fun PairingCodeDialog(
     show: Boolean,
     onDismiss: () -> Unit,
     onPairingComplete: (success: Boolean, message: String) -> Unit = { _, _ -> },
+    viewModel: PairingViewModel = viewModel(factory = pairingViewModelFactory(deviceManager)),
 ) {
     if (!show) return
 
@@ -76,61 +77,22 @@ fun PairingCodeDialog(
         val scope = rememberCoroutineScope()
         val displayCode =
             remember {
-                if (NativeCore.isReady()) NativeCore.generatePairingCode() else null
+                viewModel.ensureDisplayCode()
             }
 
         LaunchedEffect(show) {
             if (show && targetDevice != null) {
-                if (displayCode == null) {
-                    onPairingComplete(false, "配对码生成失败：核心未初始化")
-                    onDismiss()
-                    return@LaunchedEffect
-                }
                 delay(500)
-                val handshakeDeferred = DeviceConnectionManagerSingleton.getHandshakeWaiters(context).register(targetDevice.uuid)
-                try {
-                    val initSuccess =
-                        withContext(Dispatchers.IO) {
-                            if (!NativeCore.isReady()) {
-                                false
-                            } else {
-                                val batteryLevel =
-                                    notifyrelay.base.util.BatteryUtils
-                                        .getBatteryLevel(context)
-                                val isCharging =
-                                    notifyrelay.base.util.BatteryUtils
-                                        .isCharging(context)
-                                val battery = if (isCharging) batteryLevel else -batteryLevel
-                                NativeCore.sendPairingInit(deviceManager.localUuid, targetDevice.uuid, displayCode, battery, "android") == 0
-                            }
-                        }
-                    if (!initSuccess) {
-                        onPairingComplete(false, "配对初始化失败")
-                        onDismiss()
-                        return@LaunchedEffect
-                    }
-                    val result =
-                        withTimeoutOrNull(90_000L) {
-                            handshakeDeferred.await()
-                        }
-                    withContext(Dispatchers.Main) {
-                        if (result == true) {
-                            onPairingComplete(true, "配对成功")
-                        } else if (result == false) {
-                            val reason = DeviceConnectionManagerSingleton.getHandshakeWaiters(context).failureReason(targetDevice.uuid)
-                            onPairingComplete(false, pairingFailureMessage(reason, "配对码验证失败"))
-                        } else {
-                            onPairingComplete(false, "配对超时")
-                        }
-                        onDismiss()
-                    }
-                } catch (e: Exception) {
-                    withContext(Dispatchers.Main) {
-                        onPairingComplete(false, "配对异常: ${e.message}")
-                        onDismiss()
-                    }
-                } finally {
-                    DeviceConnectionManagerSingleton.getHandshakeWaiters(context).cancel(targetDevice.uuid, handshakeDeferred)
+                val batteryLevel =
+                    notifyrelay.base.util.BatteryUtils
+                        .getBatteryLevel(context)
+                val isCharging =
+                    notifyrelay.base.util.BatteryUtils
+                        .isCharging(context)
+                val battery = if (isCharging) batteryLevel else -batteryLevel
+                viewModel.startClientPairing(targetDevice, battery) { success, message ->
+                    onPairingComplete(success, message)
+                    onDismiss()
                 }
             }
         }
@@ -184,7 +146,7 @@ fun PairingCodeDialog(
                     TextButton(
                         text = "取消",
                         onClick = {
-                            if (NativeCore.isReady()) NativeCore.clearPairingCode()
+                            viewModel.clearCode()
                             onDismiss()
                         },
                     )
@@ -192,7 +154,6 @@ fun PairingCodeDialog(
             },
         )
     } else {
-        val serverScope = rememberCoroutineScope()
         var code by remember { mutableStateOf("") }
         var isPairing by remember { mutableStateOf(false) }
         var errorMsg by remember { mutableStateOf<String?>(null) }
@@ -264,50 +225,20 @@ fun PairingCodeDialog(
                                     return@TextButton
                                 }
                                 isPairing = true
-
-                                serverScope.launch {
-                                    val handshakeDeferred = DeviceConnectionManagerSingleton.getHandshakeWaiters(context).register(remoteUuid)
-                                    try {
-                                        val result =
-                                            withContext(Dispatchers.IO) {
-                                                try {
-                                                    if (!NativeCore.isReady()) return@withContext "配对失败：未初始化"
-                                                    val ltPubKey = deviceManager.localPublicKey
-                                                    // 与发起方/保活/扫描路径一致：上报本机真实带符号电量（正=充电，负=放电）
-                                                    val batteryLevel =
-                                                        notifyrelay.base.util.BatteryUtils
-                                                            .getBatteryLevel(context)
-                                                    val isCharging =
-                                                        notifyrelay.base.util.BatteryUtils
-                                                            .isCharging(context)
-                                                    val battery = if (isCharging) batteryLevel else -batteryLevel
-                                                    val sendOk = NativeCore.sendPairingResp(remoteUuid, ltPubKey, code, remoteIp, battery, "android")
-                                                    if (sendOk != 0) return@withContext "配对失败：发送响应失败"
-                                                    val success =
-                                                        withTimeoutOrNull(30_000L) {
-                                                            handshakeDeferred.await()
-                                                        }
-                                                    if (success == true) {
-                                                        "配对成功"
-                                                    } else if (success == false) {
-                                                        val reason = DeviceConnectionManagerSingleton.getHandshakeWaiters(context).failureReason(remoteUuid)
-                                                        pairingFailureMessage(reason, "配对失败：对方拒绝了配对")
-                                                    } else {
-                                                        "配对超时"
-                                                    }
-                                                } catch (e: Exception) {
-                                                    "配对失败: ${e.message}"
-                                                }
-                                            }
-                                        if (result == "配对成功") {
-                                            onPairingComplete(true, "配对成功")
-                                            onDismiss()
-                                        } else {
-                                            isPairing = false
-                                            errorMsg = result
-                                        }
-                                    } finally {
-                                        DeviceConnectionManagerSingleton.getHandshakeWaiters(context).cancel(remoteUuid, handshakeDeferred)
+                                val batteryLevel =
+                                    notifyrelay.base.util.BatteryUtils
+                                        .getBatteryLevel(context)
+                                val isCharging =
+                                    notifyrelay.base.util.BatteryUtils
+                                        .isCharging(context)
+                                val battery = if (isCharging) batteryLevel else -batteryLevel
+                                viewModel.submitServerPairing(remoteUuid, remoteIp, code, battery) { result, ok ->
+                                    if (ok) {
+                                        onPairingComplete(true, "配对成功")
+                                        onDismiss()
+                                    } else {
+                                        isPairing = false
+                                        errorMsg = result
                                     }
                                 }
                             },

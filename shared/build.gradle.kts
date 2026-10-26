@@ -48,6 +48,8 @@ kotlin {
             // 扩展图标（ScrollableTopAppBarPage / DeleteButton 等使用 MiuixIcons.Extended）
             implementation(libs.miuix.icons)
             implementation(libs.kotlinx.serialization.json)
+            // ViewModel 在公共源集的承载
+            implementation(libs.androidx.lifecycle.viewmodel)
             // UpdateDialog 依赖的 ReleaseInfo 数据模型（KMP 库）
             implementation(project(":checkupdata"))
         }
