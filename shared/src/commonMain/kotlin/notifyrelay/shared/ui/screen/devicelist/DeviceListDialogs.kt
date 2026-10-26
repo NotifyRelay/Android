@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.screen
+package notifyrelay.shared.ui.screen.devicelist
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,6 +22,9 @@ import notifyrelay.shared.ui.dialog.PairingMode
 import notifyrelay.shared.ui.dialog.RejectedDevicesDialog
 import notifyrelay.shared.ui.port.LocalToastPort
 import notifyrelay.shared.ui.screen.DeviceListScreenState
+import notifyrelay.shared.ui.screen.devicelist.DeleteDeviceConfirmDialog
+import notifyrelay.shared.ui.screen.devicelist.DeviceListPairingCodeDialog
+import notifyrelay.shared.ui.screen.devicelist.RejectedDeviceRestoreDialog
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.window.WindowDialog
@@ -33,7 +36,7 @@ import top.yukonga.miuix.kmp.window.WindowDialog
  * 抽离后原先的自由变量一律显式化为参数。配对成功后刷新已认证设备集合。
  */
 @Composable
-internal fun DeviceListPairingCodeDialog(
+fun DeviceListPairingCodeDialog(
     state: DeviceListScreenState,
     deviceManager: DeviceAdminPort,
     onAuthedUuidsChange: (Set<String>) -> Unit,
@@ -97,7 +100,7 @@ internal fun DeviceListPairingCodeDialog(
  * @param findOtherUuidsWithSameIp 查找与本设备同 IP 的其它已认证设备 uuid（原为外层局部函数）。
  */
 @Composable
-internal fun RejectedDeviceRestoreDialog(
+fun RejectedDeviceRestoreDialog(
     state: DeviceListScreenState,
     deviceManager: DeviceAdminPort,
     rejectedDevices: List<DeviceInfo>,
@@ -128,7 +131,7 @@ internal fun RejectedDeviceRestoreDialog(
  * @param onClose 关闭对话框并清空选中/待删除状态（原为内联的四处状态写入）。
  */
 @Composable
-internal fun DeleteDeviceConfirmDialog(
+fun DeleteDeviceConfirmDialog(
     show: Boolean,
     device: DeviceInfo,
     deviceManager: DeviceAdminPort,
