@@ -16,9 +16,10 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
 import com.xzyht.notifyrelay.ui.pages.UIChatTest
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
-import com.xzyht.notifyrelay.ui.viewmodel.DevicePortsViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.devicePortsViewModel
 import kotlinx.coroutines.launch
 import notifyrelay.shared.ui.navigation.Navigator
+import notifyrelay.shared.ui.viewmodel.DevicePortsViewModel
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -30,7 +31,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun HistoryScreen(
     navigator: Navigator,
-    viewModel: DevicePortsViewModel = viewModel(),
+    viewModel: DevicePortsViewModel = devicePortsViewModel(),
 ) {
     val coroutineScope = rememberCoroutineScope()
     val tabTitles = listOf("通知历史", "超级岛历史", "聊天测试")
@@ -76,7 +77,7 @@ fun HistoryScreen(
                 1 -> UISuperIslandHistory()
                 2 ->
                     UIChatTest(
-                        deviceManager = viewModel.chatPort(context),
+                        deviceManager = viewModel.chatPort(),
                     )
             }
         }

@@ -16,7 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
-import com.xzyht.notifyrelay.ui.viewmodel.DevicePortsViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.devicePortsViewModel
 import github.xzynine.superislandui.floating.bigisland.components.ProgressInfoCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.ActionInfo
@@ -24,6 +24,7 @@ import github.xzynine.superislandui.model.core.ParamIsland
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ClipboardUtils
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.shared.ui.viewmodel.DevicePortsViewModel
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 
@@ -36,7 +37,7 @@ fun ParamIslandCompose(
     modifier: Modifier = Modifier,
     actions: List<ActionInfo>? = null,
     picMap: Map<String, String>? = null,
-    viewModel: DevicePortsViewModel = viewModel(),
+    viewModel: DevicePortsViewModel = devicePortsViewModel(),
 ) {
     // 调试日志
     paramIsland.bigIslandArea?.let {
@@ -142,7 +143,7 @@ fun ParamIslandCompose(
                                             ToastUtils.showShortToast(context, "复制失败")
                                         } else {
                                             try {
-                                                val deviceManager = viewModel.queryPort(context)
+                                                val deviceManager = viewModel.queryPort()
                                                 ClipboardSyncManager.syncTextDirectly(deviceManager, code, context)
                                                 ToastUtils.showShortToast(context, "验证码已复制")
                                             } catch (e: Exception) {

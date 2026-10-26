@@ -16,7 +16,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.viewmodel.DevicePortsViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.devicePortsViewModel
 import notifyrelay.base.util.BatteryUtils
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.service.callback.HandshakeRequestHandler
@@ -24,6 +24,7 @@ import notifyrelay.shared.ui.dialog.PairingMode
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.screen.DeviceListScreenState
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
+import notifyrelay.shared.ui.viewmodel.DevicePortsViewModel
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
@@ -35,12 +36,12 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun DeviceListScreen(
     navigator: Navigator,
     state: DeviceListScreenState = remember { DeviceListScreenState() },
-    viewModel: DevicePortsViewModel = viewModel(),
+    viewModel: DevicePortsViewModel = devicePortsViewModel(),
 ) {
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
-    val deviceManager = remember { viewModel.adminPort(context) }
+    val deviceManager = remember { viewModel.adminPort() }
     val coroutineScope = rememberCoroutineScope()
 
     var authedDeviceUuids by rememberSaveable { mutableStateOf(setOf<String>()) }

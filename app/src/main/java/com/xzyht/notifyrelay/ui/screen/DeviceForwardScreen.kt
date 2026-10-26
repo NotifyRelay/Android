@@ -21,7 +21,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
 import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import com.xzyht.notifyrelay.ui.pages.RemoteAppsPage
-import com.xzyht.notifyrelay.ui.viewmodel.DevicePortsViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.devicePortsViewModel
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyAdvancedPage
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
@@ -32,6 +32,7 @@ import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
+import notifyrelay.shared.ui.viewmodel.DevicePortsViewModel
 import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
@@ -39,7 +40,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun DeviceForwardScreen(
-    portsViewModel: DevicePortsViewModel = viewModel(),
+    portsViewModel: DevicePortsViewModel = devicePortsViewModel(),
     filterViewModel: RemoteFilterViewModel = viewModel(),
 ) {
     val context = LocalContext.current
@@ -57,7 +58,7 @@ fun DeviceForwardScreen(
     val selectedTabIndex = pagerState.currentPage
     val colorScheme = MiuixTheme.colorScheme
 
-    val deviceManager = remember { portsViewModel.adminPort(context) }
+    val deviceManager = remember { portsViewModel.adminPort() }
     val selectedDeviceState = GlobalSelectedDeviceHolder.current()
     val selectedDevice = selectedDeviceState.value
 
