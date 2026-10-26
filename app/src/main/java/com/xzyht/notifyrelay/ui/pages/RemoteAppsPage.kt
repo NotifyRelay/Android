@@ -8,11 +8,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.pages.remoteapps.openLocalApp
-import com.xzyht.notifyrelay.ui.pages.remoteapps.rememberRemoteAppsPageState
 import notifyrelay.shared.ui.pages.remoteapps.DisplayNavigationBar
 import notifyrelay.shared.ui.pages.remoteapps.LocalAppsContent
+import notifyrelay.shared.ui.pages.remoteapps.LocalDisplayPort
 import notifyrelay.shared.ui.pages.remoteapps.RemoteAppsContent
 import notifyrelay.shared.ui.pages.remoteapps.RemoteAppsMenuHost
+import notifyrelay.shared.ui.pages.remoteapps.rememberRemoteAppsPageState
 import notifyrelay.shared.ui.viewmodel.LocalAppsViewModel
 import notifyrelay.shared.ui.viewmodel.RemoteAppsViewModel
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -36,7 +37,7 @@ fun RemoteAppsPage(
     val remoteState by remoteViewModel.state.collectAsState()
     val localState by localViewModel.state.collectAsState()
 
-    val pageState = rememberRemoteAppsPageState(isLocalMode = isLocalMode, context = context)
+    val pageState = rememberRemoteAppsPageState(isLocalMode = isLocalMode, displayPort = LocalDisplayPort.current)
     var showMenuForApp by pageState.showMenuForApp
 
     val searchQuery = if (isLocalMode) localState.searchQuery else remoteState.searchQuery
