@@ -10,11 +10,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.ui.viewmodel.AppsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.domain.feature.appslist.model.RemoteAppInfo
 import notifyrelay.domain.feature.appslist.model.appMatchesQuery
+import notifyrelay.shared.ui.viewmodel.AppsState
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
@@ -63,7 +63,7 @@ internal fun RemoteAppsContent(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = state.error,
+                        text = state.error ?: "",
                         color = colorScheme.error,
                     )
                     Spacer(modifier = Modifier.height(8.dp))

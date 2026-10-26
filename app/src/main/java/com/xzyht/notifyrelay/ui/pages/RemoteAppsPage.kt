@@ -12,9 +12,9 @@ import com.xzyht.notifyrelay.ui.pages.remoteapps.RemoteAppsContent
 import com.xzyht.notifyrelay.ui.pages.remoteapps.RemoteAppsMenuHost
 import com.xzyht.notifyrelay.ui.pages.remoteapps.openLocalApp
 import com.xzyht.notifyrelay.ui.pages.remoteapps.rememberRemoteAppsPageState
-import com.xzyht.notifyrelay.ui.viewmodel.LocalAppsViewModel
-import com.xzyht.notifyrelay.ui.viewmodel.RemoteAppsViewModel
 import notifyrelay.shared.ui.pages.remoteapps.DisplayNavigationBar
+import notifyrelay.shared.ui.viewmodel.LocalAppsViewModel
+import notifyrelay.shared.ui.viewmodel.RemoteAppsViewModel
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -46,9 +46,9 @@ fun RemoteAppsPage(
 
     LaunchedEffect(isLocalMode, deviceIp, deviceUuid) {
         if (isLocalMode) {
-            localViewModel.loadApps(context)
+            localViewModel.loadApps()
         } else {
-            remoteViewModel.loadApps(context, deviceUuid)
+            remoteViewModel.loadApps(deviceUuid)
         }
     }
 
@@ -85,9 +85,9 @@ fun RemoteAppsPage(
                 IconButton(
                     onClick = {
                         if (isLocalMode) {
-                            localViewModel.loadApps(context)
+                            localViewModel.loadApps()
                         } else {
-                            remoteViewModel.refreshApps(context)
+                            remoteViewModel.refreshApps()
                         }
                     },
                     enabled = if (isLocalMode) !localState.isLoading else !remoteState.isLoading,
@@ -118,10 +118,10 @@ fun RemoteAppsPage(
                 RemoteAppsContent(
                     state = remoteState,
                     onAppClick = { app ->
-                        remoteViewModel.openApp(context, app, deviceIp, useScrcpyStartApp = true)
+                        remoteViewModel.openApp(app, deviceIp, useScrcpyStartApp = true)
                     },
                     onAppLongClick = { showMenuForApp = it },
-                    onRefresh = { remoteViewModel.refreshApps(context) },
+                    onRefresh = { remoteViewModel.refreshApps() },
                 )
             }
         }

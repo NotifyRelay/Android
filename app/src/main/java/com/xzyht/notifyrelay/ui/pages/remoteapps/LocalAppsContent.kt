@@ -11,13 +11,13 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.ui.viewmodel.AppsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.domain.feature.appslist.model.LocalAppInfo
 import notifyrelay.domain.feature.appslist.model.appMatchesQuery
+import notifyrelay.shared.ui.viewmodel.AppsState
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
@@ -74,7 +74,7 @@ internal fun LocalAppsContent(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = state.error,
+                        text = state.error ?: "",
                         color = colorScheme.error,
                     )
                 }

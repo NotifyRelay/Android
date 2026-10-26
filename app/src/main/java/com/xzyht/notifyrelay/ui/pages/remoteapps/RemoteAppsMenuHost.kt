@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.ui.viewmodel.RemoteAppsViewModel
 import notifyrelay.domain.feature.appslist.model.LocalAppInfo
 import notifyrelay.domain.feature.appslist.model.RemoteAppInfo
+import notifyrelay.shared.ui.viewmodel.RemoteAppsViewModel
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.window.WindowDialog
 
@@ -49,13 +49,13 @@ internal fun RemoteAppsMenuHost(
             onDismiss = onDismiss,
             onPin =
                 if (app is RemoteAppInfo) {
-                    { remoteViewModel.pinApp(context, app.packageName) }
+                    { remoteViewModel.pinApp(app.packageName) }
                 } else {
                     null
                 },
             onUnpin =
                 if (app is RemoteAppInfo) {
-                    { remoteViewModel.unpinApp(context, app.packageName) }
+                    { remoteViewModel.unpinApp(app.packageName) }
                 } else {
                     null
                 },
