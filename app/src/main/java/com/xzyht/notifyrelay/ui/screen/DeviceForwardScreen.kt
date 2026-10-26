@@ -17,11 +17,12 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
 import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import com.xzyht.notifyrelay.ui.pages.RemoteAppsPage
+import com.xzyht.notifyrelay.ui.viewmodel.DevicePortsViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.RemoteFilterViewModel
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyAdvancedPage
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
@@ -37,15 +38,17 @@ import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-fun DeviceForwardScreen() {
+fun DeviceForwardScreen(
+    portsViewModel: DevicePortsViewModel = viewModel(),
+    filterViewModel: RemoteFilterViewModel = viewModel(),
+) {
     val context = LocalContext.current
     val navigator = LocalNavigator.current
     val coroutineScope = rememberCoroutineScope()
 
     LaunchedEffect(Unit) {
-        if (!RemoteFilterConfig.isLoaded) {
-            RemoteFilterConfig.load(context)
-            RemoteFilterConfig.isLoaded = true
+        if (!filterViewModel.isLoaded()) {
+            filterViewModel.ensureLoaded(context)
         }
     }
 
@@ -54,7 +57,7 @@ fun DeviceForwardScreen() {
     val selectedTabIndex = pagerState.currentPage
     val colorScheme = MiuixTheme.colorScheme
 
-    val deviceManager = remember { DeviceConnectionManagerSingleton.getDeviceAdmin(context) }
+    val deviceManager = remember { portsViewModel.adminPort(context) }
     val selectedDeviceState = GlobalSelectedDeviceHolder.current()
     val selectedDevice = selectedDeviceState.value
 

@@ -62,6 +62,27 @@ class AppIconViewModel : ViewModel() {
     /** 图标更新信号。 */
     val iconUpdatesFlow get() = AppIconRepository.iconUpdates
 
+    /** 取指定包名图标的原始位图；结果经 [onResult] 回调。 */
+    fun bitmapIcon(
+        context: android.content.Context,
+        packageName: String,
+        onResult: (android.graphics.Bitmap?) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onResult(runCatching { AppIconRepository.getAppIconAsync(context, packageName) }.getOrNull())
+        }
+    }
+
+    /** 解码 data URL 为位图；失败返回 null。 */
+    suspend fun decodeImage(
+        context: android.content.Context,
+        data: String,
+    ): android.graphics.Bitmap? =
+        runCatching {
+            com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+                .decodeBitmap(context, data)
+        }.getOrNull()
+
     /** 取系统默认应用图标（尺寸为 [size] 像素）。 */
     fun loadDefaultIcon(
         context: Context,

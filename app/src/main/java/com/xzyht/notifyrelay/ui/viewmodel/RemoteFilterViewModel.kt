@@ -46,6 +46,18 @@ class RemoteFilterViewModel : ViewModel() {
 
     val defaultGroupSize: Int get() = RemoteFilterConfig.defaultPackageGroups.size
 
+    fun isLoaded(): Boolean = RemoteFilterConfig.isLoaded
+
+    fun ensureLoaded(context: Context) {
+        if (!RemoteFilterConfig.isLoaded) {
+            viewModelScope.launch {
+                RemoteFilterConfig.load(context)
+                RemoteFilterConfig.isLoaded = true
+                syncFromConfig()
+            }
+        }
+    }
+
     fun load(context: Context) {
         viewModelScope.launch {
             if (!RemoteFilterConfig.isLoaded) {

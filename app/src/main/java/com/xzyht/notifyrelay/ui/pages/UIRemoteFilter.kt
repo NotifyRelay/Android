@@ -25,9 +25,8 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
-import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
+import com.xzyht.notifyrelay.ui.viewmodel.AppIconViewModel
 import com.xzyht.notifyrelay.ui.viewmodel.RemoteFilterViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -46,6 +45,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun UIRemoteFilter(
     modifier: Modifier = Modifier,
     viewModel: RemoteFilterViewModel = viewModel(),
+    iconViewModel: AppIconViewModel = viewModel(),
 ) {
     val context = LocalContext.current
 
@@ -202,13 +202,13 @@ fun UIRemoteFilter(
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         // 监听已安装应用仓库的状态，确保数据已加载
-                        val installedPkgs by remember { InstalledAppsRepository.apps }.collectAsState()
+                        val installedPkgs by viewModel.installedPkgs.collectAsState()
                         val installedPkgSet = installedPkgs.map { it.packageName }.toSet()
 
                         // 确保应用列表已加载
                         LaunchedEffect(Unit) {
-                            if (!InstalledAppsRepository.isDataLoaded()) {
-                                InstalledAppsRepository.loadApps(context)
+                            if (!viewModel.isDataLoaded()) {
+                                viewModel.loadApps(context)
                             }
                         }
 
@@ -220,10 +220,9 @@ fun UIRemoteFilter(
                             // 异步加载缺失的图标，并在加载完成后更新状态
                             LaunchedEffect(pkg) {
                                 if (iconBitmap == null) {
-                                    // 异步加载图标
-                                    val loadedIcon = AppIconRepository.getAppIconAsync(context, pkg)
-                                    // 更新状态，触发UI重新渲染
-                                    iconBitmap = loadedIcon
+                                    iconViewModel.bitmapIcon(context, pkg) { icon ->
+                                        iconBitmap = icon
+                                    }
                                 }
                             }
 

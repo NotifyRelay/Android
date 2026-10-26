@@ -36,6 +36,14 @@ class LocalFilterViewModel : ViewModel() {
     val builtinKeywords: Set<String> = BackendLocalFilter.getBuiltinKeywords()
     val builtinPackages: Set<String> = BackendLocalFilter.getDefaultPackageFilters()
 
+    companion object {
+        /** 构造过滤条目（供界面侧类型转换使用）。 */
+        fun entryOf(
+            keyword: String,
+            packageName: String,
+        ): BackendLocalFilter.FilterEntry = BackendLocalFilter.FilterEntry(keyword, packageName)
+    }
+
     fun load(context: Context) {
         viewModelScope.launch {
             allEntries = BackendLocalFilter.getFilterEntries(context).toList()

@@ -24,7 +24,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.ui.viewmodel.AppIconViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -39,6 +38,7 @@ internal fun SuperIslandHistoryImage(
     imageKey: String,
     data: String,
     modifier: Modifier = Modifier,
+    viewModel: AppIconViewModel = viewModel(),
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
@@ -53,7 +53,7 @@ internal fun SuperIslandHistoryImage(
 
         val loaded =
             withContext(Dispatchers.IO) {
-                val bitmap = SuperIslandImageStore.decodeBitmap(context, data)
+                val bitmap = viewModel.decodeImage(context, data)
                 bitmap?.let { SuperIslandImageCache.put(data, it) }
             }
 
