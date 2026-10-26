@@ -27,6 +27,10 @@ import notifyrelay.base.util.GuidePermissionRequester
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.shared.ui.guide.GuidePageFooter
+import notifyrelay.shared.ui.guide.GuidePageHeader
+import notifyrelay.shared.ui.guide.GuidePermissionItem
+import notifyrelay.shared.ui.guide.GuideSectionLabel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Text

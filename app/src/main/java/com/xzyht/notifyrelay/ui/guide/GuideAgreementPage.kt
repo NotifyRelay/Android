@@ -24,6 +24,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.R
+import notifyrelay.shared.ui.guide.GuidePageFooter
+import notifyrelay.shared.ui.guide.GuidePageHeader
+import notifyrelay.shared.ui.guide.GuideSectionLabel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Text

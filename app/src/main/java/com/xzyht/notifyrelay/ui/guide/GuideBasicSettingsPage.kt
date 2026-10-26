@@ -27,6 +27,9 @@ import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
 import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyPreferenceKeys
 import notifyrelay.shared.log.Logger
+import notifyrelay.shared.ui.guide.GuidePageFooter
+import notifyrelay.shared.ui.guide.GuidePageHeader
+import notifyrelay.shared.ui.guide.GuideSectionLabel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.preference.ArrowPreference
