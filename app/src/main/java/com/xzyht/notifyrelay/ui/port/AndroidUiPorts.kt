@@ -10,6 +10,7 @@ import com.xzyht.notifyrelay.feature.appslist.launch.AndroidAppLaunchPort
 import com.xzyht.notifyrelay.feature.device.AndroidDeviceListPort
 import com.xzyht.notifyrelay.feature.device.service.AndroidDevicePortsProvider
 import com.xzyht.notifyrelay.feature.display.AndroidDisplayPort
+import com.xzyht.notifyrelay.feature.preference.AndroidPreferencePort
 import com.xzyht.notifyrelay.feature.settings.AndroidSettingsPort
 import com.xzyht.notifyrelay.feature.ui.AndroidMainScreenPort
 import com.xzyht.notifyrelay.ui.activity.MainActivity
@@ -27,6 +28,7 @@ import notifyrelay.shared.ui.port.IntentLaunchPort
 import notifyrelay.shared.ui.port.LocalBitmapPort
 import notifyrelay.shared.ui.port.LocalClipboardPort
 import notifyrelay.shared.ui.port.LocalIntentLaunchPort
+import notifyrelay.shared.ui.port.LocalPreferencePort
 import notifyrelay.shared.ui.port.LocalSystemBarPort
 import notifyrelay.shared.ui.port.LocalThemePort
 import notifyrelay.shared.ui.port.LocalToastPort
@@ -138,6 +140,7 @@ fun ProvideAndroidUiPorts(content: @Composable () -> Unit) {
         LocalDevicePortsProvider provides AndroidDevicePortsProvider(context),
         LocalSettingsPort provides AndroidSettingsPort(context),
         LocalMainScreenPort provides AndroidMainScreenPort(context, LocalContext.current as? MainActivity),
+        LocalPreferencePort provides AndroidPreferencePort,
         content = content,
     )
 }

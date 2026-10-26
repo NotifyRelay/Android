@@ -15,7 +15,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
-import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
 import com.xzyht.notifyrelay.ui.pages.UIAbout
 import com.xzyht.notifyrelay.ui.pages.UIChatTest
@@ -31,6 +30,7 @@ import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
+import notifyrelay.shared.ui.pages.MusicControlPage
 import notifyrelay.shared.ui.screen.DeviceForwardScreen
 import notifyrelay.shared.ui.screen.HistoryScreen
 import notifyrelay.shared.ui.screen.MainScreen

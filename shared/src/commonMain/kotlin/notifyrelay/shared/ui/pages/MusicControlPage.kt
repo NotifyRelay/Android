@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages
+package notifyrelay.shared.ui.pages
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -20,9 +20,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.base.log.Logger
-import notifyrelay.data.Storage
 import notifyrelay.domain.feature.media.MediaMessageReceiveMode
 import notifyrelay.shared.ui.common.MiuixSpinnerPreference
+import notifyrelay.shared.ui.port.LocalPreferencePort
 import notifyrelay.shared.ui.port.LocalToastPort
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
 import notifyrelay.shared.ui.viewmodel.AudioRelayViewModel
@@ -40,6 +40,8 @@ fun MusicControlPage(
     audioViewModel: AudioRelayViewModel = viewModel(),
     mediaViewModel: MediaControlViewModel = viewModel(),
 ) {
+    val prefPort = LocalPreferencePort.current ?: error("LocalPreferencePort 未提供")
+
     val toastPort = LocalToastPort.current
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
@@ -57,13 +59,13 @@ fun MusicControlPage(
     }
 
     // 胶囊歌词开关状态
-    var capsuleLyricsEnabled by remember { mutableStateOf(Storage.getBoolean("capsule_lyrics_enabled")) }
+    var capsuleLyricsEnabled by remember { mutableStateOf(prefPort.getBoolean("capsule_lyrics_enabled")) }
 
     // 发送媒体通知到对端
-    var sendMediaNotificationsEnabled by remember { mutableStateOf(Storage.getBoolean("send_media_notifications_enabled", true)) }
+    var sendMediaNotificationsEnabled by remember { mutableStateOf(prefPort.getBoolean("send_media_notifications_enabled", true)) }
 
     // 音频转发方式（0: scrcpy, 1: 中继）
-    var audioRelayMode by remember { mutableStateOf(Storage.getInt("audio_relay_mode", 0)) }
+    var audioRelayMode by remember { mutableStateOf(prefPort.getInt("audio_relay_mode", 0)) }
 
     Column(
         modifier =
@@ -166,7 +168,7 @@ fun MusicControlPage(
             selectedIndex = audioRelayMode,
             onSelectedIndexChange = { index ->
                 audioRelayMode = index
-                Storage.putInt("audio_relay_mode", index)
+                prefPort.putInt("audio_relay_mode", index)
             },
         )
 
@@ -204,7 +206,7 @@ fun MusicControlPage(
             checked = capsuleLyricsEnabled,
             onCheckedChange = { enabled ->
                 capsuleLyricsEnabled = enabled
-                Storage.putBoolean("capsule_lyrics_enabled", enabled)
+                prefPort.putBoolean("capsule_lyrics_enabled", enabled)
             },
         )
 
@@ -215,12 +217,12 @@ fun MusicControlPage(
             checked = sendMediaNotificationsEnabled,
             onCheckedChange = { enabled ->
                 sendMediaNotificationsEnabled = enabled
-                Storage.putBoolean("send_media_notifications_enabled", enabled)
+                prefPort.putBoolean("send_media_notifications_enabled", enabled)
             },
         )
 
         // 歌词分割模式设置
-        var lyricsSplitMode by remember { mutableStateOf(Storage.getInt("lyrics_split_mode", 0)) }
+        var lyricsSplitMode by remember { mutableStateOf(prefPort.getInt("lyrics_split_mode", 0)) }
 
         MiuixSpinnerPreference(
             title = "歌词分割模式",
@@ -234,7 +236,7 @@ fun MusicControlPage(
             selectedIndex = lyricsSplitMode,
             onSelectedIndexChange = { index ->
                 lyricsSplitMode = index
-                Storage.putInt("lyrics_split_mode", index)
+                prefPort.putInt("lyrics_split_mode", index)
             },
         )
 
