@@ -4,7 +4,7 @@ import android.app.ActivityOptions
 import android.content.Context
 import android.content.Intent
 import android.os.Build
-import com.xzyht.notifyrelay.sync.ProtocolSender
+import com.xzyht.notifyrelay.nativecore.device.ProtocolSender
 import notifyrelay.base.log.Logger
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.service.contract.DeviceAuthTablePort

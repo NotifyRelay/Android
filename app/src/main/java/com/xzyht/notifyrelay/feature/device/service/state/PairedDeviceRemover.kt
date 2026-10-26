@@ -3,6 +3,7 @@ package com.xzyht.notifyrelay.feature.device.service.state
 import android.content.Context
 import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import com.xzyht.notifyrelay.nativecore.device.DeviceTargetRegistry
 import notifyrelay.base.log.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.domain.feature.device.model.AuthInfo

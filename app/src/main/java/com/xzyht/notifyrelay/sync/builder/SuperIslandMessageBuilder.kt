@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.sync.builder
 import android.content.Context
 import android.net.Uri
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.sync.SendGateway
+import com.xzyht.notifyrelay.nativecore.device.SendGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.log.Logger

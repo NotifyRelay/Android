@@ -1,8 +1,8 @@
 package com.xzyht.notifyrelay.feature.device.service.pairing
 
 import com.xzyht.notifyrelay.feature.device.service.state.DeviceSnapshotStore
-import com.xzyht.notifyrelay.feature.device.service.state.DeviceTargetRegistry
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import com.xzyht.notifyrelay.nativecore.device.DeviceTargetRegistry
 import notifyrelay.base.log.Logger
 import notifyrelay.domain.feature.device.model.AuthInfo
 import notifyrelay.domain.feature.device.model.PendingPairing

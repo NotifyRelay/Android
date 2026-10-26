@@ -3,8 +3,8 @@ package com.xzyht.notifyrelay.ui.port
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
-import com.xzyht.notifyrelay.feature.device.pairing.NativePairingCorePort
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.nativecore.device.NativePairingCorePort
 import notifyrelay.base.util.BatteryUtils
 import notifyrelay.shared.feature.device.pairing.LocalPairingDependencies
 import notifyrelay.shared.feature.device.pairing.PairingDependencies

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.device.service.state
+package com.xzyht.notifyrelay.nativecore.device
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.domain.feature.device.model.DeviceSnapshot

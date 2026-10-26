@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.sync
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.notification.HighPriorityNotifier
+import com.xzyht.notifyrelay.nativecore.device.SendGateway
 import com.xzyht.notifyrelay.sync.builder.ChatMessageBuilder
 import com.xzyht.notifyrelay.sync.builder.MediaMessageBuilder
 import com.xzyht.notifyrelay.sync.builder.SuperIslandMessageBuilder

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.sync
+package com.xzyht.notifyrelay.nativecore.device
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.log.Logger

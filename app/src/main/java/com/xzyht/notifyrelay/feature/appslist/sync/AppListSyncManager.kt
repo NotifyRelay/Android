@@ -4,7 +4,7 @@ import android.content.Context
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.appslist.RemoteAppsCache
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.sync.ProtocolSender
+import com.xzyht.notifyrelay.nativecore.device.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job

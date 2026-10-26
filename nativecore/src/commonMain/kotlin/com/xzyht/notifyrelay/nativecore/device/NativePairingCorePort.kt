@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.device.pairing
+package com.xzyht.notifyrelay.nativecore.device
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.domain.feature.device.pairing.PairingCorePort

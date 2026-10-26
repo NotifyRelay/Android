@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.sync.builder
 
 import android.content.Context
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.sync.SendGateway
+import com.xzyht.notifyrelay.nativecore.device.SendGateway
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.domain.feature.device.service.contract.DeviceAuthTablePort

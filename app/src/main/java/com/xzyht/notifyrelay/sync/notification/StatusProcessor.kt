@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.sync.notification
 import android.content.Context
 import android.os.Handler
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.sync.ProtocolSender
+import com.xzyht.notifyrelay.nativecore.device.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ToastUtils

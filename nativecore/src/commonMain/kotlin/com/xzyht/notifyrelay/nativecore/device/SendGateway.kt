@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.sync
+package com.xzyht.notifyrelay.nativecore.device
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.log.Logger
@@ -13,7 +13,7 @@ import notifyrelay.domain.feature.device.service.contract.DeviceQueryPort
  * - [getAuthenticatedDevices]：经 [DeviceConnectionManager] 的 `internal` 访问器读取已认证设备（已去除反射）。
  * - [enqueueNotification]：通知类入队（经 Rust 发送队列：加密、限流、重试、去重由 Rust 统一处理）。
  */
-internal object SendGateway {
+object SendGateway {
     private const val TAG = "MessageSender"
 
     /**

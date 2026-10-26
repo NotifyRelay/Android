@@ -6,7 +6,7 @@ import android.os.Looper
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.sync.ProtocolSender
+import com.xzyht.notifyrelay.nativecore.device.ProtocolSender
 import github.xzynine.superislandui.model.components.MediaSessionData
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
 import notifyrelay.base.log.Logger
