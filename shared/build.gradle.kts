@@ -62,11 +62,5 @@ kotlin {
             // UpdateDialog 依赖的 ReleaseInfo 数据模型（KMP 库）
             implementation(project(":checkupdata"))
         }
-
-        androidMain.dependencies {
-            implementation(libs.compose.multiplatform.ui.tooling)
-            // Android 侧日志通道：DebugTree 输出与级别过滤
-            implementation(libs.timber)
-        }
     }
 }

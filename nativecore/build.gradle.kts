@@ -123,7 +123,10 @@ kotlin {
             api(libs.atomicfu)
 
             // 日志通道
-            implementation(project(":shared"))
+            api(project(":base"))
+
+            // 领域模型与端口契约
+            api(project(":domain"))
         }
 
         androidMain.dependencies {
