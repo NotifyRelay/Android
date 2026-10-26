@@ -1,6 +1,7 @@
 package notifyrelay.shared.ui.port
 
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.graphics.ImageBitmap
 
 /** 轻量提示端口。 */
 interface ToastPort {
@@ -65,6 +66,9 @@ interface BitmapPort {
         drawable: Any,
         fallbackSize: Int = 96,
     ): Any
+
+    /** 解码图片字节为位图；失败返回 null。 */
+    fun decodeByteArray(bytes: ByteArray): ImageBitmap?
 }
 
 /** 默认值均为不可用实现，宿主须在启动时覆盖。 */

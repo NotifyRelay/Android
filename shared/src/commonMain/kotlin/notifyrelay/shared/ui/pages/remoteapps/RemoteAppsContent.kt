@@ -1,7 +1,5 @@
-package com.xzyht.notifyrelay.ui.pages.remoteapps
+package notifyrelay.shared.ui.pages.remoteapps
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -14,6 +12,8 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.domain.feature.appslist.model.RemoteAppInfo
 import notifyrelay.domain.feature.appslist.model.appMatchesQuery
+import notifyrelay.shared.ui.pages.remoteapps.AppItem
+import notifyrelay.shared.ui.port.LocalBitmapPort
 import notifyrelay.shared.ui.viewmodel.AppsState
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -25,16 +25,17 @@ import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-internal fun RemoteAppsContent(
+fun RemoteAppsContent(
     state: AppsState<RemoteAppInfo>,
     onAppClick: (RemoteAppInfo) -> Unit,
     onAppLongClick: (RemoteAppInfo) -> Unit,
     onRefresh: () -> Unit,
 ) {
+    val bitmapPort = LocalBitmapPort.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
 
-    val iconCache = remember { mutableStateMapOf<String, Bitmap?>() }
+    val iconCache = remember { mutableStateMapOf<String, androidx.compose.ui.graphics.ImageBitmap?>() }
 
     LaunchedEffect(state.apps) {
         state.apps.forEach { app ->
@@ -42,7 +43,7 @@ internal fun RemoteAppsContent(
             if (iconBytes != null && !iconCache.containsKey(app.packageName)) {
                 iconCache[app.packageName] =
                     withContext(Dispatchers.Default) {
-                        BitmapFactory.decodeByteArray(iconBytes, 0, iconBytes.size)
+                        bitmapPort.decodeByteArray(iconBytes)
                     }
             }
         }
@@ -63,7 +64,7 @@ internal fun RemoteAppsContent(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = state.error ?: "",
+                        text = state.error,
                         color = colorScheme.error,
                     )
                     Spacer(modifier = Modifier.height(8.dp))
