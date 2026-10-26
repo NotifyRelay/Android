@@ -19,13 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.viewmodel.AudioRelayViewModel
 import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
 import notifyrelay.domain.feature.media.MediaMessageReceiveMode
 import notifyrelay.shared.ui.common.MiuixSpinnerPreference
 import notifyrelay.shared.ui.port.LocalToastPort
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
+import notifyrelay.shared.ui.viewmodel.AudioRelayViewModel
 import notifyrelay.shared.ui.viewmodel.MediaControlViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
@@ -121,7 +121,7 @@ fun MusicControlPage(
                         toastPort.short("当前选中的是本机，无法接收本机音频")
                         return@Button
                     }
-                    toastPort.short(audioViewModel.requestSendAudio(context, selectedDevice))
+                    toastPort.short(audioViewModel.requestSendAudio(selectedDevice))
                 },
                 modifier = Modifier.weight(1f),
             ) {
@@ -135,7 +135,7 @@ fun MusicControlPage(
                         toastPort.short("当前选中的是本机，无法播放本机音频")
                         return@Button
                     }
-                    toastPort.short(audioViewModel.requestReceiveAudio(context, selectedDevice))
+                    toastPort.short(audioViewModel.requestReceiveAudio(selectedDevice))
                 },
                 modifier = Modifier.weight(1f),
             ) {
@@ -146,7 +146,7 @@ fun MusicControlPage(
         // 停止音频转发按钮
         Button(
             onClick = {
-                audioViewModel.stopAudio(context)
+                audioViewModel.stopAudio()
                 toastPort.short("已停止音频转发")
             },
             modifier = Modifier.fillMaxWidth(),

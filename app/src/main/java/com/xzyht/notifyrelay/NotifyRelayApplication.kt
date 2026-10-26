@@ -5,12 +5,14 @@ import com.xzyht.notifyrelay.feature.appslist.AndroidAppIconPort
 import com.xzyht.notifyrelay.feature.appslist.AndroidLocalAppsPort
 import com.xzyht.notifyrelay.feature.appslist.AndroidPinnedAppsPort
 import com.xzyht.notifyrelay.feature.appslist.AndroidRemoteAppsPort
+import com.xzyht.notifyrelay.feature.media.AndroidAudioRelayPort
 import com.xzyht.notifyrelay.feature.media.AndroidMediaControlPort
 import com.xzyht.notifyrelay.feature.notification.filter.AndroidLocalFilterPort
 import com.xzyht.notifyrelay.feature.notification.filter.AndroidRemoteFilterPort
 import com.xzyht.notifyrelay.feature.notification.superisland.config.AndroidSuperIslandConfigPort
 import notifyrelay.data.DataLayerAndroid
 import notifyrelay.domain.feature.appslist.RemoteAppsPortRegistry
+import notifyrelay.domain.feature.media.AudioRelayPortRegistry
 import notifyrelay.domain.feature.media.MediaControlPortRegistry
 import notifyrelay.domain.feature.notification.filter.LocalFilterPortRegistry
 import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
@@ -38,6 +40,7 @@ class NotifyRelayApplication : Application() {
         LocalFilterPortRegistry.install(AndroidLocalFilterPort(this))
         RemoteFilterPortRegistry.install(AndroidRemoteFilterPort(this))
         MediaControlPortRegistry.install(AndroidMediaControlPort(this))
+        AudioRelayPortRegistry.install(AndroidAudioRelayPort(this))
         SuperIslandConfigPortRegistry.install(AndroidSuperIslandConfigPort(this))
     }
 }
