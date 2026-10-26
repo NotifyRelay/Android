@@ -32,13 +32,13 @@ import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeoutOrNull
 import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.device.service.contract.DevicePairingPort
+import notifyrelay.shared.ui.dialog.PairingCodeInputField
+import notifyrelay.shared.ui.dialog.PairingMode
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.window.WindowDialog
-
-enum class PairingMode { CLIENT_MODE, SERVER_MODE }
 
 /**
  * 把 core 上抛的失败原因码转换为用户可读提示。

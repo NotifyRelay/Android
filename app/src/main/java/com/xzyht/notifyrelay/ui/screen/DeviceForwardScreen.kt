@@ -19,9 +19,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
-import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
-import com.xzyht.notifyrelay.ui.navigation.Navigator
-import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
 import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import com.xzyht.notifyrelay.ui.pages.RemoteAppsPage
@@ -31,6 +28,10 @@ import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyVirtualButtonOrderPage
 import kotlinx.coroutines.launch
+import notifyrelay.shared.ui.navigation.LocalNavigator
+import notifyrelay.shared.ui.navigation.Navigator
+import notifyrelay.shared.ui.navigation.Route
+import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme

@@ -44,6 +44,8 @@ kotlin {
             implementation(libs.miuix.nav)
             implementation(libs.miuix.ui.kmp)
             implementation(libs.kotlinx.serialization.json)
+            // UpdateDialog 依赖的 ReleaseInfo 数据模型（KMP 库）
+            implementation(project(":checkupdata"))
         }
 
         androidMain.dependencies {

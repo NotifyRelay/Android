@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.replica
+package notifyrelay.shared.feature.notification.superisland.replica
 
 import notifyrelay.shared.log.Logger
 
@@ -17,7 +17,7 @@ import notifyrelay.shared.log.Logger
  * @param actionName 动作名，用于拼接失败日志。
  * @param block 被保护的业务块，异常时吞没并记日志。
  */
-internal inline fun runReplicaCatching(
+inline fun runReplicaCatching(
     tag: String,
     actionName: String,
     crossinline block: () -> Unit,
@@ -36,7 +36,7 @@ internal inline fun runReplicaCatching(
  * @param actionName 动作名，用于拼接失败日志。
  * @param block 被保护的挂起业务块，异常时吞没并记日志。
  */
-internal suspend inline fun runReplicaCatchingSuspend(
+suspend inline fun runReplicaCatchingSuspend(
     tag: String,
     actionName: String,
     crossinline block: suspend () -> Unit,

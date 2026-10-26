@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.filter
+package notifyrelay.shared.feature.notification.filter
 
 import notifyrelay.shared.log.Logger
 import notifyrelay.shared.util.TextUtils
@@ -8,7 +8,7 @@ import notifyrelay.shared.util.TextUtils
  * 由 BackendRemoteFilter 持引用并响应 [BackendRemoteFilter.onLocalNotificationEnqueued]，
  * 自身不引入去重缓存依赖，命中时通过回调写入去重缓存，保持职责单一。
  */
-internal class RemoteFilterPlaceholderQueue {
+class RemoteFilterPlaceholderQueue {
     data class Placeholder(
         val title: String,
         val text: String,

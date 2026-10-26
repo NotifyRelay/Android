@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.BuildConfig
 import com.xzyht.notifyrelay.core.ffi.abiProbe
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.ui.dialog.UpdateDialog
 import com.xzyht.notifyrelay.util.ApkArchMatcher
 import github.xzynine.checkupdata.CheckUpdateManager
 import github.xzynine.checkupdata.model.ReleaseInfo
@@ -44,6 +43,7 @@ import notifyrelay.base.util.ToastUtils
 import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.data.Storage
 import notifyrelay.shared.log.Logger
+import notifyrelay.shared.ui.dialog.UpdateDialog
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField

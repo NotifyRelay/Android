@@ -13,11 +13,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.ui.navigation.Navigator
 import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
 import com.xzyht.notifyrelay.ui.pages.UIChatTest
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
 import kotlinx.coroutines.launch
+import notifyrelay.shared.ui.navigation.Navigator
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme

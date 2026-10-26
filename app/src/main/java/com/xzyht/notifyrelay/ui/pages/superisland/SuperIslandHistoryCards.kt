@@ -43,13 +43,13 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.ui.pages.DeleteButton
-import com.xzyht.notifyrelay.ui.pages.DragValue
 import com.xzyht.notifyrelay.ui.pages.formatTimestamp
 import com.xzyht.notifyrelay.ui.viewmodel.GroupedSuperIslandHistory
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.shared.ui.pages.DragValue
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider

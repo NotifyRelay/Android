@@ -6,7 +6,6 @@ import com.xzyht.notifyrelay.feature.device.model.DeviceNameCache
 import com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController
 import com.xzyht.notifyrelay.feature.device.service.callback.DeviceCallbackHost
 import com.xzyht.notifyrelay.feature.device.service.core.RustCoreSession
-import com.xzyht.notifyrelay.feature.device.service.pairing.HandshakeWaiterRegistry
 import com.xzyht.notifyrelay.feature.device.service.pairing.PairingCoordinator
 import com.xzyht.notifyrelay.feature.device.service.state.DeviceDirectory
 import com.xzyht.notifyrelay.feature.device.service.state.DeviceQuery
@@ -38,6 +37,7 @@ import notifyrelay.shared.feature.device.service.contract.DeviceChatPort
 import notifyrelay.shared.feature.device.service.contract.DeviceDiscoveryPort
 import notifyrelay.shared.feature.device.service.contract.DeviceMessagePort
 import notifyrelay.shared.feature.device.service.contract.DeviceSendPort
+import notifyrelay.shared.feature.device.service.pairing.HandshakeWaiterRegistry
 import notifyrelay.shared.log.Logger
 
 // =================== 设备连接管理器主类 ===================

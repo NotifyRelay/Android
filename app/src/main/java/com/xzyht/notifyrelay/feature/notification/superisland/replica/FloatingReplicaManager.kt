@@ -7,10 +7,11 @@ import com.xzyht.notifyrelay.feature.notification.service.ListenerForegroundCont
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.list.FloatingReplicaListModeManager
-import com.xzyht.notifyrelay.feature.notification.superisland.list.SuperIslandListManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
+import notifyrelay.shared.feature.notification.superisland.list.SuperIslandListManager
+import notifyrelay.shared.feature.notification.superisland.replica.runReplicaCatching
 import notifyrelay.shared.log.Logger
 
 object FloatingReplicaManager {

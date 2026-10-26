@@ -1,10 +1,10 @@
-package com.xzyht.notifyrelay.feature.media.lyric
+package notifyrelay.shared.feature.media.lyric
 
 // 歌词所在字段
-internal enum class LyricField { TITLE, ARTIST }
+enum class LyricField { TITLE, ARTIST }
 
 // 当前歌曲的歌词状态（per-song，切歌即重置）
-internal enum class LyricState {
+enum class LyricState {
     // 新歌：等待判断是否带歌词
     PENDING_LYRIC,
 
@@ -19,7 +19,7 @@ internal enum class LyricState {
 }
 
 // 按包名的歌词字段观测状态
-internal class LyricFieldProbe {
+class LyricFieldProbe {
     var lastTitle: String? = null
     var lastArtist: String? = null
     var candidate: LyricField? = null
@@ -46,11 +46,11 @@ internal class LyricFieldProbe {
 
 // 纯音乐判定阈值：按包名历史自适应。
 // 常出现纯音乐的包名 2s 即可回退标题，出现过歌词的包名 4s，新包名保守 6s。
-internal const val T_INSTRUMENTAL_FAST_MS = 2_000L
-internal const val T_INSTRUMENTAL_NORMAL_MS = 4_000L
-internal const val T_INSTRUMENTAL_SLOW_MS = 6_000L
+const val T_INSTRUMENTAL_FAST_MS = 2_000L
+const val T_INSTRUMENTAL_NORMAL_MS = 4_000L
+const val T_INSTRUMENTAL_SLOW_MS = 6_000L
 
-internal fun instrumentalThreshold(probe: LyricFieldProbe): Long {
+fun instrumentalThreshold(probe: LyricFieldProbe): Long {
     val total = probe.lyricHits + probe.instrHits
     if (total == 0) return T_INSTRUMENTAL_SLOW_MS
     val instrRatio = probe.instrHits.toFloat() / total

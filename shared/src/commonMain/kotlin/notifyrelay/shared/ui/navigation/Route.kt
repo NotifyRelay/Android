@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.navigation
+package notifyrelay.shared.ui.navigation
 
 import kotlinx.serialization.Serializable
 import top.yukonga.miuix.kmp.nav.core.NavKey

@@ -22,8 +22,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
 import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
-import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
-import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.pages.UIAbout
 import com.xzyht.notifyrelay.ui.pages.UIAppearance
 import com.xzyht.notifyrelay.ui.pages.UILocalFilter
@@ -35,6 +33,8 @@ import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
 import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyPreferenceKeys
 import notifyrelay.shared.log.Logger
+import notifyrelay.shared.ui.navigation.LocalNavigator
+import notifyrelay.shared.ui.navigation.Route
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme

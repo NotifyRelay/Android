@@ -12,14 +12,14 @@ import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
-import com.xzyht.notifyrelay.ui.navigation.Route
-import com.xzyht.notifyrelay.ui.navigation.rememberNavigator
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.config.DeviceInfoManager
 import notifyrelay.shared.log.Logger
+import notifyrelay.shared.ui.navigation.Route
+import notifyrelay.shared.ui.navigation.rememberNavigator
 
 class MainActivity : FragmentActivity() {
     internal val showAutoStartBanner = mutableStateOf(false)

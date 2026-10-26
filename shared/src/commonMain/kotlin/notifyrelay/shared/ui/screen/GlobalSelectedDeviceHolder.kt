@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.screen
+package notifyrelay.shared.ui.screen
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State

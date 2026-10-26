@@ -13,11 +13,11 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.xzyht.notifyrelay.ui.pages.history.NotificationHistoryScaffold
-import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
 import com.xzyht.notifyrelay.ui.viewmodel.NotificationHistoryViewModel
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.shared.log.Logger
 import notifyrelay.shared.ui.pages.rememberDeleteSwipeWidth
+import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 internal enum class DragValue { Center, End }

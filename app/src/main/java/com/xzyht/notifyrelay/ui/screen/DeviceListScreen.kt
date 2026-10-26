@@ -16,11 +16,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.ui.dialog.PairingMode
-import com.xzyht.notifyrelay.ui.navigation.Navigator
 import notifyrelay.base.util.BatteryUtils
 import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.device.service.callback.HandshakeRequestHandler
+import notifyrelay.shared.ui.dialog.PairingMode
+import notifyrelay.shared.ui.navigation.Navigator
+import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**

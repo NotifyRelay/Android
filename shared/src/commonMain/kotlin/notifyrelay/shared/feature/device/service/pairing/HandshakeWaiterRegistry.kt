@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.device.service.pairing
+package notifyrelay.shared.feature.device.service.pairing
 
 import kotlinx.coroutines.CompletableDeferred
 import notifyrelay.shared.feature.device.service.contract.HandshakeWaiterPort

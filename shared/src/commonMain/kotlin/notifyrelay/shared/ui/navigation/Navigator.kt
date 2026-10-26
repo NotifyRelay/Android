@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.navigation
+package notifyrelay.shared.ui.navigation
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.saveable.Saver

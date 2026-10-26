@@ -3,6 +3,12 @@ package com.xzyht.notifyrelay.feature.media.lyric
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.os.Handler
+import notifyrelay.shared.feature.media.lyric.LyricField
+import notifyrelay.shared.feature.media.lyric.LyricFieldProbe
+import notifyrelay.shared.feature.media.lyric.LyricState
+import notifyrelay.shared.feature.media.lyric.T_INSTRUMENTAL_NORMAL_MS
+import notifyrelay.shared.feature.media.lyric.T_INSTRUMENTAL_SLOW_MS
+import notifyrelay.shared.feature.media.lyric.instrumentalThreshold
 import notifyrelay.shared.log.Logger
 import java.util.concurrent.ConcurrentHashMap
 

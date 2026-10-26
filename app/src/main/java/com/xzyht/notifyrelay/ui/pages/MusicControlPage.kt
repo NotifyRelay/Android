@@ -23,11 +23,11 @@ import com.xzyht.notifyrelay.feature.media.MediaControlUtil
 import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import com.xzyht.notifyrelay.ui.common.MiuixSpinnerPreference
-import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.Storage
 import notifyrelay.shared.feature.media.MediaMessageReceiveMode
 import notifyrelay.shared.log.Logger
+import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.SwitchPreference

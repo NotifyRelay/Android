@@ -13,9 +13,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
-import com.xzyht.notifyrelay.ui.navigation.LocalNavigator
-import com.xzyht.notifyrelay.ui.navigation.Navigator
-import com.xzyht.notifyrelay.ui.navigation.Route
 import com.xzyht.notifyrelay.ui.screen.HistoryScreen
 import com.xzyht.notifyrelay.ui.screen.MainScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
@@ -28,6 +25,9 @@ import com.xzyht.notifyrelay.ui.screen.SettingsScrcpyScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsSuperIslandScreen
 import notifyrelay.base.util.ThemeSettingsManager
+import notifyrelay.shared.ui.navigation.LocalNavigator
+import notifyrelay.shared.ui.navigation.Navigator
+import notifyrelay.shared.ui.navigation.Route
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 

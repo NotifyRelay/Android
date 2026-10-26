@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.dialog
+package notifyrelay.shared.ui.dialog
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues

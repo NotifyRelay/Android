@@ -31,13 +31,13 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.activity.MainActivity
-import com.xzyht.notifyrelay.ui.navigation.Navigator
-import com.xzyht.notifyrelay.ui.navigation.Route
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.shared.ui.navigation.Navigator
+import notifyrelay.shared.ui.navigation.Route
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold

@@ -10,12 +10,12 @@ import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveU
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaNotificationCloser
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.runReplicaCatchingSuspend
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.shared.feature.notification.superisland.notification.SuperIslandNotificationIds
+import notifyrelay.shared.feature.notification.superisland.replica.runReplicaCatchingSuspend
 import notifyrelay.shared.log.Logger
 
 /**

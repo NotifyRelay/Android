@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.dialog
+package notifyrelay.shared.ui.dialog
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border

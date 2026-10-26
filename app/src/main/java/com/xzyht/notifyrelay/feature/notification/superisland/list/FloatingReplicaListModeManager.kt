@@ -8,13 +8,14 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingW
 import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.pipeline.SuperIslandDisplayPipeline
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.runReplicaCatching
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.runReplicaCatchingSuspend
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import notifyrelay.shared.feature.notification.superisland.list.SuperIslandListManager
+import notifyrelay.shared.feature.notification.superisland.replica.runReplicaCatching
+import notifyrelay.shared.feature.notification.superisland.replica.runReplicaCatchingSuspend
 
 object FloatingReplicaListModeManager {
     private const val TAG = "超级岛列表模式"
