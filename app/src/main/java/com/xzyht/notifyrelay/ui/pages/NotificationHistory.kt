@@ -1,8 +1,6 @@
 package com.xzyht.notifyrelay.ui.pages
 
 import android.app.Activity
-import android.app.Application
-import android.graphics.Bitmap
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -13,11 +11,12 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.xzyht.notifyrelay.ui.pages.history.NotificationHistoryScaffold
-import com.xzyht.notifyrelay.ui.viewmodel.NotificationHistoryViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.notificationHistoryViewModel
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.shared.ui.pages.rememberDeleteSwipeWidth
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
+import notifyrelay.shared.ui.viewmodel.NotificationHistoryViewModel
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 internal enum class DragValue { Center, End }
@@ -34,9 +33,7 @@ fun NotificationHistoryScreen() {
     val textStyles = MiuixTheme.textStyles
     val context = LocalContext.current
     val viewModel: NotificationHistoryViewModel =
-        viewModel(
-            factory = NotificationHistoryViewModel.Factory(context.applicationContext as Application),
-        )
+        notificationHistoryViewModel()
 
     // 创建协程作用域用于删除操作等
     // （删除操作已随 NotificationListBlock 自带作用域，此处不再需要）
@@ -70,7 +67,7 @@ fun NotificationHistoryScreen() {
         viewModel.preloadAppIcons(groupPackages)
     }
 
-    val getCachedAppInfo: (String?) -> Pair<String, Bitmap?> = { packageName ->
+    val getCachedAppInfo: (String?) -> Pair<String, androidx.compose.ui.graphics.ImageBitmap?> = { packageName ->
         if (packageName.isNullOrBlank()) {
             "" to null
         } else {

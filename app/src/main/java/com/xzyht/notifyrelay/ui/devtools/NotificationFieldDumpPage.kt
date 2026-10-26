@@ -19,6 +19,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -195,8 +196,17 @@ fun NotificationFieldDumpPage() {
                     ) { index ->
                         val entry = uiState.entries[index]
                         NotificationCard(
-                            record = entry.record,
-                            appIcon = entry.appIcon,
+                            record =
+                                notifyrelay.domain.feature.notification.history.NotificationHistoryEntry(
+                                    key = entry.record.key,
+                                    packageName = entry.record.packageName,
+                                    appName = entry.record.appName,
+                                    title = entry.record.title,
+                                    text = entry.record.text,
+                                    time = entry.record.time,
+                                    device = entry.record.device,
+                                ),
+                            appIcon = entry.appIcon?.asImageBitmap(),
                             context = context,
                             getCachedAppInfo = viewModel::getCachedAppInfo,
                             cardColor = colorScheme.surface,

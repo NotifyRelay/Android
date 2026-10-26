@@ -24,12 +24,13 @@ import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
 import com.xzyht.notifyrelay.ui.pages.superisland.SuperIslandHistoryListBlock
-import com.xzyht.notifyrelay.ui.viewmodel.SuperIslandHistoryViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.superIslandHistoryViewModel
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.Storage
 import notifyrelay.shared.ui.common.DoubleClickConfirmButton
 import notifyrelay.shared.ui.pages.rememberDeleteSwipeWidth
+import notifyrelay.shared.ui.viewmodel.SuperIslandHistoryViewModel
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -44,9 +45,7 @@ fun UISuperIslandHistory() {
     var includeImageDataOnCopy by remember { mutableStateOf(Storage.getBoolean("superisland_copy_image_data", false)) }
 
     val viewModel: SuperIslandHistoryViewModel =
-        viewModel(
-            factory = SuperIslandHistoryViewModel.Factory(context.applicationContext as android.app.Application),
-        )
+        superIslandHistoryViewModel()
 
     val isDarkTheme = isSystemInDarkTheme()
     LaunchedEffect(isDarkTheme) {

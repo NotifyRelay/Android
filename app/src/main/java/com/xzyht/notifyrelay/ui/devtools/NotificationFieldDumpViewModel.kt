@@ -6,6 +6,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -54,7 +55,7 @@ internal class NotificationFieldDumpViewModel(
     val uiState: StateFlow<NotificationDumpUiState> = _uiState.asStateFlow()
 
     /** 包名 → (应用名, 图标)。 */
-    private val iconCache = mutableMapOf<String, Pair<String, Bitmap?>>()
+    private val iconCache = mutableMapOf<String, Pair<String, androidx.compose.ui.graphics.ImageBitmap?>>()
 
     /** 载入当前通知栏的活跃通知。 */
     fun loadActiveNotifications() {
@@ -201,7 +202,7 @@ internal class NotificationFieldDumpViewModel(
     }
 
     /** 供 [com.xzyht.notifyrelay.ui.pages.history.NotificationCard] 读取「包名 → (应用名, 图标)」。 */
-    fun getCachedAppInfo(packageName: String?): Pair<String, Bitmap?> {
+    fun getCachedAppInfo(packageName: String?): Pair<String, androidx.compose.ui.graphics.ImageBitmap?> {
         if (packageName.isNullOrBlank()) return "" to null
         return iconCache[packageName] ?: (packageName to null)
     }
@@ -236,7 +237,7 @@ internal class NotificationFieldDumpViewModel(
     private suspend fun loadAppIcon(packageName: String): Bitmap? =
         try {
             val icon = AppIconRepository.getAppIconAsync(application, packageName)
-            iconCache[packageName] = getAppLabel(packageName) to icon
+            iconCache[packageName] = getAppLabel(packageName) to icon?.asImageBitmap()
             icon
         } catch (e: Exception) {
             Logger.w(TAG, "读取应用图标失败: $packageName", e)

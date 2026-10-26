@@ -41,13 +41,13 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.ui.pages.formatTimestamp
-import com.xzyht.notifyrelay.ui.viewmodel.GroupedSuperIslandHistory
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.domain.feature.notification.history.GroupedSuperIslandHistory
+import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 import notifyrelay.shared.ui.pages.DeleteButton
 import notifyrelay.shared.ui.pages.DragValue
 import top.yukonga.miuix.kmp.basic.Card
@@ -68,7 +68,7 @@ internal fun SuperIslandHistoryListBlock(
     onToggleGroup: (String) -> Unit,
     onDeleteGroup: (String) -> Unit,
     onDeleteEntry: (Long) -> Unit,
-    loadEntryDetail: suspend (Long) -> SuperIslandHistoryStoreEntry?,
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
     deleteWidthPx: Float,
     deleteWidth: Dp,
 ) {
@@ -162,7 +162,7 @@ internal fun SuperIslandHistoryGroupCard(
     includeImageDataOnCopy: Boolean,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit,
-    loadEntryDetail: suspend (Long) -> SuperIslandHistoryStoreEntry?,
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
     deleteWidthPx: Float,
     deleteWidth: Dp,
     onDeleteEntry: (Long) -> Unit,
@@ -285,7 +285,7 @@ internal fun SuperIslandHistoryGroupCard(
                                         orientation = Orientation.Horizontal,
                                     ).offset { IntOffset(entryOffset.roundToInt(), 0) },
                         ) {
-                            SuperIslandHistoryStoreEntryCard(
+                            SuperIslandHistoryEntryCard(
                                 entry = entry,
                                 includeImageDataOnCopy = includeImageDataOnCopy,
                                 appIconBitmap = appIconBitmap,
@@ -345,11 +345,11 @@ internal fun SuperIslandHistoryGroupCard(
 
 @Composable
 internal fun SuperIslandHistorySummaryRow(
-    entry: SuperIslandHistoryStoreEntry,
+    entry: SuperIslandHistoryEntry,
     includeImageDataOnCopy: Boolean,
     appIconBitmap: ImageBitmap?,
     iconPackage: String?,
-    loadEntryDetail: suspend (Long) -> SuperIslandHistoryStoreEntry?,
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
@@ -432,12 +432,12 @@ internal fun SuperIslandHistorySummaryRow(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun SuperIslandHistoryStoreEntryCard(
-    entry: SuperIslandHistoryStoreEntry,
+internal fun SuperIslandHistoryEntryCard(
+    entry: SuperIslandHistoryEntry,
     includeImageDataOnCopy: Boolean,
     appIconBitmap: ImageBitmap?,
     iconPackage: String?,
-    loadEntryDetail: suspend (Long) -> SuperIslandHistoryStoreEntry?,
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
@@ -552,7 +552,7 @@ internal fun SuperIslandHistoryStoreEntryCard(
             Text(it, style = textStyles.body2, color = colorScheme.onSurfaceVariantSummary)
         }
 
-        var loadedDetail by remember { mutableStateOf<SuperIslandHistoryStoreEntry?>(null) }
+        var loadedDetail by remember { mutableStateOf<SuperIslandHistoryEntry?>(null) }
         val displayPayload =
             remember(loadedDetail, sanitizedPayload, includeImageDataOnCopy) {
                 loadedDetail?.rawPayload?.takeIf { it.isNotBlank() }?.let {

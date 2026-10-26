@@ -1,15 +1,16 @@
-package com.xzyht.notifyrelay.ui.viewmodel
+package com.xzyht.notifyrelay.feature.notification.history
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
-import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import notifyrelay.data.database.dao.PackageCount
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.notification.history.GroupedNotifications
+import notifyrelay.domain.feature.notification.history.NotificationHistoryEntry
 import kotlin.math.max
 
-class NotificationPagingSource(
+class NotificationHistoryPagingSource(
     private val repository: DatabaseRepository,
     private val deviceUuid: String,
     private val installedPackages: Set<String>,
@@ -40,7 +41,7 @@ class NotificationPagingSource(
                                 repository.getNotificationsByPackageAndDevice(packageName, deviceUuid)
                             }.sortedByDescending { it.time }
 
-                    val notifications = records.map { it.toNotificationRecord() }
+                    val notifications = records.map { it.toNotificationEntry() }
                     val appName = notifications.firstOrNull()?.appName?.takeIf { it.isNotBlank() } ?: group.groupKey
 
                     GroupedNotifications(
@@ -93,8 +94,8 @@ class NotificationPagingSource(
             }.sortedByDescending { it.latestTime }
     }
 
-    private fun NotificationRecordEntity.toNotificationRecord(): NotificationRecord =
-        NotificationRecord(
+    private fun NotificationRecordEntity.toNotificationEntry(): NotificationHistoryEntry =
+        NotificationHistoryEntry(
             key = key,
             packageName = packageName,
             appName = appName,

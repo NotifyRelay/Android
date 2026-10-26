@@ -36,6 +36,12 @@ kotlin {
 
             // PairingViewModel 需要 ViewModel 与协程
             implementation(libs.androidx.lifecycle.viewmodel)
+
+            // Paging 公共端（历史列表分页源返回类型）
+            implementation(libs.androidx.paging.common)
+
+            // ImageBitmap（应用图标类型）
+            implementation(libs.compose.multiplatform.ui)
         }
 
         getByName("androidHostTest").dependencies {

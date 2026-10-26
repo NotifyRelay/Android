@@ -2,7 +2,6 @@ package com.xzyht.notifyrelay.ui.pages.history
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,14 +15,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.sync.MessageSender
-import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.ui.pages.ToastDebounce
 import com.xzyht.notifyrelay.ui.pages.dateTimeFormatter
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.domain.feature.notification.history.NotificationHistoryEntry
 import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -36,10 +35,10 @@ import java.time.ZoneId
 
 @Composable
 internal fun NotificationCard(
-    record: NotificationRecord,
-    appIcon: Bitmap?,
+    record: NotificationHistoryEntry,
+    appIcon: androidx.compose.ui.graphics.ImageBitmap?,
     context: Context,
-    getCachedAppInfo: (String?) -> Pair<String, Bitmap?>,
+    getCachedAppInfo: (String?) -> Pair<String, androidx.compose.ui.graphics.ImageBitmap?>,
     cardColor: Color,
     contentColor: Color,
     installedPackages: Set<String>,
@@ -63,7 +62,7 @@ internal fun NotificationCard(
     val mappedPkg = viewModel.mapToLocalPackage(record.packageName, installedPackages)
 
     // 使用映射后的包名获取应用信息
-    val appInfo: Pair<String, Bitmap?> = getCachedAppInfo(mappedPkg)
+    val appInfo: Pair<String, androidx.compose.ui.graphics.ImageBitmap?> = getCachedAppInfo(mappedPkg)
     val (_, mappedAppIcon) = appInfo
     val displayAppIcon = mappedAppIcon ?: appIcon
 
@@ -136,7 +135,7 @@ internal fun NotificationCard(
         Row(verticalAlignment = Alignment.CenterVertically) {
             if (displayAppIcon != null) {
                 Image(
-                    bitmap = displayAppIcon.asImageBitmap(),
+                    bitmap = displayAppIcon,
                     contentDescription = null,
                     modifier = Modifier.size(24.dp),
                 )

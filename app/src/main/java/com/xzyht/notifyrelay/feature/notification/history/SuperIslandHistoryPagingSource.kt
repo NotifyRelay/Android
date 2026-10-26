@@ -1,16 +1,17 @@
-package com.xzyht.notifyrelay.ui.viewmodel
+package com.xzyht.notifyrelay.feature.notification.history
 
 import android.content.Context
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.notification.history.GroupedSuperIslandHistory
+import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 
-class SuperIslandPagingSource(
+class SuperIslandHistoryPagingSource(
     private val repository: DatabaseRepository,
     private val context: Context,
 ) : PagingSource<Int, GroupedSuperIslandHistory>() {
@@ -47,7 +48,7 @@ class SuperIslandPagingSource(
                         repository.getSuperIslandHistoryByPackage(
                             if (group.packageName == "(未知应用)") null else group.packageName,
                         )
-                    val entries = entities.map { it.toSuperIslandHistoryStoreEntry(context) }
+                    val entries = entities.map { it.toDomainEntry(context) }
                     val appName =
                         entries.firstOrNull()?.appName?.takeIf { it.isNotBlank() }
                             ?: group.packageName
@@ -79,9 +80,9 @@ class SuperIslandPagingSource(
         return page.prevKey?.let { it + state.config.pageSize } ?: page.nextKey?.let { it - state.config.pageSize }
     }
 
-    private suspend fun SuperIslandHistoryEntity.toSuperIslandHistoryStoreEntry(
+    private suspend fun SuperIslandHistoryEntity.toDomainEntry(
         context: Context,
-    ): SuperIslandHistoryStoreEntry {
+    ): SuperIslandHistoryEntry {
         val rawMap: Map<String, String> =
             try {
                 gson.fromJson(picMap, stringStringMapType) ?: emptyMap()
@@ -94,7 +95,7 @@ class SuperIslandPagingSource(
             } catch (_: Exception) {
                 rawMap
             }
-        return SuperIslandHistoryStoreEntry(
+        return SuperIslandHistoryEntry(
             id = id,
             sourceDeviceUuid = sourceDeviceUuid,
             originalPackage = originalPackage,

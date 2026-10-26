@@ -50,6 +50,9 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             // ViewModel 在公共源集的承载
             implementation(libs.androidx.lifecycle.viewmodel)
+            // Paging 公共端（PagingSource / Pager / PagingData）
+            implementation(libs.androidx.paging.common)
+            implementation(libs.androidx.paging.compose)
             // 基础设施层（日志/平台标识/时间/摘要/文本/颜色工具）
             api(project(":base"))
             // 领域模型与契约

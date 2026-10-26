@@ -11,11 +11,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
-import com.xzyht.notifyrelay.ui.viewmodel.GroupedNotifications
-import com.xzyht.notifyrelay.ui.viewmodel.NotificationHistoryUiState
+import notifyrelay.domain.feature.notification.history.GroupedNotifications
+import notifyrelay.domain.feature.notification.history.NotificationHistoryUiState
 import notifyrelay.shared.ui.common.DoubleClickConfirmButton
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
@@ -30,7 +31,7 @@ internal fun NotificationHistoryScaffold(
     pagingItems: LazyPagingItems<GroupedNotifications>,
     uiState: NotificationHistoryUiState,
     installedPackages: Set<String>,
-    getCachedAppInfo: (String?) -> Pair<String, android.graphics.Bitmap?>,
+    getCachedAppInfo: (String?) -> Pair<String, androidx.compose.ui.graphics.ImageBitmap?>,
     context: Context,
     colorScheme: Colors,
     textStyles: TextStyles,

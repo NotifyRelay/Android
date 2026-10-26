@@ -28,7 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -36,9 +36,9 @@ import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
 import com.xzyht.notifyrelay.ui.pages.dateTimeFormatter
-import com.xzyht.notifyrelay.ui.viewmodel.GroupedNotifications
 import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
+import notifyrelay.domain.feature.notification.history.GroupedNotifications
 import notifyrelay.shared.ui.pages.DeleteButton
 import notifyrelay.shared.ui.pages.DragValue
 import top.yukonga.miuix.kmp.basic.Card
@@ -57,7 +57,7 @@ import kotlin.math.roundToInt
 @Composable
 internal fun NotificationListBlock(
     pagingItems: LazyPagingItems<GroupedNotifications>,
-    getCachedAppInfo: (String?) -> Pair<String, android.graphics.Bitmap?>,
+    getCachedAppInfo: (String?) -> Pair<String, androidx.compose.ui.graphics.ImageBitmap?>,
     expandedGroups: Set<String>,
     installedPackages: Set<String>,
     context: Context,
@@ -139,7 +139,7 @@ internal fun NotificationListBlock(
                                 installedPackages = installedPackages,
                             )
                         } else {
-                            val appInfo: Pair<String, android.graphics.Bitmap?> = getCachedAppInfo(groupKey)
+                            val appInfo: Pair<String, ImageBitmap?> = getCachedAppInfo(groupKey)
                             val (appName, appIcon) = appInfo
                             val groupTitle =
                                 when {
@@ -173,7 +173,7 @@ internal fun NotificationListBlock(
                                 ) {
                                     if (appIcon != null) {
                                         Image(
-                                            bitmap = appIcon.asImageBitmap(),
+                                            bitmap = appIcon,
                                             contentDescription = null,
                                             modifier = Modifier.size(24.dp),
                                         )
