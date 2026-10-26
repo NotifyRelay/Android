@@ -11,28 +11,36 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
+import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
+import com.xzyht.notifyrelay.ui.pages.MusicControlPage
 import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
 import com.xzyht.notifyrelay.ui.pages.UIAbout
 import com.xzyht.notifyrelay.ui.pages.UIChatTest
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
-import com.xzyht.notifyrelay.ui.screen.MainScreen
+import com.xzyht.notifyrelay.ui.screen.DeviceListScreenContent
 import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScrcpyScreen
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
+import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
 import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
+import notifyrelay.shared.ui.screen.DeviceForwardScreen
 import notifyrelay.shared.ui.screen.HistoryScreen
+import notifyrelay.shared.ui.screen.MainScreen
 import notifyrelay.shared.ui.screen.SettingsAboutScreen
 import notifyrelay.shared.ui.screen.SettingsAppearanceScreen
 import notifyrelay.shared.ui.screen.SettingsLocalFilterScreen
 import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
 import notifyrelay.shared.ui.screen.SettingsScreen
 import notifyrelay.shared.ui.screen.SettingsSuperIslandScreen
+import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
 import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -70,6 +78,22 @@ internal fun MainActivityContent(navigator: Navigator) {
         val colorScheme = MiuixTheme.colorScheme
         SetupSystemBars(isDarkTheme)
 
+        val filterViewModel =
+            viewModel<RemoteFilterViewModel>(
+                factory =
+                    object : androidx.lifecycle.ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
+                            RemoteFilterViewModel(
+                                notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry.current
+                                    ?: error("RemoteFilterPort 未注册"),
+                                notifyrelay.shared.feature.appslist.LocalAppsPortRegistry.current
+                                    ?: error("LocalAppsPort 未注册"),
+                                notifyrelay.shared.feature.appslist.AppIconPortRegistry.current
+                                    ?: error("AppIconPort 未注册"),
+                            ) as T
+                    },
+            )
         CompositionLocalProvider(
             LocalNavigator provides navigator,
         ) {
@@ -87,7 +111,39 @@ internal fun MainActivityContent(navigator: Navigator) {
                         }
                     },
                 ) {
-                    entry<Route.Main> { MainScreen(navigator) }
+                    entry<Route.Main> {
+                        MainScreen(
+                            navigator = navigator,
+                            deviceListContent = { args ->
+                                DeviceListScreenContent(
+                                    isLandscape = args.isLandscape,
+                                    discoveryEnabled = args.discoveryEnabled,
+                                    onDiscoveryChange = args.onDiscoveryChange,
+                                    allDevices = args.allDevices,
+                                    authedDeviceUuids = args.authedDeviceUuids,
+                                    deviceStates = args.deviceStates,
+                                    unauthedDevices = args.unauthedDevices,
+                                    selectedDevice = args.selectedDevice,
+                                    onSelectDevice = args.onSelectDevice,
+                                    onRequestDelete = args.onRequestDelete,
+                                    onShowRejectedDialog = args.onShowRejectedDialog,
+                                    localBatteryLevel = args.localBatteryLevel,
+                                    colorScheme = MiuixTheme.colorScheme,
+                                    textStyles = MiuixTheme.textStyles,
+                                )
+                            },
+                            historyContent = {
+                                HistoryScreen(
+                                    navigator,
+                                    notificationHistory = { NotificationHistoryScreen() },
+                                    superIslandHistory = { UISuperIslandHistory() },
+                                    chatTest = { UIChatTest(deviceManager = devicePortsViewModel().chatPort()) },
+                                )
+                            },
+                            forwardContent = { DeviceForwardScreen(filterViewModel = filterViewModel, clipboardSync = { ClipboardSyncPage() }, musicControl = { MusicControlPage() }, scrcpyScreen = { device, onAdvanced -> ScrcpyScreenHost(startScreen = ScrcpyRootScreen.Device, selectedDevice = device?.let { notifyrelay.data.model.SelectedDeviceInfo(it.displayName, it.ip, it.deviceType) }, onOpenAdvanced = onAdvanced) }) },
+                            settingsContent = { SettingsScreen() },
+                        )
+                    }
                     entry<Route.History> {
                         HistoryScreen(
                             navigator,

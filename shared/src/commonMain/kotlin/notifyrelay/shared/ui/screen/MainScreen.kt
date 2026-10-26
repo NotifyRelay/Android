@@ -1,9 +1,5 @@
-package com.xzyht.notifyrelay.ui.screen
+package notifyrelay.shared.ui.screen
 
-import android.content.res.Configuration
-import android.net.Uri
-import android.provider.Settings
-import androidx.activity.compose.LocalActivity
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,31 +23,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.ui.activity.MainActivity
-import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
-import com.xzyht.notifyrelay.ui.pages.MusicControlPage
-import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
-import com.xzyht.notifyrelay.ui.pages.UIChatTest
-import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
-import com.xzyht.notifyrelay.ui.screen.DeviceListScreenContent
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
-import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import notifyrelay.base.util.IntentUtils
-import notifyrelay.base.util.ToastUtils
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
 import notifyrelay.shared.ui.screen.DeviceForwardScreen
+import notifyrelay.shared.ui.screen.DeviceListContentArgs
 import notifyrelay.shared.ui.screen.DeviceListScreen
 import notifyrelay.shared.ui.screen.DeviceListScreenState
 import notifyrelay.shared.ui.screen.HistoryScreen
+import notifyrelay.shared.ui.screen.LocalMainScreenPort
 import notifyrelay.shared.ui.screen.SettingsScreen
-import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -69,7 +53,13 @@ import top.yukonga.miuix.kmp.nav.gesture.PredictiveBackHandler
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-fun MainScreen(navigator: Navigator) {
+fun MainScreen(
+    navigator: Navigator,
+    deviceListContent: @Composable (DeviceListContentArgs) -> Unit,
+    historyContent: @Composable () -> Unit,
+    forwardContent: @Composable () -> Unit,
+    settingsContent: @Composable () -> Unit,
+) {
     val filterViewModel =
         androidx.lifecycle.viewmodel.compose.viewModel<notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel>(
             factory =
@@ -85,13 +75,12 @@ fun MainScreen(navigator: Navigator) {
         )
     val colorScheme = MiuixTheme.colorScheme
 
-    val configuration = LocalConfiguration.current
-    val isLandscape = configuration.orientation == Configuration.ORIENTATION_LANDSCAPE
+    val mainPort = LocalMainScreenPort.current ?: error("LocalMainScreenPort 未提供")
+    val isLandscape = mainPort.isLandscape()
 
-    val activity = LocalActivity.current as? MainActivity
-    val showBanner = activity?.showAutoStartBanner?.value == true
-    val bannerMsg = activity?.bannerMessage?.value
-    val context = LocalContext.current
+    val showBanner = mainPort.showAutoStartBanner().value
+
+    val bannerMsg = mainPort.bannerMessage().value
 
     val deviceListState = remember { DeviceListScreenState() }
 
@@ -120,12 +109,7 @@ fun MainScreen(navigator: Navigator) {
                 duration = SnackbarDuration.Indefinite,
             )
         if (result == SnackbarResult.ActionPerformed) {
-            IntentUtils.startActivity(
-                context,
-                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
-                Uri.fromParts("package", context.packageName, null),
-                true,
-            )
+            mainPort.openAppSettings()
         }
     }
 
@@ -210,24 +194,7 @@ fun MainScreen(navigator: Navigator) {
                                 .fillMaxHeight()
                                 .background(colorScheme.background),
                     ) {
-                        DeviceListScreen(navigator, deviceListState, content = { args ->
-                            DeviceListScreenContent(
-                                isLandscape = args.isLandscape,
-                                discoveryEnabled = args.discoveryEnabled,
-                                onDiscoveryChange = args.onDiscoveryChange,
-                                allDevices = args.allDevices,
-                                authedDeviceUuids = args.authedDeviceUuids,
-                                deviceStates = args.deviceStates,
-                                unauthedDevices = args.unauthedDevices,
-                                selectedDevice = args.selectedDevice,
-                                onSelectDevice = args.onSelectDevice,
-                                onRequestDelete = args.onRequestDelete,
-                                onShowRejectedDialog = args.onShowRejectedDialog,
-                                localBatteryLevel = args.localBatteryLevel,
-                                colorScheme = MiuixTheme.colorScheme,
-                                textStyles = MiuixTheme.textStyles,
-                            )
-                        })
+                        DeviceListScreen(navigator, deviceListState, content = deviceListContent)
                     }
                     HorizontalPager(
                         state = pagerState,
@@ -238,34 +205,9 @@ fun MainScreen(navigator: Navigator) {
                         userScrollEnabled = false,
                     ) { page ->
                         when (page) {
-                            0 ->
-                                HistoryScreen(
-                                    navigator,
-                                    notificationHistory = { NotificationHistoryScreen() },
-                                    superIslandHistory = { UISuperIslandHistory() },
-                                    chatTest = { UIChatTest(deviceManager = devicePortsViewModel().chatPort()) },
-                                )
-                            1 ->
-                                DeviceForwardScreen(
-                                    filterViewModel = filterViewModel,
-                                    clipboardSync = { ClipboardSyncPage() },
-                                    musicControl = { MusicControlPage() },
-                                    scrcpyScreen = { device, onAdvanced ->
-                                        ScrcpyScreenHost(
-                                            startScreen = ScrcpyRootScreen.Device,
-                                            selectedDevice =
-                                                device?.let {
-                                                    notifyrelay.data.model.SelectedDeviceInfo(
-                                                        displayName = it.displayName,
-                                                        ip = it.ip,
-                                                        deviceType = it.deviceType,
-                                                    )
-                                                },
-                                            onOpenAdvanced = onAdvanced,
-                                        )
-                                    },
-                                )
-                            2 -> SettingsScreen()
+                            0 -> historyContent()
+                            1 -> forwardContent()
+                            2 -> settingsContent()
                         }
                     }
                 }
@@ -277,24 +219,7 @@ fun MainScreen(navigator: Navigator) {
                             .background(colorScheme.background)
                             .padding(paddingValues),
                 ) {
-                    DeviceListScreen(navigator, deviceListState, content = { args ->
-                        DeviceListScreenContent(
-                            isLandscape = args.isLandscape,
-                            discoveryEnabled = args.discoveryEnabled,
-                            onDiscoveryChange = args.onDiscoveryChange,
-                            allDevices = args.allDevices,
-                            authedDeviceUuids = args.authedDeviceUuids,
-                            deviceStates = args.deviceStates,
-                            unauthedDevices = args.unauthedDevices,
-                            selectedDevice = args.selectedDevice,
-                            onSelectDevice = args.onSelectDevice,
-                            onRequestDelete = args.onRequestDelete,
-                            onShowRejectedDialog = args.onShowRejectedDialog,
-                            localBatteryLevel = args.localBatteryLevel,
-                            colorScheme = MiuixTheme.colorScheme,
-                            textStyles = MiuixTheme.textStyles,
-                        )
-                    })
+                    DeviceListScreen(navigator, deviceListState, content = deviceListContent)
                     HorizontalPager(
                         state = pagerState,
                         modifier =
@@ -304,34 +229,9 @@ fun MainScreen(navigator: Navigator) {
                         userScrollEnabled = false,
                     ) { page ->
                         when (page) {
-                            0 ->
-                                HistoryScreen(
-                                    navigator,
-                                    notificationHistory = { NotificationHistoryScreen() },
-                                    superIslandHistory = { UISuperIslandHistory() },
-                                    chatTest = { UIChatTest(deviceManager = devicePortsViewModel().chatPort()) },
-                                )
-                            1 ->
-                                DeviceForwardScreen(
-                                    filterViewModel = filterViewModel,
-                                    clipboardSync = { ClipboardSyncPage() },
-                                    musicControl = { MusicControlPage() },
-                                    scrcpyScreen = { device, onAdvanced ->
-                                        ScrcpyScreenHost(
-                                            startScreen = ScrcpyRootScreen.Device,
-                                            selectedDevice =
-                                                device?.let {
-                                                    notifyrelay.data.model.SelectedDeviceInfo(
-                                                        displayName = it.displayName,
-                                                        ip = it.ip,
-                                                        deviceType = it.deviceType,
-                                                    )
-                                                },
-                                            onOpenAdvanced = onAdvanced,
-                                        )
-                                    },
-                                )
-                            2 -> SettingsScreen()
+                            0 -> historyContent()
+                            1 -> forwardContent()
+                            2 -> settingsContent()
                         }
                     }
                 }
@@ -347,7 +247,7 @@ private fun MainScreenBackHandler(
     navigator: Navigator,
     deviceListState: DeviceListScreenState,
 ) {
-    val activity = LocalActivity.current as? MainActivity
+    val mainPort = LocalMainScreenPort.current ?: error("LocalMainScreenPort 未提供")
     var backPressedTime by remember { mutableLongStateOf(0L) }
     val exitInterval = 2000L
     val coroutineScope = rememberCoroutineScope()
@@ -372,9 +272,9 @@ private fun MainScreenBackHandler(
             } else {
                 val currentTime = System.currentTimeMillis()
                 if (currentTime - backPressedTime < exitInterval) {
-                    activity?.finish()
+                    mainPort.finish()
                 } else {
-                    ToastUtils.showShortToast(activity ?: return@PredictiveBackHandler, "再次返回以退出应用")
+                    mainPort.showExitHint()
                     backPressedTime = currentTime
                 }
             }
