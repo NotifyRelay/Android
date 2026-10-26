@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages.remoteapps
+package notifyrelay.shared.ui.pages.remoteapps
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
@@ -8,15 +8,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 import notifyrelay.base.log.Logger
-import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.domain.feature.appslist.model.LocalAppInfo
 import notifyrelay.domain.feature.appslist.model.appMatchesQuery
+import notifyrelay.shared.feature.appslist.LocalAppsPortRegistry
 import notifyrelay.shared.ui.viewmodel.AppsState
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
@@ -27,15 +23,14 @@ import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-internal fun LocalAppsContent(
+fun LocalAppsContent(
     state: AppsState<LocalAppInfo>,
     onAppClick: (LocalAppInfo) -> Unit,
     onAppLongClick: (LocalAppInfo) -> Unit,
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
-    val context = LocalContext.current
-    val packageManager = context.packageManager
+    val appsPort = LocalAppsPortRegistry.current ?: error("LocalAppsPort 未注册")
 
     val apps = state.apps.filter { appMatchesQuery(it.appName, it.packageName, state.searchQuery) }
 
@@ -45,15 +40,11 @@ internal fun LocalAppsContent(
         apps.forEach { app ->
             if (!iconCache.containsKey(app.packageName)) {
                 iconCache[app.packageName] =
-                    withContext(Dispatchers.IO) {
-                        try {
-                            val appInfo = packageManager.getApplicationInfo(app.packageName, 0)
-                            val drawable = appInfo.loadIcon(packageManager)
-                            drawable.toBitmapOrDefault(1).asImageBitmap()
-                        } catch (e: Exception) {
-                            Logger.e("LocalAppsContent", "Failed to load icon for ${app.packageName}", e)
-                            null
-                        }
+                    try {
+                        appsPort.iconFor(app.packageName)
+                    } catch (e: Exception) {
+                        Logger.e("LocalAppsContent", "Failed to load icon for " + app.packageName, e)
+                        null
                     }
             }
         }
@@ -74,7 +65,7 @@ internal fun LocalAppsContent(
                     )
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = state.error ?: "",
+                        text = state.error,
                         color = colorScheme.error,
                     )
                 }
