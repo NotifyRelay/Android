@@ -20,24 +20,23 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
-import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils.SpecInjectionMode
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import com.xzyht.notifyrelay.ui.dialog.SuperIslandTestDialog
+import com.xzyht.notifyrelay.ui.viewmodel.SuperIslandSettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.Storage
 import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.shared.SuperIslandStorageKeys
 import notifyrelay.shared.config.FilterConfigDefaults
+import notifyrelay.shared.ui.port.LocalToastPort
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -63,16 +62,22 @@ val specInjectionOptions =
     )
 
 @Composable
-fun UISuperIslandSettings() {
+fun UISuperIslandSettings(
+    viewModel: SuperIslandSettingsViewModel = viewModel(),
+) {
     val context = LocalContext.current
+    val toastPort = LocalToastPort.current
+
+    LaunchedEffect(Unit) {
+        viewModel.load(context)
+    }
 
     var enabled by remember { mutableStateOf(Storage.getBoolean(SuperIslandStorageKeys.ENABLED, true)) }
-    var showSuperIsland by remember { mutableStateOf(SuperIslandConfigUtils.isRemoteSuperIslandDisplayEnabled(context)) }
-    var floatingWindowEnabled by remember { mutableStateOf(SuperIslandConfigUtils.isFloatingWindowEnabled(context)) }
-    var notificationListEnabled by remember { mutableStateOf(SuperIslandConfigUtils.isNotificationListMode(context)) }
+    val showSuperIsland = viewModel.showSuperIsland
+    val floatingWindowEnabled = viewModel.floatingWindowEnabled
+    val notificationListEnabled = viewModel.notificationListEnabled
 
-    val savedInjectionMode = SuperIslandConfigUtils.getSpecInjectionMode(context)
-    var specInjectionMode by remember { mutableStateOf(savedInjectionMode) }
+    val specInjectionMode = viewModel.specInjectionMode
 
     val hasFloatingWindowSetting = Storage.getString(SuperIslandConfigUtils.SUPER_ISLAND_FLOATING_WINDOW_KEY, "") != ""
 
@@ -137,12 +142,7 @@ fun UISuperIslandSettings() {
                 summary = "控制是否显示来自远端的超级岛",
                 checked = showSuperIsland,
                 onCheckedChange = {
-                    showSuperIsland = it
-                    SuperIslandConfigUtils.setRemoteSuperIslandDisplayEnabled(context, it)
-                    if (!it) {
-                        // 关闭显示：立即撤下已展示的远端超级岛（浮窗 / 列表 / 系统通知）
-                        FloatingReplicaManager.dismissAllRemoteSuperIsland(context)
-                    }
+                    viewModel.setShowSuperIsland(context, it)
                 },
             )
 
@@ -151,12 +151,7 @@ fun UISuperIslandSettings() {
                 summary = floatingWindowSummary,
                 checked = floatingWindowEnabled,
                 onCheckedChange = {
-                    floatingWindowEnabled = it
-                    if (it) notificationListEnabled = false
-                    // 配置只写入库；通道变化由设置页调用方触发切换与重建（P2-6）
-                    if (SuperIslandConfigUtils.setFloatingWindowEnabled(context, it)) {
-                        FloatingReplicaManager.switchSuperIslandChannel(context)
-                    }
+                    viewModel.setFloatingWindowEnabled(context, it)
                 },
             )
 
@@ -165,16 +160,7 @@ fun UISuperIslandSettings() {
                 summary = "平板默认开启，开启后系统外显仅保留一条超级岛，点击切换",
                 checked = notificationListEnabled,
                 onCheckedChange = {
-                    notificationListEnabled = it
-                    if (it) {
-                        // 只同步 UI 状态；关浮窗由 setNotificationListMode 内部一次完成，
-                        // 避免先单独关浮窗触发一次多余的通道切换与重建
-                        floatingWindowEnabled = false
-                    }
-                    // 配置只写入库；通道变化由设置页调用方触发切换与重建（P2-6）
-                    if (SuperIslandConfigUtils.setNotificationListMode(context, it)) {
-                        FloatingReplicaManager.switchSuperIslandChannel(context)
-                    }
+                    viewModel.setNotificationListEnabled(context, it)
                 },
             )
 
@@ -185,10 +171,10 @@ fun UISuperIslandSettings() {
                 selectedIndex = specInjectionOptions.indexOfFirst { it.second == specInjectionMode },
                 onSelectedIndexChange = { index ->
                     if (index in specInjectionOptions.indices) {
-                        specInjectionMode = specInjectionOptions[index].second
-                        SuperIslandConfigUtils.setSpecInjectionMode(context, specInjectionMode)
-                        if (specInjectionMode == SpecInjectionMode.SUPER_ISLAND) {
-                            ToastUtils.showLongToast(context, "请通过lsp模块关闭超级岛白名单否则大概率无法展示")
+                        val mode = specInjectionOptions[index].second
+                        viewModel.setSpecInjectionMode(context, mode)
+                        if (mode == SpecInjectionMode.SUPER_ISLAND) {
+                            toastPort.long("请通过lsp模块关闭超级岛白名单否则大概率无法展示")
                         }
                     }
                 },
@@ -220,7 +206,7 @@ fun UISuperIslandSettings() {
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
 
-            val installedPkgs = remember { InstalledAppsRepository.getInstalledPackageNamesSync(context) }
+            val installedPkgs = remember { viewModel.installedPackages(context) }
 
             DEFAULT_MIRROR_PACKAGES.forEach { pkg ->
                 val isInstalled = installedPkgs.contains(pkg)
@@ -229,7 +215,7 @@ fun UISuperIslandSettings() {
 
                 LaunchedEffect(pkg) {
                     if (iconBitmap == null) {
-                        iconBitmap = AppIconRepository.getAppIconAsync(context, pkg)
+                        viewModel.loadIcon(context, pkg) { icon -> iconBitmap = icon }
                     }
                 }
 
@@ -271,7 +257,7 @@ fun UISuperIslandSettings() {
 
                     LaunchedEffect(pkg) {
                         if (iconBitmap == null) {
-                            iconBitmap = AppIconRepository.getAppIconAsync(context, pkg)
+                            viewModel.loadIcon(context, pkg) { icon -> iconBitmap = icon }
                         }
                     }
 

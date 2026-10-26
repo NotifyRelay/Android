@@ -18,18 +18,17 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
-import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
-import kotlinx.coroutines.launch
+import com.xzyht.notifyrelay.ui.viewmodel.RemoteFilterViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
@@ -46,65 +45,21 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun UIRemoteFilter(
     modifier: Modifier = Modifier,
+    viewModel: RemoteFilterViewModel = viewModel(),
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
-    // 前端状态 - 先使用默认值，然后在配置加载完成后更新
-    var filterMode by remember { mutableStateOf("none") }
-    var enableDedup by remember { mutableStateOf(true) }
-    var enablePackageGroupMapping by remember { mutableStateOf(true) }
-    var allGroups by remember {
-        mutableStateOf<List<MutableList<String>>>(
-            RemoteFilterConfig.defaultPackageGroups.map { it.toMutableList() },
-        )
-    }
-    var allGroupEnabled by remember {
-        mutableStateOf<List<Boolean>>(
-            RemoteFilterConfig.defaultGroupEnabled.toMutableList(),
-        )
-    }
-    var enableLockScreenOnly by remember { mutableStateOf(false) }
-    var filterItems by remember {
-        mutableStateOf(RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) })
-    }
+    val filterMode = viewModel.filterMode
+    val enableDedup = viewModel.enableDedup
+    val enablePackageGroupMapping = viewModel.enablePackageGroupMapping
+    val allGroups = viewModel.allGroups
+    val allGroupEnabled = viewModel.allGroupEnabled
+    val enableLockScreenOnly = viewModel.enableLockScreenOnly
+    val filterItems = viewModel.filterItems
+    val enabledKeys = viewModel.enabledKeys
 
-    // B1 修复：enabledKeys 作为 Compose 状态，键为 "$packageName|$keyword"。
-    // 直接读 RemoteFilterConfig.isActiveEntryEnabled（非 Compose 状态）+ data class 结构相等
-    // 不会触发重组，改用独立状态集合并在每次变更后刷新。
-    var enabledKeys by remember { mutableStateOf<Set<String>>(emptySet()) }
-
-    // 刷新 enabledKeys 的统一入口：从 RemoteFilterConfig 当前名单派生启用集合
-    fun refreshEnabledKeys() {
-        val active = RemoteFilterConfig.getActiveFilterList()
-        enabledKeys =
-            active
-                .filter { (pkg, kw) ->
-                    RemoteFilterConfig.isActiveEntryEnabled(pkg, kw ?: "")
-                }.map { (pkg, kw) -> "$pkg|${kw ?: ""}" }
-                .toSet()
-    }
-
-    // 在LaunchedEffect中异步加载RemoteFilterConfig，避免阻塞UI
     LaunchedEffect(Unit) {
-        if (!RemoteFilterConfig.isLoaded) {
-            RemoteFilterConfig.load(context)
-            RemoteFilterConfig.isLoaded = true
-        }
-
-        // 配置加载完成后更新前端状态
-        filterMode = RemoteFilterConfig.filterMode
-        enableDedup = RemoteFilterConfig.enableDeduplication
-        enablePackageGroupMapping = RemoteFilterConfig.enablePackageGroupMapping
-        allGroups =
-            (
-                RemoteFilterConfig.defaultPackageGroups.map { it.toMutableList() } +
-                    RemoteFilterConfig.customPackageGroups.map { it.toMutableList() }
-            ).toMutableList()
-        allGroupEnabled = (RemoteFilterConfig.defaultGroupEnabled + RemoteFilterConfig.customGroupEnabled).toMutableList()
-        filterItems = RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) }
-        enableLockScreenOnly = RemoteFilterConfig.enableLockScreenOnly
-        refreshEnabledKeys()
+        viewModel.load(context)
     }
 
     var showAppPickerForGroup by remember { mutableStateOf<Pair<Boolean, Int>>(false to -1) }
@@ -127,9 +82,7 @@ fun UIRemoteFilter(
             checked = enableDedup,
             summary = "智能去重，避免重复通知",
             onCheckedChange = {
-                RemoteFilterConfig.enableDeduplication = it
-                scope.launch { RemoteFilterConfig.save(context) }
-                enableDedup = it
+                viewModel.setEnableDedup(context, it)
             },
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
@@ -140,9 +93,7 @@ fun UIRemoteFilter(
             checked = enableLockScreenOnly,
             summary = "仅复刻锁屏状态的通知到通知栏",
             onCheckedChange = {
-                RemoteFilterConfig.enableLockScreenOnly = it
-                scope.launch { RemoteFilterConfig.save(context) }
-                enableLockScreenOnly = it
+                viewModel.setEnableLockScreenOnly(context, it)
             },
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
@@ -159,46 +110,23 @@ fun UIRemoteFilter(
             onSelectedIndexChange = { idx ->
                 val safeIdx = idx.coerceIn(0, modes.lastIndex)
                 val (value, _) = modes[safeIdx]
-                RemoteFilterConfig.filterMode = value
-                RemoteFilterConfig.enablePeerMode = (value == "peer")
-                scope.launch {
-                    RemoteFilterConfig.save(context)
-                    // 保存完成后再刷新派生状态（save 内部会重写名单表，避免读到中间态）
-                    filterItems = RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) }
-                    refreshEnabledKeys()
-                }
-                filterMode = value
-                // 立即同步 UI 状态（不等 save 完成，保证响应感）
-                filterItems = RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) }
-                refreshEnabledKeys()
+                viewModel.setFilterMode(context, value)
             },
         )
 
         if (filterMode == "black" || filterMode == "white") {
             // 黑白名单配置区（添加 + 手动黑名单抽屉 + 条目禁用），复用本机过滤的公共组件
             FilterListSection(
-                manualEntries = filterItems,
+                manualEntries = filterItems.map { FilterEntryItem(it.second ?: "", it.first) },
                 entryEnabled = { item -> enabledKeys.contains("${item.packageName}|${item.keyword}") },
                 onEntryEnabledChange = { item, enabled ->
-                    scope.launch {
-                        RemoteFilterConfig.setFilterEntryEnabled(context, item.packageName, item.keyword, enabled)
-                        filterItems = RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) }
-                        refreshEnabledKeys()
-                    }
+                    viewModel.setEntryEnabled(context, item.packageName, item.keyword, enabled)
                 },
                 onAddEntry = { keyword, pkg ->
-                    scope.launch {
-                        RemoteFilterConfig.addFilterEntry(context, pkg, keyword)
-                        filterItems = RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) }
-                        refreshEnabledKeys()
-                    }
+                    viewModel.addEntry(context, pkg, keyword)
                 },
                 onRemoveEntry = { item ->
-                    scope.launch {
-                        RemoteFilterConfig.removeFilterEntry(context, item.packageName, item.keyword)
-                        filterItems = RemoteFilterConfig.getActiveFilterList().map { FilterEntryItem(it.second ?: "", it.first) }
-                        refreshEnabledKeys()
-                    }
+                    viewModel.removeEntry(context, item.packageName, item.keyword)
                 },
             )
         }
@@ -208,9 +136,7 @@ fun UIRemoteFilter(
             checked = enablePackageGroupMapping,
             summary = "启用包名等价映射功能",
             onCheckedChange = {
-                RemoteFilterConfig.enablePackageGroupMapping = it
-                scope.launch { RemoteFilterConfig.save(context) }
-                enablePackageGroupMapping = it
+                viewModel.setEnablePackageGroupMapping(context, it)
             },
             modifier = Modifier.padding(top = 16.dp),
         )
@@ -219,7 +145,7 @@ fun UIRemoteFilter(
         // 包名组配置
         Column(modifier = Modifier.fillMaxWidth()) {
             allGroups.forEachIndexed { idx, group ->
-                val groupName = if (idx < RemoteFilterConfig.defaultPackageGroups.size) "默认组${idx + 1}" else "自定义组${idx + 1 - RemoteFilterConfig.defaultPackageGroups.size}"
+                val groupName = if (idx < viewModel.defaultGroupSize) "默认组${idx + 1}" else "自定义组${idx + 1 - viewModel.defaultGroupSize}"
 
                 Column(modifier = Modifier.fillMaxWidth()) {
                     // 将CheckboxPreference和操作按钮放在同一行
@@ -234,12 +160,7 @@ fun UIRemoteFilter(
                             checked = allGroupEnabled[idx],
                             onCheckedChange = { v ->
                                 val newEnabled = allGroupEnabled.toMutableList().apply { set(idx, v) }
-                                allGroupEnabled = newEnabled
-                                // 更新后端状态
-                                val defaultSize = RemoteFilterConfig.defaultPackageGroups.size
-                                RemoteFilterConfig.defaultGroupEnabled = newEnabled.take(defaultSize).toMutableList()
-                                RemoteFilterConfig.customGroupEnabled = newEnabled.drop(defaultSize).toMutableList()
-                                scope.launch { RemoteFilterConfig.save(context) }
+                                viewModel.setGroupEnabled(context, newEnabled)
                             },
                             enabled = enablePackageGroupMapping,
                             modifier = Modifier.weight(1f),
@@ -251,7 +172,7 @@ fun UIRemoteFilter(
                             horizontalArrangement = Arrangement.End,
                             verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            if (idx >= RemoteFilterConfig.defaultPackageGroups.size) {
+                            if (idx >= viewModel.defaultGroupSize) {
                                 Button(
                                     onClick = { showAppPickerForGroup = true to idx },
                                     modifier = Modifier.defaultMinSize(minWidth = 28.dp, minHeight = 28.dp),
@@ -263,13 +184,7 @@ fun UIRemoteFilter(
                                     onClick = {
                                         val newGroups = allGroups.toMutableList().apply { removeAt(idx) }
                                         val newEnabled = allGroupEnabled.toMutableList().apply { removeAt(idx) }
-                                        allGroups = newGroups
-                                        allGroupEnabled = newEnabled
-                                        // 更新后端状态
-                                        val defaultSize = RemoteFilterConfig.defaultPackageGroups.size
-                                        RemoteFilterConfig.customPackageGroups = newGroups.drop(defaultSize).map { it.toMutableList() }.toMutableList()
-                                        RemoteFilterConfig.customGroupEnabled = newEnabled.drop(defaultSize).toMutableList()
-                                        scope.launch { RemoteFilterConfig.save(context) }
+                                        viewModel.setCustomGroups(context, newGroups, newEnabled)
                                     },
                                     modifier = Modifier.defaultMinSize(minWidth = 28.dp, minHeight = 28.dp).padding(start = 2.dp),
                                     enabled = enablePackageGroupMapping,
@@ -334,13 +249,7 @@ fun UIRemoteFilter(
             onClick = {
                 val newGroups = allGroups.toMutableList().apply { add(mutableListOf()) }
                 val newEnabled = allGroupEnabled.toMutableList().apply { add(true) }
-                allGroups = newGroups
-                allGroupEnabled = newEnabled
-                // 更新后端状态
-                val defaultSize = RemoteFilterConfig.defaultPackageGroups.size
-                RemoteFilterConfig.customPackageGroups = newGroups.drop(defaultSize).map { it.toMutableList() }.toMutableList()
-                RemoteFilterConfig.customGroupEnabled = newEnabled.drop(defaultSize).toMutableList()
-                scope.launch { RemoteFilterConfig.save(context) }
+                viewModel.setCustomGroups(context, newGroups, newEnabled)
             },
             modifier = Modifier.padding(vertical = 2.dp),
             enabled = enablePackageGroupMapping,
@@ -362,11 +271,8 @@ fun UIRemoteFilter(
                                 this[groupIdx] = (this[groupIdx] + pkg).toMutableList()
                             }
                         }
-                    allGroups = newGroups
                     // 更新后端状态
-                    val defaultSize = RemoteFilterConfig.defaultPackageGroups.size
-                    RemoteFilterConfig.customPackageGroups = newGroups.drop(defaultSize).map { it.toMutableList() }.toMutableList()
-                    scope.launch { RemoteFilterConfig.save(context) }
+                    viewModel.setCustomGroups(context, newGroups, allGroupEnabled)
                     showAppPickerForGroup = false to -1
                 },
                 title = "选择应用",
