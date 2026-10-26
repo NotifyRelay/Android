@@ -7,6 +7,8 @@ import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificatio
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.MessageSender
 import github.xzynine.superislandui.common.SuperIslandManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.image.ImageUtils
 import java.io.ByteArrayOutputStream
@@ -24,10 +26,13 @@ import java.io.ByteArrayOutputStream
  *
  * 性能：先用「轻量比较键」判断内容是否变化，未变则跳过昂贵的 `runBlocking` / fullJson 构造与推送。
  *
- * 注意：本类方法运行在 Rust 心跳线程且锁已释放，回调内可直接调用 `push`。
+ * 注意：本类方法运行在 Rust 心跳线程，回调内**不得**同步调用 NativeCore（会重入 core 导致崩溃），
+ * 推送一律经 [pushScope] 投递到其他线程执行。
  */
 class StateQueryResponder(
     private val context: Context,
+    /** 推送派发作用域；见 [pushState] 说明。 */
+    private val pushScope: CoroutineScope,
 ) {
     companion object {
         private const val TAG = "CoreCb"
@@ -127,10 +132,12 @@ class StateQueryResponder(
                     )
                 }
             // 仅当原生入队成功才写入比较键并返回“有变更”，否则保留原键以便下次查询重试
-            if (!pushState(remoteUuid, featureId, content, isMedia = false)) return 1
-            trimKeys(remoteUuid)
-            stateQueryKeys[cacheKey] = lightKey
-            return 2
+            val dispatched =
+                pushState(remoteUuid, featureId, content, isMedia = false) {
+                    trimKeys(remoteUuid)
+                    stateQueryKeys[cacheKey] = lightKey
+                }
+            return if (dispatched) 2 else 1
         }
         // 无匹配：平台上不存在该会话
         Logger.w(TAG, "状态查询: 超级岛会话不存在, fid=$featureId")
@@ -184,36 +191,49 @@ class StateQueryResponder(
                 System.currentTimeMillis(),
             )
         // 仅当原生入队成功才写入比较键并返回“有变更”，否则保留原键以便下次查询重试
-        if (!pushState(remoteUuid, featureId, content, isMedia = true)) return 1
-        trimKeys(remoteUuid)
-        stateQueryKeys[cacheKey] = lightKey
-        return 2
+        val dispatched =
+            pushState(remoteUuid, featureId, content, isMedia = true) {
+                trimKeys(remoteUuid)
+                stateQueryKeys[cacheKey] = lightKey
+            }
+        return if (dispatched) 2 else 1
     }
 
     /**
      * 查询响应推送：仅推给查询对应的远端设备（isQuery=1），差异/合并/保活由 Rust 负责。
      *
-     * @return true=原生入队成功；false=上下文/队列不可用、入队失败或异常（调用方可重试）
+     * 推送经 [pushScope] 异步执行：Rust 回调运行在 core 线程，在其中同步调用 NativeCore 会重入 core
+     * 并导致崩溃（实测栈：onStateQuery → pushMediaState → uniffi → detach while running code）。
+     *
+     * @param onSuccess 推送成功后执行（写入比较键）；失败时不执行，保留原键以便下次查询重试
+     * @return true=已派发；false=core/队列不可用
      */
     private fun pushState(
         remoteUuid: String,
         featureId: String,
         fullJson: String,
         isMedia: Boolean,
-    ): Boolean =
-        try {
-            if (!NativeCore.isReady()) return false
-            if (!NativeCore.senderQueueReady) return false
-            val ok =
-                if (isMedia) {
-                    NativeCore.pushMediaState(remoteUuid, fullJson, false, true)
+        onSuccess: () -> Unit,
+    ): Boolean {
+        if (!NativeCore.isReady()) return false
+        if (!NativeCore.senderQueueReady) return false
+        pushScope.launch {
+            try {
+                val ok =
+                    if (isMedia) {
+                        NativeCore.pushMediaState(remoteUuid, fullJson, false, true)
+                    } else {
+                        NativeCore.pushSuperislandState(remoteUuid, fullJson, false, true)
+                    }
+                if (ok) {
+                    onSuccess()
                 } else {
-                    NativeCore.pushSuperislandState(remoteUuid, fullJson, false, true)
+                    Logger.w(TAG, "查询响应入队失败: " + remoteUuid + " fid=" + featureId)
                 }
-            if (!ok) Logger.w(TAG, "查询响应入队失败: $remoteUuid fid=$featureId")
-            ok
-        } catch (e: Exception) {
-            Logger.w(TAG, "查询响应推送失败: $remoteUuid fid=$featureId", e)
-            false
+            } catch (e: Exception) {
+                Logger.w(TAG, "查询响应推送失败: " + remoteUuid + " fid=" + featureId, e)
+            }
         }
+        return true
+    }
 }

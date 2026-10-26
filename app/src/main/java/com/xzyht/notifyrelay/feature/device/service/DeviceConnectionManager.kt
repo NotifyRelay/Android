@@ -239,7 +239,7 @@ class DeviceConnectionManager(
         )
 
     /** Rust 心跳「状态查询」响应器（超级岛/媒体会话）。 */
-    override val stateQueryResponder = StateQueryResponder(context)
+    override val stateQueryResponder = StateQueryResponder(context, coroutineScope)
 
     /**
      * 音频中继控制器：与设备连接解耦，仅注入「按 uuid 反查设备」与「发送 DATA_MEDIA_CONTROL」两个能力。
@@ -370,11 +370,6 @@ class DeviceConnectionManager(
      */
     override fun triggerDeviceListRefresh() {
         snapshotStore.requestRefresh()
-    }
-
-    /** 同步刷新设备快照（沿用既有回调语义，供超时/连接/断开回调使用）。 */
-    override fun updateDeviceListNow() {
-        snapshotStore.refresh()
     }
 
     /** 同步刷新设备快照（供内部组件使用）。 */

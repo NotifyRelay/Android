@@ -83,14 +83,6 @@ interface DeviceCallbackHost {
     /** 异步触发设备快照刷新（切到协程，回调线程内安全）。 */
     fun triggerDeviceListRefresh()
 
-    /**
-     * 同步刷新设备快照（沿用既有语义，供超时/连接/断开回调使用）。
-     *
-     * ⚠ 会同步调用 `NativeCore.getDeviceList()`；仅在与既有行为一致处使用，
-     * 新代码优先使用 [triggerDeviceListRefresh]。
-     */
-    fun updateDeviceListNow()
-
     /** 登记 Rust 重连状态机目标。 */
     fun registerReconnectTarget(
         uuid: String,
