@@ -50,6 +50,9 @@ import notifyrelay.domain.feature.notification.history.GroupedSuperIslandHistory
 import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 import notifyrelay.shared.ui.pages.DeleteButton
 import notifyrelay.shared.ui.pages.DragValue
+import notifyrelay.shared.ui.pages.superisland.SuperIslandAppIcon
+import notifyrelay.shared.ui.pages.superisland.SuperIslandHistoryImage
+import notifyrelay.shared.ui.pages.superisland.rememberAppIconBitmap
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages.superisland
+package notifyrelay.shared.ui.pages.superisland
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -17,24 +17,20 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import notifyrelay.shared.ui.port.LocalImageDecodePort
 import notifyrelay.shared.ui.viewmodel.AppIconViewModel
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.util.Locale
 
-internal const val SUPER_ISLAND_IMAGE_MAX_DIMENSION = 320
+const val SUPER_ISLAND_IMAGE_MAX_DIMENSION = 320
 
 @Composable
-internal fun SuperIslandHistoryImage(
+fun SuperIslandHistoryImage(
     imageKey: String,
     data: String,
     modifier: Modifier = Modifier,
@@ -42,34 +38,29 @@ internal fun SuperIslandHistoryImage(
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
-    val context = LocalContext.current
 
-    val bitmap by produceState(initialValue = SuperIslandImageCache.get(data), key1 = data) {
-        val cached = SuperIslandImageCache.get(data)
+    val imagePort = LocalImageDecodePort.current ?: error("LocalImageDecodePort 未提供")
+
+    val imageBitmap by produceState(initialValue = imagePort.cached(data), key1 = data) {
+        val cached = imagePort.cached(data)
         if (cached != null) {
             value = cached
             return@produceState
         }
-
-        val loaded =
-            withContext(Dispatchers.IO) {
-                val bitmap = decodeIslandImage(context, data)
-                bitmap?.let { SuperIslandImageCache.put(data, it) }
-            }
-
+        val loaded = imagePort.decode(data)
+        if (loaded != null) imagePort.putCache(data, loaded)
         value = loaded
     }
-
-    val imageBitmap = remember(bitmap) { bitmap?.asImageBitmap() }
 
     Column(
         modifier = modifier,
         verticalArrangement = Arrangement.spacedBy(4.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        if (imageBitmap != null) {
+        val shown = imageBitmap
+        if (shown != null) {
             Image(
-                bitmap = imageBitmap,
+                bitmap = shown,
                 contentDescription = imageKey,
                 modifier =
                     Modifier
@@ -104,9 +95,8 @@ internal fun SuperIslandHistoryImage(
 }
 
 @Composable
-internal fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
+fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
     val target = remember(packageName) { packageName?.takeIf { it.isNotBlank() } }
-    val context = LocalContext.current
     val viewModel: AppIconViewModel = viewModel()
     val iconUpdateKey by viewModel.iconUpdatesFlow.collectAsState()
     val bitmapState =
@@ -123,7 +113,7 @@ internal fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
 }
 
 @Composable
-internal fun SuperIslandAppIcon(
+fun SuperIslandAppIcon(
     iconBitmap: ImageBitmap?,
     iconPackage: String?,
     size: Dp,
@@ -147,7 +137,7 @@ internal fun SuperIslandAppIcon(
                 iconPackage
                     ?.substringAfterLast('.')
                     ?.takeLast(2)
-                    ?.uppercase(Locale.getDefault())
+                    ?.uppercase()
                     ?: "APP"
             }
         Box(
@@ -168,11 +158,3 @@ internal fun SuperIslandAppIcon(
         }
     }
 }
-
-/** 解码超级岛历史图片（平台侧实现）。 */
-private suspend fun decodeIslandImage(
-    context: android.content.Context,
-    data: String,
-): android.graphics.Bitmap? =
-    com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
-        .decodeBitmap(context, data)
