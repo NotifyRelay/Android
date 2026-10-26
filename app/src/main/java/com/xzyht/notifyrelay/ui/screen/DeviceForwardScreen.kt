@@ -20,7 +20,6 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
 import com.xzyht.notifyrelay.ui.pages.MusicControlPage
-import com.xzyht.notifyrelay.ui.pages.RemoteAppsPage
 import com.xzyht.notifyrelay.ui.viewmodel.devicePortsViewModel
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyAdvancedPage
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
@@ -31,6 +30,7 @@ import kotlinx.coroutines.launch
 import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
+import notifyrelay.shared.ui.pages.RemoteAppsPage
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
 import notifyrelay.shared.ui.viewmodel.DevicePortsViewModel
 import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel

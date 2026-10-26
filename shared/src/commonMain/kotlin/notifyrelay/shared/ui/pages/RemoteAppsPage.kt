@@ -1,14 +1,13 @@
-package com.xzyht.notifyrelay.ui.pages
+package notifyrelay.shared.ui.pages
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.pages.remoteapps.openLocalApp
 import notifyrelay.shared.ui.pages.remoteapps.DisplayNavigationBar
+import notifyrelay.shared.ui.pages.remoteapps.LocalAppLaunchPort
 import notifyrelay.shared.ui.pages.remoteapps.LocalAppsContent
 import notifyrelay.shared.ui.pages.remoteapps.LocalDisplayPort
 import notifyrelay.shared.ui.pages.remoteapps.RemoteAppsContent
@@ -31,7 +30,7 @@ fun RemoteAppsPage(
     remoteViewModel: RemoteAppsViewModel = viewModel(),
     localViewModel: LocalAppsViewModel = viewModel(),
 ) {
-    val context = LocalContext.current
+    val launchPort = LocalAppLaunchPort.current
     val isLocalMode = deviceUuid == null || deviceIp == null
 
     val remoteState by remoteViewModel.state.collectAsState()
@@ -111,7 +110,7 @@ fun RemoteAppsPage(
                 LocalAppsContent(
                     state = localState,
                     onAppClick = { app ->
-                        openLocalApp(context, app, selectedDisplayId)
+                        launchPort?.launchLocalApp(app.packageName, selectedDisplayId)
                     },
                     onAppLongClick = { showMenuForApp = it },
                 )
