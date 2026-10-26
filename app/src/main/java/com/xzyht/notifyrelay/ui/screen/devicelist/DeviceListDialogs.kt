@@ -13,14 +13,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.ui.dialog.PairingCodeDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.ToastUtils
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.service.contract.DeviceAdminPort
+import notifyrelay.shared.ui.dialog.PairingCodeDialog
 import notifyrelay.shared.ui.dialog.PairingMode
 import notifyrelay.shared.ui.dialog.RejectedDevicesDialog
+import notifyrelay.shared.ui.port.LocalToastPort
 import notifyrelay.shared.ui.screen.DeviceListScreenState
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.layout.DialogDefaults
@@ -38,6 +38,7 @@ internal fun DeviceListPairingCodeDialog(
     deviceManager: DeviceAdminPort,
     onAuthedUuidsChange: (Set<String>) -> Unit,
 ) {
+    val toastPort = LocalToastPort.current
     // 配对码对话框 - 服务端模式
     if (state.showPairingCodeDialog && state.pairingCodeDialogMode == PairingMode.SERVER_MODE) {
         PairingCodeDialog(
@@ -136,6 +137,7 @@ internal fun DeleteDeviceConfirmDialog(
     onClose: () -> Unit,
 ) {
     val context = LocalContext.current
+    val toastPort = LocalToastPort.current
 
     WindowDialog(
         show = show,
@@ -165,10 +167,10 @@ internal fun DeleteDeviceConfirmDialog(
                                     if (removed) {
                                         onRemoveAuthedUuid(device.uuid)
                                     } else {
-                                        ToastUtils.showShortToast(context, "删除设备失败: 设备不存在或持久化删除未完成，请重试")
+                                        toastPort.short("删除设备失败: 设备不存在或持久化删除未完成，请重试")
                                     }
                                 } catch (e: Exception) {
-                                    ToastUtils.showShortToast(context, "删除设备失败: ${e.message ?: "未知错误"}")
+                                    toastPort.short("删除设备失败: ${e.message ?: "未知错误"}")
                                 }
                                 onClose()
                             }
@@ -184,10 +186,10 @@ internal fun DeleteDeviceConfirmDialog(
                                     if (removed) {
                                         onRemoveAuthedUuid(device.uuid)
                                     } else {
-                                        ToastUtils.showShortToast(context, "删除设备失败: 设备不存在或持久化删除未完成，请重试")
+                                        toastPort.short("删除设备失败: 设备不存在或持久化删除未完成，请重试")
                                     }
                                 } catch (e: Exception) {
-                                    ToastUtils.showShortToast(context, "删除设备失败: ${e.message ?: "未知错误"}")
+                                    toastPort.short("删除设备失败: ${e.message ?: "未知错误"}")
                                 }
                                 onClose()
                             }

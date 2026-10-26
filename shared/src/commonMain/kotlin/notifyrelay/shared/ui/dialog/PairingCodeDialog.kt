@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.dialog
+package notifyrelay.shared.ui.dialog
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -17,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -25,11 +24,10 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.feature.device.pairing.NativePairingCorePort
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import kotlinx.coroutines.delay
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.service.contract.DevicePairingPort
+import notifyrelay.shared.feature.device.pairing.LocalPairingDependencies
 import notifyrelay.shared.feature.device.pairing.PairingViewModel
 import notifyrelay.shared.ui.dialog.PairingCodeInputField
 import notifyrelay.shared.ui.dialog.PairingMode
@@ -42,15 +40,17 @@ import top.yukonga.miuix.kmp.window.WindowDialog
 /** 构造 [PairingViewModel]，注入核心端口与握手等待器。 */
 @Composable
 private fun pairingViewModelFactory(deviceManager: DevicePairingPort): ViewModelProvider.Factory {
-    val context = LocalContext.current.applicationContext
-    return remember(deviceManager, context) {
+    val deps =
+        LocalPairingDependencies.current
+            ?: error("LocalPairingDependencies 未提供")
+    return remember(deviceManager, deps) {
         object : ViewModelProvider.Factory {
             @Suppress("UNCHECKED_CAST")
             override fun <T : ViewModel> create(modelClass: Class<T>): T =
                 PairingViewModel(
-                    core = NativePairingCorePort,
+                    core = deps.core,
                     pairingPort = deviceManager,
-                    handshakePort = DeviceConnectionManagerSingleton.getHandshakeWaiters(context),
+                    handshakePort = deps.handshakePort,
                 ) as T
         }
     }
@@ -69,8 +69,9 @@ fun PairingCodeDialog(
 ) {
     if (!show) return
 
+    val deps = LocalPairingDependencies.current ?: error("LocalPairingDependencies 未提供")
+
     val colorScheme = MiuixTheme.colorScheme
-    val context = LocalContext.current.applicationContext
 
     if (mode == PairingMode.CLIENT_MODE) {
         val clipboardManager = LocalClipboardManager.current
@@ -83,13 +84,7 @@ fun PairingCodeDialog(
         LaunchedEffect(show) {
             if (show && targetDevice != null) {
                 delay(500)
-                val batteryLevel =
-                    notifyrelay.base.util.BatteryUtils
-                        .getBatteryLevel(context)
-                val isCharging =
-                    notifyrelay.base.util.BatteryUtils
-                        .isCharging(context)
-                val battery = if (isCharging) batteryLevel else -batteryLevel
+                val battery = deps.batteryProvider()
                 viewModel.startClientPairing(targetDevice, battery) { success, message ->
                     onPairingComplete(success, message)
                     onDismiss()
@@ -225,13 +220,7 @@ fun PairingCodeDialog(
                                     return@TextButton
                                 }
                                 isPairing = true
-                                val batteryLevel =
-                                    notifyrelay.base.util.BatteryUtils
-                                        .getBatteryLevel(context)
-                                val isCharging =
-                                    notifyrelay.base.util.BatteryUtils
-                                        .isCharging(context)
-                                val battery = if (isCharging) batteryLevel else -batteryLevel
+                                val battery = deps.batteryProvider()
                                 viewModel.submitServerPairing(remoteUuid, remoteIp, code, battery) { result, ok ->
                                     if (ok) {
                                         onPairingComplete(true, "配对成功")

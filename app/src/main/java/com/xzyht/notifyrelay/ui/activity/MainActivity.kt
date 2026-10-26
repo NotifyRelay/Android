@@ -13,6 +13,7 @@ import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.ui.port.ProvideAndroidUiPorts
+import com.xzyht.notifyrelay.ui.port.ProvidePairingDependencies
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -83,8 +84,10 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             ProvideAndroidUiPorts {
-                val navigator = rememberNavigator(Route.Main)
-                MainActivityContent(navigator)
+                ProvidePairingDependencies {
+                    val navigator = rememberNavigator(Route.Main)
+                    MainActivityContent(navigator)
+                }
             }
         }
 
