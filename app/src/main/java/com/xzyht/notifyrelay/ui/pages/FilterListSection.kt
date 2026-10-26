@@ -24,7 +24,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
-import com.xzyht.notifyrelay.ui.viewmodel.AppIconViewModel
+import notifyrelay.shared.ui.viewmodel.AppIconViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -74,7 +74,7 @@ fun FilterListSection(
     var showCustomSheet by remember { mutableStateOf(false) }
     var showAppPickerDialog by remember { mutableStateOf(false) }
 
-    val defaultAppIconBitmap = remember { viewModel.loadDefaultIcon(context, 48) }
+    val defaultAppIconBitmap = remember { viewModel.defaultIcon(48) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -156,7 +156,7 @@ fun FilterListSection(
         onAppSelected = { packageName ->
             newPackage = packageName
             newPackageIcon = defaultAppIconBitmap
-            viewModel.loadIcon(context, packageName) { icon ->
+            viewModel.loadIcon(packageName) { icon ->
                 newPackageIcon = icon ?: defaultAppIconBitmap
             }
         },
@@ -180,7 +180,7 @@ fun FilterListSection(
                     var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
                     LaunchedEffect(entry) {
                         if (entry.packageName.isNotBlank() && iconBitmap == null) {
-                            viewModel.loadIcon(context, entry.packageName) { icon ->
+                            viewModel.loadIcon(entry.packageName) { icon ->
                                 iconBitmap = icon ?: defaultAppIconBitmap
                             }
                         }
@@ -223,7 +223,7 @@ fun FilterListSection(
                     var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
                     LaunchedEffect(entry) {
                         if (entry.packageName.isNotBlank() && iconBitmap == null) {
-                            viewModel.loadIcon(context, entry.packageName) { icon ->
+                            viewModel.loadIcon(entry.packageName) { icon ->
                                 iconBitmap = icon ?: defaultAppIconBitmap
                             }
                         }

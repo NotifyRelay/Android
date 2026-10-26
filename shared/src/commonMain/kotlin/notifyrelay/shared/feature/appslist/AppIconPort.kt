@@ -28,6 +28,9 @@ interface AppIconPort {
         sourceDevice: DeviceInfo? = null,
     ): ImageBitmap?
 
+    /** 取系统默认应用图标（尺寸为 [size] 像素）。 */
+    fun defaultIcon(size: Int = 48): ImageBitmap?
+
     /** 缓存外部应用图标。 */
     suspend fun cacheExternalIcon(
         packageName: String,

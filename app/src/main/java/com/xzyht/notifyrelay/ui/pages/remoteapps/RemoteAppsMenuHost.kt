@@ -9,8 +9,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.ui.viewmodel.LocalAppInfo
 import com.xzyht.notifyrelay.ui.viewmodel.RemoteAppsViewModel
+import notifyrelay.domain.feature.appslist.model.LocalAppInfo
 import notifyrelay.domain.feature.appslist.model.RemoteAppInfo
 import top.yukonga.miuix.kmp.theme.LocalDismissState
 import top.yukonga.miuix.kmp.window.WindowDialog

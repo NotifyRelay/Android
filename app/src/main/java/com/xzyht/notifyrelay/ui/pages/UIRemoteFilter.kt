@@ -1,6 +1,5 @@
 package com.xzyht.notifyrelay.ui.pages
 
-import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -21,13 +20,12 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
-import com.xzyht.notifyrelay.ui.viewmodel.AppIconViewModel
 import com.xzyht.notifyrelay.ui.viewmodel.RemoteFilterViewModel
+import notifyrelay.shared.ui.viewmodel.AppIconViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
@@ -215,19 +213,19 @@ fun UIRemoteFilter(
                         group.forEach { pkg ->
                             val isInstalled = installedPkgSet.contains(pkg)
                             // 使用mutableStateOf保存图标状态，这样更新时会触发UI重新渲染
-                            var iconBitmap by remember { mutableStateOf<Bitmap?>(null) }
+                            var iconBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
 
                             // 异步加载缺失的图标，并在加载完成后更新状态
                             LaunchedEffect(pkg) {
                                 if (iconBitmap == null) {
-                                    iconViewModel.bitmapIcon(context, pkg) { icon ->
+                                    iconViewModel.loadIcon(pkg) { icon ->
                                         iconBitmap = icon
                                     }
                                 }
                             }
 
                             Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(end = 6.dp)) {
-                                iconBitmap?.let { Image(bitmap = it.asImageBitmap(), contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                iconBitmap?.let { Image(bitmap = it, contentDescription = null, modifier = Modifier.size(16.dp)) }
                                 Text(pkg, style = textStyles.body2, color = if (isInstalled) colorScheme.primary else colorScheme.onSurface, modifier = Modifier.padding(start = 2.dp))
                             }
                         }

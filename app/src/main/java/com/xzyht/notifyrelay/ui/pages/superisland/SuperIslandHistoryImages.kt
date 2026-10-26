@@ -24,9 +24,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.viewmodel.AppIconViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import notifyrelay.shared.ui.viewmodel.AppIconViewModel
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.Locale
@@ -53,7 +53,7 @@ internal fun SuperIslandHistoryImage(
 
         val loaded =
             withContext(Dispatchers.IO) {
-                val bitmap = viewModel.decodeImage(context, data)
+                val bitmap = decodeIslandImage(context, data)
                 bitmap?.let { SuperIslandImageCache.put(data, it) }
             }
 
@@ -115,9 +115,9 @@ internal fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
                 value = null
                 return@produceState
             }
-            val cached = viewModel.externalIcon(context, target) { value = it?.asImageBitmap() }
+            val cached = viewModel.externalIcon(target) { value = it }
             if (value != null) return@produceState
-            viewModel.iconWithAutoRequest(context, target) { value = it?.asImageBitmap() }
+            viewModel.iconWithAutoRequest(target) { value = it }
         }
     return bitmapState.value
 }
@@ -168,3 +168,11 @@ internal fun SuperIslandAppIcon(
         }
     }
 }
+
+/** 解码超级岛历史图片（平台侧实现）。 */
+private suspend fun decodeIslandImage(
+    context: android.content.Context,
+    data: String,
+): android.graphics.Bitmap? =
+    com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+        .decodeBitmap(context, data)

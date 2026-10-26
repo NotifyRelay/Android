@@ -10,6 +10,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.InstalledAppsFilter
+import notifyrelay.domain.feature.appslist.model.LocalAppInfo
 
 data class LocalAppInfo(
     val appName: String,

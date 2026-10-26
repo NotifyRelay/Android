@@ -7,10 +7,12 @@ package notifyrelay.domain.feature.appslist.model
  * @param appName 显示名
  * @param isSystemApp 是否为系统应用
  * @param isUpdatedSystemApp 是否为已更新的系统应用
+ * @param isPinned 是否已置顶
  */
 data class LocalAppInfo(
     val packageName: String,
     val appName: String,
-    val isSystemApp: Boolean,
-    val isUpdatedSystemApp: Boolean,
+    val isSystemApp: Boolean = false,
+    val isUpdatedSystemApp: Boolean = false,
+    val isPinned: Boolean = false,
 )

@@ -5,6 +5,7 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.flow.StateFlow
+import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.appslist.AppIconPort
 
@@ -34,6 +35,18 @@ class AndroidAppIconPort(
         AppIconRepository
             .getAppIconWithAutoRequest(context, packageName, sourceDevice = sourceDevice)
             ?.asImageBitmap()
+
+    override fun defaultIcon(size: Int): ImageBitmap? =
+        runCatching {
+            val drawable = context.packageManager.defaultActivityIcon
+            val bitmap =
+                if (drawable is android.graphics.drawable.BitmapDrawable) {
+                    drawable.bitmap
+                } else {
+                    drawable.toBitmapOrDefault(size)
+                }
+            bitmap.asImageBitmap()
+        }.getOrNull()
 
     override suspend fun cacheExternalIcon(
         packageName: String,
