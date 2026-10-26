@@ -1,7 +1,5 @@
 package com.xzyht.notifyrelay.ui.pages
 
-import android.graphics.Bitmap
-import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -22,14 +20,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.graphics.createBitmap
-import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
-import kotlinx.coroutines.launch
-import notifyrelay.base.util.image.toBitmapOrDefault
+import com.xzyht.notifyrelay.ui.viewmodel.AppIconViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -68,6 +63,7 @@ fun FilterListSection(
     onEntryEnabledChange: ((FilterEntryItem, Boolean) -> Unit)? = null,
     onAddEntry: (keyword: String, packageName: String) -> Unit,
     onRemoveEntry: (FilterEntryItem) -> Unit,
+    viewModel: AppIconViewModel = viewModel(),
 ) {
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
@@ -78,21 +74,7 @@ fun FilterListSection(
     var showCustomSheet by remember { mutableStateOf(false) }
     var showAppPickerDialog by remember { mutableStateOf(false) }
 
-    val pm = context.packageManager
-    val defaultAppIconBitmap =
-        remember {
-            val drawable =
-                try {
-                    pm.defaultActivityIcon
-                } catch (_: Exception) {
-                    null
-                }
-            if (drawable is BitmapDrawable) {
-                drawable.bitmap.asImageBitmap()
-            } else {
-                (drawable?.toBitmapOrDefault(48) ?: createBitmap(48, 48, Bitmap.Config.ARGB_8888)).asImageBitmap()
-            }
-        }
+    val defaultAppIconBitmap = remember { viewModel.loadDefaultIcon(context, 48) }
 
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -174,13 +156,8 @@ fun FilterListSection(
         onAppSelected = { packageName ->
             newPackage = packageName
             newPackageIcon = defaultAppIconBitmap
-            coroutineScope.launch {
-                try {
-                    val bmp = AppIconRepository.getAppIconAsync(context, packageName)
-                    newPackageIcon = bmp?.asImageBitmap() ?: defaultAppIconBitmap
-                } catch (_: Exception) {
-                    newPackageIcon = defaultAppIconBitmap
-                }
+            viewModel.loadIcon(context, packageName) { icon ->
+                newPackageIcon = icon ?: defaultAppIconBitmap
             }
         },
         title = "选择要过滤的应用",
@@ -203,9 +180,9 @@ fun FilterListSection(
                     var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
                     LaunchedEffect(entry) {
                         if (entry.packageName.isNotBlank() && iconBitmap == null) {
-                            iconBitmap = runCatching {
-                                AppIconRepository.getAppIconAsync(context, entry.packageName)?.asImageBitmap()
-                            }.getOrNull() ?: defaultAppIconBitmap
+                            viewModel.loadIcon(context, entry.packageName) { icon ->
+                                iconBitmap = icon ?: defaultAppIconBitmap
+                            }
                         }
                     }
                     SwitchPreference(
@@ -246,9 +223,9 @@ fun FilterListSection(
                     var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
                     LaunchedEffect(entry) {
                         if (entry.packageName.isNotBlank() && iconBitmap == null) {
-                            iconBitmap = runCatching {
-                                AppIconRepository.getAppIconAsync(context, entry.packageName)?.asImageBitmap()
-                            }.getOrNull() ?: defaultAppIconBitmap
+                            viewModel.loadIcon(context, entry.packageName) { icon ->
+                                iconBitmap = icon ?: defaultAppIconBitmap
+                            }
                         }
                     }
                     Row(
