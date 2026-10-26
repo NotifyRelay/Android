@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages
+package notifyrelay.shared.ui.pages
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
@@ -20,10 +20,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
+import notifyrelay.shared.ui.dialog.AppPickerDialog
 import notifyrelay.shared.ui.viewmodel.AppIconViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -65,7 +64,6 @@ fun FilterListSection(
     onRemoveEntry: (FilterEntryItem) -> Unit,
     viewModel: AppIconViewModel = viewModel(),
 ) {
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     var newKeyword by remember { mutableStateOf("") }
     var newPackage by remember { mutableStateOf("") }

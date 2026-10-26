@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages
+package notifyrelay.shared.ui.pages
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
@@ -12,10 +12,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.viewmodel.LocalFilterViewModel
+import notifyrelay.domain.feature.notification.filter.FilterEntry
+import notifyrelay.domain.feature.notification.filter.LocalFilterPortRegistry
+import notifyrelay.shared.ui.viewmodel.LocalFilterViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Text
@@ -27,15 +30,14 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * UI本机通知过滤设置
  * 提供本机通知过滤的UI界面
  */
+
 @Composable
 fun UILocalFilter(
     modifier: Modifier = Modifier,
-    viewModel: LocalFilterViewModel = viewModel(),
+    viewModel: LocalFilterViewModel = localFilterViewModel(),
 ) {
-    val context = LocalContext.current
-
     LaunchedEffect(Unit) {
-        viewModel.load(context)
+        viewModel.load()
     }
 
     val builtinKeywords = viewModel.builtinKeywords
@@ -133,21 +135,32 @@ fun UILocalFilter(
             FilterListSection(
                 defaultEntries = builtinDefaultEntries.map { FilterEntryItem(it.keyword, it.packageName) },
                 manualEntries = customEntries.map { FilterEntryItem(it.keyword, it.packageName) },
-                entryEnabled = { item -> viewModel.enabledEntries.contains(item.toFilterEntry()) },
+                entryEnabled = { item -> viewModel.enabledEntries.contains(FilterEntry(item.keyword, item.packageName)) },
                 onEntryEnabledChange = { item, enabled ->
-                    viewModel.setEntryEnabled(context, item.keyword, item.packageName, enabled)
+                    viewModel.setEntryEnabled(FilterEntry(item.keyword, item.packageName), enabled)
                 },
                 onAddEntry = { keyword, pkg ->
-                    viewModel.addEntry(context, keyword, pkg)
+                    viewModel.addEntry(keyword, pkg)
                 },
                 onRemoveEntry = { item ->
-                    viewModel.removeEntry(context, item.keyword, item.packageName)
+                    viewModel.removeEntry(item.keyword, item.packageName)
                 },
             )
         }
     }
 }
 
-private fun FilterEntryItem.toFilterEntry() =
-    com.xzyht.notifyrelay.feature.notification.filter.BackendLocalFilter
-        .FilterEntry(keyword, packageName)
+/** 以已注册的 [LocalFilterPort] 构造 [LocalFilterViewModel]。 */
+@Composable
+private fun localFilterViewModel(): LocalFilterViewModel {
+    val port =
+        LocalFilterPortRegistry.current
+            ?: error("LocalFilterPort 未注册")
+    return viewModel(
+        factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(modelClass: Class<T>): T = LocalFilterViewModel(port) as T
+            },
+    )
+}

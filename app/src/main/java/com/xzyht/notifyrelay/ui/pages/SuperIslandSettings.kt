@@ -24,7 +24,6 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils.SpecInjectionMode
 import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
-import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import com.xzyht.notifyrelay.ui.dialog.SuperIslandTestDialog
 import com.xzyht.notifyrelay.ui.viewmodel.SuperIslandSettingsViewModel
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +35,7 @@ import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.Storage
 import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.ui.dialog.AppPickerDialog
 import notifyrelay.shared.ui.port.LocalToastPort
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Button

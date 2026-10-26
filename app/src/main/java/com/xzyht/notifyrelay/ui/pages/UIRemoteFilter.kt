@@ -23,8 +23,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.dialog.AppPickerDialog
 import com.xzyht.notifyrelay.ui.viewmodel.RemoteFilterViewModel
+import notifyrelay.shared.ui.dialog.AppPickerDialog
+import notifyrelay.shared.ui.pages.FilterEntryItem
+import notifyrelay.shared.ui.pages.FilterListSection
 import notifyrelay.shared.ui.viewmodel.AppIconViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider

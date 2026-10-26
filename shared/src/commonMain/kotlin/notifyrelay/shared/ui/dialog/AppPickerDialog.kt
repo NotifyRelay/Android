@@ -1,7 +1,5 @@
-package com.xzyht.notifyrelay.ui.dialog
+package notifyrelay.shared.ui.dialog
 
-import android.content.pm.ApplicationInfo
-import android.graphics.drawable.BitmapDrawable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -29,12 +27,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.ImageBitmapConfig
-import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.viewmodel.AppPickerViewModel
-import kotlinx.coroutines.launch
+import notifyrelay.domain.feature.appslist.model.LocalAppInfo
+import notifyrelay.shared.ui.viewmodel.AppPickerViewModel
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.InputField
@@ -58,8 +54,6 @@ fun AppPickerDialog(
 ) {
     if (!visible) return
 
-    val context = LocalContext.current
-    val pm = remember(context) { context.packageManager }
     val coroutineScope = rememberCoroutineScope()
 
     var showSystemApps by rememberSaveable { mutableStateOf(true) }
@@ -72,29 +66,17 @@ fun AppPickerDialog(
     val allApps by viewModel.apps.collectAsState()
     val iconUpdateKey by viewModel.iconUpdateKey.collectAsState()
 
-    val appLabelMap by remember(allApps, context) {
-        derivedStateOf {
-            val result = mutableMapOf<String, String>()
-            allApps.forEach { info ->
-                result[info.packageName] = viewModel.appLabel(context, info.packageName) ?: info.packageName
-            }
-            result
-        }
-    }
-
     // 计算过滤后的应用列表
     val filteredApps by remember(allApps, appSearchQuery, showSystemApps) {
         derivedStateOf {
-            viewModel.filteredApps(appSearchQuery, showSystemApps, context)
+            viewModel.filteredApps(appSearchQuery, showSystemApps)
         }
     }
 
     LaunchedEffect(visible) {
         showDialog.value = visible
         if (visible && !viewModel.isDataLoaded()) {
-            coroutineScope.launch {
-                viewModel.loadApps(context)
-            }
+            viewModel.loadApps()
         }
     }
 
@@ -107,17 +89,7 @@ fun AppPickerDialog(
 
     val defaultAppIconBitmap =
         remember {
-            val drawable =
-                try {
-                    pm.defaultActivityIcon
-                } catch (_: Exception) {
-                    null
-                }
-            if (drawable is BitmapDrawable) {
-                drawable.bitmap.asImageBitmap()
-            } else {
-                ImageBitmap(22, 22, ImageBitmapConfig.Argb8888)
-            }
+            viewModel.defaultIcon(22) ?: ImageBitmap(22, 22, ImageBitmapConfig.Argb8888)
         }
 
     WindowBottomSheet(show = showDialog.value, modifier = Modifier, title = title, startAction = null, endAction = null, backgroundColor = BottomSheetDefaults.backgroundColor(), enableWindowDim = true, cornerRadius = BottomSheetDefaults.cornerRadius, sheetMaxWidth = BottomSheetDefaults.maxWidth, onDismissRequest = {
@@ -176,15 +148,15 @@ fun AppPickerDialog(
                                 }
                             }
                         } else {
-                            items(filteredApps, key = { it.packageName }) { appInfo: ApplicationInfo ->
+                            items(filteredApps, key = { it.packageName }) { appInfo: LocalAppInfo ->
                                 val pkg = appInfo.packageName
-                                val label = appLabelMap[pkg] ?: pkg
+                                val label = appInfo.appName.ifBlank { pkg }
                                 var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
 
                                 // 异步加载图标
                                 LaunchedEffect(iconUpdateKey, pkg) {
-                                    viewModel.loadIcon(context, pkg) { icon ->
-                                        iconBitmap = icon?.asImageBitmap()
+                                    viewModel.loadIcon(pkg) { icon ->
+                                        iconBitmap = icon
                                     }
                                 }
                                 Column(
@@ -217,7 +189,7 @@ fun AppPickerDialog(
                                 }
                             }
 
-                            if (appSearchQuery.isNotBlank() && filteredApps.none { app: ApplicationInfo -> app.packageName == appSearchQuery } && appSearchQuery.matches(Regex("[a-zA-Z0-9_.]+"))) {
+                            if (appSearchQuery.isNotBlank() && filteredApps.none { app: LocalAppInfo -> app.packageName == appSearchQuery } && appSearchQuery.matches(Regex("[a-zA-Z0-9_.]+"))) {
                                 item {
                                     Column(
                                         modifier =
