@@ -141,6 +141,13 @@ kotlin {
 
 // Rust .so 注册：KMP 库插件的 android 目标不暴露 jniLibs DSL，
 // 经 AndroidComponents 在变体上追加 jniLibs 目录（cargo-ndk 产出的 ABI 结构）。
+// UniFFI 生成目录是 uniffiBindgen 的输出，而 ktlint 会把它当作扫描输入。
+// 生成目录已在 .editorconfig 中豁免规则，但 Gradle 仍需显式声明任务依赖，
+// 否则并行构建时报「implicit dependency」校验失败。
+tasks.matching { it.name.startsWith("runKtlintCheckOver") }.configureEach {
+    dependsOn(uniffiBindgen)
+}
+
 androidComponents {
     onVariants { variant ->
         variant.sources.jniLibs?.addStaticSourceDirectory(
