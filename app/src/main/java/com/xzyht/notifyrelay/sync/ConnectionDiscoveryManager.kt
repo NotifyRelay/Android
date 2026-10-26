@@ -6,7 +6,6 @@ import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
 import android.net.wifi.WifiManager
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
@@ -14,6 +13,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.log.Logger
 
 /**

@@ -7,8 +7,6 @@ import android.graphics.drawable.BitmapDrawable
 import android.util.Base64
 import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceMessagePort
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
@@ -20,6 +18,8 @@ import notifyrelay.base.util.image.ImageUtils
 import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.service.contract.DeviceMessagePort
 import notifyrelay.shared.log.Logger
 import org.json.JSONArray
 import org.json.JSONObject

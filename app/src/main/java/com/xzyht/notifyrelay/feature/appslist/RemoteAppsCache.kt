@@ -1,11 +1,11 @@
 package com.xzyht.notifyrelay.feature.appslist
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
 import kotlinx.coroutines.flow.first
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.feature.appslist.model.RemoteAppInfo
 
 /**
  * 远程应用缓存。

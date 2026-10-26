@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.contract
+package notifyrelay.shared.feature.notification.superisland.contract
 
 /**
  * 超级岛通知的广播 action 契约。

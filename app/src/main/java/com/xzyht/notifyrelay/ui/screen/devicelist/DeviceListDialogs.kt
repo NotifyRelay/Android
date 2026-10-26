@@ -13,14 +13,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAdminPort
 import com.xzyht.notifyrelay.ui.dialog.PairingCodeDialog
 import com.xzyht.notifyrelay.ui.dialog.PairingMode
 import com.xzyht.notifyrelay.ui.dialog.RejectedDevicesDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.service.contract.DeviceAdminPort
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.window.WindowDialog

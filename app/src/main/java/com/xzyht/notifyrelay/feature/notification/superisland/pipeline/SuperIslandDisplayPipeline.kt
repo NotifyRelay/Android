@@ -8,7 +8,6 @@ import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIsl
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaNotificationCloser
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.runReplicaCatchingSuspend
@@ -16,6 +15,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandS
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import notifyrelay.shared.feature.notification.superisland.notification.SuperIslandNotificationIds
 import notifyrelay.shared.log.Logger
 
 /**

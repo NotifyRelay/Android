@@ -10,11 +10,11 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
-import com.xzyht.notifyrelay.feature.appslist.model.appMatchesQuery
 import com.xzyht.notifyrelay.ui.viewmodel.AppsState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import notifyrelay.shared.feature.appslist.model.RemoteAppInfo
+import notifyrelay.shared.feature.appslist.model.appMatchesQuery
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Icon
@@ -38,10 +38,11 @@ internal fun RemoteAppsContent(
 
     LaunchedEffect(state.apps) {
         state.apps.forEach { app ->
-            if (app.iconBytes != null && !iconCache.containsKey(app.packageName)) {
+            val iconBytes = app.iconBytes
+            if (iconBytes != null && !iconCache.containsKey(app.packageName)) {
                 iconCache[app.packageName] =
                     withContext(Dispatchers.Default) {
-                        BitmapFactory.decodeByteArray(app.iconBytes, 0, app.iconBytes.size)
+                        BitmapFactory.decodeByteArray(iconBytes, 0, iconBytes.size)
                     }
             }
         }

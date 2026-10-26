@@ -2,7 +2,6 @@ package com.xzyht.notifyrelay.feature.appslist
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import com.xzyht.notifyrelay.feature.appslist.model.appMatchesQuery
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +13,7 @@ import notifyrelay.base.util.image.toPngByteArray
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.feature.appslist.model.appMatchesQuery
 import notifyrelay.shared.log.Logger
 
 /**

@@ -2,13 +2,13 @@ package com.xzyht.notifyrelay.sync.builder
 
 import android.content.Context
 import android.net.Uri
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAuthTablePort
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.SendGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.feature.device.service.contract.DeviceAuthTablePort
 import notifyrelay.shared.log.Logger
 import org.json.JSONObject
 

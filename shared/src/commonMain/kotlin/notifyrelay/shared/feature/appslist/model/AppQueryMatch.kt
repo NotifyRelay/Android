@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.appslist.model
+package notifyrelay.shared.feature.appslist.model
 
 /**
  * 判断应用是否匹配搜索关键字。

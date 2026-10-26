@@ -1,11 +1,11 @@
 package com.xzyht.notifyrelay.feature.device.model
 
 import android.content.Context
-import com.xzyht.notifyrelay.sync.notification.data.NotificationRecordDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.sync.notification.data.NotificationRecordDto
 
 class NotificationRecordStore private constructor(
     private val context: Context,

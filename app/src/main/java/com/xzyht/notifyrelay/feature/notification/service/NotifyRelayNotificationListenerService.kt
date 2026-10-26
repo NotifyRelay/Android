@@ -12,7 +12,6 @@ import android.service.notification.StatusBarNotification
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationTextReader
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceDiscoveryPort
 import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.filter.BackendLocalFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
@@ -34,6 +33,7 @@ import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.Storage
 import notifyrelay.shared.SuperIslandStorageKeys
+import notifyrelay.shared.feature.device.service.contract.DeviceDiscoveryPort
 import notifyrelay.shared.log.Logger
 
 class NotifyRelayNotificationListenerService : NotificationListenerService() {

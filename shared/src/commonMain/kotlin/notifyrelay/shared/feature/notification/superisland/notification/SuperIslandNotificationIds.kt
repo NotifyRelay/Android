@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.notification
+package notifyrelay.shared.feature.notification.superisland.notification
 
 /**
  * 超级岛相关通知 ID 的唯一推导来源。
@@ -18,7 +18,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland.notification
  * 注意：本变更会改变推导出的具体 ID 值，升级后旧版本遗留的通知无法再按新 ID 取消，
  * 会保留至其自身超时（30s）被清理。
  */
-internal object SuperIslandNotificationIds {
+object SuperIslandNotificationIds {
     /** 哈希掩码：保留完整 16 位空间，两个通道基址间距（100_000）大于该空间上限 65535。 */
     private const val HASH_MASK = 0xFFFF
 

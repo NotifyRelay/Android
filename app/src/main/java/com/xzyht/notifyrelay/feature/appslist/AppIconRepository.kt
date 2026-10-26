@@ -5,7 +5,6 @@ import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -16,6 +15,7 @@ import notifyrelay.base.util.image.toPngByteArray
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.log.Logger
 
 /**

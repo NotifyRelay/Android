@@ -9,11 +9,11 @@ import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
-import com.xzyht.notifyrelay.sync.notification.data.NotificationRecordDto
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.shared.log.Logger
+import notifyrelay.shared.sync.notification.data.NotificationRecordDto
 
 /**
  * 通知历史仓库（原 NotificationData.kt）。

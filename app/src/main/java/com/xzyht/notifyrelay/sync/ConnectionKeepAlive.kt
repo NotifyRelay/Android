@@ -1,7 +1,6 @@
 package com.xzyht.notifyrelay.sync
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
@@ -9,6 +8,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.BatteryUtils
+import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.log.Logger
 
 /**

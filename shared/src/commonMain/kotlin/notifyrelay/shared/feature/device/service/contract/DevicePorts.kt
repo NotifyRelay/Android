@@ -1,8 +1,8 @@
-package com.xzyht.notifyrelay.feature.device.service.contract
+package notifyrelay.shared.feature.device.service.contract
 
-import com.xzyht.notifyrelay.feature.device.model.AuthInfo
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import kotlinx.coroutines.CompletableDeferred
+import notifyrelay.shared.feature.device.model.AuthInfo
+import notifyrelay.shared.feature.device.model.DeviceInfo
 
 /**
  * 握手结果等待契约：UI 挂起等待远端配对/连接响应。

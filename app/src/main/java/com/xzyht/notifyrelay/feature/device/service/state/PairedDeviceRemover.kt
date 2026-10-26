@@ -1,10 +1,10 @@
 package com.xzyht.notifyrelay.feature.device.service.state
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.model.AuthInfo
 import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.feature.device.model.AuthInfo
 import notifyrelay.shared.log.Logger
 
 /**

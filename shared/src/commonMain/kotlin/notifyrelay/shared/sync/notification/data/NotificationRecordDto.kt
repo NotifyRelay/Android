@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.sync.notification.data
+package notifyrelay.shared.sync.notification.data
 
 // 数据库存储实体
 data class NotificationRecordDto(

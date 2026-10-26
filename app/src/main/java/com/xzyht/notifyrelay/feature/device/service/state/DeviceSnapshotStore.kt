@@ -1,13 +1,13 @@
 package com.xzyht.notifyrelay.feature.device.service.state
 
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.model.DeviceNameCache
-import com.xzyht.notifyrelay.feature.device.model.DeviceSnapshot
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.model.DeviceSnapshot
 import notifyrelay.shared.log.Logger
 import org.json.JSONArray
 

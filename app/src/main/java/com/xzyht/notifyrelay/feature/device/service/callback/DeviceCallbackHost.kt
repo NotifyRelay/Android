@@ -1,14 +1,15 @@
 package com.xzyht.notifyrelay.feature.device.service.callback
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.model.AuthInfo
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.model.PendingPairing
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController
 import com.xzyht.notifyrelay.feature.device.service.pairing.HandshakeWaiterRegistry
 import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
 import kotlinx.coroutines.CoroutineScope
+import notifyrelay.shared.feature.device.model.AuthInfo
+import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.model.PendingPairing
+import notifyrelay.shared.feature.device.service.callback.HandshakeRequestHandler
 
 /**
  * Rust 回调处理器所需的宿主能力。

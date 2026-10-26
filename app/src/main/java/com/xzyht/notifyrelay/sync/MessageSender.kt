@@ -1,11 +1,11 @@
 package com.xzyht.notifyrelay.sync
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceMessagePort
 import com.xzyht.notifyrelay.feature.notification.HighPriorityNotifier
 import com.xzyht.notifyrelay.sync.builder.ChatMessageBuilder
 import com.xzyht.notifyrelay.sync.builder.MediaMessageBuilder
 import com.xzyht.notifyrelay.sync.builder.SuperIslandMessageBuilder
+import notifyrelay.shared.feature.device.service.contract.DeviceMessagePort
 
 /**
  * 消息发送门面（整合聊天测试、普通通知转发、媒体与超级岛数据、本地高优先级通知）。

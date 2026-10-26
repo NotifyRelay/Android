@@ -4,8 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
-import com.xzyht.notifyrelay.feature.notification.superisland.contract.SuperIslandActions
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
+import notifyrelay.shared.feature.notification.superisland.contract.SuperIslandActions
 import notifyrelay.shared.log.Logger
 
 /**

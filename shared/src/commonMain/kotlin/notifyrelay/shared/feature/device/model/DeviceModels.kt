@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.device.model
+package notifyrelay.shared.feature.device.model
 
 /**
  * 设备展示信息。

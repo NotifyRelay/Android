@@ -2,19 +2,9 @@ package com.xzyht.notifyrelay.feature.device.service
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
-import com.xzyht.notifyrelay.feature.device.model.AuthInfo
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.model.DeviceNameCache
-import com.xzyht.notifyrelay.feature.device.model.DeviceSnapshot
-import com.xzyht.notifyrelay.feature.device.model.PendingPairing
 import com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController
 import com.xzyht.notifyrelay.feature.device.service.callback.DeviceCallbackHost
-import com.xzyht.notifyrelay.feature.device.service.callback.HandshakeRequestHandler
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceAdminPort
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceChatPort
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceDiscoveryPort
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceMessagePort
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceSendPort
 import com.xzyht.notifyrelay.feature.device.service.core.RustCoreSession
 import com.xzyht.notifyrelay.feature.device.service.pairing.HandshakeWaiterRegistry
 import com.xzyht.notifyrelay.feature.device.service.pairing.PairingCoordinator
@@ -38,6 +28,16 @@ import kotlinx.coroutines.launch
 import notifyrelay.base.util.BatteryUtils
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.data.Storage
+import notifyrelay.shared.feature.device.model.AuthInfo
+import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.model.DeviceSnapshot
+import notifyrelay.shared.feature.device.model.PendingPairing
+import notifyrelay.shared.feature.device.service.callback.HandshakeRequestHandler
+import notifyrelay.shared.feature.device.service.contract.DeviceAdminPort
+import notifyrelay.shared.feature.device.service.contract.DeviceChatPort
+import notifyrelay.shared.feature.device.service.contract.DeviceDiscoveryPort
+import notifyrelay.shared.feature.device.service.contract.DeviceMessagePort
+import notifyrelay.shared.feature.device.service.contract.DeviceSendPort
 import notifyrelay.shared.log.Logger
 
 // =================== 设备连接管理器主类 ===================

@@ -7,7 +7,7 @@ import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceQueryPort
+import notifyrelay.shared.feature.device.service.contract.DeviceQueryPort
 import notifyrelay.shared.log.Logger
 
 /**

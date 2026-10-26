@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages.remoteapps
+package notifyrelay.shared.ui.pages.remoteapps
 
 data class DisplayInfo(
     val id: Int,

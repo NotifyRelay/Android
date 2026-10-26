@@ -23,11 +23,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceChatPort
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.sync.MessageSender
 import notifyrelay.base.util.ClipboardUtils
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.shared.feature.device.service.contract.DeviceChatPort
 import notifyrelay.shared.log.Logger
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Surface

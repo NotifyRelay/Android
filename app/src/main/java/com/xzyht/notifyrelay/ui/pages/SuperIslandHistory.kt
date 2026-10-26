@@ -29,6 +29,7 @@ import com.xzyht.notifyrelay.ui.viewmodel.SuperIslandHistoryViewModel
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.Storage
 import notifyrelay.shared.log.Logger
+import notifyrelay.shared.ui.pages.rememberDeleteSwipeWidth
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
 import top.yukonga.miuix.kmp.basic.Scaffold

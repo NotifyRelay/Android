@@ -1,8 +1,8 @@
-package com.xzyht.notifyrelay.feature.device.service.contract
+package notifyrelay.shared.feature.device.service.contract
 
-import com.xzyht.notifyrelay.feature.device.model.AuthInfo
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import kotlinx.coroutines.flow.StateFlow
+import notifyrelay.shared.feature.device.model.AuthInfo
+import notifyrelay.shared.feature.device.model.DeviceInfo
 
 /**
  * 设备只读查询契约：UI 读取设备视图的唯一入口。

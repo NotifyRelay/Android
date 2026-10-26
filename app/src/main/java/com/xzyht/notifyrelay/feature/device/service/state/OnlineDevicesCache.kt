@@ -1,11 +1,11 @@
 package com.xzyht.notifyrelay.feature.device.service.state
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.model.DeviceSnapshot
 import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyPreferenceKeys
 import notifyrelay.data.model.OnlineDeviceInfo
+import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.model.DeviceSnapshot
 
 /**
  * 「在线且已配对设备」列表的持久化缓存，供 scrcpy 投屏等外部能力读取。

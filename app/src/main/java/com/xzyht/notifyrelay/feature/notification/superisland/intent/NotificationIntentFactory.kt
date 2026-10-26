@@ -6,10 +6,10 @@ import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
-import com.xzyht.notifyrelay.feature.notification.superisland.contract.SuperIslandActions
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.receiver.NotificationBroadcastReceiver
+import notifyrelay.shared.feature.notification.superisland.contract.SuperIslandActions
 
 /**
  * 超级岛通知的**意图与渠道工厂**（唯一来源）。

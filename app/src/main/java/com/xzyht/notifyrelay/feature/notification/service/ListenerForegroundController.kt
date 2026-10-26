@@ -15,9 +15,9 @@ import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.R
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncReceiver
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceDiscoveryPort
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.list.SuperIslandListManager
+import notifyrelay.shared.feature.device.service.contract.DeviceDiscoveryPort
 import notifyrelay.shared.log.Logger
 
 /**

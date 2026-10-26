@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.media
+package notifyrelay.shared.feature.media
 
 enum class MediaMessageReceiveMode {
     On,

@@ -5,8 +5,8 @@ import android.content.Context
 import android.os.Build
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
+import notifyrelay.shared.feature.notification.superisland.notification.SuperIslandNotificationIds
 import notifyrelay.shared.log.Logger
 
 /**

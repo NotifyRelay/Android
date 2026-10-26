@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.device.model
+package notifyrelay.shared.feature.device.model
 
 /**
  * Rust core `NativeCore.getDeviceList()` 快照条目（平台端的只读投影）。

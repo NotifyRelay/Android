@@ -11,12 +11,12 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.appslist.model.appMatchesQuery
 import com.xzyht.notifyrelay.ui.viewmodel.AppsState
 import com.xzyht.notifyrelay.ui.viewmodel.LocalAppInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.image.toBitmapOrDefault
+import notifyrelay.shared.feature.appslist.model.appMatchesQuery
 import notifyrelay.shared.log.Logger
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon

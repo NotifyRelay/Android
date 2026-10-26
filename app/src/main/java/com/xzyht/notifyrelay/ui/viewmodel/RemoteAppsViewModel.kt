@@ -6,17 +6,17 @@ import androidx.lifecycle.viewModelScope
 import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.feature.appslist.PinnedAppsRepository
 import com.xzyht.notifyrelay.feature.appslist.RemoteAppsCache
-import com.xzyht.notifyrelay.feature.appslist.model.RemoteAppInfo
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceQueryPort
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import notifyrelay.shared.feature.appslist.model.RemoteAppInfo
+import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.service.contract.DeviceQueryPort
 import notifyrelay.shared.log.Logger
 
 /**

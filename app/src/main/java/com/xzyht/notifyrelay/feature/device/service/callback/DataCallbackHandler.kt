@@ -5,7 +5,6 @@ import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardProcessor
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.media.MediaControlUtil
 import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.sync.FtpServerManager
@@ -17,6 +16,7 @@ import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.log.Logger
 import org.json.JSONObject
 

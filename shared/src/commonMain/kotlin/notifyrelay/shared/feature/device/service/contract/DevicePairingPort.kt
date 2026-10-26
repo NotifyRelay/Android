@@ -1,7 +1,7 @@
-package com.xzyht.notifyrelay.feature.device.service.contract
+package notifyrelay.shared.feature.device.service.contract
 
-import com.xzyht.notifyrelay.feature.device.model.PendingPairing
-import com.xzyht.notifyrelay.feature.device.service.callback.HandshakeRequestHandler
+import notifyrelay.shared.feature.device.model.PendingPairing
+import notifyrelay.shared.feature.device.service.callback.HandshakeRequestHandler
 
 /**
  * 设备配对契约：配对对话框与设备列表对话框所需的配对状态与操作。

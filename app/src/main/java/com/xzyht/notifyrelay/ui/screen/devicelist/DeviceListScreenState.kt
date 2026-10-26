@@ -3,8 +3,8 @@ package com.xzyht.notifyrelay.ui.screen
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.ui.dialog.PairingMode
+import notifyrelay.shared.feature.device.model.DeviceInfo
 
 /**
  * 设备列表屏幕状态管理类

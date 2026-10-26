@@ -3,8 +3,6 @@ package com.xzyht.notifyrelay.feature.appslist.sync
 import android.content.Context
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.appslist.RemoteAppsCache
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.contract.DeviceMessagePort
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
@@ -15,6 +13,8 @@ import kotlinx.coroutines.launch
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.service.contract.DeviceMessagePort
 import notifyrelay.shared.log.Logger
 import org.json.JSONArray
 import org.json.JSONObject

@@ -1,6 +1,6 @@
-package com.xzyht.notifyrelay.feature.device.service.callback
+package notifyrelay.shared.feature.device.service.callback
 
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.model.DeviceInfo
 
 /**
  * 配对请求处理接口。

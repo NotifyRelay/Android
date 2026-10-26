@@ -17,6 +17,7 @@ import com.xzyht.notifyrelay.ui.screen.GlobalSelectedDeviceHolder
 import com.xzyht.notifyrelay.ui.viewmodel.NotificationHistoryViewModel
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.shared.log.Logger
+import notifyrelay.shared.ui.pages.rememberDeleteSwipeWidth
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 internal enum class DragValue { Center, End }

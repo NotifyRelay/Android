@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.appslist.model
+package notifyrelay.shared.feature.appslist.model
 
 data class RemoteAppInfo(
     val packageName: String,

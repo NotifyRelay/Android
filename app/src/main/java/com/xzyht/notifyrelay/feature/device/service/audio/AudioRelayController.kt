@@ -8,14 +8,14 @@ import android.os.Handler
 import android.os.Looper
 import com.xzyht.notifyrelay.feature.audio.AudioRelayPlayer
 import com.xzyht.notifyrelay.feature.audio.service.AudioRelayForegroundService
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.contract.AudioRelayPort
 import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundService
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyDefaults
+import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.service.contract.AudioRelayPort
 
 /**
  * 音频中继（投送/接收）的完整生命周期控制。

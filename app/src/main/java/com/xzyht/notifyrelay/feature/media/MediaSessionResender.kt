@@ -2,8 +2,8 @@ package com.xzyht.notifyrelay.feature.media
 
 import android.content.Context
 import android.os.Handler
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import github.xzynine.superislandui.model.components.MediaSessionData
+import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.log.Logger
 import java.util.concurrent.ConcurrentHashMap
 

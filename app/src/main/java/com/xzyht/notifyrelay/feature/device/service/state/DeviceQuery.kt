@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.feature.device.service.state
 
-import com.xzyht.notifyrelay.feature.device.model.AuthInfo
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
+import notifyrelay.shared.feature.device.model.AuthInfo
+import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.log.Logger
 
 /**

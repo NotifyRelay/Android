@@ -7,13 +7,13 @@ import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIsland
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
 import com.xzyht.notifyrelay.feature.notification.superisland.pipeline.SuperIslandDisplayPipeline
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import notifyrelay.shared.feature.notification.superisland.notification.SuperIslandNotificationIds
 import notifyrelay.shared.log.Logger
 
 object FloatingReplicaNotificationManager {
