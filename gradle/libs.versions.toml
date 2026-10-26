@@ -153,6 +153,8 @@ androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-p
 # miuix-ui 的 KMP 坐标（不带 -android 后缀，含 metadata 变体，可供 commonMain 使用）；
 # libs.miuix.ui 是 miuix-ui-android 构件，仅限 Android 源集。
 miuix-ui-kmp = { group = "top.yukonga.miuix.kmp", name = "miuix-ui", version.ref = "miuix" }
+# miuix-preference 的 KMP 坐标（含 metadata 变体，可供 commonMain 使用）
+miuix-preference-kmp = { group = "top.yukonga.miuix.kmp", name = "miuix-preference", version.ref = "miuix" }
 # kotlinx-serialization-json 为 commonMain @Serializable 提供序列化支持；
 # app 的 Route.kt 也依赖它。
 kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinxSerialization" }

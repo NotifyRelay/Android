@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.common
+package notifyrelay.shared.ui.common
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages.remoteapps
+package notifyrelay.shared.ui.pages.remoteapps
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -30,7 +30,7 @@ import top.yukonga.miuix.kmp.icon.extended.Settings
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-internal fun DisplayNavigationBar(
+fun DisplayNavigationBar(
     displays: List<DisplayInfo>,
     selectedDisplayId: Int,
     onDisplaySelected: (Int) -> Unit,

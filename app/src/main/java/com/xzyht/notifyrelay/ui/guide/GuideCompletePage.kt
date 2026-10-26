@@ -28,7 +28,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-internal fun GuideCompletePage(
+fun GuideCompletePage(
     requiredGranted: Boolean,
     onBackToPermissions: () -> Unit,
     onEnter: () -> Unit,

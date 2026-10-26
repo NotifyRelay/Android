@@ -7,7 +7,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.pages.remoteapps.DisplayNavigationBar
 import com.xzyht.notifyrelay.ui.pages.remoteapps.LocalAppsContent
 import com.xzyht.notifyrelay.ui.pages.remoteapps.RemoteAppsContent
 import com.xzyht.notifyrelay.ui.pages.remoteapps.RemoteAppsMenuHost
@@ -15,6 +14,7 @@ import com.xzyht.notifyrelay.ui.pages.remoteapps.openLocalApp
 import com.xzyht.notifyrelay.ui.pages.remoteapps.rememberRemoteAppsPageState
 import com.xzyht.notifyrelay.ui.viewmodel.LocalAppsViewModel
 import com.xzyht.notifyrelay.ui.viewmodel.RemoteAppsViewModel
+import notifyrelay.shared.ui.pages.remoteapps.DisplayNavigationBar
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton

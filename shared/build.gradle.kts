@@ -43,6 +43,10 @@ kotlin {
             implementation(libs.androidx.compose.material.icons.extended)
             implementation(libs.miuix.nav)
             implementation(libs.miuix.ui.kmp)
+            // preference 组件的 KMP 坐标（MiuixSpinnerPreference 使用）
+            implementation(libs.miuix.preference.kmp)
+            // 扩展图标（ScrollableTopAppBarPage / DeleteButton 等使用 MiuixIcons.Extended）
+            implementation(libs.miuix.icons)
             implementation(libs.kotlinx.serialization.json)
             // UpdateDialog 依赖的 ReleaseInfo 数据模型（KMP 库）
             implementation(project(":checkupdata"))

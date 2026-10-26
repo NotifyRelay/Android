@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.screen
+package notifyrelay.shared.ui.screen
 
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -12,15 +12,14 @@ import notifyrelay.shared.ui.dialog.PairingMode
  */
 class DeviceListScreenState {
     var pendingConnectDevice by mutableStateOf<DeviceInfo?>(null)
-        internal set
+
     var showRejectedDialog by mutableStateOf(false)
-        internal set
+
     var showPairingCodeDialog by mutableStateOf(false)
-        internal set
+
     var pairingCodeDialogMode by mutableStateOf(PairingMode.SERVER_MODE)
-        internal set
+
     var serverPairingCode by mutableStateOf("")
-        internal set
 
     /**
      * 检查是否有任何弹窗显示
