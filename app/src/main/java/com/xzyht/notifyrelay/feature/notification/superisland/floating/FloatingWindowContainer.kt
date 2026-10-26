@@ -27,8 +27,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.bigisland.ParamIslandCompose
+import com.xzyht.notifyrelay.ui.viewmodel.MediaControlViewModel
 import github.xzynine.superislandui.floating.bigisland.components.ActionCompose
 import github.xzynine.superislandui.floating.bigisland.components.AnimTextInfoCompose
 import github.xzynine.superislandui.floating.bigisland.components.BaseInfoCompose
@@ -83,6 +84,7 @@ fun FloatingWindowContainer(
     modifier: Modifier = Modifier,
     onUpdateEntryHeight: ((String, Int) -> Unit)? = null,
     isContainerDragging: Boolean = false,
+    mediaViewModel: MediaControlViewModel = viewModel(),
 ) {
     LocalContext.current
 
@@ -186,26 +188,14 @@ fun FloatingWindowContainer(
                                                         onEntryClick(entry.key)
                                                     },
                                                     onPlayPause = {
-                                                        // 媒体控制按钮点击事件，由RemoteMediaSessionManager处理
-                                                        RemoteMediaSessionManager.onPlayPause(
-                                                            context,
-                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-                                                                .getDeviceMessage(context),
-                                                        )
+                                                        // 媒体控制按钮点击事件，由 ViewModel 承载
+                                                        mediaViewModel.onPlayPause(context)
                                                     },
                                                     onPrevious = {
-                                                        RemoteMediaSessionManager.onPrevious(
-                                                            context,
-                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-                                                                .getDeviceMessage(context),
-                                                        )
+                                                        mediaViewModel.onPrevious(context)
                                                     },
                                                     onNext = {
-                                                        RemoteMediaSessionManager.onNext(
-                                                            context,
-                                                            com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-                                                                .getDeviceMessage(context),
-                                                        )
+                                                        mediaViewModel.onNext(context)
                                                     },
                                                     onClose = {
                                                         // 发送关闭指令，由外部处理

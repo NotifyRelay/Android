@@ -18,15 +18,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.feature.media.MediaControlUtil
-import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
-import com.xzyht.notifyrelay.sync.ProtocolSender
-import notifyrelay.base.util.ToastUtils
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.xzyht.notifyrelay.ui.viewmodel.AudioRelayViewModel
+import com.xzyht.notifyrelay.ui.viewmodel.MediaControlViewModel
 import notifyrelay.data.Storage
 import notifyrelay.shared.feature.media.MediaMessageReceiveMode
 import notifyrelay.shared.log.Logger
 import notifyrelay.shared.ui.common.MiuixSpinnerPreference
+import notifyrelay.shared.ui.port.LocalToastPort
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
@@ -37,7 +36,11 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  * 音乐控制功能页面
  */
 @Composable
-fun MusicControlPage() {
+fun MusicControlPage(
+    audioViewModel: AudioRelayViewModel = viewModel(),
+    mediaViewModel: MediaControlViewModel = viewModel(),
+) {
+    val toastPort = LocalToastPort.current
     val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
@@ -50,7 +53,7 @@ fun MusicControlPage() {
     val scrollState = rememberScrollState()
 
     var mediaMessageReceiveMode by remember {
-        mutableStateOf(RemoteMediaSessionManager.getReceiveMode(context))
+        mutableStateOf(mediaViewModel.receiveMode(context))
     }
 
     // 胶囊歌词开关状态
@@ -70,6 +73,7 @@ fun MusicControlPage() {
                 .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(16.dp),
     ) {
+        val toastPort = LocalToastPort.current
         // 标题
         Text(
             text = "音乐控制",
@@ -114,31 +118,10 @@ fun MusicControlPage() {
             Button(
                 onClick = {
                     if (selectedDevice == null) {
-                        ToastUtils.showShortToast(context, "当前选中的是本机，无法接收本机音频")
+                        toastPort.short("当前选中的是本机，无法接收本机音频")
                         return@Button
                     }
-
-                    try {
-                        val deviceManager = DeviceConnectionManagerSingleton.getDeviceSend(context)
-                        val audioRelay = DeviceConnectionManagerSingleton.getAudioRelay(context)
-                        val relayMode = Storage.getInt("audio_relay_mode", 0)
-
-                        if (relayMode == 1) {
-                            // 中继模式：先请求 MediaProjection 授权，再启动发送
-                            audioRelay.requestSendTo(selectedDevice.ip, selectedDevice.displayName, selectedDevice.uuid)
-                        } else {
-                            // scrcpy 模式：发送 audioRequest（现有逻辑）
-                            val success = deviceManager.requestAudioForwarding(selectedDevice)
-                            if (success) {
-                                ToastUtils.showShortToast(context, "已请求${selectedDevice.displayName}转发音频")
-                            } else {
-                                ToastUtils.showShortToast(context, "请求发送失败")
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Logger.e("NotifyRelay", "请求音频转发异常", e)
-                        ToastUtils.showShortToast(context, "请求发送异常: ${e.message}")
-                    }
+                    toastPort.short(audioViewModel.requestSendAudio(context, selectedDevice))
                 },
                 modifier = Modifier.weight(1f),
             ) {
@@ -149,39 +132,10 @@ fun MusicControlPage() {
             Button(
                 onClick = {
                     if (selectedDevice == null) {
-                        ToastUtils.showShortToast(context, "当前选中的是本机，无法播放本机音频")
+                        toastPort.short("当前选中的是本机，无法播放本机音频")
                         return@Button
                     }
-
-                    try {
-                        val relayMode = Storage.getInt("audio_relay_mode", 0)
-
-                        if (relayMode == 1) {
-                            // 中继模式：通过控制器启动接收（设置 currentRemoteUuid、注册停止广播并显示中继前台通知）
-                            DeviceConnectionManagerSingleton
-                                .getAudioRelay(context)
-                                .startReceive(selectedDevice.uuid, 48000, 2)
-                            ToastUtils.showShortToast(context, "已启动中继音频接收")
-                        } else {
-                            // scrcpy 模式：启动 scrcpy 音频转发（现有逻辑）
-                            val adbPort = notifyrelay.data.config.ScrcpyDefaults.ADB_PORT
-                            val success =
-                                io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService.startAudioForwarding(
-                                    context,
-                                    selectedDevice.ip,
-                                    adbPort,
-                                    selectedDevice.displayName,
-                                )
-                            if (success) {
-                                ToastUtils.showShortToast(context, "正在连接${selectedDevice.displayName}...")
-                            } else {
-                                ToastUtils.showShortToast(context, "启动失败，可能已有转发在进行中")
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Logger.e("NotifyRelay", "播放对端音频异常", e)
-                        ToastUtils.showShortToast(context, "启动异常: ${e.message}")
-                    }
+                    toastPort.short(audioViewModel.requestReceiveAudio(context, selectedDevice))
                 },
                 modifier = Modifier.weight(1f),
             ) {
@@ -192,10 +146,8 @@ fun MusicControlPage() {
         // 停止音频转发按钮
         Button(
             onClick = {
-                io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
-                    .stopAudioForwarding(context)
-                DeviceConnectionManagerSingleton.getAudioRelay(context).stop()
-                ToastUtils.showShortToast(context, "已停止音频转发")
+                audioViewModel.stopAudio(context)
+                toastPort.short("已停止音频转发")
             },
             modifier = Modifier.fillMaxWidth(),
         ) {
@@ -241,7 +193,7 @@ fun MusicControlPage() {
                         else -> MediaMessageReceiveMode.On
                     }
                 mediaMessageReceiveMode = mode
-                RemoteMediaSessionManager.setReceiveMode(context, mode)
+                mediaViewModel.setReceiveMode(context, mode)
             },
         )
 
@@ -310,21 +262,18 @@ fun MusicControlPage() {
                 onClick = {
                     try {
                         if (selectedDevice == null) {
-                            MediaControlUtil.previous()
-                            ToastUtils.showShortToast(context, "已发送上一首指令到本机")
+                            mediaViewModel.previousLocal()
+                            toastPort.short("已发送上一首指令到本机")
                         } else {
-                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(context)
-                            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"previous\"}"
-                            val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
-                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
-                                ToastUtils.showShortToast(context, "已发送上一首指令到${selectedDevice.displayName}")
+                            if (mediaViewModel.sendMediaCommand(context, selectedDevice, "previous")) {
+                                toastPort.short("已发送上一首指令到${selectedDevice.displayName}")
                             } else {
-                                ToastUtils.showShortToast(context, "发送上一首指令失败")
+                                toastPort.short("发送上一首指令失败")
                             }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "发送上一首指令失败", e)
-                        ToastUtils.showShortToast(context, "发送上一首指令失败: ${e.message}")
+                        toastPort.short("发送上一首指令失败: ${e.message}")
                     }
                 },
                 modifier = Modifier.width(100.dp),
@@ -337,21 +286,18 @@ fun MusicControlPage() {
                 onClick = {
                     try {
                         if (selectedDevice == null) {
-                            MediaControlUtil.playPause()
-                            ToastUtils.showShortToast(context, "已发送播放/暂停指令到本机")
+                            mediaViewModel.playPauseLocal()
+                            toastPort.short("已发送播放/暂停指令到本机")
                         } else {
-                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(context)
-                            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"playPause\"}"
-                            val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
-                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
-                                ToastUtils.showShortToast(context, "已发送播放/暂停指令到${selectedDevice.displayName}")
+                            if (mediaViewModel.sendMediaCommand(context, selectedDevice, "playPause")) {
+                                toastPort.short("已发送播放/暂停指令到${selectedDevice.displayName}")
                             } else {
-                                ToastUtils.showShortToast(context, "发送播放/暂停指令失败")
+                                toastPort.short("发送播放/暂停指令失败")
                             }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "发送播放/暂停指令失败", e)
-                        ToastUtils.showShortToast(context, "发送播放/暂停指令失败: ${e.message}")
+                        toastPort.short("发送播放/暂停指令失败: ${e.message}")
                     }
                 },
                 modifier = Modifier.width(100.dp),
@@ -364,21 +310,18 @@ fun MusicControlPage() {
                 onClick = {
                     try {
                         if (selectedDevice == null) {
-                            MediaControlUtil.next()
-                            ToastUtils.showShortToast(context, "已发送下一首指令到本机")
+                            mediaViewModel.nextLocal()
+                            toastPort.short("已发送下一首指令到本机")
                         } else {
-                            val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(context)
-                            val raw = "{\"type\":\"MEDIA_CONTROL\",\"action\":\"next\"}"
-                            val result = ProtocolSender.sendEncrypted(deviceManager, selectedDevice, "DATA_MEDIA_CONTROL", raw)
-                            if (result == ProtocolSender.EnqueueResult.SUCCESS) {
-                                ToastUtils.showShortToast(context, "已发送下一首指令到${selectedDevice.displayName}")
+                            if (mediaViewModel.sendMediaCommand(context, selectedDevice, "next")) {
+                                toastPort.short("已发送下一首指令到${selectedDevice.displayName}")
                             } else {
-                                ToastUtils.showShortToast(context, "发送下一首指令失败")
+                                toastPort.short("发送下一首指令失败")
                             }
                         }
                     } catch (e: Exception) {
                         Logger.e("NotifyRelay", "发送下一首指令失败", e)
-                        ToastUtils.showShortToast(context, "发送下一首指令失败: ${e.message}")
+                        toastPort.short("发送下一首指令失败: ${e.message}")
                     }
                 },
                 modifier = Modifier.width(100.dp),
