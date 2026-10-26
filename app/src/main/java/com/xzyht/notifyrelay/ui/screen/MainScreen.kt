@@ -31,6 +31,9 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.activity.MainActivity
+import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
+import com.xzyht.notifyrelay.ui.pages.UIChatTest
+import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
 import com.xzyht.notifyrelay.ui.screen.DeviceListScreenContent
 import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.launch
@@ -41,6 +44,8 @@ import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
 import notifyrelay.shared.ui.screen.DeviceListScreen
 import notifyrelay.shared.ui.screen.DeviceListScreenState
+import notifyrelay.shared.ui.screen.HistoryScreen
+import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -214,7 +219,13 @@ fun MainScreen(navigator: Navigator) {
                         userScrollEnabled = false,
                     ) { page ->
                         when (page) {
-                            0 -> HistoryScreen(navigator)
+                            0 ->
+                                HistoryScreen(
+                                    navigator,
+                                    notificationHistory = { NotificationHistoryScreen() },
+                                    superIslandHistory = { UISuperIslandHistory() },
+                                    chatTest = { UIChatTest(deviceManager = devicePortsViewModel().chatPort()) },
+                                )
                             1 -> DeviceForwardScreen()
                             2 -> SettingsScreen()
                         }
@@ -255,7 +266,13 @@ fun MainScreen(navigator: Navigator) {
                         userScrollEnabled = false,
                     ) { page ->
                         when (page) {
-                            0 -> HistoryScreen(navigator)
+                            0 ->
+                                HistoryScreen(
+                                    navigator,
+                                    notificationHistory = { NotificationHistoryScreen() },
+                                    superIslandHistory = { UISuperIslandHistory() },
+                                    chatTest = { UIChatTest(deviceManager = devicePortsViewModel().chatPort()) },
+                                )
                             1 -> DeviceForwardScreen()
                             2 -> SettingsScreen()
                         }

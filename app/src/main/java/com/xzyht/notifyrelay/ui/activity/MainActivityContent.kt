@@ -13,7 +13,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
-import com.xzyht.notifyrelay.ui.screen.HistoryScreen
+import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
+import com.xzyht.notifyrelay.ui.pages.UIChatTest
+import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
 import com.xzyht.notifyrelay.ui.screen.MainScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
@@ -28,6 +30,8 @@ import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
+import notifyrelay.shared.ui.screen.HistoryScreen
+import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -82,7 +86,14 @@ internal fun MainActivityContent(navigator: Navigator) {
                     },
                 ) {
                     entry<Route.Main> { MainScreen(navigator) }
-                    entry<Route.History> { HistoryScreen(navigator) }
+                    entry<Route.History> {
+                        HistoryScreen(
+                            navigator,
+                            notificationHistory = { NotificationHistoryScreen() },
+                            superIslandHistory = { UISuperIslandHistory() },
+                            chatTest = { UIChatTest(deviceManager = devicePortsViewModel().chatPort()) },
+                        )
+                    }
                     entry<Route.Settings> { SettingsScreen() }
                     entry<Route.ScrcpyAdvanced> { ScrcpyAdvancedScreen(navigator) }
                     entry<Route.ScrcpyVirtualButtonOrder> { ScrcpyVirtualButtonOrderScreen(navigator) }

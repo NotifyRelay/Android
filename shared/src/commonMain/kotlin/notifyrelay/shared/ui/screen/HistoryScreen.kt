@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.screen
+package notifyrelay.shared.ui.screen
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
@@ -10,16 +10,9 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
-import com.xzyht.notifyrelay.ui.pages.UIChatTest
-import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
 import kotlinx.coroutines.launch
 import notifyrelay.shared.ui.navigation.Navigator
-import notifyrelay.shared.ui.viewmodel.DevicePortsViewModel
-import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
 import top.yukonga.miuix.kmp.basic.TabRowWithContour
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -31,14 +24,15 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun HistoryScreen(
     navigator: Navigator,
-    viewModel: DevicePortsViewModel = devicePortsViewModel(),
+    notificationHistory: @Composable () -> Unit,
+    superIslandHistory: @Composable () -> Unit,
+    chatTest: @Composable () -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
     val tabTitles = listOf("通知历史", "超级岛历史", "聊天测试")
     val pagerState = rememberPagerState(initialPage = 0) { tabTitles.size }
     val selectedTabIndex = pagerState.currentPage
     val colorScheme = MiuixTheme.colorScheme
-    val context = LocalContext.current
 
     Column(
         modifier =
@@ -73,12 +67,9 @@ fun HistoryScreen(
             modifier = Modifier.fillMaxSize(),
         ) {
             when (it) {
-                0 -> NotificationHistoryScreen()
-                1 -> UISuperIslandHistory()
-                2 ->
-                    UIChatTest(
-                        deviceManager = viewModel.chatPort(),
-                    )
+                0 -> notificationHistory()
+                1 -> superIslandHistory()
+                2 -> chatTest()
             }
         }
     }
