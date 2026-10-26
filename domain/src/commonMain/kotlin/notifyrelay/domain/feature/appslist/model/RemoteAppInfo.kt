@@ -9,8 +9,7 @@ data class RemoteAppInfo(
 ) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
-        if (javaClass != other?.javaClass) return false
-        other as RemoteAppInfo
+        if (other !is RemoteAppInfo) return false
         if (packageName != other.packageName) return false
         if (appName != other.appName) return false
         if (isPinned != other.isPinned) return false
