@@ -37,6 +37,31 @@ class AppIconViewModel : ViewModel() {
         }
     }
 
+    /** 取外部应用图标（可能有缓存）。 */
+    fun externalIcon(
+        context: android.content.Context,
+        packageName: String,
+        onResult: (android.graphics.Bitmap?) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onResult(runCatching { AppIconRepository.getExternalAppIcon(context, packageName) }.getOrNull())
+        }
+    }
+
+    /** 取应用图标并在缺失时自动请求。 */
+    fun iconWithAutoRequest(
+        context: android.content.Context,
+        packageName: String,
+        onResult: (android.graphics.Bitmap?) -> Unit,
+    ) {
+        viewModelScope.launch {
+            onResult(runCatching { AppIconRepository.getAppIconWithAutoRequest(context, packageName) }.getOrNull())
+        }
+    }
+
+    /** 图标更新信号。 */
+    val iconUpdatesFlow get() = AppIconRepository.iconUpdates
+
     /** 取系统默认应用图标（尺寸为 [size] 像素）。 */
     fun loadDefaultIcon(
         context: Context,

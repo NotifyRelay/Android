@@ -18,11 +18,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import com.xzyht.notifyrelay.ui.pages.ToastDebounce
 import com.xzyht.notifyrelay.ui.pages.dateTimeFormatter
+import com.xzyht.notifyrelay.ui.viewmodel.RemoteFilterViewModel
 import notifyrelay.base.util.ToastUtils
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -53,12 +54,13 @@ internal fun NotificationCard(
     enableClick: Boolean = true,
     /** 是否在卡片上额外外显原始包名（默认 `false`，历史页不显示，行为不变）。 */
     showPackageName: Boolean = false,
+    viewModel: RemoteFilterViewModel = viewModel(),
 ) {
     val notificationTextStyles = MiuixTheme.textStyles
     val cardColorScheme = MiuixTheme.colorScheme
 
     // 对包名进行等价映射，使用缓存的包名集合，避免同步加载
-    val mappedPkg = RemoteFilterConfig.mapToLocalPackage(record.packageName, installedPackages)
+    val mappedPkg = viewModel.mapToLocalPackage(record.packageName, installedPackages)
 
     // 使用映射后的包名获取应用信息
     val appInfo: Pair<String, Bitmap?> = getCachedAppInfo(mappedPkg)
@@ -79,7 +81,7 @@ internal fun NotificationCard(
                 val pkg = record.packageName
                 if (pkg.isNotEmpty()) {
                     // 应用等价映射，使用缓存的包名集合，避免同步加载
-                    val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg, installedPackages)
+                    val mappedPkg = viewModel.mapToLocalPackage(pkg, installedPackages)
 
                     var canOpen = false
                     var intent: Intent? = null

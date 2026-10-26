@@ -12,10 +12,11 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
 import com.xzyht.notifyrelay.ui.pages.UIChatTest
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
+import com.xzyht.notifyrelay.ui.viewmodel.DevicePortsViewModel
 import kotlinx.coroutines.launch
 import notifyrelay.shared.ui.navigation.Navigator
 import top.yukonga.miuix.kmp.basic.TabRowDefaults
@@ -29,6 +30,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 @Composable
 fun HistoryScreen(
     navigator: Navigator,
+    viewModel: DevicePortsViewModel = viewModel(),
 ) {
     val coroutineScope = rememberCoroutineScope()
     val tabTitles = listOf("通知历史", "超级岛历史", "聊天测试")
@@ -74,7 +76,7 @@ fun HistoryScreen(
                 1 -> UISuperIslandHistory()
                 2 ->
                     UIChatTest(
-                        deviceManager = DeviceConnectionManagerSingleton.getDeviceChat(context),
+                        deviceManager = viewModel.chatPort(context),
                     )
             }
         }

@@ -23,8 +23,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.feature.notification.superisland.image.SuperIslandImageStore
+import com.xzyht.notifyrelay.ui.viewmodel.AppIconViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import top.yukonga.miuix.kmp.basic.Text
@@ -106,23 +107,17 @@ internal fun SuperIslandHistoryImage(
 internal fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
     val target = remember(packageName) { packageName?.takeIf { it.isNotBlank() } }
     val context = LocalContext.current
-    val iconUpdateKey by AppIconRepository.iconUpdates.collectAsState()
+    val viewModel: AppIconViewModel = viewModel()
+    val iconUpdateKey by viewModel.iconUpdatesFlow.collectAsState()
     val bitmapState =
         produceState<ImageBitmap?>(initialValue = null, key1 = target, key2 = iconUpdateKey) {
             if (target == null) {
                 value = null
                 return@produceState
             }
-            val cached = AppIconRepository.getExternalAppIcon(context, target)
-            if (cached != null) {
-                value = cached.asImageBitmap()
-                return@produceState
-            }
-            val fetched =
-                withContext(Dispatchers.IO) {
-                    AppIconRepository.getAppIconWithAutoRequest(context, target)
-                }
-            value = fetched?.asImageBitmap()
+            val cached = viewModel.externalIcon(context, target) { value = it?.asImageBitmap() }
+            if (value != null) return@produceState
+            viewModel.iconWithAutoRequest(context, target) { value = it?.asImageBitmap() }
         }
     return bitmapState.value
 }

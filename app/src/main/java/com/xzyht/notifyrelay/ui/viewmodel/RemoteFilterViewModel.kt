@@ -178,6 +178,11 @@ class RemoteFilterViewModel : ViewModel() {
         }
     }
 
+    fun mapToLocalPackage(
+        packageName: String,
+        installedPackages: Set<String>,
+    ): String = RemoteFilterConfig.mapToLocalPackage(packageName, installedPackages)
+
     fun isDataLoaded(): Boolean = InstalledAppsRepository.isDataLoaded()
 
     fun loadApps(context: Context) {

@@ -14,8 +14,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import com.xzyht.notifyrelay.ui.viewmodel.DevicePortsViewModel
 import github.xzynine.superislandui.floating.bigisland.components.ProgressInfoCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.ActionInfo
@@ -35,6 +36,7 @@ fun ParamIslandCompose(
     modifier: Modifier = Modifier,
     actions: List<ActionInfo>? = null,
     picMap: Map<String, String>? = null,
+    viewModel: DevicePortsViewModel = viewModel(),
 ) {
     // 调试日志
     paramIsland.bigIslandArea?.let {
@@ -140,7 +142,7 @@ fun ParamIslandCompose(
                                             ToastUtils.showShortToast(context, "复制失败")
                                         } else {
                                             try {
-                                                val deviceManager = DeviceConnectionManagerSingleton.getDeviceQuery(context)
+                                                val deviceManager = viewModel.queryPort(context)
                                                 ClipboardSyncManager.syncTextDirectly(deviceManager, code, context)
                                                 ToastUtils.showShortToast(context, "验证码已复制")
                                             } catch (e: Exception) {
