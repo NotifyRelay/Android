@@ -24,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -38,6 +39,9 @@ import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+
+/** 引导页应用 Logo 的平台实现在启动时提供。 */
+val LocalGuideAppLogo = staticCompositionLocalOf<(@Composable (Modifier) -> Unit)?> { null }
 
 @Composable
 fun GuideGlowBackground(modifier: Modifier = Modifier) {
@@ -257,4 +261,10 @@ fun GuidePageFooter(
             }
         }
     }
+}
+
+/** 绘制应用 Logo；平台未提供实现时不渲染。 */
+@Composable
+fun GuideAppLogoSlot(modifier: Modifier = Modifier) {
+    LocalGuideAppLogo.current?.invoke(modifier)
 }

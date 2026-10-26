@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.guide
+package notifyrelay.shared.ui.guide
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -23,7 +23,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import notifyrelay.shared.ui.guide.GuideGlowBackground
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -64,7 +63,7 @@ fun GuideCompletePage(
                         ),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    GuideAppLogo(modifier = Modifier.size(92.dp))
+                    GuideAppLogoSlot(modifier = Modifier.size(92.dp))
                     Spacer(modifier = Modifier.height(28.dp))
                     Text(
                         text = "设置完成",
