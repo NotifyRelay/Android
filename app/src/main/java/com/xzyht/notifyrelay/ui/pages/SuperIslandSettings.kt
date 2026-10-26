@@ -17,15 +17,12 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
-import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils.SpecInjectionMode
 import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
 import com.xzyht.notifyrelay.ui.dialog.SuperIslandTestDialog
-import com.xzyht.notifyrelay.ui.viewmodel.SuperIslandSettingsViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -35,8 +32,10 @@ import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.Storage
 import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.notification.superisland.SpecInjectionMode
 import notifyrelay.shared.ui.dialog.AppPickerDialog
 import notifyrelay.shared.ui.port.LocalToastPort
+import notifyrelay.shared.ui.viewmodel.SuperIslandSettingsViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -69,7 +68,7 @@ fun UISuperIslandSettings(
     val toastPort = LocalToastPort.current
 
     LaunchedEffect(Unit) {
-        viewModel.load(context)
+        viewModel.load()
     }
 
     var enabled by remember { mutableStateOf(Storage.getBoolean(SuperIslandStorageKeys.ENABLED, true)) }
@@ -142,7 +141,7 @@ fun UISuperIslandSettings(
                 summary = "控制是否显示来自远端的超级岛",
                 checked = showSuperIsland,
                 onCheckedChange = {
-                    viewModel.setShowSuperIsland(context, it)
+                    viewModel.updateShowSuperIsland(it)
                 },
             )
 
@@ -151,7 +150,7 @@ fun UISuperIslandSettings(
                 summary = floatingWindowSummary,
                 checked = floatingWindowEnabled,
                 onCheckedChange = {
-                    viewModel.setFloatingWindowEnabled(context, it)
+                    viewModel.updateFloatingWindowEnabled(it)
                 },
             )
 
@@ -160,7 +159,7 @@ fun UISuperIslandSettings(
                 summary = "平板默认开启，开启后系统外显仅保留一条超级岛，点击切换",
                 checked = notificationListEnabled,
                 onCheckedChange = {
-                    viewModel.setNotificationListEnabled(context, it)
+                    viewModel.updateNotificationListEnabled(it)
                 },
             )
 
@@ -172,7 +171,7 @@ fun UISuperIslandSettings(
                 onSelectedIndexChange = { index ->
                     if (index in specInjectionOptions.indices) {
                         val mode = specInjectionOptions[index].second
-                        viewModel.setSpecInjectionMode(context, mode)
+                        viewModel.updateSpecInjectionMode(mode)
                         if (mode == SpecInjectionMode.SUPER_ISLAND) {
                             toastPort.long("请通过lsp模块关闭超级岛白名单否则大概率无法展示")
                         }
@@ -206,16 +205,16 @@ fun UISuperIslandSettings(
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
 
-            val installedPkgs = remember { viewModel.installedPackages(context) }
+            val installedPkgs = remember { viewModel.installedPackages() }
 
             DEFAULT_MIRROR_PACKAGES.forEach { pkg ->
                 val isInstalled = installedPkgs.contains(pkg)
-                var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+                var iconBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
                 val isEnabled = customPackages.find { it.packageName == pkg }?.enabled ?: true
 
                 LaunchedEffect(pkg) {
                     if (iconBitmap == null) {
-                        viewModel.loadIcon(context, pkg) { icon -> iconBitmap = icon }
+                        viewModel.loadIcon(pkg) { icon -> iconBitmap = icon }
                     }
                 }
 
@@ -239,7 +238,7 @@ fun UISuperIslandSettings(
                     startAction = {
                         iconBitmap?.let {
                             Image(
-                                bitmap = it.asImageBitmap(),
+                                bitmap = it,
                                 contentDescription = null,
                                 modifier = Modifier.size(24.dp).padding(end = 8.dp),
                             )
@@ -252,12 +251,12 @@ fun UISuperIslandSettings(
                 key(pkgEntity.packageName) {
                     val pkg = pkgEntity.packageName
                     val isInstalled = installedPkgs.contains(pkg)
-                    var iconBitmap by remember { mutableStateOf<android.graphics.Bitmap?>(null) }
+                    var iconBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
                     var pkgEnabled by remember(pkgEntity.packageName, pkgEntity.enabled) { mutableStateOf(pkgEntity.enabled) }
 
                     LaunchedEffect(pkg) {
                         if (iconBitmap == null) {
-                            viewModel.loadIcon(context, pkg) { icon -> iconBitmap = icon }
+                            viewModel.loadIcon(pkg) { icon -> iconBitmap = icon }
                         }
                     }
 
@@ -277,7 +276,7 @@ fun UISuperIslandSettings(
                         startAction = {
                             iconBitmap?.let {
                                 Image(
-                                    bitmap = it.asImageBitmap(),
+                                    bitmap = it,
                                     contentDescription = null,
                                     modifier = Modifier.size(24.dp).padding(end = 8.dp),
                                 )
