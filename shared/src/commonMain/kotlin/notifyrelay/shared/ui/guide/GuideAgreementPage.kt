@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.guide
+package notifyrelay.shared.ui.guide
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
@@ -20,20 +20,15 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.state.ToggleableState
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.R
-import notifyrelay.shared.ui.guide.GuidePageFooter
-import notifyrelay.shared.ui.guide.GuidePageHeader
-import notifyrelay.shared.ui.guide.GuideSectionLabel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Checkbox
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-internal fun GuideAgreementPage(
+fun GuideAgreementPage(
     onBack: () -> Unit,
     onNext: () -> Unit,
     reauth: Boolean = false,
@@ -41,7 +36,6 @@ internal fun GuideAgreementPage(
 ) {
     val colorScheme = MiuixTheme.colorScheme
     var agreed by rememberSaveable { mutableStateOf(reauth) }
-    val context = LocalContext.current
 
     val notices =
         listOf(
@@ -57,12 +51,7 @@ internal fun GuideAgreementPage(
     // 避免与 Manifest 注释双重维护。通知访问（通知监听服务）非 <uses-permission> 声明、Manifest
     // 无逐条注释，作为唯一固定补充项列出。
     val declaredPermissionNotes =
-        runCatching {
-            context.resources
-                .openRawResource(R.raw.permission_notes)
-                .bufferedReader()
-                .use { it.readText() }
-        }.getOrDefault("")
+        (LocalGuideResources.current?.readRawText("permission_notes") ?: "")
             .lineSequence()
             .filter { it.isNotBlank() }
             .mapNotNull { line ->

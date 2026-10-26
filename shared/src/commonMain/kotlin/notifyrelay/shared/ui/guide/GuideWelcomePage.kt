@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.guide
+package notifyrelay.shared.ui.guide
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
@@ -24,9 +24,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.R
 import kotlinx.coroutines.delay
 import notifyrelay.shared.ui.guide.GuideGlowBackground
 import top.yukonga.miuix.kmp.basic.Icon
@@ -34,7 +32,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
-internal fun GuideWelcomePage(
+fun GuideWelcomePage(
     onStart: () -> Unit,
     reauth: Boolean = false,
     needConsent: Boolean = false,
@@ -68,7 +66,7 @@ internal fun GuideWelcomePage(
                         ),
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    GuideAppLogo(modifier = Modifier.size(92.dp))
+                    GuideAppLogoSlot(modifier = Modifier.size(92.dp))
                     Spacer(modifier = Modifier.height(28.dp))
                     Text(
                         text = "NotifyRelay",
@@ -113,7 +111,9 @@ internal fun GuideWelcomePage(
                         contentAlignment = Alignment.Center,
                     ) {
                         Icon(
-                            painter = painterResource(R.drawable.guide_icon_arrow),
+                            painter =
+                                LocalGuideResources.current?.drawablePainter("guide_icon_arrow") ?: androidx.compose.ui.graphics.painter
+                                    .ColorPainter(androidx.compose.ui.graphics.Color.Transparent),
                             contentDescription = "开始",
                             modifier = Modifier.size(width = 31.dp, height = 22.dp),
                             tint = colorScheme.onPrimary,
