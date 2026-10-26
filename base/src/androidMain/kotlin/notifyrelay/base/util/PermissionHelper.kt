@@ -14,7 +14,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.ProcessLifecycleOwner
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 /**
  * 权限辅助工具类

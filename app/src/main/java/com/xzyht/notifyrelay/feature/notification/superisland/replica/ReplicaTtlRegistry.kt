@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.feature.notification.superisland.replica
 
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import java.util.concurrent.ConcurrentHashMap
 
 /**

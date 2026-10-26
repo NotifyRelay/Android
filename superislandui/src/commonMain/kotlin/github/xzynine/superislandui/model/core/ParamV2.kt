@@ -34,7 +34,7 @@ import github.xzynine.superislandui.model.templates.parsePicInfo
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 // 摘要态组件解析
 

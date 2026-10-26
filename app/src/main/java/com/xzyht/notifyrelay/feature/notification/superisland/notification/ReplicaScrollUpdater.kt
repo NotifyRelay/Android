@@ -9,7 +9,7 @@ import android.os.Looper
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator.NOTIFICATION_CHANNEL_ID
 import github.xzynine.superislandui.common.CapsuleScrollManager
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 /**
  * 复刻通知胶囊文本的滚动更新管理。

@@ -1,9 +1,9 @@
 package com.xzyht.notifyrelay.sync
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.device.service.contract.DeviceAuthTablePort
-import notifyrelay.shared.log.Logger
 
 /**
  * 统一加密发送器

@@ -4,9 +4,9 @@ import android.os.Handler
 import android.os.Looper
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.HeartbeatProcessor
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.device.model.PendingPairing
-import notifyrelay.shared.log.Logger
 import org.json.JSONObject
 
 /**

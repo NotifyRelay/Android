@@ -16,7 +16,7 @@ import github.xzynine.superislandui.floating.smallisland.right.bProgressColorUnR
 import github.xzynine.superislandui.floating.smallisland.right.bProgressIsCCW
 import github.xzynine.superislandui.floating.smallisland.right.textToRender
 import github.xzynine.superislandui.model.core.ParamV2
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 /**
  * 媒体类型（business == "media"）复刻通知构建。

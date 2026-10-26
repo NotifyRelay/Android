@@ -1,4 +1,4 @@
-package notifyrelay.shared.util
+package notifyrelay.base.util
 
 /**
  * 文本处理工具类

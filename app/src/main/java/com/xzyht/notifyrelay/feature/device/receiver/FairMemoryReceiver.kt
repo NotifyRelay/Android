@@ -10,7 +10,7 @@ import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.cache.SuperIslandBitmapCaches
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 /**
  * 公平运行内存适配广播接收器（小米 HyperOS / 金标联盟通用）。

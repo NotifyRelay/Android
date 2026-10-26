@@ -14,10 +14,10 @@ import coil.request.ImageRequest
 import coil.request.SuccessResult
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import notifyrelay.shared.log.Logger
-import notifyrelay.shared.util.ColorUtils
-import notifyrelay.shared.util.DataUrlUtils
-import notifyrelay.shared.util.TextUtils
+import notifyrelay.base.log.Logger
+import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.DataUrlUtils
+import notifyrelay.base.util.TextUtils
 import java.io.ByteArrayOutputStream
 
 /**

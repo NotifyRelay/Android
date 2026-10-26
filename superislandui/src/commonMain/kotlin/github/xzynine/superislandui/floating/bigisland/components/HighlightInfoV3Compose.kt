@@ -23,7 +23,7 @@ import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.ActionInfoButton
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.model.templates.HighlightInfoV3
-import notifyrelay.shared.util.ColorUtils
+import notifyrelay.base.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**

@@ -15,8 +15,8 @@ import androidx.lifecycle.Lifecycle
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundService
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.shared.log.Logger
 
 /**
  * 屏幕捕获授权流程协调器

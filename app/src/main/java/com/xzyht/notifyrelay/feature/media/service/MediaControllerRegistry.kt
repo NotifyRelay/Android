@@ -4,7 +4,7 @@ import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.PlaybackState
 import android.os.Handler
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import java.util.Objects
 
 /**

@@ -25,8 +25,8 @@ import github.xzynine.superislandui.floating.smallisland.right.bTitle
 import github.xzynine.superislandui.floating.smallisland.right.isTimerType
 import github.xzynine.superislandui.floating.smallisland.right.textToRender
 import kotlinx.coroutines.CancellationException
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.image.ImageUtils
-import notifyrelay.shared.log.Logger
 
 /**
  * 小图标注入与解析：封装反射写入 [Notification.mSmallIcon]、

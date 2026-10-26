@@ -17,7 +17,7 @@ import github.xzynine.superislandui.json.optObjectOrNull
 import github.xzynine.superislandui.json.optStringOr
 import github.xzynine.superislandui.model.components.TimerInfo
 import kotlinx.serialization.json.JsonObject
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 /**
  * 解析 B区（优先识别 imageTextInfoRight 的 type，其次识别 text/digit/progress/pic）。

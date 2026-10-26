@@ -11,7 +11,7 @@ import android.os.SystemClock
 import android.service.notification.NotificationListenerService
 import com.xzyht.notifyrelay.feature.media.lyric.LyricResolver
 import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import java.util.Objects
 
 class MediaSessionMonitorService(

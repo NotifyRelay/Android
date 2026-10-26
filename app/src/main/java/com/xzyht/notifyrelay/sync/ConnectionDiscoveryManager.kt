@@ -12,9 +12,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.log.Logger
 
 /**
  * 负责「网络环境」与「设备发现」的整体协调：

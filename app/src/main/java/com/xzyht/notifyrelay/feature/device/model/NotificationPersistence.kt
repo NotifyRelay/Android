@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.device.model
 import android.content.Context
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import kotlinx.coroutines.runBlocking
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.sync.notification.data.NotificationRecordDto
 
 /**

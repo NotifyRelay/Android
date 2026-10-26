@@ -1,8 +1,8 @@
 package com.xzyht.notifyrelay.feature.device.service.state
 
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.feature.device.model.AuthInfo
 import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.log.Logger
 
 /**
  * 设备查询门面（只读）。

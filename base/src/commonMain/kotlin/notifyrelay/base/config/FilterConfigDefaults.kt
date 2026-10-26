@@ -1,4 +1,4 @@
-package notifyrelay.shared.config
+package notifyrelay.base.config
 
 /**
  * 过滤配置相关默认常量

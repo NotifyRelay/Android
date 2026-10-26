@@ -1,4 +1,4 @@
-package notifyrelay.shared
+package notifyrelay.base
 
 /**
  * 超级岛的跨模块存储 key。

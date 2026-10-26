@@ -8,7 +8,7 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonObject
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 /**
  * miui.focus.param 摘要提取结果。

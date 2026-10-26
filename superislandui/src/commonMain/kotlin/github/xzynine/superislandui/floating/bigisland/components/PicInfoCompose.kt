@@ -16,7 +16,7 @@ import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.model.templates.PicInfo
-import notifyrelay.shared.util.ColorUtils
+import notifyrelay.base.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**

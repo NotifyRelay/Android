@@ -38,7 +38,7 @@ import androidx.paging.compose.LazyPagingItems
 import com.xzyht.notifyrelay.ui.pages.dateTimeFormatter
 import com.xzyht.notifyrelay.ui.viewmodel.GroupedNotifications
 import kotlinx.coroutines.launch
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.ui.pages.DeleteButton
 import notifyrelay.shared.ui.pages.DragValue
 import top.yukonga.miuix.kmp.basic.Card

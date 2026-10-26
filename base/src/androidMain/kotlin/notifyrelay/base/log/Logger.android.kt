@@ -1,4 +1,4 @@
-package notifyrelay.shared.log
+package notifyrelay.base.log
 
 import android.util.Log
 import timber.log.Timber

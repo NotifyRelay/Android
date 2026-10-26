@@ -21,9 +21,9 @@ import github.xzynine.superislandui.floating.bigisland.components.ProgressInfoCo
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.ActionInfo
 import github.xzynine.superislandui.model.core.ParamIsland
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ClipboardUtils
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.shared.log.Logger
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 

@@ -16,9 +16,9 @@ import com.xzyht.notifyrelay.ui.port.ProvideAndroidUiPorts
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.config.DeviceInfoManager
-import notifyrelay.shared.log.Logger
 import notifyrelay.shared.ui.navigation.Route
 import notifyrelay.shared.ui.navigation.rememberNavigator
 

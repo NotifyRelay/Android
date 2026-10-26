@@ -17,11 +17,11 @@ import com.xzyht.notifyrelay.feature.notification.superisland.tracker.LocalSuper
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
+import notifyrelay.base.config.FilterConfigDefaults
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.Storage
 import notifyrelay.data.database.repository.DatabaseRepository
-import notifyrelay.shared.config.FilterConfigDefaults
-import notifyrelay.shared.log.Logger
 import org.json.JSONObject
 
 object SuperIslandProcessor {

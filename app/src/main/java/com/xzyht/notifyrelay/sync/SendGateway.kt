@@ -1,10 +1,10 @@
 package com.xzyht.notifyrelay.sync
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.device.service.contract.DeviceAuthTablePort
 import notifyrelay.shared.feature.device.service.contract.DeviceQueryPort
-import notifyrelay.shared.log.Logger
 
 /**
  * 发送网关（抽取自 [MessageSender]）。

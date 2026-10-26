@@ -26,7 +26,7 @@ import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePain
 import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.model.templates.HighlightInfo
 import kotlinx.coroutines.delay
-import notifyrelay.shared.util.ColorUtils
+import notifyrelay.base.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**

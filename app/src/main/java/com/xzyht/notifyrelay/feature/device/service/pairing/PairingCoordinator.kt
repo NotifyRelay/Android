@@ -3,9 +3,9 @@ package com.xzyht.notifyrelay.feature.device.service.pairing
 import com.xzyht.notifyrelay.feature.device.service.state.DeviceSnapshotStore
 import com.xzyht.notifyrelay.feature.device.service.state.DeviceTargetRegistry
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.feature.device.model.AuthInfo
 import notifyrelay.shared.feature.device.model.PendingPairing
-import notifyrelay.shared.log.Logger
 
 /**
  * 配对流程的平台侧状态与收尾。

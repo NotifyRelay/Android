@@ -4,10 +4,10 @@ import android.content.Intent
 import androidx.activity.result.contract.ActivityResultContracts
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ServiceManager
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.shared.log.Logger
 
 /**
  * 权限检查与服务启动协调器

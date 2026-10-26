@@ -7,9 +7,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.BatteryUtils
 import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.log.Logger
 
 /**
  * 连接保活与重连策略封装：

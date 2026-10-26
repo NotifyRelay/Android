@@ -2,8 +2,8 @@ package github.xzynine.superislandui.common
 
 import kotlinx.atomicfu.locks.SynchronizedObject
 import kotlinx.atomicfu.locks.synchronized
-import notifyrelay.shared.log.Logger
-import notifyrelay.shared.util.measureTime
+import notifyrelay.base.log.Logger
+import notifyrelay.base.util.measureTime
 
 /**
  * 位图工具类，用于处理文本到位图的转换等操作。

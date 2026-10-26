@@ -1,6 +1,6 @@
 package com.xzyht.notifyrelay.feature.notification.service
 
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import java.util.concurrent.ConcurrentHashMap
 
 /**

@@ -11,8 +11,8 @@ import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import coil.compose.rememberAsyncImagePainter
+import notifyrelay.base.util.DataUrlUtils
 import notifyrelay.base.util.image.ImageUtils
-import notifyrelay.shared.util.DataUrlUtils
 
 // Android 侧图片加载实现：data URL 交给 :base 的位图解码（与通知路径同一实现），其余 URL 交由 Coil 加载。
 @Composable

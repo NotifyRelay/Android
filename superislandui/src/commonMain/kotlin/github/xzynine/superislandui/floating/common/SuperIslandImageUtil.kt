@@ -5,8 +5,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import notifyrelay.shared.util.ColorUtils
-import notifyrelay.shared.util.TextUtils
+import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.TextUtils
 
 /**
  * 超级岛图片与文本工具类（平台无关部分）。

@@ -4,8 +4,8 @@ import android.content.Context
 import com.xzyht.notifyrelay.feature.device.service.callback.DeviceCallbackHost
 import com.xzyht.notifyrelay.feature.device.service.callback.RustCallbackInstaller
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
-import notifyrelay.shared.log.Logger
 import java.util.concurrent.atomic.AtomicBoolean
 
 /**

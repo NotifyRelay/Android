@@ -1,6 +1,6 @@
 package github.xzynine.superislandui.common
 
-import notifyrelay.shared.util.nowMillis
+import notifyrelay.base.util.nowMillis
 
 /**
  * 胶囊文本滚动管理器，用于处理超长文本的滚动显示

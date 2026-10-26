@@ -6,7 +6,7 @@ import github.xzynine.superislandui.model.core.ParamV2
 import github.xzynine.superislandui.model.core.parseParamV2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 data class FormattedSuperIslandData(
     val paramV2: ParamV2?,

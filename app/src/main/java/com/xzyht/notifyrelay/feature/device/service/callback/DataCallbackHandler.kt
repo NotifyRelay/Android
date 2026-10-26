@@ -14,10 +14,10 @@ import com.xzyht.notifyrelay.sync.notification.StatusProcessor
 import com.xzyht.notifyrelay.sync.notification.SuperIslandProcessor
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.log.Logger
 import org.json.JSONObject
 
 /**

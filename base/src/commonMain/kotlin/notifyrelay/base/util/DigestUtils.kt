@@ -1,4 +1,4 @@
-package notifyrelay.shared.util
+package notifyrelay.base.util
 
 private const val HEX_DIGITS = "0123456789abcdef"
 

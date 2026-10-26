@@ -12,7 +12,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.ui.pages.remoteapps.DisplayInfo
 
 /** 显示器相关调试日志标签，沿用原 `android.util.Log.d` 的 tag，保持既有排查滤镜可用。 */

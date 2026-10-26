@@ -6,9 +6,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.device.model.DeviceSnapshot
-import notifyrelay.shared.log.Logger
 import org.json.JSONArray
 
 /**

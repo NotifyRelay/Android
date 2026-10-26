@@ -7,8 +7,8 @@ import android.net.Uri
 import android.provider.Settings
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.ui.activity.ClipboardSyncActivity
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.shared.log.Logger
 
 /**
  * 剪贴板同步广播接收器

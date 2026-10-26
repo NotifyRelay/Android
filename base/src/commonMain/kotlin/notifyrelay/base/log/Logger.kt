@@ -1,4 +1,4 @@
-package notifyrelay.shared.log
+package notifyrelay.base.log
 
 /**
  * 全仓唯一日志入口。

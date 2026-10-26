@@ -1,4 +1,4 @@
-package notifyrelay.shared.util
+package notifyrelay.base.util
 
 /**
  * 颜色解析工具（平台无关）。

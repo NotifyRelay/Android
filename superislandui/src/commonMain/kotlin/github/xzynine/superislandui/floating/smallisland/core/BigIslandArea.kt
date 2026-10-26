@@ -10,7 +10,7 @@ import github.xzynine.superislandui.json.optStringOrNull
 import github.xzynine.superislandui.parser.parseAComponent
 import github.xzynine.superislandui.parser.parseBComponent
 import kotlinx.serialization.json.JsonObject
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 /**
  * 集中解析和承载 "bigIslandArea"（超级岛的摘要 / 收起态）相关的数据结构与工具函数。

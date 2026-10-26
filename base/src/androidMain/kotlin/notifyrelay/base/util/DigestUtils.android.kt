@@ -1,4 +1,4 @@
-package notifyrelay.shared.util
+package notifyrelay.base.util
 
 import java.security.MessageDigest
 

@@ -7,8 +7,8 @@ import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificatio
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.MessageSender
 import github.xzynine.superislandui.common.SuperIslandManager
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.image.ImageUtils
-import notifyrelay.shared.log.Logger
 import java.io.ByteArrayOutputStream
 
 /**

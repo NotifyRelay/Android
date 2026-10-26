@@ -1,7 +1,7 @@
 package notifyrelay.data
 
+import notifyrelay.base.log.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
-import notifyrelay.shared.log.Logger
 
 /**
  * 平台无关的存储入口（Context-free）。

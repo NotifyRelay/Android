@@ -14,10 +14,10 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.feature.appslist.model.RemoteAppInfo
 import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.device.service.contract.DeviceQueryPort
-import notifyrelay.shared.log.Logger
 
 /**
  * 远程设备应用列表的 ViewModel。

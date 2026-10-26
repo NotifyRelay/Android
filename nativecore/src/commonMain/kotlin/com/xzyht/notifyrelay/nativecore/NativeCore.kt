@@ -15,7 +15,7 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
-import notifyrelay.shared.log.Logger as AppLogger
+import notifyrelay.base.log.Logger as AppLogger
 
 /**
  * Rust 核心门面。

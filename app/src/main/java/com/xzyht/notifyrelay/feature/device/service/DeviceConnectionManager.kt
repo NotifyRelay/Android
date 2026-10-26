@@ -24,6 +24,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.BatteryUtils
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.data.Storage
@@ -38,7 +39,6 @@ import notifyrelay.shared.feature.device.service.contract.DeviceDiscoveryPort
 import notifyrelay.shared.feature.device.service.contract.DeviceMessagePort
 import notifyrelay.shared.feature.device.service.contract.DeviceSendPort
 import notifyrelay.shared.feature.device.service.pairing.HandshakeWaiterRegistry
-import notifyrelay.shared.log.Logger
 
 // =================== 设备连接管理器主类 ===================
 class DeviceConnectionManager(

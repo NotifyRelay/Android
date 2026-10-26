@@ -9,10 +9,10 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.device.service.contract.DevicePairingPort
 import notifyrelay.shared.feature.device.service.contract.HandshakeWaiterPort
-import notifyrelay.shared.log.Logger
 
 /** 配对失败原因码：core 版本不兼容。 */
 const val REASON_VERSION_MISMATCH = "version_mismatch"

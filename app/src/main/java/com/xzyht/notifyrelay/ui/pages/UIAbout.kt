@@ -39,10 +39,10 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.data.Storage
-import notifyrelay.shared.log.Logger
 import notifyrelay.shared.ui.dialog.UpdateDialog
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text

@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.feature.media
 
 import android.media.session.PlaybackState
 import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 object MediaControlUtil {
     /**

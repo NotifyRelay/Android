@@ -50,6 +50,8 @@ kotlin {
             implementation(libs.kotlinx.serialization.json)
             // ViewModel 在公共源集的承载
             implementation(libs.androidx.lifecycle.viewmodel)
+            // 基础设施层（日志/平台标识/时间/摘要/文本/颜色工具）
+            api(project(":base"))
             // viewModel() 在公共源集可用（KMP 构件）
             implementation(libs.androidx.lifecycle.viewmodel.compose.kmp)
             // UpdateDialog 依赖的 ReleaseInfo 数据模型（KMP 库）

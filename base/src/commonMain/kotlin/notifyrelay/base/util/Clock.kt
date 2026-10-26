@@ -1,4 +1,4 @@
-package notifyrelay.shared.util
+package notifyrelay.base.util
 
 /**
  * 当前墙钟时间（毫秒）。

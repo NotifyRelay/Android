@@ -7,7 +7,7 @@ import android.util.Base64
 import com.xzyht.notifyrelay.feature.notification.superisland.media.MediaCapsulePresenter
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.sync.MessageSender
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
 

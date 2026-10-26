@@ -51,7 +51,7 @@ import github.xzynine.superislandui.model.components.MediaSessionData
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.Text
 

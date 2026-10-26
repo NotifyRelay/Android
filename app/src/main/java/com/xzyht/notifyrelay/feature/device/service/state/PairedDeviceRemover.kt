@@ -3,9 +3,9 @@ package com.xzyht.notifyrelay.feature.device.service.state
 import android.content.Context
 import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import notifyrelay.base.log.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.shared.feature.device.model.AuthInfo
-import notifyrelay.shared.log.Logger
 
 /**
  * 移除已配对设备。

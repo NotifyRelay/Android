@@ -3,9 +3,9 @@ package com.xzyht.notifyrelay.sync.builder
 import android.content.Context
 import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.sync.SendGateway
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.device.service.contract.DeviceMessagePort
-import notifyrelay.shared.log.Logger
 import org.json.JSONException
 import org.json.JSONObject
 

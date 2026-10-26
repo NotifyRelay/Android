@@ -23,7 +23,7 @@ import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePain
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.components.AnimTextInfo
 import kotlinx.coroutines.delay
-import notifyrelay.shared.util.ColorUtils
+import notifyrelay.base.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**

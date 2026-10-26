@@ -8,8 +8,8 @@ import com.xzyht.notifyrelay.sync.MessageSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
-import notifyrelay.shared.log.Logger
 
 /*
  * 超级岛测试样例数据与触发入口。

@@ -37,8 +37,6 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            // 日志实现
-            implementation(project(":shared"))
 
             // BatteryIconConverter 返回 Compose Color（CMP 公共端坐标）
             implementation(libs.compose.multiplatform.ui)
@@ -49,12 +47,13 @@ kotlin {
             implementation(libs.androidx.appcompat)
             implementation(libs.androidx.lifecycle.process)
 
+            // 日志通道：DebugTree 输出与级别过滤（原 :shared androidMain）
+            implementation(libs.timber)
+
             // BatteryIconConverter.getBatteryColor 返回 Compose Color
             implementation(libs.androidx.compose.ui)
             // ImageUtils.loadBitmap 基于 Coil（同时传递 kotlinx-coroutines）
             implementation(libs.bundles.coil)
-
-            implementation(project(":shared"))
         }
 
         getByName("androidHostTest").dependencies {

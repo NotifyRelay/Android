@@ -29,9 +29,9 @@ import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
+import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyPreferenceKeys
-import notifyrelay.shared.log.Logger
 import notifyrelay.shared.ui.common.ScrollableTopAppBarPage
 import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Route

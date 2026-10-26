@@ -14,9 +14,9 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.shared.log.Logger
-import notifyrelay.shared.util.TextUtils
+import notifyrelay.base.util.TextUtils
 import org.json.JSONObject
 
 /**

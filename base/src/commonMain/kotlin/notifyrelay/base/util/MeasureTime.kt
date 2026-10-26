@@ -1,6 +1,6 @@
-package notifyrelay.shared.util
+package notifyrelay.base.util
 
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import kotlin.time.TimeSource
 
 /**

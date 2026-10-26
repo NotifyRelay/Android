@@ -7,7 +7,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.toColorInt
 import github.xzynine.superislandui.model.core.ParamV2
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 /**
  * 进度样式通知构建器：集中构建超级岛进度类通知的 ProgressStyle。

@@ -3,7 +3,7 @@ package notifyrelay.data
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import java.io.File
 
 /** 持久化管理器。负责应用内与设备相关的数据持久化读写。*/

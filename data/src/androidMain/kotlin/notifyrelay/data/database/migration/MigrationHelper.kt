@@ -3,6 +3,7 @@ package notifyrelay.data.database.migration
 import android.content.Context
 import com.google.gson.Gson
 import com.google.gson.reflect.TypeToken
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.data.PersistenceManager
 import notifyrelay.data.Storage
@@ -14,7 +15,6 @@ import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
-import notifyrelay.shared.log.Logger
 import java.io.ByteArrayOutputStream
 
 /**

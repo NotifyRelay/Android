@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoScrollText
 import github.xzynine.superislandui.currentTimeMillis
 import github.xzynine.superislandui.model.components.TimerInfo
-import notifyrelay.shared.util.ColorUtils
+import notifyrelay.base.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator

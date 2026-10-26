@@ -1,8 +1,8 @@
 package com.xzyht.notifyrelay.feature.device.service.state
 
 import com.xzyht.notifyrelay.feature.device.model.DeviceNameCache
+import notifyrelay.base.log.Logger
 import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.log.Logger
 
 /**
  * 设备信息的**同步查询**入口，全部数据来自 [DeviceSnapshotStore] 的只读投影。

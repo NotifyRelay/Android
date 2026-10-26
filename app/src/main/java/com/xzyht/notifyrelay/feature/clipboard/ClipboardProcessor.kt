@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.feature.clipboard
 
 import android.content.Context
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 
 /**
  * 剪贴板消息处理器

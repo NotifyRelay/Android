@@ -6,7 +6,7 @@ import android.view.View
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingEntry
 import github.xzynine.superislandui.diff.DiffSystem
 import kotlinx.coroutines.Job
-import notifyrelay.shared.log.Logger
+import notifyrelay.base.log.Logger
 import java.lang.ref.WeakReference
 import java.security.MessageDigest
 import java.util.concurrent.ConcurrentHashMap

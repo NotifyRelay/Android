@@ -1,3 +1,3 @@
-package notifyrelay.shared.platform
+package notifyrelay.base.platform
 
 actual val platformName: String = "Android"
