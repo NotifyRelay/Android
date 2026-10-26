@@ -29,7 +29,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.bigisland.ParamIslandCompose
-import com.xzyht.notifyrelay.ui.viewmodel.MediaControlViewModel
 import github.xzynine.superislandui.floating.bigisland.components.ActionCompose
 import github.xzynine.superislandui.floating.bigisland.components.AnimTextInfoCompose
 import github.xzynine.superislandui.floating.bigisland.components.BaseInfoCompose
@@ -52,6 +51,7 @@ import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import notifyrelay.base.log.Logger
+import notifyrelay.shared.ui.viewmodel.MediaControlViewModel
 import org.json.JSONObject
 import top.yukonga.miuix.kmp.basic.Text
 
@@ -189,13 +189,13 @@ fun FloatingWindowContainer(
                                                     },
                                                     onPlayPause = {
                                                         // 媒体控制按钮点击事件，由 ViewModel 承载
-                                                        mediaViewModel.onPlayPause(context)
+                                                        mediaViewModel.playPauseLocal()
                                                     },
                                                     onPrevious = {
-                                                        mediaViewModel.onPrevious(context)
+                                                        mediaViewModel.previousLocal()
                                                     },
                                                     onNext = {
-                                                        mediaViewModel.onNext(context)
+                                                        mediaViewModel.nextLocal()
                                                     },
                                                     onClose = {
                                                         // 发送关闭指令，由外部处理

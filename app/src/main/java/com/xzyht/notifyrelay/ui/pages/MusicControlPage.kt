@@ -20,13 +20,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.viewmodel.AudioRelayViewModel
-import com.xzyht.notifyrelay.ui.viewmodel.MediaControlViewModel
 import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
 import notifyrelay.domain.feature.media.MediaMessageReceiveMode
 import notifyrelay.shared.ui.common.MiuixSpinnerPreference
 import notifyrelay.shared.ui.port.LocalToastPort
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
+import notifyrelay.shared.ui.viewmodel.MediaControlViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -53,7 +53,7 @@ fun MusicControlPage(
     val scrollState = rememberScrollState()
 
     var mediaMessageReceiveMode by remember {
-        mutableStateOf(mediaViewModel.receiveMode(context))
+        mutableStateOf(mediaViewModel.receiveMode())
     }
 
     // 胶囊歌词开关状态
@@ -193,7 +193,7 @@ fun MusicControlPage(
                         else -> MediaMessageReceiveMode.On
                     }
                 mediaMessageReceiveMode = mode
-                mediaViewModel.setReceiveMode(context, mode)
+                mediaViewModel.setReceiveMode(mode)
             },
         )
 
@@ -265,7 +265,7 @@ fun MusicControlPage(
                             mediaViewModel.previousLocal()
                             toastPort.short("已发送上一首指令到本机")
                         } else {
-                            if (mediaViewModel.sendMediaCommand(context, selectedDevice, "previous")) {
+                            if (mediaViewModel.sendMediaCommand(selectedDevice, "previous")) {
                                 toastPort.short("已发送上一首指令到${selectedDevice.displayName}")
                             } else {
                                 toastPort.short("发送上一首指令失败")
@@ -289,7 +289,7 @@ fun MusicControlPage(
                             mediaViewModel.playPauseLocal()
                             toastPort.short("已发送播放/暂停指令到本机")
                         } else {
-                            if (mediaViewModel.sendMediaCommand(context, selectedDevice, "playPause")) {
+                            if (mediaViewModel.sendMediaCommand(selectedDevice, "playPause")) {
                                 toastPort.short("已发送播放/暂停指令到${selectedDevice.displayName}")
                             } else {
                                 toastPort.short("发送播放/暂停指令失败")
@@ -313,7 +313,7 @@ fun MusicControlPage(
                             mediaViewModel.nextLocal()
                             toastPort.short("已发送下一首指令到本机")
                         } else {
-                            if (mediaViewModel.sendMediaCommand(context, selectedDevice, "next")) {
+                            if (mediaViewModel.sendMediaCommand(selectedDevice, "next")) {
                                 toastPort.short("已发送下一首指令到${selectedDevice.displayName}")
                             } else {
                                 toastPort.short("发送下一首指令失败")
