@@ -8,17 +8,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
 import notifyrelay.base.util.SystemBarUtils
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.theme.darkColorScheme
-import top.yukonga.miuix.kmp.theme.lightColorScheme
-
-@Composable
-fun NotifyRelayTheme(
-    darkTheme: Boolean = false,
-    content: @Composable () -> Unit,
-) {
-    val colorScheme = if (darkTheme) darkColorScheme() else lightColorScheme()
-    MiuixTheme(colors = colorScheme, content = content)
-}
 
 /**
  * 设置系统栏外观

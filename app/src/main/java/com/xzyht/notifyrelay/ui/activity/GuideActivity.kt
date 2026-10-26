@@ -12,7 +12,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
-import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.guide.GuideScreen
 import notifyrelay.base.log.Logger
@@ -20,6 +19,7 @@ import notifyrelay.base.util.GuidePermissionRequester
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.data.Storage
+import notifyrelay.shared.ui.common.NotifyRelayTheme
 
 class GuideActivity : ComponentActivity() {
     private val permissionRequester =
