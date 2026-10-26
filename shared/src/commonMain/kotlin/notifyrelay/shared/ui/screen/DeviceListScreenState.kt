@@ -3,7 +3,7 @@ package notifyrelay.shared.ui.screen
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
-import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.shared.ui.dialog.PairingMode
 
 /**

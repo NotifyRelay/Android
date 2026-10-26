@@ -9,7 +9,7 @@ import kotlinx.coroutines.withContext
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.image.ImageUtils
-import notifyrelay.shared.feature.device.service.contract.DeviceAuthTablePort
+import notifyrelay.domain.feature.device.service.contract.DeviceAuthTablePort
 import org.json.JSONObject
 
 /**

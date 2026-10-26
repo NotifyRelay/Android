@@ -11,9 +11,9 @@ import github.xzynine.superislandui.model.components.MediaSessionData
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
 import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
-import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.feature.device.service.contract.DeviceAuthTablePort
-import notifyrelay.shared.feature.media.MediaMessageReceiveMode
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.service.contract.DeviceAuthTablePort
+import notifyrelay.domain.feature.media.MediaMessageReceiveMode
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 

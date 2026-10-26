@@ -6,7 +6,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
 
 /**
  * 全局设备选中状态单例

@@ -3,10 +3,10 @@ package com.xzyht.notifyrelay.ui.viewmodel
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import notifyrelay.shared.feature.device.service.contract.DeviceAdminPort
-import notifyrelay.shared.feature.device.service.contract.DeviceChatPort
-import notifyrelay.shared.feature.device.service.contract.DeviceMessagePort
-import notifyrelay.shared.feature.device.service.contract.DeviceQueryPort
+import notifyrelay.domain.feature.device.service.contract.DeviceAdminPort
+import notifyrelay.domain.feature.device.service.contract.DeviceChatPort
+import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
+import notifyrelay.domain.feature.device.service.contract.DeviceQueryPort
 
 /**
  * 设备端口获取的承载。

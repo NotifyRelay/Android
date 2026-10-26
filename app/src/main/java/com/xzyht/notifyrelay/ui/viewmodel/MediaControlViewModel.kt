@@ -6,7 +6,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingl
 import com.xzyht.notifyrelay.feature.media.MediaControlUtil
 import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
 import com.xzyht.notifyrelay.sync.ProtocolSender
-import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
 
 /**
  * 远端媒体控制的承载。
@@ -36,7 +36,7 @@ class MediaControlViewModel : ViewModel() {
 
     fun setReceiveMode(
         context: Context,
-        mode: notifyrelay.shared.feature.media.MediaMessageReceiveMode,
+        mode: notifyrelay.domain.feature.media.MediaMessageReceiveMode,
     ) {
         RemoteMediaSessionManager.setReceiveMode(context, mode)
     }

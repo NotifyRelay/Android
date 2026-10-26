@@ -2,7 +2,7 @@ package notifyrelay.shared.feature.appslist
 
 import androidx.compose.ui.graphics.ImageBitmap
 import kotlinx.coroutines.flow.StateFlow
-import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
 
 /**
  * 应用图标能力端口。

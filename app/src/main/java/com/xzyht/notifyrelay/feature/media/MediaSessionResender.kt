@@ -4,7 +4,7 @@ import android.content.Context
 import android.os.Handler
 import github.xzynine.superislandui.model.components.MediaSessionData
 import notifyrelay.base.log.Logger
-import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
 import java.util.concurrent.ConcurrentHashMap
 
 /**

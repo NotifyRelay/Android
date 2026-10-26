@@ -40,7 +40,7 @@ import androidx.compose.ui.unit.sp
 import com.xzyht.notifyrelay.R
 import notifyrelay.base.util.BatteryIconConverter
 import notifyrelay.base.util.BatteryUtils
-import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.shared.ui.common.DoubleClickConfirmButton
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults

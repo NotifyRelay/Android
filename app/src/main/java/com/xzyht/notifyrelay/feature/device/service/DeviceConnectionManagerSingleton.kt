@@ -2,15 +2,15 @@ package com.xzyht.notifyrelay.feature.device.service
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
-import notifyrelay.shared.feature.device.service.contract.AudioRelayPort
-import notifyrelay.shared.feature.device.service.contract.DeviceAdminPort
-import notifyrelay.shared.feature.device.service.contract.DeviceChatPort
-import notifyrelay.shared.feature.device.service.contract.DeviceDiscoveryPort
-import notifyrelay.shared.feature.device.service.contract.DeviceMessagePort
-import notifyrelay.shared.feature.device.service.contract.DeviceQueryPort
-import notifyrelay.shared.feature.device.service.contract.DeviceSendPort
-import notifyrelay.shared.feature.device.service.contract.HandshakeWaiterPort
-import notifyrelay.shared.feature.device.service.contract.NotificationDataPort
+import notifyrelay.domain.feature.device.service.contract.AudioRelayPort
+import notifyrelay.domain.feature.device.service.contract.DeviceAdminPort
+import notifyrelay.domain.feature.device.service.contract.DeviceChatPort
+import notifyrelay.domain.feature.device.service.contract.DeviceDiscoveryPort
+import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
+import notifyrelay.domain.feature.device.service.contract.DeviceQueryPort
+import notifyrelay.domain.feature.device.service.contract.DeviceSendPort
+import notifyrelay.domain.feature.device.service.contract.HandshakeWaiterPort
+import notifyrelay.domain.feature.device.service.contract.NotificationDataPort
 
 /**
  * 设备域的装配入口（组合根）。

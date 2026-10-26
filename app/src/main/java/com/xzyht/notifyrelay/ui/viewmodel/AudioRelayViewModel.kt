@@ -6,7 +6,7 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingl
 import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyDefaults
-import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
 
 /**
  * 音频转发操作的承载。

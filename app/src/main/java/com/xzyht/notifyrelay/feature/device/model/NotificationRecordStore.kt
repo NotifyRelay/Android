@@ -5,7 +5,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.repository.DatabaseRepository
-import notifyrelay.shared.sync.notification.data.NotificationRecordDto
+import notifyrelay.domain.sync.notification.data.NotificationRecordDto
 
 class NotificationRecordStore private constructor(
     private val context: Context,

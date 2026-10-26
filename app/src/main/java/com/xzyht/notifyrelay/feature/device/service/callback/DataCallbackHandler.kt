@@ -17,7 +17,7 @@ import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.IntentUtils
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
 import org.json.JSONObject
 
 /**

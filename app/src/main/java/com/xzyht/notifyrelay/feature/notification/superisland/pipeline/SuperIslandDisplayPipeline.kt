@@ -15,8 +15,8 @@ import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.base.log.Logger
-import notifyrelay.shared.feature.notification.superisland.notification.SuperIslandNotificationIds
-import notifyrelay.shared.feature.notification.superisland.replica.runReplicaCatchingSuspend
+import notifyrelay.domain.feature.notification.superisland.notification.SuperIslandNotificationIds
+import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatchingSuspend
 
 /**
  * 超级岛三通道共享的「展示一跳」。

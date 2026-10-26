@@ -14,7 +14,7 @@ import notifyrelay.base.util.image.toPngByteArray
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.repository.DatabaseRepository
-import notifyrelay.shared.feature.appslist.model.appMatchesQuery
+import notifyrelay.domain.feature.appslist.model.appMatchesQuery
 
 /**
  * 已安装应用仓库。

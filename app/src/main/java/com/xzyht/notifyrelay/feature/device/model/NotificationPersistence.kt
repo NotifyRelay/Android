@@ -4,7 +4,7 @@ import android.content.Context
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.log.Logger
-import notifyrelay.shared.sync.notification.data.NotificationRecordDto
+import notifyrelay.domain.sync.notification.data.NotificationRecordDto
 
 /**
  * 通知历史的持久化写入。

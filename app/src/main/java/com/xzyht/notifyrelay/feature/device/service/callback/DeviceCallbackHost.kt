@@ -5,11 +5,11 @@ import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController
 import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
 import kotlinx.coroutines.CoroutineScope
-import notifyrelay.shared.feature.device.model.AuthInfo
-import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.feature.device.model.PendingPairing
-import notifyrelay.shared.feature.device.service.callback.HandshakeRequestHandler
-import notifyrelay.shared.feature.device.service.pairing.HandshakeWaiterRegistry
+import notifyrelay.domain.feature.device.model.AuthInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.PendingPairing
+import notifyrelay.domain.feature.device.service.callback.HandshakeRequestHandler
+import notifyrelay.domain.feature.device.service.pairing.HandshakeWaiterRegistry
 
 /**
  * Rust 回调处理器所需的宿主能力。

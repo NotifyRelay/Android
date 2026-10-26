@@ -14,7 +14,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
 
 /**
  * 负责「网络环境」与「设备发现」的整体协调：

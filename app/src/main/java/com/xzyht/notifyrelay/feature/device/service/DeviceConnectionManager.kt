@@ -28,17 +28,17 @@ import notifyrelay.base.log.Logger
 import notifyrelay.base.util.BatteryUtils
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.data.Storage
-import notifyrelay.shared.feature.device.model.AuthInfo
-import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.feature.device.model.DeviceSnapshot
-import notifyrelay.shared.feature.device.model.PendingPairing
-import notifyrelay.shared.feature.device.service.callback.HandshakeRequestHandler
-import notifyrelay.shared.feature.device.service.contract.DeviceAdminPort
-import notifyrelay.shared.feature.device.service.contract.DeviceChatPort
-import notifyrelay.shared.feature.device.service.contract.DeviceDiscoveryPort
-import notifyrelay.shared.feature.device.service.contract.DeviceMessagePort
-import notifyrelay.shared.feature.device.service.contract.DeviceSendPort
-import notifyrelay.shared.feature.device.service.pairing.HandshakeWaiterRegistry
+import notifyrelay.domain.feature.device.model.AuthInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceSnapshot
+import notifyrelay.domain.feature.device.model.PendingPairing
+import notifyrelay.domain.feature.device.service.callback.HandshakeRequestHandler
+import notifyrelay.domain.feature.device.service.contract.DeviceAdminPort
+import notifyrelay.domain.feature.device.service.contract.DeviceChatPort
+import notifyrelay.domain.feature.device.service.contract.DeviceDiscoveryPort
+import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
+import notifyrelay.domain.feature.device.service.contract.DeviceSendPort
+import notifyrelay.domain.feature.device.service.pairing.HandshakeWaiterRegistry
 
 // =================== 设备连接管理器主类 ===================
 class DeviceConnectionManager(

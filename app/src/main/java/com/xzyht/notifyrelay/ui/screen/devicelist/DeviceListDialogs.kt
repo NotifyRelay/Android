@@ -17,8 +17,8 @@ import com.xzyht.notifyrelay.ui.dialog.PairingCodeDialog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.feature.device.service.contract.DeviceAdminPort
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.service.contract.DeviceAdminPort
 import notifyrelay.shared.ui.dialog.PairingMode
 import notifyrelay.shared.ui.dialog.RejectedDevicesDialog
 import notifyrelay.shared.ui.screen.DeviceListScreenState

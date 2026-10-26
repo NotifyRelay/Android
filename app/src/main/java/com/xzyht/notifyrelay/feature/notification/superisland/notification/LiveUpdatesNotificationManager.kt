@@ -16,7 +16,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIsl
 import com.xzyht.notifyrelay.feature.notification.superisland.intent.NotificationIntentFactory
 import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.log.Logger
-import notifyrelay.shared.feature.notification.superisland.notification.SuperIslandNotificationIds
+import notifyrelay.domain.feature.notification.superisland.notification.SuperIslandNotificationIds
 
 object LiveUpdatesNotificationManager {
     internal const val TAG = "超级岛进度类型"

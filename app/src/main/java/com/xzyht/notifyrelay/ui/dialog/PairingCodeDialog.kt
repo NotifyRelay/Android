@@ -28,9 +28,9 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.feature.device.pairing.NativePairingCorePort
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import kotlinx.coroutines.delay
-import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.service.contract.DevicePairingPort
 import notifyrelay.shared.feature.device.pairing.PairingViewModel
-import notifyrelay.shared.feature.device.service.contract.DevicePairingPort
 import notifyrelay.shared.ui.dialog.PairingCodeInputField
 import notifyrelay.shared.ui.dialog.PairingMode
 import top.yukonga.miuix.kmp.basic.Text

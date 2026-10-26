@@ -28,7 +28,7 @@ import com.xzyht.notifyrelay.sync.MessageSender
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ClipboardUtils
 import notifyrelay.base.util.ToastUtils
-import notifyrelay.shared.feature.device.service.contract.DeviceChatPort
+import notifyrelay.domain.feature.device.service.contract.DeviceChatPort
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text

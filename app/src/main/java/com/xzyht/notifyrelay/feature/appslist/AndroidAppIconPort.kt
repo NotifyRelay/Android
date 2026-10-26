@@ -5,8 +5,8 @@ import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import kotlinx.coroutines.flow.StateFlow
+import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.appslist.AppIconPort
-import notifyrelay.shared.feature.device.model.DeviceInfo
 
 /**
  * 以 [AppIconRepository] 实现 [AppIconPort]。

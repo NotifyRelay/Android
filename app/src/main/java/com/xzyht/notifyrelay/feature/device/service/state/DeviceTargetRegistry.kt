@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.feature.device.service.state
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import notifyrelay.shared.feature.device.model.DeviceSnapshot
+import notifyrelay.domain.feature.device.model.DeviceSnapshot
 
 /**
  * 平台端**唯一**向 Rust core 登记「设备连接目标」的出口。

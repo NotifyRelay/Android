@@ -14,8 +14,8 @@ import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyDefaults
-import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.feature.device.service.contract.AudioRelayPort
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.service.contract.AudioRelayPort
 
 /**
  * 音频中继（投送/接收）的完整生命周期控制。

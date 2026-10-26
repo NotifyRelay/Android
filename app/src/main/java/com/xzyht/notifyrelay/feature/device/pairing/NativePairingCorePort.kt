@@ -1,7 +1,7 @@
 package com.xzyht.notifyrelay.feature.device.pairing
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import notifyrelay.shared.feature.device.pairing.PairingCorePort
+import notifyrelay.domain.feature.device.pairing.PairingCorePort
 
 /** 以 [NativeCore] 实现配对核心端口。 */
 object NativePairingCorePort : PairingCorePort {

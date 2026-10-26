@@ -13,9 +13,9 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import notifyrelay.shared.feature.notification.superisland.list.SuperIslandListManager
-import notifyrelay.shared.feature.notification.superisland.replica.runReplicaCatching
-import notifyrelay.shared.feature.notification.superisland.replica.runReplicaCatchingSuspend
+import notifyrelay.domain.feature.notification.superisland.list.SuperIslandListManager
+import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatching
+import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatchingSuspend
 
 object FloatingReplicaListModeManager {
     private const val TAG = "超级岛列表模式"

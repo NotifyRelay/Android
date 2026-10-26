@@ -14,9 +14,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
-import notifyrelay.shared.feature.notification.superisland.notification.SuperIslandNotificationIds
-import notifyrelay.shared.feature.notification.superisland.replica.runReplicaCatching
-import notifyrelay.shared.feature.notification.superisland.replica.runReplicaCatchingSuspend
+import notifyrelay.domain.feature.notification.superisland.notification.SuperIslandNotificationIds
+import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatching
+import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatchingSuspend
 
 object FloatingReplicaNotificationManager {
     private const val TAG = "超级岛通知管理"

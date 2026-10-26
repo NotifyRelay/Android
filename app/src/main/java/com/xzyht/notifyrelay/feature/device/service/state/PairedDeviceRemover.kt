@@ -5,7 +5,7 @@ import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryRespond
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.log.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
-import notifyrelay.shared.feature.device.model.AuthInfo
+import notifyrelay.domain.feature.device.model.AuthInfo
 
 /**
  * 移除已配对设备。

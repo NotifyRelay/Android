@@ -4,8 +4,8 @@ import android.content.Context
 import notifyrelay.data.Storage
 import notifyrelay.data.config.ScrcpyPreferenceKeys
 import notifyrelay.data.model.OnlineDeviceInfo
-import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.feature.device.model.DeviceSnapshot
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.DeviceSnapshot
 
 /**
  * 「在线且已配对设备」列表的持久化缓存，供 scrcpy 投屏等外部能力读取。

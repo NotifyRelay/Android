@@ -5,7 +5,7 @@ import kotlinx.coroutines.flow.first
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.repository.DatabaseRepository
-import notifyrelay.shared.feature.appslist.model.RemoteAppInfo
+import notifyrelay.domain.feature.appslist.model.RemoteAppInfo
 
 /**
  * 远程应用缓存。

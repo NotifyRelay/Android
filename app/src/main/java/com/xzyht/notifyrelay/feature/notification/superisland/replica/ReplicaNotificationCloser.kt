@@ -7,8 +7,8 @@ import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingW
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
 import notifyrelay.base.log.Logger
-import notifyrelay.shared.feature.notification.superisland.notification.SuperIslandNotificationIds
-import notifyrelay.shared.feature.notification.superisland.replica.runReplicaCatching
+import notifyrelay.domain.feature.notification.superisland.notification.SuperIslandNotificationIds
+import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatching
 
 /**
  * 超级岛复刻通道中**带副作用的关闭动作**。

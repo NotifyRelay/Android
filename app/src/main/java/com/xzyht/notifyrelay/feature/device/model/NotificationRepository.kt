@@ -13,7 +13,7 @@ import kotlinx.coroutines.runBlocking
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.data.database.repository.DatabaseRepository
-import notifyrelay.shared.sync.notification.data.NotificationRecordDto
+import notifyrelay.domain.sync.notification.data.NotificationRecordDto
 
 /**
  * 通知历史仓库（原 NotificationData.kt）。

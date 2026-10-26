@@ -14,8 +14,8 @@ import notifyrelay.base.log.Logger
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
-import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.feature.device.service.contract.DeviceMessagePort
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
 import org.json.JSONArray
 import org.json.JSONObject
 

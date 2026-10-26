@@ -6,8 +6,8 @@ import android.content.Intent
 import android.os.Build
 import com.xzyht.notifyrelay.sync.ProtocolSender
 import notifyrelay.base.log.Logger
-import notifyrelay.shared.feature.device.model.DeviceInfo
-import notifyrelay.shared.feature.device.service.contract.DeviceAuthTablePort
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.service.contract.DeviceAuthTablePort
 import org.json.JSONObject
 
 object AppLaunchManager {

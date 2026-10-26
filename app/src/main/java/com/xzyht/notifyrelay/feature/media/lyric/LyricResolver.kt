@@ -4,12 +4,12 @@ import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.os.Handler
 import notifyrelay.base.log.Logger
-import notifyrelay.shared.feature.media.lyric.LyricField
-import notifyrelay.shared.feature.media.lyric.LyricFieldProbe
-import notifyrelay.shared.feature.media.lyric.LyricState
-import notifyrelay.shared.feature.media.lyric.T_INSTRUMENTAL_NORMAL_MS
-import notifyrelay.shared.feature.media.lyric.T_INSTRUMENTAL_SLOW_MS
-import notifyrelay.shared.feature.media.lyric.instrumentalThreshold
+import notifyrelay.domain.feature.media.lyric.LyricField
+import notifyrelay.domain.feature.media.lyric.LyricFieldProbe
+import notifyrelay.domain.feature.media.lyric.LyricState
+import notifyrelay.domain.feature.media.lyric.T_INSTRUMENTAL_NORMAL_MS
+import notifyrelay.domain.feature.media.lyric.T_INSTRUMENTAL_SLOW_MS
+import notifyrelay.domain.feature.media.lyric.instrumentalThreshold
 import java.util.concurrent.ConcurrentHashMap
 
 /**

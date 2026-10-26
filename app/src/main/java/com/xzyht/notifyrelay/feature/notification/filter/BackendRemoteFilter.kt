@@ -11,7 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.TextUtils
-import notifyrelay.shared.feature.notification.filter.RemoteFilterPlaceholderQueue
+import notifyrelay.domain.feature.notification.filter.RemoteFilterPlaceholderQueue
 import org.json.JSONObject
 
 /**

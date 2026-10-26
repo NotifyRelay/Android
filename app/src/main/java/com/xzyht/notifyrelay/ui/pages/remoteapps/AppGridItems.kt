@@ -31,7 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xzyht.notifyrelay.ui.viewmodel.LocalAppInfo
-import notifyrelay.shared.feature.appslist.model.RemoteAppInfo
+import notifyrelay.domain.feature.appslist.model.RemoteAppInfo
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
