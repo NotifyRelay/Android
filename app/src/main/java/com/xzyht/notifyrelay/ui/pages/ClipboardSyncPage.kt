@@ -24,11 +24,11 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import com.xzyht.notifyrelay.feature.clipboard.FcitxClipboardManager
-import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.util.ToastUtils
+import notifyrelay.shared.ui.common.DoubleClickConfirmButton
 import notifyrelay.shared.ui.dialog.PairingCodeInputField
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider

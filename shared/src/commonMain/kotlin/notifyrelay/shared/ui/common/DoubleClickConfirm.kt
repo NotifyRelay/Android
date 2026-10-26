@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.common
+package notifyrelay.shared.ui.common
 
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.runtime.Composable
@@ -9,10 +9,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
-import notifyrelay.base.util.ToastUtils
+import notifyrelay.shared.ui.port.LocalToastPort
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonColors
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
@@ -82,9 +81,9 @@ fun DoubleClickConfirmButton(
     confirmTextColor: Color? = null,
 ) {
     val state = rememberDoubleClickConfirm()
-    val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
 
+    val toast = LocalToastPort.current
     Button(
         onClick = {
             if (state.isConfirming) {
@@ -93,7 +92,7 @@ fun DoubleClickConfirmButton(
                 state.isConfirming = false
             } else {
                 // 第一次点击，显示提示并进入确认状态
-                ToastUtils.showShortToast(context, "再次点击确认$text")
+                toast.short("再次点击确认$text")
                 onClick()
                 state.isConfirming = true
             }

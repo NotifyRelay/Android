@@ -14,9 +14,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
-import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import com.xzyht.notifyrelay.ui.viewmodel.GroupedNotifications
 import com.xzyht.notifyrelay.ui.viewmodel.NotificationHistoryUiState
+import notifyrelay.shared.ui.common.DoubleClickConfirmButton
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
 import top.yukonga.miuix.kmp.basic.Scaffold

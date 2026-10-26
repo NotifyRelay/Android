@@ -1,0 +1,116 @@
+package com.xzyht.notifyrelay.ui.port
+
+import android.content.Context
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
+import notifyrelay.base.util.ClipboardUtils
+import notifyrelay.base.util.IntentUtils
+import notifyrelay.base.util.SystemBarUtils
+import notifyrelay.base.util.ThemeSettingsManager
+import notifyrelay.base.util.ToastUtils
+import notifyrelay.base.util.image.toBitmapOrDefault
+import notifyrelay.shared.ui.port.BitmapPort
+import notifyrelay.shared.ui.port.ClipboardPort
+import notifyrelay.shared.ui.port.IntentLaunchPort
+import notifyrelay.shared.ui.port.LocalBitmapPort
+import notifyrelay.shared.ui.port.LocalClipboardPort
+import notifyrelay.shared.ui.port.LocalIntentLaunchPort
+import notifyrelay.shared.ui.port.LocalSystemBarPort
+import notifyrelay.shared.ui.port.LocalThemePort
+import notifyrelay.shared.ui.port.LocalToastPort
+import notifyrelay.shared.ui.port.SystemBarPort
+import notifyrelay.shared.ui.port.ThemePort
+import notifyrelay.shared.ui.port.ToastPort
+
+private class AndroidToastPort(
+    private val context: Context,
+) : ToastPort {
+    override fun short(message: String) = ToastUtils.showShortToast(context, message)
+
+    override fun long(message: String) = ToastUtils.showLongToast(context, message)
+}
+
+private class AndroidClipboardPort(
+    private val context: Context,
+) : ClipboardPort {
+    override fun copyText(
+        label: String,
+        text: String,
+    ): Boolean = ClipboardUtils.copyText(context, label, text)
+}
+
+private class AndroidIntentLaunchPort(
+    private val context: Context,
+) : IntentLaunchPort {
+    override fun startAction(
+        action: String,
+        data: String?,
+        addNewTaskFlag: Boolean,
+    ) {
+        IntentUtils.startActivity(context, action, data?.let { android.net.Uri.parse(it) }, addNewTaskFlag)
+    }
+}
+
+private class AndroidThemePort(
+    private val context: Context,
+) : ThemePort {
+    override fun currentIndex(): Int = ThemeSettingsManager.getThemeBaseIndex(context)
+
+    override fun setIndex(index: Int) = ThemeSettingsManager.setThemeBaseIndex(context, index)
+
+    override fun addListener(listener: (Int) -> Unit) {
+        ThemeSettingsManager.addThemeChangeListener(context, listener)
+    }
+
+    override fun removeListener(listener: (Int) -> Unit) {
+        ThemeSettingsManager.removeThemeChangeListener(context, listener)
+    }
+}
+
+private class AndroidSystemBarPort(
+    private val view: android.view.View,
+) : SystemBarPort {
+    override fun setStatusBarColor(
+        color: Int,
+        animate: Boolean,
+    ) {
+        (view.parent as? android.view.View)?.let { }
+        val window = (view.context as? android.app.Activity)?.window ?: return
+        SystemBarUtils.setStatusBarColor(window, color, animate)
+    }
+
+    override fun setNavigationBarColor(
+        color: Int,
+        animate: Boolean,
+    ) {
+        val window = (view.context as? android.app.Activity)?.window ?: return
+        SystemBarUtils.setNavigationBarColor(window, color, animate)
+    }
+}
+
+private object AndroidBitmapPort : BitmapPort {
+    override fun drawableToBitmap(
+        drawable: Any,
+        fallbackSize: Int,
+    ): Any = (drawable as android.graphics.drawable.Drawable).toBitmapOrDefault(fallbackSize)
+}
+
+/**
+ * 为 [content] 提供全部界面端口。宿主 Activity 的内容根需以此包裹一层。
+ */
+@Composable
+fun ProvideAndroidUiPorts(content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val view = LocalView.current
+    CompositionLocalProvider(
+        LocalToastPort provides AndroidToastPort(context),
+        LocalClipboardPort provides AndroidClipboardPort(context),
+        LocalIntentLaunchPort provides AndroidIntentLaunchPort(context),
+        LocalThemePort provides AndroidThemePort(context),
+        LocalSystemBarPort provides AndroidSystemBarPort(view),
+        LocalBitmapPort provides AndroidBitmapPort,
+        content = content,
+    )
+}

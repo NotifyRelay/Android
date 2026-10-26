@@ -38,10 +38,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.xzyht.notifyrelay.R
-import com.xzyht.notifyrelay.ui.common.DoubleClickConfirmButton
 import notifyrelay.base.util.BatteryIconConverter
 import notifyrelay.base.util.BatteryUtils
 import notifyrelay.shared.feature.device.model.DeviceInfo
+import notifyrelay.shared.ui.common.DoubleClickConfirmButton
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
