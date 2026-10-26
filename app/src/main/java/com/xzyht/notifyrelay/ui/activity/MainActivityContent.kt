@@ -14,23 +14,25 @@ import androidx.compose.ui.platform.LocalContext
 import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.pages.NotificationHistoryScreen
+import com.xzyht.notifyrelay.ui.pages.UIAbout
 import com.xzyht.notifyrelay.ui.pages.UIChatTest
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
+import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
 import com.xzyht.notifyrelay.ui.screen.MainScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
-import com.xzyht.notifyrelay.ui.screen.SettingsAboutScreen
-import com.xzyht.notifyrelay.ui.screen.SettingsAppearanceScreen
-import com.xzyht.notifyrelay.ui.screen.SettingsLocalFilterScreen
-import com.xzyht.notifyrelay.ui.screen.SettingsRemoteFilterScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScrcpyScreen
-import com.xzyht.notifyrelay.ui.screen.SettingsScreen
-import com.xzyht.notifyrelay.ui.screen.SettingsSuperIslandScreen
 import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
 import notifyrelay.shared.ui.screen.HistoryScreen
+import notifyrelay.shared.ui.screen.SettingsAboutScreen
+import notifyrelay.shared.ui.screen.SettingsAppearanceScreen
+import notifyrelay.shared.ui.screen.SettingsLocalFilterScreen
+import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
+import notifyrelay.shared.ui.screen.SettingsScreen
+import notifyrelay.shared.ui.screen.SettingsSuperIslandScreen
 import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -104,13 +106,13 @@ internal fun MainActivityContent(navigator: Navigator) {
                         SettingsLocalFilterScreen()
                     }
                     entry<Route.SettingsSuperIsland> {
-                        SettingsSuperIslandScreen()
+                        SettingsSuperIslandScreen { UISuperIslandSettings() }
                     }
                     entry<Route.SettingsScrcpy> {
                         SettingsScrcpyScreen()
                     }
                     entry<Route.SettingsAbout> {
-                        SettingsAboutScreen()
+                        SettingsAboutScreen { UIAbout() }
                     }
                     entry<Route.SettingsAppearance> {
                         SettingsAppearanceScreen()
