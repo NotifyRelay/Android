@@ -2,17 +2,18 @@ package notifyrelay.desktop.platform
 
 import notifyrelay.base.log.Logger
 import java.awt.Image
-import java.awt.MenuItem
-import java.awt.PopupMenu
+import java.awt.Point
 import java.awt.SystemTray
 import java.awt.TrayIcon
 import java.awt.Window
+import java.awt.event.MouseAdapter
+import java.awt.event.MouseEvent
 import javax.swing.SwingUtilities
 
 /**
  * 桌面端窗口与托盘控制。
  *
- * 关闭窗口时隐藏到托盘并保持进程运行；托盘菜单提供显示或隐藏窗口与退出。
+ * 关闭窗口时隐藏到托盘并保持进程运行；托盘左键显示窗口，右键请求弹出菜单（由宿主以 Compose 弹层实现）。
  * 系统托盘不可用时关闭窗口即退出。
  */
 class DesktopWindowController(
@@ -21,6 +22,9 @@ class DesktopWindowController(
     private var window: Window? = null
     private var trayIcon: TrayIcon? = null
     private var exiting = false
+
+    /** 右键托盘时回调，参数为屏幕坐标。 */
+    var onMenuRequested: ((Point) -> Unit)? = null
 
     /** 托盘是否可用。 */
     val trayAvailable: Boolean
@@ -45,35 +49,36 @@ class DesktopWindowController(
         if (icon == null || !SystemTray.isSupported()) return false
         if (trayIcon != null) return true
 
-        val menu =
-            PopupMenu().apply {
-                add(
-                    MenuItem("显示或隐藏窗口").apply {
-                        addActionListener { dispatch { toggleWindow() } }
-                    },
-                )
-                addSeparator()
-                add(
-                    MenuItem("退出").apply {
-                        addActionListener { dispatch { exit() } }
-                    },
-                )
-            }
-
         val tray =
-            TrayIcon(icon, tooltip, menu).apply {
+            TrayIcon(icon, tooltip).apply {
                 isImageAutoSize = true
                 addActionListener { dispatch { showWindow() } }
+                addMouseListener(
+                    object : MouseAdapter() {
+                        override fun mouseReleased(event: MouseEvent) {
+                            when (event.button) {
+                                MouseEvent.BUTTON1 -> dispatch { showWindow() }
+                                MouseEvent.BUTTON3 -> {
+                                    val point = Point(event.x, event.y)
+                                    dispatch { onMenuRequested?.invoke(point) }
+                                }
+                            }
+                        }
+                    },
+                )
             }
-        return runCatching {
-            SystemTray.getSystemTray().add(tray)
-            trayIcon = tray
-            Logger.i(TAG, "托盘已安装")
-            true
-        }.getOrElse {
-            Logger.w(TAG, "托盘安装失败: " + it.message)
-            false
-        }
+        val installed =
+            runCatching {
+                SystemTray.getSystemTray().add(tray)
+                true
+            }.getOrElse {
+                Logger.w(TAG, "托盘安装失败: " + it.message)
+                false
+            }
+        if (!installed) return false
+        trayIcon = tray
+        Logger.i(TAG, "托盘已安装")
+        return true
     }
 
     /** 关闭请求：托盘可用时隐藏窗口，否则退出。 */
@@ -120,7 +125,7 @@ class DesktopWindowController(
         runCatching { SystemTray.getSystemTray().remove(icon) }
     }
 
-    /** 托盘回调可能来自 AWT 事件线程，统一投递到 Swing 事件线程后再操作窗口。 */
+    /** AWT 回调可能来自系统事件线程，统一投递到 Swing 事件线程。 */
     private fun dispatch(action: () -> Unit) {
         if (SwingUtilities.isEventDispatchThread()) action() else SwingUtilities.invokeLater(action)
     }

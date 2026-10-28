@@ -1,16 +1,35 @@
 package notifyrelay.desktop
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.type
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
+import androidx.compose.ui.window.rememberWindowState
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
@@ -23,6 +42,7 @@ import notifyrelay.desktop.device.DesktopDeviceManager
 import notifyrelay.desktop.device.DesktopDevicePortsProvider
 import notifyrelay.desktop.platform.DesktopDeviceListPort
 import notifyrelay.desktop.platform.DesktopNotificationActionPort
+import notifyrelay.desktop.platform.DesktopThemePort
 import notifyrelay.desktop.platform.DesktopWindowController
 import notifyrelay.desktop.platform.ProvideDesktopExtraPorts
 import notifyrelay.desktop.platform.ProvideDesktopUiPorts
@@ -31,6 +51,7 @@ import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 import notifyrelay.shared.feature.appslist.AppIconPortRegistry
 import notifyrelay.shared.feature.appslist.LocalAppsPortRegistry
 import notifyrelay.shared.feature.appslist.SharedAppIcon
+import notifyrelay.shared.ui.common.NotifyRelayTheme
 import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
@@ -38,6 +59,7 @@ import notifyrelay.shared.ui.navigation.rememberNavigator
 import notifyrelay.shared.ui.pages.MusicControlPage
 import notifyrelay.shared.ui.pages.history.LocalNotificationActionPort
 import notifyrelay.shared.ui.pages.history.NotificationHistoryScreen
+import notifyrelay.shared.ui.port.ThemeBaseIndex
 import notifyrelay.shared.ui.screen.DeviceForwardScreen
 import notifyrelay.shared.ui.screen.HistoryScreen
 import notifyrelay.shared.ui.screen.MainScreen
@@ -51,8 +73,19 @@ import notifyrelay.shared.ui.screen.devicelist.DeviceListScreenContent
 import notifyrelay.shared.ui.screen.devicelist.LocalDeviceListPort
 import notifyrelay.shared.ui.viewmodel.LocalDevicePortsProvider
 import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
+import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import java.awt.AWTEvent
+import java.awt.Point
+import java.awt.Toolkit
+import java.awt.event.AWTEventListener
+import java.awt.event.MouseEvent
+import java.awt.event.WindowAdapter
+import java.awt.event.WindowEvent
 import kotlin.math.abs
 
 private const val TRAY_ICON_SIZE = 32
@@ -89,6 +122,30 @@ fun main() {
             onDispose { windowController.disposeTray() }
         }
 
+        // 主题：索引经 ThemePort 持久化，跟随系统时读取系统深浅色
+        val themePort = DesktopThemePort
+        val themeIndex = remember { mutableIntStateOf(themePort.currentIndex()) }
+
+        DisposableEffect(themePort) {
+            val listener: (Int) -> Unit = { themeIndex.intValue = it }
+            themePort.addListener(listener)
+            onDispose { themePort.removeListener(listener) }
+        }
+
+        val darkTheme =
+            when (themeIndex.intValue) {
+                ThemeBaseIndex.LIGHT -> false
+                ThemeBaseIndex.DARK -> true
+                else -> isSystemInDarkTheme()
+            }
+
+        // 托盘右键菜单：Compose 弹层，位置取右键时的屏幕坐标
+        val trayMenuPoint = remember { mutableStateOf<Point?>(null) }
+
+        LaunchedEffect(windowController) {
+            windowController.onMenuRequested = { point -> trayMenuPoint.value = point }
+        }
+
         Window(
             onCloseRequest = { windowController.onCloseRequest() },
             title = "NotifyRelay",
@@ -119,11 +176,27 @@ fun main() {
                             LocalDevicePortsProvider provides devicePortsProvider,
                             LocalNavigator provides navigator,
                         ) {
-                            DesktopRoot(navigator)
+                            DesktopRoot(navigator, darkTheme)
                         }
                     }
                 }
             }
+        }
+
+        trayMenuPoint.value?.let { point ->
+            TrayMenu(
+                point = point,
+                darkTheme = darkTheme,
+                onDismiss = { trayMenuPoint.value = null },
+                onToggleWindow = {
+                    trayMenuPoint.value = null
+                    windowController.toggleWindow()
+                },
+                onExit = {
+                    trayMenuPoint.value = null
+                    windowController.exit()
+                },
+            )
         }
     }
 }
@@ -134,8 +207,11 @@ fun main() {
  * 屏幕镜像（scrcpy）与超级岛在桌面端不接线，对应槽位给出空内容。
  */
 @Composable
-private fun DesktopRoot(navigator: Navigator) {
-    MiuixTheme {
+private fun DesktopRoot(
+    navigator: Navigator,
+    darkTheme: Boolean,
+) {
+    NotifyRelayTheme(darkTheme = darkTheme) {
         Box(
             modifier =
                 Modifier
@@ -234,23 +310,141 @@ private fun DesktopUnavailableScreen(
     title: String,
     onBack: () -> Unit,
 ) {
-    top.yukonga.miuix.kmp.theme.MiuixTheme {
-        androidx.compose.foundation.layout.Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(MiuixTheme.colorScheme.background),
-            verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
-            horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
-        ) {
-            top.yukonga.miuix.kmp.basic
-                .Text(text = title, color = MiuixTheme.colorScheme.onBackground)
-            top.yukonga.miuix.kmp.basic.Text(
-                text = "桌面端暂未提供该功能",
-                color = MiuixTheme.colorScheme.onBackground,
-            )
-            top.yukonga.miuix.kmp.basic
-                .TextButton(text = "返回", onClick = onBack)
+    androidx.compose.foundation.layout.Column(
+        modifier =
+            Modifier
+                .fillMaxSize()
+                .background(MiuixTheme.colorScheme.background),
+        verticalArrangement = androidx.compose.foundation.layout.Arrangement.Center,
+        horizontalAlignment = androidx.compose.ui.Alignment.CenterHorizontally,
+    ) {
+        top.yukonga.miuix.kmp.basic
+            .Text(text = title, color = MiuixTheme.colorScheme.onBackground)
+        top.yukonga.miuix.kmp.basic.Text(
+            text = "桌面端暂未提供该功能",
+            color = MiuixTheme.colorScheme.onBackground,
+        )
+        top.yukonga.miuix.kmp.basic
+            .TextButton(text = "返回", onClick = onBack)
+    }
+}
+
+/** 托盘右键菜单：Miuix 样式的 Compose 弹层。 */
+@Composable
+private fun TrayMenu(
+    point: Point,
+    darkTheme: Boolean,
+    onDismiss: () -> Unit,
+    onToggleWindow: () -> Unit,
+    onExit: () -> Unit,
+) {
+    val density = LocalDensity.current
+    val menuWidth = 168.dp
+    val menuHeight = 84.dp
+    val position =
+        remember(point, density) {
+            val widthPx = with(density) { menuWidth.roundToPx() }
+            val heightPx = with(density) { menuHeight.roundToPx() }
+            val screen = Toolkit.getDefaultToolkit().screenSize
+            val x = point.x.coerceIn(0, (screen.width - widthPx).coerceAtLeast(0))
+            val y = point.y.coerceIn(0, (screen.height - heightPx).coerceAtLeast(0))
+            with(density) { WindowPosition.Absolute(x.toDp(), y.toDp()) }
+        }
+    val windowState =
+        rememberWindowState(
+            position = position,
+            size = DpSize(menuWidth, menuHeight),
+        )
+    Window(
+        onCloseRequest = onDismiss,
+        state = windowState,
+        title = "",
+        resizable = false,
+        undecorated = true,
+        transparent = true,
+        alwaysOnTop = true,
+        onPreviewKeyEvent = { event ->
+            if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
+                onDismiss()
+                true
+            } else {
+                false
+            }
+        },
+    ) {
+        // 失焦或点击菜单外部时关闭
+        DisposableEffect(window) {
+            var hadFocus = false
+            val focusListener =
+                object : WindowAdapter() {
+                    override fun windowGainedFocus(event: WindowEvent) {
+                        hadFocus = true
+                    }
+
+                    override fun windowLostFocus(event: WindowEvent) {
+                        if (hadFocus) onDismiss()
+                    }
+                }
+            window.addWindowFocusListener(focusListener)
+            val globalClick =
+                AWTEventListener { event ->
+                    val mouse = event as? MouseEvent ?: return@AWTEventListener
+                    if (mouse.id == MouseEvent.MOUSE_PRESSED && !window.containsComponent(mouse.component)) {
+                        onDismiss()
+                    }
+                }
+            Toolkit.getDefaultToolkit().addAWTEventListener(globalClick, AWTEvent.MOUSE_EVENT_MASK)
+            runCatching { window.type = java.awt.Window.Type.UTILITY }
+            window.requestFocus()
+            onDispose {
+                window.removeWindowFocusListener(focusListener)
+                Toolkit.getDefaultToolkit().removeAWTEventListener(globalClick)
+            }
+        }
+        NotifyRelayTheme(darkTheme = darkTheme) {
+            Card(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(4.dp),
+                cornerRadius = 10.dp,
+                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surface),
+            ) {
+                Column {
+                    TrayMenuItem(text = "显示或隐藏窗口", onClick = onToggleWindow)
+                    HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+                    TrayMenuItem(text = "退出", onClick = onExit)
+                }
+            }
         }
     }
+}
+
+/** 托盘菜单项。 */
+@Composable
+private fun TrayMenuItem(
+    text: String,
+    onClick: () -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .height(32.dp)
+                .clickable(onClick = onClick)
+                .padding(horizontal = 12.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(text = text, color = MiuixTheme.colorScheme.onSurface, fontSize = 13.sp)
+    }
+}
+
+/** 判断组件是否属于该窗口。 */
+private fun java.awt.Window.containsComponent(component: java.awt.Component): Boolean {
+    var current: java.awt.Component? = component
+    while (current != null) {
+        if (current === this) return true
+        current = current.parent
+    }
+    return false
 }

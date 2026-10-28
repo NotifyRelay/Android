@@ -3,6 +3,7 @@ package notifyrelay.desktop.platform
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.ImageBitmap
+import notifyrelay.data.Storage
 import notifyrelay.shared.ui.port.ClipboardPort
 import notifyrelay.shared.ui.port.IntentLaunchPort
 import notifyrelay.shared.ui.port.LocalBitmapPort
@@ -12,6 +13,7 @@ import notifyrelay.shared.ui.port.LocalSystemBarPort
 import notifyrelay.shared.ui.port.LocalThemePort
 import notifyrelay.shared.ui.port.LocalToastPort
 import notifyrelay.shared.ui.port.SystemBarPort
+import notifyrelay.shared.ui.port.ThemeBaseIndex
 import notifyrelay.shared.ui.port.ThemePort
 import notifyrelay.shared.ui.port.ToastPort
 import java.awt.Toolkit
@@ -51,16 +53,21 @@ private object DesktopIntentLaunchPort : IntentLaunchPort {
     }
 }
 
-/** 桌面端主题：固定浅色，设置不持久化。 */
-private object DesktopThemePort : ThemePort {
-    private var index = 1
+/** 桌面端主题：索引持久化到公共端 Storage，变化时分发监听。 */
+internal object DesktopThemePort : ThemePort {
+    private const val KEY_THEME_BASE_INDEX = "theme_base_index"
+
+    private var index = Storage.getInt(KEY_THEME_BASE_INDEX, ThemeBaseIndex.FOLLOW_SYSTEM)
     private val listeners = mutableListOf<(Int) -> Unit>()
 
     override fun currentIndex(): Int = index
 
     override fun setIndex(index: Int) {
-        this.index = index
-        listeners.forEach { it(index) }
+        val next = index.coerceIn(ThemeBaseIndex.FOLLOW_SYSTEM, ThemeBaseIndex.DARK)
+        if (next == this.index) return
+        this.index = next
+        Storage.putInt(KEY_THEME_BASE_INDEX, next)
+        listeners.forEach { it(next) }
     }
 
     override fun addListener(listener: (Int) -> Unit) {
