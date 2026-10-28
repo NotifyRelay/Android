@@ -33,9 +33,6 @@ class AppPickerViewModel(
         viewModelScope.launch { appsPort.load() }
     }
 
-    /** 取系统默认应用图标。 */
-    fun defaultIcon(size: Int = 48): ImageBitmap? = runCatching { iconPort.defaultIcon(size) }.getOrNull()
-
     fun loadIcon(
         packageName: String,
         onResult: (ImageBitmap?) -> Unit,

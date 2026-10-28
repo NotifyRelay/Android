@@ -17,15 +17,9 @@ ktlint_standard_backing-property-naming = disabled
 # Compose 代码惯用通配导入（foundation.layout.* / runtime.* 等），豁免通配导入规则
 ktlint_standard_no-wildcard-imports = disabled
 
-# UniFFI 生成物（nativecore/build/generated/uniffi 与 uniffi-kmp）：文件名、类名与缩进均由生成器模板决定，
-# 且每次构建都会被覆盖重写，故整目录豁免 ktlint。
-[**/generated/uniffi/**/*.{kt,kts}]
+# 构建生成目录整体豁免：build/generated 下的一切内容（UniFFI 绑定、KSP/Room、
+# Compose 资源、以及后续新增的任何生成器）均由工具模板产出，格式不可控且每次
+# 构建都会重写。此处按目录整棵排除，避免每接入一个新生成器就补一条规则。
+[**/build/generated/**/*.{kt,kts}]
 ktlint = disabled
 
-[**/generated/uniffi-kmp/**/*.{kt,kts}]
-ktlint = disabled
-
-# KSP 生成物（build/generated/ksp）：Room 生成的 *_Impl 由注解处理器模板产出，
-# 格式不可控且每次构建都会重写，整目录豁免 ktlint。
-[**/generated/ksp/**/*.{kt,kts}]
-ktlint = disabled

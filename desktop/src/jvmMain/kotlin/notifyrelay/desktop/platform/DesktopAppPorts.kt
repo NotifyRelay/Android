@@ -69,7 +69,7 @@ class DesktopLocalAppsPort : LocalAppsPort {
 
     override fun filtered(
         query: String,
-        includeSystem: Boolean,
+        showSystemApps: Boolean,
     ): List<LocalAppInfo> = emptyList()
 
     override suspend fun iconFor(packageName: String): ImageBitmap? = null
@@ -96,8 +96,6 @@ class DesktopAppIconPort : AppIconPort {
         packageName: String,
         sourceDevice: notifyrelay.domain.feature.device.model.DeviceInfo?,
     ): ImageBitmap? = null
-
-    override fun defaultIcon(size: Int): ImageBitmap? = null
 
     override suspend fun cacheExternalIcon(
         packageName: String,

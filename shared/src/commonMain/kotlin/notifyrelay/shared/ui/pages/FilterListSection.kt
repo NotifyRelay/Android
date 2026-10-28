@@ -22,6 +22,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import notifyrelay.shared.feature.appslist.SharedAppIcon
 import notifyrelay.shared.ui.dialog.AppPickerDialog
 import notifyrelay.shared.ui.viewmodel.AppIconViewModel
 import top.yukonga.miuix.kmp.basic.Button
@@ -72,7 +73,7 @@ fun FilterListSection(
     var showCustomSheet by remember { mutableStateOf(false) }
     var showAppPickerDialog by remember { mutableStateOf(false) }
 
-    val defaultAppIconBitmap = remember { viewModel.defaultIcon(48) }
+    val defaultAppIconBitmap = SharedAppIcon.bitmap()
 
     Column(
         modifier = Modifier.fillMaxWidth(),

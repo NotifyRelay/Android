@@ -26,10 +26,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.ImageBitmapConfig
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.domain.feature.appslist.model.LocalAppInfo
+import notifyrelay.shared.feature.appslist.SharedAppIcon
 import notifyrelay.shared.ui.viewmodel.AppPickerViewModel
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
@@ -87,10 +87,7 @@ fun AppPickerDialog(
         }
     }
 
-    val defaultAppIconBitmap =
-        remember {
-            viewModel.defaultIcon(22) ?: ImageBitmap(22, 22, ImageBitmapConfig.Argb8888)
-        }
+    val defaultAppIconBitmap = SharedAppIcon.bitmap()
 
     WindowBottomSheet(show = showDialog.value, modifier = Modifier, title = title, startAction = null, endAction = null, backgroundColor = BottomSheetDefaults.backgroundColor(), enableWindowDim = true, cornerRadius = BottomSheetDefaults.cornerRadius, sheetMaxWidth = BottomSheetDefaults.maxWidth, onDismissRequest = {
         showDialog.value = false

@@ -54,7 +54,4 @@ class AppIconViewModel(
             onResult(runCatching { port.iconWithAutoRequest(packageName) }.getOrNull())
         }
     }
-
-    /** 取系统默认应用图标。 */
-    fun defaultIcon(size: Int = 48): ImageBitmap? = runCatching { port.defaultIcon(size) }.getOrNull()
 }
