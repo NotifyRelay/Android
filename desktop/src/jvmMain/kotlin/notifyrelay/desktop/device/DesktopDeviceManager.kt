@@ -27,7 +27,7 @@ import notifyrelay.domain.feature.device.service.pairing.HandshakeWaiterRegistry
  * 通知转发、音频中继等能力不属于设备列表范畴，桌面端不接入。
  */
 class DesktopDeviceManager(
-    private val localDisplayName: String = "桌面端",
+    private val localDisplayName: String = MachineName.resolve(),
 ) : DeviceAdminPort,
     DeviceCallbackHost {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -225,21 +225,21 @@ class DesktopDeviceManager(
                 uuid = uuid,
                 name = localDisplayName,
                 battery = 0,
-                deviceType = "desktop",
+                deviceType = "pc",
                 tcpPort = DEFAULT_PORT.toShort(),
                 pubkey = pubkey,
             )
         Logger.i(TAG, "core 启动: " + started + ", uuid=" + uuid)
 
         // 启动周期性广播，设备发现依赖它；action=1 开始、0 停止
-        val broadcast = NativeCore.periodicBroadcast(1, uuid, localDisplayName, 0, "desktop")
+        val broadcast = NativeCore.periodicBroadcast(1, uuid, localDisplayName, 0, "pc")
         Logger.i(TAG, "广播已启动: " + broadcast)
         snapshotStore.requestRefresh()
     }
 
     /** 启动设备发现（周期性广播）。 */
     fun startDiscovery() {
-        NativeCore.periodicBroadcast(1, localUuid, localDisplayName, 0, "desktop")
+        NativeCore.periodicBroadcast(1, localUuid, localDisplayName, 0, "pc")
     }
 
     /** 停止设备发现。 */
