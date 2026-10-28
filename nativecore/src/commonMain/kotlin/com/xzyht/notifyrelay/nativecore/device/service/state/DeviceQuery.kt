@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.device.service.state
+package com.xzyht.notifyrelay.nativecore.device.service.state
 
 import notifyrelay.base.log.Logger
 import notifyrelay.domain.feature.device.model.AuthInfo

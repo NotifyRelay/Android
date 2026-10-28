@@ -11,5 +11,6 @@ cdylib_name = "notify_relay_core"
 # true：common 源集只产出 expect 声明，函数实现仅在目标源集中产出。
 kotlin_multiplatform = true
 
-# 指定产出目标源集：与 true 组合时输出 commonMain 与 androidMain 双目录。
-kotlin_targets = ["android"]
+# 指定产出目标源集：与 true 组合时输出 commonMain、androidMain 与 jvmMain 三个目录。
+# jvm 目标供桌面端使用（纯 JNA 绑定，不引用任何 Android API）。
+kotlin_targets = ["android", "jvm"]

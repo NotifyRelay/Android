@@ -42,6 +42,30 @@ val rustBuild =
         )
     }
 
+// 本机（host）Rust 构建：为 JVM/桌面端产出动态库（Windows 为 .dll，Linux/macOS 为 .so/.dylib）。
+// 与 rustBuild（cargo-ndk 交叉编译 Android）互补，两者共用同一份 Rust 源码。
+val hostRustBuild =
+    tasks.register<Exec>("hostRustBuild") {
+        description = "构建 Rust 核心库（本机 host 目标，供 JVM 桌面端使用）"
+        group = "rust"
+        doFirst {
+            require(rustCoreDir.exists()) { "Rust 子模块未同步，请执行 git submodule update --init" }
+        }
+        inputs.dir(rustCoreDir.resolve("src"))
+        inputs.file(rustCoreDir.resolve("Cargo.toml"))
+        inputs.file(rustCoreDir.resolve("Cargo.lock"))
+        val outDir = rustCoreDir.resolve("build/target/release")
+        outputs.dir(outDir)
+        workingDir = rustCoreDir
+        commandLine(
+            "cargo",
+            "build",
+            "--release",
+            "--target-dir",
+            rustCoreDir.resolve("build/target").absolutePath,
+        )
+    }
+
 // UniFFI 绑定生成（KMP 形态）：以 kotlin_multiplatform = true 的配置产出
 // commonMain（expect 声明）与 androidMain（actual 实现）双目录结构。
 // 工具为 gobley-uniffi-bindgen，需先执行:
@@ -51,8 +75,21 @@ val uniffiBindgen =
     tasks.register<Exec>("uniffiBindgen") {
         description = "由 Rust 库生成 UniFFI Kotlin 绑定（KMP 形态，需 gobley-uniffi-bindgen）"
         group = "rust"
-        dependsOn(rustBuild)
-        val soFile = rustCoreDir.resolve("build/target/aarch64-linux-android/release/libnotify_relay_core.so")
+        dependsOn(hostRustBuild)
+        // 绑定从 host 动态库导出：Windows 为 .dll，Linux/macOS 为 .so/.dylib。
+        val hostLibFile =
+            rustCoreDir.resolve(
+                "build/target/release/" +
+                    when {
+                        org.gradle.internal.os.OperatingSystem
+                            .current()
+                            .isWindows -> "notify_relay_core.dll"
+                        org.gradle.internal.os.OperatingSystem
+                            .current()
+                            .isMacOsX -> "libnotify_relay_core.dylib"
+                        else -> "libnotify_relay_core.so"
+                    },
+            )
         // KMP 配置文件位于本模块目录（仓库侧），不写入 notify-relay-core 子模块
         val configFile = project.projectDir.resolve("uniffi.kmp.toml")
         val outDir =
@@ -64,10 +101,10 @@ val uniffiBindgen =
         inputs.files(rustCoreDir.resolve("Cargo.lock"))
         // .so 是真正的输入：Rust 侧导出面变化时其内容随之改变，
         // 未声明会导致本任务被判定 UP-TO-DATE 而沿用旧绑定。
-        inputs.file(soFile)
+        inputs.file(hostLibFile)
         outputs.dir(outDir)
         doFirst {
-            require(soFile.exists()) { "Rust 产物缺失：$soFile（请先执行 :core:rustBuild）" }
+            require(hostLibFile.exists()) { "Rust 产物缺失：$hostLibFile（请先执行 :core:hostRustBuild）" }
             outDir.deleteRecursively()
             outDir.mkdirs()
         }
@@ -78,17 +115,25 @@ val uniffiBindgen =
             configFile.absolutePath,
             "--out-dir",
             outDir.absolutePath,
-            soFile.absolutePath,
+            hostLibFile.absolutePath,
         )
     }
 
 // 将 Rust 构建与绑定生成挂钩到 Gradle 构建生命周期，确保在编译前就绪。
 // KMP 库插件不创建 preBuild 任务，故挂到 Android 目标的编译任务上。
-tasks.matching { it.name == "compileAndroidMain" || it.name == "androidPreBuild" }.configureEach {
+tasks.matching { it.name == "compileAndroidMain" || it.name == "androidPreBuild" || it.name == "compileKotlinJvm" }.configureEach {
     dependsOn(rustBuild, uniffiBindgen)
 }
 
 kotlin {
+    // JVM 目标：桌面端通过 UniFFI 生成的 jvmMain 绑定访问 Rust 核心
+    jvm {
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
+            freeCompilerArgs.add("-Xexpect-actual-classes")
+        }
+    }
+
     android {
         namespace = "com.xzyht.notifyrelay.nativecore"
         compileSdk =
@@ -127,6 +172,17 @@ kotlin {
 
             // 领域模型与端口契约
             api(project(":domain"))
+
+            // 设备连接与配对的状态/仓储访问
+            api(project(":data"))
+
+            // 设备状态刷新与回调处理使用协程
+            api(libs.kotlinx.coroutines.core)
+        }
+
+        jvmMain.dependencies {
+            // UniFFI 生成的 JVM 绑定经 JNA 加载本机动态库（与 Android 同源，均为纯 JNA）
+            api("net.java.dev.jna:jna:${libs.versions.jna.get()}")
         }
 
         androidMain.dependencies {
@@ -167,4 +223,8 @@ kotlin.sourceSets.getByName("commonMain").kotlin.srcDir(
 
 kotlin.sourceSets.getByName("androidMain").kotlin.srcDir(
     layout.buildDirectory.dir("generated/uniffi-kmp/androidMain/kotlin"),
+)
+
+kotlin.sourceSets.getByName("jvmMain").kotlin.srcDir(
+    layout.buildDirectory.dir("generated/uniffi-kmp/jvmMain/kotlin"),
 )

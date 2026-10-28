@@ -1,9 +1,9 @@
-package com.xzyht.notifyrelay.feature.device.service.callback
+package com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController
-import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
+import com.xzyht.com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
+import com.xzyht.com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController
+import com.xzyht.com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
 import kotlinx.coroutines.CoroutineScope
 import notifyrelay.domain.feature.device.model.AuthInfo
 import notifyrelay.domain.feature.device.model.DeviceInfo

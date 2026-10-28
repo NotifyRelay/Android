@@ -42,7 +42,6 @@ object DataLayerDesktop {
             RemoteFilterPortRegistry.install(DesktopRemoteFilterPort())
             LocalAppsPortRegistry.install(DesktopLocalAppsPort())
             AppIconPortRegistry.install(DesktopAppIconPort())
-            SampleData.seedIfEmpty(repository)
             initialized = true
         }
     }

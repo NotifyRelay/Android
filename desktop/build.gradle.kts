@@ -16,6 +16,7 @@ kotlin {
             implementation(project(":shared"))
             implementation(project(":domain"))
             implementation(project(":data"))
+            implementation(project(":core"))
             implementation(project(":base"))
 
             // 与 :shared 一致的 UI 组件库（shared 侧为 implementation，不传递）
@@ -37,6 +38,21 @@ kotlin {
             implementation(libs.kotlinx.coroutines.swing)
         }
     }
+}
+
+// Rust 动态库（:core 的 hostRustBuild 产物）经 JNA 加载：
+// 把其所在目录加入 jvm 运行与测试的库搜索路径。
+val rustHostLibDir = rootProject.projectDir.resolve("nativecore/notify-relay-core/build/target/release")
+
+tasks.withType<JavaExec>().configureEach {
+    // JNA 优先读 jna.library.path；java.library.path 对 Native.register 不生效
+    systemProperty("jna.library.path", rustHostLibDir.absolutePath)
+    systemProperty("java.library.path", rustHostLibDir.absolutePath)
+}
+
+tasks.withType<Test>().configureEach {
+    systemProperty("jna.library.path", rustHostLibDir.absolutePath)
+    systemProperty("java.library.path", rustHostLibDir.absolutePath)
 }
 
 compose.desktop {

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.device.service.state
+package com.xzyht.com.xzyht.notifyrelay.feature.device.service.state
 
 import android.content.Context
 import notifyrelay.data.Storage

@@ -1,7 +1,7 @@
-package com.xzyht.notifyrelay.feature.device.service.state
+package com.xzyht.com.xzyht.notifyrelay.feature.device.service.state
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
+import com.xzyht.com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.device.DeviceTargetRegistry
 import notifyrelay.base.log.Logger

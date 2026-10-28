@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.device.service.callback
+package com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback
 
 import com.xzyht.notifyrelay.core.ffi.CoreCallbacks
 import com.xzyht.notifyrelay.nativecore.NativeCore

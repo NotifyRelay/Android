@@ -19,6 +19,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 桌面端入口。 */
 fun main() {
+    // Rust 核心自检：确认 JNA 能加载本机动态库
+    println("[核心自检] " + CoreSelfCheck.run())
+
     // 数据层先于 UI 初始化：历史页依赖 Room 数据库
     DataLayerDesktop.initialize()
 

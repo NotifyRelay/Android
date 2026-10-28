@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.device.service.callback
+package com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback
 
 import android.os.Build
 import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager

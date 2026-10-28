@@ -1,15 +1,20 @@
-package com.xzyht.notifyrelay.feature.device.service.state
+package com.xzyht.notifyrelay.nativecore.device.service.state
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.intOrNull
+import kotlinx.serialization.json.longOrNull
 import notifyrelay.base.log.Logger
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.model.DeviceNameCache
 import notifyrelay.domain.feature.device.model.DeviceSnapshot
-import org.json.JSONArray
 
 /**
  * 设备状态的**唯一真源消费端**：把 Rust core 的 `NativeCore.getDeviceList()` 快照转换为
@@ -44,7 +49,7 @@ class DeviceSnapshotStore(
     private val scope: CoroutineScope,
     private val localUuidProvider: () -> String,
     private val defaultPort: Int,
-    private val onlineDevicesCache: OnlineDevicesCache,
+    private val onlineDevicesCache: OnlineDevicesCachePort,
     /**
      * 投影更新后的回调（在刷新线程内同步执行）。
      *
@@ -152,12 +157,12 @@ class DeviceSnapshotStore(
             } ?: return
 
         try {
-            val arr = JSONArray(json)
+            val arr = Json.parseToJsonElement(json) as JsonArray
             val newMap = mutableMapOf<String, Pair<DeviceInfo, Boolean>>()
             val newProjection = mutableMapOf<String, DeviceSnapshot>()
-            for (i in 0 until arr.length()) {
-                val obj = arr.getJSONObject(i)
-                val uuid = obj.optString("uuid")
+            for (i in arr.indices) {
+                val obj = arr[i] as JsonObject
+                val uuid = obj.stringOrEmpty("uuid")
                 if (uuid.isEmpty() || uuid == localUuid) continue
                 val parsed = parseSnapshot(obj, uuid)
                 newProjection[uuid] = parsed
@@ -192,14 +197,14 @@ class DeviceSnapshotStore(
 
     /** 解析单条快照，并对 name/deviceType 做上帧兜底。 */
     private fun parseSnapshot(
-        obj: org.json.JSONObject,
+        obj: JsonObject,
         uuid: String,
     ): DeviceSnapshot {
         // 电量一律以 core 为准；batteryPercent/isCharging/batteryUnknown 由 core 派生下发，平台不再自行计算阈值
-        val battery = obj.optInt("battery", -101)
+        val battery = obj.intOr("battery", -101)
 
-        val rawType = obj.optString("deviceType", DeviceSnapshot.UNKNOWN_DEVICE_TYPE)
-        val rawName = obj.optString("name")
+        val rawType = obj.stringOr("deviceType", DeviceSnapshot.UNKNOWN_DEVICE_TYPE)
+        val rawName = obj.stringOrEmpty("name")
         val fallback = synchronized(displayFallback) { displayFallback[uuid] }
         val deviceType = if (rawType.isBlank() || rawType == DeviceSnapshot.UNKNOWN_DEVICE_TYPE) (fallback?.second ?: rawType) else rawType
         val name = if (rawName.isBlank()) (fallback?.first ?: "") else rawName
@@ -219,17 +224,41 @@ class DeviceSnapshotStore(
         return DeviceSnapshot(
             uuid = uuid,
             name = name,
-            ip = obj.optString("ip"),
-            port = obj.optInt("port", defaultPort).takeIf { it > 0 } ?: defaultPort,
+            ip = obj.stringOrEmpty("ip"),
+            port = obj.intOr("port", defaultPort).takeIf { it > 0 } ?: defaultPort,
             battery = battery,
             deviceType = deviceType,
-            lastSeen = obj.optLong("lastSeen", 0L),
-            connected = obj.optBoolean("connected"),
-            paired = obj.optBoolean("paired"),
-            online = obj.optBoolean("online"),
-            batteryPercent = obj.optInt("batteryPercent", -1),
-            isCharging = obj.optBoolean("isCharging"),
-            batteryUnknown = obj.optBoolean("batteryUnknown"),
+            lastSeen = obj.longOr("lastSeen", 0L),
+            connected = obj.booleanOr("connected"),
+            paired = obj.booleanOr("paired"),
+            online = obj.booleanOr("online"),
+            batteryPercent = obj.intOr("batteryPercent", -1),
+            isCharging = obj.booleanOr("isCharging"),
+            batteryUnknown = obj.booleanOr("batteryUnknown"),
         )
     }
 }
+
+/** 读取字符串字段；缺失或非字符串返回空串。 */
+private fun JsonObject.stringOrEmpty(key: String): String = stringOr(key, "")
+
+/** 读取字符串字段；缺失时用 [default]。 */
+private fun JsonObject.stringOr(
+    key: String,
+    default: String,
+): String = (this[key] as? kotlinx.serialization.json.JsonPrimitive)?.takeIf { it.isString }?.content ?: default
+
+/** 读取整数字段；缺失时用 [default]。 */
+private fun JsonObject.intOr(
+    key: String,
+    default: Int,
+): Int = (this[key] as? kotlinx.serialization.json.JsonPrimitive)?.intOrNull ?: default
+
+/** 读取长整数字段；缺失时用 [default]。 */
+private fun JsonObject.longOr(
+    key: String,
+    default: Long,
+): Long = (this[key] as? kotlinx.serialization.json.JsonPrimitive)?.longOrNull ?: default
+
+/** 读取布尔字段；缺失时用 false。 */
+private fun JsonObject.booleanOr(key: String): Boolean = (this[key] as? kotlinx.serialization.json.JsonPrimitive)?.booleanOrNull ?: false

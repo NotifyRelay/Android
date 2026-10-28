@@ -1,8 +1,8 @@
-package com.xzyht.notifyrelay.feature.device.service.core
+package com.xzyht.com.xzyht.notifyrelay.feature.device.service.core
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.service.callback.DeviceCallbackHost
-import com.xzyht.notifyrelay.feature.device.service.callback.RustCallbackInstaller
+import com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback.DeviceCallbackHost
+import com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback.RustCallbackInstaller
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage

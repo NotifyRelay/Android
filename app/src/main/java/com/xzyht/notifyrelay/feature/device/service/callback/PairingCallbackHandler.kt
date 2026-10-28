@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.device.service.callback
+package com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback
 
 import android.os.Handler
 import android.os.Looper
