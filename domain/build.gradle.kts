@@ -6,6 +6,9 @@ plugins {
 }
 
 kotlin {
+    // JVM 目标：供桌面端复用领域模型与端口契约
+    jvm()
+
     android {
         namespace = "notifyrelay.domain"
         compileSdk =

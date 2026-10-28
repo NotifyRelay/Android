@@ -24,3 +24,8 @@ ktlint = disabled
 
 [**/generated/uniffi-kmp/**/*.{kt,kts}]
 ktlint = disabled
+
+# KSP 生成物（build/generated/ksp）：Room 生成的 *_Impl 由注解处理器模板产出，
+# 格式不可控且每次构建都会重写，整目录豁免 ktlint。
+[**/generated/ksp/**/*.{kt,kts}]
+ktlint = disabled

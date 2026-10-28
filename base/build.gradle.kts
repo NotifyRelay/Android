@@ -6,6 +6,9 @@ plugins {
 }
 
 kotlin {
+    // JVM 目标：供桌面端复用公共端实现
+    jvm()
+
     android {
         namespace = "notifyrelay.base"
         compileSdk =

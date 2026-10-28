@@ -7,6 +7,9 @@ plugins {
 }
 
 kotlin {
+    // JVM 目标：供桌面端复用数据层
+    jvm()
+
     // AGP 9 的 KMP 库插件：Android 目标配置位于 kotlin 块内的 android 块。
     android {
         namespace = "notifyrelay.data"
@@ -43,10 +46,14 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            // Room 注解与运行时：实体与 DAO 位于 commonMain
+            // Room 运行时与注解：实体、DAO、Migration 均位于 commonMain（Room 2.7+ 为 KMP 库）
             implementation(libs.androidx.room.runtime)
-            implementation(libs.androidx.room.ktx)
+
+            // KSP 为 DAO 的 PagingSource 生成 LimitOffsetPagingSource，需要 room-paging
             implementation(libs.androidx.room.paging)
+
+            // SQLite 驱动：各平台统一使用 bundled 实现，避免依赖系统 SQLite
+            implementation(libs.androidx.sqlite.bundled)
 
             // Paging 公共端：DAO 的 PagingSource 返回类型
             implementation(libs.androidx.paging.common)
@@ -54,28 +61,21 @@ kotlin {
             // DAO 的 Flow 返回类型
             implementation(libs.kotlinx.coroutines.core)
 
-            // KMP 公共端：日志（StorageManagerCore 使用 shared 的 Logger）与过滤配置默认常量
-            implementation(project(":shared"))
+            // 迁移脚本解析旧配置 JSON（替代 Android 专有的 org.json / Gson）
+            implementation(libs.kotlinx.serialization.json)
+
+            // 基础设施：Logger
+            implementation(project(":base"))
+
+            // 领域模型：SelectedDeviceInfo 以 typealias 复用，避免同类双份定义
+            api(project(":domain"))
         }
 
         androidMain.dependencies {
             implementation(libs.androidx.core.ktx)
             implementation(libs.androidx.appcompat)
 
-            // 依赖base模块
-            implementation(project(":base"))
-
-            // 领域模型：SelectedDeviceInfo 以 typealias 复用，避免同类双份定义
-            api(project(":domain"))
-            // KMP 公共端（过滤配置默认常量）
-            implementation(project(":shared"))
-
-            // Room Database
-            implementation(libs.androidx.room.runtime)
-            implementation(libs.androidx.room.ktx)
-            implementation(libs.androidx.room.paging)
-
-            // Paging 3 (DAO PagingSource)
+            // Android 目标的 Paging 运行时（DAO PagingSource 的 Android 实现）
             implementation(libs.androidx.paging.runtime)
 
             // Gson
@@ -88,6 +88,7 @@ kotlin {
 }
 
 dependencies {
-    // Room 注解处理器：注册到 Android 目标源集的 KSP 编译
+    // Room 注解处理器：Android 与 JVM 两个目标各自注册
     add("kspAndroid", libs.androidx.room.compiler)
+    add("kspJvm", libs.androidx.room.compiler)
 }

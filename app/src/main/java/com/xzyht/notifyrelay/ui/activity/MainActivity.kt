@@ -96,7 +96,7 @@ class MainActivity : FragmentActivity() {
         // 后台初始化，避免阻塞 UI 线程
         lifecycleScope.launch(Dispatchers.Default) {
             val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(this@MainActivity)
-            DeviceInfoManager.generateDeviceInfoFile(this@MainActivity, deviceManager.localUuid)
+            DeviceInfoManager.generateDeviceInfoFile(deviceManager.localUuid)
             LiveUpdatesNotificationManager.initialize(this@MainActivity)
             NotificationRepository.init(this@MainActivity)
             InstalledAppsRepository.loadApps(this@MainActivity)

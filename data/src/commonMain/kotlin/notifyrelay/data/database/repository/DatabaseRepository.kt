@@ -1,6 +1,10 @@
 package notifyrelay.data.database.repository
 
 import androidx.paging.PagingSource
+import androidx.room.execSQL
+import androidx.room.useReaderConnection
+import androidx.room.useWriterConnection
+import androidx.sqlite.SQLiteException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.data.database.AppDatabase
@@ -101,30 +105,31 @@ open class DatabaseRepository(
         withContext(Dispatchers.IO) {
             val rows = mutableListOf<DeviceMigrationRow>()
             try {
-                database.openHelper.readableDatabase
-                    .query(
-                        "SELECT uuid, publicKey, sharedSecret, isAccepted, displayName, lastIp, lastPort FROM device_migration",
-                        emptyArray<Any?>(),
-                    ).use { cursor ->
-                        while (cursor.moveToNext()) {
-                            rows.add(
-                                DeviceMigrationRow(
-                                    uuid = cursor.getString(cursor.getColumnIndexOrThrow("uuid")),
-                                    publicKey = cursor.getString(cursor.getColumnIndexOrThrow("publicKey")),
-                                    sharedSecret = cursor.getString(cursor.getColumnIndexOrThrow("sharedSecret")),
-                                    isAccepted = cursor.getInt(cursor.getColumnIndexOrThrow("isAccepted")) != 0,
-                                    displayName = cursor.getString(cursor.getColumnIndexOrThrow("displayName")),
-                                    lastIp = cursor.getString(cursor.getColumnIndexOrThrow("lastIp")),
-                                    lastPort = cursor.getInt(cursor.getColumnIndexOrThrow("lastPort")),
-                                ),
-                            )
+                database.useReaderConnection { connection ->
+                    connection
+                        .usePrepared(
+                            "SELECT uuid, publicKey, sharedSecret, isAccepted, displayName, lastIp, lastPort FROM device_migration",
+                        ) { statement ->
+                            while (statement.step()) {
+                                rows.add(
+                                    DeviceMigrationRow(
+                                        uuid = statement.getText(0),
+                                        publicKey = statement.getText(1),
+                                        sharedSecret = statement.getText(2),
+                                        isAccepted = statement.getInt(3) != 0,
+                                        displayName = statement.getText(4),
+                                        lastIp = statement.getText(5),
+                                        lastPort = statement.getInt(6),
+                                    ),
+                                )
+                            }
                         }
-                    }
-            } catch (e: android.database.sqlite.SQLiteException) {
+                }
+            } catch (e: SQLiteException) {
                 // 仅表不存在视为幂等（迁移已完成，返回空）；
                 // 其他查询失败必须抛出，由调用方暂缓清理旧存储并在下次启动重试，
                 // 否则迁移会被静默跳过导致密钥永久丢失
-                if (e.message?.contains("no such table", ignoreCase = true) != true) {
+                if (!e.isNoSuchTable()) {
                     throw e
                 }
             }
@@ -138,13 +143,16 @@ open class DatabaseRepository(
     suspend fun deleteDeviceMigrationByUuid(uuid: String) {
         withContext(Dispatchers.IO) {
             try {
-                database.openHelper.writableDatabase.execSQL(
-                    "DELETE FROM device_migration WHERE uuid = ?",
-                    arrayOf<Any?>(uuid),
-                )
-            } catch (e: android.database.sqlite.SQLiteException) {
+                database.useWriterConnection { connection ->
+                    connection
+                        .usePrepared("DELETE FROM device_migration WHERE uuid = ?") { statement ->
+                            statement.bindText(1, uuid)
+                            statement.step()
+                        }
+                }
+            } catch (e: SQLiteException) {
                 // 仅忽略 "no such table" 错误（表不存在：迁移已完成），其他错误重新抛出
-                if (e.message?.contains("no such table", ignoreCase = true) != true) {
+                if (!e.isNoSuchTable()) {
                     throw e
                 }
             }
@@ -156,7 +164,9 @@ open class DatabaseRepository(
      */
     suspend fun dropDeviceMigrationTable() {
         withContext(Dispatchers.IO) {
-            database.openHelper.writableDatabase.execSQL("DROP TABLE IF EXISTS device_migration")
+            database.useWriterConnection { connection ->
+                connection.execSQL("DROP TABLE IF EXISTS device_migration")
+            }
         }
     }
 
@@ -723,6 +733,9 @@ open class DatabaseRepository(
     ) {
         appDeviceDao.deleteByPackageNameAndDeviceUuid(packageName, deviceUuid)
     }
+
+    /** 判断是否为「表不存在」错误：迁移已完成后访问临时表属幂等场景。 */
+    private fun SQLiteException.isNoSuchTable(): Boolean = message?.contains("no such table", ignoreCase = true) == true
 }
 
 /** 旧 devices 表迁移行（MIGRATION_8_9 → device_migration 临时表） */
