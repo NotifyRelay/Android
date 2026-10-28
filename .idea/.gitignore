@@ -1,0 +1,15 @@
+# 默认忽略的文件
+/shelf/
+/workspace.xml
+/caches/
+/artifacts/
+/deviceManager.xml
+/deploymentTargetSelector.xml
+/markdown.xml
+/MarsCodeWorkspaceAppSettings.xml
+/kotlinc.xml
+/misc.xml
+/.name
+/AndroidProjectSystem.xml
+/codeStyles/
+/inspectionProfiles/

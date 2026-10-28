@@ -1,6 +1,5 @@
 # IDE 相关文件
 *.iml
-.idea/
 .vscode/
 .trae/
 # 构建相关文件
