@@ -3,20 +3,20 @@ package com.xzyht.notifyrelay.feature.device.service
 import android.content.Context
 import com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager
 import com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController
-import com.xzyht.notifyrelay.feature.device.service.callback.DeviceCallbackHost
-import com.xzyht.notifyrelay.feature.device.service.core.RustCoreSession
-import com.xzyht.notifyrelay.feature.device.service.pairing.PairingCoordinator
-import com.xzyht.notifyrelay.feature.device.service.state.DeviceDirectory
-import com.xzyht.notifyrelay.feature.device.service.state.DeviceQuery
-import com.xzyht.notifyrelay.feature.device.service.state.DeviceSnapshotStore
-import com.xzyht.notifyrelay.feature.device.service.state.OnlineDevicesCache
-import com.xzyht.notifyrelay.feature.device.service.state.PairedDeviceRemover
+import com.xzyht.notifyrelay.feature.device.service.callback.AndroidDataMessagePort
 import com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
 import com.xzyht.notifyrelay.feature.device.service.system.LegacyDeviceMigrator
 import com.xzyht.notifyrelay.feature.device.service.system.SystemStateMonitor
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.device.DeviceTargetRegistry
 import com.xzyht.notifyrelay.nativecore.device.ProtocolSender
+import com.xzyht.notifyrelay.nativecore.device.service.callback.DeviceCallbackHost
+import com.xzyht.notifyrelay.nativecore.device.service.core.RustCoreSession
+import com.xzyht.notifyrelay.nativecore.device.service.pairing.PairingCoordinator
+import com.xzyht.notifyrelay.nativecore.device.service.state.DeviceDirectory
+import com.xzyht.notifyrelay.nativecore.device.service.state.DeviceQuery
+import com.xzyht.notifyrelay.nativecore.device.service.state.DeviceSnapshotStore
+import com.xzyht.notifyrelay.nativecore.device.service.state.PairedDeviceRemover
 import com.xzyht.notifyrelay.sync.ConnectionDiscoveryManager
 import com.xzyht.notifyrelay.sync.ConnectionKeepAlive
 import kotlinx.coroutines.CoroutineScope
@@ -27,6 +27,7 @@ import notifyrelay.base.log.Logger
 import notifyrelay.base.util.BatteryUtils
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.data.Storage
+import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.domain.feature.device.model.AuthInfo
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.model.DeviceNameCache
@@ -189,7 +190,9 @@ class DeviceConnectionManager(
         )
 
     /** 在线且已配对设备列表的持久化缓存（供 scrcpy 等外部能力读取），由快照存储驱动。 */
-    private val onlineDevicesCache = OnlineDevicesCache(context)
+    private val onlineDevicesCache =
+        com.xzyht.notifyrelay.feature.device.service.state
+            .AndroidOnlineDevicesCache(context)
 
     /**
      * 设备状态的唯一真源消费端：消费 core 快照并派生 [devices]。
@@ -227,7 +230,7 @@ class DeviceConnectionManager(
         )
 
     /** Rust core 上下文的一次性初始化与启动。 */
-    private val rustSession = RustCoreSession(context)
+    private val rustSession = RustCoreSession()
 
     /** 配对流程的平台侧状态与收尾。 */
     private val pairingCoordinator =
@@ -241,10 +244,8 @@ class DeviceConnectionManager(
     /** Rust 心跳「状态查询」响应器（超级岛/媒体会话）。 */
     override val stateQueryResponder = StateQueryResponder(context, coroutineScope)
 
-    /**
-     * 音频中继控制器：与设备连接解耦，仅注入「按 uuid 反查设备」与「发送 DATA_MEDIA_CONTROL」两个能力。
-     */
-    override val audioRelay =
+    /** 音频中继控制器：与设备连接解耦，仅注入「按 uuid 反查设备」与「发送 DATA_MEDIA_CONTROL」两个能力。 */
+    internal val audioRelay =
         AudioRelayController(
             context = context,
             resolveDeviceInfo = { uuid -> resolveDeviceInfo(uuid, "", 23333) },
@@ -253,6 +254,38 @@ class DeviceConnectionManager(
             },
         )
 
+    /** 入站数据报文的业务实现（Android 侧处理器集合）。 */
+    private val dataMessagePort =
+        AndroidDataMessagePort(
+            host = this,
+            context = context,
+            audioRelay = audioRelay,
+            deviceManager = this,
+        )
+
+    /** 心跳报文的业务实现。 */
+    private val heartbeatPort =
+        object : com.xzyht.notifyrelay.nativecore.device.service.callback.HeartbeatMessagePort {
+            override fun onHeartbeat(
+                deviceUuid: String,
+                intValue: Int,
+                payload: String,
+            ) {
+                com.xzyht.notifyrelay.sync.HeartbeatProcessor.processHeartbeat(
+                    com.xzyht.notifyrelay.sync.HeartbeatProcessor.HeartbeatInfo(
+                        uuid = deviceUuid,
+                        displayName = "",
+                        port = 23333,
+                        batteryLevel = kotlin.math.abs(intValue),
+                        isCharging = intValue >= 0,
+                        deviceType = "unknown",
+                        ip = "",
+                    ),
+                    this@DeviceConnectionManager,
+                )
+            }
+        }
+
     // 协议不兼容设备集合（收到对端协议不兼容标记时登记）
     override val incompatibleDeviceIds: MutableSet<String> =
         java.util.Collections.synchronizedSet(mutableSetOf())
@@ -260,27 +293,21 @@ class DeviceConnectionManager(
     /** 移除已配对设备（含 core 侧密钥删除与目标注销）。 */
     private val deviceRemover =
         PairedDeviceRemover(
-            context = context,
             registry = targetRegistry,
             snapshotStore = snapshotStore,
             stateQueryResponder = stateQueryResponder,
             incompatibleDeviceIds = incompatibleDeviceIds,
             authenticatedDeviceTable = authenticatedDevices,
+            repository = DatabaseRepository.getInstance(),
         )
 
     // ==================== DeviceCallbackHost 实现（供 Rust 回调处理器使用） ====================
-
-    override val callbackContext: Context
-        get() = context
 
     override val callbackScope: CoroutineScope
         get() = coroutineScope
 
     override val localUuid: String
         get() = uuid
-
-    override val deviceManager: DeviceConnectionManager
-        get() = this
 
     override fun localDisplayName(): String = getLocalDisplayName()
 
@@ -339,7 +366,7 @@ class DeviceConnectionManager(
         }
 
         // 初始化 Rust 上下文、密钥与回调（持久化由 Rust 私有库管理）
-        val init = rustSession.initialize(this, legacyUuid)
+        val init = rustSession.initialize(this, legacyUuid, dataMessagePort, heartbeatPort)
         uuid = init.localUuid
         localPublicKey = init.localPublicKey
         loadAuthedDevices()

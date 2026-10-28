@@ -1,13 +1,14 @@
-package com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback
+package com.xzyht.notifyrelay.nativecore.device.service.callback
 
-import android.os.Handler
-import android.os.Looper
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.sync.HeartbeatProcessor
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonPrimitive
 import notifyrelay.base.log.Logger
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.model.PendingPairing
-import org.json.JSONObject
 
 /**
  * `CoreCallbacks.onPairing` 回调处理器。
@@ -44,6 +45,7 @@ import org.json.JSONObject
  */
 class PairingCallbackHandler(
     private val host: DeviceCallbackHost,
+    private val heartbeatPort: HeartbeatMessagePort,
 ) {
     companion object {
         private const val TAG = "CoreCb"
@@ -91,11 +93,11 @@ class PairingCallbackHandler(
         var autoAccept = false
         data?.let {
             try {
-                val json = JSONObject(it)
-                pubKey = json.optString("pub_key", "")
-                ip = json.optString("ip", "")
-                deviceType = json.optString("device_type", "unknown")
-                autoAccept = json.optBoolean("auto_accept", false)
+                val json = parseJsonObject(it)
+                pubKey = json.stringOr("pub_key", "")
+                ip = json.stringOr("ip", "")
+                deviceType = json.stringOr("device_type", "unknown")
+                autoAccept = json.booleanOr("auto_accept", false)
             } catch (_: Exception) {
             }
         }
@@ -163,9 +165,9 @@ class PairingCallbackHandler(
         var ip = ""
         data?.let {
             try {
-                val json = JSONObject(it)
-                spake2Pub = json.optString("spake2_pub", "")
-                ip = json.optString("ip", "")
+                val json = parseJsonObject(it)
+                spake2Pub = json.stringOr("spake2_pub", "")
+                ip = json.stringOr("ip", "")
             } catch (_: Exception) {
             }
         }
@@ -179,7 +181,7 @@ class PairingCallbackHandler(
         val displayName = existing?.displayName?.takeIf { it.isNotBlank() } ?: "未知设备"
         host.pendingPairing = PendingPairing(remoteUuid = uuid, remotePubKey = spake2Pub, remoteIp = ip)
         val remoteDevice = DeviceInfo(uuid, displayName, ip, existing?.port ?: 23333)
-        Handler(Looper.getMainLooper()).post {
+        host.callbackScope.launch {
             host.handshakeRequestHandler?.onPairingInitRequest(remoteDevice, spake2Pub)
         }
         Logger.d(TAG, "PAIRING_INIT 已处理: $uuid")
@@ -194,9 +196,9 @@ class PairingCallbackHandler(
         var ip = ""
         data?.let {
             try {
-                val json = JSONObject(it)
-                ltPubKey = json.optString("lt_pub_key", "")
-                ip = json.optString("ip", "")
+                val json = parseJsonObject(it)
+                ltPubKey = json.stringOr("lt_pub_key", "")
+                ip = json.stringOr("ip", "")
             } catch (_: Exception) {
             }
         }
@@ -218,7 +220,7 @@ class PairingCallbackHandler(
         // core 在"版本不兼容"等主动拒绝场景会带上 reason（REJECT 负载第二段）。
         val reason =
             data
-                ?.let { runCatching { JSONObject(it).optString("reason", "") }.getOrDefault("") }
+                ?.let { runCatching { parseJsonObject(it).stringOr("reason", "") }.getOrDefault("") }
                 .orEmpty()
                 .ifEmpty { extra.orEmpty() }
         if (reason == REASON_VERSION_MISMATCH) {
@@ -250,7 +252,7 @@ class PairingCallbackHandler(
         val keyJson = if (NativeCore.isReady()) NativeCore.exportDeviceKey(uuid) else null
         val ltPub =
             keyJson
-                ?.let { runCatching { JSONObject(it).optString("remote_pub_key", "") }.getOrDefault("") }
+                ?.let { runCatching { parseJsonObject(it).stringOr("remote_pub_key", "") }.getOrDefault("") }
                 .orEmpty()
         // 仅当长期密钥齐全且完成配对成功时，才登记已知设备并唤醒等待者
         val completed = ltPub.isNotEmpty() && host.completePairingWithLongTermKeys(uuid, ltPub)
@@ -261,36 +263,31 @@ class PairingCallbackHandler(
         host.handshakeWaiters.resolve(uuid, completed)
     }
 
-    /** TCP 心跳：把对端名称/电量/类型/IP 交给心跳处理器。 */
+    /** TCP 心跳：把对端名称/电量/类型/IP 交给平台侧心跳处理器。 */
     private fun handleHeartbeatTcp(
         uuid: String,
         data: String?,
         extra: String?,
         intValue: Int,
     ) {
-        val remoteName = extra ?: return
-        var deviceType = "unknown"
-        var ip = ""
-        data?.let {
-            try {
-                val json = JSONObject(it)
-                deviceType = json.optString("device_type", "unknown")
-                ip = json.optString("ip", "")
-            } catch (_: Exception) {
-            }
-        }
-        val info =
-            HeartbeatProcessor.HeartbeatInfo(
-                uuid = uuid,
-                displayName = remoteName,
-                port = 23333,
-                batteryLevel = kotlin.math.abs(intValue),
-                isCharging = intValue >= 0,
-                deviceType = deviceType,
-                ip = ip,
-            )
-        if (info.uuid != host.localUuid) {
-            HeartbeatProcessor.processHeartbeat(info, host.deviceManager)
-        }
+        if (extra == null) return
+        if (uuid == host.localUuid) return
+        // 报文原文同时携带名称/电量/类型/IP，由平台侧端口解析
+        heartbeatPort.onHeartbeat(uuid, intValue, data.orEmpty())
     }
 }
+
+/** 解析 JSON 对象；失败返回空对象。 */
+private fun parseJsonObject(raw: String): JsonObject = runCatching { Json.parseToJsonElement(raw) as? JsonObject }.getOrNull() ?: JsonObject(emptyMap())
+
+/** 读取字符串字段；缺失时用 [default]。 */
+private fun JsonObject.stringOr(
+    key: String,
+    default: String,
+): String = runCatching { this[key]?.jsonPrimitive?.content }.getOrNull() ?: default
+
+/** 读取布尔字段；缺失时用 [default]。 */
+private fun JsonObject.booleanOr(
+    key: String,
+    default: Boolean,
+): Boolean = runCatching { this[key]?.jsonPrimitive?.booleanOrNull }.getOrNull() ?: default

@@ -1,4 +1,4 @@
-package com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback
+package com.xzyht.notifyrelay.nativecore.device.service.callback
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
 
@@ -16,9 +16,16 @@ object RustCallbackInstaller {
      * 注册全部回调。
      *
      * @param host 回调宿主（提供状态与操作能力）
+     * @param dataPort 入站数据报文的业务处理端口
+     * @param heartbeatPort 心跳报文的业务处理端口
      */
-    fun install(host: DeviceCallbackHost) {
-        val adapter = adapterRef ?: CoreCallbacksAdapter(host).also { adapterRef = it }
+    fun install(
+        host: DeviceCallbackHost,
+        dataPort: DataMessagePort = NoopDataMessagePort,
+        heartbeatPort: HeartbeatMessagePort = NoopHeartbeatMessagePort,
+    ) {
+        val adapter =
+            adapterRef ?: CoreCallbacksAdapter(host, dataPort, heartbeatPort).also { adapterRef = it }
         NativeCore.setCallbacks(adapter)
     }
 }

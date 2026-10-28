@@ -1,4 +1,4 @@
-package com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback
+package com.xzyht.notifyrelay.nativecore.device.service.callback
 
 import notifyrelay.base.log.Logger
 
@@ -38,8 +38,8 @@ class DeviceEventCallbackHandler(
         private const val TAG = "CoreCb"
     }
 
-    private val lastDiscovered =
-        java.util.concurrent.ConcurrentHashMap<String, String>()
+    private val discoveredLock = Any()
+    private val lastDiscovered = mutableMapOf<String, String>()
 
     /** TCP 扫描发现：core 已完成自身过滤/名称解码/状态登记，平台端仅触发一次快照刷新。 */
     fun handleDiscovered(
@@ -53,7 +53,8 @@ class DeviceEventCallbackHandler(
         try {
             // 仅在发现内容实际变化时打印（2s 广播周期会重复上抛同一内容）
             val signature = "$remoteIp:$port:$battery"
-            if (lastDiscovered.put(remoteUuid, signature) != signature) {
+            val previous = synchronized(discoveredLock) { lastDiscovered.put(remoteUuid, signature) }
+            if (previous != signature) {
                 Logger.d(
                     "死神-NotifyRelay",
                     "[on_device_discovered] uuid=$remoteUuid, ip=$remoteIp, port=$port, battery=$battery",

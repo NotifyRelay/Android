@@ -1,10 +1,5 @@
-package com.xzyht.notifyrelay.ui.screen
+package notifyrelay.shared.ui.screen.devicelist
 
-import android.content.BroadcastReceiver
-import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
-import android.os.BatteryManager
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -24,24 +19,19 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.Font
-import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.xzyht.notifyrelay.R
 import notifyrelay.base.util.BatteryIconConverter
-import notifyrelay.base.util.BatteryUtils
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.shared.ui.common.DoubleClickConfirmButton
+import notifyrelay.shared.ui.screen.devicelist.LocalDeviceListPort
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.Text
@@ -60,7 +50,7 @@ private val ButtonMinHeight = 44.dp
  * 仅负责布局编排与按钮调用，状态 derivation 与副作用保留在 [DeviceListScreen]。
  */
 @Composable
-internal fun DeviceListScreenContent(
+fun DeviceListScreenContent(
     isLandscape: Boolean,
     discoveryEnabled: Boolean,
     onDiscoveryChange: (Boolean) -> Unit,
@@ -202,7 +192,7 @@ internal fun DeviceListScreenContent(
  * 「显示未认证设备」开关。
  */
 @Composable
-internal fun DiscoverySwitch(
+fun DiscoverySwitch(
     discoveryEnabled: Boolean,
     onDiscoveryChange: (Boolean) -> Unit,
     textStyles: TextStyles,
@@ -219,7 +209,7 @@ internal fun DiscoverySwitch(
  * 本机（未指定设备）按钮。
  */
 @Composable
-internal fun LocalDeviceButton(
+fun LocalDeviceButton(
     selectedDevice: DeviceInfo?,
     onSelectDevice: (DeviceInfo?) -> Unit,
     localBatteryLevel: Int,
@@ -227,42 +217,12 @@ internal fun LocalDeviceButton(
     colorScheme: Colors,
     textStyles: TextStyles,
 ) {
-    val context = LocalContext.current
+    val port = LocalDeviceListPort.current
     val batteryLevel = localBatteryLevel
-    // 充电状态需随系统变化刷新：原实现用 remember 只在首次组合时读一次，插拔电源后图标不再更新。
-    // ACTION_BATTERY_CHANGED 为粘性广播，注册后立即回调一次当前状态，故无需额外初始化读取。
-    val isCharging = remember { mutableStateOf(if (BatteryUtils.isCharging(context)) '1' else '0') }
-    DisposableEffect(context) {
-        val receiver =
-            object : BroadcastReceiver() {
-                override fun onReceive(
-                    ctx: Context?,
-                    intent: Intent?,
-                ) {
-                    if (intent?.action != Intent.ACTION_BATTERY_CHANGED) return
-                    val status = intent.getIntExtra(BatteryManager.EXTRA_STATUS, -1)
-                    isCharging.value =
-                        if (status == BatteryManager.BATTERY_STATUS_CHARGING ||
-                            status == BatteryManager.BATTERY_STATUS_FULL
-                        ) {
-                            '1'
-                        } else {
-                            '0'
-                        }
-                }
-            }
-        val filter = IntentFilter(Intent.ACTION_BATTERY_CHANGED)
-        try {
-            context.registerReceiver(receiver, filter)
-        } catch (_: Exception) {
-            // 注册失败时保留首次读取的静态值，不影响其余 UI
-        }
-        onDispose {
-            try {
-                context.unregisterReceiver(receiver)
-            } catch (_: Exception) {
-            }
-        }
+    // 充电状态随组合刷新；平台侧在每次组合时提供最新值
+    val isCharging = remember { mutableStateOf(port?.localChargingState() ?: '0') }
+    LaunchedEffect(Unit) {
+        port?.let { isCharging.value = it.localChargingState() }
     }
     val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel, isCharging.value)
 
@@ -314,7 +274,7 @@ internal fun LocalDeviceButton(
  * 已认证设备按钮（含选中态下的删除按钮）。
  */
 @Composable
-internal fun AuthenticatedDeviceButton(
+fun AuthenticatedDeviceButton(
     device: DeviceInfo,
     deviceStates: Map<String, Boolean>,
     selectedDevice: DeviceInfo?,
@@ -325,7 +285,7 @@ internal fun AuthenticatedDeviceButton(
     textStyles: TextStyles,
 ) {
     val isOnline = deviceStates[device.uuid] == true
-    val context = LocalContext.current
+    val port = LocalDeviceListPort.current
 
     val batteryLevel = remember { mutableIntStateOf(100) }
     val isCharging = remember { mutableStateOf(device.chargingStatus) }
@@ -387,9 +347,9 @@ internal fun AuthenticatedDeviceButton(
                     if (isOnline) {
                         Text(
                             text = batteryIcon,
-                            fontFamily = FontFamily(Font(resId = R.font.segsmdl2)),
+                            fontFamily = port?.iconFontFamily(),
                             fontSize = 16.sp,
-                            color = BatteryIconConverter.getBatteryColor(batteryLevel.intValue),
+                            color = port?.localBatteryColor(batteryLevel.intValue) ?: colorScheme.primary,
                             modifier = Modifier.padding(end = 8.dp),
                         )
                     }
@@ -427,7 +387,7 @@ internal fun AuthenticatedDeviceButton(
  * 未认证设备按钮。
  */
 @Composable
-internal fun UnauthenticatedDeviceButton(
+fun UnauthenticatedDeviceButton(
     device: DeviceInfo,
     deviceStates: Map<String, Boolean>,
     onSelectDevice: (DeviceInfo?) -> Unit,
@@ -458,7 +418,7 @@ internal fun UnauthenticatedDeviceButton(
  * 「查看已拒绝设备」按钮。
  */
 @Composable
-internal fun RejectedDevicesButton(
+fun RejectedDevicesButton(
     onShowRejectedDialog: () -> Unit,
     isLandscape: Boolean,
     colorScheme: Colors,

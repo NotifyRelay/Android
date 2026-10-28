@@ -1,9 +1,9 @@
-package com.xzyht.com.xzyht.notifyrelay.feature.device.service.state
+package com.xzyht.notifyrelay.nativecore.device.service.state
 
-import android.content.Context
-import com.xzyht.com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.device.DeviceTargetRegistry
+import com.xzyht.notifyrelay.nativecore.device.service.callback.StateQueryPort
+import com.xzyht.notifyrelay.nativecore.device.service.state.DeviceSnapshotStore
 import notifyrelay.base.log.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.domain.feature.device.model.AuthInfo
@@ -20,12 +20,12 @@ import notifyrelay.domain.feature.device.model.AuthInfo
  *    数据库清理失败则返回 false 并保留内存状态不变。
  */
 class PairedDeviceRemover(
-    private val context: Context,
     private val registry: DeviceTargetRegistry,
     private val snapshotStore: DeviceSnapshotStore,
-    private val stateQueryResponder: StateQueryResponder,
+    private val stateQueryResponder: StateQueryPort,
     private val incompatibleDeviceIds: MutableSet<String>,
     private val authenticatedDeviceTable: MutableMap<String, AuthInfo>,
+    private val repository: DatabaseRepository,
 ) {
     companion object {
         private const val TAG = "死神-NotifyRelay"
@@ -59,7 +59,7 @@ class PairedDeviceRemover(
                 // 先完成数据库清理（可等待）：迁移残留行与 deleteHistory=true 的通知/关联数据全部成功后，
                 // 才移除内存记录与快照投影，避免 db 失败时内存已删但库未同步（重启后经旧行复活）
                 try {
-                    val repository = DatabaseRepository.getInstance()
+                    val repository = this.repository
                     repository.deleteDeviceMigrationByUuid(uuid)
                     if (deleteHistory) {
                         repository.deleteNotificationsByDevice(uuid)

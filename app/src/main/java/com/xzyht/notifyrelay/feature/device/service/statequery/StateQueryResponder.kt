@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import com.xzyht.notifyrelay.nativecore.device.service.callback.StateQueryPort
 import com.xzyht.notifyrelay.sync.MessageSender
 import github.xzynine.superislandui.common.SuperIslandManager
 import kotlinx.coroutines.CoroutineScope
@@ -33,7 +34,7 @@ class StateQueryResponder(
     private val context: Context,
     /** 推送派发作用域；见 [pushState] 说明。 */
     private val pushScope: CoroutineScope,
-) {
+) : StateQueryPort {
     companion object {
         private const val TAG = "CoreCb"
 
@@ -50,7 +51,7 @@ class StateQueryResponder(
     private val mediaCoverCacheLock = Any()
 
     /** 会话结束时清除该 featureId 的比较键。 */
-    fun removeKey(
+    override fun removeKey(
         remoteUuid: String,
         featureId: String,
     ) {
@@ -58,7 +59,7 @@ class StateQueryResponder(
     }
 
     /** 设备被移除时清除其全部比较键。 */
-    fun removeKeysForDevice(uuid: String) {
+    override fun removeKeysForDevice(uuid: String) {
         stateQueryKeys.keys.removeIf { it.startsWith("$uuid|") }
     }
 
@@ -68,7 +69,7 @@ class StateQueryResponder(
      * @param isMedia true=媒体会话查询，false=超级岛查询
      * @return 0=不存在 / 1=存在无变更 / 2=存在有变更
      */
-    fun handle(
+    override fun handle(
         remoteUuid: String,
         featureId: String,
         isMedia: Boolean,

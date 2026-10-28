@@ -1,9 +1,5 @@
-package com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback
+package com.xzyht.notifyrelay.nativecore.device.service.callback
 
-import android.content.Context
-import com.xzyht.com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController
-import com.xzyht.com.xzyht.notifyrelay.feature.device.service.statequery.StateQueryResponder
 import kotlinx.coroutines.CoroutineScope
 import notifyrelay.domain.feature.device.model.AuthInfo
 import notifyrelay.domain.feature.device.model.DeviceInfo
@@ -12,20 +8,45 @@ import notifyrelay.domain.feature.device.service.callback.HandshakeRequestHandle
 import notifyrelay.domain.feature.device.service.pairing.HandshakeWaiterRegistry
 
 /**
+ * 状态查询的应答端口。
+ *
+ * 实现方按超级岛/媒体的当前状态返回：0=平台不存在该会话、1=存在无变更、2=存在且有变更。
+ */
+interface StateQueryPort {
+    /**
+     * 应答一次状态查询。
+     *
+     * @param remoteUuid 对端设备 uuid
+     * @param featureId 特征 ID
+     * @param isMedia 是否为媒体查询
+     */
+    fun handle(
+        remoteUuid: String,
+        featureId: String,
+        isMedia: Boolean,
+    ): Int
+
+    /** 移除指定特征的状态缓存。 */
+    fun removeKey(
+        remoteUuid: String,
+        featureId: String,
+    )
+
+    /** 移除指定设备的全部状态缓存。 */
+    fun removeKeysForDevice(remoteUuid: String)
+}
+
+/**
  * Rust 回调处理器所需的宿主能力。
  *
- * 由 [DeviceConnectionManager] 实现。回调处理器只通过本接口访问宿主状态，
+ * 由设备连接管理器实现。回调处理器只通过本接口访问宿主状态，
  * 不直接依赖宿主的具体实现细节。
  *
  * 注意：所有 `CoreCallbacks` 回调都运行在 **JNA 附加线程**（非主线程、非协程），因此：
  * - 回调内禁止执行阻塞或重入操作；
- * - 回调内同步调用 `NativeCore.getDeviceList()` 会与 core 重入，优先走 [triggerDeviceListRefresh]（协程异步）；
- *   [updateDeviceListNow] 为同步版本，仅用于沿用既有语义的超时/连接/断开回调。
+ * - 回调内同步调用 `NativeCore.getDeviceList()` 会与 core 重入，优先走 [triggerDeviceListRefresh]（协程异步）。
  */
 interface DeviceCallbackHost {
-    /** 应用上下文（供各 Processor 与系统服务使用）。 */
-    val callbackContext: Context
-
     /** IO 协程作用域：回调线程内需要异步执行的操作都投递到这里。 */
     val callbackScope: CoroutineScope
 
@@ -56,14 +77,8 @@ interface DeviceCallbackHost {
     /** 通知数据接收回调集合。 */
     val notificationDataReceivedCallbacks: Collection<(String) -> Unit>
 
-    /** 音频中继控制器。 */
-    val audioRelay: AudioRelayController
-
     /** 状态查询响应器。 */
-    val stateQueryResponder: StateQueryResponder
-
-    /** 设备连接管理器本体（各 Processor 以它作为回调宿主）。 */
-    val deviceManager: DeviceConnectionManager
+    val stateQueryResponder: StateQueryPort
 
     fun localDisplayName(): String
 

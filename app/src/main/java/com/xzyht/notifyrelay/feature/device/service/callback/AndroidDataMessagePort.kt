@@ -1,4 +1,4 @@
-package com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback
+package com.xzyht.notifyrelay.feature.device.service.callback
 
 import android.os.Build
 import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
@@ -7,6 +7,8 @@ import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardProcessor
 import com.xzyht.notifyrelay.feature.media.MediaControlUtil
 import com.xzyht.notifyrelay.feature.media.RemoteMediaSessionManager
+import com.xzyht.notifyrelay.nativecore.device.service.callback.DataMessagePort
+import com.xzyht.notifyrelay.nativecore.device.service.callback.DeviceCallbackHost
 import com.xzyht.notifyrelay.sync.FtpServerManager
 import com.xzyht.notifyrelay.sync.FtpServerManager.StartResult
 import com.xzyht.notifyrelay.sync.notification.NotificationProcessor
@@ -21,92 +23,112 @@ import notifyrelay.domain.feature.device.model.DeviceInfo
 import org.json.JSONObject
 
 /**
- * `CoreCallbacks.onData` 回调处理器（统一数据通道分发）。
+ * Android 侧入站数据报文的业务实现。
  *
- * 支持的通道：`NOTIFICATION` / `MEDIAPLAY` / `ICON_REQUEST` / `ICON_RESPONSE` /
- * `APP_LIST_REQUEST` / `APP_LIST_RESPONSE` / `MEDIA_CONTROL` / `FTP` / `CLIPBOARD` /
- * `STATUS` / `APP_LAUNCH` / `SUPERISLAND`。
+ * 报文分发由公共端 [com.xzyht.notifyrelay.nativecore.device.service.callback.DataCallbackHandler] 完成，
+ * 本类只承载各业务处理器的调用。
  *
  * 约束：
- * - 未认证设备的数据包一律丢弃（`DATA_UNKNOWN` 除外）；
  * - 回调运行在 JNA 附加线程，耗时/阻塞操作必须投递到 [DeviceCallbackHost.callbackScope]；
  * - 回调内禁止同步调用 `NativeCore.getDeviceList()`（core 重入崩溃）。
  */
-class DataCallbackHandler(
+class AndroidDataMessagePort(
     private val host: DeviceCallbackHost,
-) {
+    private val context: android.content.Context,
+    private val audioRelay: com.xzyht.notifyrelay.feature.device.service.audio.AudioRelayController,
+    private val deviceManager: com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager,
+) : DataMessagePort {
     companion object {
         private const val TAG = "CoreCb"
     }
 
-    /** 入站数据报文入口。 */
-    fun handle(
-        uuidStr: String,
-        messageTypeStr: String,
-        text: String,
+    override fun onNotification(
+        deviceUuid: String,
+        payload: String,
     ) {
-        val authed =
-            synchronized(host.authenticatedDeviceTable) {
-                host.authenticatedDeviceTable[uuidStr]?.isAccepted == true
-            }
-        Logger.d(TAG, "on_data: type=$messageTypeStr, authed=$authed, text_len=${text.length}")
-        if (!authed && messageTypeStr != "DATA_UNKNOWN") return
-
-        try {
-            when (messageTypeStr) {
-                "NOTIFICATION" ->
-                    NotificationProcessor.process(
-                        host.callbackContext,
-                        host.deviceManager,
-                        host.callbackScope,
-                        NotificationProcessor.NotificationInput("DATA_NOTIFICATION", text, uuidStr),
-                        host.notificationDataReceivedCallbacks,
-                    )
-                "MEDIAPLAY" -> {
-                    val json = JSONObject(text)
-                    host.resolveDevice(uuidStr)?.let {
-                        RemoteMediaSessionManager.onMediaMessageReceived(host.callbackContext, json, it)
-                    }
-                }
-                "ICON_REQUEST" -> {
-                    host.resolveDevice(uuidStr)?.let {
-                        IconSyncManager.handleIconRequest(text, host.deviceManager, it, host.callbackContext)
-                    }
-                }
-                "ICON_RESPONSE" -> IconSyncManager.handleIconResponse(text, host.callbackContext)
-                "APP_LIST_REQUEST" -> {
-                    host.resolveDevice(uuidStr)?.let {
-                        AppListSyncManager.handleAppListRequest(text, host.deviceManager, it, host.callbackContext)
-                    }
-                }
-                "APP_LIST_RESPONSE" ->
-                    AppListSyncManager.handleAppListResponse(text, host.callbackContext, uuidStr, host.deviceManager)
-                "MEDIA_CONTROL" -> handleMediaControl(uuidStr, text)
-                "FTP" -> handleFtp(uuidStr, text)
-                "CLIPBOARD" ->
-                    ClipboardProcessor.process(host.callbackContext, ClipboardProcessor.ClipboardInput("DATA_CLIPBOARD", text, ""))
-                "STATUS" ->
-                    StatusProcessor.process(
-                        host.callbackContext,
-                        host.deviceManager,
-                        host.callbackScope,
-                        StatusProcessor.StatusInput("DATA_STATUS", text, uuidStr),
-                        host.notificationDataReceivedCallbacks,
-                    )
-                "APP_LAUNCH" -> {
-                    host.resolveDevice(uuidStr)?.let {
-                        AppLaunchManager.handleAppLaunchRequest(text, host.deviceManager, it, host.callbackContext)
-                    }
-                }
-                "SUPERISLAND" -> SuperIslandProcessor.process(host.callbackContext, host.deviceManager, text, uuidStr)
-                else -> Logger.d(TAG, "未知DATA通道: type=$messageTypeStr, uuid=$uuidStr, size=${text.length}")
-            }
-        } catch (e: Exception) {
-            Logger.e(TAG, "on_data error: ${e.message}")
-        }
+        NotificationProcessor.process(
+            context,
+            deviceManager,
+            host.callbackScope,
+            NotificationProcessor.NotificationInput("DATA_NOTIFICATION", payload, deviceUuid),
+            host.notificationDataReceivedCallbacks,
+        )
     }
 
-    /** 媒体控制：播放控制直达本机媒体，音频中继动作交由 [DeviceCallbackHost.audioRelay]。 */
+    override fun onMediaPlay(
+        device: DeviceInfo,
+        payload: String,
+    ) {
+        RemoteMediaSessionManager.onMediaMessageReceived(context, JSONObject(payload), device)
+    }
+
+    override fun onIconRequest(
+        device: DeviceInfo,
+        payload: String,
+    ) {
+        IconSyncManager.handleIconRequest(payload, deviceManager, device, context)
+    }
+
+    override fun onIconResponse(payload: String) {
+        IconSyncManager.handleIconResponse(payload, context)
+    }
+
+    override fun onAppListRequest(
+        device: DeviceInfo,
+        payload: String,
+    ) {
+        AppListSyncManager.handleAppListRequest(payload, deviceManager, device, context)
+    }
+
+    override fun onAppListResponse(
+        deviceUuid: String,
+        payload: String,
+    ) {
+        AppListSyncManager.handleAppListResponse(payload, context, deviceUuid, deviceManager)
+    }
+
+    override fun onMediaControl(
+        deviceUuid: String,
+        payload: String,
+    ) = handleMediaControl(deviceUuid, payload)
+
+    override fun onFtp(
+        deviceUuid: String,
+        payload: String,
+    ) = handleFtp(deviceUuid, payload)
+
+    override fun onClipboard(payload: String) {
+        ClipboardProcessor.process(context, ClipboardProcessor.ClipboardInput("DATA_CLIPBOARD", payload, ""))
+    }
+
+    override fun onStatus(
+        deviceUuid: String,
+        payload: String,
+    ) {
+        StatusProcessor.process(
+            context,
+            deviceManager,
+            host.callbackScope,
+            StatusProcessor.StatusInput("DATA_STATUS", payload, deviceUuid),
+            host.notificationDataReceivedCallbacks,
+        )
+    }
+
+    override fun onAppLaunch(
+        device: DeviceInfo,
+        payload: String,
+    ) {
+        AppLaunchManager.handleAppLaunchRequest(payload, deviceManager, device, context)
+    }
+
+    override fun onSuperIsland(
+        deviceUuid: String,
+        payload: String,
+    ) {
+        SuperIslandProcessor.process(context, deviceManager, payload, deviceUuid)
+    }
+
+    /** 媒体控制：播放控制直达本机媒体，音频中继动作交由音频控制器。 */
     private fun handleMediaControl(
         uuid: String,
         text: String,
@@ -116,12 +138,12 @@ class DataCallbackHandler(
             "playPause" -> runLocalMediaAction(uuid, action) { MediaControlUtil.playPause() }
             "next" -> runLocalMediaAction(uuid, action) { MediaControlUtil.next() }
             "previous" -> runLocalMediaAction(uuid, action) { MediaControlUtil.previous() }
-            "audioRequest" -> host.callbackScope.launch { host.audioRelay.handleAudioRequest(uuid) }
+            "audioRequest" -> host.callbackScope.launch { audioRelay.handleAudioRequest(uuid) }
             "audioResponse" ->
-                host.audioRelay.handleAudioResponse(json.optString("result", "rejected") == "accepted")
+                audioRelay.handleAudioResponse(json.optString("result", "rejected") == "accepted")
             "audioStart" ->
                 host.callbackScope.launch {
-                    host.audioRelay.startReceive(
+                    audioRelay.startReceive(
                         remoteUuid = uuid,
                         sampleRate = json.optInt("sampleRate", 48000),
                         channels = json.optInt("channels", 2),
@@ -129,7 +151,7 @@ class DataCallbackHandler(
                 }
             "audioStop" ->
                 host.callbackScope.launch {
-                    host.audioRelay.stopFromRemote(
+                    audioRelay.stopFromRemote(
                         remoteUuid = uuid,
                         replyAck = json.optString("result", "").isEmpty(),
                     )
@@ -206,7 +228,7 @@ class DataCallbackHandler(
     ) {
         val pcUser: String? = if (json.has("username")) json.optString("username") else null
         val pcPass: String? = if (json.has("password")) json.optString("password") else null
-        val result = FtpServerManager.start(host.localDisplayName(), host.callbackContext, pcUser, pcPass)
+        val result = FtpServerManager.start(host.localDisplayName(), context, pcUser, pcPass)
         when (result.status) {
             StartResult.SUCCESS, StartResult.ALREADY_RUNNING -> {
                 result.serverInfo?.let { info ->
@@ -218,11 +240,11 @@ class DataCallbackHandler(
                                 put("port", info.port)
                             }.toString()
                     host.resolveDevice(uuid)?.let { replyToDevice(it, "DATA_FTP", raw) }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !PermissionHelper.checkManageExternalStoragePermission(host.callbackContext)) {
-                        val intent = IntentUtils.createIntent(host.callbackContext, GuideActivity::class.java)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && !PermissionHelper.checkManageExternalStoragePermission(context)) {
+                        val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
                         intent.putExtra("fromftp", true)
                         intent.putExtra("fromInternal", true)
-                        IntentUtils.startActivity(host.callbackContext, intent, true)
+                        IntentUtils.startActivity(context, intent, true)
                     }
                 }
             }

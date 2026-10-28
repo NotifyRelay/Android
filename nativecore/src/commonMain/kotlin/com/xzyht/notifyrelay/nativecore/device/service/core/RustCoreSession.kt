@@ -1,9 +1,8 @@
-package com.xzyht.com.xzyht.notifyrelay.feature.device.service.core
+package com.xzyht.notifyrelay.nativecore.device.service.core
 
-import android.content.Context
-import com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback.DeviceCallbackHost
-import com.xzyht.com.xzyht.notifyrelay.feature.device.service.callback.RustCallbackInstaller
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import com.xzyht.notifyrelay.nativecore.device.service.callback.DeviceCallbackHost
+import com.xzyht.notifyrelay.nativecore.device.service.callback.RustCallbackInstaller
 import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
 import java.util.concurrent.atomic.AtomicBoolean
@@ -41,9 +40,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  *     Core-->>App: 就绪（senderQueueReady）
  * ```
  */
-class RustCoreSession(
-    private val context: Context,
-) {
+class RustCoreSession {
     companion object {
         private const val TAG = "死神-NotifyRelay"
 
@@ -78,6 +75,8 @@ class RustCoreSession(
     fun initialize(
         host: DeviceCallbackHost,
         legacyUuid: String,
+        dataPort: com.xzyht.notifyrelay.nativecore.device.service.callback.DataMessagePort = com.xzyht.notifyrelay.nativecore.device.service.callback.NoopDataMessagePort,
+        heartbeatPort: com.xzyht.notifyrelay.nativecore.device.service.callback.HeartbeatMessagePort = com.xzyht.notifyrelay.nativecore.device.service.callback.NoopHeartbeatMessagePort,
     ): InitResult {
         val legacyStateEnc = Storage.getString(PREF_LEGACY_STATE)
         var localUuid = legacyUuid
@@ -99,7 +98,7 @@ class RustCoreSession(
             }
             pubKey = NativeCore.getPublicKey() ?: ""
             Logger.d(TAG, "Rust core 上下文已初始化")
-            RustCallbackInstaller.install(host)
+            RustCallbackInstaller.install(host, dataPort, heartbeatPort)
         } catch (e: Exception) {
             Logger.e(TAG, "Rust core 初始化失败", e)
         }

@@ -19,4 +19,7 @@ interface OnlineDevicesCachePort {
         devices: Map<String, Pair<DeviceInfo, Boolean>>,
         addressable: List<DeviceSnapshot>,
     )
+
+    /** 缓存内容变化后的平台回调（如刷新动态快捷方式）。 */
+    fun onCacheUpdated()
 }

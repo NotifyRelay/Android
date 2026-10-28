@@ -18,7 +18,6 @@ import com.xzyht.notifyrelay.ui.pages.UIAbout
 import com.xzyht.notifyrelay.ui.pages.UIChatTest
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandHistory
 import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
-import com.xzyht.notifyrelay.ui.screen.DeviceListScreenContent
 import com.xzyht.notifyrelay.ui.screen.ScrcpyAdvancedScreen
 import com.xzyht.notifyrelay.ui.screen.ScrcpyVirtualButtonOrderScreen
 import com.xzyht.notifyrelay.ui.screen.SettingsScrcpyScreen
@@ -40,6 +39,7 @@ import notifyrelay.shared.ui.screen.SettingsLocalFilterScreen
 import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
 import notifyrelay.shared.ui.screen.SettingsScreen
 import notifyrelay.shared.ui.screen.SettingsSuperIslandScreen
+import notifyrelay.shared.ui.screen.devicelist.DeviceListScreenContent
 import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
 import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
