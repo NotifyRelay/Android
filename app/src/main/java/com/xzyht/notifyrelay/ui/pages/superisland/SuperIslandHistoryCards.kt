@@ -41,11 +41,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.ui.pages.formatTimestamp
 import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.TimestampFormatter
 import notifyrelay.domain.feature.notification.history.GroupedSuperIslandHistory
 import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 import notifyrelay.shared.ui.pages.DeleteButton
@@ -187,7 +187,7 @@ internal fun SuperIslandHistoryGroupCard(
     val appIconBitmap = rememberAppIconBitmap(iconPackage)
     val latestTimestamp =
         remember(headerEntry?.id) {
-            headerEntry?.let { formatTimestamp(it.id) }
+            headerEntry?.let { TimestampFormatter.format(it.id) }
         }
 
     Card(
@@ -367,7 +367,7 @@ internal fun SuperIslandHistorySummaryRow(
             ?: "超级岛事件"
 
     val displayTitle = titleText.let { SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it) }
-    val formattedTimestamp = remember(entry.id) { formatTimestamp(entry.id) }
+    val formattedTimestamp = remember(entry.id) { TimestampFormatter.format(entry.id) }
 
     Row(
         modifier =
@@ -446,7 +446,7 @@ internal fun SuperIslandHistoryEntryCard(
     val textStyles = MiuixTheme.textStyles
     val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
-    val formattedTimestamp = remember(entry.id) { formatTimestamp(entry.id) }
+    val formattedTimestamp = remember(entry.id) { TimestampFormatter.format(entry.id) }
     val sanitizedDetail =
         remember(entry.text, includeImageDataOnCopy) {
             val detail = entry.text

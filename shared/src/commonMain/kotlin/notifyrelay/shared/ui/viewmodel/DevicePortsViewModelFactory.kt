@@ -18,7 +18,10 @@ fun devicePortsViewModel(): DevicePortsViewModel {
         factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T = DevicePortsViewModel(provider) as T
+                override fun <T : ViewModel> create(
+                    modelClass: kotlin.reflect.KClass<T>,
+                    extras: androidx.lifecycle.viewmodel.CreationExtras,
+                ): T = DevicePortsViewModel(provider) as T
             },
     )
 }

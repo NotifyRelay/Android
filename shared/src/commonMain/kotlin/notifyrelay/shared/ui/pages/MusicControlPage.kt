@@ -16,7 +16,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.base.log.Logger
@@ -43,7 +42,6 @@ fun MusicControlPage(
     val prefPort = LocalPreferencePort.current ?: error("LocalPreferencePort 未提供")
 
     val toastPort = LocalToastPort.current
-    val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
 

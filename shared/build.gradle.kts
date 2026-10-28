@@ -6,6 +6,9 @@ plugins {
 }
 
 kotlin {
+    // JVM 目标：供桌面端复用 UI 层
+    jvm()
+
     // AGP 9 的 KMP 库插件：Android 目标配置位于 kotlin 块内的 android 块。
     android {
         namespace = "notifyrelay.shared"

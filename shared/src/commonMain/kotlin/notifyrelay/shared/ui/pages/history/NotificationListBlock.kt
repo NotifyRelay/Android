@@ -1,6 +1,5 @@
-package com.xzyht.notifyrelay.ui.pages.history
+package notifyrelay.shared.ui.pages.history
 
-import android.content.Context
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.gestures.AnchoredDraggableState
@@ -35,12 +34,13 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
-import com.xzyht.notifyrelay.ui.pages.dateTimeFormatter
 import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
+import notifyrelay.base.util.TimestampFormatter
 import notifyrelay.domain.feature.notification.history.GroupedNotifications
 import notifyrelay.shared.ui.pages.DeleteButton
 import notifyrelay.shared.ui.pages.DragValue
+import notifyrelay.shared.ui.pages.history.NotificationActionPort
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -48,19 +48,16 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.Colors
 import top.yukonga.miuix.kmp.theme.TextStyles
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun NotificationListBlock(
+fun NotificationListBlock(
     pagingItems: LazyPagingItems<GroupedNotifications>,
     getCachedAppInfo: (String?) -> Pair<String, androidx.compose.ui.graphics.ImageBitmap?>,
     expandedGroups: Set<String>,
     installedPackages: Set<String>,
-    context: Context,
+    actionPort: NotificationActionPort,
     colorScheme: Colors,
     textStyles: TextStyles,
     deleteWidthPx: Float,
@@ -132,7 +129,7 @@ internal fun NotificationListBlock(
                             NotificationCard(
                                 record = record,
                                 appIcon = appIcon,
-                                context = context,
+                                actionPort = actionPort,
                                 getCachedAppInfo = getCachedAppInfo,
                                 cardColor = colorScheme.surface,
                                 contentColor = colorScheme.onSurface,
@@ -185,12 +182,7 @@ internal fun NotificationListBlock(
                                     )
                                     Spacer(modifier = Modifier.width(12.dp))
                                     Text(
-                                        text =
-                                            LocalDateTime
-                                                .ofInstant(
-                                                    Instant.ofEpochMilli(group.latestTime),
-                                                    ZoneId.systemDefault(),
-                                                ).format(dateTimeFormatter),
+                                        text = TimestampFormatter.format(group.latestTime),
                                         style = textStyles.body2.copy(color = colorScheme.onSurfaceSecondary),
                                     )
                                     Spacer(modifier = Modifier.weight(1f))
@@ -304,7 +296,7 @@ internal fun NotificationListBlock(
                                                     NotificationCard(
                                                         record = record,
                                                         appIcon = appIcon1,
-                                                        context = context,
+                                                        actionPort = actionPort,
                                                         getCachedAppInfo = getCachedAppInfo,
                                                         cardColor = colorScheme.surfaceContainer,
                                                         contentColor = colorScheme.onSurface,

@@ -65,7 +65,10 @@ fun MainScreen(
             factory =
                 object : androidx.lifecycle.ViewModelProvider.Factory {
                     @Suppress("UNCHECKED_CAST")
-                    override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
+                    override fun <T : androidx.lifecycle.ViewModel> create(
+                        modelClass: kotlin.reflect.KClass<T>,
+                        extras: androidx.lifecycle.viewmodel.CreationExtras,
+                    ): T =
                         notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel(
                             notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry.current ?: error("RemoteFilterPort 未注册"),
                             notifyrelay.shared.feature.appslist.LocalAppsPortRegistry.current ?: error("LocalAppsPort 未注册"),

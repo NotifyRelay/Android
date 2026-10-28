@@ -292,7 +292,10 @@ private fun remoteFilterViewModel(): RemoteFilterViewModel {
         factory =
             object : ViewModelProvider.Factory {
                 @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(modelClass: Class<T>): T = RemoteFilterViewModel(filterPort, appsPort, iconPort) as T
+                override fun <T : ViewModel> create(
+                    modelClass: kotlin.reflect.KClass<T>,
+                    extras: androidx.lifecycle.viewmodel.CreationExtras,
+                ): T = RemoteFilterViewModel(filterPort, appsPort, iconPort) as T
             },
     )
 }

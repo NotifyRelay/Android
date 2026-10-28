@@ -5,9 +5,9 @@ import com.google.gson.GsonBuilder
 import com.google.gson.JsonParser
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
-import com.xzyht.notifyrelay.ui.pages.formatTimestamp
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ClipboardUtils
+import notifyrelay.base.util.TimestampFormatter
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 
@@ -17,7 +17,7 @@ internal fun buildEntryCopyText(
 ): String =
     buildString {
         appendLine("id: ${entry.id}")
-        appendLine("timestamp: ${formatTimestamp(entry.id)}")
+        appendLine("timestamp: ${TimestampFormatter.format(entry.id)}")
         entry.sourceDeviceUuid?.takeIf { it.isNotBlank() }?.let {
             appendLine("sourceDeviceUuid: $it")
         }

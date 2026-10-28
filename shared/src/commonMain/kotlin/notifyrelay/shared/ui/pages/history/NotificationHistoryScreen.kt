@@ -1,57 +1,40 @@
-package com.xzyht.notifyrelay.ui.pages
+package notifyrelay.shared.ui.pages.history
 
-import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.ui.platform.LocalContext
-import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.xzyht.notifyrelay.ui.pages.history.NotificationHistoryScaffold
-import com.xzyht.notifyrelay.ui.viewmodel.notificationHistoryViewModel
 import notifyrelay.base.log.Logger
-import notifyrelay.base.util.ToastUtils
+import notifyrelay.domain.feature.notification.history.NotificationHistoryPortRegistry
 import notifyrelay.shared.ui.pages.rememberDeleteSwipeWidth
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
 import notifyrelay.shared.ui.viewmodel.NotificationHistoryViewModel
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-internal enum class DragValue { Center, End }
-
-// 防抖 Toast（文件级顶层对象）
-internal object ToastDebounce {
-    var lastToastTime: Long = 0L
-    const val DEBOUNCE_MILLIS: Long = 1500L
-}
-
+/**
+ * 通知历史页。
+ *
+ * 平台交互（打开应用、提示、重发通知）经 [LocalNotificationActionPort] 注入；
+ * 数据经 [NotificationHistoryPortRegistry] 注入的端口读取。
+ */
 @Composable
 fun NotificationHistoryScreen() {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
-    val context = LocalContext.current
-    val viewModel: NotificationHistoryViewModel =
-        notificationHistoryViewModel()
+    val actionPort = LocalNotificationActionPort.current ?: error("LocalNotificationActionPort 未提供")
 
-    // 创建协程作用域用于删除操作等
-    // （删除操作已随 NotificationListBlock 自带作用域，此处不再需要）
+    val viewModel: NotificationHistoryViewModel = notificationHistoryViewModel()
 
     val selectedDeviceObj by GlobalSelectedDeviceHolder.current()
     val selectedDevice = selectedDeviceObj?.uuid ?: "本机"
 
     LaunchedEffect(selectedDevice) {
         viewModel.loadNotifications(selectedDevice)
-    }
-
-    val isDarkTheme = isSystemInDarkTheme()
-    LaunchedEffect(isDarkTheme) {
-        val window = (context as? Activity)?.window
-        window?.let {
-            val decorView = it.decorView
-            WindowInsetsControllerCompat(it, decorView).isAppearanceLightStatusBars = !isDarkTheme
-        }
     }
 
     val uiState by viewModel.uiState.collectAsState()
@@ -80,10 +63,7 @@ fun NotificationHistoryScreen() {
             viewModel.clearHistory()
         } catch (e: Exception) {
             Logger.e("NotifyRelay", "清除历史异常", e)
-            ToastUtils.showShortToast(
-                context,
-                "清除失败: ${e.message}",
-            )
+            actionPort.showToast("清除失败: " + (e.message ?: ""))
         }
     }
     val (deleteWidthPx, deleteWidth) = rememberDeleteSwipeWidth()
@@ -93,7 +73,7 @@ fun NotificationHistoryScreen() {
         uiState = uiState,
         installedPackages = installedPackages,
         getCachedAppInfo = getCachedAppInfo,
-        context = context,
+        actionPort = actionPort,
         colorScheme = colorScheme,
         textStyles = textStyles,
         deleteWidthPx = deleteWidthPx,
@@ -102,5 +82,21 @@ fun NotificationHistoryScreen() {
         onToggleGroup = { packageName -> viewModel.toggleGroupExpansion(packageName) },
         onDeleteGroup = { packageName -> viewModel.deleteGroup(packageName) },
         onDeleteNotification = { key -> viewModel.deleteNotification(key) },
+    )
+}
+
+/** 以已注册的 [NotificationHistoryPortRegistry] 构造 [NotificationHistoryViewModel]。 */
+@Composable
+private fun notificationHistoryViewModel(): NotificationHistoryViewModel {
+    val port = NotificationHistoryPortRegistry.current ?: error("NotificationHistoryPort 未注册")
+    return viewModel(
+        factory =
+            object : ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : ViewModel> create(
+                    modelClass: kotlin.reflect.KClass<T>,
+                    extras: CreationExtras,
+                ): T = NotificationHistoryViewModel(port) as T
+            },
     )
 }

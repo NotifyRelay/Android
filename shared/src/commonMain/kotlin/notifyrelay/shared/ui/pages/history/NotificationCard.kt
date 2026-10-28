@@ -1,7 +1,5 @@
-package com.xzyht.notifyrelay.ui.pages.history
+package notifyrelay.shared.ui.pages.history
 
-import android.content.Context
-import android.content.Intent
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -18,26 +16,27 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.sync.MessageSender
-import com.xzyht.notifyrelay.ui.pages.ToastDebounce
-import com.xzyht.notifyrelay.ui.pages.dateTimeFormatter
-import notifyrelay.base.util.ToastUtils
+import notifyrelay.base.util.TimestampFormatter
 import notifyrelay.domain.feature.notification.history.NotificationHistoryEntry
+import notifyrelay.shared.ui.pages.history.NotificationActionPort
 import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
-import java.time.Instant
-import java.time.LocalDateTime
-import java.time.ZoneId
+
+/** 提示去抖：避免连续点击重复弹出同一条提示。 */
+internal object ToastDebounce {
+    var lastToastTime: Long = 0L
+    const val DEBOUNCE_MILLIS: Long = 1500L
+}
 
 @Composable
-internal fun NotificationCard(
+fun NotificationCard(
     record: NotificationHistoryEntry,
     appIcon: androidx.compose.ui.graphics.ImageBitmap?,
-    context: Context,
+    actionPort: NotificationActionPort,
     getCachedAppInfo: (String?) -> Pair<String, androidx.compose.ui.graphics.ImageBitmap?>,
     cardColor: Color,
     contentColor: Color,
@@ -53,13 +52,14 @@ internal fun NotificationCard(
     enableClick: Boolean = true,
     /** 是否在卡片上额外外显原始包名（默认 `false`，历史页不显示，行为不变）。 */
     showPackageName: Boolean = false,
-    viewModel: RemoteFilterViewModel = viewModel(),
+    viewModel: RemoteFilterViewModel? = null,
 ) {
+    val filterViewModel = viewModel ?: remoteFilterViewModel()
     val notificationTextStyles = MiuixTheme.textStyles
     val cardColorScheme = MiuixTheme.colorScheme
 
     // 对包名进行等价映射，使用缓存的包名集合，避免同步加载
-    val mappedPkg = viewModel.mapToLocalPackage(record.packageName, installedPackages)
+    val mappedPkg = filterViewModel.mapToLocalPackage(record.packageName, installedPackages)
 
     // 使用映射后的包名获取应用信息
     val appInfo: Pair<String, androidx.compose.ui.graphics.ImageBitmap?> = getCachedAppInfo(mappedPkg)
@@ -80,36 +80,19 @@ internal fun NotificationCard(
                 val pkg = record.packageName
                 if (pkg.isNotEmpty()) {
                     // 应用等价映射，使用缓存的包名集合，避免同步加载
-                    val mappedPkg = viewModel.mapToLocalPackage(pkg, installedPackages)
-
-                    var canOpen = false
-                    var intent: Intent? = null
-                    try {
-                        intent = context.packageManager.getLaunchIntentForPackage(mappedPkg)
-                        if (intent != null) {
-                            canOpen = true
-                        } else {
-                            val now = System.currentTimeMillis()
-                            if (now - ToastDebounce.lastToastTime > ToastDebounce.DEBOUNCE_MILLIS) {
-                                ToastUtils.showShortToast(context, "无法打开应用：$mappedPkg")
-                                ToastDebounce.lastToastTime = now
-                            }
-                        }
-                    } catch (e: Exception) {
+                    val mappedPkg = filterViewModel.mapToLocalPackage(pkg, installedPackages)
+                    val failure = actionPort.openApp(mappedPkg)
+                    if (failure != null) {
                         val now = System.currentTimeMillis()
                         if (now - ToastDebounce.lastToastTime > ToastDebounce.DEBOUNCE_MILLIS) {
-                            ToastUtils.showShortToast(context, "启动失败：${e.message}")
+                            actionPort.showToast(failure)
                             ToastDebounce.lastToastTime = now
                         }
-                    }
-                    // 仅在即将跳转前显示通知标题和内容
-                    if (canOpen) {
-                        // 发送高优先级悬浮通知
+                    } else {
+                        // 仅在即将跳转前显示通知标题和内容
                         val title = record.title ?: "(无标题)"
                         val text = record.text ?: "(无内容)"
-                        MessageSender.sendHighPriorityNotification(context, title, text)
-                        intent!!.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        context.startActivity(intent)
+                        actionPort.resendAsHighPriority(title, text)
                     }
                 }
             }
@@ -164,12 +147,32 @@ internal fun NotificationCard(
         Spacer(modifier = Modifier.height(4.dp))
         Text(
             text =
-                LocalDateTime
-                    .ofInstant(
-                        Instant.ofEpochMilli(record.time),
-                        ZoneId.systemDefault(),
-                    ).format(dateTimeFormatter),
+                TimestampFormatter.format(record.time),
             style = notificationTextStyles.body2.copy(color = cardColorScheme.onSurfaceSecondary),
         )
     }
+}
+
+/** 以已注册端口构造 [RemoteFilterViewModel]（供卡片独立使用时）。 */
+@androidx.compose.runtime.Composable
+private fun remoteFilterViewModel(): RemoteFilterViewModel {
+    val filterPort =
+        notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry.current
+            ?: error("RemoteFilterPort 未注册")
+    val appsPort =
+        notifyrelay.shared.feature.appslist.LocalAppsPortRegistry.current
+            ?: error("LocalAppsPort 未注册")
+    val iconPort =
+        notifyrelay.shared.feature.appslist.AppIconPortRegistry.current
+            ?: error("AppIconPort 未注册")
+    return androidx.lifecycle.viewmodel.compose.viewModel(
+        factory =
+            object : androidx.lifecycle.ViewModelProvider.Factory {
+                @Suppress("UNCHECKED_CAST")
+                override fun <T : androidx.lifecycle.ViewModel> create(
+                    modelClass: kotlin.reflect.KClass<T>,
+                    extras: androidx.lifecycle.viewmodel.CreationExtras,
+                ): T = RemoteFilterViewModel(filterPort, appsPort, iconPort) as T
+            },
+    )
 }

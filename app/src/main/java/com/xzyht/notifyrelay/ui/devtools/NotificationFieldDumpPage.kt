@@ -23,10 +23,11 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.ui.pages.history.NotificationCard
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.data.Storage
+import notifyrelay.shared.ui.pages.history.LocalNotificationActionPort
+import notifyrelay.shared.ui.pages.history.NotificationCard
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
@@ -207,7 +208,7 @@ fun NotificationFieldDumpPage() {
                                     device = entry.record.device,
                                 ),
                             appIcon = entry.appIcon?.asImageBitmap(),
-                            context = context,
+                            actionPort = LocalNotificationActionPort.current ?: error("LocalNotificationActionPort 未提供"),
                             getCachedAppInfo = viewModel::getCachedAppInfo,
                             cardColor = colorScheme.surface,
                             contentColor = colorScheme.onSurface,

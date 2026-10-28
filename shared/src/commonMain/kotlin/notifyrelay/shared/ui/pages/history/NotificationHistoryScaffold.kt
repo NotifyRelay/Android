@@ -1,6 +1,5 @@
-package com.xzyht.notifyrelay.ui.pages.history
+package notifyrelay.shared.ui.pages.history
 
-import android.content.Context
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,6 +17,7 @@ import androidx.paging.compose.LazyPagingItems
 import notifyrelay.domain.feature.notification.history.GroupedNotifications
 import notifyrelay.domain.feature.notification.history.NotificationHistoryUiState
 import notifyrelay.shared.ui.common.DoubleClickConfirmButton
+import notifyrelay.shared.ui.pages.history.NotificationActionPort
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -27,12 +27,12 @@ import top.yukonga.miuix.kmp.theme.Colors
 import top.yukonga.miuix.kmp.theme.TextStyles
 
 @Composable
-internal fun NotificationHistoryScaffold(
+fun NotificationHistoryScaffold(
     pagingItems: LazyPagingItems<GroupedNotifications>,
     uiState: NotificationHistoryUiState,
     installedPackages: Set<String>,
     getCachedAppInfo: (String?) -> Pair<String, androidx.compose.ui.graphics.ImageBitmap?>,
-    context: Context,
+    actionPort: NotificationActionPort,
     colorScheme: Colors,
     textStyles: TextStyles,
     deleteWidthPx: Float,
@@ -100,7 +100,7 @@ internal fun NotificationHistoryScaffold(
                         getCachedAppInfo = getCachedAppInfo,
                         expandedGroups = uiState.expandedGroups,
                         installedPackages = installedPackages,
-                        context = context,
+                        actionPort = actionPort,
                         colorScheme = colorScheme,
                         textStyles = textStyles,
                         deleteWidthPx = deleteWidthPx,
