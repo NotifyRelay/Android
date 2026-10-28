@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
@@ -22,6 +23,7 @@ import notifyrelay.desktop.device.DesktopDeviceManager
 import notifyrelay.desktop.device.DesktopDevicePortsProvider
 import notifyrelay.desktop.platform.DesktopDeviceListPort
 import notifyrelay.desktop.platform.DesktopNotificationActionPort
+import notifyrelay.desktop.platform.DesktopWindowController
 import notifyrelay.desktop.platform.ProvideDesktopExtraPorts
 import notifyrelay.desktop.platform.ProvideDesktopUiPorts
 import notifyrelay.desktop.platform.WindowIcon
@@ -51,6 +53,9 @@ import notifyrelay.shared.ui.viewmodel.LocalDevicePortsProvider
 import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import kotlin.math.abs
+
+private const val TRAY_ICON_SIZE = 32
 
 /** 桌面端入口。 */
 fun main() {
@@ -72,11 +77,24 @@ fun main() {
         }.getOrDefault(emptyList())
 
     application {
+        // 窗口与托盘：关闭按钮隐藏窗口，托盘菜单负责显隐与退出
+        val windowController = remember { DesktopWindowController { exitApplication() } }
+
+        LaunchedEffect(Unit) {
+            val trayImage = iconImages.minByOrNull { abs(it.getWidth(null) - TRAY_ICON_SIZE) }
+            windowController.installTray(trayImage, "NotifyRelay")
+        }
+
+        DisposableEffect(Unit) {
+            onDispose { windowController.disposeTray() }
+        }
+
         Window(
-            onCloseRequest = ::exitApplication,
+            onCloseRequest = { windowController.onCloseRequest() },
             title = "NotifyRelay",
         ) {
-            LaunchedEffect(Unit) {
+            LaunchedEffect(window) {
+                windowController.bindWindow(window)
                 window.setIconImages(iconImages)
             }
 
@@ -94,7 +112,7 @@ fun main() {
 
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 ProvideDesktopUiPorts {
-                    ProvideDesktopExtraPorts(onExit = ::exitApplication) {
+                    ProvideDesktopExtraPorts(onFinish = { windowController.hideWindow() }) {
                         CompositionLocalProvider(
                             LocalNotificationActionPort provides actionPort,
                             LocalDeviceListPort provides deviceListPort,

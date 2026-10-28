@@ -90,9 +90,9 @@ internal object DesktopAppLaunchPort : AppLaunchPort {
     }
 }
 
-/** 主界面端口：桌面端固定非横屏、无自启动横幅、退出直接结束进程。 */
+/** 主界面端口：桌面端固定非横屏、无自启动横幅、结束动作隐藏到托盘。 */
 internal class DesktopMainScreenPort(
-    private val onExit: () -> Unit,
+    private val onFinish: () -> Unit,
 ) : MainScreenPort {
     private val noBanner = mutableStateOf(false)
     private val noMessage = mutableStateOf<String?>(null)
@@ -106,7 +106,7 @@ internal class DesktopMainScreenPort(
 
     override fun openAppSettings() = Unit
 
-    override fun finish() = onExit()
+    override fun finish() = onFinish()
 
     override fun showExitHint() = Unit
 }
@@ -121,10 +121,10 @@ internal object DesktopSettingsPort : SettingsPort {
 /** 为 [content] 提供桌面端补充端口。 */
 @Composable
 fun ProvideDesktopExtraPorts(
-    onExit: () -> Unit,
+    onFinish: () -> Unit,
     content: @Composable () -> Unit,
 ) {
-    val mainScreenPort = DesktopMainScreenPort(onExit)
+    val mainScreenPort = DesktopMainScreenPort(onFinish)
     CompositionLocalProvider(
         LocalPreferencePort provides DesktopPreferencePort,
         LocalImageDecodePort provides DesktopImageDecodePort,
