@@ -31,6 +31,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.domain.feature.appslist.model.LocalAppInfo
 import notifyrelay.shared.feature.appslist.SharedAppIcon
 import notifyrelay.shared.ui.viewmodel.AppPickerViewModel
+import notifyrelay.shared.ui.viewmodel.appPickerViewModel
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.InfiniteProgressIndicator
 import top.yukonga.miuix.kmp.basic.InputField
@@ -49,7 +50,7 @@ fun AppPickerDialog(
     visible: Boolean,
     onDismiss: () -> Unit,
     onAppSelected: (String) -> Unit,
-    viewModel: AppPickerViewModel = viewModel(),
+    viewModel: AppPickerViewModel = appPickerViewModel(),
     title: String = "选择应用",
 ) {
     if (!visible) return

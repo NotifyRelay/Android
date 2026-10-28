@@ -5,7 +5,6 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.shared.ui.pages.remoteapps.DisplayNavigationBar
 import notifyrelay.shared.ui.pages.remoteapps.LocalAppLaunchPort
 import notifyrelay.shared.ui.pages.remoteapps.LocalAppsContent
@@ -15,6 +14,8 @@ import notifyrelay.shared.ui.pages.remoteapps.RemoteAppsMenuHost
 import notifyrelay.shared.ui.pages.remoteapps.rememberRemoteAppsPageState
 import notifyrelay.shared.ui.viewmodel.LocalAppsViewModel
 import notifyrelay.shared.ui.viewmodel.RemoteAppsViewModel
+import notifyrelay.shared.ui.viewmodel.localAppsViewModel
+import notifyrelay.shared.ui.viewmodel.remoteAppsViewModel
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -27,8 +28,8 @@ fun RemoteAppsPage(
     deviceUuid: String?,
     deviceIp: String?,
     modifier: Modifier = Modifier,
-    remoteViewModel: RemoteAppsViewModel = viewModel(),
-    localViewModel: LocalAppsViewModel = viewModel(),
+    remoteViewModel: RemoteAppsViewModel = remoteAppsViewModel(),
+    localViewModel: LocalAppsViewModel = localAppsViewModel(),
 ) {
     val launchPort = LocalAppLaunchPort.current
     val isLocalMode = deviceUuid == null || deviceIp == null

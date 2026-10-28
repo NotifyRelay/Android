@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.shared.ui.port.LocalImageDecodePort
 import notifyrelay.shared.ui.viewmodel.AppIconViewModel
+import notifyrelay.shared.ui.viewmodel.appIconViewModel
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -34,7 +35,7 @@ fun SuperIslandHistoryImage(
     imageKey: String,
     data: String,
     modifier: Modifier = Modifier,
-    viewModel: AppIconViewModel = viewModel(),
+    viewModel: AppIconViewModel = appIconViewModel(),
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
@@ -97,7 +98,7 @@ fun SuperIslandHistoryImage(
 @Composable
 fun rememberAppIconBitmap(packageName: String?): ImageBitmap? {
     val target = remember(packageName) { packageName?.takeIf { it.isNotBlank() } }
-    val viewModel: AppIconViewModel = viewModel()
+    val viewModel: AppIconViewModel = appIconViewModel()
     val iconUpdateKey by viewModel.iconUpdatesFlow.collectAsState()
     val bitmapState =
         produceState<ImageBitmap?>(initialValue = null, key1 = target, key2 = iconUpdateKey) {

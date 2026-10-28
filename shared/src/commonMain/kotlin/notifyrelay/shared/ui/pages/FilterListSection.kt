@@ -25,6 +25,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.shared.feature.appslist.SharedAppIcon
 import notifyrelay.shared.ui.dialog.AppPickerDialog
 import notifyrelay.shared.ui.viewmodel.AppIconViewModel
+import notifyrelay.shared.ui.viewmodel.appIconViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.IconButton
@@ -63,7 +64,7 @@ fun FilterListSection(
     onEntryEnabledChange: ((FilterEntryItem, Boolean) -> Unit)? = null,
     onAddEntry: (keyword: String, packageName: String) -> Unit,
     onRemoveEntry: (FilterEntryItem) -> Unit,
-    viewModel: AppIconViewModel = viewModel(),
+    viewModel: AppIconViewModel = appIconViewModel(),
 ) {
     val coroutineScope = rememberCoroutineScope()
     var newKeyword by remember { mutableStateOf("") }

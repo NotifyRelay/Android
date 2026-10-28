@@ -17,7 +17,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.base.log.Logger
 import notifyrelay.domain.feature.media.MediaMessageReceiveMode
 import notifyrelay.shared.ui.common.MiuixSpinnerPreference
@@ -26,6 +25,8 @@ import notifyrelay.shared.ui.port.LocalToastPort
 import notifyrelay.shared.ui.screen.GlobalSelectedDeviceHolder
 import notifyrelay.shared.ui.viewmodel.AudioRelayViewModel
 import notifyrelay.shared.ui.viewmodel.MediaControlViewModel
+import notifyrelay.shared.ui.viewmodel.audioRelayViewModel
+import notifyrelay.shared.ui.viewmodel.mediaControlViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.SwitchPreference
@@ -36,8 +37,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
  */
 @Composable
 fun MusicControlPage(
-    audioViewModel: AudioRelayViewModel = viewModel(),
-    mediaViewModel: MediaControlViewModel = viewModel(),
+    audioViewModel: AudioRelayViewModel = audioRelayViewModel(),
+    mediaViewModel: MediaControlViewModel = mediaControlViewModel(),
 ) {
     val prefPort = LocalPreferencePort.current ?: error("LocalPreferencePort 未提供")
 

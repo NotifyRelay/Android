@@ -32,6 +32,7 @@ import notifyrelay.shared.ui.pages.FilterEntryItem
 import notifyrelay.shared.ui.pages.FilterListSection
 import notifyrelay.shared.ui.viewmodel.AppIconViewModel
 import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
+import notifyrelay.shared.ui.viewmodel.appIconViewModel
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
@@ -49,7 +50,7 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun UIRemoteFilter(
     modifier: Modifier = Modifier,
     viewModel: RemoteFilterViewModel = remoteFilterViewModel(),
-    iconViewModel: AppIconViewModel = viewModel(),
+    iconViewModel: AppIconViewModel = appIconViewModel(),
 ) {
     val filterMode = viewModel.filterMode
     val enableDedup = viewModel.enableDedup
