@@ -116,11 +116,12 @@ class RemoteAppsViewModel(
         appsMachine.update { it.copy(apps = updatedApps) }
     }
 
+    /** 在当前设备上启动应用；设备取本列表的 [currentDeviceUuid]。 */
     fun openApp(
         app: RemoteAppInfo,
-        deviceIp: String,
         useScrcpyStartApp: Boolean = false,
     ) {
-        port.launchApp(app, deviceIp, useScrcpyStartApp)
+        val deviceUuid = currentDeviceUuid ?: return
+        port.launchApp(app, deviceUuid, useScrcpyStartApp)
     }
 }

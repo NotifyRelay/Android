@@ -20,7 +20,7 @@ import notifyrelay.shared.feature.appslist.LocalAppsPort
  * 桌面端远端应用列表端口。
  *
  * 列表来自公共缓存；请求经公共同步管理器发出，与 Android 同一条报文链路。
- * 本机应用不列出，因此 [launchApp] 走 scrcpy 启动层（P3 接线前为空操作）。
+ * 本机应用不列出；[launchApp] 经 scrcpy 以 `--start-app` 在远端拉起应用。
  *
  * @param deviceMessagePort 提供当前设备消息端口的访问器（设备管理器在数据层之后创建）
  */
@@ -59,9 +59,28 @@ class DesktopRemoteAppsPort(
 
     override fun launchApp(
         app: RemoteAppInfo,
-        deviceIp: String,
+        deviceUuid: String,
         useScrcpyStartApp: Boolean,
-    ) = Unit
+    ) {
+        if (!useScrcpyStartApp) return
+        // 应用列表携带的设备 UUID 直接对应 adb 设备，无需经 IP 反查
+        val device = findOnlineDevice(deviceUuid)
+        if (device == null) {
+            DesktopToastHost.show("未找到该在线设备，无法启动应用", DesktopToastHost.Duration.LONG)
+            return
+        }
+        val started =
+            DesktopScrcpyLauncher.launch(
+                deviceUuid = device.uuid,
+                deviceName = device.displayName,
+                deviceIp = device.ip,
+                startApp = app.packageName,
+                startAppTitle = app.appName,
+            )
+        if (started) {
+            DesktopToastHost.show("正在启动「" + app.appName + "」", DesktopToastHost.Duration.SHORT)
+        }
+    }
 }
 
 /** 桌面端本机应用端口：无已安装应用概念，返回空列表。 */

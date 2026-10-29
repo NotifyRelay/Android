@@ -119,7 +119,7 @@ fun RemoteAppsPage(
                 RemoteAppsContent(
                     state = remoteState,
                     onAppClick = { app ->
-                        remoteViewModel.openApp(app, deviceIp, useScrcpyStartApp = true)
+                        remoteViewModel.openApp(app, useScrcpyStartApp = true)
                     },
                     onAppLongClick = { showMenuForApp = it },
                     onRefresh = { remoteViewModel.refreshApps() },

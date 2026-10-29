@@ -40,10 +40,16 @@ interface RemoteAppsPort {
     /** 解析在线设备信息；不存在返回 null。 */
     fun findOnlineDevice(deviceUuid: String): DeviceInfo?
 
-    /** 启动远端应用。 */
+    /**
+     * 在远端设备上启动应用。
+     *
+     * @param app 目标应用
+     * @param deviceUuid 应用所属设备的 UUID（据此解析对应的 adb 设备）
+     * @param useScrcpyStartApp 是否经 scrcpy 的 `--start-app` 拉起
+     */
     fun launchApp(
         app: RemoteAppInfo,
-        deviceIp: String,
+        deviceUuid: String,
         useScrcpyStartApp: Boolean,
     )
 }

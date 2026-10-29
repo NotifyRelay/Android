@@ -72,43 +72,60 @@ object DesktopScrcpyLauncher {
     /**
      * 启动指定设备的投屏。
      *
+     * 序列号由 adb 实测得出（AndroidId / 型号匹配 → 偏好选择 → 必要时自动重连），
+     * 不再假定 ip:5555。
+     *
      * @param deviceUuid 设备 UUID（用于读取该设备的配置）
-     * @param serial 设备序列号（adb 标识，通常为 ip:port）
+     * @param deviceName 设备显示名（型号模糊匹配用）
+     * @param deviceIp 设备 IP（自动重连与无线连接用）
      * @param startApp 启动后拉起的包名；为空表示仅投屏
+     * @param startAppTitle 启动应用时的窗口标题；为空则用包名
      * @return 是否成功启动
      */
     fun launch(
         deviceUuid: String,
-        serial: String,
+        deviceName: String,
+        deviceIp: String,
         startApp: String = "",
+        startAppTitle: String = "",
     ): Boolean {
         val executable = resolveScrcpy()
         if (executable == null) {
             DesktopToastHost.show("未找到 scrcpy，请先在屏幕镜像设置中选择路径", DesktopToastHost.Duration.LONG)
             return false
         }
-        if (serial.isBlank()) {
-            DesktopToastHost.show("设备序列号为空，无法启动投屏", DesktopToastHost.Duration.SHORT)
+        val settings = ScrcpySettingsStore.load(deviceUuid)
+
+        // 解析实际可用的 adb 序列号；失败时不再退化为固定端口
+        val serial =
+            DesktopAdbDeviceResolver.resolveSerial(
+                adbPath = adbPath(),
+                deviceUuid = deviceUuid,
+                deviceName = deviceName,
+                deviceIp = deviceIp,
+                preference = settings.devicePreference,
+                tcpipEnabled = settings.adbTcpipModeEnabled,
+            )
+        if (serial.isNullOrBlank()) {
+            DesktopToastHost.show("未找到该设备的 adb 连接，请确认已开启 USB 调试或无线调试", DesktopToastHost.Duration.LONG)
             return false
         }
         // 同一设备重复启动：先终止已有进程（对应 Windows 端 killExistingProcess）
         stop(serial)
-
-        val settings = ScrcpySettingsStore.load(deviceUuid)
 
         // 启动前按设备配置解锁（对齐 Windows ScrcpyDeviceSelector.ResolveDeviceSerialAsync）
         if (settings.unlockBeforeLaunch) {
             unlockIfNeeded(deviceUuid, serial, settings)
         }
 
-        val args = ScrcpyOptions.buildArguments(settings, serial, startApp)
+        val args = ScrcpyOptions.buildArguments(settings, serial, startApp, startAppTitle)
         return try {
             val command = listOf(executable.absolutePath) + args
             Logger.i(TAG, "启动 scrcpy: " + command.joinToString(" "))
+            // 不合并 stderr：错误输出单独回收，异常退出时用于提示与日志
             val builder =
                 ProcessBuilder(command)
-                    .redirectErrorStream(true)
-                    .redirectOutput(ProcessBuilder.Redirect.DISCARD)
+                    .redirectErrorStream(false)
             // 图标路径：仅在已配置时注入，供 scrcpy 作为窗口图标
             windowIconPath()?.let { builder.environment()[ENV_ICON_PATH] = it }
             val process = builder.start()
@@ -120,6 +137,23 @@ object DesktopScrcpyLauncher {
             DesktopToastHost.show("启动投屏失败：" + (e.message ?: ""), DesktopToastHost.Duration.LONG)
             false
         }
+    }
+
+    /** 解析指定设备当前可用的 adb 序列号；无连接时返回 null。 */
+    fun resolveSerialFor(
+        deviceUuid: String,
+        deviceName: String,
+        deviceIp: String,
+    ): String? {
+        val settings = ScrcpySettingsStore.load(deviceUuid)
+        return DesktopAdbDeviceResolver.resolveSerial(
+            adbPath = adbPath(),
+            deviceUuid = deviceUuid,
+            deviceName = deviceName,
+            deviceIp = deviceIp,
+            preference = settings.devicePreference,
+            tcpipEnabled = settings.adbTcpipModeEnabled,
+        )
     }
 
     /** 停止指定设备的投屏进程。 */
@@ -151,14 +185,49 @@ object DesktopScrcpyLauncher {
         process: Process,
     ) {
         Thread({
+            // 并发回收两路输出，避免管道写满阻塞；stderr 用于异常退出时上报
+            val errorBuffer = StringBuilder()
+            val outThread =
+                Thread({
+                    runCatching {
+                        process.inputStream.bufferedReader().forEachLine { line ->
+                            if (line.isNotBlank()) Logger.d(TAG, "scrcpy: " + line)
+                        }
+                    }
+                }, "scrcpy-out-" + serial).apply {
+                    isDaemon = true
+                    start()
+                }
+            val errThread =
+                Thread({
+                    runCatching {
+                        process.errorStream.bufferedReader().forEachLine { line ->
+                            if (line.isNotBlank()) {
+                                synchronized(errorBuffer) { errorBuffer.appendLine(line) }
+                            }
+                        }
+                    }
+                }, "scrcpy-err-" + serial).apply {
+                    isDaemon = true
+                    start()
+                }
+
             val code =
                 runCatching { process.waitFor() }
                     .getOrDefault(-1)
+            runCatching {
+                outThread.join(1000)
+                errThread.join(1000)
+            }
             runningProcesses.remove(serial)
             // 0 正常结束；2 与 -1 为 scrcpy 在设备断开 / 被终止时的既有取值，不报错
             if (code != 0 && code != 2 && code != -1) {
-                Logger.w(TAG, "scrcpy 异常退出: serial=" + serial + " code=" + code)
-                DesktopToastHost.show("投屏已退出（退出码 " + code + "）", DesktopToastHost.Duration.LONG)
+                val detail = synchronized(errorBuffer) { errorBuffer.toString().trim() }
+                Logger.w(TAG, "scrcpy 异常退出: serial=" + serial + " code=" + code + (if (detail.isEmpty()) "" else " 错误输出=" + detail))
+                DesktopToastHost.show(
+                    if (detail.isEmpty()) "投屏已退出（退出码 " + code + "）" else "投屏失败：" + detail.lineSequence().first(),
+                    DesktopToastHost.Duration.LONG,
+                )
             } else {
                 Logger.i(TAG, "scrcpy 已结束: serial=" + serial + " code=" + code)
             }

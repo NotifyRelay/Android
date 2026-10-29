@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import notifyrelay.data.config.ScrcpyAudioOutputMode
+import notifyrelay.data.config.ScrcpyDevicePreference
 import notifyrelay.data.config.ScrcpyOptions
 import notifyrelay.data.config.ScrcpySettings
 import notifyrelay.shared.ui.common.MiuixSpinnerPreference
@@ -32,6 +33,9 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /** 音频输出模式的可选文案，顺序与 [ScrcpyAudioOutputMode] 一致。 */
 private val AUDIO_OUTPUT_LABELS = listOf("桌面播放", "仅远端", "两端同时")
+
+/** 目标设备选择偏好的可选文案，顺序与 [ScrcpyDevicePreference] 一致。 */
+private val DEVICE_PREFERENCE_LABELS = listOf("自动（优先 USB）", "优先 USB", "优先无线", "每次询问")
 
 /**
  * 屏幕镜像设置页。
@@ -210,6 +214,47 @@ private fun ScrcpySettingsContent(modifier: Modifier = Modifier) {
             onValueChange = { update(settings.copy(customArguments = it)) },
             modifier = Modifier.fillMaxWidth(),
             label = "自定义参数（原样追加）",
+        )
+
+        SwitchPreference(
+            title = "启用虚拟显示",
+            summary = "仅在启动应用（--start-app）时生效；关闭则复用主显示",
+            checked = settings.virtualDisplayEnabled,
+            onCheckedChange = { update(settings.copy(virtualDisplayEnabled = it)) },
+        )
+
+        TextField(
+            value = settings.virtualDisplaySize,
+            onValueChange = { update(settings.copy(virtualDisplaySize = it)) },
+            modifier = Modifier.fillMaxWidth(),
+            label = "虚拟显示尺寸（如 1920x1080，留空用主显示尺寸）",
+        )
+
+        Text("连接（按设备）", style = textStyles.title2, color = colorScheme.onSurface)
+
+        if (deviceUuid == null) {
+            Text(
+                text = "连接方式按设备保存，请先在设备列表中选择一台设备",
+                style = textStyles.body2,
+                color = colorScheme.onSurfaceSecondary,
+            )
+        }
+
+        MiuixSpinnerPreference(
+            title = "目标设备选择",
+            summary = DEVICE_PREFERENCE_LABELS[settings.devicePreference.ordinal],
+            items = DEVICE_PREFERENCE_LABELS,
+            selectedIndex = settings.devicePreference.ordinal,
+            onSelectedIndexChange = { index ->
+                update(settings.copy(devicePreference = ScrcpyDevicePreference.entries[index]))
+            },
+        )
+
+        SwitchPreference(
+            title = "允许启用无线调试",
+            summary = "无可用 adb 连接时，对 USB 设备启用 tcpip 后重连（会重启对端 adbd）",
+            checked = settings.adbTcpipModeEnabled,
+            onCheckedChange = { update(settings.copy(adbTcpipModeEnabled = it)) },
         )
 
         Text("解锁（按设备）", style = textStyles.title2, color = colorScheme.onSurface)

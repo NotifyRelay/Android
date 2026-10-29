@@ -34,12 +34,29 @@ interface ScrcpyPort {
         settings: ScrcpySettings,
     )
 
-    /** 启动指定设备的投屏；[startApp] 非空时启动后拉起该应用。 */
+    /**
+     * 启动指定设备的投屏；[startApp] 非空时启动后拉起该应用。
+     *
+     * 序列号由平台侧经 adb 实测解析，不由调用方假定。
+     */
     fun launch(
         deviceUuid: String,
-        serial: String,
+        deviceName: String,
+        deviceIp: String,
         startApp: String = "",
+        startAppTitle: String = "",
     ): Boolean
+
+    /**
+     * 解析指定设备当前的 adb 序列号（用于界面展示与运行态判定）。
+     *
+     * @return 可用序列号；无 adb 连接时返回 null
+     */
+    fun resolveSerial(
+        deviceUuid: String,
+        deviceName: String,
+        deviceIp: String,
+    ): String?
 
     /** 停止指定设备的投屏。 */
     fun stop(serial: String)

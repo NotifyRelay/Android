@@ -42,6 +42,8 @@ data class ScrcpySettings(
     val display: String = "",
     /** 虚拟显示尺寸，如 `1920x1080`。 */
     val virtualDisplaySize: String = "",
+    /** 是否启用虚拟显示（仅在带 `--start-app` 启动应用时生效）。 */
+    val virtualDisplayEnabled: Boolean = true,
     /** 自定义附加参数（原样追加到命令行）。 */
     val customArguments: String = "",
     /** 仅音频转发（不投屏）。 */
@@ -50,6 +52,10 @@ data class ScrcpySettings(
     val audioOutputMode: ScrcpyAudioOutputMode = ScrcpyAudioOutputMode.DESKTOP,
     /** 转发麦克风。 */
     val forwardMicrophone: Boolean = false,
+    /** 目标设备选择偏好（按设备配置）。 */
+    val devicePreference: ScrcpyDevicePreference = ScrcpyDevicePreference.AUTO,
+    /** 允许对 USB 设备启用 tcpip 以建立无线 adb（按设备配置）。 */
+    val adbTcpipModeEnabled: Boolean = false,
     /** 启动前若设备锁屏则自动解锁（按设备配置）。 */
     val unlockBeforeLaunch: Boolean = false,
     /** 解锁密码缓存分钟数；0 表示每次都要输入。 */
@@ -57,6 +63,21 @@ data class ScrcpySettings(
     /** 解锁命令序列，每行一条 adb shell 命令；`%pwd%` 会替换为输入的密码。 */
     val unlockCommands: String = "",
 )
+
+/** 目标设备选择偏好，对齐 Windows `ScrcpyDevicePreferenceType`。 */
+enum class ScrcpyDevicePreference {
+    /** 自动：优先 USB，其次无线。 */
+    AUTO,
+
+    /** 优先 USB。 */
+    USB,
+
+    /** 优先无线。 */
+    TCPIP,
+
+    /** 每次询问；桌面端按自动处理（无设备选择弹窗）。 */
+    ASK_EVERY_TIME,
+}
 
 /** 音频输出模式，对齐 Windows `AudioOutputModeType`。 */
 enum class ScrcpyAudioOutputMode {
@@ -110,6 +131,7 @@ object ScrcpySettingsStore {
                 crop = Storage.getString(globalKey("crop"), d.crop, Storage.PrefsType.SCRCPY),
                 display = Storage.getString(globalKey(ScrcpyPreferenceKeys.DISPLAY_ID), d.display, Storage.PrefsType.SCRCPY),
                 virtualDisplaySize = Storage.getString(globalKey("virtual_display_size"), d.virtualDisplaySize, Storage.PrefsType.SCRCPY),
+                virtualDisplayEnabled = Storage.getBoolean(globalKey("virtual_display_enabled"), d.virtualDisplayEnabled, Storage.PrefsType.SCRCPY),
                 customArguments = Storage.getString(globalKey("custom_arguments"), d.customArguments, Storage.PrefsType.SCRCPY),
                 disableVideoForwarding = Storage.getBoolean(globalKey(ScrcpyPreferenceKeys.NO_VIDEO), d.disableVideoForwarding, Storage.PrefsType.SCRCPY),
                 audioOutputMode =
@@ -125,6 +147,14 @@ object ScrcpySettingsStore {
             unlockBeforeLaunch = Storage.getBoolean(unlockKey(deviceUuid, "before_launch"), d.unlockBeforeLaunch, Storage.PrefsType.SCRCPY),
             unlockTimeout = Storage.getInt(unlockKey(deviceUuid, "timeout"), d.unlockTimeout, Storage.PrefsType.SCRCPY),
             unlockCommands = Storage.getString(unlockKey(deviceUuid, "commands"), d.unlockCommands, Storage.PrefsType.SCRCPY),
+            devicePreference =
+                runCatching {
+                    ScrcpyDevicePreference.valueOf(
+                        Storage.getString(unlockKey(deviceUuid, "device_preference"), d.devicePreference.name, Storage.PrefsType.SCRCPY),
+                    )
+                }.getOrDefault(d.devicePreference),
+            adbTcpipModeEnabled =
+                Storage.getBoolean(unlockKey(deviceUuid, "adb_tcpip_mode"), d.adbTcpipModeEnabled, Storage.PrefsType.SCRCPY),
         )
     }
 
@@ -152,6 +182,7 @@ object ScrcpySettingsStore {
         Storage.putString(globalKey("crop"), settings.crop, Storage.PrefsType.SCRCPY)
         Storage.putString(globalKey(ScrcpyPreferenceKeys.DISPLAY_ID), settings.display, Storage.PrefsType.SCRCPY)
         Storage.putString(globalKey("virtual_display_size"), settings.virtualDisplaySize, Storage.PrefsType.SCRCPY)
+        Storage.putBoolean(globalKey("virtual_display_enabled"), settings.virtualDisplayEnabled, Storage.PrefsType.SCRCPY)
         Storage.putString(globalKey("custom_arguments"), settings.customArguments, Storage.PrefsType.SCRCPY)
         Storage.putBoolean(globalKey(ScrcpyPreferenceKeys.NO_VIDEO), settings.disableVideoForwarding, Storage.PrefsType.SCRCPY)
         Storage.putString(globalKey("audio_output_mode"), settings.audioOutputMode.name, Storage.PrefsType.SCRCPY)
@@ -161,5 +192,7 @@ object ScrcpySettingsStore {
         Storage.putBoolean(unlockKey(deviceUuid, "before_launch"), settings.unlockBeforeLaunch, Storage.PrefsType.SCRCPY)
         Storage.putInt(unlockKey(deviceUuid, "timeout"), settings.unlockTimeout, Storage.PrefsType.SCRCPY)
         Storage.putString(unlockKey(deviceUuid, "commands"), settings.unlockCommands, Storage.PrefsType.SCRCPY)
+        Storage.putString(unlockKey(deviceUuid, "device_preference"), settings.devicePreference.name, Storage.PrefsType.SCRCPY)
+        Storage.putBoolean(unlockKey(deviceUuid, "adb_tcpip_mode"), settings.adbTcpipModeEnabled, Storage.PrefsType.SCRCPY)
     }
 }

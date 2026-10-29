@@ -5,6 +5,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -22,8 +23,8 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * 桌面端屏幕镜像页。
  *
- * 只做「按当前选中设备启动 / 停止外部 scrcpy 进程」；
- * 具体参数由设置页按设备配置，投屏窗口由 scrcpy 自身创建。
+ * 按当前选中设备启动 / 停止外部 scrcpy 进程；目标 adb 序列号由平台侧实测解析
+ * （AndroidId / 型号匹配 → 设备偏好 → 必要时自动重连），界面展示解析结果。
  */
 @Composable
 internal fun DesktopScrcpyScreen(
@@ -35,11 +36,21 @@ internal fun DesktopScrcpyScreen(
 
     val selectedDevice by GlobalSelectedDeviceHolder.current()
     val deviceUuid = selectedDevice?.uuid
-    // 序列号取设备 IP + scrcpy 默认 adb 端口；scrcpy 的 -s 接受 ip:port 形式
-    val serial = fallbackDevice?.ip?.takeIf { it.isNotBlank() }?.let { it + ":5555" }
+    val deviceName = selectedDevice?.displayName ?: fallbackDevice?.displayName.orEmpty()
+    val deviceIp = fallbackDevice?.ip.orEmpty()
 
-    var running by remember(serial) {
-        mutableStateOf(serial != null && DesktopScrcpyLauncher.isRunning(serial))
+    // 已解析的 adb 序列号；null 表示当前无可用 adb 连接
+    var serial by remember(deviceUuid, deviceIp) { mutableStateOf<String?>(null) }
+    var resolving by remember(deviceUuid, deviceIp) { mutableStateOf(false) }
+    var running by remember(deviceUuid, deviceIp) { mutableStateOf(false) }
+
+    // 进入页面即解析一次，避免展示与运行态基于假定的 ip:5555
+    LaunchedEffect(deviceUuid, deviceIp) {
+        if (deviceUuid == null) return@LaunchedEffect
+        resolving = true
+        serial = DesktopScrcpyLauncher.resolveSerialFor(deviceUuid, deviceName, deviceIp)
+        running = serial?.let { DesktopScrcpyLauncher.isRunning(it) } ?: false
+        resolving = false
     }
 
     Column(
@@ -48,7 +59,7 @@ internal fun DesktopScrcpyScreen(
     ) {
         Text("屏幕镜像", style = textStyles.title2, color = colorScheme.onSurface)
 
-        if (deviceUuid == null || serial == null) {
+        if (deviceUuid == null) {
             Text(
                 text = "请先在设备列表中选择一台已连接的设备",
                 style = textStyles.body2,
@@ -58,15 +69,26 @@ internal fun DesktopScrcpyScreen(
         }
 
         Text(
-            text = "目标：${selectedDevice?.displayName ?: ""}（$serial）",
+            text = "目标：" + deviceName,
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary,
         )
 
         Text(
             text =
+                when {
+                    resolving -> "正在解析 adb 连接…"
+                    serial != null -> "adb 序列号：" + serial
+                    else -> "未找到该设备的 adb 连接，请确认已开启 USB 调试或无线调试"
+                },
+            style = textStyles.body2,
+            color = if (serial != null) colorScheme.onSurfaceSecondary else colorScheme.error,
+        )
+
+        Text(
+            text =
                 if (running) {
-                    "投屏进行中。参数在「设置 → 屏幕镜像」中按设备配置。"
+                    "投屏进行中。参数在「设置 → 屏幕镜像」中配置。"
                 } else {
                     "停止状态。启动后由 scrcpy 创建独立窗口。"
                 },
@@ -76,14 +98,16 @@ internal fun DesktopScrcpyScreen(
 
         Button(
             onClick = {
-                running =
-                    if (running) {
-                        DesktopScrcpyLauncher.stop(serial)
-                        false
-                    } else {
-                        DesktopScrcpyLauncher.launch(deviceUuid, serial)
-                    }
+                if (running) {
+                    serial?.let { DesktopScrcpyLauncher.stop(it) }
+                    running = false
+                } else {
+                    running = DesktopScrcpyLauncher.launch(deviceUuid, deviceName, deviceIp)
+                    // 启动后回读实际序列号，失败时置空以便界面提示
+                    serial = DesktopScrcpyLauncher.resolveSerialFor(deviceUuid, deviceName, deviceIp)
+                }
             },
+            enabled = !resolving && (running || serial != null),
             modifier = Modifier.fillMaxWidth(),
             colors =
                 if (running) {

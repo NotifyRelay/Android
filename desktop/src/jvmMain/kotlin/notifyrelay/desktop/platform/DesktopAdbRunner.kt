@@ -130,6 +130,156 @@ internal object DesktopAdbRunner {
         return true
     }
 
+    /** 设备信息文件路径：由 App 侧写入 AndroidId，用于把 adb 设备与已配对设备对应起来。 */
+    private const val DEVICE_INFO_PATH =
+        "cat /storage/emulated/0/Android/data/com.xzyht.notifyrelay/files/device_info.txt"
+
+    /** 目标应用包名。 */
+    private const val PACKAGE_NAME = "com.xzyht.notifyrelay"
+
+    /** adb 设备条目。 */
+    data class Device(
+        val serial: String,
+        val state: String,
+        val model: String,
+    ) {
+        /** 是否在线（device 状态）。 */
+        val isOnline: Boolean get() = state == "device"
+
+        /**
+         * 是否无线连接。
+         *
+         * 除 Windows `AdbDeviceFactory.ResolveType` 的 `:` / `tcp` 判定外，
+         * 还需识别 adb 无线调试的 mDNS 序列号形态
+         * （`adb-<serial>-<suffix>._adb-tls-connect._tcp`），否则会被误判为 USB。
+         */
+        val isWireless: Boolean
+            get() =
+                serial.contains(':') ||
+                    serial.contains("tcp") ||
+                    serial.contains("_adb-tls-connect") ||
+                    serial.contains("_adb-tls-pairing")
+
+        /** 该设备的 adb 端口；无线序列号取冒号后的端口，无则按 5555。 */
+        val port: Int
+            get() = serial.substringAfterLast(':', "5555").toIntOrNull() ?: 5555
+    }
+
+    /**
+     * 枚举 adb 设备（`adb devices -l`）。
+     *
+     * @return 设备列表；命令失败返回空列表
+     */
+    fun devices(adbPath: String): List<Device> {
+        val result = run(adbPath, listOf("devices", "-l")) ?: return emptyList()
+        return result.stdout
+            .lineSequence()
+            .drop(1)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() && !it.startsWith("*") }
+            .mapNotNull { line ->
+                val parts = line.split(Regex("\\s+"))
+                if (parts.size < 2) return@mapNotNull null
+                val serial = parts[0]
+                val state = parts[1]
+                val model =
+                    parts
+                        .firstOrNull { it.startsWith("model:") }
+                        ?.removePrefix("model:")
+                        .orEmpty()
+                Device(serial, state, model)
+            }.toList()
+    }
+
+    /** 指定序列号是否在线。 */
+    fun isOnline(
+        adbPath: String,
+        serial: String,
+    ): Boolean = devices(adbPath).any { it.serial == serial && it.isOnline }
+
+    /**
+     * 读取设备的 AndroidId（`device_info.txt` 内容）。
+     *
+     * @return 设备 UUID；文件不存在或内容为空时返回 null
+     */
+    fun androidId(
+        adbPath: String,
+        serial: String,
+    ): String? = shell(adbPath, serial, DEVICE_INFO_PATH)?.trim()?.takeIf { it.isNotEmpty() }
+
+    /**
+     * 连接无线 adb。
+     *
+     * @param port adb 端口
+     * @return 是否连接成功（输出含 connected 且不含 failed/refused）
+     */
+    fun connect(
+        adbPath: String,
+        host: String,
+        port: Int = 5555,
+    ): Boolean {
+        if (host.isBlank()) return false
+        val result = run(adbPath, listOf("connect", host + ":" + port)) ?: return false
+        val output = (result.stdout + result.stderr).lowercase()
+        if (output.contains("failed") || output.contains("refused")) return false
+        return output.contains("connected")
+    }
+
+    /**
+     * 对指定设备启用 tcpip 模式（会重启对端 adbd）。
+     *
+     * @return 是否成功
+     */
+    fun enableTcpip(
+        adbPath: String,
+        serial: String,
+        port: Int = 5555,
+    ): Boolean {
+        val result = run(adbPath, listOf("-s", serial, "tcpip", port.toString())) ?: return false
+        if (result.exitCode != 0) {
+            Logger.w(TAG, "启用 tcpip 失败: " + result.stderr.trim())
+            return false
+        }
+        return true
+    }
+
+    /** 设备上是否已安装 NotifyRelay。 */
+    fun isAppInstalled(
+        adbPath: String,
+        serial: String,
+    ): Boolean {
+        val output = shell(adbPath, serial, "pm list packages " + PACKAGE_NAME).orEmpty()
+        return output.contains(PACKAGE_NAME)
+    }
+
+    /**
+     * 授予 NotifyRelay 运行所需权限（对齐 Windows `AdbDeviceInfoResolver.GrantPermissionsAsync`）。
+     *
+     * 未安装应用时命令必然失败，属正常情况直接跳过。
+     */
+    fun grantPermissions(
+        adbPath: String,
+        serial: String,
+    ) {
+        if (!isAppInstalled(adbPath, serial)) return
+        // pm grant 幂等，直接执行
+        run(adbPath, listOf("-s", serial, "shell", "pm grant", PACKAGE_NAME, "android.permission.READ_LOGS"))
+        // 后台读剪贴板所需；部分设备不支持该 appops，失败不影响主流程
+        run(adbPath, listOf("-s", serial, "shell", "cmd", "appops", "set", PACKAGE_NAME, "READ_CLIPBOARD", "allow"))
+    }
+
+    /** 通过 `ip route` 取设备的 WiFi IP。 */
+    fun wifiIp(
+        adbPath: String,
+        serial: String,
+    ): String? {
+        val output = shell(adbPath, serial, "ip route get 0.0.0.0").orEmpty()
+        val idx = output.indexOf("src ")
+        if (idx < 0) return null
+        val ip = output.substring(idx + 4).trim().substringBefore(' ')
+        return ip.takeIf { it.isNotEmpty() }
+    }
+
     /** 解析配置里的解锁命令：按行拆分、去空白、去空行。 */
     fun parseCommands(raw: String): List<String> =
         raw

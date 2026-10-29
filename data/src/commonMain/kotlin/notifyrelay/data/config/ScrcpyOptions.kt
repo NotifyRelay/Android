@@ -59,12 +59,13 @@ object ScrcpyOptions {
      * @param settings 设备配置
      * @param serial 目标设备序列号（`adb devices` 中的标识）
      * @param startApp 启动后要拉起的包名；为空表示仅投屏
-     * @param iconPath 图标路径（注入 `SCRCPY_ICON_PATH` 由调用方负责）
+     * @param windowTitle 窗口标题；仅在 [startApp] 非空时生效（对齐 Windows 的应用启动带标题）
      */
     fun buildArguments(
         settings: ScrcpySettings,
         serial: String,
         startApp: String = "",
+        windowTitle: String = "",
     ): List<String> {
         val args = mutableListOf<String>()
         args.add("-s")
@@ -76,7 +77,7 @@ object ScrcpyOptions {
             args.add("--no-video")
             args.add("--audio-source=playback")
             args.add("--audio-dup")
-            if (settings.audioBitrate.isNotBlank()) args.add("--audio-bit-rate=" + settings.audioBitrate)
+            formatBitrate(settings.audioBitrate, "K")?.let { args.add("--audio-bit-rate=" + it) }
             if (settings.audioBuffer.isNotBlank()) args.add("--audio-buffer=" + settings.audioBuffer)
             if (settings.audioOutputBuffer.isNotBlank()) args.add("--audio-output-buffer=" + settings.audioOutputBuffer)
             return args
@@ -85,6 +86,7 @@ object ScrcpyOptions {
         // 启动应用参数前置（与 Windows 端 args[0].StartsWith("--start-app") 的判定顺序对应）
         if (startApp.isNotBlank()) {
             args.add("--start-app=" + startApp)
+            if (windowTitle.isNotBlank()) args.add("--window-title=" + windowTitle)
         }
 
         if (settings.customArguments.isNotBlank()) {
@@ -105,7 +107,7 @@ object ScrcpyOptions {
             args.addAll(it.split(WHITESPACE).filter { part -> part.isNotBlank() })
         }
         if (settings.videoResolution.isNotBlank()) args.add("--max-size=" + settings.videoResolution)
-        if (settings.videoBitrate.isNotBlank()) args.add("--video-bit-rate=" + settings.videoBitrate)
+        formatBitrate(settings.videoBitrate, "M")?.let { args.add("--video-bit-rate=" + it) }
         if (settings.videoBuffer.isNotBlank()) args.add("--video-buffer=" + settings.videoBuffer)
         if (settings.frameRate.isNotBlank()) args.add("--max-fps=" + settings.frameRate)
         if (settings.crop.isNotBlank()) args.add("--crop=" + settings.crop)
@@ -115,7 +117,7 @@ object ScrcpyOptions {
         if (settings.display.isNotBlank()) args.add("--display-id=" + settings.display)
 
         // 音频
-        if (settings.audioBitrate.isNotBlank()) args.add("--audio-bit-rate=" + settings.audioBitrate)
+        formatBitrate(settings.audioBitrate, "K")?.let { args.add("--audio-bit-rate=" + it) }
         if (settings.audioBuffer.isNotBlank()) args.add("--audio-buffer=" + settings.audioBuffer)
         if (settings.audioOutputBuffer.isNotBlank()) args.add("--audio-output-buffer=" + settings.audioOutputBuffer)
         if (settings.forwardMicrophone) args.add("--audio-source=mic")
@@ -128,12 +130,38 @@ object ScrcpyOptions {
             args.addAll(it.split(WHITESPACE).filter { part -> part.isNotBlank() })
         }
 
-        // 虚拟显示（与 Windows 端一致：仅启用虚拟显示时追加；未启用则终止既存进程，由调用方处理）
-        if (settings.virtualDisplaySize.isNotBlank()) {
-            args.add("--new-display=" + settings.virtualDisplaySize)
+        // 虚拟显示：仅在带 --start-app 启动应用时生效（对齐 Windows ScrcpyConfigBuilder），
+        // 且受 virtualDisplayEnabled 开关控制；未启用虚拟显示时由调用方终止既存进程。
+        if (startApp.isNotBlank() && settings.virtualDisplayEnabled) {
+            if (settings.virtualDisplaySize.isNotBlank()) {
+                args.add("--new-display=" + settings.virtualDisplaySize)
+            } else {
+                args.add("--new-display")
+            }
         }
 
         return args
+    }
+
+    /**
+     * 码率格式化。
+     *
+     * 配置存数值（对齐 Android 端 `video_bit_rate_input` / `audio_bit_rate_input`），
+     * 而 scrcpy 命令行要求带单位：纯数字按 [unit] 补后缀，已带 M/K/G 则原样返回。
+     *
+     * @return 可用的码率文本；无法解析时返回 null（跳过该参数）
+     */
+    private fun formatBitrate(
+        raw: String,
+        unit: String,
+    ): String? {
+        val text = raw.trim()
+        if (text.isEmpty()) return null
+        val last = text.last().uppercaseChar()
+        if (last == 'M' || last == 'K' || last == 'G') return text
+        val number = text.toDoubleOrNull() ?: return null
+        val normalized = if (number == number.toLong().toDouble()) number.toLong().toString() else number.toString()
+        return normalized + unit
     }
 
     private val WHITESPACE = Regex("\\s+")

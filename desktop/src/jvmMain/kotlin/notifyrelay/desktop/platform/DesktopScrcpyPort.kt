@@ -49,9 +49,27 @@ internal object DesktopScrcpyPort : ScrcpyPort {
 
     override fun launch(
         deviceUuid: String,
-        serial: String,
+        deviceName: String,
+        deviceIp: String,
         startApp: String,
-    ): Boolean = DesktopScrcpyLauncher.launch(deviceUuid, serial, startApp)
+        startAppTitle: String,
+    ): Boolean = DesktopScrcpyLauncher.launch(deviceUuid, deviceName, deviceIp, startApp, startAppTitle)
+
+    override fun resolveSerial(
+        deviceUuid: String,
+        deviceName: String,
+        deviceIp: String,
+    ): String? {
+        val settings = ScrcpySettingsStore.load(deviceUuid)
+        return DesktopAdbDeviceResolver.resolveSerial(
+            adbPath = DesktopScrcpyLauncher.adbPath(),
+            deviceUuid = deviceUuid,
+            deviceName = deviceName,
+            deviceIp = deviceIp,
+            preference = settings.devicePreference,
+            tcpipEnabled = settings.adbTcpipModeEnabled,
+        )
+    }
 
     override fun stop(serial: String) = DesktopScrcpyLauncher.stop(serial)
 

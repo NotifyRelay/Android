@@ -57,12 +57,19 @@ class AndroidRemoteAppsPort(
 
     override fun launchApp(
         app: RemoteAppInfo,
-        deviceIp: String,
+        deviceUuid: String,
         useScrcpyStartApp: Boolean,
     ) {
+        // 由设备 UUID 取其当前 IP 后启动
+        val device = findOnlineDevice(deviceUuid)
+        if (device == null) {
+            notifyrelay.base.log.Logger
+                .w("AndroidRemoteApps", "未找到在线设备: " + deviceUuid)
+            return
+        }
         io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity.startFullscreenControl(
             context = context,
-            ip = deviceIp,
+            ip = device.ip,
             port = 5555,
             name = app.appName,
             startApp = app.packageName,
