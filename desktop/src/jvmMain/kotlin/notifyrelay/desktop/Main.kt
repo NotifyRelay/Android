@@ -134,6 +134,8 @@ fun main() {
                     DataLayerDesktop.clipboardSync?.stop()
                     DataLayerDesktop.mediaControl?.stop()
                     DataLayerDesktop.localNotificationRelay?.stop()
+                    notifyrelay.desktop.platform.DesktopOverlayHost
+                        .stop()
                     exitApplication()
                 }
             }
@@ -184,6 +186,10 @@ fun main() {
                 DataLayerDesktop.mediaControl?.start()
                 // 本机通知采集：WinRT 桥轮询，新增通知经公共网关转发
                 DataLayerDesktop.localNotificationRelay?.start()
+                // 叠加层：拉起伴生进程并连接通道；宿主缺失时降级为不显示
+                notifyrelay.desktop.platform.DesktopOverlayHost.start(
+                    System.getProperty("notifyrelay.overlay.host").orEmpty(),
+                )
             }
 
             val actionPort = remember { DesktopNotificationActionPort() }

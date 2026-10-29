@@ -1,6 +1,8 @@
 package notifyrelay.desktop
 
 import com.xzyht.notifyrelay.nativecore.device.appsync.IconCodecPortRegistry
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import notifyrelay.data.Storage
 import notifyrelay.data.database.AppDatabaseJvmFactory
 import notifyrelay.data.database.repository.DatabaseRepository
@@ -76,6 +78,15 @@ object DataLayerDesktop {
     var clipboardSync: notifyrelay.desktop.platform.DesktopClipboardSyncPort? = null
         private set
 
+    /** 叠加层数据观察作用域（媒体会话等）。 */
+    private val overlayScope =
+        kotlinx.coroutines.CoroutineScope(
+            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
+        )
+
+    /** 媒体会话 → 叠加层的观察任务。 */
+    private var overlayMediaObserver: Job? = null
+
     /** 本机通知转发实例，由入口启动与释放。 */
     @Volatile
     var localNotificationRelay: notifyrelay.desktop.device.DesktopLocalNotificationRelay? = null
@@ -148,6 +159,59 @@ object DataLayerDesktop {
             )
             mediaControl = notifyrelay.desktop.platform.DesktopMediaControlPort { onlineDevices() }
             MediaControlPortRegistry.install(mediaControl!!)
+            // 媒体会话 → 叠加层：本机用 Compose 渲染成位图后按坐标贴上；
+            // 会话从映射中消失即移除对应位图
+            overlayMediaObserver =
+                overlayScope.launch {
+                    // 上一轮出现的设备：用于识别已结束的会话（映射里不再有该键）
+                    val shown = mutableSetOf<String>()
+                    mediaControl!!.sessionsFlow().collect { sessions ->
+                        sessions.forEach { (deviceUuid, snapshot) ->
+                            shown.add(deviceUuid)
+                            val deviceName = snapshot.packageName.orEmpty().ifBlank { deviceUuid }
+                            val png =
+                                notifyrelay.desktop.platform.DesktopOverlayRenderer.renderMediaCard(
+                                    snapshot = snapshot,
+                                    deviceName = deviceName,
+                                )
+                            if (png == null) {
+                                notifyrelay.base.log.Logger
+                                    .w("DesktopMediaMap", "媒体卡渲染失败: " + deviceUuid)
+                                return@forEach
+                            }
+                            val width =
+                                notifyrelay.desktop.platform.DesktopOverlayRenderer.MEDIA_WIDTH
+                                    .toFloat()
+                            val height =
+                                notifyrelay.desktop.platform.DesktopOverlayRenderer.MEDIA_HEIGHT
+                                    .toFloat()
+                            val screenWidth =
+                                java.awt.Toolkit
+                                    .getDefaultToolkit()
+                                    .screenSize.width
+                                    .toFloat()
+                            val ok =
+                                notifyrelay.desktop.platform.DesktopOverlayHost.showImageOverlay(
+                                    id = "media:" + deviceUuid,
+                                    x = (screenWidth - width) / 2f,
+                                    y = 10f,
+                                    width = width,
+                                    height = height,
+                                    png = png,
+                                )
+                            notifyrelay.base.log.Logger.i(
+                                "DesktopMediaMap",
+                                "媒体卡已推送 " + deviceUuid + " " + png.size + "B ok=" + ok,
+                            )
+                        }
+                        // 已不在映射中的设备：移除其位图
+                        shown.filterNot { sessions.containsKey(it) }.forEach { deviceUuid ->
+                            notifyrelay.desktop.platform.DesktopOverlayHost
+                                .removeImageOverlay("media:" + deviceUuid)
+                            shown.remove(deviceUuid)
+                        }
+                    }
+                }
             SuperIslandConfigPortRegistry.install(DesktopSuperIslandConfigPort())
 
             // 剪贴板同步：收发判定在 Rust core，平台只做系统剪贴板读写

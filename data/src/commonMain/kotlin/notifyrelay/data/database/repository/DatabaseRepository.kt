@@ -238,6 +238,16 @@ open class DatabaseRepository(
     suspend fun getNotificationCountByDevice(deviceUuid: String): Int = notificationRecordDao.countByDevice(deviceUuid)
 
     /**
+     * 判断是否已存在同内容通知记录（跨重启内容级判重）
+     */
+    suspend fun hasNotificationWithContent(
+        deviceUuid: String,
+        packageName: String,
+        title: String,
+        text: String,
+    ): Boolean = notificationRecordDao.countByContent(deviceUuid, packageName, title, text) > 0
+
+    /**
      * 根据包名和设备UUID删除通知记录
      */
     suspend fun deleteNotificationsByPackageAndDevice(

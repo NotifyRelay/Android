@@ -93,6 +93,21 @@ interface NotificationRecordDao {
     )
 
     /**
+     * 判断是否已存在同内容通知记录。
+     *
+     * 用于跨重启的内容级判重：本机通知每次采集的时间戳不同，
+     * 不能以「时间+包名+设备」作键，需按「设备 + 包名 + 标题 + 内容」比对
+     * （与 Windows `NotificationRepository` 的聚合键同思路）。
+     */
+    @Query("SELECT COUNT(*) FROM notification_records WHERE deviceUuid = :deviceUuid AND packageName = :packageName AND title = :title AND text = :text")
+    suspend fun countByContent(
+        deviceUuid: String,
+        packageName: String,
+        title: String,
+        text: String,
+    ): Int
+
+    /**
      * 根据包名和设备UUID获取通知记录，按时间降序排序
      */
     @Query("SELECT * FROM notification_records WHERE packageName = :packageName AND deviceUuid = :deviceUuid ORDER BY time DESC")

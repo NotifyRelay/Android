@@ -92,5 +92,8 @@ internal class DesktopDataMessagePort(
     override fun onSuperIsland(
         deviceUuid: String,
         payload: String,
-    ) = Unit
+    ) {
+        // 超级岛：归一解析后转投叠加层（布局由叠加层解析 paramV2Raw）
+        DesktopSuperIslandRemoteHandler.onSuperIsland(deviceUuid, payload)
+    }
 }
