@@ -207,7 +207,10 @@ class DesktopDeviceManager(
 
     override val rejectedDeviceIds: MutableSet<String> get() = rejectedDevices
 
-    override val incompatibleDeviceIds: MutableSet<String> = mutableSetOf()
+    // 协议不兼容设备集合：由 Rust 配对回调写入、由 PairedDeviceRemover 直接移除，
+    // 故须为同步集合——其包装对象同时是 PairingCallbackHandler 的同步监视器。
+    override val incompatibleDeviceIds: MutableSet<String> =
+        java.util.Collections.synchronizedSet(mutableSetOf())
 
     override val authenticatedDeviceTable: MutableMap<String, AuthInfo> get() = authenticatedDevices
 
