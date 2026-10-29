@@ -34,7 +34,8 @@ class DesktopDeviceManager(
     private val localDisplayName: String = MachineName.resolve(),
 ) : DeviceAdminPort,
     DeviceAuthTablePort,
-    DeviceCallbackHost {
+    DeviceCallbackHost,
+    notifyrelay.domain.feature.device.service.contract.DeviceMessagePort {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val authenticatedDevices = mutableMapOf<String, AuthInfo>()
@@ -228,7 +229,7 @@ class DesktopDeviceManager(
     fun start() {
         // 注册核心回调：设备发现/连接事件需要它们才能刷新列表，core 日志也经此输出
         com.xzyht.notifyrelay.nativecore.device.service.callback.RustCallbackInstaller
-            .install(this, dataPort = DesktopDataMessagePort(this))
+            .install(this, dataPort = DesktopDataMessagePort(this, this))
 
         if (!NativeCore.isReady() && !NativeCore.createContext()) {
             Logger.e(TAG, "Rust core 上下文创建失败，设备功能不可用")

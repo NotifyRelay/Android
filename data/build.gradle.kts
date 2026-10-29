@@ -84,6 +84,10 @@ kotlin {
             // Kotlin Coroutines
             implementation(libs.bundles.kotlinx.coroutines)
         }
+
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
     }
 }
 

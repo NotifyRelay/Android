@@ -1,47 +1,42 @@
-package com.xzyht.notifyrelay.ui.pages.superisland
+package notifyrelay.shared.ui.pages.superisland
 
-import android.content.Context
-import com.google.gson.GsonBuilder
-import com.google.gson.JsonParser
-import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
-import notifyrelay.base.log.Logger
-import notifyrelay.base.util.ClipboardUtils
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonElement
 import notifyrelay.base.util.TimestampFormatter
-import notifyrelay.base.util.ToastUtils
 import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 
-internal fun buildEntryCopyText(
+/** 组装历史条目的复制文本。 */
+fun buildEntryCopyText(
     entry: SuperIslandHistoryEntry,
     includeImageDataOnCopy: Boolean,
 ): String =
     buildString {
-        appendLine("id: ${entry.id}")
-        appendLine("timestamp: ${TimestampFormatter.format(entry.id)}")
+        appendLine("id: " + entry.id)
+        appendLine("timestamp: " + TimestampFormatter.format(entry.id))
         entry.sourceDeviceUuid?.takeIf { it.isNotBlank() }?.let {
-            appendLine("sourceDeviceUuid: $it")
+            appendLine("sourceDeviceUuid: " + it)
         }
         entry.originalPackage?.takeIf { it.isNotBlank() }?.let {
-            appendLine("originalPackage: $it")
+            appendLine("originalPackage: " + it)
         }
         entry.mappedPackage?.takeIf { it.isNotBlank() }?.let {
-            appendLine("mappedPackage: $it")
+            appendLine("mappedPackage: " + it)
         }
         entry.appName?.takeIf { it.isNotBlank() }?.let {
-            appendLine("appName: $it")
+            appendLine("appName: " + it)
         }
         entry.title?.takeIf { it.isNotBlank() }?.let {
-            appendLine("title: $it")
+            appendLine("title: " + it)
         }
         entry.text?.takeIf { it.isNotBlank() }?.let {
-            appendLine("text: ${sanitizeImageContent(it, includeImageDataOnCopy)}")
+            appendLine("text: " + sanitizeImageContent(it, includeImageDataOnCopy))
         }
         if (entry.picMap.isNotEmpty()) {
             appendLine("picMap:")
             entry.picMap.forEach { (label, data) ->
                 val finalLabel = label.ifBlank { "(未命名图片)" }
                 val finalData = if (includeImageDataOnCopy) data else "图片"
-                appendLine("  $finalLabel: $finalData")
+                appendLine("  " + finalLabel + ": " + finalData)
             }
         }
         entry.paramV2Raw?.takeIf { it.isNotBlank() }?.let {
@@ -52,51 +47,8 @@ internal fun buildEntryCopyText(
         }
     }.trim()
 
-internal fun copyEntryToClipboard(
-    context: Context,
-    content: String,
-) {
-    if (content.isBlank()) {
-        ToastUtils.showShortToast(context, "当前条目无可复制内容")
-        return
-    }
-    if (ClipboardUtils.copyText(context, "super_island_entry", content)) {
-        ToastUtils.showShortToast(context, "已复制原始消息到剪贴板")
-    } else {
-        // ClipboardUtils 内部已记录异常，此处仅补充业务语义提示（异常堆栈见 ClipboardUtils 的 Logger.e）
-        Logger.w("NotifyRelay", "复制超级岛原始消息失败")
-        ToastUtils.showShortToast(context, "复制失败")
-    }
-}
-
-internal fun triggerFloatingReplica(
-    context: Context,
-    entry: SuperIslandHistoryEntry,
-) {
-    // 主动展示同样受「超级岛显示」开关约束：关闭时提示用户并中止
-    if (!SuperIslandConfigUtils.confirmManualRemoteSuperIslandDisplay(context)) return
-    val sourceId =
-        entry.mappedPackage?.takeIf { it.isNotBlank() }
-            ?: entry.originalPackage?.takeIf { it.isNotBlank() }
-            ?: entry.appName?.takeIf { it.isNotBlank() }
-            ?: entry.id.toString()
-    val title =
-        entry.title?.takeIf { it.isNotBlank() }
-            ?: entry.appName?.takeIf { it.isNotBlank() }
-            ?: entry.mappedPackage?.takeIf { it.isNotBlank() }
-            ?: entry.originalPackage?.takeIf { it.isNotBlank() }
-    FloatingReplicaManager.showFloating(
-        context = context,
-        sourceId = sourceId,
-        title = title,
-        text = entry.text,
-        paramV2Raw = entry.paramV2Raw,
-        picMap = entry.picMap.takeIf { it.isNotEmpty() },
-        isLocked = false,
-    )
-}
-
-internal fun sanitizeImageContent(
+/** 把图片原始数据替换为占位文本。 */
+fun sanitizeImageContent(
     source: String,
     includeImageDataOnCopy: Boolean,
 ): String {
@@ -118,6 +70,8 @@ private val IMAGE_URL_REGEX =
         options = setOf(RegexOption.IGNORE_CASE),
     )
 
+private val prettyJson = Json { prettyPrint = true }
+
 private fun formatMultilineContent(content: String): List<String> {
     if (content.isBlank()) return emptyList()
     prettyPrintJson(content)?.let { return it }
@@ -128,13 +82,13 @@ private fun prettyPrintJson(text: String): List<String>? {
     val firstNonWhitespace = text.firstOrNull { !it.isWhitespace() } ?: return emptyList()
     if (firstNonWhitespace != '{' && firstNonWhitespace != '[') return null
     return try {
-        val jsonElement = JsonParser.parseString(text)
-        val pretty = prettyGson.toJson(jsonElement)
-        pretty
+        val element = prettyJson.parseToJsonElement(text)
+        prettyJson
+            .encodeToString(JsonElement.serializer(), element)
             .lineSequence()
             .flatMap { wrapPlainText(it).asSequence() }
             .toList()
-    } catch (_: Exception) {
+    } catch (e: IllegalArgumentException) {
         null
     }
 }
@@ -161,8 +115,6 @@ private fun wrapPlainText(text: String): List<String> {
     return result
 }
 
-private val prettyGson by lazy { GsonBuilder().setPrettyPrinting().create() }
-
 private const val SANITIZED_LINE_WRAP = 80
 private val WRAP_BREAK_CHARS = charArrayOf(',', ' ', ';', ')', ']', '}', '"')
 
@@ -173,8 +125,8 @@ private fun StringBuilder.appendMultilineField(
 ) {
     val sanitized = sanitizeImageContent(content, includeImageDataOnCopy).trim()
     if (sanitized.isBlank()) return
-    appendLine("$label:")
+    appendLine(label + ":")
     formatMultilineContent(sanitized).forEach {
-        appendLine("  $it")
+        appendLine("  " + it)
     }
 }

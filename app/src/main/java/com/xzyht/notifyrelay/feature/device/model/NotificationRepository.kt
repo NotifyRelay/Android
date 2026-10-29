@@ -7,12 +7,12 @@ import android.service.notification.StatusBarNotification
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
-import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 import notifyrelay.domain.sync.notification.data.NotificationRecordDto
 
 /**
@@ -210,7 +210,7 @@ object NotificationRepository {
             syncToCache(context)
             // 被动去重：仅在智能去重开启时，通知 BackendRemoteFilter 检查是否命中可撤回队列并撤回复刻通知
             try {
-                if (RemoteFilterConfig.enableDeduplication) {
+                if (RemoteFilterPortRegistry.current?.enableDedup == true) {
                     BackendRemoteFilter
                         .onLocalNotificationEnqueued(title, text, packageName, time, context)
                 } else {

@@ -58,9 +58,13 @@ import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
 import notifyrelay.shared.ui.navigation.rememberNavigator
 import notifyrelay.shared.ui.pages.MusicControlPage
+import notifyrelay.shared.ui.pages.UISuperIslandSettings
+import notifyrelay.shared.ui.pages.chat.UIChatTest
 import notifyrelay.shared.ui.pages.history.LocalNotificationActionPort
 import notifyrelay.shared.ui.pages.history.NotificationHistoryScreen
+import notifyrelay.shared.ui.pages.history.SuperIslandHistoryScreen
 import notifyrelay.shared.ui.port.ThemeBaseIndex
+import notifyrelay.shared.ui.screen.DeveloperModeScreen
 import notifyrelay.shared.ui.screen.DeviceForwardScreen
 import notifyrelay.shared.ui.screen.HistoryScreen
 import notifyrelay.shared.ui.screen.MainScreen
@@ -185,7 +189,7 @@ fun main() {
                                 LocalDevicePortsProvider provides devicePortsProvider,
                                 LocalNavigator provides navigator,
                             ) {
-                                DesktopRoot(navigator, darkTheme)
+                                DesktopRoot(navigator, darkTheme, devicePortsProvider)
                             }
                         }
                     }
@@ -220,6 +224,7 @@ fun main() {
 private fun DesktopRoot(
     navigator: Navigator,
     darkTheme: Boolean,
+    devicePortsProvider: DesktopDevicePortsProvider,
 ) {
     NotifyRelayTheme(darkTheme = darkTheme) {
         Box(
@@ -261,8 +266,13 @@ private fun DesktopRoot(
                             HistoryScreen(
                                 navigator,
                                 notificationHistory = { NotificationHistoryScreen() },
-                                superIslandHistory = {},
-                                chatTest = {},
+                                superIslandHistory = { SuperIslandHistoryScreen() },
+                                chatTest = {
+                                    UIChatTest(
+                                        deviceManager = devicePortsProviderChatPort(devicePortsProvider),
+                                        onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
+                                    )
+                                },
                             )
                         },
                         forwardContent = {
@@ -281,14 +291,20 @@ private fun DesktopRoot(
                     HistoryScreen(
                         navigator,
                         notificationHistory = { NotificationHistoryScreen() },
-                        superIslandHistory = {},
-                        chatTest = {},
+                        superIslandHistory = { SuperIslandHistoryScreen() },
+                        chatTest = {
+                            UIChatTest(
+                                deviceManager = devicePortsProviderChatPort(devicePortsProvider),
+                                onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
+                            )
+                        },
                     )
                 }
                 entry<Route.Settings> { SettingsScreen() }
                 entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
                 entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
-                entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen {} }
+                entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
+                entry<Route.SettingsDeveloperMode> { DeveloperModeScreen() }
                 entry<Route.SettingsAbout> { SettingsAboutScreen {} }
                 entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
                 // 屏幕镜像相关路由在桌面端不接线，给出占位页避免导航失败
@@ -298,6 +314,21 @@ private fun DesktopRoot(
             }
         }
     }
+}
+
+/** 构造桌面端聊天端口。 */
+private fun devicePortsProviderChatPort(provider: DesktopDevicePortsProvider): notifyrelay.domain.feature.device.service.contract.DeviceChatPort = provider.chat()
+
+/** 发送聊天测试消息：报文构造与入队由公共网关承担。 */
+private fun sendChatMessage(
+    provider: DesktopDevicePortsProvider,
+    message: String,
+) {
+    com.xzyht.notifyrelay.nativecore.device.appsync.ChatSendGateway.sendChatMessage(
+        localPackageName = "com.xzyht.notifyrelay.desktop",
+        message = message,
+        deviceManager = provider.message(),
+    )
 }
 
 /** 以公共端端口注册表构造远端过滤 ViewModel。 */

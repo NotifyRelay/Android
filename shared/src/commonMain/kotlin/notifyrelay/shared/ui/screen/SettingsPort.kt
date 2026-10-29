@@ -6,9 +6,6 @@ import androidx.compose.runtime.staticCompositionLocalOf
 interface SettingsPort {
     /** 开发者模式是否已激活。 */
     fun isDeveloperModeEnabled(): Boolean
-
-    /** 打开开发者选项页面。 */
-    fun openDeveloperMode()
 }
 
 /** 由宿主提供实现。 */

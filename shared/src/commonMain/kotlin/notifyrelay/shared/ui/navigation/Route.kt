@@ -66,6 +66,13 @@ sealed interface Route : NavKey {
     data object SettingsSuperIsland : Route
 
     /**
+     * 设置-开发者选项子页面
+     * Settings developer options sub page
+     */
+    @Serializable
+    data object SettingsDeveloperMode : Route
+
+    /**
      * 设置-屏幕镜像子页面
      * Settings scrcpy sub page
      */

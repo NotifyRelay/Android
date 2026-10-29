@@ -2,9 +2,9 @@ package notifyrelay.data.config
 
 import notifyrelay.base.SuperIslandStorageKeys
 import notifyrelay.base.util.VersionUtils
+import notifyrelay.data.Storage
 import notifyrelay.domain.feature.notification.superisland.SpecInjectionMode
 import notifyrelay.domain.platform.FormFactorPort
-import notifyrelay.data.Storage
 
 /**
  * 超级岛配置策略：键定义、持久化编码与互斥推导的唯一实现。
@@ -42,8 +42,7 @@ object SuperIslandConfigPolicy {
     }
 
     /** 浮窗兼容是否开启。 */
-    fun isFloatingWindowEnabled(formFactor: FormFactorPort?): Boolean =
-        Storage.getBoolean(SuperIslandStorageKeys.FLOATING_WINDOW, defaultFloatingWindowEnabled(formFactor))
+    fun isFloatingWindowEnabled(formFactor: FormFactorPort?): Boolean = Storage.getBoolean(SuperIslandStorageKeys.FLOATING_WINDOW, defaultFloatingWindowEnabled(formFactor))
 
     /** 是否列表模式；默认值由「非浮窗 + 平板」推导。 */
     fun isNotificationListMode(formFactor: FormFactorPort?): Boolean {

@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages
+package notifyrelay.shared.ui.pages.chat
 
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -21,14 +21,11 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
-import com.xzyht.notifyrelay.sync.MessageSender
-import notifyrelay.base.log.Logger
-import notifyrelay.base.util.ClipboardUtils
-import notifyrelay.base.util.ToastUtils
 import notifyrelay.domain.feature.device.service.contract.DeviceChatPort
+import notifyrelay.domain.feature.notification.chat.ChatMemory
+import notifyrelay.shared.ui.port.LocalClipboardPort
+import notifyrelay.shared.ui.port.LocalToastPort
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Surface
 import top.yukonga.miuix.kmp.basic.Text
@@ -36,28 +33,32 @@ import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 /**
- * 聊天测试独立组件，从 DeviceForwardFragment 中抽离
+ * 聊天测试页。
+ *
+ * 页面只负责展示与输入：发送动作经 [onSendMessage] 注入（平台侧决定发送实现），
+ * 历史来自公共 [ChatMemory]。
  */
 @Composable
 fun UIChatTest(
     deviceManager: DeviceChatPort,
+    onSendMessage: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val context = LocalContext.current
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
+    val clipboardPort = LocalClipboardPort.current
+    val toastPort = LocalToastPort.current
 
     var chatInput by rememberSaveable { mutableStateOf("") }
     val chatHistoryState = remember { mutableStateOf<List<String>>(emptyList()) }
 
-    LaunchedEffect(context) {
-        chatHistoryState.value = ChatMemory.getChatHistory(context)
+    LaunchedEffect(Unit) {
+        chatHistoryState.value = ChatMemory.getHistory()
     }
     val notificationCallback: (String) -> Unit =
         remember {
-            { data: String ->
-                // Logger.d("NotifyRelay(狂鼠)", "UIChatTest onNotificationDataReceived: $data")
-                chatHistoryState.value = ChatMemory.getChatHistory(context)
+            { _: String ->
+                chatHistoryState.value = ChatMemory.getHistory()
             }
         }
     DisposableEffect(deviceManager) {
@@ -66,8 +67,6 @@ fun UIChatTest(
             deviceManager.unregisterOnNotificationDataReceived(notificationCallback)
         }
     }
-
-    // 通知数据回调仅在上层 DeviceForwardScreen 注册并同步 ChatMemory，这里只读取显示与发送
 
     Column(modifier = modifier.fillMaxSize().padding(top = 8.dp)) {
         val listState = remember { LazyListState() }
@@ -108,10 +107,10 @@ fun UIChatTest(
                                 .combinedClickable(
                                     onClick = {},
                                     onLongClick = {
-                                        if (ClipboardUtils.copyText(context, "message", msg)) {
-                                            ToastUtils.showShortToast(context, "已复制原始消息到剪贴板")
+                                        if (clipboardPort.copyText("message", msg)) {
+                                            toastPort.short("已复制原始消息到剪贴板")
                                         } else {
-                                            Logger.e("NotifyRelay", "复制失败")
+                                            toastPort.short("复制失败")
                                         }
                                     },
                                 ),
@@ -142,25 +141,19 @@ fun UIChatTest(
             )
             Button(
                 onClick = {
-                    MessageSender.sendChatMessage(
-                        context,
-                        chatInput,
-                        deviceManager,
-                    )
-                    chatHistoryState.value = ChatMemory.getChatHistory(context)
+                    onSendMessage(chatInput)
+                    chatHistoryState.value = ChatMemory.getHistory()
                     chatInput = ""
                 },
-                enabled =
-                    MessageSender.hasAvailableDevices(deviceManager) &&
-                        MessageSender.isValidMessage(chatInput),
+                enabled = deviceManager.devices.value.isNotEmpty() && chatInput.isNotBlank(),
                 modifier = Modifier.align(Alignment.CenterVertically),
             ) {
                 Text("发送")
             }
             Button(
                 onClick = {
-                    ChatMemory.clearAll(context)
-                    chatHistoryState.value = ChatMemory.getChatHistory(context)
+                    ChatMemory.clear()
+                    chatHistoryState.value = ChatMemory.getHistory()
                 },
                 modifier =
                     Modifier

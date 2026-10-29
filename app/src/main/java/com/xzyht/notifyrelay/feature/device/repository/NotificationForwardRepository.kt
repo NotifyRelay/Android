@@ -160,9 +160,9 @@ suspend fun replicateNotification(
     } catch (e: Exception) {
         Logger.e("NotifyRelay(狂鼠)", "[立即]远程通知复刻失败", e)
     }
-    com.xzyht.notifyrelay.feature.notification.data.ChatMemory
-        .append(context, "收到: ${result.rawData}")
+    notifyrelay.domain.feature.notification.chat.ChatMemory
+        .append("收到: " + result.rawData)
     chatHistoryState?.value =
-        com.xzyht.notifyrelay.feature.notification.data.ChatMemory
-            .getChatHistory(context)
+        notifyrelay.domain.feature.notification.chat.ChatMemory
+            .getHistory()
 }

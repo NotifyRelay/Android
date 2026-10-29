@@ -1,69 +1,60 @@
 package notifyrelay.desktop.platform
 
 import androidx.compose.ui.graphics.ImageBitmap
+import com.xzyht.notifyrelay.nativecore.device.appsync.RemoteAppIconCache
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import notifyrelay.domain.feature.appslist.model.LocalAppInfo
-import notifyrelay.domain.feature.notification.filter.RemoteFilterPort
+import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.appslist.AppIconPort
 import notifyrelay.shared.feature.appslist.LocalAppsPort
 
 /**
- * 桌面端远端过滤端口：默认不过滤。
+ * 桌面端远端应用列表端口。
  *
- * 桌面端暂无远端通知源，过滤规则保持中性；接入真实数据后改为持久化配置。
+ * 列表来自公共缓存；本机应用不列出，因此 [launchApp] 走 scrcpy 启动层（P3 接线前为空操作）。
  */
-class DesktopRemoteFilterPort : RemoteFilterPort {
-    override var filterMode: String = "none"
-    override var enableDedup: Boolean = false
-    override var enablePackageGroupMapping: Boolean = false
-    override var enableLockScreenOnly: Boolean = false
-    override val defaultPackageGroups: List<List<String>> = emptyList()
-    override var defaultGroupEnabled: List<Boolean> = emptyList()
-    override var customPackageGroups: List<List<String>> = emptyList()
-    override var customGroupEnabled: List<Boolean> = emptyList()
-    override var isLoaded: Boolean = true
+class DesktopRemoteAppsPort : notifyrelay.domain.feature.appslist.RemoteAppsPort {
+    private val pinned = MutableStateFlow<Map<String, Set<String>>>(emptyMap())
 
-    override suspend fun load() = Unit
+    override val iconUpdates: StateFlow<Pair<String, Long>?> get() = RemoteAppIconCache.iconUpdates
 
-    override suspend fun save() = Unit
+    override val pinnedApps: StateFlow<Map<String, Set<String>>> = pinned
 
-    override fun activeFilterList(): List<Pair<String, String?>> = emptyList()
+    override suspend fun remoteApps(deviceUuid: String): List<notifyrelay.domain.feature.appslist.model.RemoteAppInfo> =
+        com.xzyht.notifyrelay.nativecore.device.appsync.RemoteAppsCacheCore
+            .list(deviceUuid)
 
-    override fun isActiveEntryEnabled(
+    override fun loadPinned(deviceUuid: String) = Unit
+
+    override fun pin(
+        deviceUuid: String,
         packageName: String,
-        keyword: String,
-    ): Boolean = false
-
-    override suspend fun setEntryEnabled(
-        packageName: String,
-        keyword: String,
-        enabled: Boolean,
     ) = Unit
 
-    override suspend fun addEntry(
+    override fun unpin(
+        deviceUuid: String,
         packageName: String,
-        keyword: String,
     ) = Unit
 
-    override suspend fun removeEntry(
-        packageName: String,
-        keyword: String,
-    ) = Unit
+    override suspend fun requestAppList(deviceUuid: String): Boolean = false
 
-    override fun mapToLocalPackage(
-        packageName: String,
-        installedPackages: Set<String>,
-    ): String = packageName
+    override fun findOnlineDevice(deviceUuid: String): DeviceInfo? = null
+
+    override fun launchApp(
+        app: notifyrelay.domain.feature.appslist.model.RemoteAppInfo,
+        deviceIp: String,
+        useScrcpyStartApp: Boolean,
+    ) = Unit
 }
 
 /** 桌面端本机应用端口：无已安装应用概念，返回空列表。 */
 class DesktopLocalAppsPort : LocalAppsPort {
-    private val _isLoading = MutableStateFlow(false)
-    override val isLoading: StateFlow<Boolean> = _isLoading
+    private val isLoadingState = MutableStateFlow(false)
+    override val isLoading: StateFlow<Boolean> = isLoadingState
 
-    private val _apps = MutableStateFlow<List<LocalAppInfo>>(emptyList())
-    override val apps: StateFlow<List<LocalAppInfo>> = _apps
+    private val appsState = MutableStateFlow<List<LocalAppInfo>>(emptyList())
+    override val apps: StateFlow<List<LocalAppInfo>> = appsState
 
     override suspend fun load() = Unit
 
@@ -81,10 +72,15 @@ class DesktopLocalAppsPort : LocalAppsPort {
     override fun installedPackageNamesSync(): Set<String> = emptySet()
 }
 
-/** 桌面端应用图标端口：暂无图标来源。 */
+/**
+ * 桌面端应用图标端口。
+ *
+ * 图标字节来自公共缓存；本机无图标来源（[localIcon] 恒 null）。
+ * 字节到 [ImageBitmap] 的解码在 #30 落地后启用，当前返回 null。
+ */
 class DesktopAppIconPort : AppIconPort {
-    private val _iconUpdates = MutableStateFlow<Pair<String, Long>?>(null)
-    override val iconUpdates: StateFlow<Pair<String, Long>?> = _iconUpdates
+    override val iconUpdates: StateFlow<Pair<String, Long>?>
+        get() = RemoteAppIconCache.iconUpdates
 
     override suspend fun localIcon(packageName: String): ImageBitmap? = null
 
@@ -94,7 +90,7 @@ class DesktopAppIconPort : AppIconPort {
 
     override suspend fun iconWithAutoRequest(
         packageName: String,
-        sourceDevice: notifyrelay.domain.feature.device.model.DeviceInfo?,
+        sourceDevice: DeviceInfo?,
     ): ImageBitmap? = null
 
     override suspend fun cacheExternalIcon(

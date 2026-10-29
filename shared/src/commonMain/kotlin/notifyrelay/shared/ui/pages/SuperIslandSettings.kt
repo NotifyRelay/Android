@@ -1,6 +1,7 @@
-package com.xzyht.notifyrelay.ui.pages
+package notifyrelay.shared.ui.pages
 
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,25 +18,23 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
-import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
-import com.xzyht.notifyrelay.ui.dialog.SuperIslandTestDialog
-import kotlinx.coroutines.Dispatchers
+import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import notifyrelay.base.SuperIslandStorageKeys
 import notifyrelay.base.config.FilterConfigDefaults
-import notifyrelay.base.util.PermissionHelper
-import notifyrelay.data.Storage
+import notifyrelay.data.config.SuperIslandConfigPolicy
 import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
-import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.data.repository.MirrorFilterRepository
 import notifyrelay.domain.feature.notification.superisland.SpecInjectionMode
+import notifyrelay.domain.platform.FormFactorPortRegistry
+import notifyrelay.shared.ui.common.DebugFlags
 import notifyrelay.shared.ui.dialog.AppPickerDialog
+import notifyrelay.shared.ui.port.LocalPreferencePort
 import notifyrelay.shared.ui.port.LocalToastPort
 import notifyrelay.shared.ui.viewmodel.SuperIslandSettingsViewModel
+import notifyrelay.shared.ui.viewmodel.superIslandSettingsViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponentDefaults
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -50,64 +49,64 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+/** 镜像应用的默认过滤包名。 */
 private val DEFAULT_MIRROR_PACKAGES: List<String>
     get() = FilterConfigDefaults.defaultMirrorPackages
 
-// 注入方式选项
+/** 注入方式选项。 */
 val specInjectionOptions =
     listOf(
         "仅超级岛规范信息注入" to SpecInjectionMode.SUPER_ISLAND,
         "仅Live Updates规范信息注入" to SpecInjectionMode.LIVE_UPDATES,
     )
 
+/**
+ * 超级岛设置页。
+ *
+ * 配置读写经公共策略与仓储；平台专属的「测试超级岛分支」入口经 [testBranchContent] 注入，
+ * 传 null 时不显示该项。
+ */
 @Composable
 fun UISuperIslandSettings(
-    viewModel: SuperIslandSettingsViewModel = viewModel(),
+    viewModel: SuperIslandSettingsViewModel = superIslandSettingsViewModel(),
+    testBranchContent: (@Composable () -> Unit)? = null,
 ) {
-    val context = LocalContext.current
+    val preferencePort = LocalPreferencePort.current
     val toastPort = LocalToastPort.current
+    val formFactor = FormFactorPortRegistry.current
 
     LaunchedEffect(Unit) {
         viewModel.load()
     }
 
-    var enabled by remember { mutableStateOf(Storage.getBoolean(SuperIslandStorageKeys.ENABLED, true)) }
+    var enabled by remember { mutableStateOf(preferencePort?.getBoolean(SuperIslandStorageKeys.ENABLED, true) ?: true) }
     val showSuperIsland = viewModel.showSuperIsland
     val floatingWindowEnabled = viewModel.floatingWindowEnabled
     val notificationListEnabled = viewModel.notificationListEnabled
-
     val specInjectionMode = viewModel.specInjectionMode
 
-    val hasFloatingWindowSetting = Storage.getString(SuperIslandConfigUtils.SUPER_ISLAND_FLOATING_WINDOW_KEY, "") != ""
+    val hasFloatingWindowSetting = preferencePort?.getString(SuperIslandStorageKeys.FLOATING_WINDOW, "")?.isNotEmpty() ?: false
+    val defaultFloatingWindowEnabled = SuperIslandConfigPolicy.defaultFloatingWindowEnabled(formFactor)
 
-    val defaultFloatingWindowEnabled = SuperIslandConfigUtils.defaultFloatingWindowEnabled()
-
-    val showTestDialog = remember { mutableStateOf(false) }
-
-    var mirrorFilterEnabled by remember { mutableStateOf(Storage.getBoolean(SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, true)) }
+    var mirrorFilterEnabled by remember {
+        mutableStateOf(preferencePort?.getBoolean(SuperIslandStorageKeys.MIRROR_FILTER_ENABLED, true) ?: true)
+    }
     var customPackages by remember { mutableStateOf<List<SuperIslandMirrorFilterEntity>>(emptyList()) }
     var showAppPicker by remember { mutableStateOf(false) }
-    var showCustomPkgInput by remember { mutableStateOf(false) }
-    var customPkgText by remember { mutableStateOf("") }
 
     val floatingWindowSummary =
         run {
             val baseSummary = "用于a16的livedata通知api被系统支持前使用浮窗展示超级岛"
-            val currentOsVersion = PermissionHelper.getDetailedOsVersion() ?: "未知"
-            val versionComparisonResult = PermissionHelper.isVersionGreaterThan(currentOsVersion, "OS3.0.300")
-            if (DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
-                "$baseSummary (当前版本: $currentOsVersion, 版本比较: ${if (versionComparisonResult) "高于" else "低于或等于"} OS3.0.300, 有用户设置: ${if (hasFloatingWindowSetting) "是" else "否"}, 预设默认值: ${if (defaultFloatingWindowEnabled) "开启" else "关闭"})"
+            if (DebugFlags.DEBUG_UI_ENABLED.value) {
+                val currentOsVersion = formFactor?.osVersion() ?: "未知"
+                "$baseSummary (当前版本: $currentOsVersion, 有用户设置: ${if (hasFloatingWindowSetting) "是" else "否"}, 预设默认值: ${if (defaultFloatingWindowEnabled) "开启" else "关闭"})"
             } else {
                 baseSummary
             }
         }
 
     suspend fun loadCustomPackages() {
-        val repo = DatabaseRepository.getInstance()
-        customPackages =
-            withContext(Dispatchers.IO) {
-                repo.getAllMirrorFilterPackages()
-            }
+        customPackages = MirrorFilterRepository.getAll()
     }
 
     LaunchedEffect(Unit) {
@@ -123,7 +122,7 @@ fun UISuperIslandSettings(
                 Modifier
                     .fillMaxSize()
                     .padding(horizontal = 16.dp, vertical = 12.dp)
-                    .verticalScroll(remember { androidx.compose.foundation.ScrollState(0) }),
+                    .verticalScroll(remember { ScrollState(0) }),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             SwitchPreference(
@@ -132,7 +131,7 @@ fun UISuperIslandSettings(
                 checked = enabled,
                 onCheckedChange = {
                     enabled = it
-                    Storage.putBoolean(SuperIslandStorageKeys.ENABLED, it)
+                    preferencePort?.putBoolean(SuperIslandStorageKeys.ENABLED, it)
                 },
             )
 
@@ -140,27 +139,21 @@ fun UISuperIslandSettings(
                 title = "超级岛显示",
                 summary = "控制是否显示来自远端的超级岛",
                 checked = showSuperIsland,
-                onCheckedChange = {
-                    viewModel.updateShowSuperIsland(it)
-                },
+                onCheckedChange = { viewModel.updateShowSuperIsland(it) },
             )
 
             SwitchPreference(
                 title = "浮窗兼容",
                 summary = floatingWindowSummary,
                 checked = floatingWindowEnabled,
-                onCheckedChange = {
-                    viewModel.updateFloatingWindowEnabled(it)
-                },
+                onCheckedChange = { viewModel.updateFloatingWindowEnabled(it) },
             )
 
             SwitchPreference(
                 title = "超级岛列表模式",
                 summary = "平板默认开启，开启后系统外显仅保留一条超级岛，点击切换",
                 checked = notificationListEnabled,
-                onCheckedChange = {
-                    viewModel.updateNotificationListEnabled(it)
-                },
+                onCheckedChange = { viewModel.updateNotificationListEnabled(it) },
             )
 
             WindowDropdownPreference(
@@ -179,12 +172,13 @@ fun UISuperIslandSettings(
                 },
             )
 
-            ArrowPreference(
-                title = "测试超级岛分支",
-                onClick = {
-                    showTestDialog.value = true
-                },
-            )
+            if (testBranchContent != null) {
+                ArrowPreference(
+                    title = "测试超级岛分支",
+                    onClick = { },
+                )
+                testBranchContent()
+            }
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))
 
@@ -194,7 +188,7 @@ fun UISuperIslandSettings(
                 checked = mirrorFilterEnabled,
                 onCheckedChange = {
                     mirrorFilterEnabled = it
-                    Storage.putBoolean(SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, it)
+                    SuperIslandConfigPolicy.setMirrorFilterEnabled(it)
                 },
             )
 
@@ -205,34 +199,30 @@ fun UISuperIslandSettings(
                 modifier = Modifier.padding(horizontal = 4.dp),
             )
 
-            val installedPkgs = remember { viewModel.installedPackages() }
+            val installedPackages = remember { viewModel.installedPackages() }
 
-            DEFAULT_MIRROR_PACKAGES.forEach { pkg ->
-                val isInstalled = installedPkgs.contains(pkg)
-                var iconBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-                val isEnabled = customPackages.find { it.packageName == pkg }?.enabled ?: true
+            DEFAULT_MIRROR_PACKAGES.forEach { packageName ->
+                val isInstalled = installedPackages.contains(packageName)
+                var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+                val isEnabled = customPackages.find { it.packageName == packageName }?.enabled ?: true
 
-                LaunchedEffect(pkg) {
+                LaunchedEffect(packageName) {
                     if (iconBitmap == null) {
-                        viewModel.loadIcon(pkg) { icon -> iconBitmap = icon }
+                        viewModel.loadIcon(packageName) { iconBitmap = it }
                     }
                 }
 
                 SwitchPreference(
-                    title = pkg,
+                    title = packageName,
                     titleColor =
                         BasicComponentDefaults.titleColor(
                             color = if (isInstalled) colorScheme.primary else colorScheme.onSurface,
                         ),
                     checked = isEnabled,
-                    onCheckedChange = { v ->
-                        kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                            DatabaseRepository.getInstance().upsertMirrorFilterPackage(
-                                SuperIslandMirrorFilterEntity(pkg, enabled = v),
-                            )
-                            withContext(Dispatchers.Main) {
-                                loadCustomPackages()
-                            }
+                    onCheckedChange = { value ->
+                        viewModel.viewModelScope.launch {
+                            MirrorFilterRepository.upsert(packageName, value)
+                            loadCustomPackages()
                         }
                     },
                     startAction = {
@@ -247,30 +237,30 @@ fun UISuperIslandSettings(
                 )
             }
 
-            customPackages.filter { it.packageName !in DEFAULT_MIRROR_PACKAGES }.forEach { pkgEntity ->
-                key(pkgEntity.packageName) {
-                    val pkg = pkgEntity.packageName
-                    val isInstalled = installedPkgs.contains(pkg)
-                    var iconBitmap by remember { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
-                    var pkgEnabled by remember(pkgEntity.packageName, pkgEntity.enabled) { mutableStateOf(pkgEntity.enabled) }
+            customPackages.filter { it.packageName !in DEFAULT_MIRROR_PACKAGES }.forEach { entity ->
+                key(entity.packageName) {
+                    val packageName = entity.packageName
+                    val isInstalled = installedPackages.contains(packageName)
+                    var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+                    var packageEnabled by remember(entity.packageName, entity.enabled) { mutableStateOf(entity.enabled) }
 
-                    LaunchedEffect(pkg) {
+                    LaunchedEffect(packageName) {
                         if (iconBitmap == null) {
-                            viewModel.loadIcon(pkg) { icon -> iconBitmap = icon }
+                            viewModel.loadIcon(packageName) { iconBitmap = it }
                         }
                     }
 
                     SwitchPreference(
-                        title = pkg,
+                        title = packageName,
                         titleColor =
                             BasicComponentDefaults.titleColor(
                                 color = if (isInstalled) colorScheme.primary else colorScheme.onSurface,
                             ),
-                        checked = pkgEnabled,
-                        onCheckedChange = { v ->
-                            pkgEnabled = v
-                            kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                                DatabaseRepository.getInstance().setMirrorFilterEnabled(pkg, v)
+                        checked = packageEnabled,
+                        onCheckedChange = { value ->
+                            packageEnabled = value
+                            viewModel.viewModelScope.launch {
+                                MirrorFilterRepository.setEnabled(packageName, value)
                             }
                         },
                         startAction = {
@@ -284,11 +274,9 @@ fun UISuperIslandSettings(
                         },
                         endActions = {
                             IconButton(onClick = {
-                                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                                    DatabaseRepository.getInstance().deleteMirrorFilterPackage(pkg)
-                                    withContext(Dispatchers.Main) {
-                                        loadCustomPackages()
-                                    }
+                                viewModel.viewModelScope.launch {
+                                    MirrorFilterRepository.delete(packageName)
+                                    loadCustomPackages()
                                 }
                             }) {
                                 Icon(
@@ -306,30 +294,22 @@ fun UISuperIslandSettings(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Button(
-                    onClick = { showAppPicker = true },
-                ) {
+                Button(onClick = { showAppPicker = true }) {
                     Text("选择应用")
                 }
             }
         }
     }
 
-    SuperIslandTestDialog(showTestDialog, context)
-
     if (showAppPicker) {
         AppPickerDialog(
             visible = true,
             onDismiss = { showAppPicker = false },
-            onAppSelected = { pkg ->
+            onAppSelected = { packageName ->
                 showAppPicker = false
-                kotlinx.coroutines.CoroutineScope(Dispatchers.IO).launch {
-                    DatabaseRepository.getInstance().upsertMirrorFilterPackage(
-                        SuperIslandMirrorFilterEntity(pkg, enabled = true),
-                    )
-                    withContext(Dispatchers.Main) {
-                        loadCustomPackages()
-                    }
+                viewModel.viewModelScope.launch {
+                    MirrorFilterRepository.upsert(packageName, true)
+                    loadCustomPackages()
                 }
             },
             title = "选择镜像过滤应用",

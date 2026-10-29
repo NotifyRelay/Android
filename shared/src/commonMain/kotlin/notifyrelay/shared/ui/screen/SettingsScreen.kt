@@ -100,7 +100,7 @@ fun SettingsScreen() {
             ArrowPreference(
                 title = "开发者选项",
                 summary = "开发者调试设置",
-                onClick = { settingsPort?.openDeveloperMode() },
+                onClick = { navigator.push(Route.SettingsDeveloperMode) },
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
         }

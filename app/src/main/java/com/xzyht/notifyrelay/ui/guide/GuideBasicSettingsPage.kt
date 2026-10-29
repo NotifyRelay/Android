@@ -17,7 +17,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.ui.pages.UISuperIslandSettings
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyRootScreen
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyScreenHost
 import io.github.miuzarte.scrcpyforandroid.pages.ScrcpyUiViewModel
@@ -30,6 +29,7 @@ import notifyrelay.shared.ui.guide.GuideSectionLabel
 import notifyrelay.shared.ui.pages.UIAppearance
 import notifyrelay.shared.ui.pages.UILocalFilter
 import notifyrelay.shared.ui.pages.UIRemoteFilter
+import notifyrelay.shared.ui.pages.UISuperIslandSettings
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.preference.ArrowPreference

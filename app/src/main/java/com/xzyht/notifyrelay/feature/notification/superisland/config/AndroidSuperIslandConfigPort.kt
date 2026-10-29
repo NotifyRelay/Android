@@ -5,15 +5,17 @@ import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingRe
 import notifyrelay.domain.feature.notification.superisland.SpecInjectionMode
 import notifyrelay.domain.feature.notification.superisland.SuperIslandConfigPort
 
-/** 以 [SuperIslandConfigUtils] 与 [FloatingReplicaManager] 实现 [SuperIslandConfigPort]。 */
+/**
+ * 超级岛配置端口（Android）。
+ *
+ * 配置读写委托公共策略；本类只补平台专属的展示副作用（撤下/切换通道）。
+ */
 class AndroidSuperIslandConfigPort(
     private val context: Context,
 ) : SuperIslandConfigPort {
     override fun isRemoteDisplayEnabled(): Boolean = SuperIslandConfigUtils.isRemoteSuperIslandDisplayEnabled(context)
 
-    override fun setRemoteDisplayEnabled(enabled: Boolean) {
-        SuperIslandConfigUtils.setRemoteSuperIslandDisplayEnabled(context, enabled)
-    }
+    override fun setRemoteDisplayEnabled(enabled: Boolean) = SuperIslandConfigUtils.setRemoteSuperIslandDisplayEnabled(context, enabled)
 
     override fun isFloatingWindowEnabled(): Boolean = SuperIslandConfigUtils.isFloatingWindowEnabled(context)
 
@@ -23,28 +25,11 @@ class AndroidSuperIslandConfigPort(
 
     override fun setNotificationListMode(enabled: Boolean): Boolean = SuperIslandConfigUtils.setNotificationListMode(context, enabled)
 
-    override fun specInjectionMode(): SpecInjectionMode =
-        when (SuperIslandConfigUtils.getSpecInjectionMode(context)) {
-            SuperIslandConfigUtils.SpecInjectionMode.SUPER_ISLAND -> SpecInjectionMode.SUPER_ISLAND
-            SuperIslandConfigUtils.SpecInjectionMode.LIVE_UPDATES -> SpecInjectionMode.LIVE_UPDATES
-            SuperIslandConfigUtils.SpecInjectionMode.NONE -> SpecInjectionMode.NONE
-        }
+    override fun specInjectionMode(): SpecInjectionMode = SuperIslandConfigUtils.getSpecInjectionMode(context)
 
-    override fun setSpecInjectionMode(mode: SpecInjectionMode) {
-        val legacy =
-            when (mode) {
-                SpecInjectionMode.SUPER_ISLAND -> SuperIslandConfigUtils.SpecInjectionMode.SUPER_ISLAND
-                SpecInjectionMode.LIVE_UPDATES -> SuperIslandConfigUtils.SpecInjectionMode.LIVE_UPDATES
-                SpecInjectionMode.NONE -> SuperIslandConfigUtils.SpecInjectionMode.NONE
-            }
-        SuperIslandConfigUtils.setSpecInjectionMode(context, legacy)
-    }
+    override fun setSpecInjectionMode(mode: SpecInjectionMode) = SuperIslandConfigUtils.setSpecInjectionMode(context, mode)
 
-    override fun dismissAllRemote() {
-        FloatingReplicaManager.dismissAllRemoteSuperIsland(context)
-    }
+    override fun dismissAllRemote() = FloatingReplicaManager.dismissAllRemoteSuperIsland(context)
 
-    override fun switchChannel() {
-        FloatingReplicaManager.switchSuperIslandChannel(context)
-    }
+    override fun switchChannel() = FloatingReplicaManager.switchSuperIslandChannel(context)
 }

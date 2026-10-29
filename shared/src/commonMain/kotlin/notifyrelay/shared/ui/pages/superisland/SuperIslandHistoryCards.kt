@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.ui.pages.superisland
+package notifyrelay.shared.ui.pages.superisland
 
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.clickable
@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
@@ -36,23 +35,18 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
-import kotlinx.coroutines.Dispatchers
+import androidx.paging.compose.LazyPagingItems
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
+import notifyrelay.base.util.SuperIslandImageUtils
 import notifyrelay.base.util.TimestampFormatter
 import notifyrelay.domain.feature.notification.history.GroupedSuperIslandHistory
 import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 import notifyrelay.shared.ui.pages.DeleteButton
 import notifyrelay.shared.ui.pages.DragValue
-import notifyrelay.shared.ui.pages.superisland.SuperIslandAppIcon
-import notifyrelay.shared.ui.pages.superisland.SuperIslandHistoryImage
-import notifyrelay.shared.ui.pages.superisland.rememberAppIconBitmap
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -62,10 +56,16 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
 import kotlin.math.roundToInt
 
+/**
+ * 超级岛历史列表块：按包名分组，分组与组内条目均可侧滑删除。
+ *
+ * 平台专属动作（点击复刻、复制原文）经 [onReplicaRequest] 与 [onCopyEntry] 注入：
+ * 复刻为 null 时不响应点击。
+ */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-internal fun SuperIslandHistoryListBlock(
-    pagingItems: androidx.paging.compose.LazyPagingItems<GroupedSuperIslandHistory>,
+fun SuperIslandHistoryListBlock(
+    pagingItems: LazyPagingItems<GroupedSuperIslandHistory>,
     expandedGroups: Set<String>,
     includeImageDataOnCopy: Boolean,
     onToggleGroup: (String) -> Unit,
@@ -74,6 +74,8 @@ internal fun SuperIslandHistoryListBlock(
     loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
     deleteWidthPx: Float,
     deleteWidth: Dp,
+    onReplicaRequest: ((SuperIslandHistoryEntry) -> Unit)?,
+    onCopyEntry: (SuperIslandHistoryEntry) -> Unit,
 ) {
     val coroutineScope = rememberCoroutineScope()
 
@@ -83,7 +85,7 @@ internal fun SuperIslandHistoryListBlock(
     ) {
         items(
             count = pagingItems.itemCount,
-            key = { index -> pagingItems[index]?.packageName ?: "group-$index" },
+            key = { index -> pagingItems[index]?.packageName ?: "group-" + index },
         ) { index ->
             val group = pagingItems[index] ?: return@items
             val groupKey = group.packageName
@@ -135,6 +137,8 @@ internal fun SuperIslandHistoryListBlock(
                         deleteWidthPx = deleteWidthPx,
                         deleteWidth = deleteWidth,
                         onDeleteEntry = onDeleteEntry,
+                        onReplicaRequest = onReplicaRequest,
+                        onCopyEntry = onCopyEntry,
                     )
                 }
 
@@ -160,7 +164,7 @@ internal fun SuperIslandHistoryListBlock(
 
 @OptIn(ExperimentalLayoutApi::class, ExperimentalFoundationApi::class)
 @Composable
-internal fun SuperIslandHistoryGroupCard(
+private fun SuperIslandHistoryGroupCard(
     group: GroupedSuperIslandHistory,
     includeImageDataOnCopy: Boolean,
     isExpanded: Boolean,
@@ -169,6 +173,8 @@ internal fun SuperIslandHistoryGroupCard(
     deleteWidthPx: Float,
     deleteWidth: Dp,
     onDeleteEntry: (Long) -> Unit,
+    onReplicaRequest: ((SuperIslandHistoryEntry) -> Unit)?,
+    onCopyEntry: (SuperIslandHistoryEntry) -> Unit,
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
@@ -182,7 +188,7 @@ internal fun SuperIslandHistoryGroupCard(
         remember(headerEntry, group.packageName) {
             headerEntry?.mappedPackage?.takeIf { it.isNotBlank() }
                 ?: headerEntry?.originalPackage?.takeIf { it.isNotBlank() }
-                ?: group.packageName.takeIf { group.packageName != "(未知应用)" }
+                ?: group.packageName.takeIf { group.packageName != UNKNOWN_PACKAGE_LABEL }
         }
     val appIconBitmap = rememberAppIconBitmap(iconPackage)
     val latestTimestamp =
@@ -224,7 +230,7 @@ internal fun SuperIslandHistoryGroupCard(
                 ) {
                     Text(groupTitle, style = textStyles.body1, color = colorScheme.onSurface)
                     Text(
-                        text = "${group.packageName} · ${group.entries.size} 条记录",
+                        text = group.packageName + " · " + group.entries.size + " 条记录",
                         style = textStyles.body2,
                         color = colorScheme.onSurfaceVariantSummary,
                         maxLines = 1,
@@ -232,7 +238,7 @@ internal fun SuperIslandHistoryGroupCard(
                     )
                     latestTimestamp?.let {
                         Text(
-                            text = "最新时间: $it",
+                            text = "最新时间: " + it,
                             style = textStyles.body2,
                             color = colorScheme.outline,
                             maxLines = 1,
@@ -294,6 +300,8 @@ internal fun SuperIslandHistoryGroupCard(
                                 appIconBitmap = appIconBitmap,
                                 iconPackage = iconPackage,
                                 loadEntryDetail = loadEntryDetail,
+                                onReplicaRequest = onReplicaRequest,
+                                onCopyEntry = onCopyEntry,
                             )
                         }
 
@@ -328,6 +336,8 @@ internal fun SuperIslandHistoryGroupCard(
                         appIconBitmap = appIconBitmap,
                         iconPackage = iconPackage,
                         loadEntryDetail = loadEntryDetail,
+                        onReplicaRequest = onReplicaRequest,
+                        onCopyEntry = onCopyEntry,
                     )
                     if (index < previewList.lastIndex) {
                         Spacer(modifier = Modifier.height(8.dp))
@@ -336,7 +346,7 @@ internal fun SuperIslandHistoryGroupCard(
                 if (group.entries.size > previewList.size) {
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "... 共${group.entries.size}条，点击展开",
+                        text = "... 共" + group.entries.size + "条，点击展开",
                         style = textStyles.body2,
                         color = colorScheme.onSurfaceVariantSummary,
                     )
@@ -347,16 +357,17 @@ internal fun SuperIslandHistoryGroupCard(
 }
 
 @Composable
-internal fun SuperIslandHistorySummaryRow(
+private fun SuperIslandHistorySummaryRow(
     entry: SuperIslandHistoryEntry,
     includeImageDataOnCopy: Boolean,
     appIconBitmap: ImageBitmap?,
     iconPackage: String?,
     loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
+    onReplicaRequest: ((SuperIslandHistoryEntry) -> Unit)?,
+    onCopyEntry: (SuperIslandHistoryEntry) -> Unit,
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
 
     val titleText =
@@ -366,7 +377,7 @@ internal fun SuperIslandHistorySummaryRow(
             ?: entry.originalPackage?.takeIf { it.isNotBlank() }
             ?: "超级岛事件"
 
-    val displayTitle = titleText.let { SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it) }
+    val displayTitle = parseHtmlToAnnotatedString(titleText)
     val formattedTimestamp = remember(entry.id) { TimestampFormatter.format(entry.id) }
 
     Row(
@@ -375,21 +386,17 @@ internal fun SuperIslandHistorySummaryRow(
                 .fillMaxWidth()
                 .combinedClickable(
                     onClick = {
-                        triggerFloatingReplica(context, entry)
+                        onReplicaRequest?.invoke(entry)
                     },
                     onLongClick = {
-                        coroutineScope.launch(Dispatchers.IO) {
+                        coroutineScope.launch {
                             val full =
                                 try {
                                     loadEntryDetail(entry.id)
-                                } catch (_: Exception) {
+                                } catch (e: IllegalStateException) {
                                     null
                                 }
-                            val final = full ?: entry
-                            val text = buildEntryCopyText(final, includeImageDataOnCopy)
-                            withContext(Dispatchers.Main) {
-                                copyEntryToClipboard(context, text)
-                            }
+                            onCopyEntry(full ?: entry)
                         }
                     },
                 ),
@@ -422,7 +429,7 @@ internal fun SuperIslandHistorySummaryRow(
             )
             if (entry.picMap.isNotEmpty()) {
                 Text(
-                    text = "包含图片 ${entry.picMap.size} 张",
+                    text = "包含图片 " + entry.picMap.size + " 张",
                     style = textStyles.body2,
                     color = colorScheme.onSurfaceVariantSummary,
                     maxLines = 1,
@@ -435,16 +442,17 @@ internal fun SuperIslandHistorySummaryRow(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-internal fun SuperIslandHistoryEntryCard(
+private fun SuperIslandHistoryEntryCard(
     entry: SuperIslandHistoryEntry,
     includeImageDataOnCopy: Boolean,
     appIconBitmap: ImageBitmap?,
     iconPackage: String?,
     loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
+    onReplicaRequest: ((SuperIslandHistoryEntry) -> Unit)?,
+    onCopyEntry: (SuperIslandHistoryEntry) -> Unit,
 ) {
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
-    val context = LocalContext.current
     val coroutineScope = rememberCoroutineScope()
     val formattedTimestamp = remember(entry.id) { TimestampFormatter.format(entry.id) }
     val sanitizedDetail =
@@ -478,21 +486,17 @@ internal fun SuperIslandHistoryEntryCard(
                 .fillMaxWidth()
                 .combinedClickable(
                     onClick = {
-                        triggerFloatingReplica(context, entry)
+                        onReplicaRequest?.invoke(entry)
                     },
                     onLongClick = {
-                        coroutineScope.launch(Dispatchers.IO) {
+                        coroutineScope.launch {
                             val full =
                                 try {
                                     loadEntryDetail(entry.id)
-                                } catch (_: Exception) {
+                                } catch (e: IllegalStateException) {
                                     null
                                 }
-                            val final = full ?: entry
-                            val text = buildEntryCopyText(final, includeImageDataOnCopy)
-                            withContext(Dispatchers.Main) {
-                                copyEntryToClipboard(context, text)
-                            }
+                            onCopyEntry(full ?: entry)
                         }
                     },
                 ),
@@ -503,7 +507,7 @@ internal fun SuperIslandHistoryEntryCard(
                 ?: entry.mappedPackage?.takeIf { it.isNotBlank() }
                 ?: entry.originalPackage?.takeIf { it.isNotBlank() }
                 ?: "超级岛事件"
-        val displayTitle = titleText.let { SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it) }
+        val displayTitle = parseHtmlToAnnotatedString(titleText)
         Row(
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -534,15 +538,15 @@ internal fun SuperIslandHistoryEntryCard(
 
         val mappedPackage = entry.mappedPackage
         if (!mappedPackage.isNullOrBlank()) {
-            Text("映射包名: $mappedPackage", style = textStyles.body2, color = colorScheme.outline)
+            Text("映射包名: " + mappedPackage, style = textStyles.body2, color = colorScheme.outline)
         }
         val originalPackage = entry.originalPackage
         if (!originalPackage.isNullOrBlank()) {
-            Text("原始包名: $originalPackage", style = textStyles.body2, color = colorScheme.outline)
+            Text("原始包名: " + originalPackage, style = textStyles.body2, color = colorScheme.outline)
         }
         val sourceDevice = entry.sourceDeviceUuid
         if (!sourceDevice.isNullOrBlank()) {
-            Text("来源设备: $sourceDevice", style = textStyles.body2, color = colorScheme.outline)
+            Text("来源设备: " + sourceDevice, style = textStyles.body2, color = colorScheme.outline)
         }
 
         Text(
@@ -578,7 +582,7 @@ internal fun SuperIslandHistoryEntryCard(
                         val full =
                             try {
                                 loadEntryDetail(entry.id)
-                            } catch (_: Exception) {
+                            } catch (e: IllegalStateException) {
                                 null
                             }
                         if (full != null) {
@@ -590,3 +594,9 @@ internal fun SuperIslandHistoryEntryCard(
         }
     }
 }
+
+/** 解析简易 HTML 标签为带样式文本。 */
+private fun parseHtmlToAnnotatedString(html: String) = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(html)
+
+/** 无法归属到具体包名时的分组标签。 */
+private const val UNKNOWN_PACKAGE_LABEL = "(未知应用)"

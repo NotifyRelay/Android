@@ -41,8 +41,9 @@ kotlin {
     sourceSets {
         commonMain.dependencies {
 
-            // BatteryIconConverter 返回 Compose Color（CMP 公共端坐标）
-            implementation(libs.compose.multiplatform.ui)
+            // BatteryIconConverter 返回 Compose Color（CMP 公共端坐标）；
+            // SuperIslandImageUtils 的公开签名含 AnnotatedString，故须 api 传递
+            api(libs.compose.multiplatform.ui)
         }
 
         androidMain.dependencies {

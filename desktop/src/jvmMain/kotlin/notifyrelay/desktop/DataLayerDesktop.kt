@@ -1,30 +1,41 @@
 package notifyrelay.desktop
 
+import com.xzyht.notifyrelay.nativecore.device.appsync.IconCodecPortRegistry
 import notifyrelay.data.Storage
 import notifyrelay.data.database.AppDatabaseJvmFactory
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.data.filter.RemoteFilterRepository
 import notifyrelay.desktop.platform.DesktopAppIconPort
 import notifyrelay.desktop.platform.DesktopAudioRelayPort
+import notifyrelay.desktop.platform.DesktopFormFactorPort
 import notifyrelay.desktop.platform.DesktopHistoryPort
+import notifyrelay.desktop.platform.DesktopIconCodecPort
+import notifyrelay.desktop.platform.DesktopInstalledPackagesPort
 import notifyrelay.desktop.platform.DesktopLocalAppsPort
 import notifyrelay.desktop.platform.DesktopLocalFilterPort
 import notifyrelay.desktop.platform.DesktopMediaControlPort
+import notifyrelay.desktop.platform.DesktopNativeFilterPort
 import notifyrelay.desktop.platform.DesktopPinnedAppsPort
 import notifyrelay.desktop.platform.DesktopRemoteAppsPort
 import notifyrelay.desktop.platform.DesktopRemoteFilterPort
 import notifyrelay.desktop.platform.DesktopSuperIslandConfigPort
 import notifyrelay.desktop.platform.DesktopSuperIslandHistoryPort
+import notifyrelay.domain.feature.appslist.InstalledPackagesPortRegistry
 import notifyrelay.domain.feature.appslist.RemoteAppsPortRegistry
 import notifyrelay.domain.feature.media.AudioRelayPortRegistry
 import notifyrelay.domain.feature.media.MediaControlPortRegistry
 import notifyrelay.domain.feature.notification.filter.LocalFilterPortRegistry
+import notifyrelay.domain.feature.notification.filter.NativeFilterPortRegistry
 import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 import notifyrelay.domain.feature.notification.history.NotificationHistoryPortRegistry
 import notifyrelay.domain.feature.notification.history.SuperIslandHistoryPortRegistry
 import notifyrelay.domain.feature.notification.superisland.SuperIslandConfigPortRegistry
+import notifyrelay.domain.platform.FormFactorPortRegistry
 import notifyrelay.shared.feature.appslist.AppIconPortRegistry
 import notifyrelay.shared.feature.appslist.LocalAppsPortRegistry
 import notifyrelay.shared.feature.appslist.PinnedAppsPortRegistry
+import notifyrelay.shared.ui.common.DebugFlags
+import notifyrelay.shared.ui.screen.loadLogLevel
 import java.io.File
 
 /**
@@ -52,20 +63,32 @@ object DataLayerDesktop {
             val repository = DatabaseRepository(AppDatabaseJvmFactory.create(databasePath()))
             Storage.initialize(repository)
 
-            // 有数据源的端口：通知历史直接读 Room
-            NotificationHistoryPortRegistry.install(DesktopHistoryPort(repository))
+            // 平台能力端口
+            FormFactorPortRegistry.install(DesktopFormFactorPort)
+            InstalledPackagesPortRegistry.install(DesktopInstalledPackagesPort)
+            NativeFilterPortRegistry.install(DesktopNativeFilterPort)
+            IconCodecPortRegistry.install(DesktopIconCodecPort)
 
-            // 桌面端无对应数据源的端口：给中性实现，保证公共端 UI 可渲染
-            RemoteFilterPortRegistry.install(DesktopRemoteFilterPort())
-            LocalAppsPortRegistry.install(DesktopLocalAppsPort())
-            AppIconPortRegistry.install(DesktopAppIconPort())
-            PinnedAppsPortRegistry.install(DesktopPinnedAppsPort())
-            RemoteAppsPortRegistry.install(DesktopRemoteAppsPort())
+            // 有数据源的端口：通知历史与超级岛历史直接读 Room
+            NotificationHistoryPortRegistry.install(DesktopHistoryPort(repository))
+            SuperIslandHistoryPortRegistry.install(DesktopSuperIslandHistoryPort(repository))
+
+            // 与 Android 共用仓储的端口
+            val remoteFilterRepository = RemoteFilterRepository()
+            RemoteFilterPortRegistry.install(DesktopRemoteFilterPort(remoteFilterRepository))
             LocalFilterPortRegistry.install(DesktopLocalFilterPort())
+            AppIconPortRegistry.install(DesktopAppIconPort())
+            LocalAppsPortRegistry.install(DesktopLocalAppsPort())
+            RemoteAppsPortRegistry.install(DesktopRemoteAppsPort())
             AudioRelayPortRegistry.install(DesktopAudioRelayPort())
             MediaControlPortRegistry.install(DesktopMediaControlPort())
             SuperIslandConfigPortRegistry.install(DesktopSuperIslandConfigPort())
-            SuperIslandHistoryPortRegistry.install(DesktopSuperIslandHistoryPort())
+
+            // 置顶应用由公共仓库承担，端口直接暴露其状态流
+            PinnedAppsPortRegistry.install(DesktopPinnedAppsPort())
+
+            loadLogLevel { key, default -> Storage.getInt(key, default) }
+            DebugFlags.load { key, default -> Storage.getBoolean(key, default) }
 
             initialized = true
         }

@@ -7,9 +7,7 @@ import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.repository.remoteNotificationFilter
 import com.xzyht.notifyrelay.feature.device.repository.replicateNotification
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
-import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
@@ -17,6 +15,8 @@ import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.TextUtils
+import notifyrelay.domain.feature.notification.chat.ChatMemory
+import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 import org.json.JSONObject
 
 /**
@@ -79,7 +79,7 @@ object NotificationProcessor {
                 val time = if (timeRaw == 0L) System.currentTimeMillis() else timeRaw
 
                 val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
-                val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
+                val mappedPkg = RemoteFilterPortRegistry.current?.mapToLocalPackage(pkg.orEmpty(), installedPkgs) ?: pkg.orEmpty()
 
                 try {
                     NotificationRepository.addRemoteNotification(mappedPkg, appName, title, text, time, remoteUuid, context)
@@ -107,7 +107,7 @@ object NotificationProcessor {
 
             if (result.needsDelay && localIsLocked) {
                 handleLockedScreenDelayed(context, scope, result)
-                ChatMemory.append(context, "收到: ${result.rawData}")
+                ChatMemory.append("收到: " + result.rawData)
             } else {
                 scope.launch {
                     replicateNotification(context, result, null, startMonitoring = true)
@@ -130,7 +130,7 @@ object NotificationProcessor {
                 }
             }
         } else {
-            ChatMemory.append(context, "收到: ${result.rawData}")
+            ChatMemory.append("收到: " + result.rawData)
         }
     }
 
@@ -140,7 +140,7 @@ object NotificationProcessor {
         result: BackendRemoteFilter.FilterResult,
     ) {
         try {
-            if (RemoteFilterConfig.enableDeduplication) {
+            if (RemoteFilterPortRegistry.current?.enableDedup == true) {
                 BackendRemoteFilter.addPlaceholder(result.title, result.text, result.mappedPkg, 15_000L)
             }
         } catch (_: Exception) {

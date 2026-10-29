@@ -1,13 +1,16 @@
 package com.xzyht.notifyrelay.feature.appslist
 
 import android.content.Context
+import com.xzyht.notifyrelay.nativecore.device.appsync.AppListSyncManagerCore
+import com.xzyht.notifyrelay.nativecore.device.appsync.RemoteAppsCacheCore
 import kotlinx.coroutines.flow.StateFlow
+import notifyrelay.data.repository.applist.PinnedAppsRepository
 import notifyrelay.domain.feature.appslist.RemoteAppsPort
 import notifyrelay.domain.feature.appslist.model.RemoteAppInfo
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.appslist.PinnedAppsPortRegistry
 
-/** 以现有仓库与服务实现 [RemoteAppsPort]。 */
+/** 以公共缓存与同步管理器实现 [RemoteAppsPort]。 */
 class AndroidRemoteAppsPort(
     private val context: Context,
 ) : RemoteAppsPort {
@@ -16,24 +19,24 @@ class AndroidRemoteAppsPort(
     override val pinnedApps: StateFlow<Map<String, Set<String>>>
         get() = PinnedAppsPortRegistry.current?.pinnedApps ?: PinnedAppsRepository.pinnedApps
 
-    override suspend fun remoteApps(deviceUuid: String): List<RemoteAppInfo> = RemoteAppsCache.getRemoteAppsList(context, deviceUuid)
+    override suspend fun remoteApps(deviceUuid: String): List<RemoteAppInfo> = RemoteAppsCacheCore.list(deviceUuid)
 
     override fun loadPinned(deviceUuid: String) {
-        PinnedAppsRepository.loadPinnedApps(context, deviceUuid)
+        PinnedAppsRepository.loadPinnedApps(deviceUuid)
     }
 
     override fun pin(
         deviceUuid: String,
         packageName: String,
     ) {
-        PinnedAppsRepository.pinApp(context, deviceUuid, packageName)
+        PinnedAppsRepository.pinApp(deviceUuid, packageName)
     }
 
     override fun unpin(
         deviceUuid: String,
         packageName: String,
     ) {
-        PinnedAppsRepository.unpinApp(context, deviceUuid, packageName)
+        PinnedAppsRepository.unpinApp(deviceUuid, packageName)
     }
 
     override suspend fun requestAppList(deviceUuid: String): Boolean {
@@ -41,11 +44,7 @@ class AndroidRemoteAppsPort(
             com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
                 .getDeviceMessage(context)
         val deviceInfo = findOnlineDevice(deviceUuid) ?: return false
-        com.xzyht.notifyrelay.feature.appslist.sync.AppListSyncManager.requestAppListFromDevice(
-            context,
-            deviceManager,
-            deviceInfo,
-        )
+        AppListSyncManagerCore.requestAppList(deviceManager, deviceInfo)
         return true
     }
 

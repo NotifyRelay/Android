@@ -1,7 +1,5 @@
-package com.xzyht.notifyrelay.ui.pages
+package notifyrelay.shared.ui.pages.history
 
-import android.app.Activity
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -18,19 +16,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import androidx.core.view.WindowInsetsControllerCompat
-import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.compose.collectAsLazyPagingItems
-import com.xzyht.notifyrelay.ui.pages.superisland.SuperIslandHistoryListBlock
-import com.xzyht.notifyrelay.ui.viewmodel.superIslandHistoryViewModel
-import notifyrelay.base.log.Logger
-import notifyrelay.base.util.ToastUtils
-import notifyrelay.data.Storage
+import notifyrelay.base.SuperIslandStorageKeys
+import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 import notifyrelay.shared.ui.common.DoubleClickConfirmButton
 import notifyrelay.shared.ui.pages.rememberDeleteSwipeWidth
+import notifyrelay.shared.ui.pages.superisland.SuperIslandHistoryListBlock
+import notifyrelay.shared.ui.pages.superisland.buildEntryCopyText
+import notifyrelay.shared.ui.port.LocalClipboardPort
+import notifyrelay.shared.ui.port.LocalPreferencePort
+import notifyrelay.shared.ui.port.LocalToastPort
 import notifyrelay.shared.ui.viewmodel.SuperIslandHistoryViewModel
+import notifyrelay.shared.ui.viewmodel.superIslandHistoryViewModel
 import top.yukonga.miuix.kmp.basic.ButtonDefaults
 import top.yukonga.miuix.kmp.basic.FloatingToolbar
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -39,21 +37,26 @@ import top.yukonga.miuix.kmp.basic.ToolbarPosition
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+/** 历史条目复制的默认剪贴板标签。 */
+private const val CLIPBOARD_LABEL = "super_island_entry"
+
+/**
+ * 超级岛历史页。
+ *
+ * 页面只依赖端口：剪贴板、提示与偏好均由宿主提供；
+ * 「点击条目复刻超级岛」为平台专属动作，经 [onReplicaRequest] 注入，传 null 时不响应点击。
+ */
 @Composable
-fun UISuperIslandHistory() {
-    val context = LocalContext.current
-    var includeImageDataOnCopy by remember { mutableStateOf(Storage.getBoolean("superisland_copy_image_data", false)) }
+fun SuperIslandHistoryScreen(
+    onReplicaRequest: ((SuperIslandHistoryEntry) -> Unit)? = null,
+    viewModel: SuperIslandHistoryViewModel = superIslandHistoryViewModel(),
+) {
+    val preferencePort = LocalPreferencePort.current
+    val clipboardPort = LocalClipboardPort.current
+    val toastPort = LocalToastPort.current
 
-    val viewModel: SuperIslandHistoryViewModel =
-        superIslandHistoryViewModel()
-
-    val isDarkTheme = isSystemInDarkTheme()
-    LaunchedEffect(isDarkTheme) {
-        val window = (context as? Activity)?.window
-        window?.let {
-            val decorView = it.decorView
-            WindowInsetsControllerCompat(it, decorView).isAppearanceLightStatusBars = !isDarkTheme
-        }
+    var includeImageDataOnCopy by remember {
+        mutableStateOf(preferencePort?.getBoolean(SuperIslandStorageKeys.COPY_IMAGE_DATA, false) ?: false)
     }
 
     val uiState by viewModel.uiState.collectAsState()
@@ -67,18 +70,20 @@ fun UISuperIslandHistory() {
         viewModel.preloadAppIcons(groupPackages)
     }
 
-    val clearHistory: () -> Unit = {
-        try {
-            viewModel.clearHistory()
-        } catch (e: Exception) {
-            Logger.e("NotifyRelay", "清除超级岛历史异常", e)
-            ToastUtils.showShortToast(context, "清除失败: ${e.message}")
-        }
-    }
-
     val colorScheme = MiuixTheme.colorScheme
     val textStyles = MiuixTheme.textStyles
     val (deleteWidthPx, deleteWidth) = rememberDeleteSwipeWidth()
+
+    val copyEntry: (SuperIslandHistoryEntry) -> Unit = { entry ->
+        val content = buildEntryCopyText(entry, includeImageDataOnCopy)
+        if (content.isBlank()) {
+            toastPort.short("当前条目无可复制内容")
+        } else if (clipboardPort.copyText(CLIPBOARD_LABEL, content)) {
+            toastPort.short("已复制原始消息到剪贴板")
+        } else {
+            toastPort.short("复制失败")
+        }
+    }
 
     Scaffold(
         containerColor = colorScheme.background,
@@ -98,7 +103,7 @@ fun UISuperIslandHistory() {
                             text = "清空超级岛历史",
                             confirmText = "确认?",
                             onClick = {},
-                            onConfirm = clearHistory,
+                            onConfirm = { viewModel.clearHistory() },
                             colors = ButtonDefaults.buttonColors(color = colorScheme.onSurface),
                             confirmColors = ButtonDefaults.buttonColors(color = colorScheme.error),
                         )
@@ -120,7 +125,7 @@ fun UISuperIslandHistory() {
                     checked = includeImageDataOnCopy,
                     onCheckedChange = {
                         includeImageDataOnCopy = it
-                        Storage.putBoolean("superisland_copy_image_data", it)
+                        preferencePort?.putBoolean(SuperIslandStorageKeys.COPY_IMAGE_DATA, it)
                     },
                     modifier = Modifier.padding(bottom = 8.dp),
                 )
@@ -128,7 +133,11 @@ fun UISuperIslandHistory() {
                 Spacer(modifier = Modifier.height(12.dp))
 
                 if (pagingItems.itemCount == 0) {
-                    Text("暂无超级岛历史记录", style = textStyles.body2, color = colorScheme.onSurfaceVariantSummary)
+                    Text(
+                        "暂无超级岛历史记录",
+                        style = textStyles.body2,
+                        color = colorScheme.onSurfaceVariantSummary,
+                    )
                 } else {
                     SuperIslandHistoryListBlock(
                         pagingItems = pagingItems,
@@ -140,6 +149,8 @@ fun UISuperIslandHistory() {
                         loadEntryDetail = { id -> viewModel.loadEntryDetail(id) },
                         deleteWidthPx = deleteWidthPx,
                         deleteWidth = deleteWidth,
+                        onReplicaRequest = onReplicaRequest,
+                        onCopyEntry = copyEntry,
                     )
                 }
             }
