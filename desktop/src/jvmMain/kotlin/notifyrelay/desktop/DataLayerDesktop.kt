@@ -63,6 +63,15 @@ object DataLayerDesktop {
     @Volatile
     private var deviceMessagePort: () -> notifyrelay.domain.feature.device.service.contract.DeviceMessagePort? = { null }
 
+    /** 在线已认证设备来源，供剪贴板同步取发送目标。 */
+    @Volatile
+    private var onlineDevices: () -> List<notifyrelay.domain.feature.device.model.DeviceInfo> = { emptyList() }
+
+    /** 剪贴板同步端口实例，由入口启动与释放。 */
+    @Volatile
+    var clipboardSync: notifyrelay.desktop.platform.DesktopClipboardSyncPort? = null
+        private set
+
     /**
      * 登记设备管理器。
      *
@@ -72,6 +81,7 @@ object DataLayerDesktop {
     fun registerDeviceManager(manager: notifyrelay.desktop.device.DesktopDeviceManager) {
         knownDevices = { manager.knownDeviceUuids() }
         deviceMessagePort = { manager }
+        onlineDevices = { manager.getAuthenticatedOnlineDevices() }
     }
 
     /** 初始化公共端存储与仓储单例；重复调用无副作用。 */
@@ -102,6 +112,13 @@ object DataLayerDesktop {
             AudioRelayPortRegistry.install(DesktopAudioRelayPort())
             MediaControlPortRegistry.install(DesktopMediaControlPort())
             SuperIslandConfigPortRegistry.install(DesktopSuperIslandConfigPort())
+
+            // 剪贴板同步：收发判定在 Rust core，平台只做系统剪贴板读写
+            clipboardSync =
+                notifyrelay.desktop.platform.DesktopClipboardSyncPort(
+                    { deviceMessagePort() },
+                    { onlineDevices() },
+                )
 
             // 置顶应用由公共仓库承担，端口直接暴露其状态流
             PinnedAppsPortRegistry.install(DesktopPinnedAppsPort())

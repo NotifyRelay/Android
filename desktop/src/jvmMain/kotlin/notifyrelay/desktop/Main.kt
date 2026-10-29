@@ -57,6 +57,7 @@ import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
 import notifyrelay.shared.ui.navigation.rememberNavigator
+import notifyrelay.shared.ui.pages.ClipboardSyncPage
 import notifyrelay.shared.ui.pages.MusicControlPage
 import notifyrelay.shared.ui.pages.UISuperIslandSettings
 import notifyrelay.shared.ui.pages.chat.UIChatTest
@@ -110,6 +111,9 @@ fun main() {
     // 通知历史、应用列表与图标的请求链路均取该管理器（与 Android 的 scanDeviceList 同口径）
     DataLayerDesktop.registerDeviceManager(deviceManager)
 
+    // 剪贴板同步：默认开启（口径：桌面无取用限制，直接读写系统剪贴板）
+    DataLayerDesktop.clipboardSync?.start()
+
     // 窗口图标与 UI 共用 :shared 的同一份资源
     val iconImages =
         runCatching {
@@ -123,6 +127,7 @@ fun main() {
             remember {
                 DesktopWindowController {
                     deviceManager.stopPowerMonitor()
+                    DataLayerDesktop.clipboardSync?.stop()
                     exitApplication()
                 }
             }
@@ -281,7 +286,7 @@ private fun DesktopRoot(
                         forwardContent = {
                             DeviceForwardScreen(
                                 filterViewModel = remoteFilterViewModel(),
-                                clipboardSync = {},
+                                clipboardSync = { ClipboardSyncPage() },
                                 musicControl = { MusicControlPage() },
                                 scrcpyScreen = { _, _ -> },
                             )

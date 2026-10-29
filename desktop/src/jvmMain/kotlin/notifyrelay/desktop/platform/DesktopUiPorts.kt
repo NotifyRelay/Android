@@ -5,10 +5,12 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.ImageBitmap
 import notifyrelay.base.util.decodeImageBitmap
 import notifyrelay.data.Storage
+import notifyrelay.desktop.DataLayerDesktop
 import notifyrelay.shared.ui.port.ClipboardPort
 import notifyrelay.shared.ui.port.IntentLaunchPort
 import notifyrelay.shared.ui.port.LocalBitmapPort
 import notifyrelay.shared.ui.port.LocalClipboardPort
+import notifyrelay.shared.ui.port.LocalClipboardSyncPort
 import notifyrelay.shared.ui.port.LocalIntentLaunchPort
 import notifyrelay.shared.ui.port.LocalSystemBarPort
 import notifyrelay.shared.ui.port.LocalThemePort
@@ -122,6 +124,7 @@ fun ProvideDesktopUiPorts(content: @Composable () -> Unit) {
         LocalThemePort provides DesktopThemePort,
         LocalSystemBarPort provides DesktopSystemBarPort,
         LocalBitmapPort provides DesktopBitmapPort,
+        LocalClipboardSyncPort provides DataLayerDesktop.clipboardSync,
         content = content,
     )
 }

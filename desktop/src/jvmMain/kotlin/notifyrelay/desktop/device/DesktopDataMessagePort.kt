@@ -3,6 +3,7 @@ package notifyrelay.desktop.device
 import com.xzyht.notifyrelay.nativecore.device.appsync.AppListSyncManagerCore
 import com.xzyht.notifyrelay.nativecore.device.appsync.IconSyncManagerCore
 import com.xzyht.notifyrelay.nativecore.device.service.callback.DataMessagePort
+import notifyrelay.desktop.DataLayerDesktop
 import notifyrelay.domain.feature.device.model.DeviceInfo
 
 /**
@@ -67,7 +68,10 @@ internal class DesktopDataMessagePort(
         payload: String,
     ) = Unit
 
-    override fun onClipboard(payload: String) = Unit
+    override fun onClipboard(payload: String) {
+        // 远端剪贴板写回系统剪贴板（Rust 已登记防循环窗口，回写不会再被当作本机变更发出）
+        DataLayerDesktop.clipboardSync?.onReceived(payload)
+    }
 
     override fun onStatus(
         deviceUuid: String,
