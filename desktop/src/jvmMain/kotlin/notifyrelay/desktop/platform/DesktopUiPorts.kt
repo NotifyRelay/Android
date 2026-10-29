@@ -3,6 +3,7 @@ package notifyrelay.desktop.platform
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.decodeToImageBitmap
 import notifyrelay.data.Storage
 import notifyrelay.shared.ui.port.ClipboardPort
 import notifyrelay.shared.ui.port.IntentLaunchPort
@@ -92,14 +93,29 @@ private object DesktopSystemBarPort : SystemBarPort {
     ) = Unit
 }
 
-/** 桌面端位图端口：仅支持字节解码。 */
+/**
+ * 桌面端位图端口。
+ *
+ * 字节解码经 Compose 的 Skia 解码器（支持 PNG/JPEG/WebP 等），
+ * 失败返回 null 由界面回落到占位图标。
+ *
+ * [drawableToBitmap] 在桌面端没有 Drawable 概念：入参已是平台位图时原样返回，
+ * 传入字节数组时按字节解码。
+ */
 private object DesktopBitmapPort : notifyrelay.shared.ui.port.BitmapPort {
     override fun drawableToBitmap(
         drawable: Any,
         fallbackSize: Int,
-    ): Any = drawable
+    ): Any =
+        when (drawable) {
+            is ByteArray -> decodeByteArray(drawable) ?: drawable
+            else -> drawable
+        }
 
-    override fun decodeByteArray(bytes: ByteArray): ImageBitmap? = null
+    override fun decodeByteArray(bytes: ByteArray): ImageBitmap? {
+        if (bytes.isEmpty()) return null
+        return runCatching { bytes.decodeToImageBitmap() }.getOrNull()
+    }
 }
 
 /** 为 [content] 提供桌面端全部界面端口。 */
