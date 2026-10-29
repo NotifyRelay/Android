@@ -156,16 +156,8 @@ object AppListSyncManagerCore {
             ioScope.launch {
                     trackCurrentJob(deviceUuid)
                     RemoteAppsCacheCore.cache(appsMap, deviceUuid)
-                    val now = System.currentTimeMillis()
-                    DatabaseRepository.getInstance().saveAppDeviceAssociations(
-                        packageNames.map {
-                            AppDeviceEntity(
-                                packageName = it,
-                                sourceDevice = deviceUuid,
-                                lastUpdated = now,
-                            )
-                        },
-                    )
+                    // cache 已为每个包名写入 apps 父行；linkToDevice 再确保幂等并写关联
+                    packageNames.forEach { RemoteAppIconCache.linkToDevice(it, deviceUuid) }
                     val sourceDevice = deviceManager.resolveDeviceInfo(deviceUuid, null, DEFAULT_PORT)
                     sourceDevice?.let { checkAndRequestMissingIcons(packageNames, deviceManager, it) }
                 }

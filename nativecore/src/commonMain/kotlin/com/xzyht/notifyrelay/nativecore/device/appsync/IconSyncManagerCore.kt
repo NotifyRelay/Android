@@ -71,15 +71,8 @@ object IconSyncManagerCore {
                 if (requestJson == null || requestJson == "{}") return@launch
 
                 requestIconsFromDevice(requestJson, deviceManager, sourceDevice)
-                databaseRepository.saveAppDeviceAssociations(
-                    listOf(
-                        AppDeviceEntity(
-                            packageName = packageName,
-                            sourceDevice = sourceDevice.uuid,
-                            lastUpdated = System.currentTimeMillis(),
-                        ),
-                    ),
-                )
+                // 先补父行再写关联：app_devices 对 apps 有外键约束
+                RemoteAppIconCache.linkToDevice(packageName, sourceDevice.uuid)
             } catch (e: IllegalStateException) {
                 Logger.e(TAG, "请求图标失败：" + packageName, e)
             }
@@ -120,16 +113,8 @@ object IconSyncManagerCore {
         try {
             requestIconsFromDevice(requestJson, deviceManager, sourceDevice)
             val need = parseRequestedPackages(requestJson)
-            val now = System.currentTimeMillis()
-            databaseRepository.saveAppDeviceAssociations(
-                need.map {
-                    AppDeviceEntity(
-                        packageName = it,
-                        sourceDevice = sourceDeviceUuid,
-                        lastUpdated = now,
-                    )
-                },
-            )
+            // 先补父行再写关联：app_devices 对 apps 有外键约束
+            need.forEach { RemoteAppIconCache.linkToDevice(it, sourceDeviceUuid) }
         } catch (e: IllegalStateException) {
             Logger.e(TAG, "批量请求失败：" + packageNames, e)
         }

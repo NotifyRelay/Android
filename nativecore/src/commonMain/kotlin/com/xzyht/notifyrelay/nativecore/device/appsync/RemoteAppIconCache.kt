@@ -71,6 +71,51 @@ object RemoteAppIconCache {
         _iconUpdates.value = packageName to now
     }
 
+    /**
+     * 确保 `apps` 表中存在该包名的记录（`app_devices` 的外键父行）。
+     *
+     * `app_devices.packageName` 外键指向 `apps.packageName`，父行缺失时插入关联会失败；
+     * 本方法幂等，供只拿到包名、尚未缓存图标的路径先补齐父行。
+     */
+    suspend fun ensureApp(packageName: String) {
+        if (packageName.isBlank()) return
+        val repo = DatabaseRepository.getInstance()
+        if (repo.getAppByPackageName(packageName) != null) return
+        val now = System.currentTimeMillis()
+        repo.saveApp(
+            AppEntity(
+                packageName = packageName,
+                appName = packageName,
+                isSystemApp = false,
+                iconBytes = null,
+                isIconMissing = true,
+                lastUpdated = now,
+            ),
+        )
+    }
+
+    /**
+     * 写入「应用与设备」关联，先补齐父行再插入。
+     *
+     * 这是唯一入口：任何只持有包名的调用方都应使用本方法，避免外键失败。
+     */
+    suspend fun linkToDevice(
+        packageName: String,
+        deviceUuid: String,
+    ) {
+        ensureApp(packageName)
+        if (deviceUuid.isBlank()) return
+        DatabaseRepository.getInstance().saveAppDeviceAssociations(
+            listOf(
+                AppDeviceEntity(
+                    packageName = packageName,
+                    sourceDevice = deviceUuid,
+                    lastUpdated = System.currentTimeMillis(),
+                ),
+            ),
+        )
+    }
+
     /** 标记图标缺失。 */
     suspend fun markMissing(packageName: String) {
         DatabaseRepository.getInstance().markAppIconAsMissing(packageName)
