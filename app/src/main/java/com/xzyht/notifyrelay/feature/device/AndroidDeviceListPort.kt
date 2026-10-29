@@ -5,11 +5,10 @@ import android.content.res.Configuration
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
-import com.xzyht.notifyrelay.R
 import notifyrelay.base.util.BatteryIconConverter
 import notifyrelay.base.util.BatteryUtils
+import notifyrelay.shared.ui.common.deviceIconFontFamily
 import notifyrelay.shared.ui.screen.devicelist.DeviceListPort
 
 /** 以 [Context] 与 [LocalConfiguration] 实现 [DeviceListPort]。 */
@@ -31,5 +30,5 @@ class AndroidDeviceListPort(
     override fun isLandscape(): Boolean = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 
     @Composable
-    override fun iconFontFamily(): FontFamily = FontFamily(Font(resId = R.font.segsmdl2))
+    override fun iconFontFamily(): FontFamily = deviceIconFontFamily()
 }

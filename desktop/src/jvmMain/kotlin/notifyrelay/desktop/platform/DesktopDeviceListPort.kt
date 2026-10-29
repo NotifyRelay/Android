@@ -4,13 +4,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import notifyrelay.base.util.BatteryIconConverter
+import notifyrelay.shared.ui.common.deviceIconFontFamily
 import notifyrelay.shared.ui.screen.devicelist.DeviceListPort
 
 /**
  * 桌面端设备列表端口。
  *
  * 电量与充电状态取 [PowerStatusMonitor.snapshot]（由系统电源通知驱动，与 Windows 端
- * BatteryChanged 同源），字体使用默认族；横屏口径与主界面端口一致（窗口宽高比）。
+ * BatteryChanged 同源），图标字体取 `:shared` 的 MDL2 字体；横屏口径与主界面端口一致（窗口宽高比）。
  */
 class DesktopDeviceListPort : DeviceListPort {
     override fun localBatteryLevel(): Int = PowerStatusMonitor.snapshot.value.percent
@@ -28,5 +29,5 @@ class DesktopDeviceListPort : DeviceListPort {
     override fun isLandscape(): Boolean = isWindowLandscape()
 
     @Composable
-    override fun iconFontFamily(): FontFamily? = null
+    override fun iconFontFamily(): FontFamily = deviceIconFontFamily()
 }
