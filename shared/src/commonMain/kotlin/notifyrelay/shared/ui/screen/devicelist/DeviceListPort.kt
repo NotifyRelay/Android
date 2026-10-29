@@ -12,10 +12,14 @@ import androidx.compose.ui.text.font.FontFamily
  * 页面本身只做展示。
  */
 interface DeviceListPort {
-    /** 本机电量（0-100）。 */
+    /**
+     * 本机电量（0-100）。
+     *
+     * 在组合期内调用：实现方读取平台侧的可观察状态即可让页面随电量变化重组。
+     */
     fun localBatteryLevel(): Int
 
-    /** 充电状态字符：'1' 充电 / '0' 未充电。 */
+    /** 充电状态字符：'1' 充电 / '0' 未充电；与 [localBatteryLevel] 同为组合期内调用。 */
     fun localChargingState(): Char
 
     /** 本机电池图标字形（MDL2 私有区字符）。 */

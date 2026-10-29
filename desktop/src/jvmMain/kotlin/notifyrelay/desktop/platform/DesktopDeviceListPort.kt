@@ -9,12 +9,13 @@ import notifyrelay.shared.ui.screen.devicelist.DeviceListPort
 /**
  * 桌面端设备列表端口。
  *
- * 电量固定为满值、不充电，字体使用默认族；横屏口径与主界面端口一致（窗口宽高比）。
+ * 电量与充电状态取 [PowerStatusMonitor.snapshot]（由系统电源通知驱动，与 Windows 端
+ * BatteryChanged 同源），字体使用默认族；横屏口径与主界面端口一致（窗口宽高比）。
  */
 class DesktopDeviceListPort : DeviceListPort {
-    override fun localBatteryLevel(): Int = 100
+    override fun localBatteryLevel(): Int = PowerStatusMonitor.snapshot.value.percent
 
-    override fun localChargingState(): Char = '0'
+    override fun localChargingState(): Char = if (PowerStatusMonitor.snapshot.value.charging) '1' else '0'
 
     override fun localBatteryGlyph(
         level: Int,

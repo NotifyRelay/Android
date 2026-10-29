@@ -217,14 +217,10 @@ fun LocalDeviceButton(
     colorScheme: Colors,
     textStyles: TextStyles,
 ) {
-    val port = LocalDeviceListPort.current
     val batteryLevel = localBatteryLevel
-    // 充电状态随组合刷新；平台侧在每次组合时提供最新值
-    val isCharging = remember { mutableStateOf(port?.localChargingState() ?: '0') }
-    LaunchedEffect(Unit) {
-        port?.let { isCharging.value = it.localChargingState() }
-    }
-    val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel, isCharging.value)
+    // 组合期读取（不进 remember）：实现方读平台可观察状态时，充电变化可驱动重组
+    val isCharging = LocalDeviceListPort.current?.localChargingState() ?: '0'
+    val batteryIcon = BatteryIconConverter.getBatteryIcon(batteryLevel, isCharging)
 
     val buttonColors =
         if (selectedDevice == null) {

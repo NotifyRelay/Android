@@ -55,10 +55,8 @@ fun DeviceListScreen(
     var showDeleteHistoryDialog by remember { mutableStateOf(false) }
     var pendingDeleteDevice by remember { mutableStateOf<DeviceInfo?>(null) }
 
-    val localBatteryLevel =
-        remember {
-            deviceListPort?.localBatteryLevel() ?: 0
-        }
+    // 组合期读取（不进 remember）：实现方读平台可观察状态时，电量变化可驱动本页重组
+    val localBatteryLevel = deviceListPort?.localBatteryLevel() ?: 0
 
     val allDevices: List<DeviceInfo?> = listOf<DeviceInfo?>(null) + devices
     val validAuthedDeviceUuids = authedDeviceUuids.intersect(devices.map { it.uuid }.toSet())

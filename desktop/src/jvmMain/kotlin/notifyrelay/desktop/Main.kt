@@ -111,7 +111,13 @@ fun main() {
 
     application {
         // 窗口与托盘：关闭按钮隐藏窗口，托盘菜单负责显隐与退出
-        val windowController = remember { DesktopWindowController { exitApplication() } }
+        val windowController =
+            remember {
+                DesktopWindowController {
+                    deviceManager.stopPowerMonitor()
+                    exitApplication()
+                }
+            }
 
         LaunchedEffect(Unit) {
             val trayImage = iconImages.minByOrNull { abs(it.getWidth(null) - TRAY_ICON_SIZE) }

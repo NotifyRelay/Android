@@ -14,6 +14,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import notifyrelay.base.log.Logger
 import notifyrelay.desktop.platform.BatteryLevel
+import notifyrelay.desktop.platform.PowerStatusMonitor
 import notifyrelay.domain.feature.device.model.AuthInfo
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.model.DeviceSnapshot
@@ -153,7 +154,7 @@ class DesktopDeviceManager(
 
     override fun sendAccept(deviceType: String) {
         if (!NativeCore.isReady()) return
-        NativeCore.sendAccept(localUuid, localPublicKey, NativeCore.getLocalIp() ?: "0.0.0.0", BatteryLevel.percent(), deviceType)
+        NativeCore.sendAccept(localUuid, localPublicKey, NativeCore.getLocalIp() ?: "0.0.0.0", BatteryLevel.signedPercent(), deviceType)
     }
 
     override fun sendReject() {
@@ -242,11 +243,13 @@ class DesktopDeviceManager(
             Logger.e(TAG, "本机身份不可用，跳过 core 启动")
             return
         }
+        // core 以符号区分充电/放电：正=充电、负=放电
+        val battery = BatteryLevel.signedPercent()
         val started =
             NativeCore.startCore(
                 uuid = uuid,
                 name = localDisplayName,
-                battery = 0,
+                battery = battery,
                 deviceType = "pc",
                 tcpPort = DEFAULT_PORT.toShort(),
                 pubkey = pubkey,
@@ -254,14 +257,32 @@ class DesktopDeviceManager(
         Logger.i(TAG, "core 启动: " + started + ", uuid=" + uuid)
 
         // 启动周期性广播，设备发现依赖它；action=1 开始、0 停止
-        val broadcast = NativeCore.periodicBroadcast(1, uuid, localDisplayName, 0, "pc")
+        val broadcast = NativeCore.periodicBroadcast(1, uuid, localDisplayName, battery, "pc")
         Logger.i(TAG, "广播已启动: " + broadcast)
+        startPowerMonitor()
         snapshotStore.requestRefresh()
     }
 
+    /**
+     * 注册电源状态变化监听：电量或充电状态变化时更新 core 心跳调度器参数，
+     * 使心跳报文携带实时带符号电量（正=充电、负=放电）。
+     *
+     * 与 Windows 端 `SystemInfoService.BatteryChanged` → `UpdateHeartbeatSchedulerParams` 同一条路径。
+     */
+    private fun startPowerMonitor() {
+        PowerStatusMonitor.start { snapshot ->
+            if (!NativeCore.isReady()) return@start
+            val signed = if (snapshot.charging) snapshot.percent else -snapshot.percent
+            NativeCore.updateHeartbeatSchedulerParams(localDisplayName, signed, "pc")
+        }
+    }
+
+    /** 注销电源状态监听。 */
+    fun stopPowerMonitor() = PowerStatusMonitor.stop()
+
     /** 启动设备发现（周期性广播）。 */
     fun startDiscovery() {
-        NativeCore.periodicBroadcast(1, localUuid, localDisplayName, 0, "pc")
+        NativeCore.periodicBroadcast(1, localUuid, localDisplayName, BatteryLevel.signedPercent(), "pc")
     }
 
     /** 停止设备发现。 */
