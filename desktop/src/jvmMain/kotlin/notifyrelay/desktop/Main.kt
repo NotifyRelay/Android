@@ -133,6 +133,7 @@ fun main() {
                     deviceManager.stopPowerMonitor()
                     DataLayerDesktop.clipboardSync?.stop()
                     DataLayerDesktop.mediaControl?.stop()
+                    DataLayerDesktop.localNotificationRelay?.stop()
                     exitApplication()
                 }
             }
@@ -181,6 +182,8 @@ fun main() {
                 DataLayerDesktop.clipboardSync?.start(windowController.nativeHandle())
                 // 媒体会话读取：SMTC 桥只提供读取接口，按固定间隔取快照
                 DataLayerDesktop.mediaControl?.start()
+                // 本机通知采集：WinRT 桥轮询，新增通知经公共网关转发
+                DataLayerDesktop.localNotificationRelay?.start()
             }
 
             val actionPort = remember { DesktopNotificationActionPort() }

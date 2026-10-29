@@ -76,6 +76,11 @@ object DataLayerDesktop {
     var clipboardSync: notifyrelay.desktop.platform.DesktopClipboardSyncPort? = null
         private set
 
+    /** 本机通知转发实例，由入口启动与释放。 */
+    @Volatile
+    var localNotificationRelay: notifyrelay.desktop.device.DesktopLocalNotificationRelay? = null
+        private set
+
     /** 媒体控制端口实例，由入口启动与释放。 */
     @Volatile
     var mediaControl: notifyrelay.desktop.platform.DesktopMediaControlPort? = null
@@ -154,6 +159,9 @@ object DataLayerDesktop {
 
             // 置顶应用由公共仓库承担，端口直接暴露其状态流
             PinnedAppsPortRegistry.install(DesktopPinnedAppsPort())
+
+            // 本机通知采集与转发：采集经 smtc-rust 的 WinRT 桥，转发委托公共网关
+            localNotificationRelay = notifyrelay.desktop.device.DesktopLocalNotificationRelay { deviceMessagePort() }
 
             loadLogLevel { key, default -> Storage.getInt(key, default) }
             DebugFlags.load { key, default -> Storage.getBoolean(key, default) }

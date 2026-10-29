@@ -70,6 +70,15 @@ object SMTCLoader {
     /** 采集流格式：`[采样率, 声道数]`；未运行时为 `[0, 0]`。 */
     @JvmStatic
     external fun audioCaptureFormat(): IntArray
+
+    /**
+     * 读取当前全部本机通知。
+     *
+     * @return 每条 `id\u0001appName\u0001appPackage\u0001title\u0001text`，多条以 `\u0002` 分隔；
+     * 失败时以 `!` 开头返回错误说明
+     */
+    @JvmStatic
+    external fun listNotifications(): String
 }
 
 /** 系统声音采集的数据接收者。 */
