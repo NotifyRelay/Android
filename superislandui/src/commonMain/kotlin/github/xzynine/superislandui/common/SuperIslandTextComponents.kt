@@ -80,6 +80,7 @@ fun AutoFitText(
  * @param baseSpeedPxPerSec 基础滚动速度，单位为像素/秒，默认100f
  * @param pauseMillis 滚动开始前和滚动结束后的暂停时间，单位为毫秒，默认0
  * @param maxWidth 最大宽度限制，超过此宽度才会滚动，默认使用父容器宽度
+ * @param endPauseMillis 滚动到达终点并复位后的停留时间，单位为毫秒，默认300
  */
 @Composable
 fun AutoScrollText(
@@ -89,6 +90,7 @@ fun AutoScrollText(
     baseSpeedPxPerSec: Float = 100f,
     pauseMillis: Int = 0,
     maxWidth: Int? = null,
+    endPauseMillis: Int = 300,
 ) {
     // 预览模式下禁用动画，直接显示静态文本
     if (LocalInspectionMode.current) {
@@ -162,7 +164,7 @@ fun AutoScrollText(
         )
     }
 
-    LaunchedEffect(canScroll, intrinsicWidth, actualMaxWidth, duration, pauseMillis) {
+    LaunchedEffect(canScroll, intrinsicWidth, actualMaxWidth, duration, pauseMillis, endPauseMillis) {
         offset.snapTo(0f)
         if (!canScroll) return@LaunchedEffect
 
@@ -173,7 +175,7 @@ fun AutoScrollText(
                 animationSpec = tween(durationMillis = duration, easing = LinearEasing),
             )
             offset.snapTo(0f)
-            delay(300)
+            delay(endPauseMillis.toLong())
         }
     }
 }

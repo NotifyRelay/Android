@@ -1,14 +1,19 @@
 package notifyrelay.desktop.overlay
 
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -22,7 +27,9 @@ import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -30,8 +37,9 @@ import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
+import github.xzynine.superislandui.common.AutoScrollText
 import github.xzynine.superislandui.floating.bigisland.components.MediaIslandCompose
-import github.xzynine.superislandui.floating.smallisland.compose.BigIslandCollapsedCompose
+import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.model.components.MediaSessionData
 import kotlinx.coroutines.delay
 import notifyrelay.base.log.Logger
@@ -161,11 +169,55 @@ private fun OverlayMediaItem(
             MediaIslandCompose(mediaSession = mediaSession, showControls = false)
         }
     } else {
-        Box(Modifier.widthIn(max = COLLAPSED_MAX_WIDTH)) {
-            BigIslandCollapsedCompose(
-                bigIsland = null,
-                picMap = snapshot.coverUrl?.let { mapOf("miui.focus.pic_cover" to it) },
-                fallbackTitle = snapshot.title,
+        CollapsedMediaCapsule(title = snapshot.title, coverUrl = snapshot.coverUrl)
+    }
+}
+
+/**
+ * 收起态胶囊。
+ *
+ * 定宽胶囊：封面在左，标题在右侧剩余宽度内滚动；滚动结束复位后停留片刻再开始下一轮。
+ */
+@Composable
+private fun CollapsedMediaCapsule(
+    title: String?,
+    coverUrl: String?,
+) {
+    val shape = RoundedCornerShape(percent = 50)
+    val painter = rememberSuperIslandImagePainter(url = coverUrl)
+    Row(
+        modifier =
+            Modifier
+                .width(COLLAPSED_WIDTH)
+                .height(COLLAPSED_HEIGHT)
+                .shadow(elevation = 6.dp, shape = shape)
+                .background(color = CAPSULE_BACKGROUND, shape = shape)
+                .border(width = 1.dp, color = CAPSULE_BORDER, shape = shape)
+                .clip(shape)
+                .padding(horizontal = COLLAPSED_HORIZONTAL_PADDING),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (painter != null) {
+            Image(
+                painter = painter,
+                contentDescription = "歌曲封面",
+                modifier = Modifier.size(COLLAPSED_COVER_SIZE).clip(RoundedCornerShape(4.dp)),
+                contentScale = ContentScale.Crop,
+            )
+        } else {
+            Text(text = "\u266A", color = Color(0xFF888888), fontSize = 14.sp)
+        }
+
+        Spacer(Modifier.width(6.dp))
+
+        Box(Modifier.weight(1f)) {
+            AutoScrollText(
+                text = title.orEmpty().ifBlank { "未在播放" },
+                style = TextStyle(fontSize = 12.sp),
+                color = Color.White,
+                baseSpeedPxPerSec = 100f,
+                pauseMillis = 0,
+                endPauseMillis = CAPSULE_END_PAUSE_MS,
             )
         }
     }
@@ -234,8 +286,26 @@ private fun DanmakuLayer(now: Long) {
 
 private const val DANMAKU_SPEED_PX_PER_SEC = 180f
 
-/** 收起态胶囊宽度上限。 */
-private val COLLAPSED_MAX_WIDTH = 260.dp
+/** 收起态胶囊宽度。 */
+private val COLLAPSED_WIDTH = 260.dp
+
+/** 收起态胶囊高度。 */
+private val COLLAPSED_HEIGHT = 36.dp
+
+/** 收起态文本滚动结束复位后的停留时长。 */
+private const val CAPSULE_END_PAUSE_MS = 1_500
+
+/** 收起态封面尺寸。 */
+private val COLLAPSED_COVER_SIZE = 24.dp
+
+/** 收起态左右内边距。 */
+private val COLLAPSED_HORIZONTAL_PADDING = 10.dp
+
+/** 收起态胶囊背景。 */
+private val CAPSULE_BACKGROUND = Color(0xCC000000)
+
+/** 收起态胶囊边框。 */
+private val CAPSULE_BORDER = Color(0x80FFFFFF)
 
 /** 媒体卡展开后自动收起时长。 */
 private const val MEDIA_AUTO_COLLAPSE_MS = 5_000L
