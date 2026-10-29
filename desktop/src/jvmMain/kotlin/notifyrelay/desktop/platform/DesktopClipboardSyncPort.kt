@@ -23,8 +23,8 @@ import javax.imageio.ImageIO
  * 桌面端剪贴板同步。
  *
  * 与 Windows `ClipboardService` 同口径：
- * - 监听系统剪贴板的拥有者变化（AWT 无内容变更事件，采用拥有者轮询）；
- * - 采集文本（CRLF 归一为 LF）或图片（PNG → Base64）；
+ * - 监听系统剪贴板变更事件（`AddClipboardFormatListener`，见 [ClipboardChangeMonitor]）；
+ * - 采集文本（原样，不做换行归一）或图片（PNG → Base64）；
  * - 去重、防循环、频率限制与 2MB 阈值全部交给 Rust core（`clipboardOnChanged`）；
  * - 收到远端报文经 `clipboardOnReceived` 解析后写回系统剪贴板。
  *
@@ -37,9 +37,6 @@ class DesktopClipboardSyncPort(
     private companion object {
         const val TAG = "DesktopClipboard"
         const val KEY_ENABLED = "clipboard_sync_enabled"
-
-        /** 剪贴板轮询间隔（毫秒）。 */
-        const val POLL_INTERVAL_MS = 800L
 
         /** 文本 MIME。 */
         const val MIME_TEXT = "text/plain"
@@ -57,8 +54,6 @@ class DesktopClipboardSyncPort(
     private val lastResultState = MutableStateFlow<String?>(null)
     override val lastResult: StateFlow<String?> = lastResultState.asStateFlow()
 
-    private var poller: Thread? = null
-
     @Volatile
     private var running = false
 
@@ -66,8 +61,15 @@ class DesktopClipboardSyncPort(
     @Volatile
     private var lastSignature: Int = 0
 
-    /** 启动轮询；系统剪贴板不可用时保持未监听状态。 */
-    fun start() {
+    /**
+     * 启动剪贴板监听。
+     *
+     * 注册系统剪贴板变更事件（与 [PowerStatusMonitor] 同为 JNA 调 Win32 的方式）。
+     * 非 Windows 或窗口句柄无效时监听不可用，本方法返回后 [watching] 保持 false。
+     *
+     * @param hwnd 主窗口句柄（`AddClipboardFormatListener` 需要窗口接收消息）
+     */
+    fun start(hwnd: Long = 0L) {
         if (running) return
         val clipboard = runCatching { Toolkit.getDefaultToolkit().systemClipboard }.getOrNull()
         if (clipboard == null) {
@@ -76,31 +78,27 @@ class DesktopClipboardSyncPort(
         }
         running = true
         watchingState.value = true
-        poller =
-            Thread({
-                while (running) {
-                    try {
-                        Thread.sleep(POLL_INTERVAL_MS)
-                        pollOnce(clipboard)
-                    } catch (e: InterruptedException) {
-                        Thread.currentThread().interrupt()
-                        return@Thread
-                    } catch (e: IllegalStateException) {
-                        Logger.w(TAG, "剪贴板轮询异常", e)
-                    }
-                }
-            }, "desktop-clipboard-watch").apply {
-                isDaemon = true
-                start()
+
+        val eventDriven =
+            ClipboardChangeMonitor.start(hwnd) {
+                // 窗口消息线程：只做采集与入队，Rust 负责去重与防循环
+                runCatching { handleClipboardChange(clipboard) }
+                    .onFailure { Logger.w(TAG, "剪贴板事件处理失败", it) }
             }
-        Logger.i(TAG, "剪贴板监视已启动")
+
+        if (!eventDriven) {
+            running = false
+            watchingState.value = false
+            Logger.w(TAG, "剪贴板事件监听不可用（需 Windows 且窗口句柄有效）")
+            return
+        }
+        Logger.i(TAG, "剪贴板监视已启动（事件驱动）")
     }
 
-    /** 停止轮询。 */
+    /** 停止监听。 */
     fun stop() {
         running = false
-        poller?.interrupt()
-        poller = null
+        ClipboardChangeMonitor.stop()
         watchingState.value = false
     }
 
@@ -115,7 +113,7 @@ class DesktopClipboardSyncPort(
             return
         }
         runCatching { Toolkit.getDefaultToolkit().systemClipboard }
-            .onSuccess { pollOnce(it, force = true) }
+            .onSuccess { handleClipboardChange(it, force = true) }
             .onFailure { lastResultState.value = "系统剪贴板不可用" }
     }
 
@@ -142,13 +140,13 @@ class DesktopClipboardSyncPort(
                     java.awt.datatransfer.StringSelection(content)
                 }
             clipboard.setContents(transferable, null)
-            // 同步本地内容签名：回写触发的下一次轮询不应再被当作本机变更
+            // 同步本地内容签名：回写触发的下一次变更事件不应再被当作本机内容发出
             lastSignature = content.hashCode()
         }.onFailure { Logger.w(TAG, "写入系统剪贴板失败", it) }
     }
 
-    /** 读取一次剪贴板并按需发送。 */
-    private fun pollOnce(
+    /** 处理一次剪贴板变化：采集内容并交给 Rust 判定与发送。 */
+    private fun handleClipboardChange(
         clipboard: Clipboard,
         force: Boolean = false,
     ) {
@@ -156,7 +154,7 @@ class DesktopClipboardSyncPort(
 
         val captured = capture(clipboard) ?: return
 
-        // 内容签名未变则跳过：避免每次轮询都把同一内容交给 Rust
+        // 内容签名未变则跳过：避免同一内容被重复交给 Rust 判定
         val signature = captured.first.hashCode()
         if (!force && signature == lastSignature) return
         lastSignature = signature
@@ -200,8 +198,9 @@ class DesktopClipboardSyncPort(
                 runCatching { transferable.getTransferData(DataFlavor.stringFlavor) as? String }
                     .getOrNull()
             if (!raw.isNullOrEmpty()) {
-                // Windows 换行为 CRLF，统一为 LF（与 Windows 端一致）
-                return raw.replace("\r\n", "\n") to MIME_TEXT
+                // 内容原样传递：Rust core 与 Android 均不做换行归一，
+                // 在此改写会与另外两端产生内容差异（接收端看到被改写的文本）
+                return raw to MIME_TEXT
             }
         }
 

@@ -4,7 +4,6 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
-import kotlinx.serialization.json.jsonPrimitive
 import notifyrelay.base.log.Logger
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.repository.DatabaseRepository
@@ -93,10 +92,8 @@ object InboundNotificationProcessor {
     fun localDevice(): String = LOCAL_DEVICE
 
     /** 读取 JSON 对象的字符串字段；缺失或非字符串时返回空串。 */
-    private fun JsonObject.optString(field: String): String =
-        (this[field] as? JsonPrimitive)?.content ?: ""
+    private fun JsonObject.optString(field: String): String = (this[field] as? JsonPrimitive)?.content ?: ""
 
     /** 读取 JSON 对象的 Long 字段；缺失或非数值时返回 0。 */
-    private fun JsonObject.optLong(field: String): Long =
-        (this[field] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L
+    private fun JsonObject.optLong(field: String): Long = (this[field] as? JsonPrimitive)?.content?.toLongOrNull() ?: 0L
 }

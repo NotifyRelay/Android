@@ -111,9 +111,6 @@ fun main() {
     // 通知历史、应用列表与图标的请求链路均取该管理器（与 Android 的 scanDeviceList 同口径）
     DataLayerDesktop.registerDeviceManager(deviceManager)
 
-    // 剪贴板同步：默认开启（口径：桌面无取用限制，直接读写系统剪贴板）
-    DataLayerDesktop.clipboardSync?.start()
-
     // 窗口图标与 UI 共用 :shared 的同一份资源
     val iconImages =
         runCatching {
@@ -172,6 +169,8 @@ fun main() {
             LaunchedEffect(window) {
                 windowController.bindWindow(window)
                 window.setIconImages(iconImages)
+                // 剪贴板同步：默认开启；窗口就绪后才能取到 HWND 注册系统剪贴板事件
+                DataLayerDesktop.clipboardSync?.start(windowController.nativeHandle())
             }
 
             val actionPort = remember { DesktopNotificationActionPort() }

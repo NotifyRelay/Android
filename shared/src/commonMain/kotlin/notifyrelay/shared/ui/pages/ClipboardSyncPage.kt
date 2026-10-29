@@ -76,8 +76,9 @@ fun ClipboardSyncPage(modifier: Modifier = Modifier) {
         }
 
         Text(
-            text = "说明：内容未变、来自对端的回环内容与过于频繁的改动会被自动忽略；" +
-                "超过 2MB 的图片改为文件传输。",
+            text =
+                "说明：内容未变、来自对端的回环内容与过于频繁的改动会被自动忽略；" +
+                    "超过 2MB 的图片改为文件传输。",
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary,
         )

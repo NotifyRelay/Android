@@ -22,8 +22,7 @@ object RemoteAppIconCache {
     val iconUpdates: StateFlow<Pair<String, Long>?> = _iconUpdates.asStateFlow()
 
     /** 读取单个外部应用图标的 PNG 字节。 */
-    suspend fun cachedBytes(packageName: String): ByteArray? =
-        DatabaseRepository.getInstance().getAppByPackageName(packageName)?.iconBytes
+    suspend fun cachedBytes(packageName: String): ByteArray? = DatabaseRepository.getInstance().getAppByPackageName(packageName)?.iconBytes
 
     /** 批量读取外部应用图标的 PNG 字节；缺失项为 null。 */
     suspend fun cachedBytes(packageNames: List<String>): Map<String, ByteArray?> {

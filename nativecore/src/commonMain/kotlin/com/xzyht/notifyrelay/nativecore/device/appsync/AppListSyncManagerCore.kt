@@ -7,7 +7,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
-import kotlin.coroutines.coroutineContext
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.serialization.json.Json
@@ -20,12 +19,11 @@ import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import notifyrelay.base.log.Logger
-import notifyrelay.data.database.entity.AppDeviceEntity
-import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.domain.feature.appslist.AppLabelPortRegistry
 import notifyrelay.domain.feature.appslist.InstalledPackagesPortRegistry
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
+import kotlin.coroutines.coroutineContext
 
 /**
  * 应用列表同步管理器。
@@ -154,13 +152,13 @@ object AppListSyncManagerCore {
             }
 
             ioScope.launch {
-                    trackCurrentJob(deviceUuid)
-                    RemoteAppsCacheCore.cache(appsMap, deviceUuid)
-                    // cache 已为每个包名写入 apps 父行；linkToDevice 再确保幂等并写关联
-                    packageNames.forEach { RemoteAppIconCache.linkToDevice(it, deviceUuid) }
-                    val sourceDevice = deviceManager.resolveDeviceInfo(deviceUuid, null, DEFAULT_PORT)
-                    sourceDevice?.let { checkAndRequestMissingIcons(packageNames, deviceManager, it) }
-                }
+                trackCurrentJob(deviceUuid)
+                RemoteAppsCacheCore.cache(appsMap, deviceUuid)
+                // cache 已为每个包名写入 apps 父行；linkToDevice 再确保幂等并写关联
+                packageNames.forEach { RemoteAppIconCache.linkToDevice(it, deviceUuid) }
+                val sourceDevice = deviceManager.resolveDeviceInfo(deviceUuid, null, DEFAULT_PORT)
+                sourceDevice?.let { checkAndRequestMissingIcons(packageNames, deviceManager, it) }
+            }
         } catch (e: IllegalArgumentException) {
             Logger.e(TAG, "处理应用列表响应失败", e)
         }
@@ -173,13 +171,13 @@ object AppListSyncManagerCore {
         sourceDevice: DeviceInfo,
     ) {
         ioScope.launch {
-                trackCurrentJob(sourceDevice.uuid)
-                val missingIcons = RemoteAppIconCache.missingOf(packageNames)
-                if (missingIcons.isEmpty()) return@launch
-                val needRequestIcons = filterOutLocalInstalled(missingIcons)
-                if (needRequestIcons.isEmpty()) return@launch
-                IconSyncManagerCore.requestIconsBatch(needRequestIcons, deviceManager, sourceDevice)
-            }
+            trackCurrentJob(sourceDevice.uuid)
+            val missingIcons = RemoteAppIconCache.missingOf(packageNames)
+            if (missingIcons.isEmpty()) return@launch
+            val needRequestIcons = filterOutLocalInstalled(missingIcons)
+            if (needRequestIcons.isEmpty()) return@launch
+            IconSyncManagerCore.requestIconsBatch(needRequestIcons, deviceManager, sourceDevice)
+        }
     }
 
     /** 入站入口：处理应用列表请求（非挂起，供 Rust 回调线程直接调用）。 */
@@ -211,7 +209,11 @@ object AppListSyncManagerCore {
         field: String,
     ): String? =
         try {
-            json.parseToJsonElement(raw).jsonObject[field]?.jsonPrimitive?.content
+            json
+                .parseToJsonElement(raw)
+                .jsonObject[field]
+                ?.jsonPrimitive
+                ?.content
         } catch (e: IllegalArgumentException) {
             null
         }

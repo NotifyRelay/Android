@@ -40,7 +40,9 @@ object ChatSendGateway {
         message: String,
         deviceManager: DeviceMessagePort,
     ) {
-        val allDevices = deviceManager.devices.value.values.map { it.first }
+        val allDevices =
+            deviceManager.devices.value.values
+                .map { it.first }
         if (allDevices.isEmpty() || message.isBlank()) {
             Logger.w(TAG, "没有可用的设备或消息为空")
             return
