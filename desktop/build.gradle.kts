@@ -48,11 +48,17 @@ tasks.withType<JavaExec>().configureEach {
     // JNA 优先读 jna.library.path；java.library.path 对 Native.register 不生效
     systemProperty("jna.library.path", rustHostLibDir.absolutePath)
     systemProperty("java.library.path", rustHostLibDir.absolutePath)
+    // 控制台输出编码：中文 Windows 默认按 GBK 编码 stdout/stderr，捕获端（Gradle/IDE）按 UTF-8 解码会乱码。
+    // JDK 18+ 起 file.encoding 不再决定控制台编码，需显式指定 stdout.encoding / stderr.encoding。
+    systemProperty("stdout.encoding", "UTF-8")
+    systemProperty("stderr.encoding", "UTF-8")
 }
 
 tasks.withType<Test>().configureEach {
     systemProperty("jna.library.path", rustHostLibDir.absolutePath)
     systemProperty("java.library.path", rustHostLibDir.absolutePath)
+    systemProperty("stdout.encoding", "UTF-8")
+    systemProperty("stderr.encoding", "UTF-8")
 }
 
 compose.desktop {
