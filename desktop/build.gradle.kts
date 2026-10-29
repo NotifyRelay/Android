@@ -19,6 +19,8 @@ kotlin {
             implementation(project(":data"))
             implementation(project(":core"))
             implementation(project(":base"))
+            // 超级岛公共 UI（含媒体浮窗 MediaIslandCompose）
+            implementation(project(":superislandui"))
 
             // 与 :shared 一致的 UI 组件库（shared 侧为 implementation，不传递）
             implementation(libs.miuix.ui.kmp)

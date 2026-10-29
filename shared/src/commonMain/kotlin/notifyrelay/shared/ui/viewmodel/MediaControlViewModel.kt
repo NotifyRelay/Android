@@ -15,6 +15,9 @@ class MediaControlViewModel(
 ) : ViewModel() {
     val sessionUpdates get() = port.sessionUpdates
 
+    /** 各设备会话的映射流（键为设备 UUID，本机为 [LOCAL_SESSION_KEY]）。 */
+    fun sessionsFlow(): kotlinx.coroutines.flow.StateFlow<Map<String, MediaSessionSnapshot>> = port.sessionsFlow()
+
     fun currentSession(): MediaSessionSnapshot? = port.currentSession()
 
     fun currentDevice(): DeviceInfo? = port.currentDevice()

@@ -67,6 +67,8 @@ kotlin {
             implementation(libs.androidx.lifecycle.viewmodel.compose.kmp)
             // UpdateDialog 依赖的 ReleaseInfo 数据模型（KMP 库）
             implementation(project(":checkupdata"))
+            // 超级岛公共 UI（音乐控制页复用媒体浮窗 MediaIslandCompose）
+            implementation(project(":superislandui"))
         }
     }
 }

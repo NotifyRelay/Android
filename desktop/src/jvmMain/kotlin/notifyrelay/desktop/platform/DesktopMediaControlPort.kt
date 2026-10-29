@@ -8,6 +8,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
@@ -35,23 +36,42 @@ class DesktopMediaControlPort(
         const val TAG = "DesktopMedia"
         const val KEY_RECEIVE_MODE = "media_message_receive_mode"
 
+        /** 本机会话在分设备表里的键。 */
+        const val LOCAL_KEY = "local"
+
         /** 会话轮询间隔：SMTC 桥只提供读取接口，无变更事件，故周期取快照。 */
         const val POLL_INTERVAL_MS = 1_000L
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
+    /**
+     * 各设备各自的会话。
+     *
+     * 键为设备 UUID；本机会话固定用 [LOCAL_KEY]。分设备保存，
+     * 避免多台设备（含本机）的媒体状态互相覆盖。
+     */
+    private val sessionsByDevice = MutableStateFlow<Map<String, MediaSessionSnapshot>>(emptyMap())
+
+    /** 对外仍暴露「当前会话」：优先本机，其次最近更新的远端。 */
     private val sessionState = MutableStateFlow<MediaSessionSnapshot?>(null)
     override val sessionUpdates: StateFlow<MediaSessionSnapshot?> = sessionState.asStateFlow()
 
     private var pollJob: Job? = null
 
-    /** 最近一次读取到的会话所属设备（远端回推时为对应设备，本机会话为 null）。 */
+    /** 当前会话所属设备（本机会话为 null）。 */
+    @Volatile
     private var currentDeviceState: DeviceInfo? = null
 
     override fun currentSession(): MediaSessionSnapshot? = sessionState.value
 
     override fun currentDevice(): DeviceInfo? = currentDeviceState
+
+    /** 取指定设备的会话；[deviceUuid] 为空表示本机。 */
+    fun sessionOf(deviceUuid: String?): MediaSessionSnapshot? = sessionsByDevice.value[deviceUuid ?: LOCAL_KEY]
+
+    /** 指定设备的会话变化流。 */
+    override fun sessionsFlow(): StateFlow<Map<String, MediaSessionSnapshot>> = sessionsByDevice.asStateFlow()
 
     override fun isEnabled(): Boolean = receiveMode() != MediaMessageReceiveMode.Off
 
@@ -112,11 +132,16 @@ class DesktopMediaControlPort(
         pollJob = null
     }
 
-    /** 更新远端回推的会话（来自 `onMediaPlay` 报文）。 */
+    /** 更新远端回推的会话（来自 `onMediaPlay` 报文）；按设备各自保存。 */
     fun updateRemoteSession(
         device: DeviceInfo?,
         snapshot: MediaSessionSnapshot?,
     ) {
+        val key = device?.uuid ?: LOCAL_KEY
+        sessionsByDevice.update { current ->
+            if (snapshot == null) current - key else current + (key to snapshot)
+        }
+        // 对外「当前会话」：优先反映最近一次远端回推（页面按设备取用时走 sessionOf）
         currentDeviceState = device
         sessionState.value = snapshot
     }
@@ -130,9 +155,14 @@ class DesktopMediaControlPort(
                     packageName = it.sourceAppId,
                     title = it.title,
                     artist = it.artist,
+                    coverUrl = it.coverDataUrl,
                 )
             }
-        // 本机会话优先；无本机会话时保留远端回推的内容
+        // 本机会话单独占一个键，不与远端设备的会话互相覆盖
+        sessionsByDevice.update { current ->
+            if (mapped == null) current - LOCAL_KEY else current + (LOCAL_KEY to mapped)
+        }
+        // 对外「当前会话」以本机为准（本机无会话时保留最近一次远端回推）
         if (mapped != null) {
             currentDeviceState = null
             sessionState.value = mapped

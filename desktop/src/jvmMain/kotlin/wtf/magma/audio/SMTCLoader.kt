@@ -40,4 +40,10 @@ object SMTCLoader {
     /** 当前会话所属应用的 User Model ID；无会话时为空串。 */
     @JvmStatic
     external fun getSourceAppId(): String
+
+    /**
+     * 当前会话封面的 base64（原始图片字节，通常 JPEG/PNG）；无封面时为空串。
+     */
+    @JvmStatic
+    external fun getCoverBase64(): String
 }

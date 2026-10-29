@@ -64,7 +64,32 @@ internal object DesktopMediaSessionSource {
             durationMs = durationMs,
             playing = status == STATUS_PLAYING,
             sourceAppId = sourceAppId.takeIf { it.isNotBlank() },
+            coverDataUrl = readCoverDataUrl(),
         )
+    }
+
+    /**
+     * 读取封面并转成 data URL。
+     *
+     * Rust 侧返回原始图片字节的 base64；这里按图片内容的魔数判断 MIME，
+     * 未知类型统一按 PNG 标注（Compose 解码器按内容识别，不依赖 MIME）。
+     */
+    private fun readCoverDataUrl(): String? {
+        val base64 = runCatching { SMTCLoader.getCoverBase64() }.getOrNull()
+        if (base64.isNullOrBlank()) return null
+        val mime =
+            runCatching {
+                val head =
+                    java.util.Base64
+                        .getDecoder()
+                        .decode(base64.take(16))
+                when {
+                    head.size >= 3 && head[0] == 0xFF.toByte() && head[1] == 0xD8.toByte() -> "image/jpeg"
+                    head.size >= 8 && head[0] == 0x89.toByte() && head[1] == 'P'.code.toByte() -> "image/png"
+                    else -> "image/png"
+                }
+            }.getOrDefault("image/png")
+        return "data:" + mime + ";base64," + base64
     }
 
     /** 一次媒体会话快照。 */
@@ -75,6 +100,7 @@ internal object DesktopMediaSessionSource {
         val durationMs: Long,
         val playing: Boolean,
         val sourceAppId: String?,
+        val coverDataUrl: String? = null,
     )
 
     /** Windows `MediaPlaybackStatus` 取值。 */

@@ -38,11 +38,24 @@ internal object DesktopMediaRemoteHandler {
                 .getOrNull()
                 ?: return
 
+        // 字段口径以 core 的 parse_media_inbound 为准：
+        // 歌手在 text（无 artist 字段）；封面被重命名为 coverImage；isEnd 表示会话结束。
+        val isEnd =
+            (root["isEnd"] as? kotlinx.serialization.json.JsonPrimitive)
+                ?.content
+                ?.toBooleanStrictOrNull() ?: false
+        if (isEnd) {
+            DataLayerDesktop.mediaControl?.updateRemoteSession(device, null)
+            Logger.d(TAG, "远端媒体会话已结束: device=" + device.displayName)
+            return
+        }
+
         val snapshot =
             MediaSessionSnapshot(
                 packageName = root.stringField("packageName"),
                 title = root.stringField("title"),
-                artist = root.stringField("artist") ?: root.stringField("appName"),
+                artist = root.stringField("text"),
+                coverUrl = root.stringField("coverImage"),
             )
         DataLayerDesktop.mediaControl?.updateRemoteSession(device, snapshot)
         Logger.d(TAG, "收到远端媒体状态: device=" + device.displayName)

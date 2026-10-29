@@ -1,23 +1,29 @@
 package notifyrelay.shared.ui.pages
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import notifyrelay.base.log.Logger
+import github.xzynine.superislandui.floating.bigisland.components.MediaIslandCompose
+import github.xzynine.superislandui.model.components.MediaSessionData
+import notifyrelay.domain.feature.media.LOCAL_SESSION_KEY
 import notifyrelay.domain.feature.media.MediaMessageReceiveMode
 import notifyrelay.shared.ui.common.MiuixSpinnerPreference
 import notifyrelay.shared.ui.port.LocalPreferencePort
@@ -28,6 +34,8 @@ import notifyrelay.shared.ui.viewmodel.MediaControlViewModel
 import notifyrelay.shared.ui.viewmodel.audioRelayViewModel
 import notifyrelay.shared.ui.viewmodel.mediaControlViewModel
 import top.yukonga.miuix.kmp.basic.Button
+import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -239,96 +247,65 @@ fun MusicControlPage(
             },
         )
 
-        // 媒体控制标题
-        Text(
-            text = "媒体控制",
-            style = textStyles.title2,
-            color = colorScheme.onSurface,
-        )
-
-        // 媒体控制说明文本
-        Text(
-            text = "控制当前选中设备的媒体播放",
-            style = textStyles.body2,
-            color = colorScheme.onSurfaceSecondary,
-        )
-
-        // 媒体控制按钮组
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-        ) {
-            // 上一首按钮
-            Button(
-                onClick = {
-                    try {
-                        if (selectedDevice == null) {
-                            mediaViewModel.previousLocal()
-                            toastPort.short("已发送上一首指令到本机")
-                        } else {
-                            if (mediaViewModel.sendMediaCommand(selectedDevice, "previous")) {
-                                toastPort.short("已发送上一首指令到${selectedDevice.displayName}")
-                            } else {
-                                toastPort.short("发送上一首指令失败")
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Logger.e("NotifyRelay", "发送上一首指令失败", e)
-                        toastPort.short("发送上一首指令失败: ${e.message}")
-                    }
-                },
-                modifier = Modifier.width(100.dp),
-            ) {
-                Text("上一首")
+        // 媒体浮窗：复用 :superislandui 的媒体卡片，替换原三键文本按钮区。
+        // 会话按「选中设备」各自取用，避免多台设备的媒体状态互相覆盖。
+        val allSessions by mediaViewModel.sessionsFlow().collectAsState()
+        val sessionSnapshot = allSessions[selectedDevice?.uuid ?: LOCAL_SESSION_KEY]
+        val mediaSession =
+            sessionSnapshot?.let { snapshot ->
+                MediaSessionData(
+                    packageName = snapshot.packageName ?: "",
+                    appName = snapshot.packageName,
+                    title = snapshot.title.orEmpty(),
+                    text = snapshot.artist.orEmpty().ifBlank { snapshot.title.orEmpty() },
+                    coverUrl = snapshot.coverUrl,
+                    deviceName = selectedDevice?.displayName ?: "本机",
+                )
             }
 
-            // 播放/暂停按钮
-            Button(
-                onClick = {
-                    try {
-                        if (selectedDevice == null) {
-                            mediaViewModel.playPauseLocal()
-                            toastPort.short("已发送播放/暂停指令到本机")
-                        } else {
-                            if (mediaViewModel.sendMediaCommand(selectedDevice, "playPause")) {
-                                toastPort.short("已发送播放/暂停指令到${selectedDevice.displayName}")
-                            } else {
-                                toastPort.short("发送播放/暂停指令失败")
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Logger.e("NotifyRelay", "发送播放/暂停指令失败", e)
-                        toastPort.short("发送播放/暂停指令失败: ${e.message}")
-                    }
-                },
-                modifier = Modifier.width(100.dp),
+        if (mediaSession != null) {
+            // 用 Card 承载浮窗内容，给出明确边界（媒体卡片自身背景为深色，落在浅色页面时需要边框区分）
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                cornerRadius = 12.dp,
+                colors =
+                    CardDefaults.defaultColors(
+                        color = colorScheme.surface,
+                        contentColor = colorScheme.onSurface,
+                    ),
             ) {
-                Text("播放\n暂停")
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxWidth()
+                            .background(Color(0xFF1C1C1E), RoundedCornerShape(12.dp)),
+                ) {
+                    MediaIslandCompose(
+                        mediaSession = mediaSession,
+                        onPlayPause = {
+                            if (selectedDevice == null) mediaViewModel.playPauseLocal() else mediaViewModel.sendMediaCommand(selectedDevice, "playPause")
+                        },
+                        onPrevious = {
+                            if (selectedDevice == null) mediaViewModel.previousLocal() else mediaViewModel.sendMediaCommand(selectedDevice, "previous")
+                        },
+                        onNext = {
+                            if (selectedDevice == null) mediaViewModel.nextLocal() else mediaViewModel.sendMediaCommand(selectedDevice, "next")
+                        },
+                        onClose = {},
+                    )
+                }
             }
-
-            // 下一首按钮
-            Button(
-                onClick = {
-                    try {
-                        if (selectedDevice == null) {
-                            mediaViewModel.nextLocal()
-                            toastPort.short("已发送下一首指令到本机")
-                        } else {
-                            if (mediaViewModel.sendMediaCommand(selectedDevice, "next")) {
-                                toastPort.short("已发送下一首指令到${selectedDevice.displayName}")
-                            } else {
-                                toastPort.short("发送下一首指令失败")
-                            }
-                        }
-                    } catch (e: Exception) {
-                        Logger.e("NotifyRelay", "发送下一首指令失败", e)
-                        toastPort.short("发送下一首指令失败: ${e.message}")
-                    }
-                },
-                modifier = Modifier.width(100.dp),
-            ) {
-                Text("下一首")
-            }
+        } else {
+            Text(
+                text =
+                    if (selectedDevice == null) {
+                        "本机暂无正在播放的媒体"
+                    } else {
+                        "「${selectedDevice.displayName}」暂无媒体会话信息"
+                    },
+                style = textStyles.body2,
+                color = colorScheme.onSurfaceSecondary,
+            )
         }
 
         // 提示信息

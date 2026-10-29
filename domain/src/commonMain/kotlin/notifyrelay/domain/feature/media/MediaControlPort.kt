@@ -3,11 +3,13 @@ package notifyrelay.domain.feature.media
 import kotlinx.coroutines.flow.StateFlow
 import notifyrelay.domain.feature.device.model.DeviceInfo
 
-/** 远端媒体会话信息（平台无关视图）。 */
+/** 媒体会话信息（平台无关视图）。 */
 data class MediaSessionSnapshot(
     val packageName: String?,
     val title: String?,
     val artist: String?,
+    /** 封面：data URL 或 http(s) 地址；无封面为 null。 */
+    val coverUrl: String? = null,
 )
 
 /**
@@ -42,7 +44,20 @@ interface MediaControlPort {
 
     /** 会话变化信号。 */
     val sessionUpdates: StateFlow<MediaSessionSnapshot?>
+
+    /**
+     * 各设备会话的映射（键为设备 UUID，本机为 [LOCAL_SESSION_KEY]）。
+     *
+     * 平台未分设备维护时返回空映射，页面按「无会话」渲染。
+     */
+    fun sessionsFlow(): StateFlow<Map<String, MediaSessionSnapshot>> = emptySessionsFlow
 }
+
+/** 本机会话在分设备映射中的键。 */
+const val LOCAL_SESSION_KEY: String = "local"
+
+/** 空会话映射流（[MediaControlPort.sessionsFlow] 的默认实现用）。 */
+private val emptySessionsFlow: StateFlow<Map<String, MediaSessionSnapshot>> = kotlinx.coroutines.flow.MutableStateFlow(emptyMap())
 
 /** 媒体控制动作。 */
 enum class MediaControlAction { PLAY_PAUSE, PREVIOUS, NEXT }
