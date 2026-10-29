@@ -3,6 +3,7 @@ package notifyrelay.desktop.platform
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
 import com.xzyht.notifyrelay.nativecore.device.appsync.InboundNotificationProcessor
+import com.xzyht.notifyrelay.nativecore.device.appsync.RemoteAppIconCache
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import notifyrelay.data.database.repository.DatabaseRepository
@@ -53,7 +54,22 @@ class DesktopHistoryPort(
 
     override fun installedPackages(): Set<String> = emptySet()
 
-    override suspend fun appIcons(packageNames: List<String>): Map<String, AppIconInfo> = packageNames.associateWith { packageName -> AppIconInfo(appName = packageName, icon = null) }
+    /**
+     * 历史卡片的图标与应用名。
+     *
+     * 图标取公共图标缓存（字节）并解码；应用名取缓存的 appName，
+     * 缺失时回落到应用列表应答里带回的名字，再退化为包名。
+     */
+    override suspend fun appIcons(packageNames: List<String>): Map<String, AppIconInfo> =
+        packageNames.associateWith { packageName ->
+            AppIconInfo(
+                appName = resolveAppName(packageName),
+                icon = RemoteAppIconCache.cachedBytes(packageName)?.let { DesktopIconCodecPort.decodeToBitmap(it) },
+            )
+        }
+
+    /** 应用显示名：优先应用表里的名字，退回包名。 */
+    private suspend fun resolveAppName(packageName: String): String = repository.getAppByPackageName(packageName)?.appName?.takeIf { it.isNotBlank() } ?: packageName
 
     override suspend fun deleteNotification(key: String) {
         repository.deleteNotificationByKey(key)

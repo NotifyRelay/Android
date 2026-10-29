@@ -3,7 +3,7 @@ package notifyrelay.desktop.platform
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.decodeToImageBitmap
+import notifyrelay.base.util.decodeImageBitmap
 import notifyrelay.data.Storage
 import notifyrelay.shared.ui.port.ClipboardPort
 import notifyrelay.shared.ui.port.IntentLaunchPort
@@ -96,11 +96,8 @@ private object DesktopSystemBarPort : SystemBarPort {
 /**
  * 桌面端位图端口。
  *
- * 字节解码经 Compose 的 Skia 解码器（支持 PNG/JPEG/WebP 等），
- * 失败返回 null 由界面回落到占位图标。
- *
- * [drawableToBitmap] 在桌面端没有 Drawable 概念：入参已是平台位图时原样返回，
- * 传入字节数组时按字节解码。
+ * 解码统一走 [decodeImageBitmap]（公共实现，平台后端为 Skia）；
+ * [drawableToBitmap] 在桌面端没有 Drawable 概念：入参为字节数组时按字节解码，其余原样返回。
  */
 private object DesktopBitmapPort : notifyrelay.shared.ui.port.BitmapPort {
     override fun drawableToBitmap(
@@ -108,14 +105,11 @@ private object DesktopBitmapPort : notifyrelay.shared.ui.port.BitmapPort {
         fallbackSize: Int,
     ): Any =
         when (drawable) {
-            is ByteArray -> decodeByteArray(drawable) ?: drawable
+            is ByteArray -> decodeImageBitmap(drawable) ?: drawable
             else -> drawable
         }
 
-    override fun decodeByteArray(bytes: ByteArray): ImageBitmap? {
-        if (bytes.isEmpty()) return null
-        return runCatching { bytes.decodeToImageBitmap() }.getOrNull()
-    }
+    override fun decodeByteArray(bytes: ByteArray): ImageBitmap? = decodeImageBitmap(bytes)
 }
 
 /** 为 [content] 提供桌面端全部界面端口。 */

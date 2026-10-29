@@ -2,7 +2,6 @@ package com.xzyht.notifyrelay.feature.appslist
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.drawable.BitmapDrawable
 import com.xzyht.notifyrelay.nativecore.device.appsync.IconCodecPort
 import notifyrelay.base.util.image.toBitmapOrDefault
@@ -17,7 +16,7 @@ import notifyrelay.base.util.image.toPngByteArray
 class AndroidAppIconCodecPort(
     private val context: Context,
 ) : IconCodecPort {
-    override fun decodePng(bytes: ByteArray): Any? = BitmapFactory.decodeByteArray(bytes, 0, bytes.size)
+    override fun decodePng(bytes: ByteArray): Any? = notifyrelay.base.util.decodeImageBitmap(bytes)
 
     override fun encodePng(platformBitmap: Any): ByteArray? = (platformBitmap as? Bitmap)?.toPngByteArray()
 

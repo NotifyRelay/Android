@@ -3,7 +3,6 @@ package com.xzyht.notifyrelay.ui.port
 import android.content.Context
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import com.xzyht.notifyrelay.feature.appslist.launch.AndroidAppLaunchPort
@@ -116,12 +115,7 @@ private object AndroidBitmapPort : BitmapPort {
         fallbackSize: Int,
     ): Any = (drawable as android.graphics.drawable.Drawable).toBitmapOrDefault(fallbackSize)
 
-    override fun decodeByteArray(bytes: ByteArray): androidx.compose.ui.graphics.ImageBitmap? =
-        runCatching {
-            android.graphics.BitmapFactory
-                .decodeByteArray(bytes, 0, bytes.size)
-                ?.asImageBitmap()
-        }.getOrNull()
+    override fun decodeByteArray(bytes: ByteArray): androidx.compose.ui.graphics.ImageBitmap? = notifyrelay.base.util.decodeImageBitmap(bytes)
 }
 
 /**
