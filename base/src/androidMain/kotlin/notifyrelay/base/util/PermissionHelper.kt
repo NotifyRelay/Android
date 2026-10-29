@@ -354,32 +354,7 @@ object PermissionHelper {
     fun isVersionGreaterThan(
         version: String?,
         target: String?,
-    ): Boolean {
-        if (version == null || target == null) return false
-
-        try {
-            // 去除OS前缀
-            val versionNum = version.replace("OS", "")
-            val targetNum = target.replace("OS", "")
-
-            // 分割版本号
-            val versionParts = versionNum.split(".").mapNotNull { it.toIntOrNull() }
-            val targetParts = targetNum.split(".").mapNotNull { it.toIntOrNull() }
-
-            // 比较版本号
-            for (i in 0 until Math.max(versionParts.size, targetParts.size)) {
-                val versionPart = versionParts.getOrElse(i) { 0 }
-                val targetPart = targetParts.getOrElse(i) { 0 }
-
-                if (versionPart > targetPart) return true
-                if (versionPart < targetPart) return false
-            }
-
-            return false // 版本相同
-        } catch (e: Exception) {
-            return false
-        }
-    }
+    ): Boolean = VersionUtils.isVersionGreaterThan(version, target)
 
     /**
      * 检测设备是否为 MIUI/澎湃（基于厂商名或系统权限信息判断）。

@@ -61,6 +61,8 @@ kotlin {
             api(project(":base"))
             // 领域模型与契约
             api(project(":domain"))
+            // 数据层仓储（超级岛设置页的镜像过滤条目、历史分页源共用同一份实现）
+            implementation(project(":data"))
             // viewModel() 在公共源集可用（KMP 构件）
             implementation(libs.androidx.lifecycle.viewmodel.compose.kmp)
             // UpdateDialog 依赖的 ReleaseInfo 数据模型（KMP 库）
