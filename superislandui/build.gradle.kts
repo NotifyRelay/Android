@@ -7,6 +7,10 @@ plugins {
 }
 
 kotlin {
+    // JVM 目标：供桌面端复用公共 UI（媒体浮窗、超级岛文本组件等）。
+    // commonMain 已无平台分叉（位图统一用 Compose ImageBitmap），故无需 jvmMain actual。
+    jvm()
+
     // AGP 9 的 KMP 库插件：Android 目标配置位于 kotlin 块内的 android 块。
     android {
         namespace = "github.xzynine.superislandui"
@@ -72,6 +76,10 @@ kotlin {
 
             // BitmapUtils 缓存池使用 atomicfu 的同步原语
             implementation(libs.atomicfu)
+
+            // 基础设施层（Logger / ColorUtils / TextUtils / nowMillis / measureTime），
+            // commonMain 已直接引用，须声明在公共源集
+            api(project(":base"))
         }
 
         androidMain.dependencies {
@@ -92,8 +100,7 @@ kotlin {
             implementation(libs.gson)
             implementation(libs.bundles.coil)
 
-            // 依赖其他模块（原 :core 工具类已并入 :base）
-            implementation(project(":base"))
+            // 依赖其他模块（:base 已上移 commonMain）
             implementation(project(":data"))
         }
     }

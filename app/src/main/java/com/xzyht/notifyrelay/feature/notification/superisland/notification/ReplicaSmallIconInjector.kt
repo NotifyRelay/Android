@@ -5,6 +5,8 @@ import android.app.Notification
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.drawable.Icon
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.data.SuperIslandStructuredDataHelper
@@ -151,7 +153,7 @@ internal object ReplicaSmallIconInjector {
         Logger.d(TAG, "超级岛 处理小图标位图 - bProgress: $bProgress")
         if (bProgress != null) {
             Logger.d(TAG, "超级岛 使用进度数据生成位图")
-            val bitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
+            val bitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)?.asAndroidBitmap()
             Logger.d(TAG, "超级岛 进度位图生成结果: ${bitmap != null}")
             if (bitmap != null) return bitmap
         }
@@ -173,7 +175,7 @@ internal object ReplicaSmallIconInjector {
             if (!textToRender.isNullOrBlank()) {
                 Logger.d(TAG, "超级岛 使用文本生成位图")
                 val albumBitmap = loadAlbumBitmapOrNull(context, picMap, textToRender.length)
-                val bitmap = BitmapUtils.textToBitmap(textToRender, albumBitmap = albumBitmap)
+                val bitmap = BitmapUtils.textToBitmap(textToRender, BitmapTextMeasurer.get(context), albumBitmap = albumBitmap?.asImageBitmap())?.asAndroidBitmap()
                 Logger.d(TAG, "超级岛 文本位图生成结果: ${bitmap != null}")
                 if (bitmap != null) return bitmap
             }

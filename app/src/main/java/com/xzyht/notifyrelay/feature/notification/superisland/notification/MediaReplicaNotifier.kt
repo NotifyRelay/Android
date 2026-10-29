@@ -4,6 +4,8 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.content.Context
 import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.data.SuperIslandStructuredDataHelper
@@ -129,7 +131,7 @@ internal object MediaReplicaNotifier {
             Logger.i(TAG, "超级岛 超级岛注入模式：不注入小图标，左岛由图文组件渲染专辑图")
         } else if (iconText.isNotEmpty()) {
             val albumBitmap = ReplicaSmallIconInjector.loadAlbumBitmapOrNull(context, picMap, iconText.length)
-            val iconBitmap = BitmapUtils.textToBitmap(iconText, albumBitmap = albumBitmap)
+            val iconBitmap = BitmapUtils.textToBitmap(iconText, BitmapTextMeasurer.get(context), albumBitmap = albumBitmap?.asImageBitmap())?.asAndroidBitmap()
             if (iconBitmap != null) {
                 ReplicaSmallIconInjector.injectSmallIconWithCache(notification, iconBitmap, key)
             }
@@ -170,7 +172,7 @@ internal object MediaReplicaNotifier {
 
             // 处理进度数据，生成位图
             if (bProgress != null) {
-                smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)
+                smallIconBitmap = BitmapUtils.progressToBitmap(bProgress, bProgressColorReach, bProgressColorUnReach, bProgressIsCCW)?.asAndroidBitmap()
             }
 
             // 如果没有进度数据，尝试生成文本位图
@@ -179,7 +181,7 @@ internal object MediaReplicaNotifier {
                 val textToRender = bComponent.textToRender
 
                 if (!textToRender.isNullOrBlank()) {
-                    smallIconBitmap = BitmapUtils.textToBitmap(textToRender)
+                    smallIconBitmap = BitmapUtils.textToBitmap(textToRender, BitmapTextMeasurer.get(context))?.asAndroidBitmap()
                 }
             }
 
