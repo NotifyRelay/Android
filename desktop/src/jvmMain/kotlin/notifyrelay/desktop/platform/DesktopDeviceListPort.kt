@@ -9,7 +9,7 @@ import notifyrelay.shared.ui.screen.devicelist.DeviceListPort
 /**
  * 桌面端设备列表端口。
  *
- * 桌面端无电池与横屏概念：电量固定为满值、不充电，字体使用默认族。
+ * 电量固定为满值、不充电，字体使用默认族；横屏口径与主界面端口一致（窗口宽高比）。
  */
 class DesktopDeviceListPort : DeviceListPort {
     override fun localBatteryLevel(): Int = 100
@@ -24,7 +24,7 @@ class DesktopDeviceListPort : DeviceListPort {
     override fun localBatteryColor(level: Int): Color = BatteryIconConverter.getBatteryColor(level)
 
     @Composable
-    override fun isLandscape(): Boolean = false
+    override fun isLandscape(): Boolean = isWindowLandscape()
 
     @Composable
     override fun iconFontFamily(): FontFamily? = null

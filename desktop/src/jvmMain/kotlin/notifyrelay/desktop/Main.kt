@@ -266,6 +266,16 @@ private fun DesktopRoot(
                         settingsContent = { SettingsScreen() },
                     )
                 }
+                // 与 MainScreen 页签同源：单独 push 这两个路由时复用同一内容，避免未注册 entry 报错
+                entry<Route.History> {
+                    HistoryScreen(
+                        navigator,
+                        notificationHistory = { NotificationHistoryScreen() },
+                        superIslandHistory = {},
+                        chatTest = {},
+                    )
+                }
+                entry<Route.Settings> { SettingsScreen() }
                 entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
                 entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
                 entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen {} }

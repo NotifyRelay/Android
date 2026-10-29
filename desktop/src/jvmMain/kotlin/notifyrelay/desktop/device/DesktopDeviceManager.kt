@@ -2,22 +2,25 @@ package notifyrelay.desktop.device
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.device.DeviceTargetRegistry
+import com.xzyht.notifyrelay.nativecore.device.ProtocolSender
 import com.xzyht.notifyrelay.nativecore.device.service.callback.DeviceCallbackHost
 import com.xzyht.notifyrelay.nativecore.device.service.callback.StateQueryPort
 import com.xzyht.notifyrelay.nativecore.device.service.pairing.PairingCoordinator
 import com.xzyht.notifyrelay.nativecore.device.service.state.DeviceSnapshotStore
-import com.xzyht.notifyrelay.nativecore.device.service.state.OnlineDevicesCachePort
+import com.xzyht.notifyrelay.nativecore.device.service.state.OnlineDevicesCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.StateFlow
 import notifyrelay.base.log.Logger
+import notifyrelay.desktop.platform.BatteryLevel
 import notifyrelay.domain.feature.device.model.AuthInfo
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.model.DeviceSnapshot
 import notifyrelay.domain.feature.device.model.PendingPairing
 import notifyrelay.domain.feature.device.service.callback.HandshakeRequestHandler
 import notifyrelay.domain.feature.device.service.contract.DeviceAdminPort
+import notifyrelay.domain.feature.device.service.contract.DeviceAuthTablePort
 import notifyrelay.domain.feature.device.service.pairing.HandshakeWaiterRegistry
 
 /**
@@ -29,22 +32,15 @@ import notifyrelay.domain.feature.device.service.pairing.HandshakeWaiterRegistry
 class DesktopDeviceManager(
     private val localDisplayName: String = MachineName.resolve(),
 ) : DeviceAdminPort,
+    DeviceAuthTablePort,
     DeviceCallbackHost {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     private val authenticatedDevices = mutableMapOf<String, AuthInfo>()
     private val rejectedDevices = mutableSetOf<String>()
 
-    /** 桌面端不落盘在线缓存，只保留内存态。 */
-    private val onlineCache =
-        object : OnlineDevicesCachePort {
-            override fun update(
-                devices: Map<String, Pair<DeviceInfo, Boolean>>,
-                addressable: List<DeviceSnapshot>,
-            ) = Unit
-
-            override fun onCacheUpdated() = Unit
-        }
+    /** 在线设备缓存：随 core 快照落 Storage（键 online_devices_cache，SCRCPY 组）。 */
+    private val onlineCache = OnlineDevicesCache()
 
     private val snapshotStore =
         DeviceSnapshotStore(
@@ -84,6 +80,8 @@ class DesktopDeviceManager(
     override fun cancelPendingPairing() = pairingCoordinator.cancelPendingPairing()
 
     override fun getAuthenticatedDevices(): Map<String, AuthInfo> = synchronized(authenticatedDevices) { authenticatedDevices.toMap() }
+
+    override fun authenticatedSnapshot(): Map<String, AuthInfo> = getAuthenticatedDevices()
 
     override fun getPairedDeviceUuids(): Set<String> = synchronized(authenticatedDevices) { authenticatedDevices.keys.toSet() }
 
@@ -132,7 +130,8 @@ class DesktopDeviceManager(
     override fun deviceInfoOf(uuid: String): DeviceInfo? = snapshotStore.currentInfo(uuid)
 
     override fun saveAuthedDevices() {
-        // 桌面端不落盘认证表：core 私有库已保存密钥，快照即真源
+        // 认证表以 core 快照为真源：请求刷新后由 onSnapshotRefreshed 重建
+        snapshotStore.requestRefresh()
     }
 
     override fun registerReconnectTarget(
@@ -154,7 +153,7 @@ class DesktopDeviceManager(
 
     override fun sendAccept(deviceType: String) {
         if (!NativeCore.isReady()) return
-        NativeCore.sendAccept(localUuid, localPublicKey, localDisplayName, 0, deviceType)
+        NativeCore.sendAccept(localUuid, localPublicKey, NativeCore.getLocalIp() ?: "0.0.0.0", BatteryLevel.percent(), deviceType)
     }
 
     override fun sendReject() {
@@ -167,7 +166,10 @@ class DesktopDeviceManager(
         header: String,
         plaintext: String,
     ) {
-        // 桌面端不承载数据通道（通知/媒体/剪贴板等由 Android 端处理）
+        val result = ProtocolSender.sendEncrypted(this, target, header, plaintext)
+        if (result != ProtocolSender.EnqueueResult.SUCCESS && result != ProtocolSender.EnqueueResult.DEDUPED) {
+            Logger.w(TAG, "入队失败: header=" + header + ", device=" + target.displayName + ", result=" + result)
+        }
     }
 
     /** 状态查询端口：桌面端无超级岛/媒体会话，统一回 1（存在无变更）保活。 */
@@ -199,13 +201,33 @@ class DesktopDeviceManager(
 
     private val notificationCallbacks = mutableSetOf<(String) -> Unit>()
 
-    override val notificationDataReceivedCallbacks: Collection<(String) -> Unit> get() = notificationCallbacks
+    override val notificationDataReceivedCallbacks: Collection<(String) -> Unit>
+        get() = synchronized(notificationCallbacks) { notificationCallbacks.toList() }
+
+    /** 登记入站通知回调（聊天端口与本表共用同一集合）。 */
+    internal fun registerNotificationDataCallback(callback: (String) -> Unit) {
+        synchronized(notificationCallbacks) { notificationCallbacks.add(callback) }
+    }
+
+    /** 注销入站通知回调。 */
+    internal fun unregisterNotificationDataCallback(callback: (String) -> Unit) {
+        synchronized(notificationCallbacks) { notificationCallbacks.remove(callback) }
+    }
+
+    /** 广播一条入站通知报文；单个回调异常不影响其余回调。 */
+    internal fun dispatchNotification(payload: String) {
+        val callbacks = synchronized(notificationCallbacks) { notificationCallbacks.toList() }
+        for (callback in callbacks) {
+            runCatching { callback(payload) }
+                .onFailure { Logger.w(TAG, "通知回调失败", it) }
+        }
+    }
 
     /** 启动 core 并开始设备发现。 */
     fun start() {
         // 注册核心回调：设备发现/连接事件需要它们才能刷新列表，core 日志也经此输出
         com.xzyht.notifyrelay.nativecore.device.service.callback.RustCallbackInstaller
-            .install(this)
+            .install(this, dataPort = DesktopDataMessagePort(this))
 
         if (!NativeCore.isReady() && !NativeCore.createContext()) {
             Logger.e(TAG, "Rust core 上下文创建失败，设备功能不可用")
