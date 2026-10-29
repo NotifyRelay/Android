@@ -105,6 +105,15 @@ private const val TRAY_ICON_SIZE = 32
 
 /** 桌面端入口。 */
 fun main() {
+    // 单实例：已有实例在运行时请求其显示窗口并退出，避免多进程共用同一份数据与端口
+    if (!notifyrelay.desktop.platform.DesktopSingleInstance
+            .acquire()
+    ) {
+        notifyrelay.base.log.Logger
+            .i("DesktopSingle", "已有实例在运行，已请求其显示窗口")
+        return
+    }
+
     // 数据层先初始化：偏好、历史等公共端 UI 均经 Storage 与端口读取
     DataLayerDesktop.initialize()
 
@@ -141,6 +150,13 @@ fun main() {
         LaunchedEffect(Unit) {
             val trayImage = iconImages.minByOrNull { abs(it.getWidth(null) - TRAY_ICON_SIZE) }
             windowController.installTray(trayImage, "NotifyRelay")
+        }
+
+        // 重复启动时的窗口唤起：报文来自监听线程，需投递到事件线程
+        LaunchedEffect(windowController) {
+            notifyrelay.desktop.platform.DesktopSingleInstance.onActivate = {
+                javax.swing.SwingUtilities.invokeLater { windowController.showWindow() }
+            }
         }
 
         DisposableEffect(Unit) {

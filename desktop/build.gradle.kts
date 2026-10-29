@@ -84,6 +84,31 @@ val smtcRustBuild =
 tasks.named("compileKotlinJvm") { dependsOn(smtcRustBuild) }
 val smtcLibDir = smtcRustDir.resolve("target/release")
 
+// ===== 可分发包（createDistributable / runDistributable）的原生库 =====
+// 两个 Rust 动态库不随 jar 分发：复制进应用镜像的 app/resources，
+// 启动参数再把 JNA 与 System.loadLibrary 的搜索路径指向该目录。
+val distributableAppResources = layout.buildDirectory.dir("distributable/appResources")
+
+val prepareDistributableNatives =
+    tasks.register<Sync>("prepareDistributableNatives") {
+        description = "把 Rust 动态库收集到可分发包的资源目录"
+        group = "distribution"
+        into(distributableAppResources.map { it.dir("common") })
+        dependsOn(":core:hostRustBuild")
+        dependsOn(smtcRustBuild)
+        from(rustHostLibDir) { include("*.dll") }
+        from(smtcLibDir) { include("*.dll") }
+    }
+
+tasks
+    .matching {
+        it.name.startsWith("createDistributable") ||
+            it.name.startsWith("package") ||
+            it.name == "runDistributable" ||
+            it.name == "suggestRuntimeModules" ||
+            it.name == "prepareAppResources"
+    }.configureEach { dependsOn(prepareDistributableNatives) }
+
 // 原生库经 System.loadLibrary 载入，JDK 24+ 默认对未具名模块的原生访问告警；
 // 显式放行以消除 "A restricted method in java.lang.System has been called" 警告。
 val nativeAccessArgs = listOf("--enable-native-access=ALL-UNNAMED")
@@ -111,12 +136,24 @@ tasks.withType<Test>().configureEach {
 compose.desktop {
     application {
         mainClass = "notifyrelay.desktop.MainKt"
-        // 打包产物同样需要放行原生访问
+        // 打包产物同样需要放行原生访问；库搜索路径指向随包分发的资源目录（$APPDIR 由启动器替换）
         jvmArgs += nativeAccessArgs
+        jvmArgs +=
+            listOf(
+                "-Djna.library.path=\$APPDIR/resources",
+                "-Djava.library.path=\$APPDIR/resources",
+                "-Dstdout.encoding=UTF-8",
+                "-Dstderr.encoding=UTF-8",
+            )
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "NotifyRelay"
             packageVersion = "1.0.0"
+            appResourcesRootDir.set(distributableAppResources)
+            windows {
+                // 保留控制台，便于直接运行应用镜像时查看日志
+                console = true
+            }
         }
     }
 }
