@@ -2,10 +2,10 @@ package com.xzyht.notifyrelay.feature.notification.history
 
 import androidx.paging.PagingSource
 import androidx.paging.PagingState
-import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import notifyrelay.data.database.dao.PackageCount
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 import notifyrelay.domain.feature.notification.history.GroupedNotifications
 import notifyrelay.domain.feature.notification.history.NotificationHistoryEntry
 import kotlin.math.max
@@ -75,7 +75,7 @@ class NotificationHistoryPagingSource(
         val grouped = linkedMapOf<String, GroupAccumulator>()
 
         for (count in packageCounts) {
-            val mappedPackage = RemoteFilterConfig.mapToLocalPackage(count.packageName, installedPackages)
+            val mappedPackage = RemoteFilterPortRegistry.current?.mapToLocalPackage(count.packageName, installedPackages) ?: count.packageName
             val group =
                 grouped.getOrPut(mappedPackage) {
                     GroupAccumulator(mappedPackage)

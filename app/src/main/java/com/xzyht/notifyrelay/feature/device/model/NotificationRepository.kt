@@ -7,13 +7,12 @@ import android.service.notification.StatusBarNotification
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
-import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.AppListHelper
 import notifyrelay.data.database.repository.DatabaseRepository
-import notifyrelay.domain.sync.notification.data.NotificationRecordDto
+import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 
 /**
  * 通知历史仓库（原 NotificationData.kt）。
@@ -30,8 +29,6 @@ import notifyrelay.domain.sync.notification.data.NotificationRecordDto
  * 其线程安全完全依赖调用方已持有本对象监视器；`@Synchronized` + `runBlocking` 的组合不得新增第二把锁。
  *
  * 以下方法**刻意不加** `@Synchronized`：
- * - [addRemoteNotification]：`@JvmStatic`，可能运行在 Rust/JNA 原生线程。它只写库后再调用 [notifyHistoryChanged]，
- *   而后者自带 `@Synchronized`；若在此加锁，会与 JNA 线程的阻塞调用叠加放大死锁面。
  * - [scanDeviceList]：仅刷新 `deviceList` 展示数据，调用点分散（UI 协程 / 通知处理协程），
  *   且 [init] 与 [syncToCache] 内部已在持锁状态下调用它，故其本体不加锁。
  * - 属性访问器 [notifications] / [currentDevice] / [deviceList]：不加锁。
@@ -86,65 +83,6 @@ object NotificationRepository {
             notifications.clear()
             Logger.e("NotifyRelay", "notifyHistoryChanged 失败", e)
         }
-    }
-
-    /**
-     * 新增：以远程设备uuid存储转发通知。
-     *
-     * 注意：不加 `@Synchronized`（与拆分前一致）。本方法可能由 Rust/JNA 原生线程调用，
-     * 其写库段自行串行化，最终变更推送依赖 [notifyHistoryChanged] 自带的 `@Synchronized` 保护。
-     */
-    @JvmStatic
-    fun addRemoteNotification(
-        packageName: String,
-        appName: String?,
-        title: String,
-        text: String,
-        time: Long,
-        device: String,
-        context: Context,
-    ) {
-        val ctxType = context::class.java.name
-        val ctxHash = System.identityHashCode(context)
-        Logger.i("秩序之光 狂鼠 NotifyRelay", "[addRemoteNotification] contextType=$ctxType, hash=$ctxHash, device=$device")
-        if (context !is android.app.Application) {
-            Logger.w("秩序之光 狂鼠 NotifyRelay", "[addRemoteNotification] context is not Application: $ctxType, hash=$ctxHash")
-        }
-        val key = (time.toString() + packageName + device)
-        // 使用传入的appName参数
-        try {
-            val store = NotificationRecordStore.getInstance(context)
-            val fileKey = device // 远程设备uuid
-            val oldList = runBlocking { store.getAll(fileKey) }.toMutableList()
-            oldList.removeAll { it.key == key }
-            // device 字段严格等于 fileKey，保证UI读取时一致
-            oldList.add(
-                0,
-                NotificationRecordDto(
-                    key = key,
-                    packageName = packageName,
-                    appName = appName,
-                    title = title,
-                    text = text,
-                    time = time,
-                    device = fileKey,
-                ),
-            )
-            // writeAll是suspend函数，需要runBlocking
-            runBlocking { store.writeAll(oldList, fileKey) }
-            Logger.i("秩序之光 狂鼠 NotifyRelay", "写入远端历史 device=$device, size=${oldList.size}")
-
-            // 限制每个包名的通知数量为80
-            val repository = DatabaseRepository.getInstance()
-            runBlocking {
-                repository.deleteOldestNotificationsByPackageAndDevice(packageName, device, 80)
-            }
-        } catch (e: Exception) {
-            Logger.e("秩序之光 狂鼠 NotifyRelay", "[addRemoteNotification] 写入远程设备json失败: $device, error=${e.message}")
-        }
-        // 写入后主动推送变更
-        notifyHistoryChanged(device, context)
-        Logger.i("秩序之光 狂鼠 NotifyRelay", "[addRemoteNotification] after sync (no global add), device=$device")
     }
 
     /**
@@ -210,7 +148,7 @@ object NotificationRepository {
             syncToCache(context)
             // 被动去重：仅在智能去重开启时，通知 BackendRemoteFilter 检查是否命中可撤回队列并撤回复刻通知
             try {
-                if (RemoteFilterConfig.enableDeduplication) {
+                if (RemoteFilterPortRegistry.current?.enableDedup == true) {
                     BackendRemoteFilter
                         .onLocalNotificationEnqueued(title, text, packageName, time, context)
                 } else {

@@ -5,13 +5,14 @@ import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
-import com.xzyht.notifyrelay.ui.activity.DeveloperModeActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.runBlocking
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.TextUtils
 import notifyrelay.domain.feature.notification.filter.RemoteFilterPlaceholderQueue
+import notifyrelay.shared.ui.common.DebugFlags
 import org.json.JSONObject
 
 /**
@@ -112,14 +113,14 @@ object BackendRemoteFilter {
             val isLocked = json.optBoolean("isLocked", false)
 
             val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
-            val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg, installedPkgs)
+            val mappedPkg = port().mapToLocalPackage(pkg, installedPkgs)
 
             // 对等/黑白名单/锁屏(1) 过滤
             val modeResult = passesModeFilters(mappedPkg, title, text, installedPkgs, isLocked, data)
             if (modeResult != null) return modeResult
 
             // 智能去重检查 - 优化性能和逻辑
-            if (RemoteFilterConfig.enableDeduplication) {
+            if (port().enableDedup) {
                 val dedupResult = runDeduplication(title, text, pkg, mappedPkg, installedPkgs, isLocked, data)
                 if (dedupResult != null) return dedupResult
             }
@@ -142,14 +143,15 @@ object BackendRemoteFilter {
         context: Context,
         data: String,
     ): FilterResult? {
-        synchronized(RemoteFilterConfig) {
-            if (!RemoteFilterConfig.isLoaded) {
+        val filterPort = port()
+        synchronized(filterPort) {
+            if (!filterPort.isLoaded) {
                 try {
-                    RemoteFilterConfig.loadBlocking(context)
-                    RemoteFilterConfig.isLoaded = true
+                    runBlocking { filterPort.load() }
+                    filterPort.isLoaded = true
                     if (NativeCore.isReady()) {
                         val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
-                        RemoteFilterConfig.syncToRust(installedPkgs)
+                        filterPort.let { (it as? AndroidRemoteFilterPort)?.syncToRust(installedPkgs) }
                     }
                 } catch (e: Exception) {
                     Logger.e("NotifyRelay(狂鼠)", "远程过滤配置加载失败", e)
@@ -158,6 +160,17 @@ object BackendRemoteFilter {
             }
         }
         return null
+    }
+
+    /** 远端过滤端口：实现由应用启动时经注册点注入。 */
+    private fun port(): notifyrelay.domain.feature.notification.filter.RemoteFilterPort =
+        notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry.current
+            ?: error("RemoteFilterPort 未注册")
+
+    /** 已启用组构成的包名等价组；实现未提供时退化为空表。 */
+    private fun enabledPackageGroups(): List<Set<String>> {
+        val filterPort = port()
+        return (filterPort as? AndroidRemoteFilterPort)?.packageGroups() ?: emptyList()
     }
 
     /**
@@ -173,23 +186,23 @@ object BackendRemoteFilter {
         data: String,
     ): FilterResult? {
         // 对等模式过滤（保持 Kotlin 实现）
-        if (RemoteFilterConfig.enablePeerMode) {
+        if (port().enablePeerMode) {
             if (mappedPkg !in installedPkgs) {
                 return FilterResult(false, mappedPkg, title, text, data)
             }
         }
 
         // 黑白名单过滤 — 委托给 Rust Core（含关键词匹配）
-        val filterMode = RemoteFilterConfig.filterMode
+        val filterMode = port().filterMode
         if (filterMode == "black" || filterMode == "white") {
-            val pass = RemoteFilterConfig.checkFilterWithRust(mappedPkg, title, text)
+            val pass = port().checkFilterAccepted(mappedPkg, title, text)
             if (!pass) {
                 return FilterResult(false, mappedPkg, title, text, data)
             }
         }
 
         // 锁屏通知过滤
-        if (RemoteFilterConfig.enableLockScreenOnly && !isLocked) {
+        if (port().enableLockScreenOnly && !isLocked) {
             // Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 锁屏过滤开启 - 非锁屏通知被过滤")
             return FilterResult(false, mappedPkg, title, text, data)
         }
@@ -221,13 +234,13 @@ object BackendRemoteFilter {
         //  - 且映射到的本地包未安装
         // 对于本机已安装映射包（包括 mappedPkg == pkg 的同包名场景）仍然执行去重。
         val pkgInGroups =
-            if (RemoteFilterConfig.enablePackageGroupMapping) {
-                RemoteFilterConfig.packageGroups.any { pkg in it }
+            if (port().enablePackageGroupMapping) {
+                enabledPackageGroups().any { pkg in it }
             } else {
                 true
             }
 
-        val shouldSkipDedup = RemoteFilterConfig.enablePackageGroupMapping && !pkgInGroups && (mappedPkg !in installedPkgs)
+        val shouldSkipDedup = port().enablePackageGroupMapping && !pkgInGroups && (mappedPkg !in installedPkgs)
 
         if (shouldSkipDedup) {
             // Logger.d("智能去重", "跳过去重：包名不属于等价组且本机未安装映射包，包名=$pkg, mappedPkg=$mappedPkg")
@@ -321,7 +334,7 @@ object BackendRemoteFilter {
         packageName: String,
         ttl: Long = 15_000L,
     ) {
-        if (!RemoteFilterConfig.enableDeduplication) return
+        if (!port().enableDedup) return
         placeholders.add(title, text, packageName, ttl)
     }
 
@@ -356,7 +369,7 @@ object BackendRemoteFilter {
         time: Long,
         context: Context,
     ) {
-        if (!RemoteFilterConfig.enableDeduplication) return
+        if (!port().enableDedup) return
         val normalizedPendingTitle = TextUtils.normalizeTitle(title ?: "")
         val pendingText = text ?: ""
         // 先处理占位匹配（用于延迟复刻的占位）——在单独的锁上操作以避免并发问题
@@ -367,7 +380,7 @@ object BackendRemoteFilter {
 
         // 再处理已发送但在可撤回期的通知
         val matches = pendingMonitor.cancelMatching(normalizedPendingTitle, pendingText, packageName)
-        if (matches.isNotEmpty() && DeveloperModeActivity.DEBUG_UI_ENABLED.value) {
+        if (matches.isNotEmpty() && DebugFlags.DEBUG_UI_ENABLED.value) {
             val titlePreview = if ((title?.length ?: 0) > 10) "${title?.take(10)}..." else (title ?: "")
             Logger.d("智能去重", "被动命中待撤回通知 - 包名:$packageName, 标题预览:$titlePreview, 匹配数量:${matches.size}")
         }
@@ -386,7 +399,7 @@ object BackendRemoteFilter {
         context: Context,
     ) {
         // 只有在去重开关开启时才添加监控
-        if (!RemoteFilterConfig.enableDeduplication) {
+        if (!port().enableDedup) {
             return
         }
         pendingMonitor.addPendingNotification(notifyId, title, text, packageName, context)

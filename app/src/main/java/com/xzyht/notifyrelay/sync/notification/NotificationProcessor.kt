@@ -1,23 +1,22 @@
 package com.xzyht.notifyrelay.sync.notification
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.repository.remoteNotificationFilter
 import com.xzyht.notifyrelay.feature.device.repository.replicateNotification
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
-import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
-import com.xzyht.notifyrelay.nativecore.NativeCore
+import com.xzyht.notifyrelay.nativecore.device.appsync.InboundNotificationProcessor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.TextUtils
-import org.json.JSONObject
+import notifyrelay.domain.feature.notification.chat.ChatMemory
+import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 
 /**
  * 远程通知处理管线（单条通知级别，不负责网络收发）。
@@ -54,6 +53,12 @@ object NotificationProcessor {
         }
     }
 
+    /**
+     * 解析并落库远端通知。
+     *
+     * 解析、包名映射与落库统一由公共端 [InboundNotificationProcessor] 完成；
+     * 本方法只补平台侧的内存态刷新（历史推送与设备列表扫描）。
+     */
     private fun handleJsonLevel(
         context: Context,
         manager: DeviceConnectionManager,
@@ -61,35 +66,18 @@ object NotificationProcessor {
         decrypted: String,
         remoteUuid: String?,
     ) {
+        if (remoteUuid == null) return
         try {
-            if (remoteUuid != null) {
-                val parsedJson =
-                    try {
-                        NativeCore.parseNotificationInbound(decrypted)
-                    } catch (_: Exception) {
-                        null
-                    }
-                if (parsedJson == null) return
-                val parsed = JSONObject(parsedJson)
-                val pkg = parsed.optString("packageName")
-                val appName = parsed.optString("appName")
-                val title = parsed.optString("title")
-                val text = parsed.optString("text")
-                val timeRaw = parsed.optLong("time", 0L)
-                val time = if (timeRaw == 0L) System.currentTimeMillis() else timeRaw
-
-                val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
-                val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
-
-                try {
-                    NotificationRepository.addRemoteNotification(mappedPkg, appName, title, text, time, remoteUuid, context)
-                    NotificationRepository.scanDeviceList(context)
-                } catch (e: Exception) {
-                    Logger.e(TAG, "存储远程通知失败: ${e.message}")
+            val record =
+                runBlocking {
+                    InboundNotificationProcessor.process(decrypted, remoteUuid)
                 }
+            if (record != null) {
+                NotificationRepository.notifyHistoryChanged(remoteUuid, context)
+                NotificationRepository.scanDeviceList(context)
             }
         } catch (e: Exception) {
-            Logger.e(TAG, "handleJsonLevel异常: ${e.message}")
+            Logger.e(TAG, "存储远程通知失败: ${e.message}")
         }
     }
 
@@ -107,7 +95,7 @@ object NotificationProcessor {
 
             if (result.needsDelay && localIsLocked) {
                 handleLockedScreenDelayed(context, scope, result)
-                ChatMemory.append(context, "收到: ${result.rawData}")
+                ChatMemory.append("收到: " + result.rawData)
             } else {
                 scope.launch {
                     replicateNotification(context, result, null, startMonitoring = true)
@@ -130,7 +118,7 @@ object NotificationProcessor {
                 }
             }
         } else {
-            ChatMemory.append(context, "收到: ${result.rawData}")
+            ChatMemory.append("收到: " + result.rawData)
         }
     }
 
@@ -140,7 +128,7 @@ object NotificationProcessor {
         result: BackendRemoteFilter.FilterResult,
     ) {
         try {
-            if (RemoteFilterConfig.enableDeduplication) {
+            if (RemoteFilterPortRegistry.current?.enableDedup == true) {
                 BackendRemoteFilter.addPlaceholder(result.title, result.text, result.mappedPkg, 15_000L)
             }
         } catch (_: Exception) {

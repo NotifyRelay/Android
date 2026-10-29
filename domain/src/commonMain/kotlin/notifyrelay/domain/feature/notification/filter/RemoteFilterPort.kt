@@ -18,6 +18,9 @@ interface RemoteFilterPort {
     /** 仅复刻锁屏通知。 */
     var enableLockScreenOnly: Boolean
 
+    /** 对等模式：仅放行本机存在的应用或通用应用。 */
+    var enablePeerMode: Boolean
+
     /** 默认包名组。 */
     val defaultPackageGroups: List<List<String>>
 
@@ -72,6 +75,13 @@ interface RemoteFilterPort {
         packageName: String,
         installedPackages: Set<String>,
     ): String
+
+    /** 按当前过滤模式判定是否放行（Rust 未就绪时应放行）。 */
+    fun checkFilterAccepted(
+        packageName: String,
+        title: String,
+        text: String,
+    ): Boolean
 }
 
 /** [RemoteFilterPort] 的注册点。 */

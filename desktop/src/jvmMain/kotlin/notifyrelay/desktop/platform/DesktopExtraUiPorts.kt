@@ -227,8 +227,6 @@ internal object DesktopSettingsPort : SettingsPort {
     private const val KEY_DEVELOPER_MODE = "developer_mode_enabled"
 
     override fun isDeveloperModeEnabled(): Boolean = Storage.getBoolean(KEY_DEVELOPER_MODE, false)
-
-    override fun openDeveloperMode() = Unit
 }
 
 /** 窗口是否横向：取主窗口容器尺寸的宽高比，未附着窗口（尺寸为 0）时为 false。 */

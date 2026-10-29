@@ -3,11 +3,14 @@ package notifyrelay.desktop.platform
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.ImageBitmap
+import notifyrelay.base.util.decodeImageBitmap
 import notifyrelay.data.Storage
+import notifyrelay.desktop.DataLayerDesktop
 import notifyrelay.shared.ui.port.ClipboardPort
 import notifyrelay.shared.ui.port.IntentLaunchPort
 import notifyrelay.shared.ui.port.LocalBitmapPort
 import notifyrelay.shared.ui.port.LocalClipboardPort
+import notifyrelay.shared.ui.port.LocalClipboardSyncPort
 import notifyrelay.shared.ui.port.LocalIntentLaunchPort
 import notifyrelay.shared.ui.port.LocalSystemBarPort
 import notifyrelay.shared.ui.port.LocalThemePort
@@ -92,14 +95,23 @@ private object DesktopSystemBarPort : SystemBarPort {
     ) = Unit
 }
 
-/** 桌面端位图端口：仅支持字节解码。 */
+/**
+ * 桌面端位图端口。
+ *
+ * 解码统一走 [decodeImageBitmap]（公共实现，平台后端为 Skia）；
+ * [drawableToBitmap] 在桌面端没有 Drawable 概念：入参为字节数组时按字节解码，其余原样返回。
+ */
 private object DesktopBitmapPort : notifyrelay.shared.ui.port.BitmapPort {
     override fun drawableToBitmap(
         drawable: Any,
         fallbackSize: Int,
-    ): Any = drawable
+    ): Any =
+        when (drawable) {
+            is ByteArray -> decodeImageBitmap(drawable) ?: drawable
+            else -> drawable
+        }
 
-    override fun decodeByteArray(bytes: ByteArray): ImageBitmap? = null
+    override fun decodeByteArray(bytes: ByteArray): ImageBitmap? = decodeImageBitmap(bytes)
 }
 
 /** 为 [content] 提供桌面端全部界面端口。 */
@@ -112,6 +124,7 @@ fun ProvideDesktopUiPorts(content: @Composable () -> Unit) {
         LocalThemePort provides DesktopThemePort,
         LocalSystemBarPort provides DesktopSystemBarPort,
         LocalBitmapPort provides DesktopBitmapPort,
+        LocalClipboardSyncPort provides DataLayerDesktop.clipboardSync,
         content = content,
     )
 }

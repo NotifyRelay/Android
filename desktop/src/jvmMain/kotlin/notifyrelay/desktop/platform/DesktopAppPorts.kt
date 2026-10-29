@@ -1,69 +1,76 @@
 package notifyrelay.desktop.platform
 
 import androidx.compose.ui.graphics.ImageBitmap
+import com.xzyht.notifyrelay.nativecore.device.appsync.AppListSyncManagerCore
+import com.xzyht.notifyrelay.nativecore.device.appsync.IconSyncManagerCore
+import com.xzyht.notifyrelay.nativecore.device.appsync.RemoteAppIconCache
+import com.xzyht.notifyrelay.nativecore.device.appsync.RemoteAppsCacheCore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import notifyrelay.data.repository.applist.PinnedAppsRepository
+import notifyrelay.domain.feature.appslist.RemoteAppsPort
 import notifyrelay.domain.feature.appslist.model.LocalAppInfo
-import notifyrelay.domain.feature.notification.filter.RemoteFilterPort
+import notifyrelay.domain.feature.appslist.model.RemoteAppInfo
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
 import notifyrelay.shared.feature.appslist.AppIconPort
 import notifyrelay.shared.feature.appslist.LocalAppsPort
 
 /**
- * 桌面端远端过滤端口：默认不过滤。
+ * 桌面端远端应用列表端口。
  *
- * 桌面端暂无远端通知源，过滤规则保持中性；接入真实数据后改为持久化配置。
+ * 列表来自公共缓存；请求经公共同步管理器发出，与 Android 同一条报文链路。
+ * 本机应用不列出，因此 [launchApp] 走 scrcpy 启动层（P3 接线前为空操作）。
+ *
+ * @param deviceMessagePort 提供当前设备消息端口的访问器（设备管理器在数据层之后创建）
  */
-class DesktopRemoteFilterPort : RemoteFilterPort {
-    override var filterMode: String = "none"
-    override var enableDedup: Boolean = false
-    override var enablePackageGroupMapping: Boolean = false
-    override var enableLockScreenOnly: Boolean = false
-    override val defaultPackageGroups: List<List<String>> = emptyList()
-    override var defaultGroupEnabled: List<Boolean> = emptyList()
-    override var customPackageGroups: List<List<String>> = emptyList()
-    override var customGroupEnabled: List<Boolean> = emptyList()
-    override var isLoaded: Boolean = true
+class DesktopRemoteAppsPort(
+    private val deviceMessagePort: () -> DeviceMessagePort?,
+) : RemoteAppsPort {
+    override val iconUpdates: StateFlow<Pair<String, Long>?> get() = RemoteAppIconCache.iconUpdates
 
-    override suspend fun load() = Unit
+    override val pinnedApps: StateFlow<Map<String, Set<String>>> get() = PinnedAppsRepository.pinnedApps
 
-    override suspend fun save() = Unit
+    override suspend fun remoteApps(deviceUuid: String): List<RemoteAppInfo> = RemoteAppsCacheCore.list(deviceUuid)
 
-    override fun activeFilterList(): List<Pair<String, String?>> = emptyList()
+    override fun loadPinned(deviceUuid: String) = PinnedAppsRepository.loadPinnedApps(deviceUuid)
 
-    override fun isActiveEntryEnabled(
+    override fun pin(
+        deviceUuid: String,
         packageName: String,
-        keyword: String,
-    ): Boolean = false
+    ) = PinnedAppsRepository.pinApp(deviceUuid, packageName)
 
-    override suspend fun setEntryEnabled(
+    override fun unpin(
+        deviceUuid: String,
         packageName: String,
-        keyword: String,
-        enabled: Boolean,
+    ) = PinnedAppsRepository.unpinApp(deviceUuid, packageName)
+
+    override suspend fun requestAppList(deviceUuid: String): Boolean {
+        val manager = deviceMessagePort() ?: return false
+        val deviceInfo = findOnlineDevice(deviceUuid) ?: return false
+        AppListSyncManagerCore.requestAppList(manager, deviceInfo)
+        return true
+    }
+
+    override fun findOnlineDevice(deviceUuid: String): DeviceInfo? {
+        val manager = deviceMessagePort() ?: return null
+        return manager.getAuthenticatedOnlineDevices().find { it.uuid == deviceUuid }
+    }
+
+    override fun launchApp(
+        app: RemoteAppInfo,
+        deviceIp: String,
+        useScrcpyStartApp: Boolean,
     ) = Unit
-
-    override suspend fun addEntry(
-        packageName: String,
-        keyword: String,
-    ) = Unit
-
-    override suspend fun removeEntry(
-        packageName: String,
-        keyword: String,
-    ) = Unit
-
-    override fun mapToLocalPackage(
-        packageName: String,
-        installedPackages: Set<String>,
-    ): String = packageName
 }
 
 /** 桌面端本机应用端口：无已安装应用概念，返回空列表。 */
 class DesktopLocalAppsPort : LocalAppsPort {
-    private val _isLoading = MutableStateFlow(false)
-    override val isLoading: StateFlow<Boolean> = _isLoading
+    private val isLoadingState = MutableStateFlow(false)
+    override val isLoading: StateFlow<Boolean> = isLoadingState
 
-    private val _apps = MutableStateFlow<List<LocalAppInfo>>(emptyList())
-    override val apps: StateFlow<List<LocalAppInfo>> = _apps
+    private val appsState = MutableStateFlow<List<LocalAppInfo>>(emptyList())
+    override val apps: StateFlow<List<LocalAppInfo>> = appsState
 
     override suspend fun load() = Unit
 
@@ -81,21 +88,37 @@ class DesktopLocalAppsPort : LocalAppsPort {
     override fun installedPackageNamesSync(): Set<String> = emptySet()
 }
 
-/** 桌面端应用图标端口：暂无图标来源。 */
-class DesktopAppIconPort : AppIconPort {
-    private val _iconUpdates = MutableStateFlow<Pair<String, Long>?>(null)
-    override val iconUpdates: StateFlow<Pair<String, Long>?> = _iconUpdates
+/**
+ * 桌面端应用图标端口。
+ *
+ * 图标字节来自公共缓存并经 Skia 解码；本机无图标来源（[localIcon] 恒 null）。
+ * 缺失图标时按来源设备向对端发起请求，与 Android 同一条报文链路。
+ */
+class DesktopAppIconPort(
+    private val deviceMessagePort: () -> DeviceMessagePort?,
+) : AppIconPort {
+    override val iconUpdates: StateFlow<Pair<String, Long>?> get() = RemoteAppIconCache.iconUpdates
 
     override suspend fun localIcon(packageName: String): ImageBitmap? = null
 
-    override suspend fun externalIcon(packageName: String): ImageBitmap? = null
+    override suspend fun externalIcon(packageName: String): ImageBitmap? = RemoteAppIconCache.cachedBytes(packageName)?.let { DesktopIconCodecPort.decodeToBitmap(it) }
 
-    override suspend fun externalIcons(packageNames: List<String>): Map<String, ImageBitmap?> = emptyMap()
+    override suspend fun externalIcons(packageNames: List<String>): Map<String, ImageBitmap?> =
+        RemoteAppIconCache
+            .cachedBytes(packageNames)
+            .mapValues { (_, bytes) -> bytes?.let { DesktopIconCodecPort.decodeToBitmap(it) } }
 
     override suspend fun iconWithAutoRequest(
         packageName: String,
-        sourceDevice: notifyrelay.domain.feature.device.model.DeviceInfo?,
-    ): ImageBitmap? = null
+        sourceDevice: DeviceInfo?,
+    ): ImageBitmap? {
+        externalIcon(packageName)?.let { return it }
+        val manager = deviceMessagePort()
+        if (manager != null && sourceDevice != null) {
+            IconSyncManagerCore.checkAndSyncIcon(packageName, manager, sourceDevice)
+        }
+        return null
+    }
 
     override suspend fun cacheExternalIcon(
         packageName: String,

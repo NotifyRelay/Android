@@ -1,76 +1,43 @@
 package com.xzyht.notifyrelay.sync.builder
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.nativecore.device.SendGateway
+import com.xzyht.notifyrelay.nativecore.device.appsync.ChatSendGateway
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import notifyrelay.base.log.Logger
-import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.base.util.PermissionHelper
 import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
-import org.json.JSONException
-import org.json.JSONObject
 
 /**
- * 聊天/通知消息构造与发送（抽取自 [com.xzyht.notifyrelay.sync.MessageSender]）。
+ * 聊天/通知消息构造与发送。
  *
- * 仅做搬移/抽取，逻辑与 [com.xzyht.notifyrelay.sync.MessageSender] 原实现逐行保持一致。
+ * 聊天测试的报文构造已上移到公共端 [ChatSendGateway]；本类保留 Android 侧的 `Context` 入口，
+ * 并承载通知转发报文（含锁屏状态）的构造。
  */
 object ChatMessageBuilder {
     private const val TAG = "MessageSender"
 
+    private val json = kotlinx.serialization.json.Json { encodeDefaults = false }
+
     /**
-     * 发送聊天测试消息
-     * @param context 上下文
-     * @param message 消息内容
-     * @param deviceManager 设备管理器
+     * 发送聊天测试消息。
+     *
+     * @param context 上下文（仅用于取本机包名）。
+     * @param message 消息内容。
+     * @param deviceManager 设备管理器。
      */
     fun sendChatMessage(
         context: Context,
         message: String,
         deviceManager: DeviceMessagePort,
-    ) {
-        // 设备查找
-        val allDevices =
-            deviceManager.devices.value.values
-                .map { it.first }
-        val sentAny = allDevices.isNotEmpty() && message.isNotBlank()
-
-        if (!sentAny) {
-            Logger.w(TAG, "没有可用的设备或消息为空")
-            return
-        }
-
-        // JSON 构造
-        val pkgName: String = context.packageName
-        val raw =
-            try {
-                JSONObject()
-                    .apply {
-                        put("packageName", pkgName)
-                        put("appName", "NotifyRelay")
-                        put("title", "聊天测试")
-                        put("text", message)
-                        put("time", System.currentTimeMillis())
-                    }.toString()
-            } catch (e: JSONException) {
-                Logger.e(TAG, "构造聊天消息 JSON 失败: pkg=$pkgName", e)
-                return
-            }
-
-        // 入队
-        allDevices.forEach { device: DeviceInfo ->
-            if (!SendGateway.enqueueNotification(device, raw, deviceManager, "聊天")) {
-                Logger.w(TAG, "聊天消息入队失败: ${device.displayName}")
-            }
-        }
-
-        // 记录到聊天历史
-        ChatMemory.append(context, "发送: $message")
-
-        Logger.i(TAG, "聊天消息已加入队列，共发送到 ${allDevices.size} 个设备")
-    }
+    ) = ChatSendGateway.sendChatMessage(context.packageName, message, deviceManager)
 
     /**
-     * 发送普通通知转发消息
+     * 发送普通通知转发消息。
+     *
      * @param context 上下文
      * @param packageName 应用包名
      * @param appName 应用名称
@@ -90,7 +57,6 @@ object ChatMessageBuilder {
         deviceManager: DeviceMessagePort,
         notificationKey: String? = null,
     ) {
-        // 设备查找
         val authenticatedDevices = SendGateway.getAuthenticatedDevices(deviceManager)
 
         if (authenticatedDevices.isEmpty()) {
@@ -99,37 +65,29 @@ object ChatMessageBuilder {
         }
 
         // 获取锁屏状态
-        val isLocked =
-            notifyrelay.base.util.PermissionHelper
-                .isDeviceLocked(context)
+        val isLocked = PermissionHelper.isDeviceLocked(context)
 
         // JSON 构造
         val raw =
-            try {
-                JSONObject()
-                    .apply {
-                        put("packageName", packageName)
-                        put("appName", appName ?: packageName)
-                        put("title", title ?: "")
-                        put("text", text ?: "")
-                        put("time", time)
-                        put("isLocked", isLocked)
-                        if (!notificationKey.isNullOrEmpty()) {
-                            put("notificationKey", notificationKey)
-                        }
-                    }.toString()
-            } catch (e: JSONException) {
-                Logger.e(TAG, "构造通知消息 JSON 失败: pkg=$packageName, notificationKey=$notificationKey", e)
-                return
-            }
+            buildJsonObject {
+                put("packageName", packageName)
+                put("appName", appName ?: packageName)
+                put("title", title ?: "")
+                put("text", text ?: "")
+                put("time", JsonPrimitive(time))
+                put("isLocked", JsonPrimitive(isLocked))
+                if (!notificationKey.isNullOrEmpty()) {
+                    put("notificationKey", notificationKey)
+                }
+            }.let { json.encodeToString(JsonObject.serializer(), it) }
 
         // 入队
         authenticatedDevices.forEach { deviceInfo ->
             if (!SendGateway.enqueueNotification(deviceInfo, raw, deviceManager, "通知")) {
-                Logger.w(TAG, "通知入队失败: ${deviceInfo.displayName}, pkg=$packageName")
+                Logger.w(TAG, "通知入队失败: " + deviceInfo.displayName + ", pkg=" + packageName)
             }
         }
 
-        Logger.i(TAG, "通知已加入队列，共 ${authenticatedDevices.size} 个设备")
+        Logger.i(TAG, "通知已加入队列，共 " + authenticatedDevices.size + " 个设备")
     }
 }

@@ -8,6 +8,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.domain.feature.appslist.RemoteAppsPortRegistry
 import notifyrelay.domain.feature.media.AudioRelayPortRegistry
 import notifyrelay.domain.feature.media.MediaControlPortRegistry
+import notifyrelay.domain.feature.notification.history.SuperIslandHistoryPortRegistry
+import notifyrelay.domain.feature.notification.superisland.SuperIslandConfigPortRegistry
 import notifyrelay.shared.feature.appslist.AppIconPortRegistry
 import notifyrelay.shared.feature.appslist.LocalAppsPortRegistry
 
@@ -29,6 +31,24 @@ private inline fun <reified VM : ViewModel> registryViewModel(crossinline create
                 ): T = create() as T
             },
     )
+
+/** 超级岛历史承载。 */
+@Composable
+fun superIslandHistoryViewModel(): SuperIslandHistoryViewModel =
+    registryViewModel {
+        SuperIslandHistoryViewModel(SuperIslandHistoryPortRegistry.current ?: error("SuperIslandHistoryPort 未注册"))
+    }
+
+/** 超级岛设置承载。 */
+@Composable
+fun superIslandSettingsViewModel(): SuperIslandSettingsViewModel =
+    registryViewModel {
+        SuperIslandSettingsViewModel(
+            SuperIslandConfigPortRegistry.current ?: error("SuperIslandConfigPort 未注册"),
+            LocalAppsPortRegistry.current ?: error("LocalAppsPort 未注册"),
+            AppIconPortRegistry.current ?: error("AppIconPort 未注册"),
+        )
+    }
 
 /** 应用图标承载。 */
 @Composable

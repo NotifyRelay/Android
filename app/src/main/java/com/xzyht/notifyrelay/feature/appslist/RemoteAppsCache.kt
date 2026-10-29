@@ -1,102 +1,27 @@
 package com.xzyht.notifyrelay.feature.appslist
 
 import android.content.Context
-import kotlinx.coroutines.flow.first
-import notifyrelay.data.database.entity.AppDeviceEntity
-import notifyrelay.data.database.entity.AppEntity
-import notifyrelay.data.database.repository.DatabaseRepository
+import com.xzyht.notifyrelay.nativecore.device.appsync.RemoteAppsCacheCore
 import notifyrelay.domain.feature.appslist.model.RemoteAppInfo
 
 /**
- * 远程应用缓存。
+ * 远程应用缓存（Android 侧入口）。
  *
- * 负责远端设备应用列表的数据库持久化，以及按设备维度读取远程应用明细：
- * - [cacheRemoteAppList] 缓存远端上报的应用列表（Map<包名, 应用名>）到数据库
- * - [getRemoteAppsList] 按设备 UUID 从数据库读取远程应用并附带置顶状态
+ * 实现位于公共端 [RemoteAppsCacheCore]；本类保留 `Context` 形参以不动既有调用点。
  */
 internal object RemoteAppsCache {
-    /**
-     * 缓存远程应用列表。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @param apps 远程应用列表，格式为 Map<包名, 应用名>
-     * @param deviceUuid 远程设备UUID
-     */
+    /** 缓存远程应用列表。 */
     suspend fun cacheRemoteAppList(
         context: Context,
         apps: Map<String, String>,
         deviceUuid: String,
     ) {
-        val appEntities = mutableListOf<AppEntity>()
-        val appDeviceEntities = mutableListOf<AppDeviceEntity>()
-
-        apps.forEach { (packageName, appName) ->
-            // 检查应用是否已存在
-            val existingApp = DatabaseRepository.getInstance().getAppByPackageName(packageName)
-            val appEntity =
-                if (existingApp != null) {
-                    // 更新现有应用
-                    existingApp.copy(
-                        appName = appName,
-                        lastUpdated = System.currentTimeMillis(),
-                    )
-                } else {
-                    // 创建新应用
-                    AppEntity(
-                        packageName = packageName,
-                        appName = appName,
-                        isSystemApp = false,
-                        iconBytes = null,
-                        isIconMissing = true,
-                        lastUpdated = System.currentTimeMillis(),
-                    )
-                }
-            appEntities.add(appEntity)
-
-            // 创建应用设备关联
-            val appDeviceEntity =
-                AppDeviceEntity(
-                    packageName = packageName,
-                    sourceDevice = deviceUuid,
-                    lastUpdated = System.currentTimeMillis(),
-                )
-            appDeviceEntities.add(appDeviceEntity)
-        }
-
-        // 保存到数据库
-        if (appEntities.isNotEmpty()) {
-            DatabaseRepository.getInstance().saveApps(appEntities)
-        }
-        if (appDeviceEntities.isNotEmpty()) {
-            DatabaseRepository.getInstance().saveAppDeviceAssociations(appDeviceEntities)
-        }
-        // Logger.d(TAG, "缓存远程应用列表成功，共 ${apps.size} 个应用")
+        RemoteAppsCacheCore.cache(apps, deviceUuid)
     }
 
-    /**
-     * 获取指定设备的远程应用列表（含置顶状态）。
-     *
-     * @param context Android 上下文，用于访问数据库（非空）。
-     * @param deviceUuid 远程设备UUID。
-     * @return 按「置顶优先、其次应用名」排序的远程应用列表。
-     */
+    /** 获取指定设备的远程应用列表（含置顶状态）。 */
     suspend fun getRemoteAppsList(
         context: Context,
         deviceUuid: String,
-    ): List<RemoteAppInfo> {
-        val appDevices = DatabaseRepository.getInstance().getAppDevicesByDeviceUuid(deviceUuid).first()
-        val packageNames = appDevices.map { it.packageName }.distinct()
-        if (packageNames.isEmpty()) return emptyList()
-        val apps = DatabaseRepository.getInstance().getAppsByPackageNames(packageNames)
-        return apps
-            .map { entity ->
-                RemoteAppInfo(
-                    packageName = entity.packageName,
-                    appName = entity.appName,
-                    iconBytes = entity.iconBytes,
-                    isPinned = PinnedAppsRepository.isAppPinned(deviceUuid, entity.packageName),
-                    isLoading = false,
-                )
-            }.sortedWith(compareByDescending<RemoteAppInfo> { it.isPinned }.thenBy { it.appName })
-    }
+    ): List<RemoteAppInfo> = RemoteAppsCacheCore.list(deviceUuid)
 }

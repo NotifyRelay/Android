@@ -1,30 +1,41 @@
 package notifyrelay.desktop
 
+import com.xzyht.notifyrelay.nativecore.device.appsync.IconCodecPortRegistry
 import notifyrelay.data.Storage
 import notifyrelay.data.database.AppDatabaseJvmFactory
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.data.filter.RemoteFilterRepository
 import notifyrelay.desktop.platform.DesktopAppIconPort
 import notifyrelay.desktop.platform.DesktopAudioRelayPort
+import notifyrelay.desktop.platform.DesktopFormFactorPort
 import notifyrelay.desktop.platform.DesktopHistoryPort
+import notifyrelay.desktop.platform.DesktopIconCodecPort
+import notifyrelay.desktop.platform.DesktopInstalledPackagesPort
 import notifyrelay.desktop.platform.DesktopLocalAppsPort
 import notifyrelay.desktop.platform.DesktopLocalFilterPort
 import notifyrelay.desktop.platform.DesktopMediaControlPort
+import notifyrelay.desktop.platform.DesktopNativeFilterPort
 import notifyrelay.desktop.platform.DesktopPinnedAppsPort
 import notifyrelay.desktop.platform.DesktopRemoteAppsPort
 import notifyrelay.desktop.platform.DesktopRemoteFilterPort
 import notifyrelay.desktop.platform.DesktopSuperIslandConfigPort
 import notifyrelay.desktop.platform.DesktopSuperIslandHistoryPort
+import notifyrelay.domain.feature.appslist.InstalledPackagesPortRegistry
 import notifyrelay.domain.feature.appslist.RemoteAppsPortRegistry
 import notifyrelay.domain.feature.media.AudioRelayPortRegistry
 import notifyrelay.domain.feature.media.MediaControlPortRegistry
 import notifyrelay.domain.feature.notification.filter.LocalFilterPortRegistry
+import notifyrelay.domain.feature.notification.filter.NativeFilterPortRegistry
 import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 import notifyrelay.domain.feature.notification.history.NotificationHistoryPortRegistry
 import notifyrelay.domain.feature.notification.history.SuperIslandHistoryPortRegistry
 import notifyrelay.domain.feature.notification.superisland.SuperIslandConfigPortRegistry
+import notifyrelay.domain.platform.FormFactorPortRegistry
 import notifyrelay.shared.feature.appslist.AppIconPortRegistry
 import notifyrelay.shared.feature.appslist.LocalAppsPortRegistry
 import notifyrelay.shared.feature.appslist.PinnedAppsPortRegistry
+import notifyrelay.shared.ui.common.DebugFlags
+import notifyrelay.shared.ui.screen.loadLogLevel
 import java.io.File
 
 /**
@@ -44,6 +55,35 @@ object DataLayerDesktop {
         return File(dir, "notify_relay.db").absolutePath
     }
 
+    /** 通知历史的设备列表来源，由 [registerDeviceManager] 注入；默认为仅本机。 */
+    @Volatile
+    private var knownDevices: () -> List<String> = { emptyList() }
+
+    /** 设备消息端口来源，供应用列表与图标的请求链路使用。 */
+    @Volatile
+    private var deviceMessagePort: () -> notifyrelay.domain.feature.device.service.contract.DeviceMessagePort? = { null }
+
+    /** 在线已认证设备来源，供剪贴板同步取发送目标。 */
+    @Volatile
+    private var onlineDevices: () -> List<notifyrelay.domain.feature.device.model.DeviceInfo> = { emptyList() }
+
+    /** 剪贴板同步端口实例，由入口启动与释放。 */
+    @Volatile
+    var clipboardSync: notifyrelay.desktop.platform.DesktopClipboardSyncPort? = null
+        private set
+
+    /**
+     * 登记设备管理器。
+     *
+     * 设备管理器在数据层之后创建，故由入口在创建后调用；
+     * 端口侧每次查询时读取该提供者，避免持有过期实例。
+     */
+    fun registerDeviceManager(manager: notifyrelay.desktop.device.DesktopDeviceManager) {
+        knownDevices = { manager.knownDeviceUuids() }
+        deviceMessagePort = { manager }
+        onlineDevices = { manager.getAuthenticatedOnlineDevices() }
+    }
+
     /** 初始化公共端存储与仓储单例；重复调用无副作用。 */
     fun initialize() {
         if (initialized) return
@@ -52,20 +92,39 @@ object DataLayerDesktop {
             val repository = DatabaseRepository(AppDatabaseJvmFactory.create(databasePath()))
             Storage.initialize(repository)
 
-            // 有数据源的端口：通知历史直接读 Room
-            NotificationHistoryPortRegistry.install(DesktopHistoryPort(repository))
+            // 平台能力端口
+            FormFactorPortRegistry.install(DesktopFormFactorPort)
+            InstalledPackagesPortRegistry.install(DesktopInstalledPackagesPort)
+            NativeFilterPortRegistry.install(DesktopNativeFilterPort)
+            IconCodecPortRegistry.install(DesktopIconCodecPort)
 
-            // 桌面端无对应数据源的端口：给中性实现，保证公共端 UI 可渲染
-            RemoteFilterPortRegistry.install(DesktopRemoteFilterPort())
-            LocalAppsPortRegistry.install(DesktopLocalAppsPort())
-            AppIconPortRegistry.install(DesktopAppIconPort())
-            PinnedAppsPortRegistry.install(DesktopPinnedAppsPort())
-            RemoteAppsPortRegistry.install(DesktopRemoteAppsPort())
+            // 有数据源的端口：通知历史与超级岛历史直接读 Room
+            NotificationHistoryPortRegistry.install(DesktopHistoryPort(repository) { knownDevices() })
+            SuperIslandHistoryPortRegistry.install(DesktopSuperIslandHistoryPort(repository))
+
+            // 与 Android 共用仓储的端口
+            val remoteFilterRepository = RemoteFilterRepository()
+            RemoteFilterPortRegistry.install(DesktopRemoteFilterPort(remoteFilterRepository))
             LocalFilterPortRegistry.install(DesktopLocalFilterPort())
+            AppIconPortRegistry.install(DesktopAppIconPort { deviceMessagePort() })
+            LocalAppsPortRegistry.install(DesktopLocalAppsPort())
+            RemoteAppsPortRegistry.install(DesktopRemoteAppsPort { deviceMessagePort() })
             AudioRelayPortRegistry.install(DesktopAudioRelayPort())
             MediaControlPortRegistry.install(DesktopMediaControlPort())
             SuperIslandConfigPortRegistry.install(DesktopSuperIslandConfigPort())
-            SuperIslandHistoryPortRegistry.install(DesktopSuperIslandHistoryPort())
+
+            // 剪贴板同步：收发判定在 Rust core，平台只做系统剪贴板读写
+            clipboardSync =
+                notifyrelay.desktop.platform.DesktopClipboardSyncPort(
+                    { deviceMessagePort() },
+                    { onlineDevices() },
+                )
+
+            // 置顶应用由公共仓库承担，端口直接暴露其状态流
+            PinnedAppsPortRegistry.install(DesktopPinnedAppsPort())
+
+            loadLogLevel { key, default -> Storage.getInt(key, default) }
+            DebugFlags.load { key, default -> Storage.getBoolean(key, default) }
 
             initialized = true
         }

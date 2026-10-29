@@ -36,6 +36,25 @@ class DesktopWindowController(
     }
 
     /**
+     * 取主窗口的原生句柄（Windows 为 HWND，其余平台为 0）。
+     *
+     * AWT 不直接暴露 HWND；Compose Desktop 的窗口是 `JFrame`，
+     * 经 JNA 的 `getWindowID` 取得 AWT 内部窗口 ID（即 HWND）。
+     */
+    fun nativeHandle(): Long {
+        val current = window ?: return 0L
+        if (!System.getProperty("os.name").orEmpty().startsWith("Windows", ignoreCase = true)) return 0L
+        return runCatching {
+            com.sun.jna.Native
+                .getWindowID(current)
+                .toLong()
+        }.getOrElse {
+            Logger.w(TAG, "取窗口句柄失败: " + it.message)
+            0L
+        }
+    }
+
+    /**
      * 安装托盘图标。
      *
      * @param icon 托盘图标，为空时为无托盘模式

@@ -7,10 +7,12 @@ import androidx.paging.Pager
 import androidx.paging.PagingConfig
 import androidx.paging.PagingData
 import androidx.paging.cachedIn
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import notifyrelay.domain.feature.notification.history.AppIconInfo
@@ -22,6 +24,7 @@ import notifyrelay.domain.feature.notification.history.SuperIslandHistoryUiState
 /**
  * 超级岛历史页的 ViewModel（平台无关）。
  */
+@OptIn(ExperimentalCoroutinesApi::class)
 class SuperIslandHistoryViewModel(
     private val port: SuperIslandHistoryPort,
 ) : ViewModel() {
@@ -34,10 +37,16 @@ class SuperIslandHistoryViewModel(
     private val refreshSignal = MutableStateFlow(0L)
     private val iconLoading = mutableSetOf<String>()
 
+    /**
+     * 分页流：删除或清空后重建 [Pager]，使列表立即刷新。
+     *
+     * [refreshSignal] 每次递增即触发重建；[historyChanged] 同样接入该入口。
+     */
     val groupedPagingFlow: Flow<PagingData<GroupedSuperIslandHistory>> =
-        Pager(PagingConfig(pageSize = 20, enablePlaceholders = false)) { port.pagingSource() }
-            .flow
-            .cachedIn(viewModelScope)
+        refreshSignal
+            .flatMapLatest {
+                Pager(PagingConfig(pageSize = 20, enablePlaceholders = false)) { port.pagingSource() }.flow
+            }.cachedIn(viewModelScope)
 
     init {
         viewModelScope.launch {
@@ -47,6 +56,10 @@ class SuperIslandHistoryViewModel(
                     preloadAppIcons(listOf(packageName))
                 }
             }
+        }
+        viewModelScope.launch {
+            // 外部写入（入站新增、清空）同样触发列表重建
+            port.historyChanged.collect { refreshPaging() }
         }
     }
 
