@@ -87,6 +87,9 @@ class DesktopDeviceManager(
 
     override fun getPairedDeviceUuids(): Set<String> = synchronized(authenticatedDevices) { authenticatedDevices.keys.toSet() }
 
+    /** 当前已知的远端设备 UUID（供通知历史的设备维度使用）。 */
+    fun knownDeviceUuids(): List<String> = getPairedDeviceUuids().sorted()
+
     override fun getAuthenticatedOnlineCount(): Int = snapshotStore.onlinePairedUuids().size
 
     override fun getAuthenticatedOnlineDevices(): List<DeviceInfo> = snapshotStore.onlinePairedAddressableSnapshots().mapNotNull { snap -> snapshotStore.currentInfo(snap.uuid) }
@@ -216,12 +219,20 @@ class DesktopDeviceManager(
         synchronized(notificationCallbacks) { notificationCallbacks.remove(callback) }
     }
 
-    /** 广播一条入站通知报文；单个回调异常不影响其余回调。 */
+    /**
+     * 广播一条入站通知报文；单个回调异常不影响其余回调。
+     *
+     * 回调订阅方是 Compose 界面（聊天测试页），写入的是快照状态，
+     * 而本方法运行在 Rust/JNA 回调线程，故统一投递到事件派发线程执行。
+     */
     internal fun dispatchNotification(payload: String) {
         val callbacks = synchronized(notificationCallbacks) { notificationCallbacks.toList() }
-        for (callback in callbacks) {
-            runCatching { callback(payload) }
-                .onFailure { Logger.w(TAG, "通知回调失败", it) }
+        if (callbacks.isEmpty()) return
+        javax.swing.SwingUtilities.invokeLater {
+            for (callback in callbacks) {
+                runCatching { callback(payload) }
+                    .onFailure { Logger.w(TAG, "通知回调失败", it) }
+            }
         }
     }
 

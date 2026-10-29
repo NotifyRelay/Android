@@ -55,6 +55,19 @@ object DataLayerDesktop {
         return File(dir, "notify_relay.db").absolutePath
     }
 
+    /** 通知历史的设备列表来源，由 [registerDeviceProvider] 注入；默认为仅本机。 */
+    @Volatile
+    private var knownDevices: () -> List<String> = { emptyList() }
+
+    /**
+     * 登记通知历史的远端设备来源。
+     *
+     * 设备管理器在数据层之后创建，故由入口在创建后调用；端口侧每次查询时读取该提供者。
+     */
+    fun registerDeviceProvider(provider: () -> List<String>) {
+        knownDevices = provider
+    }
+
     /** 初始化公共端存储与仓储单例；重复调用无副作用。 */
     fun initialize() {
         if (initialized) return
@@ -70,7 +83,7 @@ object DataLayerDesktop {
             IconCodecPortRegistry.install(DesktopIconCodecPort)
 
             // 有数据源的端口：通知历史与超级岛历史直接读 Room
-            NotificationHistoryPortRegistry.install(DesktopHistoryPort(repository))
+            NotificationHistoryPortRegistry.install(DesktopHistoryPort(repository) { knownDevices() })
             SuperIslandHistoryPortRegistry.install(DesktopSuperIslandHistoryPort(repository))
 
             // 与 Android 共用仓储的端口

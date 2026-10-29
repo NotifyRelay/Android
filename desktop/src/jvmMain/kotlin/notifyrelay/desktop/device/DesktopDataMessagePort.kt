@@ -18,7 +18,11 @@ internal class DesktopDataMessagePort(
     override fun onNotification(
         deviceUuid: String,
         payload: String,
-    ) = manager.dispatchNotification(payload)
+    ) {
+        // 回调广播（聊天测试订阅方）与落库归档并行推进，两者互不阻塞
+        manager.dispatchNotification(payload)
+        DesktopInboundNotificationHandler.dispatch(payload, deviceUuid)
+    }
 
     override fun onMediaPlay(
         device: DeviceInfo,
