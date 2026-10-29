@@ -84,11 +84,16 @@ val smtcRustBuild =
 tasks.named("compileKotlinJvm") { dependsOn(smtcRustBuild) }
 val smtcLibDir = smtcRustDir.resolve("target/release")
 
+// 原生库经 System.loadLibrary 载入，JDK 24+ 默认对未具名模块的原生访问告警；
+// 显式放行以消除 "A restricted method in java.lang.System has been called" 警告。
+val nativeAccessArgs = listOf("--enable-native-access=ALL-UNNAMED")
+
 tasks.withType<JavaExec>().configureEach {
     // JNA 优先读 jna.library.path；java.library.path 对 Native.register 不生效
     // 两个 Rust 产物目录都要在搜索路径上：JNA 与 System.loadLibrary 各自按名字找
     systemProperty("jna.library.path", rustHostLibDir.absolutePath + File.pathSeparator + smtcLibDir.absolutePath)
     systemProperty("java.library.path", rustHostLibDir.absolutePath + File.pathSeparator + smtcLibDir.absolutePath)
+    jvmArgs(nativeAccessArgs)
     // 控制台输出编码：中文 Windows 默认按 GBK 编码 stdout/stderr，捕获端（Gradle/IDE）按 UTF-8 解码会乱码。
     // JDK 18+ 起 file.encoding 不再决定控制台编码，需显式指定 stdout.encoding / stderr.encoding。
     systemProperty("stdout.encoding", "UTF-8")
@@ -100,11 +105,14 @@ tasks.withType<Test>().configureEach {
     systemProperty("java.library.path", rustHostLibDir.absolutePath + File.pathSeparator + smtcLibDir.absolutePath)
     systemProperty("stdout.encoding", "UTF-8")
     systemProperty("stderr.encoding", "UTF-8")
+    jvmArgs(nativeAccessArgs)
 }
 
 compose.desktop {
     application {
         mainClass = "notifyrelay.desktop.MainKt"
+        // 打包产物同样需要放行原生访问
+        jvmArgs += nativeAccessArgs
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "NotifyRelay"

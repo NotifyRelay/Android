@@ -46,4 +46,34 @@ object SMTCLoader {
      */
     @JvmStatic
     external fun getCoverBase64(): String
+
+    /**
+     * 启动系统声音采集（WASAPI 回环）。
+     *
+     * 采集线程回调 [listener] 的 `onAudioPcm(ByteArray)`，参数为 16 位小端交错 PCM。
+     * Rust 侧以 `onAudioPcm` 名称反射调用，不可改名。
+     *
+     * @param listener 接收 PCM 的对象
+     * @return 0 成功；负值失败
+     */
+    @JvmStatic
+    external fun startAudioCapture(listener: AudioCaptureListener): Int
+
+    /** 停止系统声音采集。 */
+    @JvmStatic
+    external fun stopAudioCapture(): Int
+
+    /** 采集是否运行中。 */
+    @JvmStatic
+    external fun isAudioCapturing(): Int
+
+    /** 采集流格式：`[采样率, 声道数]`；未运行时为 `[0, 0]`。 */
+    @JvmStatic
+    external fun audioCaptureFormat(): IntArray
+}
+
+/** 系统声音采集的数据接收者。 */
+interface AudioCaptureListener {
+    /** 收到一帧 PCM（16 位小端交错）。 */
+    fun onAudioPcm(pcm: ByteArray)
 }

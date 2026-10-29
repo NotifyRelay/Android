@@ -73,6 +73,26 @@ internal object DesktopMediaRemoteHandler {
                 ?: return
         val actionType = root.stringField("playbackActionType") ?: root.stringField("action") ?: return
 
+        // 音频转发控制与媒体控制共用 DATA_MEDIA_CONTROL 通道，先分派
+        when (actionType.lowercase()) {
+            "audiorequest" -> {
+                DesktopAudioRemoteHandler.onAudioRequest(root)
+                return
+            }
+            "audioresponse" -> {
+                DesktopAudioRemoteHandler.onAudioResponse(root)
+                return
+            }
+            "audiostart" -> {
+                DesktopAudioRemoteHandler.onAudioStart(root)
+                return
+            }
+            "audiostop" -> {
+                DesktopAudioRemoteHandler.onAudioStop()
+                return
+            }
+        }
+
         val action =
             when (actionType.lowercase()) {
                 "play", "pause", "playpause" -> MediaControlAction.PLAY_PAUSE

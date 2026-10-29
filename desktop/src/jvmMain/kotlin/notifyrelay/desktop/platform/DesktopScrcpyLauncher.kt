@@ -130,11 +130,73 @@ object DesktopScrcpyLauncher {
             windowIconPath()?.let { builder.environment()[ENV_ICON_PATH] = it }
             val process = builder.start()
             runningProcesses[serial] = process
+            rememberSerial(deviceUuid, serial)
             watchProcess(serial, process)
             true
         } catch (e: java.io.IOException) {
             Logger.e(TAG, "启动 scrcpy 失败: " + serial, e)
             DesktopToastHost.show("启动投屏失败：" + (e.message ?: ""), DesktopToastHost.Duration.LONG)
+            false
+        }
+    }
+
+    /**
+     * 以仅音频模式启动 scrcpy（`--no-video`），把设备声音转发到本机播放。
+     *
+     * 与 [launch] 共用序列号解析与解锁流程，仅参数固定为音频转发集合；
+     * 进程同样按序列号登记，退出由 [watchProcess] 回收。
+     *
+     * @param audioOnly 为 true 时强制仅音频（忽略设备投屏配置）
+     * @return 是否成功启动
+     */
+    fun launchAudio(
+        deviceUuid: String,
+        deviceName: String,
+        deviceIp: String,
+        audioOnly: Boolean = true,
+    ): Boolean {
+        val executable = resolveScrcpy()
+        if (executable == null) {
+            DesktopToastHost.show("未找到 scrcpy，请先在屏幕镜像设置中选择路径", DesktopToastHost.Duration.LONG)
+            return false
+        }
+        val settings = ScrcpySettingsStore.load(deviceUuid)
+        val serial =
+            DesktopAdbDeviceResolver.resolveSerial(
+                adbPath = adbPath(),
+                deviceUuid = deviceUuid,
+                deviceName = deviceName,
+                deviceIp = deviceIp,
+                preference = settings.devicePreference,
+                tcpipEnabled = settings.adbTcpipModeEnabled,
+            )
+        if (serial.isNullOrBlank()) {
+            DesktopToastHost.show("未找到该设备的 adb 连接，无法转发音频", DesktopToastHost.Duration.LONG)
+            return false
+        }
+        if (settings.unlockBeforeLaunch) {
+            unlockIfNeeded(deviceUuid, serial, settings)
+        }
+
+        // 仅音频模式：强制 --no-video，其余音频参数沿用设备配置
+        val args =
+            ScrcpyOptions.buildArguments(
+                settings.copy(disableVideoForwarding = audioOnly || settings.disableVideoForwarding),
+                serial,
+            )
+        return try {
+            val command = listOf(executable.absolutePath) + args
+            Logger.i(TAG, "启动 scrcpy 音频转发: " + command.joinToString(" "))
+            val builder = ProcessBuilder(command).redirectErrorStream(false)
+            windowIconPath()?.let { builder.environment()[ENV_ICON_PATH] = it }
+            val process = builder.start()
+            runningProcesses[serial] = process
+            rememberSerial(deviceUuid, serial)
+            watchProcess(serial, process)
+            true
+        } catch (e: java.io.IOException) {
+            Logger.e(TAG, "启动 scrcpy 音频转发失败: " + serial, e)
+            DesktopToastHost.show("启动音频转发失败：" + (e.message ?: ""), DesktopToastHost.Duration.LONG)
             false
         }
     }
@@ -154,6 +216,37 @@ object DesktopScrcpyLauncher {
             preference = settings.devicePreference,
             tcpipEnabled = settings.adbTcpipModeEnabled,
         )
+    }
+
+    /** 按设备 UUID 停止该设备的 scrcpy 进程（投屏与音频共用一张进程表）。 */
+    fun stopByDeviceUuid(
+        deviceUuid: String,
+        deviceName: String,
+        deviceIp: String,
+    ) {
+        // 先用当前解析结果停止；解析不到时回落到按 IP 推导的常见序列号
+        val serial = resolveSerialFor(deviceUuid, deviceName, deviceIp)
+        if (serial != null) {
+            stop(serial)
+        }
+        serialSerialsOf(deviceUuid).forEach { stop(it) }
+    }
+
+    /** 该设备既有进程的序列号登记：UUID → 序列号。 */
+    private val deviceSerials = ConcurrentHashMap<String, MutableSet<String>>()
+
+    /** 记录设备与序列号的对应关系，供按设备停止时精确命中。 */
+    private fun rememberSerial(
+        deviceUuid: String,
+        serial: String,
+    ) {
+        deviceSerials.getOrPut(deviceUuid) { java.util.concurrent.CopyOnWriteArraySet() }.add(serial)
+    }
+
+    /** 取该设备登记过的序列号集合。 */
+    private fun serialSerialsOf(deviceUuid: String): Set<String> {
+        val serials = deviceSerials.remove(deviceUuid) ?: return emptySet()
+        return serials.toSet()
     }
 
     /** 停止指定设备的投屏进程。 */

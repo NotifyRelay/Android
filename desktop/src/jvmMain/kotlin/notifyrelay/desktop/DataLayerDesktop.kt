@@ -67,6 +67,10 @@ object DataLayerDesktop {
     @Volatile
     private var onlineDevices: () -> List<notifyrelay.domain.feature.device.model.DeviceInfo> = { emptyList() }
 
+    /** 设备回调宿主来源，供需要主动发报文的端口（音频中继）使用。 */
+    @Volatile
+    private var deviceCallbackHost: () -> com.xzyht.notifyrelay.nativecore.device.service.callback.DeviceCallbackHost? = { null }
+
     /** 剪贴板同步端口实例，由入口启动与释放。 */
     @Volatile
     var clipboardSync: notifyrelay.desktop.platform.DesktopClipboardSyncPort? = null
@@ -87,7 +91,14 @@ object DataLayerDesktop {
         knownDevices = { manager.knownDeviceUuids() }
         deviceMessagePort = { manager }
         onlineDevices = { manager.getAuthenticatedOnlineDevices() }
+        deviceCallbackHost = { manager }
     }
+
+    /** 取设备回调宿主（供报文发送方使用）；未登记时返回 null。 */
+    fun callbackHost(): com.xzyht.notifyrelay.nativecore.device.service.callback.DeviceCallbackHost? = deviceCallbackHost()
+
+    /** 按 UUID 取在线设备；不存在时返回 null。 */
+    fun findOnlineDevice(uuid: String): notifyrelay.domain.feature.device.model.DeviceInfo? = onlineDevices().find { it.uuid == uuid }
 
     /** 初始化公共端存储与仓储单例；重复调用无副作用。 */
     fun initialize() {
@@ -114,7 +125,22 @@ object DataLayerDesktop {
             AppIconPortRegistry.install(DesktopAppIconPort { deviceMessagePort() })
             LocalAppsPortRegistry.install(DesktopLocalAppsPort())
             RemoteAppsPortRegistry.install(DesktopRemoteAppsPort { deviceMessagePort() })
-            AudioRelayPortRegistry.install(DesktopAudioRelayPort())
+            // 音频端口需要按 UUID 找设备并发送控制报文；两者都依赖设备消息端口
+            AudioRelayPortRegistry.install(
+                DesktopAudioRelayPort(
+                    findDevice = { uuid -> onlineDevices().find { it.uuid == uuid } },
+                    sendControl = { device, plaintext ->
+                        val host = deviceCallbackHost()
+                        if (host == null) {
+                            false
+                        } else {
+                            runCatching {
+                                host.sendDataMessage(device, "DATA_MEDIA_CONTROL", plaintext)
+                            }.isSuccess
+                        }
+                    },
+                ),
+            )
             mediaControl = notifyrelay.desktop.platform.DesktopMediaControlPort { onlineDevices() }
             MediaControlPortRegistry.install(mediaControl!!)
             SuperIslandConfigPortRegistry.install(DesktopSuperIslandConfigPort())
