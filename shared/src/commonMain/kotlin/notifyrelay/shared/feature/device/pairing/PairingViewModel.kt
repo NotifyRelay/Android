@@ -37,6 +37,7 @@ class PairingViewModel(
     private val core: PairingCorePort,
     private val pairingPort: DevicePairingPort,
     private val handshakePort: HandshakeWaiterPort,
+    private val platform: String,
     private val dispatcher: CoroutineDispatcher = Dispatchers.Default,
 ) : ViewModel() {
     private val _state = MutableStateFlow(PairingUiState())
@@ -90,7 +91,7 @@ class PairingViewModel(
                                 targetDevice.uuid,
                                 displayCode,
                                 battery,
-                                "android",
+                                platform,
                             ) == 0
                         }
                     }
@@ -137,7 +138,9 @@ class PairingViewModel(
                                 "配对失败：未初始化"
                             } else {
                                 val ltPubKey = pairingPort.localPublicKey
-                                val sendOk = core.sendPairingResp(remoteUuid, ltPubKey, code, remoteIp, battery, "android")
+                                // 首段为本机 uuid：core 用它编码 PAIRING_RESP 的发送方身份，
+                                // 发起方据此按对端 uuid 匹配自己的配对会话
+                                val sendOk = core.sendPairingResp(pairingPort.localUuid, ltPubKey, code, remoteIp, battery, platform)
                                 if (sendOk != 0) {
                                     "配对失败：发送响应失败"
                                 } else {

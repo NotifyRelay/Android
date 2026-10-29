@@ -10,6 +10,8 @@ data class PairingDependencies(
     val handshakePort: HandshakeWaiterPort,
     /** 带符号电量（正=充电，负=放电）。 */
     val batteryProvider: () -> Int,
+    /** 本机平台标识，随配对报文上报（如 `android`、`pc`）。 */
+    val platform: String,
 )
 
 /** 由宿主在引导页根节点注入。 */

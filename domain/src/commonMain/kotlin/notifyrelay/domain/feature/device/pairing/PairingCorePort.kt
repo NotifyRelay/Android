@@ -21,9 +21,15 @@ interface PairingCorePort {
         platform: String,
     ): Int
 
-    /** 发送配对响应；返回 0 表示成功。 */
+    /**
+     * 发送配对响应；返回 0 表示成功。
+     *
+     * @param localUuid 本机 uuid：core 将其编码为 PAIRING_RESP 首段（发送方身份），
+     *   发起方据此按「对端 uuid」精确匹配自己的配对会话；勿传对端 uuid。
+     * @param remoteIp 发起方地址，作为 core 解析本机地址失败时的兜底。
+     */
     fun sendPairingResp(
-        remoteUuid: String,
+        localUuid: String,
         localPublicKey: String,
         code: String,
         remoteIp: String,

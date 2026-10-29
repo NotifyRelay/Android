@@ -45,6 +45,7 @@ import notifyrelay.desktop.platform.DesktopNotificationActionPort
 import notifyrelay.desktop.platform.DesktopThemePort
 import notifyrelay.desktop.platform.DesktopWindowController
 import notifyrelay.desktop.platform.ProvideDesktopExtraPorts
+import notifyrelay.desktop.platform.ProvideDesktopPairingDependencies
 import notifyrelay.desktop.platform.ProvideDesktopUiPorts
 import notifyrelay.desktop.platform.WindowIcon
 import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
@@ -176,13 +177,16 @@ fun main() {
             CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
                 ProvideDesktopUiPorts {
                     ProvideDesktopExtraPorts(onFinish = { windowController.hideWindow() }) {
-                        CompositionLocalProvider(
-                            LocalNotificationActionPort provides actionPort,
-                            LocalDeviceListPort provides deviceListPort,
-                            LocalDevicePortsProvider provides devicePortsProvider,
-                            LocalNavigator provides navigator,
-                        ) {
-                            DesktopRoot(navigator, darkTheme)
+                        // 配对依赖：配对对话框与设备列表共用同一个握手等待器实例
+                        ProvideDesktopPairingDependencies(deviceManager.handshakeWaiters) {
+                            CompositionLocalProvider(
+                                LocalNotificationActionPort provides actionPort,
+                                LocalDeviceListPort provides deviceListPort,
+                                LocalDevicePortsProvider provides devicePortsProvider,
+                                LocalNavigator provides navigator,
+                            ) {
+                                DesktopRoot(navigator, darkTheme)
+                            }
                         }
                     }
                 }

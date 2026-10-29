@@ -54,6 +54,7 @@ private fun pairingViewModelFactory(deviceManager: DevicePairingPort): ViewModel
                     core = deps.core,
                     pairingPort = deviceManager,
                     handshakePort = deps.handshakePort,
+                    platform = deps.platform,
                 ) as T
         }
     }

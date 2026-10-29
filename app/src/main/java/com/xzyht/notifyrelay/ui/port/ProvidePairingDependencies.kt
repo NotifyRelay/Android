@@ -21,6 +21,7 @@ fun ProvidePairingDependencies(content: @Composable () -> Unit) {
                 val level = BatteryUtils.getBatteryLevel(context)
                 if (BatteryUtils.isCharging(context)) level else -level
             },
+            platform = "android",
         )
     CompositionLocalProvider(LocalPairingDependencies provides deps, content = content)
 }

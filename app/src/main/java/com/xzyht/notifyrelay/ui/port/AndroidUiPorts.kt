@@ -10,6 +10,8 @@ import com.xzyht.notifyrelay.feature.appslist.launch.AndroidAppLaunchPort
 import com.xzyht.notifyrelay.feature.device.AndroidDeviceListPort
 import com.xzyht.notifyrelay.feature.device.service.AndroidDevicePortsProvider
 import com.xzyht.notifyrelay.feature.display.AndroidDisplayPort
+import com.xzyht.notifyrelay.feature.image.AndroidImageDecodePort
+import com.xzyht.notifyrelay.feature.notification.history.AndroidNotificationActionPort
 import com.xzyht.notifyrelay.feature.preference.AndroidPreferencePort
 import com.xzyht.notifyrelay.feature.settings.AndroidSettingsPort
 import com.xzyht.notifyrelay.feature.ui.AndroidMainScreenPort
@@ -20,6 +22,7 @@ import notifyrelay.base.util.SystemBarUtils
 import notifyrelay.base.util.ThemeSettingsManager
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.base.util.image.toBitmapOrDefault
+import notifyrelay.shared.ui.pages.history.LocalNotificationActionPort
 import notifyrelay.shared.ui.pages.remoteapps.LocalAppLaunchPort
 import notifyrelay.shared.ui.pages.remoteapps.LocalDisplayPort
 import notifyrelay.shared.ui.port.BitmapPort
@@ -27,6 +30,7 @@ import notifyrelay.shared.ui.port.ClipboardPort
 import notifyrelay.shared.ui.port.IntentLaunchPort
 import notifyrelay.shared.ui.port.LocalBitmapPort
 import notifyrelay.shared.ui.port.LocalClipboardPort
+import notifyrelay.shared.ui.port.LocalImageDecodePort
 import notifyrelay.shared.ui.port.LocalIntentLaunchPort
 import notifyrelay.shared.ui.port.LocalPreferencePort
 import notifyrelay.shared.ui.port.LocalSystemBarPort
@@ -141,6 +145,8 @@ fun ProvideAndroidUiPorts(content: @Composable () -> Unit) {
         LocalSettingsPort provides AndroidSettingsPort(context),
         LocalMainScreenPort provides AndroidMainScreenPort(context, LocalContext.current as? MainActivity),
         LocalPreferencePort provides AndroidPreferencePort,
+        LocalNotificationActionPort provides AndroidNotificationActionPort(context),
+        LocalImageDecodePort provides AndroidImageDecodePort(context),
         content = content,
     )
 }
