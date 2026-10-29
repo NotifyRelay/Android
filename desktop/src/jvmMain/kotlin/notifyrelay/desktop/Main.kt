@@ -40,6 +40,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import kotlinx.coroutines.runBlocking
 import notifyrelay.desktop.device.DesktopDeviceManager
 import notifyrelay.desktop.device.DesktopDevicePortsProvider
+import notifyrelay.desktop.device.DesktopScrcpyScreen
 import notifyrelay.desktop.platform.DesktopDeviceListPort
 import notifyrelay.desktop.platform.DesktopNotificationActionPort
 import notifyrelay.desktop.platform.DesktopThemePort
@@ -60,6 +61,7 @@ import notifyrelay.shared.ui.navigation.Route
 import notifyrelay.shared.ui.navigation.rememberNavigator
 import notifyrelay.shared.ui.pages.ClipboardSyncPage
 import notifyrelay.shared.ui.pages.MusicControlPage
+import notifyrelay.shared.ui.pages.ScrcpySettingsPage
 import notifyrelay.shared.ui.pages.UISuperIslandSettings
 import notifyrelay.shared.ui.pages.chat.UIChatTest
 import notifyrelay.shared.ui.pages.history.LocalNotificationActionPort
@@ -317,7 +319,9 @@ private fun DesktopRoot(
                                     filterViewModel = remoteFilterViewModel(),
                                     clipboardSync = { ClipboardSyncPage() },
                                     musicControl = { MusicControlPage() },
-                                    scrcpyScreen = { _, _ -> },
+                                    scrcpyScreen = { deviceInfo, _ ->
+                                        DesktopScrcpyScreen(devicePortsProvider, deviceInfo)
+                                    },
                                 )
                             },
                             settingsContent = { SettingsScreen() },
@@ -344,9 +348,10 @@ private fun DesktopRoot(
                     entry<Route.SettingsDeveloperMode> { DeveloperModeScreen() }
                     entry<Route.SettingsAbout> { SettingsAboutScreen {} }
                     entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
-                    // 屏幕镜像相关路由在桌面端不接线，给出占位页避免导航失败
-                    entry<Route.SettingsScrcpy> { DesktopUnavailableScreen("屏幕镜像") { navigator.pop() } }
-                    entry<Route.ScrcpyAdvanced> { DesktopUnavailableScreen("屏幕镜像高级设置") { navigator.pop() } }
+                    entry<Route.SettingsScrcpy> { ScrcpySettingsPage() }
+                    // 高级设置与基础设置同页：桌面端参数集较移动端少，不再分组
+                    entry<Route.ScrcpyAdvanced> { ScrcpySettingsPage() }
+                    // 虚拟按钮排序在桌面端不接线（无触摸注入语义）
                     entry<Route.ScrcpyVirtualButtonOrder> { DesktopUnavailableScreen("虚拟按钮排序") { navigator.pop() } }
                 }
             }

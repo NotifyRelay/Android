@@ -50,11 +50,15 @@ class Navigator(
     }
 
     /**
-     * 弹出当前路由
-     * Pop the current route
+     * 弹出当前路由。
+     *
+     * 保留最后一项：导航栈为空会使 NavDisplay 抛 IllegalArgumentException，
+     * 且根页面本身不应被弹出。
      */
     fun pop() {
-        backStack.removeLastOrNull()
+        if (backStack.size > 1) {
+            backStack.removeAt(backStack.lastIndex)
+        }
     }
 
     /**

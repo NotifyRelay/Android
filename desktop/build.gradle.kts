@@ -39,6 +39,9 @@ kotlin {
 
             // Compose Desktop 需要 Main 调度器（Swing EDT）
             implementation(libs.kotlinx.coroutines.swing)
+
+            // Win32 COM 封装：现代文件对话框（IFileOpenDialog）经 JNA 调用
+            implementation(libs.jna.platform)
         }
     }
 }

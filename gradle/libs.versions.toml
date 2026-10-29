@@ -153,6 +153,8 @@ androidx-compose-material-icons-extended = { group = "androidx.compose.material"
 reorderable = { group = "sh.calvin.reorderable", name = "reorderable", version.ref = "reorderable" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
+# Win32 COM / Shell 封装（文件对话框 IFileOpenDialog）
+jna-platform = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jna" }
 libxposed-api = { group = "io.github.libxposed", name = "api", version.ref = "libxposed" }
 dexkit = { module = "org.luckypray:dexkit", version.ref = "dexkit" }
 ezhooktool-core = { group = "io.github.lingqiqi5211.ezhooktool", name = "core", version.ref = "ezhooktool" }

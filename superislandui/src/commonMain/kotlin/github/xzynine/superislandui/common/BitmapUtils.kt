@@ -160,7 +160,7 @@ object BitmapUtils {
 
                 val image = getOrCreateBitmap(finalWidth, finalHeight)
                 Canvas(image).drawInto(finalWidth, finalHeight) {
-                    if (shouldAddAlbum && albumBitmap != null) {
+                    if (shouldAddAlbum) {
                         drawImage(
                             image = albumBitmap,
                             srcOffset = androidx.compose.ui.unit.IntOffset.Zero,

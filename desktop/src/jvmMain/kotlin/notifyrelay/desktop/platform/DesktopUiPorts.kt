@@ -12,6 +12,7 @@ import notifyrelay.shared.ui.port.LocalBitmapPort
 import notifyrelay.shared.ui.port.LocalClipboardPort
 import notifyrelay.shared.ui.port.LocalClipboardSyncPort
 import notifyrelay.shared.ui.port.LocalIntentLaunchPort
+import notifyrelay.shared.ui.port.LocalScrcpyPort
 import notifyrelay.shared.ui.port.LocalSystemBarPort
 import notifyrelay.shared.ui.port.LocalThemePort
 import notifyrelay.shared.ui.port.LocalToastPort
@@ -140,6 +141,7 @@ fun ProvideDesktopUiPorts(content: @Composable () -> Unit) {
         LocalSystemBarPort provides DesktopSystemBarPort,
         LocalBitmapPort provides DesktopBitmapPort,
         LocalClipboardSyncPort provides DataLayerDesktop.clipboardSync,
+        LocalScrcpyPort provides DesktopScrcpyPort,
         content = content,
     )
 }
