@@ -419,7 +419,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         processNotification(sbn)
     }
 
-    private fun forwardNotificationToRemoteDevices(sbn: StatusBarNotification) {
+    private suspend fun forwardNotificationToRemoteDevices(sbn: StatusBarNotification) {
         Logger.i(TAG, "[NotifyListener] forwardNotificationToRemoteDevices called, sbnKey=${sbn.key}, pkg=${sbn.packageName}")
         val appName = getAppName(sbn.packageName)
 

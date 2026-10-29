@@ -135,6 +135,39 @@ object LocalFilterRepository {
         setFilterEntryEnabled(FilterEntry("", packageName), enabled)
     }
 
+    /**
+     * 本机通知是否应转发给对端。
+     *
+     * 对齐 Windows `BackendLocalFilter.ShouldForward`：
+     * 1. 自身通知（包名或应用名含 `notifyrelay`）；
+     * 2. 启用条目命中（关键词匹配标题/内容、包名匹配包名，二者兼有时需同时命中）；
+     * 3. 标题与内容均为空。
+     *
+     * 「过滤无标题或无内容」按 Windows 语义取「二者皆空」，而非任一为空。
+     *
+     * @param packageName 通知所属包名（已映射为远端包名时的结果同样适用）
+     * @param appName 通知所属应用显示名
+     * @param title 通知标题
+     * @param text 通知内容
+     */
+    suspend fun shouldForward(
+        packageName: String,
+        appName: String,
+        title: String,
+        text: String,
+    ): Boolean {
+        val enabledEntries = getEnabledFilterEntries()
+        return LocalForwardRules.shouldForward(
+            filterSelf = filterSelf,
+            filterNoTitleOrText = filterNoTitleOrText,
+            packageName = packageName,
+            appName = appName,
+            title = title,
+            text = text,
+            enabledEntries = enabledEntries,
+        )
+    }
+
     private suspend fun rowsCached(): List<FilterEntryEntity> =
         saveLock.withLock {
             cachedRows?.let { return@withLock it }
@@ -153,4 +186,69 @@ object LocalFilterRepository {
     private fun invalidateCache() {
         cachedRows = null
     }
+}
+
+/**
+ * 本机通知转发的纯判定规则。
+ *
+ * 与 [LocalFilterRepository] 分离以便脱离数据库单测；规则逐条对齐 Windows
+ * `BackendLocalFilter.ShouldForward` 与 `FilterEntry.Matches`。
+ */
+internal object LocalForwardRules {
+    /** 自身应用标识：包名或应用名含该串即视为自身通知。 */
+    private const val SELF_INDICATOR = "notifyrelay"
+
+    /**
+     * 条目是否命中通知。
+     *
+     * 两者均为空时该条目无效；仅关键词时只看标题/内容；仅包名时只看包名；
+     * 二者兼有时需同时命中。
+     */
+    fun matches(
+        entry: FilterEntry,
+        packageName: String,
+        title: String,
+        text: String,
+    ): Boolean {
+        val hasKeyword = entry.keyword.isNotBlank()
+        val hasPackage = entry.packageName.isNotBlank()
+        if (!hasKeyword && !hasPackage) return false
+
+        val keywordMatch = !hasKeyword || title.contains(entry.keyword, ignoreCase = true) || text.contains(entry.keyword, ignoreCase = true)
+        val packageMatch = !hasPackage || packageName.contains(entry.packageName, ignoreCase = true)
+
+        return when {
+            hasKeyword && hasPackage -> keywordMatch && packageMatch
+            hasKeyword -> keywordMatch
+            else -> packageMatch
+        }
+    }
+
+    /** 是否应转发；规则顺序与 Windows 一致，短路返回。 */
+    fun shouldForward(
+        filterSelf: Boolean,
+        filterNoTitleOrText: Boolean,
+        packageName: String,
+        appName: String,
+        title: String,
+        text: String,
+        enabledEntries: Set<FilterEntry>,
+    ): Boolean {
+        // 1. 自身通知
+        if (filterSelf && isSelfNotification(packageName, appName)) return false
+
+        // 2. 启用条目命中
+        if (enabledEntries.any { matches(it, packageName, title, text) }) return false
+
+        // 3. 标题与内容均为空
+        if (filterNoTitleOrText && title.isBlank() && text.isBlank()) return false
+
+        return true
+    }
+
+    /** 包名或应用名含自身标识即视为自身通知。 */
+    fun isSelfNotification(
+        packageName: String,
+        appName: String,
+    ): Boolean = packageName.contains(SELF_INDICATOR, ignoreCase = true) || appName.contains(SELF_INDICATOR, ignoreCase = true)
 }

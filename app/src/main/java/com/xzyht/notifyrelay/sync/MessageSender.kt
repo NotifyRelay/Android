@@ -104,7 +104,7 @@ object MessageSender {
      * @param deviceManager 设备管理器
      * @param notificationKey 通知稳定标识键（NotificationListenerService 的 sbn.key），缺省时不写入 JSON
      */
-    fun sendNotificationMessage(
+    suspend fun sendNotificationMessage(
         context: Context,
         packageName: String,
         appName: String?,

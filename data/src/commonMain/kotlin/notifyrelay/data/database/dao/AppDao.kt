@@ -27,6 +27,15 @@ interface AppDao {
     suspend fun getByPackageName(packageName: String): AppEntity?
 
     /**
+     * 根据应用显示名获取应用。
+     *
+     * 用于把本机通知的应用名映射为远端已同步应用的包名（对齐 Windows `FindPackageByAppName`）。
+     * 同名应用可能来自不同设备，取首个命中。
+     */
+    @Query("SELECT * FROM apps WHERE appName = :appName LIMIT 1")
+    suspend fun getByAppName(appName: String): AppEntity?
+
+    /**
      * 批量根据包名获取应用
      */
     @Query("SELECT * FROM apps WHERE packageName IN (:packageNames)")

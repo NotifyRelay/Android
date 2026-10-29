@@ -600,6 +600,11 @@ open class DatabaseRepository(
     suspend fun getAppByPackageName(packageName: String): AppEntity? = appDao.getByPackageName(packageName)
 
     /**
+     * 按应用显示名反查应用（用于本机通知的应用名 → 远端包名映射）
+     */
+    suspend fun getAppByAppName(appName: String): AppEntity? = appDao.getByAppName(appName)
+
+    /**
      * 批量根据包名获取应用
      */
     suspend fun getAppsByPackageNames(packageNames: List<String>): List<AppEntity> = appDao.getByPackageNames(packageNames)
