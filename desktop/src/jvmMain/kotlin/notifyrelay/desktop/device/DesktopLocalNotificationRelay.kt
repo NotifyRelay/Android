@@ -38,6 +38,16 @@ class DesktopLocalNotificationRelay(
                 Logger.w(TAG, "设备端口未就绪，丢弃本机通知: " + item.appName)
                 return@start
             }
+            // 叠加层弹幕：本机通知即时上屏
+            notifyrelay.desktop.overlay.DesktopOverlayStore.addDanmaku(
+                notifyrelay.desktop.overlay.DanmakuEntry(
+                    id = item.id.hashCode().toLong(),
+                    appName = item.appName,
+                    title = item.title,
+                    text = item.text,
+                    deviceName = "本机",
+                ),
+            )
             scope.launch {
                 runCatching {
                     LocalNotificationForwardGateway.forward(

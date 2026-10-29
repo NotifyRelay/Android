@@ -84,37 +84,6 @@ val smtcRustBuild =
 tasks.named("compileKotlinJvm") { dependsOn(smtcRustBuild) }
 val smtcLibDir = smtcRustDir.resolve("target/release")
 
-// ===== 叠加层伴生进程（overlay 子模块） =====
-// 由 JVM 启动时拉起、退出时终止；两者以 TCP 回环 + UTF-8 JSON 行通信。
-val overlayDir = layout.projectDirectory.dir("overlay")
-val overlayHostDir = overlayDir.dir("OverlayHost")
-val overlayHostConfig = "Release"
-val overlayHostOutDir = overlayHostDir.dir("bin/$overlayHostConfig/net10.0-windows10.0.26100")
-
-val overlayHostBuild =
-    tasks.register<Exec>("overlayHostBuild") {
-        description = "构建叠加层伴生进程 OverlayHost（.NET）"
-        group = "build"
-        doFirst {
-            require(overlayDir.asFile.exists()) { "overlay 子模块未同步，请执行 git submodule update --init" }
-        }
-        inputs.dir(overlayDir.dir("Services"))
-        inputs.dir(overlayDir.dir("Models"))
-        inputs.dir(overlayHostDir)
-        inputs.file(overlayDir.file("NotifyRelay.Overlay.csproj"))
-        outputs.dir(overlayHostOutDir)
-        workingDir = overlayHostDir.asFile
-        commandLine(
-            "dotnet",
-            "build",
-            "OverlayHost.csproj",
-            "-c",
-            overlayHostConfig,
-            "--nologo",
-        )
-    }
-tasks.named("compileKotlinJvm") { dependsOn(overlayHostBuild) }
-
 // 原生库经 System.loadLibrary 载入，JDK 24+ 默认对未具名模块的原生访问告警；
 // 显式放行以消除 "A restricted method in java.lang.System has been called" 警告。
 val nativeAccessArgs = listOf("--enable-native-access=ALL-UNNAMED")
@@ -129,8 +98,6 @@ tasks.withType<JavaExec>().configureEach {
     // JDK 18+ 起 file.encoding 不再决定控制台编码，需显式指定 stdout.encoding / stderr.encoding。
     systemProperty("stdout.encoding", "UTF-8")
     systemProperty("stderr.encoding", "UTF-8")
-    // 叠加层宿主可执行文件路径，供运行时拉起伴生进程
-    systemProperty("notifyrelay.overlay.host", overlayHostOutDir.file("OverlayHost.exe").asFile.absolutePath)
 }
 
 tasks.withType<Test>().configureEach {

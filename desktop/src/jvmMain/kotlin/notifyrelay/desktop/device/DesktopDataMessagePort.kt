@@ -93,7 +93,8 @@ internal class DesktopDataMessagePort(
         deviceUuid: String,
         payload: String,
     ) {
-        // 超级岛：归一解析后转投叠加层（布局由叠加层解析 paramV2Raw）
-        DesktopSuperIslandRemoteHandler.onSuperIsland(deviceUuid, payload)
+        // 超级岛：归一解析后写入叠加层状态，由叠加层窗口渲染
+        notifyrelay.desktop.overlay.DesktopSuperIslandInbound
+            .handle(deviceUuid, payload)
     }
 }

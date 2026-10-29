@@ -1,4 +1,4 @@
-package notifyrelay.desktop.device
+package notifyrelay.desktop.overlay
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.serialization.json.Json
@@ -7,33 +7,28 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import notifyrelay.base.log.Logger
 import notifyrelay.desktop.DataLayerDesktop
-import notifyrelay.desktop.platform.DesktopOverlayHost
 import notifyrelay.domain.feature.appslist.InstalledPackagesPortRegistry
 import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 
 /**
  * 桌面端超级岛入站处理。
  *
- * 与 Android 侧同源：报文由 Rust core 的 `parseSuperIslandInbound` 归一，
- * 本类只做字段读取并转投叠加层；超级岛的布局解析与绘制由叠加层自行完成
- * （其 `SuperIslandParamV2Parser` 消费 `paramV2Raw`），不在 JVM 侧重复实现。
+ * 报文由 Rust core 归一后写入叠加层状态；界面由叠加层窗口用 Compose 渲染。
  */
-internal object DesktopSuperIslandRemoteHandler {
+internal object DesktopSuperIslandInbound {
     private const val TAG = "DesktopSuperIsland"
 
     private val json = Json { ignoreUnknownKeys = true }
 
     /** 处理一条超级岛报文。 */
-    fun onSuperIsland(
+    fun handle(
         deviceUuid: String,
         payload: String,
     ) {
-        // 与 Android SuperIslandProcessor 一致：先取原包名并映射为本地包名，
-        // 再交给 core 归一（sourceKey 由 uuid|pkg|featureId 拼成，pkg 会影响去重键）
+        // 与 Android 一致：先取原包名并映射为本地包名（sourceKey 含包名）
         val rawPkg =
             runCatching {
-                (json.parseToJsonElement(payload) as? JsonObject)
-                    ?.stringField("packageName")
+                (json.parseToJsonElement(payload) as? JsonObject)?.stringField("packageName")
             }.getOrNull().orEmpty()
         val installed = InstalledPackagesPortRegistry.current?.installedPackagesSync() ?: emptySet()
         val mappedPkg =
@@ -46,8 +41,7 @@ internal object DesktopSuperIslandRemoteHandler {
                 NativeCore.parseSuperIslandInbound(deviceUuid, mappedPkg, payload)
             }.getOrNull() ?: return
         val root =
-            runCatching { json.parseToJsonElement(parsed) as? JsonObject }.getOrNull()
-                ?: return
+            runCatching { json.parseToJsonElement(parsed) as? JsonObject }.getOrNull() ?: return
 
         val sourceKey = root.stringField("sourceKey")
         if (sourceKey.isNullOrBlank()) {
@@ -55,22 +49,22 @@ internal object DesktopSuperIslandRemoteHandler {
             return
         }
 
-        // 会话结束：从叠加层移除
         val isEnd = (root["isEnd"] as? JsonPrimitive)?.content?.toBooleanStrictOrNull() ?: false
         if (isEnd) {
-            DesktopOverlayHost.removeSuperIsland(sourceKey)
-            Logger.d(TAG, "超级岛已结束: " + sourceKey)
+            DesktopOverlayStore.removeSuperIsland(sourceKey)
             return
         }
 
         val deviceName = DataLayerDesktop.findOnlineDevice(deviceUuid)?.displayName ?: deviceUuid
-        DesktopOverlayHost.showSuperIsland(
-            sourceId = sourceKey,
-            deviceName = deviceName,
-            title = root.stringField("title"),
-            text = root.stringField("text"),
-            paramV2Raw = root.stringField("paramV2Raw"),
-            pics = parsePics(root),
+        DesktopOverlayStore.putSuperIsland(
+            SuperIslandEntry(
+                sourceKey = sourceKey,
+                deviceName = deviceName,
+                title = root.stringField("title"),
+                text = root.stringField("text"),
+                paramV2Raw = root.stringField("paramV2Raw"),
+                pics = parsePics(root),
+            ),
         )
     }
 

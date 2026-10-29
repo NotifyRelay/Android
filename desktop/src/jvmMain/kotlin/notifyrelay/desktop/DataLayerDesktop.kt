@@ -159,56 +159,18 @@ object DataLayerDesktop {
             )
             mediaControl = notifyrelay.desktop.platform.DesktopMediaControlPort { onlineDevices() }
             MediaControlPortRegistry.install(mediaControl!!)
-            // 媒体会话 → 叠加层：本机用 Compose 渲染成位图后按坐标贴上；
-            // 会话从映射中消失即移除对应位图
+            // 媒体会话 → 叠加层状态：由叠加层窗口直接渲染，不经位图与进程转换
             overlayMediaObserver =
                 overlayScope.launch {
-                    // 上一轮出现的设备：用于识别已结束的会话（映射里不再有该键）
-                    val shown = mutableSetOf<String>()
                     mediaControl!!.sessionsFlow().collect { sessions ->
+                        // 映射中已不存在的设备：从叠加层移除
+                        val stale =
+                            notifyrelay.desktop.overlay.DesktopOverlayStore.mediaSessions.keys
+                                .filterNot { sessions.containsKey(it) }
+                        stale.forEach(notifyrelay.desktop.overlay.DesktopOverlayStore::removeMedia)
                         sessions.forEach { (deviceUuid, snapshot) ->
-                            shown.add(deviceUuid)
-                            val deviceName = snapshot.packageName.orEmpty().ifBlank { deviceUuid }
-                            val png =
-                                notifyrelay.desktop.platform.DesktopOverlayRenderer.renderMediaCard(
-                                    snapshot = snapshot,
-                                    deviceName = deviceName,
-                                )
-                            if (png == null) {
-                                notifyrelay.base.log.Logger
-                                    .w("DesktopMediaMap", "媒体卡渲染失败: " + deviceUuid)
-                                return@forEach
-                            }
-                            val width =
-                                notifyrelay.desktop.platform.DesktopOverlayRenderer.MEDIA_WIDTH
-                                    .toFloat()
-                            val height =
-                                notifyrelay.desktop.platform.DesktopOverlayRenderer.MEDIA_HEIGHT
-                                    .toFloat()
-                            val screenWidth =
-                                java.awt.Toolkit
-                                    .getDefaultToolkit()
-                                    .screenSize.width
-                                    .toFloat()
-                            val ok =
-                                notifyrelay.desktop.platform.DesktopOverlayHost.showImageOverlay(
-                                    id = "media:" + deviceUuid,
-                                    x = (screenWidth - width) / 2f,
-                                    y = 10f,
-                                    width = width,
-                                    height = height,
-                                    png = png,
-                                )
-                            notifyrelay.base.log.Logger.i(
-                                "DesktopMediaMap",
-                                "媒体卡已推送 " + deviceUuid + " " + png.size + "B ok=" + ok,
-                            )
-                        }
-                        // 已不在映射中的设备：移除其位图
-                        shown.filterNot { sessions.containsKey(it) }.forEach { deviceUuid ->
-                            notifyrelay.desktop.platform.DesktopOverlayHost
-                                .removeImageOverlay("media:" + deviceUuid)
-                            shown.remove(deviceUuid)
+                            notifyrelay.desktop.overlay.DesktopOverlayStore
+                                .putMedia(deviceUuid, snapshot)
                         }
                     }
                 }
