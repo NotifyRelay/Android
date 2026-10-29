@@ -29,7 +29,10 @@ internal class DesktopDataMessagePort(
     override fun onMediaPlay(
         device: DeviceInfo,
         payload: String,
-    ) = Unit
+    ) {
+        // 远端播放状态回推：解析后更新媒体端口，供音乐控制页展示
+        DesktopMediaRemoteHandler.onMediaPlay(device, payload)
+    }
 
     override fun onIconRequest(
         device: DeviceInfo,
@@ -61,7 +64,10 @@ internal class DesktopDataMessagePort(
     override fun onMediaControl(
         deviceUuid: String,
         payload: String,
-    ) = Unit
+    ) {
+        // 远端下发的媒体控制指令：以系统媒体键在本机执行
+        DesktopMediaRemoteHandler.onMediaControl(payload)
+    }
 
     override fun onFtp(
         deviceUuid: String,

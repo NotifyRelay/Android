@@ -72,6 +72,11 @@ object DataLayerDesktop {
     var clipboardSync: notifyrelay.desktop.platform.DesktopClipboardSyncPort? = null
         private set
 
+    /** 媒体控制端口实例，由入口启动与释放。 */
+    @Volatile
+    var mediaControl: notifyrelay.desktop.platform.DesktopMediaControlPort? = null
+        private set
+
     /**
      * 登记设备管理器。
      *
@@ -110,7 +115,8 @@ object DataLayerDesktop {
             LocalAppsPortRegistry.install(DesktopLocalAppsPort())
             RemoteAppsPortRegistry.install(DesktopRemoteAppsPort { deviceMessagePort() })
             AudioRelayPortRegistry.install(DesktopAudioRelayPort())
-            MediaControlPortRegistry.install(DesktopMediaControlPort())
+            mediaControl = notifyrelay.desktop.platform.DesktopMediaControlPort { onlineDevices() }
+            MediaControlPortRegistry.install(mediaControl!!)
             SuperIslandConfigPortRegistry.install(DesktopSuperIslandConfigPort())
 
             // 剪贴板同步：收发判定在 Rust core，平台只做系统剪贴板读写

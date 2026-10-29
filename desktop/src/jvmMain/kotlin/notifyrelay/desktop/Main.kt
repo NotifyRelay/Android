@@ -130,6 +130,7 @@ fun main() {
                 DesktopWindowController {
                     deviceManager.stopPowerMonitor()
                     DataLayerDesktop.clipboardSync?.stop()
+                    DataLayerDesktop.mediaControl?.stop()
                     exitApplication()
                 }
             }
@@ -176,6 +177,8 @@ fun main() {
                 window.setIconImages(iconImages)
                 // 剪贴板同步：默认开启；窗口就绪后才能取到 HWND 注册系统剪贴板事件
                 DataLayerDesktop.clipboardSync?.start(windowController.nativeHandle())
+                // 媒体会话读取：SMTC 桥只提供读取接口，按固定间隔取快照
+                DataLayerDesktop.mediaControl?.start()
             }
 
             val actionPort = remember { DesktopNotificationActionPort() }

@@ -1,14 +1,8 @@
 package notifyrelay.desktop.platform
 
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
 import notifyrelay.data.config.SuperIslandConfigPolicy
 import notifyrelay.domain.feature.media.AudioOperationResult
 import notifyrelay.domain.feature.media.AudioRelayPort
-import notifyrelay.domain.feature.media.MediaControlAction
-import notifyrelay.domain.feature.media.MediaControlPort
-import notifyrelay.domain.feature.media.MediaMessageReceiveMode
-import notifyrelay.domain.feature.media.MediaSessionSnapshot
 import notifyrelay.domain.feature.notification.superisland.SpecInjectionMode
 import notifyrelay.domain.feature.notification.superisland.SuperIslandConfigPort
 import notifyrelay.domain.platform.FormFactorPortRegistry
@@ -25,29 +19,6 @@ class DesktopAudioRelayPort : AudioRelayPort {
     override fun requestReceiveAudio(device: notifyrelay.domain.feature.device.model.DeviceInfo): AudioOperationResult = AudioOperationResult.Failure("桌面端暂不支持音频转发")
 
     override fun stopAudio() = Unit
-}
-
-/** 媒体控制：桌面端未接入媒体会话，会话为空、控制为空操作。 */
-class DesktopMediaControlPort : MediaControlPort {
-    private val noSession = MutableStateFlow<MediaSessionSnapshot?>(null)
-    override val sessionUpdates: StateFlow<MediaSessionSnapshot?> = noSession
-
-    override fun currentSession(): MediaSessionSnapshot? = null
-
-    override fun currentDevice(): notifyrelay.domain.feature.device.model.DeviceInfo? = null
-
-    override fun isEnabled(): Boolean = false
-
-    override fun receiveMode(): MediaMessageReceiveMode = MediaMessageReceiveMode.Off
-
-    override fun setReceiveMode(mode: MediaMessageReceiveMode) = Unit
-
-    override fun localControl(action: MediaControlAction) = Unit
-
-    override fun sendToRemote(
-        device: notifyrelay.domain.feature.device.model.DeviceInfo,
-        action: MediaControlAction,
-    ): Boolean = false
 }
 
 /**
