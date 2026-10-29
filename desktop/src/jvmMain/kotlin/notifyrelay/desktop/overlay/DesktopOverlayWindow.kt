@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -80,7 +81,13 @@ internal fun DesktopOverlayWindow() {
             window.setBounds(0, 0, screen.width, screen.height)
             window.isAlwaysOnTop = true
             val applied = DesktopOverlayWindowStyle.apply(window)
+            // 置顶与几何监控：系统或其他应用改写 z-order、显示器尺寸变化后自动恢复
+            DesktopOverlayTopmostMonitor.start(window)
             Logger.i("DesktopOverlayWin", "叠加层窗口已就绪 点击穿透=" + applied)
+        }
+
+        DisposableEffect(Unit) {
+            onDispose { DesktopOverlayTopmostMonitor.stop() }
         }
 
         OverlayContent()
@@ -94,7 +101,11 @@ private fun OverlayContent() {
     var frameNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
     LaunchedEffect(Unit) {
         while (true) {
-            withFrameMillis { frameNow = System.currentTimeMillis() }
+            withFrameMillis {
+                frameNow = System.currentTimeMillis()
+                // 帧心跳：置顶监控据此判定渲染是否卡死
+                DesktopOverlayTopmostMonitor.onFrame()
+            }
         }
     }
 

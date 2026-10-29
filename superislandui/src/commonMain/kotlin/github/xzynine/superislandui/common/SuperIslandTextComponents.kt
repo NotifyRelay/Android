@@ -80,7 +80,7 @@ fun AutoFitText(
  * @param baseSpeedPxPerSec 基础滚动速度，单位为像素/秒，默认100f
  * @param pauseMillis 滚动开始前和滚动结束后的暂停时间，单位为毫秒，默认0
  * @param maxWidth 最大宽度限制，超过此宽度才会滚动，默认使用父容器宽度
- * @param endPauseMillis 滚动到达终点并复位后的停留时间，单位为毫秒，默认300
+ * @param endPauseMillis 滚动到达终点后的停留时间，单位为毫秒，默认300
  */
 @Composable
 fun AutoScrollText(
@@ -174,8 +174,9 @@ fun AutoScrollText(
                 -scrollRange.toFloat(),
                 animationSpec = tween(durationMillis = duration, easing = LinearEasing),
             )
-            offset.snapTo(0f)
+            // 到达终点后停留，再复位进入下一轮
             delay(endPauseMillis.toLong())
+            offset.snapTo(0f)
         }
     }
 }
