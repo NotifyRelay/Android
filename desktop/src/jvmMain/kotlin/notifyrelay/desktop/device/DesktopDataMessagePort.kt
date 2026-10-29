@@ -14,6 +14,7 @@ import notifyrelay.domain.feature.device.model.DeviceInfo
 internal class DesktopDataMessagePort(
     private val manager: DesktopDeviceManager,
     private val messagePort: notifyrelay.domain.feature.device.service.contract.DeviceMessagePort,
+    private val notificationHandler: DesktopInboundNotificationHandler,
 ) : DataMessagePort {
     override fun onNotification(
         deviceUuid: String,
@@ -21,7 +22,7 @@ internal class DesktopDataMessagePort(
     ) {
         // 回调广播（聊天测试订阅方）与落库归档并行推进，两者互不阻塞
         manager.dispatchNotification(payload)
-        DesktopInboundNotificationHandler.dispatch(payload, deviceUuid)
+        notificationHandler.dispatch(payload, deviceUuid)
     }
 
     override fun onMediaPlay(

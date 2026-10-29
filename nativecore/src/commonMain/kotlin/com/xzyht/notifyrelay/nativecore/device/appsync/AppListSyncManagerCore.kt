@@ -22,6 +22,7 @@ import kotlinx.serialization.json.put
 import notifyrelay.base.log.Logger
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.appslist.AppLabelPortRegistry
 import notifyrelay.domain.feature.appslist.InstalledPackagesPortRegistry
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
@@ -98,11 +99,12 @@ object AppListSyncManagerCore {
             val scope = parseField(requestData, "scope") ?: SCOPE_USER
 
             val localPackages = InstalledPackagesPortRegistry.current?.installedPackagesSync() ?: emptySet()
+            val labelPort = AppLabelPortRegistry.current
             val appArray =
                 localPackages.map { packageName ->
                     buildJsonObject {
                         put("packageName", packageName)
-                        put("appName", packageName)
+                        put("appName", labelPort?.labelOf(packageName) ?: packageName)
                     }
                 }
 

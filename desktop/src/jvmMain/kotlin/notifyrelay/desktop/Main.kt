@@ -107,8 +107,8 @@ fun main() {
     val deviceManager = DesktopDeviceManager()
     deviceManager.start()
 
-    // 通知历史的设备维度取自已配对设备（与 Android 的 scanDeviceList 同口径）
-    DataLayerDesktop.registerDeviceProvider { deviceManager.knownDeviceUuids() }
+    // 通知历史、应用列表与图标的请求链路均取该管理器（与 Android 的 scanDeviceList 同口径）
+    DataLayerDesktop.registerDeviceManager(deviceManager)
 
     // 窗口图标与 UI 共用 :shared 的同一份资源
     val iconImages =

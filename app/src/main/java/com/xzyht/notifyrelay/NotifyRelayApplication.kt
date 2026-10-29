@@ -13,6 +13,7 @@ import com.xzyht.notifyrelay.feature.notification.filter.AndroidRemoteFilterPort
 import com.xzyht.notifyrelay.feature.notification.history.AndroidNotificationHistoryPort
 import com.xzyht.notifyrelay.feature.notification.history.AndroidSuperIslandHistoryPort
 import com.xzyht.notifyrelay.feature.notification.superisland.config.AndroidSuperIslandConfigPort
+import com.xzyht.notifyrelay.feature.platform.AndroidAppLabelPort
 import com.xzyht.notifyrelay.feature.platform.AndroidFormFactorPort
 import com.xzyht.notifyrelay.feature.platform.AndroidInstalledPackagesPort
 import com.xzyht.notifyrelay.feature.platform.AndroidNativeFilterPort
@@ -20,6 +21,7 @@ import com.xzyht.notifyrelay.nativecore.device.appsync.IconCodecPortRegistry
 import notifyrelay.data.DataLayerAndroid
 import notifyrelay.data.Storage
 import notifyrelay.data.filter.RemoteFilterRepository
+import notifyrelay.domain.feature.appslist.AppLabelPortRegistry
 import notifyrelay.domain.feature.appslist.InstalledPackagesPortRegistry
 import notifyrelay.domain.feature.appslist.RemoteAppsPortRegistry
 import notifyrelay.domain.feature.media.AudioRelayPortRegistry
@@ -52,6 +54,7 @@ class NotifyRelayApplication : Application() {
     private fun installPorts() {
         FormFactorPortRegistry.install(AndroidFormFactorPort(this))
         InstalledPackagesPortRegistry.install(AndroidInstalledPackagesPort(this))
+        AppLabelPortRegistry.install(AndroidAppLabelPort(this))
         NativeFilterPortRegistry.install(AndroidNativeFilterPort)
         IconCodecPortRegistry.install(AndroidAppIconCodecPort(this))
 

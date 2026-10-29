@@ -3,6 +3,7 @@ package notifyrelay.desktop.device
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.device.DeviceTargetRegistry
 import com.xzyht.notifyrelay.nativecore.device.ProtocolSender
+import com.xzyht.notifyrelay.nativecore.device.appsync.AppListSyncManagerCore
 import com.xzyht.notifyrelay.nativecore.device.service.callback.DeviceCallbackHost
 import com.xzyht.notifyrelay.nativecore.device.service.callback.StateQueryPort
 import com.xzyht.notifyrelay.nativecore.device.service.pairing.PairingCoordinator
@@ -11,7 +12,9 @@ import com.xzyht.notifyrelay.nativecore.device.service.state.OnlineDevicesCache
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
 import notifyrelay.desktop.platform.BatteryLevel
 import notifyrelay.desktop.platform.PowerStatusMonitor
@@ -50,7 +53,10 @@ class DesktopDeviceManager(
             localUuidProvider = { localUuid },
             defaultPort = DEFAULT_PORT,
             onlineDevicesCache = onlineCache,
-            onSnapshotRefreshed = { projection -> syncAuthenticated(projection) },
+            onSnapshotRefreshed = { projection ->
+                syncAuthenticated(projection)
+                autoRequestAppListForNewDevices(projection)
+            },
         )
 
     private val targetRegistry = DeviceTargetRegistry { localUuid }
@@ -89,6 +95,9 @@ class DesktopDeviceManager(
 
     /** 当前已知的远端设备 UUID（供通知历史的设备维度使用）。 */
     fun knownDeviceUuids(): List<String> = getPairedDeviceUuids().sorted()
+
+    /** 已自动请求过应用列表的设备，避免重复触发。 */
+    private val autoRequestedDevices = java.util.Collections.synchronizedSet(mutableSetOf<String>())
 
     override fun getAuthenticatedOnlineCount(): Int = snapshotStore.onlinePairedUuids().size
 
@@ -240,7 +249,7 @@ class DesktopDeviceManager(
     fun start() {
         // 注册核心回调：设备发现/连接事件需要它们才能刷新列表，core 日志也经此输出
         com.xzyht.notifyrelay.nativecore.device.service.callback.RustCallbackInstaller
-            .install(this, dataPort = DesktopDataMessagePort(this, this))
+            .install(this, dataPort = DesktopDataMessagePort(this, this, DesktopInboundNotificationHandler(this)))
 
         if (!NativeCore.isReady() && !NativeCore.createContext()) {
             Logger.e(TAG, "Rust core 上下文创建失败，设备功能不可用")
@@ -302,6 +311,32 @@ class DesktopDeviceManager(
         NativeCore.periodicBroadcast(0)
     }
 
+    /**
+     * 对新上线的已配对设备自动请求应用列表。
+     *
+     * 与 Windows `NetworkService.DelayedRequestAppList` 同口径：延迟 3 秒，
+     * 等连接与握手稳定后再发请求，避免与握手竞争；每台设备只自动触发一次。
+     */
+    private fun autoRequestAppListForNewDevices(projection: Map<String, DeviceSnapshot>) {
+        if (!NativeCore.isReady()) return
+        val online =
+            projection.values
+                .filter { it.paired }
+                .map { it.uuid }
+        for (uuid in online) {
+            if (uuid == localUuid) continue
+            if (!autoRequestedDevices.add(uuid)) continue
+            scope.launch {
+                delay(AUTO_APP_LIST_DELAY_MS)
+                val deviceInfo = snapshotStore.currentInfo(uuid) ?: return@launch
+                AppListSyncManagerCore.requestAppList(this@DesktopDeviceManager, deviceInfo)
+                Logger.i(TAG, "已自动触发应用列表请求: " + deviceInfo.displayName)
+            }
+        }
+        // 已不在线的设备允许下次重新触发
+        autoRequestedDevices.retainAll(online.toSet())
+    }
+
     /** 从快照投影同步已认证设备表。 */
     private fun syncAuthenticated(projection: Map<String, DeviceSnapshot>) {
         synchronized(authenticatedDevices) {
@@ -326,5 +361,8 @@ class DesktopDeviceManager(
     private companion object {
         const val TAG = "DesktopDevice"
         const val DEFAULT_PORT = 23333
+
+        /** 自动请求应用列表前的等待时间，等连接稳定（与 Windows 同值）。 */
+        const val AUTO_APP_LIST_DELAY_MS = 3_000L
     }
 }

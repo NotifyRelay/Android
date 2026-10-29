@@ -2,8 +2,10 @@ package com.xzyht.notifyrelay.feature.platform
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
+import notifyrelay.base.util.AppListHelper
 import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.domain.feature.appslist.AppLabelPort
 import notifyrelay.domain.feature.appslist.InstalledPackagesPort
 import notifyrelay.domain.feature.notification.filter.NativeFilterPort
 import notifyrelay.domain.platform.FormFactorPort
@@ -24,6 +26,13 @@ class AndroidInstalledPackagesPort(
     override suspend fun installedPackages(): Set<String> = InstalledAppsRepository.getInstalledPackageNames(context)
 
     override fun installedPackagesSync(): Set<String> = InstalledAppsRepository.getInstalledPackageNamesSync(context)
+}
+
+/** 本机应用显示名端口：经包管理器取应用名，失败回落包名。 */
+class AndroidAppLabelPort(
+    private val context: Context,
+) : AppLabelPort {
+    override fun labelOf(packageName: String): String = runCatching { AppListHelper.getApplicationLabel(context, packageName) }.getOrDefault(packageName)
 }
 
 /** Rust 过滤能力端口：以 NativeCore 的过滤三方法为唯一来源。 */

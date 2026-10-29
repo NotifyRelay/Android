@@ -55,17 +55,23 @@ object DataLayerDesktop {
         return File(dir, "notify_relay.db").absolutePath
     }
 
-    /** 通知历史的设备列表来源，由 [registerDeviceProvider] 注入；默认为仅本机。 */
+    /** 通知历史的设备列表来源，由 [registerDeviceManager] 注入；默认为仅本机。 */
     @Volatile
     private var knownDevices: () -> List<String> = { emptyList() }
 
+    /** 设备消息端口来源，供应用列表与图标的请求链路使用。 */
+    @Volatile
+    private var deviceMessagePort: () -> notifyrelay.domain.feature.device.service.contract.DeviceMessagePort? = { null }
+
     /**
-     * 登记通知历史的远端设备来源。
+     * 登记设备管理器。
      *
-     * 设备管理器在数据层之后创建，故由入口在创建后调用；端口侧每次查询时读取该提供者。
+     * 设备管理器在数据层之后创建，故由入口在创建后调用；
+     * 端口侧每次查询时读取该提供者，避免持有过期实例。
      */
-    fun registerDeviceProvider(provider: () -> List<String>) {
-        knownDevices = provider
+    fun registerDeviceManager(manager: notifyrelay.desktop.device.DesktopDeviceManager) {
+        knownDevices = { manager.knownDeviceUuids() }
+        deviceMessagePort = { manager }
     }
 
     /** 初始化公共端存储与仓储单例；重复调用无副作用。 */
@@ -90,9 +96,9 @@ object DataLayerDesktop {
             val remoteFilterRepository = RemoteFilterRepository()
             RemoteFilterPortRegistry.install(DesktopRemoteFilterPort(remoteFilterRepository))
             LocalFilterPortRegistry.install(DesktopLocalFilterPort())
-            AppIconPortRegistry.install(DesktopAppIconPort())
+            AppIconPortRegistry.install(DesktopAppIconPort { deviceMessagePort() })
             LocalAppsPortRegistry.install(DesktopLocalAppsPort())
-            RemoteAppsPortRegistry.install(DesktopRemoteAppsPort())
+            RemoteAppsPortRegistry.install(DesktopRemoteAppsPort { deviceMessagePort() })
             AudioRelayPortRegistry.install(DesktopAudioRelayPort())
             MediaControlPortRegistry.install(DesktopMediaControlPort())
             SuperIslandConfigPortRegistry.install(DesktopSuperIslandConfigPort())
