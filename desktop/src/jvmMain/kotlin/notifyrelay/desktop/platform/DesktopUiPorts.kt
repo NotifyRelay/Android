@@ -22,14 +22,14 @@ import notifyrelay.shared.ui.port.ToastPort
 import java.awt.Toolkit
 import java.awt.datatransfer.StringSelection
 
-/** 桌面端提示：输出到控制台（无原生 Toast 概念）。 */
+/** 桌面端提示：经主窗口的 Miuix Snackbar 展示（见 [DesktopToastHost]）。 */
 private object DesktopToastPort : ToastPort {
     override fun short(message: String) {
-        println("[提示] " + message)
+        DesktopToastHost.show(message, DesktopToastHost.Duration.SHORT)
     }
 
     override fun long(message: String) {
-        println("[提示] " + message)
+        DesktopToastHost.show(message, DesktopToastHost.Duration.LONG)
     }
 }
 
@@ -45,14 +45,29 @@ private object DesktopClipboardPort : ClipboardPort {
         }.getOrDefault(false)
 }
 
-/** 桌面端跳转：暂不实现系统界面跳转。 */
+/**
+ * 桌面端外部打开。
+ *
+ * 现有调用点只来自「打开链接 / 打开目录」一类动作，桌面端统一交给系统默认程序处理；
+ * adb 与 scrcpy 的路径相关跳转在接入这两个能力时再补 action 映射。
+ */
 private object DesktopIntentLaunchPort : IntentLaunchPort {
     override fun startAction(
         action: String,
         data: String?,
         addNewTaskFlag: Boolean,
     ) {
-        println("[跳转] action=" + action + " data=" + (data ?: ""))
+        if (data.isNullOrBlank()) return
+        val opened =
+            runCatching {
+                val desktop = java.awt.Desktop.getDesktop()
+                if (!desktop.isSupported(java.awt.Desktop.Action.BROWSE)) return@runCatching false
+                desktop.browse(java.net.URI(data))
+                true
+            }.getOrDefault(false)
+        if (!opened) {
+            DesktopToastHost.show("无法打开链接：" + data, DesktopToastHost.Duration.LONG)
+        }
     }
 }
 

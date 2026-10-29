@@ -110,11 +110,16 @@ class DesktopClipboardSyncPort(
     override fun syncNow() {
         if (!enabledState.value) {
             lastResultState.value = "同步已关闭"
+            DesktopToastHost.show("剪贴板同步已关闭", DesktopToastHost.Duration.SHORT)
             return
         }
         runCatching { Toolkit.getDefaultToolkit().systemClipboard }
-            .onSuccess { handleClipboardChange(it, force = true) }
-            .onFailure { lastResultState.value = "系统剪贴板不可用" }
+            .onSuccess {
+                handleClipboardChange(it, force = true, notify = true)
+            }.onFailure {
+                lastResultState.value = "系统剪贴板不可用"
+                DesktopToastHost.show("系统剪贴板不可用", DesktopToastHost.Duration.LONG)
+            }
     }
 
     /** 处理一条入站剪贴板报文，写回系统剪贴板。 */
@@ -149,6 +154,7 @@ class DesktopClipboardSyncPort(
     private fun handleClipboardChange(
         clipboard: Clipboard,
         force: Boolean = false,
+        notify: Boolean = false,
     ) {
         if (!enabledState.value) return
 
@@ -186,6 +192,13 @@ class DesktopClipboardSyncPort(
                 else -> null
             }
         if (action == "sent") Logger.i(TAG, "剪贴板已发送，目标 " + targets.size + " 台")
+        // 自动同步不打扰用户，仅手动触发时给出提示
+        if (notify) {
+            val message = lastResultState.value
+            if (!message.isNullOrBlank()) {
+                DesktopToastHost.show(message, DesktopToastHost.Duration.SHORT)
+            }
+        }
     }
 
     /** 采集剪贴板内容：优先文本，其次图片；返回（内容, MIME）。 */

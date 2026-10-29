@@ -43,6 +43,7 @@ import notifyrelay.desktop.device.DesktopDevicePortsProvider
 import notifyrelay.desktop.platform.DesktopDeviceListPort
 import notifyrelay.desktop.platform.DesktopNotificationActionPort
 import notifyrelay.desktop.platform.DesktopThemePort
+import notifyrelay.desktop.platform.DesktopToastHost
 import notifyrelay.desktop.platform.DesktopWindowController
 import notifyrelay.desktop.platform.ProvideDesktopExtraPorts
 import notifyrelay.desktop.platform.ProvideDesktopPairingDependencies
@@ -82,6 +83,10 @@ import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SnackbarDuration
+import top.yukonga.miuix.kmp.basic.SnackbarHost
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -234,90 +239,113 @@ private fun DesktopRoot(
     devicePortsProvider: DesktopDevicePortsProvider,
 ) {
     NotifyRelayTheme(darkTheme = darkTheme) {
-        Box(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .background(MiuixTheme.colorScheme.background),
-        ) {
-            NavDisplay(
-                backStack = navigator.backStack,
-                onBack = {
-                    if (navigator.backStackSize() > 1) {
-                        navigator.pop()
-                    }
-                },
+        // 全局提示承载：桌面端 Toast 经此 Snackbar 展示（任意线程入队）
+        val snackbarHostState = remember { SnackbarHostState() }
+        LaunchedEffect(snackbarHostState) {
+            DesktopToastHost.messages.collect { message ->
+                snackbarHostState.showSnackbar(
+                    message = message.text,
+                    duration =
+                        when (message.duration) {
+                            // Miuix 的 Short 约 4s、Long 约 10s，对桌面端偏长，改用自定义时长
+                            DesktopToastHost.Duration.SHORT -> SnackbarDuration.Custom(DesktopToastHost.SHORT_MILLIS)
+                            DesktopToastHost.Duration.LONG -> SnackbarDuration.Custom(DesktopToastHost.LONG_MILLIS)
+                        },
+                )
+            }
+        }
+
+        Scaffold(
+            modifier = Modifier.fillMaxSize(),
+            containerColor = MiuixTheme.colorScheme.background,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+        ) { paddingValues ->
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxSize()
+                        .padding(paddingValues)
+                        .background(MiuixTheme.colorScheme.background),
             ) {
-                entry<Route.Main> {
-                    MainScreen(
-                        navigator = navigator,
-                        deviceListContent = { args ->
-                            DeviceListScreenContent(
-                                isLandscape = args.isLandscape,
-                                discoveryEnabled = args.discoveryEnabled,
-                                onDiscoveryChange = args.onDiscoveryChange,
-                                allDevices = args.allDevices,
-                                authedDeviceUuids = args.authedDeviceUuids,
-                                deviceStates = args.deviceStates,
-                                unauthedDevices = args.unauthedDevices,
-                                selectedDevice = args.selectedDevice,
-                                onSelectDevice = args.onSelectDevice,
-                                onRequestDelete = args.onRequestDelete,
-                                onShowRejectedDialog = args.onShowRejectedDialog,
-                                localBatteryLevel = args.localBatteryLevel,
-                                colorScheme = MiuixTheme.colorScheme,
-                                textStyles = MiuixTheme.textStyles,
-                            )
-                        },
-                        historyContent = {
-                            HistoryScreen(
-                                navigator,
-                                notificationHistory = { NotificationHistoryScreen() },
-                                superIslandHistory = { SuperIslandHistoryScreen() },
-                                chatTest = {
-                                    UIChatTest(
-                                        deviceManager = devicePortsProviderChatPort(devicePortsProvider),
-                                        onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
-                                    )
-                                },
-                            )
-                        },
-                        forwardContent = {
-                            DeviceForwardScreen(
-                                filterViewModel = remoteFilterViewModel(),
-                                clipboardSync = { ClipboardSyncPage() },
-                                musicControl = { MusicControlPage() },
-                                scrcpyScreen = { _, _ -> },
-                            )
-                        },
-                        settingsContent = { SettingsScreen() },
-                    )
+                NavDisplay(
+                    backStack = navigator.backStack,
+                    onBack = {
+                        if (navigator.backStackSize() > 1) {
+                            navigator.pop()
+                        }
+                    },
+                ) {
+                    entry<Route.Main> {
+                        MainScreen(
+                            navigator = navigator,
+                            deviceListContent = { args ->
+                                DeviceListScreenContent(
+                                    isLandscape = args.isLandscape,
+                                    discoveryEnabled = args.discoveryEnabled,
+                                    onDiscoveryChange = args.onDiscoveryChange,
+                                    allDevices = args.allDevices,
+                                    authedDeviceUuids = args.authedDeviceUuids,
+                                    deviceStates = args.deviceStates,
+                                    unauthedDevices = args.unauthedDevices,
+                                    selectedDevice = args.selectedDevice,
+                                    onSelectDevice = args.onSelectDevice,
+                                    onRequestDelete = args.onRequestDelete,
+                                    onShowRejectedDialog = args.onShowRejectedDialog,
+                                    localBatteryLevel = args.localBatteryLevel,
+                                    colorScheme = MiuixTheme.colorScheme,
+                                    textStyles = MiuixTheme.textStyles,
+                                )
+                            },
+                            historyContent = {
+                                HistoryScreen(
+                                    navigator,
+                                    notificationHistory = { NotificationHistoryScreen() },
+                                    superIslandHistory = { SuperIslandHistoryScreen() },
+                                    chatTest = {
+                                        UIChatTest(
+                                            deviceManager = devicePortsProviderChatPort(devicePortsProvider),
+                                            onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
+                                        )
+                                    },
+                                )
+                            },
+                            forwardContent = {
+                                DeviceForwardScreen(
+                                    filterViewModel = remoteFilterViewModel(),
+                                    clipboardSync = { ClipboardSyncPage() },
+                                    musicControl = { MusicControlPage() },
+                                    scrcpyScreen = { _, _ -> },
+                                )
+                            },
+                            settingsContent = { SettingsScreen() },
+                        )
+                    }
+                    // 与 MainScreen 页签同源：单独 push 这两个路由时复用同一内容，避免未注册 entry 报错
+                    entry<Route.History> {
+                        HistoryScreen(
+                            navigator,
+                            notificationHistory = { NotificationHistoryScreen() },
+                            superIslandHistory = { SuperIslandHistoryScreen() },
+                            chatTest = {
+                                UIChatTest(
+                                    deviceManager = devicePortsProviderChatPort(devicePortsProvider),
+                                    onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
+                                )
+                            },
+                        )
+                    }
+                    entry<Route.Settings> { SettingsScreen() }
+                    entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
+                    entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
+                    entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
+                    entry<Route.SettingsDeveloperMode> { DeveloperModeScreen() }
+                    entry<Route.SettingsAbout> { SettingsAboutScreen {} }
+                    entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
+                    // 屏幕镜像相关路由在桌面端不接线，给出占位页避免导航失败
+                    entry<Route.SettingsScrcpy> { DesktopUnavailableScreen("屏幕镜像") { navigator.pop() } }
+                    entry<Route.ScrcpyAdvanced> { DesktopUnavailableScreen("屏幕镜像高级设置") { navigator.pop() } }
+                    entry<Route.ScrcpyVirtualButtonOrder> { DesktopUnavailableScreen("虚拟按钮排序") { navigator.pop() } }
                 }
-                // 与 MainScreen 页签同源：单独 push 这两个路由时复用同一内容，避免未注册 entry 报错
-                entry<Route.History> {
-                    HistoryScreen(
-                        navigator,
-                        notificationHistory = { NotificationHistoryScreen() },
-                        superIslandHistory = { SuperIslandHistoryScreen() },
-                        chatTest = {
-                            UIChatTest(
-                                deviceManager = devicePortsProviderChatPort(devicePortsProvider),
-                                onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
-                            )
-                        },
-                    )
-                }
-                entry<Route.Settings> { SettingsScreen() }
-                entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
-                entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
-                entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
-                entry<Route.SettingsDeveloperMode> { DeveloperModeScreen() }
-                entry<Route.SettingsAbout> { SettingsAboutScreen {} }
-                entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
-                // 屏幕镜像相关路由在桌面端不接线，给出占位页避免导航失败
-                entry<Route.SettingsScrcpy> { DesktopUnavailableScreen("屏幕镜像") { navigator.pop() } }
-                entry<Route.ScrcpyAdvanced> { DesktopUnavailableScreen("屏幕镜像高级设置") { navigator.pop() } }
-                entry<Route.ScrcpyVirtualButtonOrder> { DesktopUnavailableScreen("虚拟按钮排序") { navigator.pop() } }
             }
         }
     }

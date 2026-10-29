@@ -181,7 +181,12 @@ internal object DesktopImageDecodePort : ImageDecodePort {
     }
 }
 
-/** 显示器端口：桌面端只有单一显示区，不做插拔监听。 */
+/**
+ * 显示器端口。
+ *
+ * 该端口在 Android 端用于「把应用投到指定显示器」；桌面端的窗口管理由操作系统承担，
+ * 不需要多显示器枚举，故按设计保持单屏中性实现（不接线）。
+ */
 internal class DesktopDisplayPort : DisplayPort {
     private val single = MutableStateFlow(listOf(DisplayInfo(id = 0, name = "桌面", isBuiltIn = true)))
     override val displays = single
@@ -215,11 +220,25 @@ internal class DesktopMainScreenPort(
 
     override fun bannerMessage(): State<String?> = noMessage
 
-    override fun openAppSettings() = Unit
+    /** 打开应用数据目录（`~/.notifyrelay`），对应 Android 的应用详情设置页。 */
+    override fun openAppSettings() {
+        val opened =
+            runCatching {
+                val directory = java.io.File(System.getProperty("user.home"), ".notifyrelay")
+                if (!directory.exists()) directory.mkdirs()
+                java.awt.Desktop
+                    .getDesktop()
+                    .open(directory)
+                true
+            }.getOrDefault(false)
+        if (!opened) DesktopToastHost.show("无法打开数据目录", DesktopToastHost.Duration.SHORT)
+    }
 
     override fun finish() = onFinish()
 
-    override fun showExitHint() = Unit
+    override fun showExitHint() {
+        DesktopToastHost.show("窗口已隐藏到托盘，右键托盘图标可退出", DesktopToastHost.Duration.LONG)
+    }
 }
 
 /** 设置端口：开发者模式开关落到公共端 Storage，入口页面未接线。 */
