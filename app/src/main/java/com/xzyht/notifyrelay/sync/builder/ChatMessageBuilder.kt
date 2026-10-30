@@ -64,6 +64,11 @@ object ChatMessageBuilder {
                 ),
             deviceManager = deviceManager,
             persistLocally = false,
+            // 通知库已按「时间 + 包名 + 本机」落库，检定需排除本条自身
+            existingKey = time.toString() + packageName + LOCAL_DEVICE,
         )
     }
+
+    /** 通知库写入本机记录时使用的设备标识。 */
+    private const val LOCAL_DEVICE = "本机"
 }

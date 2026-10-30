@@ -76,22 +76,27 @@ object LocalNotificationForwardGateway {
     }
 
     /**
-     * 转发一条本机通知：过滤 → （可选）匹配包名 → 构造 → （可选）落库 → 广播。
+     * 转发一条本机通知：过滤 → （可选）匹配包名 → 已入库检定 → 构造 → （可选）落库 → 广播。
+     *
+     * 已入库检定为重复时仍落库与广播，只是不上屏：返回值中的 `showOnScreen` 为 false，
+     * 平台层据此跳过弹幕/系统通知复刻。
      *
      * @param notification 采集结果
      * @param deviceManager 设备端口（取已认证设备）
      * @param persistLocally 是否以本机标识写入通知历史；平台已自行落库时传 false
-     * @return 是否已转发
+     * @param existingKey 平台已落库时本条记录的键，用于检定排除自身
+     * @return 转发结果；被过滤时为 null
      */
     suspend fun forward(
         notification: LocalNotification,
         deviceManager: DeviceAuthTablePort,
         persistLocally: Boolean = false,
-    ): Boolean {
+        existingKey: String? = null,
+    ): ForwardResult? {
         // 过滤用原始标识：与 Windows 一致（ShouldForward 收到的是 appPackage 而非解析结果）
         if (!LocalFilterRepository.shouldForward(notification.rawPackage, notification.appName, notification.title, notification.text)) {
             Logger.d(TAG, "本机通知被过滤: " + notification.appName)
-            return false
+            return null
         }
 
         val packageName =
@@ -100,39 +105,50 @@ object LocalNotificationForwardGateway {
             } else {
                 notification.rawPackage
             }
-        // 内容级判重（跨重启）：本机通知每次采集的时间戳不同，
-        // 仅靠采集侧 TTL 无法覆盖重启后重新枚举到的历史通知；
-        // 与 Windows NotificationRepository 的聚合键同思路，命中即不重复转发。
-        if (persistLocally && isAlreadyStored(packageName, notification.title, notification.text)) {
-            Logger.d(TAG, "本机通知已存在，跳过: " + notification.appName)
-            return false
+
+        // 已入库检定：与远端入站同一判定入口，命中时只影响上屏
+        val duplicate =
+            isAlreadyStored(
+                packageName = packageName,
+                appName = notification.appName,
+                title = notification.title,
+                text = notification.text,
+                excludeKey = existingKey,
+            )
+        if (duplicate) {
+            Logger.d(TAG, "本机通知已入库，仅转发不上屏: " + notification.appName)
+        } else {
+            InboundNotificationProcessor.markContentSeen(notification.appName, notification.title, notification.text)
         }
 
         val raw = buildNewPayload(notification, packageName)
         if (persistLocally) persist(raw)
         broadcast(raw, deviceManager)
         Logger.i(TAG, "已转发本机通知: " + notification.appName + " → " + packageName)
-        return true
+        return ForwardResult(showOnScreen = !duplicate)
     }
 
+    /** 转发结果：是否已入库（决定是否上屏）。 */
+    data class ForwardResult(
+        /** 未命中已入库检定时为 true，平台层据此上屏。 */
+        val showOnScreen: Boolean,
+    )
+
     /**
-     * 是否已存在同内容的本机通知记录。
+     * 是否与库中记录重复。
      *
-     * 仅比对「包名 + 标题 + 内容」，不含时间：本机通知由系统重新枚举时
-     * 时间戳会变，含时间会导致同一通知在每次启动后重复转发。
+     * 判定复用公共入站处理器的 [InboundNotificationProcessor.isDuplicate]：
+     * 10 秒内容窗口 → 24 小时内相似度 → 更早记录完全一致。
      */
     private suspend fun isAlreadyStored(
         packageName: String,
+        appName: String,
         title: String,
         text: String,
+        excludeKey: String?,
     ): Boolean =
         runCatching {
-            DatabaseRepository.getInstance().hasNotificationWithContent(
-                deviceUuid = InboundNotificationProcessor.localDevice(),
-                packageName = packageName,
-                title = title,
-                text = text,
-            )
+            InboundNotificationProcessor.isDuplicate(packageName, appName, title, text, excludeKey)
         }.getOrDefault(false)
 
     /** 组装新增通知报文。 */

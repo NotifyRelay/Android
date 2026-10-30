@@ -40,7 +40,7 @@ internal class DesktopInboundNotificationHandler(
         remoteUuid: String,
     ) {
         scope.launch {
-            val record =
+            val inbound =
                 try {
                     InboundNotificationProcessor.process(payload, remoteUuid)
                 } catch (e: IllegalStateException) {
@@ -51,14 +51,24 @@ internal class DesktopInboundNotificationHandler(
             // 聊天记忆归档与落库结果无关：入站报文一律可见
             ChatMemory.append("收到: " + payload)
 
-            // 远端通知上屏：与 Android 侧收到即展示同口径
-            if (record != null) {
+            // 远端通知上屏：与 Android 侧收到即展示同口径；已入库检定命中时只跳过上屏
+            if (inbound != null) {
+                val record = inbound.record
                 // 登记应用（应用名 + 包名 + 图标）：清空历史后仍可用于列表与图标展示
                 registerRemoteApp(record, remoteUuid)
-                // 图标取本地缓存（入站时同链路的图标请求可能尚未回包，无图标时不占位）
-                val icon = runCatching { RemoteAppIconCache.cachedBytes(record.packageName) }.getOrNull()
-                withContext(Dispatchers.Main) {
-                    DesktopOverlayStore.addDanmaku(record.toDanmaku(remoteUuid, icon))
+                if (inbound.duplicate) {
+                    Logger.d(TAG, "远端通知已入库，跳过弹幕: pkg=" + record.packageName)
+                } else {
+                    InboundNotificationProcessor.markContentSeen(
+                        record.appName.orEmpty(),
+                        record.title.orEmpty(),
+                        record.text.orEmpty(),
+                    )
+                    // 图标取本地缓存（入站时同链路的图标请求可能尚未回包，无图标时不占位）
+                    val icon = runCatching { RemoteAppIconCache.cachedBytes(record.packageName) }.getOrNull()
+                    withContext(Dispatchers.Main) {
+                        DesktopOverlayStore.addDanmaku(record.toDanmaku(remoteUuid, icon))
+                    }
                 }
                 // 图标缺失时向来源设备请求（与 Android 入站后 checkAndSyncIcon 同口径）
                 requestIconIfMissing(record.packageName, remoteUuid)

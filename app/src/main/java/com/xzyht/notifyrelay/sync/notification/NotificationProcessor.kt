@@ -39,10 +39,18 @@ object NotificationProcessor {
     ) {
         val (header, data, remoteUuid) = input
 
-        // data 已由 ProtocolRouter 解密为明文，直接处理
-        handleJsonLevel(context, manager, header, data, remoteUuid)
+        // data 已由 ProtocolRouter 解密为明文，直接处理；返回值为落库记录与已入库检定结果
+        val inbound = handleJsonLevel(context, manager, header, data, remoteUuid)
 
-        handleFilterAndReplicate(context, manager, scope, data, remoteUuid)
+        // 已入库检定：命中则跳过复刻到系统通知中心（历史与聊天记忆照常）
+        if (inbound == null) {
+            handleFilterAndReplicate(context, manager, scope, data, remoteUuid)
+        } else if (inbound.duplicate) {
+            Logger.d(TAG, "远端通知已入库，跳过复刻: pkg=" + inbound.record.packageName)
+            ChatMemory.append("收到: " + data)
+        } else {
+            handleFilterAndReplicate(context, manager, scope, data, remoteUuid)
+        }
 
         notificationCallbacks.forEach { callback ->
             try {
@@ -65,19 +73,21 @@ object NotificationProcessor {
         header: String?,
         decrypted: String,
         remoteUuid: String?,
-    ) {
-        if (remoteUuid == null) return
-        try {
-            val record =
+    ): InboundNotificationProcessor.InboundResult? {
+        if (remoteUuid == null) return null
+        return try {
+            val result =
                 runBlocking {
                     InboundNotificationProcessor.process(decrypted, remoteUuid)
                 }
-            if (record != null) {
+            if (result != null) {
                 NotificationRepository.notifyHistoryChanged(remoteUuid, context)
                 NotificationRepository.scanDeviceList(context)
             }
+            result
         } catch (e: Exception) {
             Logger.e(TAG, "存储远程通知失败: ${e.message}")
+            null
         }
     }
 

@@ -243,24 +243,27 @@ object NativeCore {
         arg2Ms: Long = 0L,
     ): Int = coreRef.value?.dedup(action, dedupKey, arg1Ms, arg2Ms) ?: -1
 
-    // ======== 入站内容去重（10s 窗口；键与 TTL 由 core 持有）========
+    // ======== 入站内容去重（10s 窗口；键为「应用名 + 标题 + 正文」，TTL 由 core 持有）========
 
     fun contentDedup(
         action: Int,
+        appName: String,
         title: String,
         text: String,
-    ): Int = coreRef.value?.contentDedup(action, title, text) ?: -1
+    ): Int = coreRef.value?.contentDedup(action, appName, title, text) ?: -1
 
     // ======== Text similarity & dedup ========
 
     fun shouldDeduplicate(
+        newAppName: String,
         newTitle: String,
         newText: String,
+        oldAppName: String,
         oldTitle: String,
         oldText: String,
     ): Boolean =
         com.xzyht.notifyrelay.core.ffi
-            .shouldDeduplicate(newTitle, newText, oldTitle, oldText)
+            .shouldDeduplicate(newAppName, newTitle, newText, oldAppName, oldTitle, oldText)
 
     // ======== Filter ========
 

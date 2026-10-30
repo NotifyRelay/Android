@@ -2,9 +2,8 @@ package com.xzyht.notifyrelay.feature.notification.filter
 
 import android.content.Context
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
-import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
+import com.xzyht.notifyrelay.nativecore.device.appsync.InboundNotificationProcessor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -24,6 +23,9 @@ import org.json.JSONObject
  * - 延迟复刻占位队列 → [RemoteFilterPlaceholderQueue]
  * - 待撤回监控队列与超时协程 → [RemoteFilterPendingMonitor]
  * 内部数据类与逻辑一字未改，仅搬迁至对应文件。
+ *
+ * 「已入库检定」不在本类：唯一判定处为 [InboundNotificationProcessor.isDuplicate]，
+ * 由 [com.xzyht.notifyrelay.sync.notification.NotificationProcessor] 在入口调用。
  */
 object BackendRemoteFilter {
     // 结构化协程作用域，替代 GlobalScope
@@ -36,7 +38,7 @@ object BackendRemoteFilter {
     private val pendingMonitor =
         RemoteFilterPendingMonitor(
             scope = scope,
-            onDedupCache = { title, text -> markContentSeen(title, text) },
+            onDedupCache = { title, text -> onTimeoutSeen(title, text) },
             onClearExpiredPlaceholders = { placeholders.clearExpired() },
         )
 
@@ -44,38 +46,9 @@ object BackendRemoteFilter {
      * 清空待处理列表（供公平运行内存回调使用）。
      */
     fun clearPending() {
-        clearContentWindow()
+        InboundNotificationProcessor.clearContentWindow()
         pendingMonitor.clear()
         placeholders.clear()
-    }
-
-    // ======== 入站内容去重（10s 窗口；键与 TTL 由 core 持有）========
-    private const val CONTENT_DEDUP_QUERY = 0
-    private const val CONTENT_DEDUP_MARK = 1
-    private const val CONTENT_DEDUP_CLEAR = 2
-
-    /** 内容窗口查询：core 持有 10s 窗口与键；core 未就绪时按未见过处理（fail-open） */
-    private fun contentSeen(
-        title: String,
-        text: String,
-    ): Boolean {
-        if (!NativeCore.isReady()) return false
-        return NativeCore.contentDedup(CONTENT_DEDUP_QUERY, title, text) == 1
-    }
-
-    /** 内容窗口标记：core 持有 10s 窗口与键；core 未就绪时跳过 */
-    private fun markContentSeen(
-        title: String,
-        text: String,
-    ) {
-        if (!NativeCore.isReady()) return
-        NativeCore.contentDedup(CONTENT_DEDUP_MARK, title, text)
-    }
-
-    /** 清空内容窗口 */
-    private fun clearContentWindow() {
-        if (!NativeCore.isReady()) return
-        NativeCore.contentDedup(CONTENT_DEDUP_CLEAR, "", "")
     }
 
     /**
@@ -92,7 +65,7 @@ object BackendRemoteFilter {
 
     /**
      * 过滤远程通知
-     * 包含包名映射（Rust）、智能去重、黑白名单/对等模式（Rust）
+     * 包含包名映射（Rust）、黑白名单/对等模式/锁屏过滤
      *
      * 同步契约：被消息处理链（NotificationProcessor.process，非 suspend）调用，
      * 无法直接挂起。配置加载通过 loadBlocking 兜底（仅首次加载，后续 isLoaded 短路）。
@@ -115,21 +88,17 @@ object BackendRemoteFilter {
             val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
             val mappedPkg = port().mapToLocalPackage(pkg, installedPkgs)
 
-            // 对等/黑白名单/锁屏(1) 过滤
+            // 对等/黑白名单/锁屏过滤
             val modeResult = passesModeFilters(mappedPkg, title, text, installedPkgs, isLocked, data)
             if (modeResult != null) return modeResult
 
-            // 智能去重检查 - 优化性能和逻辑
-            if (port().enableDedup) {
-                val dedupResult = runDeduplication(title, text, pkg, mappedPkg, installedPkgs, isLocked, data)
-                if (dedupResult != null) return dedupResult
+            // 本机锁屏时不立即展示，由上层在超期后再次检查并决定是否复刻
+            if (port().enableDedup && isLocked) {
+                return FilterResult(false, mappedPkg, title, text, data, needsDelay = false)
             }
 
-            // 锁屏过滤已在 passesModeFilters 内统一判定（enableLockScreenOnly && !isLocked 时返回）。
-            // 此处原有一处重复的同条件判断，因该条件为 false 才能走到本行，故其分支不可达，已移除。
-
-            // Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 直接通过 - mappedPkg=$mappedPkg title=$title text=$text")
-            return FilterResult(true, mappedPkg, title, text, data)
+            // 无重复时标记为延迟验证：先发送，由监控在 15 秒内按本机入队情况撤回
+            return FilterResult(true, mappedPkg, title, text, data, needsDelay = true)
         } catch (e: Exception) {
             Logger.e("NotifyRelay(狂鼠)", "filterRemoteNotification: 解析异常 - data=$data", e)
             return FilterResult(true, "", "", "", data)
@@ -167,15 +136,9 @@ object BackendRemoteFilter {
         notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry.current
             ?: error("RemoteFilterPort 未注册")
 
-    /** 已启用组构成的包名等价组；实现未提供时退化为空表。 */
-    private fun enabledPackageGroups(): List<Set<String>> {
-        val filterPort = port()
-        return (filterPort as? AndroidRemoteFilterPort)?.packageGroups() ?: emptyList()
-    }
-
     /**
      * 对等模式 / 黑白名单 / 锁屏(1) 过滤。
-     * 返回非 null 表示命中过滤需提前返回的结果，null 表示继续（进入去重与锁屏(2)）。
+     * 返回非 null 表示命中过滤需提前返回的结果，null 表示继续。
      */
     private fun passesModeFilters(
         mappedPkg: String,
@@ -203,7 +166,6 @@ object BackendRemoteFilter {
 
         // 锁屏通知过滤
         if (port().enableLockScreenOnly && !isLocked) {
-            // Logger.d("NotifyRelay(狂鼠)", "filterRemoteNotification: 锁屏过滤开启 - 非锁屏通知被过滤")
             return FilterResult(false, mappedPkg, title, text, data)
         }
 
@@ -211,118 +173,13 @@ object BackendRemoteFilter {
     }
 
     /**
-     * 智能去重检查（先发送后监控机制）。
-     * 返回非 null 表示已作出去重决策需提前返回的结果，null 表示跳过去重（继续走锁屏(2)/通过）。
-     *
-     * 契约（与 DeviceConnectionManager 的隐式约定，语义不可改）：
-     *  - 命中缓存/内存重复 → shouldShow=false
-     *  - 本机锁屏且无重复 → shouldShow=false, needsDelay=false（避免先发再撤回）
-     *  - 无重复 → shouldShow=true, needsDelay=true（先发送后由监控撤回）
+     * 待撤回通知超时后标记内容已见（core 10 秒窗口）。
      */
-    private fun runDeduplication(
-        title: String,
-        text: String,
-        pkg: String,
-        mappedPkg: String,
-        installedPkgs: Set<String>,
-        isLocked: Boolean,
-        data: String,
-    ): FilterResult? {
-        // 性能优化：仅在满足以下情况时跳过去重：
-        //  - 开启了包名等价组映射
-        //  - 远端包名不属于任何等价组
-        //  - 且映射到的本地包未安装
-        // 对于本机已安装映射包（包括 mappedPkg == pkg 的同包名场景）仍然执行去重。
-        val pkgInGroups =
-            if (port().enablePackageGroupMapping) {
-                enabledPackageGroups().any { pkg in it }
-            } else {
-                true
-            }
-
-        val shouldSkipDedup = port().enablePackageGroupMapping && !pkgInGroups && (mappedPkg !in installedPkgs)
-
-        if (shouldSkipDedup) {
-            // Logger.d("智能去重", "跳过去重：包名不属于等价组且本机未安装映射包，包名=$pkg, mappedPkg=$mappedPkg")
-            // 跳过去重，继续走后续流程（如锁屏过滤和最终通过）
-            return null
-        }
-
-        // 1. 10 秒内容窗口查询（core 持有窗口与键）
-        if (contentSeen(title, text)) {
-            // 撤回匹配的待监控通知（按原始标题/文本匹配，与缓存写入口径一致）。
-            // 保持基线语义：命中缓存只撤回，不刷新去重窗口。
-            pendingMonitor.cancelMatchingRaw(title, text)
-            // Logger.d("智能去重", "命中10秒缓存并撤回之前的通知 - 包名:$pkg, 标题:$title, 内容:$text")
-            return FilterResult(false, mappedPkg, title, text, data)
-        }
-
-        // 2. 历史重复检查优化
-        try {
-            // 获取内存历史数据
-            val localList =
-                NotificationRepository
-                    .getNotificationsByDevice("本机")
-            val memoryDup = checkDuplicateInMemory(localList, title, text)
-
-            // 如果内存中有重复，直接过滤
-            if (memoryDup) {
-                // Logger.d("智能去重", "命中内存历史重复")
-                return FilterResult(false, mappedPkg, title, text, data)
-            }
-
-            // 内存无重复，默认情况下标记为需要延迟验证（先发送后监控机制）。
-            // 但如果该远端通知接受到时本机锁屏，则避免先发送再撤回，改为不立即展示，
-            // 由上层在超期后再次检查并决定是否复刻（见 DeviceConnectionManager 的处理）。
-            if (isLocked) {
-                // Logger.d("NotifyRelay(狂鼠)", "本机锁屏：内存无重复，改为不立即展示，等待超期后再复刻")
-                return FilterResult(false, mappedPkg, title, text, data, needsDelay = false)
-            }
-
-            // Logger.d("NotifyRelay(狂鼠)", "无历史重复，标记延迟验证")
-            return FilterResult(true, mappedPkg, title, text, data, needsDelay = true)
-        } catch (e: Exception) {
-            // 异常时保持既有 fail-open 语义（默认延迟验证），但补日志避免静默吞异常难以排查
-            Logger.e("智能去重", "历史检查异常，按 fail-open 默认延迟验证", e)
-            return FilterResult(true, mappedPkg, title, text, data, needsDelay = true)
-        }
-    }
-
-    /**
-     * 检查内存中的重复通知 — 使用 Rust shouldDeduplicate 比较文本相似度
-     */
-    private fun checkDuplicateInMemory(
-        localList: List<NotificationRecord>,
-        title: String,
-        text: String,
-    ): Boolean {
-        var hasDuplicate = false
-
-        for (notification in localList) {
-            try {
-                if (notification.device != "本机") continue
-                val oldTitle = TextUtils.normalizeTitle(notification.title ?: "")
-                val oldText = notification.text ?: ""
-                val newTitle = TextUtils.normalizeTitle(title)
-                if (NativeCore.shouldDeduplicate(newTitle, text, oldTitle, oldText)) {
-                    hasDuplicate = true
-                }
-            } catch (e: Exception) {
-                Logger.e("智能去重", "内存检查异常", e)
-            }
-        }
-
-        return hasDuplicate
-    }
-
-    /**
-     * 标记内容已见（core 10 秒窗口）
-     */
-    fun addToDedupCache(
+    private fun onTimeoutSeen(
         title: String,
         text: String,
     ) {
-        markContentSeen(title, text)
+        InboundNotificationProcessor.markContentSeen("", title, text)
     }
 
     /**
@@ -375,7 +232,7 @@ object BackendRemoteFilter {
         // 先处理占位匹配（用于延迟复刻的占位）——在单独的锁上操作以避免并发问题
         placeholders.removeMatching(title, text, packageName) { ph ->
             // 命中占位（阻止延迟复刻）：将其标记为内容已见
-            markContentSeen(ph.title, ph.text)
+            InboundNotificationProcessor.markContentSeen("", ph.title, ph.text)
         }
 
         // 再处理已发送但在可撤回期的通知
@@ -384,8 +241,8 @@ object BackendRemoteFilter {
             val titlePreview = if ((title?.length ?: 0) > 10) "${title?.take(10)}..." else (title ?: "")
             Logger.d("智能去重", "被动命中待撤回通知 - 包名:$packageName, 标题预览:$titlePreview, 匹配数量:${matches.size}")
         }
-        // 对于命中的通知，也可以把本地这条记录记入内容窗口，避免短时间内再次复刻
-        matches.forEach { markContentSeen(it.title, it.text) }
+        // 对于命中的通知，把本地这条记录记入内容窗口，避免短时间内再次复刻
+        matches.forEach { InboundNotificationProcessor.markContentSeen("", it.title, it.text) }
     }
 
     /**
