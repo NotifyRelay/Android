@@ -1,6 +1,7 @@
 package notifyrelay.desktop.overlay
 
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import github.xzynine.superislandui.model.core.parseParamV2
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -55,6 +56,16 @@ internal object DesktopSuperIslandInbound {
             return
         }
 
+        val paramV2Raw = root.stringField("paramV2Raw")
+        val business =
+            runCatching {
+                paramV2Raw?.let {
+                    github.xzynine.superislandui.model.core
+                        .parseParamV2(it)
+                        ?.business
+                }
+            }.getOrNull()
+
         val deviceName = DataLayerDesktop.findOnlineDevice(deviceUuid)?.displayName ?: deviceUuid
         DesktopOverlayStore.putSuperIsland(
             SuperIslandEntry(
@@ -62,8 +73,9 @@ internal object DesktopSuperIslandInbound {
                 deviceName = deviceName,
                 title = root.stringField("title"),
                 text = root.stringField("text"),
-                paramV2Raw = root.stringField("paramV2Raw"),
+                paramV2Raw = paramV2Raw,
                 pics = parsePics(root),
+                business = business,
             ),
         )
     }

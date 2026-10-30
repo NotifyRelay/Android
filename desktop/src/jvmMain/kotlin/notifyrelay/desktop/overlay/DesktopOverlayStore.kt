@@ -4,6 +4,9 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import notifyrelay.domain.feature.media.MediaSessionSnapshot
 
+/** 媒体业务标识。 */
+internal const val BUSINESS_MEDIA = "media"
+
 /**
  * 叠加层显示状态。
  *
@@ -45,12 +48,19 @@ internal object DesktopOverlayStore {
         superIslands.remove(sourceKey)
     }
 
-    /** 清理超过存活时长没有更新的超级岛。 */
+    /** 清理超过存活时长没有更新的超级岛；媒体类存活更长（与 Android 轮询周期一致）。 */
     fun pruneSuperIslands(
-        timeoutMs: Long,
+        nonMediaTimeoutMs: Long,
+        mediaTimeoutMs: Long,
         now: Long = System.currentTimeMillis(),
     ) {
-        val expired = superIslands.filterValues { now - it.updatedAt > timeoutMs }.keys.toList()
+        val expired =
+            superIslands
+                .filterValues { entry ->
+                    val timeout = if (entry.business == BUSINESS_MEDIA) mediaTimeoutMs else nonMediaTimeoutMs
+                    now - entry.updatedAt > timeout
+                }.keys
+                .toList()
         expired.forEach { superIslands.remove(it) }
     }
 
@@ -73,6 +83,8 @@ internal data class SuperIslandEntry(
     val text: String?,
     val paramV2Raw: String?,
     val pics: Map<String, String>?,
+    /** 业务标识（如 media / miui_flashlight）。 */
+    val business: String? = null,
     /** 最近更新时间（毫秒），用于超时回收。 */
     val updatedAt: Long = System.currentTimeMillis(),
 )

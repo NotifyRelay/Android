@@ -133,7 +133,10 @@ private fun OverlayContent() {
         LaunchedEffect(Unit) {
             while (true) {
                 delay(SUPER_ISLAND_TIMEOUT_MS)
-                DesktopOverlayStore.pruneSuperIslands(SUPER_ISLAND_TIMEOUT_MS)
+                DesktopOverlayStore.pruneSuperIslands(
+                    nonMediaTimeoutMs = SUPER_ISLAND_TIMEOUT_MS,
+                    mediaTimeoutMs = SUPER_ISLAND_MEDIA_TIMEOUT_MS,
+                )
             }
         }
 

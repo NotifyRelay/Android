@@ -25,8 +25,14 @@ private const val SUPER_ISLAND_AUTO_COLLAPSE_MS = 3_000L
 /** 展开态卡片宽度（与媒体卡同宽）。 */
 private val SUPER_ISLAND_CARD_WIDTH = 420.dp
 
-/** 超级岛无更新时的存活时长。 */
+/** 超级岛无更新时的存活时长（非媒体类型）。 */
 internal const val SUPER_ISLAND_TIMEOUT_MS = 12_000L
+
+/** 媒体类型超级岛的存活时长（长于轮询刷新周期）。 */
+internal const val SUPER_ISLAND_MEDIA_TIMEOUT_MS = 45_000L
+
+/** 仅摘要显示的业务标识（手电筒）：不展开为大岛。 */
+private const val BUSINESS_SUMMARY_ONLY = "miui_flashlight"
 
 /** 媒体封面在 picMap 中的键。 */
 private const val COVER_PIC_KEY = "miui.focus.pic_cover"
@@ -41,14 +47,22 @@ private const val COVER_PIC_KEY = "miui.focus.pic_cover"
 internal fun SuperIslandCard(entry: SuperIslandEntry) {
     val contentKey =
         entry.title.orEmpty() + "\u0001" + entry.text.orEmpty() + "\u0001" + entry.paramV2Raw.orEmpty()
-    var expanded by remember { mutableStateOf(true) }
-    LaunchedEffect(contentKey) {
+    val paramV2 = remember(entry.paramV2Raw) { parseParamV2OrNull(entry.paramV2Raw) }
+    // 仅摘要类（如手电筒）不展开：与 Android FloatingWindowManager 的 summaryOnly 同口径
+    val summaryOnly =
+        paramV2?.business == BUSINESS_SUMMARY_ONLY ||
+            entry.paramV2Raw?.contains(BUSINESS_SUMMARY_ONLY) == true
+    var expanded by remember { mutableStateOf(!summaryOnly) }
+    LaunchedEffect(contentKey, summaryOnly) {
+        if (summaryOnly) {
+            expanded = false
+            return@LaunchedEffect
+        }
         expanded = true
         delay(SUPER_ISLAND_AUTO_COLLAPSE_MS)
         expanded = false
     }
 
-    val paramV2 = remember(entry.paramV2Raw) { parseParamV2OrNull(entry.paramV2Raw) }
     if (expanded) {
         ExpandedSuperIslandCard(entry, paramV2)
     } else {
