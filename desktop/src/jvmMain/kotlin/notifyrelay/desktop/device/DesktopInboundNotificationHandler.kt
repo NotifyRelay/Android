@@ -7,7 +7,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import notifyrelay.base.log.Logger
+import notifyrelay.data.database.entity.NotificationRecordEntity
+import notifyrelay.desktop.overlay.DanmakuEntry
+import notifyrelay.desktop.overlay.DesktopOverlayStore
 import notifyrelay.domain.feature.notification.chat.ChatMemory
 import notifyrelay.domain.feature.notification.history.NotificationHistoryPortRegistry
 
@@ -47,14 +51,55 @@ internal class DesktopInboundNotificationHandler(
             // 聊天记忆归档与落库结果无关：入站报文一律可见
             ChatMemory.append("收到: " + payload)
 
-            // 图标缺失时向来源设备请求（与 Android 入站后 checkAndSyncIcon 同口径）
+            // 远端通知上屏：与 Android 侧收到即展示同口径
             if (record != null) {
+                // 登记应用（应用名 + 包名 + 图标）：清空历史后仍可用于列表与图标展示
+                registerRemoteApp(record, remoteUuid)
+                // 图标取本地缓存（入站时同链路的图标请求可能尚未回包，无图标时不占位）
+                val icon = runCatching { RemoteAppIconCache.cachedBytes(record.packageName) }.getOrNull()
+                withContext(Dispatchers.Main) {
+                    DesktopOverlayStore.addDanmaku(record.toDanmaku(remoteUuid, icon))
+                }
+                // 图标缺失时向来源设备请求（与 Android 入站后 checkAndSyncIcon 同口径）
                 requestIconIfMissing(record.packageName, remoteUuid)
             }
 
             (NotificationHistoryPortRegistry.current as? notifyrelay.desktop.platform.DesktopHistoryPort)?.notifyHistoryChanged()
         }
     }
+
+    /** 登记远端应用：应用名与包名写入应用表，并建立来源设备关联。 */
+    private suspend fun registerRemoteApp(
+        record: NotificationRecordEntity,
+        remoteUuid: String,
+    ) {
+        if (record.packageName.isBlank()) return
+        runCatching {
+            RemoteAppIconCache.cache(
+                packageName = record.packageName,
+                pngBytes = null,
+                deviceUuid = remoteUuid,
+                appName = record.appName,
+            )
+        }.onFailure { Logger.w(TAG, "登记远端应用失败: " + record.packageName, it) }
+    }
+
+    /** 远端通知转弹幕：应用名为记录中的应用名，缺省回落到包名。 */
+    private fun NotificationRecordEntity.toDanmaku(
+        remoteUuid: String,
+        icon: ByteArray?,
+    ): DanmakuEntry =
+        DanmakuEntry(
+            id = key.hashCode().toLong(),
+            appName = appName?.takeIf { it.isNotBlank() } ?: packageName,
+            title = title.orEmpty(),
+            text = text.orEmpty(),
+            deviceName =
+                notifyrelay.desktop.DataLayerDesktop
+                    .findOnlineDevice(remoteUuid)
+                    ?.displayName ?: remoteUuid,
+            iconPng = icon,
+        )
 
     /** 本机缓存无该包名图标时，向来源设备发起图标请求。 */
     private suspend fun requestIconIfMissing(

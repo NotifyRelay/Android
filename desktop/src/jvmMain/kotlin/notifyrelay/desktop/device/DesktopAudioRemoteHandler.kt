@@ -95,12 +95,8 @@ internal object DesktopAudioRemoteHandler {
         val sourceDevice =
             DataLayerDesktop.findOnlineDevice(remoteUuid)
                 ?: senderUuid?.let { DataLayerDesktop.findOnlineDevice(it) }
-        if (sourceDevice == null) {
-            Logger.w(TAG, "未找到音频来源设备: remoteUuid=" + remoteUuid + " senderUuid=" + senderUuid)
-        } else {
-            notifyrelay.desktop.platform.DesktopSystemMediaControl
-                .onRelayStarted(sourceDevice)
-        }
+        notifyrelay.desktop.platform.DesktopSystemMediaControl
+            .onRelayStarted(sourceDevice)
         Logger.i(TAG, "已开始接收对端音频")
     }
 

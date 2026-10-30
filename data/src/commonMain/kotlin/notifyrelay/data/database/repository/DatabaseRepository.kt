@@ -6,6 +6,7 @@ import androidx.room.useReaderConnection
 import androidx.room.useWriterConnection
 import androidx.sqlite.SQLiteException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import notifyrelay.data.database.AppDatabase
 import notifyrelay.data.database.dao.PackageCount
@@ -646,6 +647,11 @@ open class DatabaseRepository(
     suspend fun deleteAppByPackageName(packageName: String) {
         appDao.deleteByPackageName(packageName)
     }
+
+    /**
+     * 取指定来源设备登记过的应用关联（用于「历史出现过」的应用列表）。
+     */
+    suspend fun getAppDeviceLinks(deviceUuid: String): List<AppDeviceEntity> = appDeviceDao.getByDeviceUuid(deviceUuid).first()
 
     /**
      * 获取缺失图标的应用

@@ -41,7 +41,7 @@ fun LocalAppItem(
     Column(
         modifier =
             Modifier
-                .width(72.dp)
+                .width(80.dp)
                 .combinedClickable(
                     onClick = onClick,
                     onLongClick = onLongClick,
@@ -49,7 +49,7 @@ fun LocalAppItem(
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Box(
-            modifier = Modifier.size(56.dp),
+            modifier = Modifier.size(64.dp),
         ) {
             Box(
                 modifier =

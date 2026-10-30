@@ -96,6 +96,8 @@ internal data class DanmakuEntry(
     val title: String,
     val text: String,
     val deviceName: String,
+    /** 来源应用图标（PNG/JPEG 原始字节）；缺失时为 null，占位不绘制。 */
+    val iconPng: ByteArray? = null,
     /** 入队时刻（毫秒）。 */
     val spawnAt: Long = System.currentTimeMillis(),
 )

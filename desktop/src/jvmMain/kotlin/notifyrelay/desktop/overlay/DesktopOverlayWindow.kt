@@ -30,6 +30,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
@@ -266,16 +267,29 @@ private fun DanmakuLayer(now: Long) {
     DesktopOverlayStore.danmaku.forEachIndexed { index, entry ->
         val elapsed = (now - entry.spawnAt) / 1000f
         val x = screenWidth - elapsed * DANMAKU_SPEED_PX_PER_SEC
-        Box(
-            Modifier
-                .offset(x = x.dp, y = (520 + (index % 6) * laneHeight).dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(Color(0xCC000000)),
+        Row(
+            modifier =
+                Modifier
+                    .offset(x = x.dp, y = (520 + (index % 6) * laneHeight).dp)
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xCC000000))
+                    .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalAlignment = Alignment.CenterVertically,
         ) {
+            // 来源应用图标：文本行内与字号等高，缺失时不占位
+            val icon = rememberDanmakuIcon(entry.iconPng)
+            if (icon != null) {
+                Image(
+                    bitmap = icon,
+                    contentDescription = entry.appName,
+                    modifier = Modifier.size(DANMAKU_ICON_SIZE).clip(RoundedCornerShape(4.dp)),
+                    contentScale = ContentScale.Crop,
+                )
+                Spacer(Modifier.width(6.dp))
+            }
             Text(
                 text = entry.appName + ": " + entry.title + " - " + entry.text,
                 color = Color.White,
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
                 style = notifyrelay.desktop.overlay.OverlayTypography.BODY,
             )
         }
@@ -283,6 +297,16 @@ private fun DanmakuLayer(now: Long) {
 }
 
 private const val DANMAKU_SPEED_PX_PER_SEC = 180f
+
+/** 弹幕应用图标边长，与 13sp 正文视觉对齐。 */
+private val DANMAKU_ICON_SIZE = 24.dp
+
+/** 解码弹幕应用图标；无图标或解码失败时返回 null。 */
+@Composable
+private fun rememberDanmakuIcon(png: ByteArray?): ImageBitmap? =
+    remember(png) {
+        png?.let { bytes -> notifyrelay.base.util.decodeImageBitmap(bytes) }
+    }
 
 /** 媒体卡展开后自动收起时长。 */
 private const val MEDIA_AUTO_COLLAPSE_MS = 5_000L

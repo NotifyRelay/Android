@@ -31,29 +31,37 @@ object RemoteAppIconCache {
         return packageNames.associateWith { packageName -> appMap[packageName]?.iconBytes }
     }
 
-    /** 缓存外部应用图标；[pngBytes] 为 null 时标记为缺失。 */
+    /**
+     * 缓存应用图标；[pngBytes] 为 null 时标记为缺失。
+     *
+     * @param appName 新记录的应用显示名；为空时以包名占位（仅在该包名首次入库时生效）
+     */
     suspend fun cache(
         packageName: String,
         pngBytes: ByteArray?,
         deviceUuid: String,
+        appName: String? = null,
     ) {
         val repo = DatabaseRepository.getInstance()
         val now = System.currentTimeMillis()
         val existing = repo.getAppByPackageName(packageName)
+        // 本次无图标时保留既有图标：采集/同步路径可能只有应用名与包名
+        val bytes = pngBytes ?: existing?.iconBytes
         val entity =
             if (existing != null) {
                 existing.copy(
-                    iconBytes = pngBytes,
-                    isIconMissing = pngBytes == null,
+                    appName = appName?.takeIf { it.isNotBlank() } ?: existing.appName,
+                    iconBytes = bytes,
+                    isIconMissing = bytes == null,
                     lastUpdated = now,
                 )
             } else {
                 AppEntity(
                     packageName = packageName,
-                    appName = packageName,
+                    appName = appName?.takeIf { it.isNotBlank() } ?: packageName,
                     isSystemApp = false,
-                    iconBytes = pngBytes,
-                    isIconMissing = pngBytes == null,
+                    iconBytes = bytes,
+                    isIconMissing = bytes == null,
                     lastUpdated = now,
                 )
             }

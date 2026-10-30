@@ -15,8 +15,8 @@ import notifyrelay.domain.feature.notification.history.SuperIslandHistoryPort
 /**
  * 桌面端超级岛历史端口。
  *
- * 分页源、详情读取与清空均复用公共实现；桌面端无本机应用图标来源，
- * 故 [appIcons] 的应用名退化为包名、图标为 null。
+ * 分页源、详情读取与清空均复用公共实现；[appIcons] 取应用表中的应用名
+ * 与图标缓存（与通知历史、弹幕层同源）。
  */
 class DesktopSuperIslandHistoryPort(
     private val repository: DatabaseRepository,
@@ -28,7 +28,13 @@ class DesktopSuperIslandHistoryPort(
 
     override fun pagingSource(): PagingSource<Int, GroupedSuperIslandHistory> = SuperIslandHistoryPagingSource(repository)
 
-    override suspend fun appIcons(packageNames: List<String>): Map<String, AppIconInfo> = packageNames.associateWith { packageName -> AppIconInfo(appName = packageName, icon = null) }
+    override suspend fun appIcons(packageNames: List<String>): Map<String, AppIconInfo> =
+        packageNames.associateWith { packageName ->
+            AppIconInfo(
+                appName = repository.getAppByPackageName(packageName)?.appName?.takeIf { it.isNotBlank() } ?: packageName,
+                icon = RemoteAppIconCache.cachedBytes(packageName)?.let { DesktopIconCodecPort.decodeToBitmap(it) },
+            )
+        }
 
     override suspend fun loadEntryDetail(id: Long): SuperIslandHistoryEntry? = SuperIslandHistoryStore.loadEntryDetail(id)?.toDomainEntry()
 
