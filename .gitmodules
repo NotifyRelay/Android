@@ -14,7 +14,3 @@
 	path = desktop/smtc-rust
 	url = https://github.com/xzy-nine-common/SMTC_Rust.git
 	branch = master
-[submodule "desktop/overlay"]
-	path = desktop/overlay
-	url = https://github.com/xzy-nine-common/overlay.git
-	branch = main
