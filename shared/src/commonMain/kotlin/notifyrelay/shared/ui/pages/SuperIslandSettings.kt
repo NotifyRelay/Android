@@ -63,13 +63,13 @@ val specInjectionOptions =
 /**
  * 超级岛设置页。
  *
- * 配置读写经公共策略与仓储；平台专属的「测试超级岛分支」入口经 [testBranchContent] 注入，
+ * 配置读写经公共策略与仓储；平台专属的「测试超级岛分支」入口经 [onOpenTestBranch] 注入，
  * 传 null 时不显示该项。
  */
 @Composable
 fun UISuperIslandSettings(
     viewModel: SuperIslandSettingsViewModel = superIslandSettingsViewModel(),
-    testBranchContent: (@Composable () -> Unit)? = null,
+    onOpenTestBranch: (() -> Unit)? = null,
 ) {
     val preferencePort = LocalPreferencePort.current
     val toastPort = LocalToastPort.current
@@ -172,12 +172,11 @@ fun UISuperIslandSettings(
                 },
             )
 
-            if (testBranchContent != null) {
+            if (onOpenTestBranch != null) {
                 ArrowPreference(
                     title = "测试超级岛分支",
-                    onClick = { },
+                    onClick = onOpenTestBranch,
                 )
-                testBranchContent()
             }
 
             HorizontalDivider(modifier = Modifier.padding(horizontal = 16.dp))

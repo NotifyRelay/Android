@@ -73,6 +73,7 @@ import notifyrelay.shared.ui.screen.HistoryScreen
 import notifyrelay.shared.ui.screen.MainScreen
 import notifyrelay.shared.ui.screen.SettingsAboutScreen
 import notifyrelay.shared.ui.screen.SettingsAppearanceScreen
+import notifyrelay.shared.ui.screen.SettingsDeveloperModeScreen
 import notifyrelay.shared.ui.screen.SettingsLocalFilterScreen
 import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
 import notifyrelay.shared.ui.screen.SettingsScreen
@@ -520,7 +521,7 @@ private fun DesktopRoot(
                         entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
                         entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
                         entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
-                        entry<Route.SettingsDeveloperMode> { DeveloperModeScreen() }
+                        entry<Route.SettingsDeveloperMode> { SettingsDeveloperModeScreen { DeveloperModeScreen() } }
                         entry<Route.SettingsAbout> { SettingsAboutScreen {} }
                         entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
                         entry<Route.SettingsScrcpy> { ScrcpySettingsPage() }

@@ -4,56 +4,33 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.feature.notification.superisland.floating.bigisland.ParamIslandCompose
-import github.xzynine.superislandui.floating.bigisland.components.ActionCompose
-import github.xzynine.superislandui.floating.bigisland.components.AnimTextInfoCompose
-import github.xzynine.superislandui.floating.bigisland.components.BaseInfoCompose
-import github.xzynine.superislandui.floating.bigisland.components.ChatInfoCompose
-import github.xzynine.superislandui.floating.bigisland.components.CoverInfoCompose
-import github.xzynine.superislandui.floating.bigisland.components.HighlightInfoCompose
-import github.xzynine.superislandui.floating.bigisland.components.HighlightInfoV3Compose
-import github.xzynine.superislandui.floating.bigisland.components.HintInfoCompose
-import github.xzynine.superislandui.floating.bigisland.components.IconTextInfoCompose
-import github.xzynine.superislandui.floating.bigisland.components.MediaIslandCompose
-import github.xzynine.superislandui.floating.bigisland.components.MultiProgressCompose
-import github.xzynine.superislandui.floating.bigisland.components.PicInfoCompose
-import github.xzynine.superislandui.floating.bigisland.components.ProgressCompose
-import github.xzynine.superislandui.floating.bigisland.components.TextButtonCompose
-import github.xzynine.superislandui.floating.common.CommonImageCompose
-import github.xzynine.superislandui.floating.common.SuperIslandComposeRoot
+import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
+import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import github.xzynine.superislandui.floating.bigisland.components.SuperIslandTemplateCompose
 import github.xzynine.superislandui.floating.smallisland.compose.BigIslandCollapsedCompose
-import github.xzynine.superislandui.model.components.MediaSessionData
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import notifyrelay.base.log.Logger
+import notifyrelay.base.util.ClipboardUtils
+import notifyrelay.base.util.ToastUtils
 import notifyrelay.shared.ui.viewmodel.MediaControlViewModel
+import notifyrelay.shared.ui.viewmodel.mediaControlViewModel
 import org.json.JSONObject
-import top.yukonga.miuix.kmp.basic.Text
 
 /**
  * 浮窗条目数据类，对应原有EntryRecord
@@ -84,7 +61,7 @@ fun FloatingWindowContainer(
     modifier: Modifier = Modifier,
     onUpdateEntryHeight: ((String, Int) -> Unit)? = null,
     isContainerDragging: Boolean = false,
-    mediaViewModel: MediaControlViewModel = viewModel(),
+    mediaViewModel: MediaControlViewModel = mediaControlViewModel(),
 ) {
     LocalContext.current
 
@@ -155,226 +132,38 @@ fun FloatingWindowContainer(
                         enter = expandedEnterTransition,
                         exit = expandedExitTransition,
                     ) {
-                        SuperIslandComposeRoot(
-                            content = {
-                                val hasParamV2 = entry.paramV2 != null
-
-                                val context = LocalContext.current
-                                if (hasParamV2) {
-                                    entry.paramV2.let { paramV2 ->
-                                        Logger.d("超级岛", "FloatingWindowContainer渲染: paramIsland=${paramV2.paramIsland != null}, highlight=${paramV2.highlightInfo != null}, baseInfo=${paramV2.baseInfo != null}")
-                                        when {
-                                            // 媒体类型处理
-                                            paramV2.business == "media" -> {
-                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 MediaIslandCompose")
-                                                // 构建MediaSessionData
-                                                val mediaSession =
-                                                    MediaSessionData(
-                                                        packageName = entry.appName ?: "",
-                                                        appName = entry.appName,
-                                                        title = entry.title ?: "",
-                                                        text = entry.text ?: "",
-                                                        coverUrl =
-                                                            entry.picMap?.get("miui.focus.pic_cover")
-                                                                ?: entry.picMap?.values?.firstOrNull(),
-                                                        deviceName = entry.appName ?: "",
-                                                    )
-                                                // 使用媒体类型大岛组件
-                                                MediaIslandCompose(
-                                                    mediaSession = mediaSession,
-                                                    isExpanded = entry.isExpanded,
-                                                    onCollapse = {
-                                                        // 点击条目切换展开状态
-                                                        onEntryClick(entry.key)
-                                                    },
-                                                    onPlayPause = {
-                                                        // 媒体控制按钮点击事件，由 ViewModel 承载
-                                                        mediaViewModel.playPauseLocal()
-                                                    },
-                                                    onPrevious = {
-                                                        mediaViewModel.previousLocal()
-                                                    },
-                                                    onNext = {
-                                                        mediaViewModel.nextLocal()
-                                                    },
-                                                    onClose = {
-                                                        // 发送关闭指令，由外部处理
-                                                        onEntryClick(entry.key)
-                                                    },
-                                                )
-                                            }
-
-                                            paramV2.paramIsland != null -> {
-                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 ParamIslandCompose")
-                                                ParamIslandCompose(paramV2.paramIsland!!, actions = paramV2.actions, picMap = entry.picMap)
-                                            }
-
-                                            // 组合模板渲染：主内容组件 + 右侧识别图形组件1 + 底部按钮组件
-                                            else -> {
-                                                // 主内容组件：文本组件/IM图文/动画文本/新图文/封面/强调图文/识别图形
-                                                val hasPrimaryContent =
-                                                    paramV2.baseInfo != null ||
-                                                        paramV2.chatInfo != null ||
-                                                        paramV2.animTextInfo != null ||
-                                                        paramV2.iconTextInfo != null ||
-                                                        paramV2.coverInfo != null ||
-                                                        paramV2.highlightInfo != null
-                                                val hasPicInfo = paramV2.picInfo != null
-                                                // 按钮组件：按钮组件5 / 2、3 / 4 / 1（位于底部按钮区）
-                                                val hasButton =
-                                                    paramV2.highlightInfoV3 != null ||
-                                                        paramV2.hintInfo != null ||
-                                                        paramV2.textButton != null ||
-                                                        paramV2.actions?.isNotEmpty() == true
-
-                                                if (!hasPrimaryContent && !hasPicInfo && !hasButton) {
-                                                    Logger.d("超级岛", "FloatingWindowContainer: 渲染 DefaultSuperIslandCompose")
-                                                    // 默认模板：未支持的模板类型
-                                                    Box(modifier = Modifier.padding(16.dp)) {
-                                                        Text(
-                                                            text = "未支持的模板",
-                                                            color = Color.White,
-                                                        )
-                                                    }
-                                                } else {
-                                                    Column(modifier = Modifier.fillMaxWidth()) {
-                                                        // 顶部：主内容组件 + 右侧识别图形组件1（应用图标）
-                                                        if (hasPrimaryContent || hasPicInfo) {
-                                                            Row(
-                                                                modifier = Modifier.fillMaxWidth(),
-                                                                verticalAlignment = Alignment.CenterVertically,
-                                                            ) {
-                                                                Box(modifier = Modifier.weight(1f)) {
-                                                                    when {
-                                                                        paramV2.baseInfo != null -> {
-                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 BaseInfoCompose")
-                                                                            BaseInfoCompose(paramV2.baseInfo!!, picMap = entry.picMap)
-                                                                        }
-                                                                        paramV2.chatInfo != null -> {
-                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 ChatInfoCompose")
-                                                                            ChatInfoCompose(paramV2, picMap = entry.picMap)
-                                                                        }
-                                                                        paramV2.animTextInfo != null -> {
-                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 AnimTextInfoCompose")
-                                                                            AnimTextInfoCompose(paramV2.animTextInfo!!, picMap = entry.picMap)
-                                                                        }
-                                                                        paramV2.iconTextInfo != null -> {
-                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 IconTextInfoCompose")
-                                                                            IconTextInfoCompose(paramV2.iconTextInfo!!, picMap = entry.picMap)
-                                                                        }
-                                                                        paramV2.coverInfo != null -> {
-                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 CoverInfoCompose")
-                                                                            CoverInfoCompose(paramV2.coverInfo!!, picMap = entry.picMap)
-                                                                        }
-                                                                        paramV2.highlightInfo != null -> {
-                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 HighlightInfoCompose")
-                                                                            HighlightInfoCompose(paramV2.highlightInfo!!, picMap = entry.picMap)
-                                                                        }
-                                                                        paramV2.picInfo != null -> {
-                                                                            Logger.d("超级岛", "FloatingWindowContainer: 渲染 PicInfoCompose")
-                                                                            PicInfoCompose(paramV2.picInfo!!, picMap = entry.picMap)
-                                                                        }
-                                                                    }
-                                                                }
-                                                                // 识别图形组件1：主内容存在时作为右侧应用图标（主内容为 picInfo 自身时不重复）
-                                                                if (hasPicInfo && hasPrimaryContent) {
-                                                                    Spacer(modifier = Modifier.width(8.dp))
-                                                                    CommonImageCompose(
-                                                                        picKey = paramV2.picInfo!!.pic,
-                                                                        picMap = entry.picMap,
-                                                                        size = 28.dp,
-                                                                    )
-                                                                }
-                                                            }
-                                                        }
-                                                        // 底部按钮区：按钮组件5 / 2、3 / 4 / 1
-                                                        if (hasButton) {
-                                                            if (hasPrimaryContent || hasPicInfo) {
-                                                                Spacer(modifier = Modifier.height(6.dp))
-                                                                Spacer(
-                                                                    modifier =
-                                                                        Modifier
-                                                                            .fillMaxWidth()
-                                                                            .height(1.dp)
-                                                                            .background(Color(0x33FFFFFF)),
-                                                                )
-                                                                Spacer(modifier = Modifier.height(2.dp))
-                                                            }
-                                                            when {
-                                                                paramV2.highlightInfoV3 != null -> {
-                                                                    Logger.d("超级岛", "FloatingWindowContainer: 渲染 HighlightInfoV3Compose")
-                                                                    HighlightInfoV3Compose(paramV2.highlightInfoV3!!, picMap = entry.picMap)
-                                                                }
-                                                                paramV2.hintInfo != null -> {
-                                                                    Logger.d("超级岛", "FloatingWindowContainer: 渲染 HintInfoCompose")
-                                                                    HintInfoCompose(paramV2.hintInfo!!, picMap = entry.picMap)
-                                                                }
-                                                                paramV2.textButton != null -> {
-                                                                    Logger.d("超级岛", "FloatingWindowContainer: 渲染 TextButtonCompose")
-                                                                    TextButtonCompose(paramV2.textButton!!, picMap = entry.picMap)
-                                                                }
-                                                            }
-                                                            // 按钮动作区独立于上方内容分支：只要 actions 非空就渲染，
-                                                            // 避免被 highlightInfoV3 / hintInfo / textButton 任一存在而吞掉。
-                                                            if (paramV2.actions?.isNotEmpty() == true) {
-                                                                Logger.d("超级岛", "FloatingWindowContainer: 渲染 ActionCompose")
-                                                                ActionCompose(paramV2.actions!!, entry.picMap)
-                                                            }
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-
-                                        // 进度组件
-                                        paramV2.multiProgressInfo?.let {
-                                            MultiProgressCompose(it, picMap = entry.picMap, business = entry.business)
-                                        } ?: paramV2.progressInfo?.let {
-                                            ProgressCompose(it, entry.picMap)
-                                        }
-                                    }
+                        val context = LocalContext.current
+                        SuperIslandTemplateCompose(
+                            paramV2 = entry.paramV2,
+                            picMap = entry.picMap,
+                            fallbackTitle = entry.title,
+                            fallbackContent = entry.text,
+                            mediaAppName = entry.appName,
+                            isOverlapping = entry.isOverlapping,
+                            onCopyVerificationCode = { code ->
+                                if (code.contains("*")) {
+                                    ToastUtils.showShortToast(context, "请解锁对端设备")
+                                } else if (!ClipboardUtils.copyText(context, "verification code", code)) {
+                                    Logger.e("ParamIslandCompose", "复制验证码失败")
+                                    ToastUtils.showShortToast(context, "复制失败")
                                 } else {
-                                    // 兜底显示：当没有paramV2时，使用title和text作为fallback
-                                    Box(modifier = Modifier.padding(16.dp)) {
-                                        Row(
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            modifier = Modifier.fillMaxWidth(),
-                                        ) {
-                                            // 添加a区图标
-                                            CommonImageCompose(
-                                                picKey = null,
-                                                picMap = entry.picMap,
-                                                size = 24.dp,
-                                                isFocusIcon = true,
-                                                contentDescription = null,
-                                            )
-
-                                            // 文本内容
-                                            Column(
-                                                modifier = Modifier.padding(start = 8.dp),
-                                            ) {
-                                                if (!entry.title.isNullOrEmpty()) {
-                                                    Text(
-                                                        text = entry.title,
-                                                        color = Color.White,
-                                                        fontSize = 16.sp,
-                                                        fontWeight = FontWeight.Bold,
-                                                        modifier = Modifier.padding(bottom = 8.dp),
-                                                    )
-                                                }
-                                                if (!entry.text.isNullOrEmpty()) {
-                                                    Text(
-                                                        text = entry.text,
-                                                        color = Color(0xFFDDDDDD),
-                                                        fontSize = 14.sp,
-                                                    )
-                                                }
-                                            }
-                                        }
+                                    runCatching {
+                                        ClipboardSyncManager.syncTextDirectly(
+                                            DeviceConnectionManagerSingleton.getDeviceQuery(context),
+                                            code,
+                                            context,
+                                        )
+                                        ToastUtils.showShortToast(context, "验证码已复制")
+                                    }.onFailure {
+                                        Logger.e("ParamIslandCompose", "复制验证码失败", it)
+                                        ToastUtils.showShortToast(context, "复制失败")
                                     }
                                 }
                             },
-                            isOverlapping = entry.isOverlapping,
+                            onPlayPause = { mediaViewModel.playPauseLocal() },
+                            onPrevious = { mediaViewModel.previousLocal() },
+                            onNext = { mediaViewModel.nextLocal() },
+                            onCollapseClick = { onEntryClick(entry.key) },
                         )
                     }
 

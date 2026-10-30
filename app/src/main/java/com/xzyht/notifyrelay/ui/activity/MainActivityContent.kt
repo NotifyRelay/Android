@@ -40,6 +40,7 @@ import notifyrelay.shared.ui.screen.HistoryScreen
 import notifyrelay.shared.ui.screen.MainScreen
 import notifyrelay.shared.ui.screen.SettingsAboutScreen
 import notifyrelay.shared.ui.screen.SettingsAppearanceScreen
+import notifyrelay.shared.ui.screen.SettingsDeveloperModeScreen
 import notifyrelay.shared.ui.screen.SettingsLocalFilterScreen
 import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
 import notifyrelay.shared.ui.screen.SettingsScreen
@@ -192,27 +193,39 @@ internal fun MainActivityContent(navigator: Navigator) {
                         SettingsLocalFilterScreen()
                     }
                     entry<Route.SettingsSuperIsland> {
-                        SettingsSuperIslandScreen { UISuperIslandSettings() }
+                        val showTestDialog = remember { mutableStateOf(false) }
+                        SettingsSuperIslandScreen {
+                            UISuperIslandSettings(onOpenTestBranch = { showTestDialog.value = true })
+                        }
+                        com.xzyht.notifyrelay.ui.dialog
+                            .SuperIslandTestDialog(showTestDialog, context)
                     }
                     entry<Route.SettingsDeveloperMode> {
                         // 通知字段转储为 Android 专有页面：经本地状态在开发者选项内切换显示
                         var showDumpPage by remember { mutableStateOf(false) }
                         if (showDumpPage) {
-                            com.xzyht.notifyrelay.ui.devtools
-                                .NotificationFieldDumpPage()
+                            notifyrelay.shared.ui.common.ScrollableTopAppBarPage(
+                                title = "通知字段转储",
+                                onBack = { showDumpPage = false },
+                            ) {
+                                com.xzyht.notifyrelay.ui.devtools
+                                    .NotificationFieldDumpPage()
+                            }
                         } else {
-                            DeveloperModeScreen(
-                                onOpenGuideBranch = { branch ->
-                                    val intent =
+                            SettingsDeveloperModeScreen {
+                                DeveloperModeScreen(
+                                    onOpenGuideBranch = { branch ->
+                                        val intent =
+                                            notifyrelay.base.util.IntentUtils
+                                                .createIntent(context, GuideActivity::class.java)
+                                        intent.putExtra("fromInternal", true)
+                                        intent.putExtra("forceBranch", branch)
                                         notifyrelay.base.util.IntentUtils
-                                            .createIntent(context, GuideActivity::class.java)
-                                    intent.putExtra("fromInternal", true)
-                                    intent.putExtra("forceBranch", branch)
-                                    notifyrelay.base.util.IntentUtils
-                                        .startActivity(context, intent, true)
-                                },
-                                onOpenDumpPage = { showDumpPage = true },
-                            )
+                                            .startActivity(context, intent, true)
+                                    },
+                                    onOpenDumpPage = { showDumpPage = true },
+                                )
+                            }
                         }
                     }
                     entry<Route.SettingsScrcpy> {

@@ -129,6 +129,14 @@ private fun OverlayContent() {
             }
         }
 
+        // 超级岛超时回收：超过存活时长没有更新的条目自动移除
+        LaunchedEffect(Unit) {
+            while (true) {
+                delay(SUPER_ISLAND_TIMEOUT_MS)
+                DesktopOverlayStore.pruneSuperIslands(SUPER_ISLAND_TIMEOUT_MS)
+            }
+        }
+
         // 弹幕层
         DanmakuLayer(now = frameNow)
     }
@@ -234,30 +242,6 @@ private fun CollapsedMediaCapsule(
     }
 }
 
-/** 超级岛卡片：先以标题/正文呈现，布局解析待接入 paramV2。 */
-@Composable
-private fun SuperIslandCard(entry: SuperIslandEntry) {
-    Box(
-        Modifier
-            .width(380.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(Color(0xFF1C1C1E)),
-    ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-            Text(
-                text = entry.title.orEmpty(),
-                color = Color.White,
-                style = notifyrelay.desktop.overlay.OverlayTypography.TITLE,
-            )
-            Text(
-                text = entry.text.orEmpty(),
-                color = Color(0xFFB0B0B0),
-                style = notifyrelay.desktop.overlay.OverlayTypography.BODY,
-            )
-        }
-    }
-}
-
 /** 弹幕层：自右向左匀速滚动，出屏即移除。 */
 @Composable
 private fun DanmakuLayer(now: Long) {
@@ -297,6 +281,9 @@ private fun DanmakuLayer(now: Long) {
 
 private const val DANMAKU_SPEED_PX_PER_SEC = 180f
 
+/** 媒体卡展开后自动收起时长。 */
+private const val MEDIA_AUTO_COLLAPSE_MS = 5_000L
+
 /** 收起态胶囊宽度。 */
 private val COLLAPSED_WIDTH = 260.dp
 
@@ -317,9 +304,6 @@ private val CAPSULE_BACKGROUND = Color(0xCC000000)
 
 /** 收起态胶囊边框。 */
 private val CAPSULE_BORDER = Color(0x80FFFFFF)
-
-/** 媒体卡展开后自动收起时长。 */
-private const val MEDIA_AUTO_COLLAPSE_MS = 5_000L
 
 /** 媒体卡背景。 */
 private val MEDIA_CARD_BACKGROUND = Color(0xFF1C1C1E)

@@ -45,6 +45,15 @@ internal object DesktopOverlayStore {
         superIslands.remove(sourceKey)
     }
 
+    /** 清理超过存活时长没有更新的超级岛。 */
+    fun pruneSuperIslands(
+        timeoutMs: Long,
+        now: Long = System.currentTimeMillis(),
+    ) {
+        val expired = superIslands.filterValues { now - it.updatedAt > timeoutMs }.keys.toList()
+        expired.forEach { superIslands.remove(it) }
+    }
+
     /** 入队一条弹幕。 */
     fun addDanmaku(entry: DanmakuEntry) {
         danmaku.add(entry)
@@ -64,6 +73,8 @@ internal data class SuperIslandEntry(
     val text: String?,
     val paramV2Raw: String?,
     val pics: Map<String, String>?,
+    /** 最近更新时间（毫秒），用于超时回收。 */
+    val updatedAt: Long = System.currentTimeMillis(),
 )
 
 /** 一条弹幕显示数据。 */

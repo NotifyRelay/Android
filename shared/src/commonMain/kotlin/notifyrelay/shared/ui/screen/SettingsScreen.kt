@@ -134,6 +134,9 @@ fun SettingsLocalFilterScreen() = SettingsSubPage("本地过滤") { UILocalFilte
 @Composable
 fun SettingsSuperIslandScreen(content: @Composable () -> Unit) = SettingsSubPage("超级岛") { content() }
 
+@Composable
+fun SettingsDeveloperModeScreen(content: @Composable () -> Unit) = SettingsSubPage("开发者选项") { content() }
+
 /**
  * 屏幕镜像设置子页（含 TopAppBar）
  */
