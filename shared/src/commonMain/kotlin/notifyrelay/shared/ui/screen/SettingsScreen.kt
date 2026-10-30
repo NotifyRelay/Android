@@ -28,9 +28,11 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 /**
  * 设置页面屏幕
  * 传统 Preference 多子页类型：主页为设置项列表，点击进入对应子页
+ *
+ * @param showOverlayEntry 是否显示「叠加层」入口；仅桌面端为 true
  */
 @Composable
-fun SettingsScreen() {
+fun SettingsScreen(showOverlayEntry: Boolean = false) {
     val navigator = LocalNavigator.current
     val settingsPort = LocalSettingsPort.current
     val colorScheme = MiuixTheme.colorScheme
@@ -89,6 +91,16 @@ fun SettingsScreen() {
             modifier = Modifier.padding(horizontal = 16.dp),
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
+        // 叠加层为桌面端专有能力：Android 端不显示该入口
+        if (showOverlayEntry) {
+            ArrowPreference(
+                title = "叠加层",
+                summary = "媒体卡、超级岛与弹幕的显示设置",
+                onClick = { navigator.push(Route.SettingsOverlay) },
+                modifier = Modifier.padding(horizontal = 16.dp),
+            )
+            HorizontalDivider(modifier = Modifier.padding(horizontal = 32.dp))
+        }
         ArrowPreference(
             title = "关于",
             summary = "版本、更新与下载设置",
@@ -146,3 +158,7 @@ fun SettingsAboutScreen(content: @Composable () -> Unit) = SettingsSubPage("关�
 
 @Composable
 fun SettingsAppearanceScreen() = SettingsSubPage("外观") { UIAppearance() }
+
+/** 叠加层设置子页（仅桌面端注册内容）。 */
+@Composable
+fun SettingsOverlayScreen(content: @Composable () -> Unit) = SettingsSubPage("叠加层") { content() }

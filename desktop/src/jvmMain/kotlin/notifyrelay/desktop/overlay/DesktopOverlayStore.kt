@@ -64,9 +64,18 @@ internal object DesktopOverlayStore {
         expired.forEach { superIslands.remove(it) }
     }
 
+    /** 弹幕轨道运行态：不入 Compose 状态，避免每帧触发重组。 */
+    val danmakuTracks = java.util.concurrent.ConcurrentHashMap<Long, DanmakuTracks.Occupancy>()
+
     /** 入队一条弹幕。 */
     fun addDanmaku(entry: DanmakuEntry) {
         danmaku.add(entry)
+    }
+
+    /** 移除弹幕并清理其轨道占用。 */
+    fun removeDanmakuWithTrack(entry: DanmakuEntry) {
+        danmaku.remove(entry)
+        danmakuTracks.remove(entry.id)
     }
 
     /** 移除已结束的弹幕。 */
@@ -100,4 +109,7 @@ internal data class DanmakuEntry(
     val iconPng: ByteArray? = null,
     /** 入队时刻（毫秒）。 */
     val spawnAt: Long = System.currentTimeMillis(),
-)
+) {
+    /** 弹幕文本（应用名 + 标题 + 内容）。 */
+    val displayText: String get() = appName + ": " + title + " - " + text
+}

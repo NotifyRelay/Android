@@ -20,6 +20,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -32,7 +33,10 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onGloballyPositioned
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
@@ -46,10 +50,12 @@ import github.xzynine.superislandui.model.components.MediaSessionData
 import kotlinx.coroutines.delay
 import notifyrelay.base.log.Logger
 import notifyrelay.desktop.DataLayerDesktop
+import notifyrelay.desktop.platform.DesktopOverlaySettings
 import notifyrelay.domain.feature.media.MediaSessionSnapshot
 import top.yukonga.miuix.kmp.basic.Text
 import java.awt.Dimension
 import java.awt.Toolkit
+import kotlin.math.roundToInt
 
 /**
  * 叠加层窗口：无边框、透明、置顶、点击穿透、不抢焦点。
@@ -60,12 +66,17 @@ import java.awt.Toolkit
 @Composable
 internal fun DesktopOverlayWindow() {
     val screen: Dimension = remember { Toolkit.getDefaultToolkit().screenSize }
+    // 窗口按物理像素铺满主屏：dp 与像素之间需除以 density，
+    // 否则系统缩放 150% 时窗口会被建成 1.5 倍屏幕尺寸
+    val density = LocalDensity.current
+    val widthDp = with(density) { screen.width.toFloat().toDp() }
+    val heightDp = with(density) { screen.height.toFloat().toDp() }
     val windowState =
         rememberWindowState(
             placement = WindowPlacement.Floating,
             position = WindowPosition(0.dp, 0.dp),
-            width = screen.width.dp,
-            height = screen.height.dp,
+            width = widthDp,
+            height = heightDp,
         )
 
     Window(
@@ -110,10 +121,20 @@ private fun OverlayContent() {
         }
     }
 
+    // 顶部卡片高度（像素）：作为弹幕轨道起点（对齐 C# 叠加层的 TopOffset）
+    var topOffsetPx by remember { mutableFloatStateOf(0f) }
+    val layoutDensity = LocalDensity.current
+
     Box(Modifier.fillMaxSize()) {
         // 顶部：媒体卡与超级岛纵向排布
         Column(
-            modifier = Modifier.align(Alignment.TopCenter).padding(top = 10.dp),
+            modifier =
+                Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 10.dp)
+                    .onGloballyPositioned { coords ->
+                        topOffsetPx = coords.size.height + TOP_CARD_BOTTOM_GAP_PX
+                    },
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(8.dp),
         ) {
@@ -141,8 +162,8 @@ private fun OverlayContent() {
             }
         }
 
-        // 弹幕层
-        DanmakuLayer(now = frameNow)
+        // 弹幕层：轨道从顶部卡片下方开始
+        DanmakuLayer(now = frameNow, topOffsetPx = topOffsetPx)
     }
 }
 
@@ -166,9 +187,10 @@ private fun OverlayMediaItem(
 ) {
     val trackKey = snapshot.title.orEmpty() + "\u0001" + snapshot.artist.orEmpty()
     var expanded by remember { mutableStateOf(true) }
-    LaunchedEffect(trackKey) {
+    val collapseMs = remember { DesktopOverlaySettings.mediaAutoCollapseMs }
+    LaunchedEffect(trackKey, collapseMs) {
         expanded = true
-        delay(MEDIA_AUTO_COLLAPSE_MS)
+        delay(collapseMs)
         expanded = false
     }
 
@@ -246,66 +268,170 @@ private fun CollapsedMediaCapsule(
     }
 }
 
-/** 弹幕层：自右向左匀速滚动，出屏即移除。 */
+/**
+ * 弹幕层。
+ *
+ * 与 C# 叠加层同口径：轨道起点取顶部卡片实测高度（`TopOffset`），
+ * 几何与字号一律按**物理像素**计（C# 侧窗口 DPI 固定 96，36px 字号即 60px 轨道）。
+ */
 @Composable
-private fun DanmakuLayer(now: Long) {
-    val screenWidth =
+private fun DanmakuLayer(
+    now: Long,
+    topOffsetPx: Float,
+) {
+    val screen =
         remember {
-            Toolkit
-                .getDefaultToolkit()
-                .screenSize.width
-                .toFloat()
+            Toolkit.getDefaultToolkit().screenSize
         }
-    val laneHeight = 44f
-    // 超过存活时间的弹幕移除，避免状态无限增长
+    val widthPx = screen.width.toFloat()
+    val heightPx = screen.height.toFloat()
+    val density = LocalDensity.current
+
+    // 到期弹幕：完全离屏即移除，并清理轨道占用
     val expired =
         DesktopOverlayStore.danmaku.filter { entry ->
-            (now - entry.spawnAt) / 1000f * DANMAKU_SPEED_PX_PER_SEC > screenWidth + 600f
+            val track = DesktopOverlayStore.danmakuTracks[entry.id] ?: return@filter false
+            DanmakuTracks.isExpired(
+                spawnX = track.spawnX,
+                spawnAt = track.spawnAt,
+                width = track.width,
+                now = now,
+            )
         }
-    expired.forEach { DesktopOverlayStore.removeDanmaku(it) }
+    expired.forEach { DesktopOverlayStore.removeDanmakuWithTrack(it) }
 
-    DesktopOverlayStore.danmaku.forEachIndexed { index, entry ->
-        val elapsed = (now - entry.spawnAt) / 1000f
-        val x = screenWidth - elapsed * DANMAKU_SPEED_PX_PER_SEC
+    // 字号按物理像素换算为 sp：Compose 的 sp 会再乘 fontScale 与 density
+    val fontScale = density.fontScale * density.density
+    val fontSizeSp = (DanmakuTracks.fontSizePx / fontScale.coerceAtLeast(0.01f)).sp
+    // 图标边长在 C# 中等于字号像素值
+    val iconSizeDp = with(density) { (DanmakuTracks.fontSizePx / density.density).dp }
+
+    // 每帧批量分配：只要还有待分配条目且轨道可分配就持续分配（对应 C# 的 SpawnPending）
+    val pendingIds =
+        DesktopOverlayStore.danmaku
+            .filter { DesktopOverlayStore.danmakuTracks[it.id] == null }
+            .map { it.id }
+    if (pendingIds.isNotEmpty()) {
+        val occupied = DesktopOverlayStore.danmakuTracks.values.toMutableList()
+        val widthCache = HashMap<Long, Float>()
+        DesktopOverlayStore.danmaku.forEach { widthCache[it.id] = estimateWidth(it, density.density) }
+        val assigned =
+            DanmakuTracks.spawnPending(
+                width = widthPx,
+                topOffset = topOffsetPx,
+                areaHeight = heightPx,
+                now = now,
+                pending = pendingIds,
+                occupied = occupied,
+                widthOf = { id -> widthCache[id] ?: 0f },
+            )
+        assigned.forEach { (id, occupancy) -> DesktopOverlayStore.danmakuTracks[id] = occupancy }
+    }
+
+    DesktopOverlayStore.danmaku.forEach { entry ->
+        val track = DesktopOverlayStore.danmakuTracks[entry.id] ?: return@forEach
+        val x = track.spawnX - (now - track.spawnAt) / 1000f * DanmakuTracks.pixelsPerSecond
+        // 纯文字绘制：无卡片背景，阴影与描边只作用于文字（与 C# DrawDanmaku 一致）
         Row(
             modifier =
                 Modifier
-                    .offset(x = x.dp, y = (520 + (index % 6) * laneHeight).dp)
-                    .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xCC000000))
-                    .padding(horizontal = 10.dp, vertical = 6.dp),
+                    // 直接以像素定位，避免 dp 换算改变轨道位置
+                    .offset { IntOffset(x.roundToInt(), track.trackY.roundToInt()) },
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // 来源应用图标：文本行内与字号等高，缺失时不占位
             val icon = rememberDanmakuIcon(entry.iconPng)
             if (icon != null) {
                 Image(
                     bitmap = icon,
                     contentDescription = entry.appName,
-                    modifier = Modifier.size(DANMAKU_ICON_SIZE).clip(RoundedCornerShape(4.dp)),
-                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.size(iconSizeDp),
+                    contentScale = ContentScale.FillBounds,
                 )
-                Spacer(Modifier.width(6.dp))
+                Spacer(Modifier.width(8.dp))
             }
-            Text(
-                text = entry.appName + ": " + entry.title + " - " + entry.text,
-                color = Color.White,
-                style = notifyrelay.desktop.overlay.OverlayTypography.BODY,
-            )
+            DanmakuText(text = entry.displayText, fontSize = fontSizeSp)
         }
     }
 }
 
-private const val DANMAKU_SPEED_PX_PER_SEC = 180f
+/**
+ * 弹幕文字：黑色描边 + 白色填充 + 右下 2px 阴影。
+ *
+ * 对应 C# `DrawDanmaku`：`BorderEnabled = true`、`BorderThickness = 2`、
+ * `ShadowEnabled = true`、`ShadowDepth = 2`、`Color = #FFFFFF`、`Bold = true`。
+ */
+@Composable
+private fun DanmakuText(
+    text: String,
+    fontSize: androidx.compose.ui.unit.TextUnit,
+) {
+    val style =
+        androidx.compose.ui.text.TextStyle(
+            fontSize = fontSize,
+            fontWeight = androidx.compose.ui.text.font.FontWeight.Bold,
+        )
+    // 两层文字必须叠在同一位置：用 Box 承载，否则 Row 会把它们并排摆放
+    Box {
+        // 描边层：Stroke 样式的同文案
+        Text(
+            text = text,
+            color = Color.Black,
+            style =
+                style.copy(
+                    drawStyle =
+                        androidx.compose.ui.graphics.drawscope
+                            .Stroke(width = 2f),
+                ),
+        )
+        // 填充层：白色 + 文字阴影
+        Text(
+            text = text,
+            color = Color.White,
+            style =
+                style.copy(
+                    shadow =
+                        androidx.compose.ui.graphics.Shadow(
+                            color = Color.Black,
+                            offset =
+                                androidx.compose.ui.geometry
+                                    .Offset(2f, 2f),
+                            blurRadius = 0f,
+                        ),
+                ),
+        )
+    }
+}
 
-/** 弹幕应用图标边长，与 13sp 正文视觉对齐。 */
-private val DANMAKU_ICON_SIZE = 24.dp
+/**
+ * 估算弹幕宽度（像素）。
+ *
+ * 按保守上界计算，宁可偏大：CJK 字符按满宽（1.0×字号）、ASCII 按 0.6×字号，
+ * 再加上图标（字号值 + 8）与左右内边距。偏大会让轨道让位更保守，避免重叠。
+ */
+private fun estimateWidth(
+    entry: DanmakuEntry,
+    density: Float,
+): Float {
+    val font = DanmakuTracks.fontSizePx
+    var textWidth = 0f
+    entry.displayText.forEach { ch ->
+        textWidth += if (ch.code > 0x2E80) font else font * 0.6f
+    }
+    val iconWidth = if (entry.iconPng != null) font + 8f else 0f
+    return textWidth + iconWidth + 20f * density
+}
 
-/** 解码弹幕应用图标；无图标或解码失败时返回 null。 */
+/** 顶部卡片与首条弹幕轨道之间的间距（像素）。 */
+private const val TOP_CARD_BOTTOM_GAP_PX = 16f
+
+/** 解码弹幕应用图标（与列表/历史同一条解码路径，含透明留白裁剪）；无图标或解码失败时返回 null。 */
 @Composable
 private fun rememberDanmakuIcon(png: ByteArray?): ImageBitmap? =
     remember(png) {
-        png?.let { bytes -> notifyrelay.base.util.decodeImageBitmap(bytes) }
+        png?.let { bytes ->
+            notifyrelay.desktop.platform.DesktopIconCodecPort
+                .decodeIconBitmap(bytes)
+        }
     }
 
 /** 媒体卡展开后自动收起时长。 */

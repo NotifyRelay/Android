@@ -36,6 +36,7 @@ import notifyrelay.desktop.device.DesktopDevicePortsProvider
 import notifyrelay.desktop.device.DesktopScrcpyScreen
 import notifyrelay.desktop.platform.DesktopDeviceListPort
 import notifyrelay.desktop.platform.DesktopNotificationActionPort
+import notifyrelay.desktop.platform.DesktopOverlaySettingsContent
 import notifyrelay.desktop.platform.DesktopThemePort
 import notifyrelay.desktop.platform.DesktopToastHost
 import notifyrelay.desktop.platform.DesktopWindowController
@@ -68,6 +69,7 @@ import notifyrelay.shared.ui.screen.SettingsAboutScreen
 import notifyrelay.shared.ui.screen.SettingsAppearanceScreen
 import notifyrelay.shared.ui.screen.SettingsDeveloperModeScreen
 import notifyrelay.shared.ui.screen.SettingsLocalFilterScreen
+import notifyrelay.shared.ui.screen.SettingsOverlayScreen
 import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
 import notifyrelay.shared.ui.screen.SettingsScreen
 import notifyrelay.shared.ui.screen.SettingsSuperIslandScreen
@@ -472,7 +474,7 @@ private fun DesktopRoot(
                                         },
                                     )
                                 },
-                                settingsContent = { SettingsScreen() },
+                                settingsContent = { SettingsScreen(showOverlayEntry = true) },
                             )
                         }
                         // 与 MainScreen 页签同源：单独 push 这两个路由时复用同一内容，避免未注册 entry 报错
@@ -489,13 +491,16 @@ private fun DesktopRoot(
                                 },
                             )
                         }
-                        entry<Route.Settings> { SettingsScreen() }
+                        entry<Route.Settings> { SettingsScreen(showOverlayEntry = true) }
                         entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
                         entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
                         entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
                         entry<Route.SettingsDeveloperMode> { SettingsDeveloperModeScreen { DeveloperModeScreen() } }
                         entry<Route.SettingsAbout> { SettingsAboutScreen {} }
                         entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
+                        entry<Route.SettingsOverlay> {
+                            SettingsOverlayScreen { DesktopOverlaySettingsContent() }
+                        }
                         entry<Route.SettingsScrcpy> { ScrcpySettingsPage() }
                         // 高级设置与基础设置同页：桌面端参数集较移动端少，不再分组
                         entry<Route.ScrcpyAdvanced> { ScrcpySettingsPage() }
