@@ -1,6 +1,8 @@
 package notifyrelay.desktop.platform
 
+import kotlinx.coroutines.runBlocking
 import notifyrelay.base.log.Logger
+import notifyrelay.shared.feature.appslist.SharedAppIcon
 import org.jetbrains.skia.Bitmap
 import org.jetbrains.skia.Data
 import org.jetbrains.skia.Paint
@@ -12,8 +14,8 @@ import java.awt.image.BufferedImage
 /**
  * 应用图标（矢量源）。
  *
- * 桌面端图标取自打包进资源的 `app_icon.svg`，按目标尺寸即时栅格化，
- * 不维护多档位像素图；窗口图标、托盘图标与标题栏图标共用同一份矢量源。
+ * 矢量源是 :shared 的 `composeResources/drawable/app_icon.svg`，与 Android 共用同一份；
+ * 桌面端按目标尺寸即时栅格化，不维护多档位像素图。
  */
 object AppIcon {
     private const val TAG = "DesktopAppIcon"
@@ -27,31 +29,25 @@ object AppIcon {
     /** 底色圆角半径占边长的比例。 */
     private const val CORNER_RADIUS_RATIO = 0.22f
 
-    /** 资源内的矢量图标路径。 */
-    private const val RESOURCE = "/app_icon.svg"
-
     /** 常见标题栏与任务栏尺寸。 */
     private val SIZES = intArrayOf(16, 20, 24, 32, 40, 48, 64, 128, 256)
-
-    /** 矢量源字节；缺失时为空数组。 */
-    private val svgBytes: ByteArray by lazy { loadSvg() }
 
     /**
      * 构建多尺寸窗口图标。
      *
-     * @return 按尺寸升序排列的图像列表；矢量源缺失或解码失败时返回空列表
+     * @return 按尺寸升序排列的图像列表；矢量源不可用时返回空列表
      */
     fun images(): List<BufferedImage> {
-        if (svgBytes.isEmpty()) return emptyList()
-        return SIZES.map { size -> runCatching { render(size) }.getOrNull() }.filterNotNull()
+        val svg = loadSvg() ?: return emptyList()
+        return SIZES.map { size -> runCatching { render(svg, size) }.getOrNull() }.filterNotNull()
     }
 
-    /**
-     * 按指定边长渲染图标。
-     *
-     * @param size 边长（像素）
-     */
-    fun render(size: Int): BufferedImage = render(svgBytes, size)
+    /** 读取 :shared 的矢量源；不可用时记日志并返回 null。 */
+    private fun loadSvg(): ByteArray? =
+        runCatching { runBlocking { SharedAppIcon.preload() } }.getOrElse {
+            Logger.w(TAG, "读取矢量图标失败", it)
+            null
+        }
 
     /**
      * 用给定矢量源渲染图标，供构建期图标生成复用。
@@ -99,15 +95,6 @@ object AppIcon {
             paint,
         )
     }
-
-    /** 读取矢量源；资源缺失时记日志并返回空数组。 */
-    private fun loadSvg(): ByteArray =
-        runCatching {
-            AppIcon::class.java.getResourceAsStream(RESOURCE)?.use { it.readBytes() }
-        }.getOrElse {
-            Logger.w(TAG, "读取矢量图标失败", it)
-            null
-        } ?: ByteArray(0)
 
     /** Skia Bitmap 转 BufferedImage。 */
     private fun Bitmap.toBufferedImage(): BufferedImage {

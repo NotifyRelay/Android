@@ -47,7 +47,6 @@ class DesktopWindowController(
         return runCatching {
             com.sun.jna.Native
                 .getWindowID(current)
-                .toLong()
         }.getOrElse {
             Logger.w(TAG, "取窗口句柄失败: " + it.message)
             0L

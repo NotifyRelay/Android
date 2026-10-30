@@ -117,7 +117,7 @@ tasks
 // ===== 应用图标 =====
 // 图标源是矢量文件 src/jvmMain/resources/app_icon.svg：运行期按需要尺寸即时栅格化，
 // 打包期由 IconTool 生成 Windows .ico，不维护多档位像素图。
-val iconSvgFile = layout.projectDirectory.file("src/jvmMain/resources/app_icon.svg")
+val iconSvgFile = rootProject.projectDir.resolve("shared/src/commonMain/composeResources/drawable/app_icon.svg")
 val iconIcoFile = layout.buildDirectory.file("icon.ico")
 val jvmMainCompilation = kotlin.jvm().compilations.getByName("main")
 
@@ -131,7 +131,7 @@ val generateIconIco =
         inputs.file(iconSvgFile)
         outputs.file(iconIcoFile)
         doFirst {
-            args(iconSvgFile.asFile.absolutePath, iconIcoFile.get().asFile.absolutePath)
+            args(iconSvgFile.absolutePath, iconIcoFile.get().asFile.absolutePath)
         }
     }
 

@@ -38,7 +38,6 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
-import kotlinx.coroutines.runBlocking
 import notifyrelay.desktop.device.DesktopDeviceManager
 import notifyrelay.desktop.device.DesktopDevicePortsProvider
 import notifyrelay.desktop.device.DesktopScrcpyScreen
@@ -51,11 +50,9 @@ import notifyrelay.desktop.platform.DesktopWindowPlacement
 import notifyrelay.desktop.platform.ProvideDesktopExtraPorts
 import notifyrelay.desktop.platform.ProvideDesktopPairingDependencies
 import notifyrelay.desktop.platform.ProvideDesktopUiPorts
-import notifyrelay.desktop.platform.WindowIcon
 import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 import notifyrelay.shared.feature.appslist.AppIconPortRegistry
 import notifyrelay.shared.feature.appslist.LocalAppsPortRegistry
-import notifyrelay.shared.feature.appslist.SharedAppIcon
 import notifyrelay.shared.ui.common.NotifyRelayTheme
 import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
@@ -161,17 +158,12 @@ fun main() {
     // 通知历史、应用列表与图标的请求链路均取该管理器（与 Android 的 scanDeviceList 同口径）
     DataLayerDesktop.registerDeviceManager(deviceManager)
 
-    // 窗口图标由矢量源按需栅格化；矢量不可用时回退到 :shared 的位图资源
-    val fallbackIcons =
-        runCatching {
-            runBlocking { SharedAppIcon.preload() }?.let { WindowIcon.buildMultiSize(it) } ?: emptyList()
-        }.getOrDefault(emptyList())
+    // 窗口图标由 :shared 的矢量图标即时栅格化（与 Android 共用同一份资源）
     val iconImages =
         runCatching {
             notifyrelay.desktop.platform.AppIcon
                 .images()
         }.getOrDefault(emptyList())
-            .ifEmpty { fallbackIcons }
 
     application {
         // 主窗口状态：上次的非最大化矩形与最大化标记，启动时还原、退出时保存

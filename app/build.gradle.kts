@@ -42,6 +42,24 @@ val injectedVersionCode =
             ?: fixedVersionCode.toString()
     ).toIntOrNull() ?: fixedVersionCode
 
+// AGP 9 的 KMP 库插件下，:shared 的 composeResources 不会自动进入安卓 assets，
+// 这里同步一份到应用 assets（路径与 compose 资源访问器的包名一致）。
+val sharedComposeAssetsDir = layout.buildDirectory.dir("generated/sharedComposeAssets")
+
+val syncSharedComposeResources =
+    tasks.register<Sync>("syncSharedComposeResources") {
+        description = "把 :shared 的 composeResources 同步到应用 assets"
+        group = "build"
+        from(rootProject.layout.projectDirectory.dir("shared/src/commonMain/composeResources")) {
+            into("composeResources/notifyrelay.shared.generated.resources")
+        }
+        into(sharedComposeAssetsDir)
+    }
+
+tasks
+    .matching { it.name.startsWith("mergeDebugAssets") || it.name.startsWith("mergeReleaseAssets") }
+    .configureEach { dependsOn(syncSharedComposeResources) }
+
 android {
     namespace = "com.xzyht.notifyrelay"
     compileSdk =
@@ -152,6 +170,8 @@ android {
             isUniversalApk = true
         }
     }
+
+    sourceSets["main"].assets.srcDir(sharedComposeAssetsDir.get().asFile)
 
     // 配置资源打包选项，解决 META-INF/DEPENDENCIES 冲突问题
     packaging {
