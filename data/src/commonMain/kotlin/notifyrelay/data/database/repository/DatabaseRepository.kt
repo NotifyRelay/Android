@@ -249,23 +249,29 @@ open class DatabaseRepository(
     ): Boolean = notificationRecordDao.countByContent(deviceUuid, packageName, title, text) > 0
 
     /**
-     * 跨全部设备判断是否已存在「同包名 + 同应用名 + 同标题 + 同正文」记录。
+     * 判断是否已存在「同包名 + 同应用名 + 同标题 + 同正文」记录。
+     *
+     * @param deviceUuid 为空时跨全部设备判定
      */
     suspend fun hasNotificationWithExactContent(
         packageName: String,
         appName: String,
         title: String,
         text: String,
-    ): Boolean = notificationRecordDao.countByExactContent(packageName, appName, title, text) > 0
+        deviceUuid: String? = null,
+    ): Boolean = notificationRecordDao.countByExactContent(packageName, appName, title, text, deviceUuid) > 0
 
     /**
      * 取指定时刻之后、同一包名的记录，按时间倒序限制条数。
+     *
+     * @param deviceUuid 为空时跨全部设备取候选
      */
     suspend fun getRecentNotificationsByPackage(
         packageName: String,
         sinceTime: Long,
         limit: Int,
-    ): List<NotificationRecordEntity> = notificationRecordDao.getRecentByPackage(packageName, sinceTime, limit)
+        deviceUuid: String? = null,
+    ): List<NotificationRecordEntity> = notificationRecordDao.getRecentByPackage(packageName, sinceTime, limit, deviceUuid)
 
     /**
      * 根据包名和设备UUID删除通知记录

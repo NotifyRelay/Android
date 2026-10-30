@@ -108,31 +108,39 @@ interface NotificationRecordDao {
     ): Int
 
     /**
-     * 跨全部设备统计「同包名 + 同应用名 + 同标题 + 同正文」的记录数。
+     * 统计「同包名 + 同应用名 + 同标题 + 同正文」的记录数。
      *
      * 用于相似度窗口之外的旧记录判定：不限时间，仅比对完全一致。
+     * [deviceUuid] 为空时跨全部设备统计。
      */
     @Query(
         "SELECT COUNT(*) FROM notification_records WHERE packageName = :packageName " +
-            "AND IFNULL(appName, '') = :appName AND IFNULL(title, '') = :title AND IFNULL(text, '') = :text",
+            "AND IFNULL(appName, '') = :appName AND IFNULL(title, '') = :title AND IFNULL(text, '') = :text " +
+            "AND (:deviceUuid IS NULL OR deviceUuid = :deviceUuid)",
     )
     suspend fun countByExactContent(
         packageName: String,
         appName: String,
         title: String,
         text: String,
+        deviceUuid: String?,
     ): Int
 
     /**
      * 取指定时刻之后、同一包名的记录，按时间倒序限制条数。
      *
      * 作为相似度比对的候选集，避免全表扫描。
+     * [deviceUuid] 为空时跨全部设备取候选。
      */
-    @Query("SELECT * FROM notification_records WHERE packageName = :packageName AND time >= :sinceTime ORDER BY time DESC LIMIT :limit")
+    @Query(
+        "SELECT * FROM notification_records WHERE packageName = :packageName AND time >= :sinceTime " +
+            "AND (:deviceUuid IS NULL OR deviceUuid = :deviceUuid) ORDER BY time DESC LIMIT :limit",
+    )
     suspend fun getRecentByPackage(
         packageName: String,
         sinceTime: Long,
         limit: Int,
+        deviceUuid: String?,
     ): List<NotificationRecordEntity>
 
     /**

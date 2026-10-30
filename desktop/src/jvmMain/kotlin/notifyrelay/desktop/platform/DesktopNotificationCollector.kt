@@ -11,8 +11,8 @@ import java.util.concurrent.ConcurrentHashMap
  * 系统设置 → 通知中允许），故不依赖稀疏 MSIX 包标识。
  *
  * 采集为轮询式，**与 Android `onListenerConnected` 同策略**：首轮即把当前
- * 全部活跃通知交给 [listener]，不做启动跳过；重复由上层「已处理缓存 + 落库去重」承担
- * （对应 Android 的 `NotificationProcessedCache` 与 `addNotification` 返回 false 不转发）。
+ * 全部活跃通知交给 [listener]，不做启动跳过。本采集器只按通知 id 拦截本进程内的重复回调，
+ * 内容级重复（含重启后重新枚举到的历史通知）由上层已入库检定承担。
  */
 internal object DesktopNotificationCollector {
     private const val TAG = "DesktopNotif"
@@ -20,17 +20,17 @@ internal object DesktopNotificationCollector {
     /** 轮询间隔：与 Windows 端一致（10 秒）。 */
     private const val POLL_INTERVAL_MS = 10_000L
 
-    /** 已处理通知的 TTL（毫秒）：与 Android `NotificationProcessedCache` 同量级。 */
-    private const val PROCESSED_TTL_MS = 60_000L
-
     /** 字段分隔符，与 Rust 侧编码一致。 */
     private const val FIELD_SEP = '\u0001'
 
     /** 记录分隔符，与 Rust 侧编码一致。 */
     private const val RECORD_SEP = '\u0002'
 
-    /** 已处理通知 id → 处理时刻，用于 TTL 去重（对应 Android `NotificationProcessedCache`）。 */
-    private val processed = ConcurrentHashMap<String, Long>()
+    /** 本进程内已回调的通知 id，避免同一通知在后续轮询中重复回调。 */
+    private val seenIds = ConcurrentHashMap.newKeySet<String>()
+
+    /** 已回调 id 的上限：超过后整体清空（重新回调同样由上层已入库检定拦截）。 */
+    private const val SEEN_IDS_LIMIT = 4096
 
     @Volatile
     private var pollThread: Thread? = null
@@ -86,19 +86,15 @@ internal object DesktopNotificationCollector {
     }
 
     /**
-     * 读取一次并回调未处理的通知。
+     * 读取一次并回调未见过的通知。
      *
-     * 与 Android 一致：过滤已处理项后立刻标记，避免同一通知在一轮内重复。
+     * 只按通知 id 拦截本进程内的重复回调；内容级重复由上层已入库检定判定。
      */
     private fun dispatchNew(onNew: (Item) -> Unit) {
         val items = readAll() ?: return
-        val now = System.currentTimeMillis()
-        // 清理过期条目，避免映射无限增长
-        processed.entries.removeIf { now - it.value > PROCESSED_TTL_MS }
+        if (seenIds.size > SEEN_IDS_LIMIT) seenIds.clear()
         items.forEach { item ->
-            val last = processed[item.id]
-            if (last != null && now - last <= PROCESSED_TTL_MS) return@forEach
-            processed[item.id] = now
+            if (!seenIds.add(item.id)) return@forEach
             runCatching { onNew(item) }
                 .onFailure { Logger.w(TAG, "处理通知失败", it) }
         }
@@ -118,7 +114,7 @@ internal object DesktopNotificationCollector {
         running = false
         pollThread?.interrupt()
         pollThread = null
-        processed.clear()
+        seenIds.clear()
     }
 
     /**

@@ -110,6 +110,8 @@ object InboundNotificationProcessor {
      *
      * @param packageName 已映射的本机等价包名。
      * @param appName 应用显示名。
+     * @param scopeDeviceUuid 限定比对的设备维度；为空时跨全部设备。本机采集链路传 [localDevice]，
+     *   远端入站链路留空。
      * @param excludeKey 需排除的记录键：平台已把本条写入库时传入，避免自我命中。
      * @return 是否判为重复。
      */
@@ -118,6 +120,7 @@ object InboundNotificationProcessor {
         appName: String,
         title: String,
         text: String,
+        scopeDeviceUuid: String? = null,
         excludeKey: String? = null,
         now: Long = System.currentTimeMillis(),
     ): Boolean {
@@ -136,6 +139,7 @@ object InboundNotificationProcessor {
                     packageName = packageName,
                     sinceTime = now - SIMILARITY_WINDOW_MS,
                     limit = SIMILARITY_CANDIDATE_LIMIT,
+                    deviceUuid = scopeDeviceUuid,
                 )
             }.getOrElse {
                 Logger.w(TAG, "读取相似度候选失败: pkg=" + packageName, it)
@@ -162,7 +166,7 @@ object InboundNotificationProcessor {
 
         val exactOld =
             runCatching {
-                repository.hasNotificationWithExactContent(packageName, appName, title, text)
+                repository.hasNotificationWithExactContent(packageName, appName, title, text, scopeDeviceUuid)
             }.getOrDefault(false)
         if (exactOld) {
             Logger.d(TAG, "24 小时外完全一致记录命中: pkg=" + packageName)

@@ -59,9 +59,9 @@ class DesktopLocalNotificationRelay(
                         deviceManager = manager,
                         persistLocally = true,
                     )
-                }.onSuccess { result ->
-                    // 已入库检定命中时只不上屏：转发与落库照常，跳过弹幕
-                    if (result == null || !result.showOnScreen) return@onSuccess
+                }.onSuccess { forwarded ->
+                    // 被过滤或与本机历史重复时网关返回 false，不落库不转发不上屏
+                    if (!forwarded) return@onSuccess
                     // 图标统一走缓存：先落库，再与列表/历史页读同一来源
                     registerLocalApp(item)
                     val icon = cachedIcon(item)
