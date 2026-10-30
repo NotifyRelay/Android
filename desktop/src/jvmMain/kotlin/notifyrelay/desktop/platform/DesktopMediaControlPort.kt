@@ -31,6 +31,8 @@ import notifyrelay.domain.feature.media.MediaSessionSnapshot
  */
 class DesktopMediaControlPort(
     private val onlineDevices: () -> List<DeviceInfo>,
+    /** 向指定设备发送一条 `DATA_MEDIA_CONTROL` 报文；返回是否已交给发送链路。 */
+    private val sendControl: (DeviceInfo, String) -> Boolean = { _, _ -> false },
 ) : MediaControlPort {
     private companion object {
         const val TAG = "DesktopMedia"
@@ -98,16 +100,23 @@ class DesktopMediaControlPort(
     /**
      * 向远端设备发送控制指令。
      *
-     * 桌面端只负责读取本机会话并展示，远端播放器由对端自行控制；
-     * 故此处仅在本机存在对应会话时下发媒体键，返回是否成功。
+     * 动作名与 Android 侧 `handleMediaControl` 一致，由对端以本机媒体键执行；
+     * 本机不再代为执行媒体键。
      */
     override fun sendToRemote(
         device: DeviceInfo,
         action: MediaControlAction,
     ): Boolean {
         if (onlineDevices().none { it.uuid == device.uuid }) return false
-        localControl(action)
-        return true
+        val name =
+            when (action) {
+                MediaControlAction.PLAY_PAUSE -> "playPause"
+                MediaControlAction.PREVIOUS -> "previous"
+                MediaControlAction.NEXT -> "next"
+            }
+        val sent = sendControl(device, """{"type":"MEDIA_CONTROL","action":"$name"}""")
+        if (!sent) Logger.w(TAG, "媒体指令下发失败: " + name + " 设备=" + device.displayName)
+        return sent
     }
 
     /** 启动本机会话轮询。 */

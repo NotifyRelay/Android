@@ -162,7 +162,11 @@ object DataLayerDesktop {
             // 系统媒体中心由入口在 Swing 事件线程上接线（见 Main.kt）
             notifyrelay.desktop.platform.DesktopSystemMediaControl
                 .setSendControl(sendMediaControl)
-            mediaControl = notifyrelay.desktop.platform.DesktopMediaControlPort { onlineDevices() }
+            mediaControl =
+                notifyrelay.desktop.platform.DesktopMediaControlPort(
+                    onlineDevices = { onlineDevices() },
+                    sendControl = sendMediaControl,
+                )
             MediaControlPortRegistry.install(mediaControl!!)
             // 系统媒体中心按设备取当前会话：中继播放时优先展示对端曲目信息
             notifyrelay.desktop.platform.DesktopSystemMediaControl.setSessionProvider { uuid ->

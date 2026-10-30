@@ -149,12 +149,13 @@ internal object DesktopSystemMediaControl {
         // 每次发布都取最新会话：会话晚到时无需等待 push
         relayDevice?.uuid?.let { uuid -> sessionProvider?.invoke(uuid)?.let { relaySnapshot = it } }
         val snapshot = relaySnapshot
-        // 有源设备会话时用其曲目信息；否则曲目为「来自：{设备名}的音频中继」、艺人为应用名
-        val fallbackTitle = "来自：" + name + "的音频中继"
+        // 有源设备会话时用其曲目信息；否则标题为「音频中继」、艺人为「来自：{设备名}」
+        val fallbackTitle = "音频中继"
+        val fallbackArtist = "来自：" + name
         Logger.i(
             TAG,
             "发布: 标题=" + (snapshot?.title ?: fallbackTitle) +
-                " 艺人=" + (snapshot?.artist ?: "NotifyRelay") +
+                " 艺人=" + (snapshot?.artist ?: fallbackArtist) +
                 " 设备=" + name,
         )
         onEdt {
@@ -162,7 +163,7 @@ internal object DesktopSystemMediaControl {
                 MediaControlService.setMetadata(
                     MediaMetadata(
                         title = snapshot?.title ?: fallbackTitle,
-                        artist = snapshot?.artist ?: "NotifyRelay",
+                        artist = snapshot?.artist ?: fallbackArtist,
                         // 有会话封面用会话封面，无封面时用应用图标
                         coverUrl = DesktopMediaCover.resolve(snapshot?.coverUrl),
                     ),
@@ -172,20 +173,25 @@ internal object DesktopSystemMediaControl {
         }
     }
 
-    /** 系统媒体按键：转发为对源设备的控制报文。 */
+    /**
+     * 系统媒体按键：转发为对源设备的控制报文。
+     *
+     * 动作名与 Android 侧 `handleMediaControl` 一致（playPause / next / previous），
+     * 使对端以本机媒体键执行播放控制。
+     */
     private fun handleEvent(event: MediaControlEvent) {
         val device = relayDevice ?: return
         val action =
             when (event) {
-                MediaControlEvent.Play -> "play"
-                MediaControlEvent.Pause -> "pause"
-                MediaControlEvent.Toggle -> "playpause"
+                MediaControlEvent.Play, MediaControlEvent.Pause, MediaControlEvent.Toggle -> "playPause"
                 MediaControlEvent.Next -> "next"
                 MediaControlEvent.Previous -> "previous"
-                MediaControlEvent.Stop -> "pause"
+                // 停止在语义上等同暂停，对端无独立停止动作
+                MediaControlEvent.Stop -> "playPause"
                 else -> null
             } ?: return
-        sendControl?.invoke(device, """{"type":"MEDIA_CONTROL","action":"$action"}""")
+        val sent = sendControl?.invoke(device, """{"type":"MEDIA_CONTROL","action":"$action"}""") ?: false
+        Logger.i(TAG, "系统媒体按键: " + action + " 设备=" + relayDeviceName + " 已发送=" + sent)
     }
 
     /** 在 Swing 事件线程上执行；调用线程不是 EDT 时同步等待。 */
