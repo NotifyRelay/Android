@@ -6,6 +6,7 @@ import androidx.room.useReaderConnection
 import androidx.room.useWriterConnection
 import androidx.sqlite.SQLiteException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
 import notifyrelay.data.database.AppDatabase
 import notifyrelay.data.database.dao.PackageCount
@@ -236,6 +237,16 @@ open class DatabaseRepository(
      * 获取设备的通知记录数量
      */
     suspend fun getNotificationCountByDevice(deviceUuid: String): Int = notificationRecordDao.countByDevice(deviceUuid)
+
+    /**
+     * 判断是否已存在同内容通知记录（跨重启内容级判重）
+     */
+    suspend fun hasNotificationWithContent(
+        deviceUuid: String,
+        packageName: String,
+        title: String,
+        text: String,
+    ): Boolean = notificationRecordDao.countByContent(deviceUuid, packageName, title, text) > 0
 
     /**
      * 根据包名和设备UUID删除通知记录
@@ -636,6 +647,11 @@ open class DatabaseRepository(
     suspend fun deleteAppByPackageName(packageName: String) {
         appDao.deleteByPackageName(packageName)
     }
+
+    /**
+     * 取指定来源设备登记过的应用关联（用于「历史出现过」的应用列表）。
+     */
+    suspend fun getAppDeviceLinks(deviceUuid: String): List<AppDeviceEntity> = appDeviceDao.getByDeviceUuid(deviceUuid).first()
 
     /**
      * 获取缺失图标的应用

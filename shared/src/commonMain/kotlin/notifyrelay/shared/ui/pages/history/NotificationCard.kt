@@ -120,7 +120,7 @@ fun NotificationCard(
                 Image(
                     bitmap = displayAppIcon,
                     contentDescription = null,
-                    modifier = Modifier.size(24.dp),
+                    modifier = Modifier.size(32.dp),
                 )
                 Spacer(modifier = Modifier.width(8.dp))
             }

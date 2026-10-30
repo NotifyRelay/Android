@@ -92,4 +92,11 @@ sealed interface Route : NavKey {
      */
     @Serializable
     data object SettingsAppearance : Route
+
+    /**
+     * 设置-叠加层子页面（仅桌面端显示）
+     * Settings overlay sub page, desktop only
+     */
+    @Serializable
+    data object SettingsOverlay : Route
 }

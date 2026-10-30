@@ -251,61 +251,48 @@ fun MusicControlPage(
         // 会话按「选中设备」各自取用，避免多台设备的媒体状态互相覆盖。
         val allSessions by mediaViewModel.sessionsFlow().collectAsState()
         val sessionSnapshot = allSessions[selectedDevice?.uuid ?: LOCAL_SESSION_KEY]
+        val deviceName = selectedDevice?.displayName ?: "本机"
+        // 无会话时仍保留媒体块，以「暂无正在播放」占位，避免区域塌陷
         val mediaSession =
-            sessionSnapshot?.let { snapshot ->
-                MediaSessionData(
-                    packageName = snapshot.packageName ?: "",
-                    appName = snapshot.packageName,
-                    title = snapshot.title.orEmpty(),
-                    text = snapshot.artist.orEmpty().ifBlank { snapshot.title.orEmpty() },
-                    coverUrl = snapshot.coverUrl,
-                    deviceName = selectedDevice?.displayName ?: "本机",
+            MediaSessionData(
+                packageName = sessionSnapshot?.packageName.orEmpty(),
+                appName = sessionSnapshot?.packageName,
+                title = sessionSnapshot?.title.orEmpty().ifBlank { "暂无正在播放" },
+                text = sessionSnapshot?.artist.orEmpty(),
+                coverUrl = sessionSnapshot?.coverUrl,
+                deviceName = deviceName,
+            )
+
+        // 用 Card 承载浮窗内容，给出明确边界（媒体卡片自身背景为深色，落在浅色页面时需要边框区分）
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            cornerRadius = 12.dp,
+            colors =
+                CardDefaults.defaultColors(
+                    color = colorScheme.surface,
+                    contentColor = colorScheme.onSurface,
+                ),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth()
+                        .background(Color(0xFF1C1C1E), RoundedCornerShape(12.dp)),
+            ) {
+                MediaIslandCompose(
+                    mediaSession = mediaSession,
+                    onPlayPause = {
+                        if (selectedDevice == null) mediaViewModel.playPauseLocal() else mediaViewModel.sendMediaCommand(selectedDevice, "playPause")
+                    },
+                    onPrevious = {
+                        if (selectedDevice == null) mediaViewModel.previousLocal() else mediaViewModel.sendMediaCommand(selectedDevice, "previous")
+                    },
+                    onNext = {
+                        if (selectedDevice == null) mediaViewModel.nextLocal() else mediaViewModel.sendMediaCommand(selectedDevice, "next")
+                    },
+                    onClose = {},
                 )
             }
-
-        if (mediaSession != null) {
-            // 用 Card 承载浮窗内容，给出明确边界（媒体卡片自身背景为深色，落在浅色页面时需要边框区分）
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                cornerRadius = 12.dp,
-                colors =
-                    CardDefaults.defaultColors(
-                        color = colorScheme.surface,
-                        contentColor = colorScheme.onSurface,
-                    ),
-            ) {
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxWidth()
-                            .background(Color(0xFF1C1C1E), RoundedCornerShape(12.dp)),
-                ) {
-                    MediaIslandCompose(
-                        mediaSession = mediaSession,
-                        onPlayPause = {
-                            if (selectedDevice == null) mediaViewModel.playPauseLocal() else mediaViewModel.sendMediaCommand(selectedDevice, "playPause")
-                        },
-                        onPrevious = {
-                            if (selectedDevice == null) mediaViewModel.previousLocal() else mediaViewModel.sendMediaCommand(selectedDevice, "previous")
-                        },
-                        onNext = {
-                            if (selectedDevice == null) mediaViewModel.nextLocal() else mediaViewModel.sendMediaCommand(selectedDevice, "next")
-                        },
-                        onClose = {},
-                    )
-                }
-            }
-        } else {
-            Text(
-                text =
-                    if (selectedDevice == null) {
-                        "本机暂无正在播放的媒体"
-                    } else {
-                        "「${selectedDevice.displayName}」暂无媒体会话信息"
-                    },
-                style = textStyles.body2,
-                color = colorScheme.onSurfaceSecondary,
-            )
         }
 
         // 提示信息

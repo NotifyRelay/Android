@@ -3,6 +3,8 @@
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/checkupdata" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/desktop/overlay" vcs="Git" />
+    <mapping directory="$PROJECT_DIR$/desktop/smtc-rust" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/nativecore/notify-relay-core" vcs="Git" />
     <mapping directory="$PROJECT_DIR$/scrcpy" vcs="Git" />
   </component>

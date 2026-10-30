@@ -65,8 +65,8 @@ internal class DesktopDataMessagePort(
         deviceUuid: String,
         payload: String,
     ) {
-        // 远端下发的媒体控制指令：以系统媒体键在本机执行
-        DesktopMediaRemoteHandler.onMediaControl(payload)
+        // 远端下发的媒体控制指令：携带发送方 uuid，供音频中继定位来源设备
+        DesktopMediaRemoteHandler.onMediaControl(payload, deviceUuid)
     }
 
     override fun onFtp(
@@ -92,5 +92,9 @@ internal class DesktopDataMessagePort(
     override fun onSuperIsland(
         deviceUuid: String,
         payload: String,
-    ) = Unit
+    ) {
+        // 超级岛：归一解析后写入叠加层状态，由叠加层窗口渲染
+        notifyrelay.desktop.overlay.DesktopSuperIslandInbound
+            .handle(deviceUuid, payload)
+    }
 }

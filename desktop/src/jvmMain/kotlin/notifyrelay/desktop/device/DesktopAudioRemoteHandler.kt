@@ -54,7 +54,10 @@ internal object DesktopAudioRemoteHandler {
     }
 
     /** 对端开始推送音频：本机启动 Rust 接收并播放。 */
-    fun onAudioStart(root: JsonObject) {
+    fun onAudioStart(
+        root: JsonObject,
+        senderUuid: String? = null,
+    ) {
         if (DesktopPcmPlayer.isRunning) return
         if (!com.xzyht.notifyrelay.nativecore.NativeCore
                 .isReady()
@@ -62,7 +65,12 @@ internal object DesktopAudioRemoteHandler {
             Logger.w(TAG, "原生核心未就绪，无法接收音频")
             return
         }
-        val remoteUuid = (root["remoteUuid"] as? JsonPrimitive)?.jsonPrimitive?.content.orEmpty()
+        // 报文中的设备字段在不同实现里为 remoteUuid / fromUuid / deviceUuid，取首个非空
+        val remoteUuid =
+            listOf("remoteUuid", "fromUuid", "deviceUuid")
+                .firstNotNullOfOrNull { key ->
+                    (root[key] as? JsonPrimitive)?.jsonPrimitive?.content?.takeIf { it.isNotBlank() }
+                }.orEmpty()
         val ret =
             com.xzyht.notifyrelay.nativecore.NativeCore.audioStart(
                 "recv",
@@ -83,11 +91,20 @@ internal object DesktopAudioRemoteHandler {
         com.xzyht.notifyrelay.nativecore.NativeCore.registerAudioDataCallback { pcm, _, _ ->
             DesktopPcmPlayer.write(pcm, pcm.size)
         }
+        // 对端发起的接收同样发布到系统媒体中心：报文字段优先，其次取报文发送方 uuid
+        val sourceDevice =
+            DataLayerDesktop.findOnlineDevice(remoteUuid)
+                ?: senderUuid?.let { DataLayerDesktop.findOnlineDevice(it) }
+        notifyrelay.desktop.platform.DesktopSystemMediaControl
+            .onRelayStarted(sourceDevice)
         Logger.i(TAG, "已开始接收对端音频")
     }
 
     /** 对端停止推送音频。 */
     fun onAudioStop() {
+        // 无论播放器是否已关闭，都要撤回系统媒体中心会话
+        notifyrelay.desktop.platform.DesktopSystemMediaControl
+            .onRelayStopped()
         if (!DesktopPcmPlayer.isRunning) return
         runCatching {
             com.xzyht.notifyrelay.nativecore.NativeCore

@@ -58,6 +58,10 @@ activityCompose = "1.13.0"
 reorderable = "3.1.0"
 timber = "5.0.1"
 jna = "5.19.1"
+# Nucleus 运行时模块（与 Compose 1.12 线配套）
+nucleus = "2.5.18"
+# ComposeNativeTray 独立版本线（托盘图标与原生菜单）
+composeNativeTray = "2.1.7"
 libxposed = "102.0.0"
 dexkit = "2.2.0"
 ezhooktool = "1.2.2"
@@ -155,6 +159,11 @@ timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "tim
 jna = { group = "net.java.dev.jna", name = "jna", version.ref = "jna" }
 # Win32 COM / Shell 封装（文件对话框 IFileOpenDialog）
 jna-platform = { group = "net.java.dev.jna", name = "jna-platform", version.ref = "jna" }
+compose-native-tray = { group = "dev.nucleusframework", name = "composenativetray", version.ref = "composeNativeTray" }
+nucleus-core-runtime = { group = "dev.nucleusframework", name = "nucleus.core-runtime", version.ref = "nucleus" }
+nucleus-darkmode-detector = { group = "dev.nucleusframework", name = "nucleus.darkmode-detector", version.ref = "nucleus" }
+nucleus-autolaunch = { group = "dev.nucleusframework", name = "nucleus.autolaunch", version.ref = "nucleus" }
+nucleus-media-control = { group = "dev.nucleusframework", name = "nucleus.media-control", version.ref = "nucleus" }
 libxposed-api = { group = "io.github.libxposed", name = "api", version.ref = "libxposed" }
 dexkit = { module = "org.luckypray:dexkit", version.ref = "dexkit" }
 ezhooktool-core = { group = "io.github.lingqiqi5211.ezhooktool", name = "core", version.ref = "ezhooktool" }

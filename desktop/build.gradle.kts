@@ -22,6 +22,14 @@ kotlin {
             // 超级岛公共 UI（含媒体浮窗 MediaIslandCompose）
             implementation(project(":superislandui"))
 
+            // 原生托盘与菜单（ComposeNativeTray，独立版本线）
+            implementation(libs.compose.native.tray)
+            // 单实例、系统深色模式、开机自启与系统媒体中心
+            implementation(libs.nucleus.core.runtime)
+            implementation(libs.nucleus.darkmode.detector)
+            implementation(libs.nucleus.autolaunch)
+            implementation(libs.nucleus.media.control)
+
             // 与 :shared 一致的 UI 组件库（shared 侧为 implementation，不传递）
             implementation(libs.miuix.ui.kmp)
             implementation(libs.miuix.preference.kmp)
@@ -84,6 +92,57 @@ val smtcRustBuild =
 tasks.named("compileKotlinJvm") { dependsOn(smtcRustBuild) }
 val smtcLibDir = smtcRustDir.resolve("target/release")
 
+// ===== 可分发包（createDistributable / runDistributable）的原生库 =====
+// 两个 Rust 动态库不随 jar 分发：复制进应用镜像的 app/resources，
+// 启动参数再把 JNA 与 System.loadLibrary 的搜索路径指向该目录。
+val distributableAppResources = layout.buildDirectory.dir("distributable/appResources")
+
+val prepareDistributableNatives =
+    tasks.register<Sync>("prepareDistributableNatives") {
+        description = "把 Rust 动态库收集到可分发包的资源目录"
+        group = "distribution"
+        into(distributableAppResources.map { it.dir("common") })
+        dependsOn(":core:hostRustBuild")
+        dependsOn(smtcRustBuild)
+        from(rustHostLibDir) { include("*.dll") }
+        from(smtcLibDir) { include("*.dll") }
+    }
+
+tasks
+    .matching {
+        it.name.startsWith("createDistributable") ||
+            it.name.startsWith("package") ||
+            it.name == "runDistributable" ||
+            it.name == "suggestRuntimeModules" ||
+            it.name == "prepareAppResources"
+    }.configureEach { dependsOn(prepareDistributableNatives) }
+
+tasks
+    .matching {
+        it.name.startsWith("createDistributable") || it.name.startsWith("package")
+    }.configureEach { dependsOn(generateIconIco) }
+
+// ===== 应用图标 =====
+// 图标源是矢量文件 src/jvmMain/resources/app_icon.svg：运行期按需要尺寸即时栅格化，
+// 打包期由 IconTool 生成 Windows .ico，不维护多档位像素图。
+val iconSvgFile = rootProject.projectDir.resolve("shared/src/commonMain/composeResources/drawable/app_icon.svg")
+val iconIcoFile = layout.buildDirectory.file("icon.ico")
+val jvmMainCompilation = kotlin.jvm().compilations.getByName("main")
+
+val generateIconIco =
+    tasks.register<JavaExec>("generateIconIco") {
+        description = "由矢量图标生成 Windows 图标文件"
+        group = "build"
+        dependsOn("jvmJar")
+        classpath = jvmMainCompilation.output.allOutputs + jvmMainCompilation.runtimeDependencyFiles
+        mainClass.set("notifyrelay.desktop.tool.IconTool")
+        inputs.file(iconSvgFile)
+        outputs.file(iconIcoFile)
+        doFirst {
+            args(iconSvgFile.absolutePath, iconIcoFile.get().asFile.absolutePath)
+        }
+    }
+
 // 原生库经 System.loadLibrary 载入，JDK 24+ 默认对未具名模块的原生访问告警；
 // 显式放行以消除 "A restricted method in java.lang.System has been called" 警告。
 val nativeAccessArgs = listOf("--enable-native-access=ALL-UNNAMED")
@@ -111,12 +170,23 @@ tasks.withType<Test>().configureEach {
 compose.desktop {
     application {
         mainClass = "notifyrelay.desktop.MainKt"
-        // 打包产物同样需要放行原生访问
+        // 打包产物同样需要放行原生访问；库搜索路径指向随包分发的资源目录（$APPDIR 由启动器替换）
         jvmArgs += nativeAccessArgs
+        jvmArgs +=
+            listOf(
+                "-Dstdout.encoding=UTF-8",
+                "-Dstderr.encoding=UTF-8",
+            )
         nativeDistributions {
             targetFormats(TargetFormat.Dmg, TargetFormat.Msi, TargetFormat.Deb)
             packageName = "NotifyRelay"
             packageVersion = "1.0.0"
+            appResourcesRootDir.set(distributableAppResources)
+            windows {
+                // 保留控制台，便于直接运行应用镜像时查看日志
+                console = true
+                iconFile.set(iconIcoFile)
+            }
         }
     }
 }

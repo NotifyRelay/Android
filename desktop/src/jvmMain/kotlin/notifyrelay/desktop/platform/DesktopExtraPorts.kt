@@ -168,6 +168,8 @@ class DesktopAudioRelayPort(
             DesktopPcmPlayer.write(pcm, pcm.size)
         }
         relayReceiving = true
+        // 中继播放期间向系统媒体中心发布正在播放
+        DesktopSystemMediaControl.onRelayStarted(device)
         return AudioOperationResult.Success("已启动中继音频接收")
     }
 
@@ -180,6 +182,7 @@ class DesktopAudioRelayPort(
                 .audioStop()
         }
         DesktopPcmPlayer.close()
+        DesktopSystemMediaControl.onRelayStopped()
     }
 
     private companion object {

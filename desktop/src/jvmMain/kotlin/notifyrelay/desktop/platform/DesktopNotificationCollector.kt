@@ -45,6 +45,8 @@ internal object DesktopNotificationCollector {
         val appPackage: String,
         val title: String,
         val text: String,
+        /** 应用图标原始字节；采集不到时为 null。 */
+        val iconPng: ByteArray? = null,
     )
 
     /** 采集是否可用（原生库加载成功）。 */
@@ -102,6 +104,14 @@ internal object DesktopNotificationCollector {
         }
     }
 
+    /** 解码 base64 图标字节；失败返回 null。 */
+    private fun decodeBase64(text: String): ByteArray? =
+        runCatching {
+            java.util.Base64
+                .getDecoder()
+                .decode(text)
+        }.getOrNull()
+
     /** 停止采集。 */
     fun stop() {
         if (!running) return
@@ -134,6 +144,8 @@ internal object DesktopNotificationCollector {
                 appPackage = f[2],
                 title = f[3],
                 text = f[4],
+                // 第 6 字段为应用图标 base64（Rust 侧 DisplayInfo.GetLogo），缺失时为空串
+                iconPng = f.getOrNull(5)?.takeIf { it.isNotBlank() }?.let { decodeBase64(it) },
             )
         }
     }

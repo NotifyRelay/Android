@@ -1,6 +1,8 @@
 package notifyrelay.desktop
 
 import com.xzyht.notifyrelay.nativecore.device.appsync.IconCodecPortRegistry
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import notifyrelay.data.Storage
 import notifyrelay.data.database.AppDatabaseJvmFactory
 import notifyrelay.data.database.repository.DatabaseRepository
@@ -76,6 +78,15 @@ object DataLayerDesktop {
     var clipboardSync: notifyrelay.desktop.platform.DesktopClipboardSyncPort? = null
         private set
 
+    /** 叠加层数据观察作用域（媒体会话等）。 */
+    private val overlayScope =
+        kotlinx.coroutines.CoroutineScope(
+            kotlinx.coroutines.SupervisorJob() + kotlinx.coroutines.Dispatchers.IO,
+        )
+
+    /** 媒体会话 → 叠加层的观察任务。 */
+    private var overlayMediaObserver: Job? = null
+
     /** 本机通知转发实例，由入口启动与释放。 */
     @Volatile
     var localNotificationRelay: notifyrelay.desktop.device.DesktopLocalNotificationRelay? = null
@@ -130,24 +141,55 @@ object DataLayerDesktop {
             AppIconPortRegistry.install(DesktopAppIconPort { deviceMessagePort() })
             LocalAppsPortRegistry.install(DesktopLocalAppsPort())
             RemoteAppsPortRegistry.install(DesktopRemoteAppsPort { deviceMessagePort() })
+            // 控制报文发送：音频转发与系统媒体中心共用
+            val sendMediaControl = { device: notifyrelay.domain.feature.device.model.DeviceInfo, plaintext: String ->
+                val host = deviceCallbackHost()
+                if (host == null) {
+                    false
+                } else {
+                    runCatching {
+                        host.sendDataMessage(device, "DATA_MEDIA_CONTROL", plaintext)
+                    }.isSuccess
+                }
+            }
             // 音频端口需要按 UUID 找设备并发送控制报文；两者都依赖设备消息端口
             AudioRelayPortRegistry.install(
                 DesktopAudioRelayPort(
                     findDevice = { uuid -> onlineDevices().find { it.uuid == uuid } },
-                    sendControl = { device, plaintext ->
-                        val host = deviceCallbackHost()
-                        if (host == null) {
-                            false
-                        } else {
-                            runCatching {
-                                host.sendDataMessage(device, "DATA_MEDIA_CONTROL", plaintext)
-                            }.isSuccess
-                        }
-                    },
+                    sendControl = sendMediaControl,
                 ),
             )
-            mediaControl = notifyrelay.desktop.platform.DesktopMediaControlPort { onlineDevices() }
+            // 系统媒体中心由入口在 Swing 事件线程上接线（见 Main.kt）
+            notifyrelay.desktop.platform.DesktopSystemMediaControl
+                .setSendControl(sendMediaControl)
+            mediaControl =
+                notifyrelay.desktop.platform.DesktopMediaControlPort(
+                    onlineDevices = { onlineDevices() },
+                    sendControl = sendMediaControl,
+                )
             MediaControlPortRegistry.install(mediaControl!!)
+            // 系统媒体中心按设备取当前会话：中继播放时优先展示对端曲目信息
+            notifyrelay.desktop.platform.DesktopSystemMediaControl.setSessionProvider { uuid ->
+                mediaControl?.sessionOf(uuid)
+            }
+            // 媒体会话 → 叠加层状态：由叠加层窗口直接渲染，不经位图与进程转换
+            overlayMediaObserver =
+                overlayScope.launch {
+                    mediaControl!!.sessionsFlow().collect { sessions ->
+                        // 映射中已不存在的设备：从叠加层移除
+                        val stale =
+                            notifyrelay.desktop.overlay.DesktopOverlayStore.mediaSessions.keys
+                                .filterNot { sessions.containsKey(it) }
+                        stale.forEach(notifyrelay.desktop.overlay.DesktopOverlayStore::removeMedia)
+                        sessions.forEach { (deviceUuid, snapshot) ->
+                            notifyrelay.desktop.overlay.DesktopOverlayStore
+                                .putMedia(deviceUuid, snapshot)
+                        }
+                        // 中继播放时同步源设备会话到系统媒体中心
+                        notifyrelay.desktop.platform.DesktopSystemMediaControl
+                            .onSessions(sessions)
+                    }
+                }
             SuperIslandConfigPortRegistry.install(DesktopSuperIslandConfigPort())
 
             // 剪贴板同步：收发判定在 Rust core，平台只做系统剪贴板读写

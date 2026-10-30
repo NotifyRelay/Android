@@ -38,6 +38,7 @@ private const val COVER_SIZE = 80
 fun MediaIslandCompose(
     mediaSession: MediaSessionData,
     isExpanded: Boolean = true,
+    showControls: Boolean = true,
     onCollapse: () -> Unit = {},
     onPlayPause: () -> Unit = {},
     onPrevious: () -> Unit = {},
@@ -46,6 +47,7 @@ fun MediaIslandCompose(
 ) {
     ExpandedMediaIsland(
         mediaSession = mediaSession,
+        showControls = showControls,
         onPlayPause = onPlayPause,
         onPrevious = onPrevious,
         onNext = onNext,
@@ -56,6 +58,7 @@ fun MediaIslandCompose(
 @Composable
 private fun ExpandedMediaIsland(
     mediaSession: MediaSessionData,
+    showControls: Boolean,
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit,
     onNext: () -> Unit,
@@ -143,6 +146,8 @@ private fun ExpandedMediaIsland(
                 )
             }
         }
+
+        if (!showControls) return@Column
 
         Spacer(modifier = Modifier.height(12.dp))
 

@@ -100,12 +100,40 @@ object LocalNotificationForwardGateway {
             } else {
                 notification.rawPackage
             }
+        // 内容级判重（跨重启）：本机通知每次采集的时间戳不同，
+        // 仅靠采集侧 TTL 无法覆盖重启后重新枚举到的历史通知；
+        // 与 Windows NotificationRepository 的聚合键同思路，命中即不重复转发。
+        if (persistLocally && isAlreadyStored(packageName, notification.title, notification.text)) {
+            Logger.d(TAG, "本机通知已存在，跳过: " + notification.appName)
+            return false
+        }
+
         val raw = buildNewPayload(notification, packageName)
         if (persistLocally) persist(raw)
         broadcast(raw, deviceManager)
         Logger.i(TAG, "已转发本机通知: " + notification.appName + " → " + packageName)
         return true
     }
+
+    /**
+     * 是否已存在同内容的本机通知记录。
+     *
+     * 仅比对「包名 + 标题 + 内容」，不含时间：本机通知由系统重新枚举时
+     * 时间戳会变，含时间会导致同一通知在每次启动后重复转发。
+     */
+    private suspend fun isAlreadyStored(
+        packageName: String,
+        title: String,
+        text: String,
+    ): Boolean =
+        runCatching {
+            DatabaseRepository.getInstance().hasNotificationWithContent(
+                deviceUuid = InboundNotificationProcessor.localDevice(),
+                packageName = packageName,
+                title = title,
+                text = text,
+            )
+        }.getOrDefault(false)
 
     /** 组装新增通知报文。 */
     private fun buildNewPayload(

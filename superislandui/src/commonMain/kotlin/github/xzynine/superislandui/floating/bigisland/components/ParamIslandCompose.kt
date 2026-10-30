@@ -1,4 +1,4 @@
-package com.xzyht.notifyrelay.feature.notification.superisland.floating.bigisland
+package github.xzynine.superislandui.floating.bigisland.components
 
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -10,26 +10,26 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.lifecycle.viewmodel.compose.viewModel
-import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
-import github.xzynine.superislandui.floating.bigisland.components.ProgressInfoCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.ActionInfo
 import github.xzynine.superislandui.model.core.ParamIsland
-import notifyrelay.base.log.Logger
-import notifyrelay.base.util.ClipboardUtils
-import notifyrelay.base.util.ToastUtils
-import notifyrelay.shared.ui.viewmodel.DevicePortsViewModel
-import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 
 /**
- * ParamIsland的Compose组件实现
+ * ParamIsland（摘要区）的 Compose 实现。
+ *
+ * 小岛区展示文本与进度，大岛区展示左/右图标与文本；
+ * 验证码的复制动作由平台注入 [onCopyVerificationCode]，为空时不渲染复制按钮。
+ *
+ * @param paramIsland 摘要区数据
+ * @param modifier 修饰符
+ * @param actions 动作列表（取其中的「复制」文案）
+ * @param picMap 图片键值表
+ * @param onCopyVerificationCode 复制验证码回调，参数为验证码文本
  */
 @Composable
 fun ParamIslandCompose(
@@ -37,24 +37,17 @@ fun ParamIslandCompose(
     modifier: Modifier = Modifier,
     actions: List<ActionInfo>? = null,
     picMap: Map<String, String>? = null,
-    viewModel: DevicePortsViewModel = devicePortsViewModel(),
+    onCopyVerificationCode: ((String) -> Unit)? = null,
 ) {
-    // 调试日志
-    paramIsland.bigIslandArea?.let {
-        Logger.d("超级岛ParamIslandCompose", "渲染ParamIsland: isVerCode=${it.isVerificationCode}, code=${it.verificationCode}, primary=${it.primaryText}")
-    }
-
     Column(
         modifier =
             modifier
                 .fillMaxWidth()
                 .padding(8.dp),
     ) {
-        // SmallIslandArea渲染
+        // 小岛区
         paramIsland.smallIslandArea?.let { smallArea ->
-            Column(
-                modifier = Modifier.fillMaxWidth(),
-            ) {
+            Column(modifier = Modifier.fillMaxWidth()) {
                 smallArea.primaryText?.let {
                     Text(
                         text = it,
@@ -74,24 +67,20 @@ fun ParamIslandCompose(
                 }
 
                 smallArea.progressInfo?.let { progressInfo ->
-                    ProgressInfoCompose(
-                        progressInfo = progressInfo,
-                    )
+                    ProgressInfoCompose(progressInfo = progressInfo)
                 }
             }
         }
 
-        // BigIslandArea渲染（简化版，仅显示文本信息）
+        // 大岛区
         paramIsland.bigIslandArea?.let { bigArea ->
             Column(
                 modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
             ) {
-                // 内容区域：图标 + 文本
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
                     modifier = Modifier.fillMaxWidth(),
                 ) {
-                    // 左侧图标
                     if (!bigArea.leftImage.isNullOrBlank()) {
                         CommonImageCompose(
                             picKey = bigArea.leftImage,
@@ -101,7 +90,6 @@ fun ParamIslandCompose(
                         Spacer(modifier = Modifier.width(12.dp))
                     }
 
-                    // 文本信息
                     Column(modifier = Modifier.weight(1f)) {
                         bigArea.primaryText?.let {
                             Text(
@@ -122,44 +110,20 @@ fun ParamIslandCompose(
                         }
                     }
 
-                    if (bigArea.isVerificationCode) {
+                    if (bigArea.isVerificationCode && onCopyVerificationCode != null) {
                         val copyAction =
-                            actions?.find {
-                                it.actionTitle?.contains("复制") == true
-                            } ?: ActionInfo(actionTitle = "复制")
+                            actions?.find { it.actionTitle?.contains("复制") == true }
+                                ?: ActionInfo(actionTitle = "复制")
                         val code = bigArea.verificationCode ?: bigArea.primaryText
                         if (!code.isNullOrBlank()) {
-                            Logger.d("ParamIslandCompose", "渲染验证码复制按钮: code=$code")
-                            val context = LocalContext.current
                             Spacer(modifier = Modifier.width(8.dp))
                             TextButton(
                                 text = copyAction.actionTitle ?: "复制",
-                                onClick = {
-                                    if (code.contains("*")) {
-                                        ToastUtils.showShortToast(context, "请解锁对端设备")
-                                    } else {
-                                        if (!ClipboardUtils.copyText(context, "verification code", code)) {
-                                            Logger.e("ParamIslandCompose", "复制验证码失败")
-                                            ToastUtils.showShortToast(context, "复制失败")
-                                        } else {
-                                            try {
-                                                val deviceManager = viewModel.queryPort()
-                                                ClipboardSyncManager.syncTextDirectly(deviceManager, code, context)
-                                                ToastUtils.showShortToast(context, "验证码已复制")
-                                            } catch (e: Exception) {
-                                                Logger.e("ParamIslandCompose", "复制验证码失败", e)
-                                                ToastUtils.showShortToast(context, "复制失败")
-                                            }
-                                        }
-                                    }
-                                },
+                                onClick = { onCopyVerificationCode(code) },
                             )
-                        } else {
-                            Logger.w("超级岛ParamIslandCompose", "验证码按钮未渲染: copyAction=${true}, code=${!code.isNullOrBlank()}")
                         }
                     }
 
-                    // 右侧图标
                     if (!bigArea.rightImage.isNullOrBlank()) {
                         Spacer(modifier = Modifier.width(12.dp))
                         CommonImageCompose(
