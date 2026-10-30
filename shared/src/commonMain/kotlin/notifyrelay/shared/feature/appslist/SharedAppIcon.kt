@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import notifyrelay.shared.generated.resources.Res
 import notifyrelay.shared.generated.resources.app_icon
+import notifyrelay.shared.generated.resources.app_icon_tile
 import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.getDrawableResourceBytes
 import org.jetbrains.compose.resources.getSystemResourceEnvironment
@@ -31,9 +32,13 @@ object SharedAppIcon {
     /** 绘制位图时的默认边长。 */
     private const val DEFAULT_BITMAP_SIZE = 96
 
-    /** 矢量资源本身：托盘等原生图标场景直接交给平台按目标尺寸栅格化。 */
+    /** 矢量资源本身（透明底）。 */
     val drawable: DrawableResource
         get() = Res.drawable.app_icon
+
+    /** 含品牌底色与圆角的完整图标：托盘、启动器等需要不透明图标的场景使用。 */
+    val tileDrawable: DrawableResource
+        get() = Res.drawable.app_icon_tile
 
     @Volatile
     private var cachedBytes: ByteArray? = null

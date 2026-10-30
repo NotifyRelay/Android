@@ -141,24 +141,33 @@ object DataLayerDesktop {
             AppIconPortRegistry.install(DesktopAppIconPort { deviceMessagePort() })
             LocalAppsPortRegistry.install(DesktopLocalAppsPort())
             RemoteAppsPortRegistry.install(DesktopRemoteAppsPort { deviceMessagePort() })
+            // 控制报文发送：音频转发与系统媒体中心共用
+            val sendMediaControl = { device: notifyrelay.domain.feature.device.model.DeviceInfo, plaintext: String ->
+                val host = deviceCallbackHost()
+                if (host == null) {
+                    false
+                } else {
+                    runCatching {
+                        host.sendDataMessage(device, "DATA_MEDIA_CONTROL", plaintext)
+                    }.isSuccess
+                }
+            }
             // 音频端口需要按 UUID 找设备并发送控制报文；两者都依赖设备消息端口
             AudioRelayPortRegistry.install(
                 DesktopAudioRelayPort(
                     findDevice = { uuid -> onlineDevices().find { it.uuid == uuid } },
-                    sendControl = { device, plaintext ->
-                        val host = deviceCallbackHost()
-                        if (host == null) {
-                            false
-                        } else {
-                            runCatching {
-                                host.sendDataMessage(device, "DATA_MEDIA_CONTROL", plaintext)
-                            }.isSuccess
-                        }
-                    },
+                    sendControl = sendMediaControl,
                 ),
             )
+            // 系统媒体中心由入口在 Swing 事件线程上接线（见 Main.kt）
+            notifyrelay.desktop.platform.DesktopSystemMediaControl
+                .setSendControl(sendMediaControl)
             mediaControl = notifyrelay.desktop.platform.DesktopMediaControlPort { onlineDevices() }
             MediaControlPortRegistry.install(mediaControl!!)
+            // 系统媒体中心按设备取当前会话：中继播放时优先展示对端曲目信息
+            notifyrelay.desktop.platform.DesktopSystemMediaControl.setSessionProvider { uuid ->
+                mediaControl?.sessionOf(uuid)
+            }
             // 媒体会话 → 叠加层状态：由叠加层窗口直接渲染，不经位图与进程转换
             overlayMediaObserver =
                 overlayScope.launch {
@@ -172,6 +181,9 @@ object DataLayerDesktop {
                             notifyrelay.desktop.overlay.DesktopOverlayStore
                                 .putMedia(deviceUuid, snapshot)
                         }
+                        // 中继播放时同步源设备会话到系统媒体中心
+                        notifyrelay.desktop.platform.DesktopSystemMediaControl
+                            .onSessions(sessions)
                     }
                 }
             SuperIslandConfigPortRegistry.install(DesktopSuperIslandConfigPort())

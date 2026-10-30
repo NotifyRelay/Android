@@ -1,7 +1,6 @@
 package notifyrelay.desktop
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +30,7 @@ import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import notifyrelay.desktop.device.DesktopDeviceManager
 import notifyrelay.desktop.device.DesktopDevicePortsProvider
 import notifyrelay.desktop.device.DesktopScrcpyScreen
@@ -118,6 +118,11 @@ private fun applyDistributionLibraryPath() {
 fun main() {
     applyDistributionLibraryPath()
 
+    // 应用标识：未用 Nucleus 插件打包时由系统属性提供，供系统媒体中心与自启解析 AUMID
+    System.setProperty("nucleus.app.id", "notifyrelay.desktop")
+    System.setProperty("nucleus.app.name", "NotifyRelay")
+    System.setProperty("nucleus.app.aumid", "NotifyRelay.Desktop")
+
     // 单实例：已有实例在运行时请求其显示窗口并退出，避免多进程共用同一份数据与端口
     if (!notifyrelay.desktop.platform.DesktopSingleInstance
             .acquire()
@@ -126,6 +131,15 @@ fun main() {
             .i("DesktopSingle", "已有实例在运行，已请求其显示窗口")
         return
     }
+
+    // 开机自启后端在后台预加载（首次加载会 dlopen 原生库，避免阻塞界面）
+    Thread({
+        notifyrelay.desktop.platform.DesktopAutoLaunch
+            .preload()
+    }, "desktop-autolaunch")
+        .apply {
+            isDaemon = true
+        }.start()
 
     // 数据层先初始化：偏好、历史等公共端 UI 均经 Storage 与端口读取
     DataLayerDesktop.initialize()
@@ -169,6 +183,8 @@ fun main() {
                     DataLayerDesktop.clipboardSync?.stop()
                     DataLayerDesktop.mediaControl?.stop()
                     DataLayerDesktop.localNotificationRelay?.stop()
+                    notifyrelay.desktop.platform.DesktopSystemMediaControl
+                        .stop()
                     exitApplication()
                 }
             }
@@ -204,13 +220,8 @@ fun main() {
             when (themeIndex.intValue) {
                 ThemeBaseIndex.LIGHT -> false
                 ThemeBaseIndex.DARK -> true
-                else -> isSystemInDarkTheme()
+                else -> isSystemInDarkMode()
             }
-
-        // 托盘右键菜单：Compose 弹层，位置取右键时的屏幕坐标
-
-        LaunchedEffect(windowController) {
-        }
 
         // 还原上次的窗口矩形（裁剪到屏幕内）；没有记录时首次启动居中
         val restoredBounds = remember { savedBounds?.let { DesktopWindowPlacement.clampToScreen(it) } }

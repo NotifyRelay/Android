@@ -42,6 +42,9 @@ object AppIcon {
         return SIZES.map { size -> runCatching { render(svg, size) }.getOrNull() }.filterNotNull()
     }
 
+    /** 读取 :shared 的矢量源；不可用时返回 null（供其它图标场景复用）。 */
+    fun loadSvgBytes(): ByteArray? = loadSvg()
+
     /** 读取 :shared 的矢量源；不可用时记日志并返回 null。 */
     private fun loadSvg(): ByteArray? =
         runCatching { runBlocking { SharedAppIcon.preload() } }.getOrElse {

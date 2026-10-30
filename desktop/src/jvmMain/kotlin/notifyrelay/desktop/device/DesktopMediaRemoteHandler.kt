@@ -66,7 +66,10 @@ internal object DesktopMediaRemoteHandler {
      *
      * 指令字段与 Windows 端一致：`playbackActionType` 取 `Play`/`Pause`/`playPause`/`Next`/`Previous`。
      */
-    fun onMediaControl(payload: String) {
+    fun onMediaControl(
+        payload: String,
+        deviceUuid: String? = null,
+    ) {
         val root =
             runCatching { json.parseToJsonElement(payload) as? JsonObject }
                 .getOrNull()
@@ -84,7 +87,7 @@ internal object DesktopMediaRemoteHandler {
                 return
             }
             "audiostart" -> {
-                DesktopAudioRemoteHandler.onAudioStart(root)
+                DesktopAudioRemoteHandler.onAudioStart(root, deviceUuid)
                 return
             }
             "audiostop" -> {
