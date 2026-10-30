@@ -183,8 +183,8 @@ compose.desktop {
             packageVersion = "1.0.0"
             appResourcesRootDir.set(distributableAppResources)
             windows {
-                // 保留控制台，便于直接运行应用镜像时查看日志
-                console = true
+                // 不显示控制台窗口：直接运行 exe 时无额外黑窗
+                console = false
                 iconFile.set(iconIcoFile)
             }
         }
