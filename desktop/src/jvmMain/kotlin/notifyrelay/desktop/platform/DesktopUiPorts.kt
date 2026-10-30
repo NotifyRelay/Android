@@ -34,16 +34,21 @@ private object DesktopToastPort : ToastPort {
     }
 }
 
-/** 桌面端剪贴板：使用 AWT 系统剪贴板。 */
+/** 桌面端剪贴板：文本经 [Win32Clipboard] 直写，绕开 AWT 的 LF→CRLF 转换。 */
 private object DesktopClipboardPort : ClipboardPort {
     override fun copyText(
         label: String,
         text: String,
-    ): Boolean =
-        runCatching {
-            Toolkit.getDefaultToolkit().systemClipboard.setContents(StringSelection(text), null)
+    ): Boolean {
+        if (Win32Clipboard.isAvailable()) return Win32Clipboard.writeText(text)
+        return runCatching {
+            Toolkit
+                .getDefaultToolkit()
+                .systemClipboard
+                .setContents(StringSelection(Win32Clipboard.normalizeNewlines(text)), null)
             true
         }.getOrDefault(false)
+    }
 }
 
 /**

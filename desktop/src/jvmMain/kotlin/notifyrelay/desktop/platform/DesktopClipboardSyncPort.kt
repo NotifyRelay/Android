@@ -24,7 +24,8 @@ import javax.imageio.ImageIO
  *
  * 与 Windows `ClipboardService` 同口径：
  * - 监听系统剪贴板变更事件（`AddClipboardFormatListener`，见 [ClipboardChangeMonitor]）；
- * - 采集文本（原样，不做换行归一）或图片（PNG → Base64）；
+ * - 文本经 [Win32Clipboard] 直写，绕开 AWT 写 `CF_UNICODETEXT` 时把 `\n` 换成 `\r\n` 的行为；
+ * - 采集文本时归一换行为 `\n`（`CRLF` → `LF`，其余字符不变），图片走 AWT（PNG → Base64）；
  * - 去重、防循环、频率限制与 2MB 阈值全部交给 Rust core（`clipboardOnChanged`）；
  * - 收到远端报文经 `clipboardOnReceived` 解析后写回系统剪贴板。
  *
@@ -43,6 +44,9 @@ class DesktopClipboardSyncPort(
 
         /** 图片 MIME。 */
         const val MIME_PNG = "image/png"
+
+        /** Rust 归一后的类型：图片。 */
+        const val CLIPBOARD_TYPE_IMAGE = "image"
     }
 
     private val enabledState = MutableStateFlow(Storage.getBoolean(KEY_ENABLED, true))
@@ -135,18 +139,21 @@ class DesktopClipboardSyncPort(
         if (content.isEmpty()) return
 
         runCatching {
-            val clipboard = Toolkit.getDefaultToolkit().systemClipboard
-            val transferable =
-                if (type == "image") {
-                    val bytes = Base64.getDecoder().decode(content)
-                    val image = ImageIO.read(bytes.inputStream()) ?: return@runCatching
-                    ImageSelection(image)
-                } else {
-                    java.awt.datatransfer.StringSelection(content)
-                }
-            clipboard.setContents(transferable, null)
+            if (type == CLIPBOARD_TYPE_IMAGE) {
+                val bytes = Base64.getDecoder().decode(content)
+                val image = ImageIO.read(bytes.inputStream()) ?: return@runCatching
+                Toolkit.getDefaultToolkit().systemClipboard.setContents(ImageSelection(image), null)
+            } else if (Win32Clipboard.isAvailable()) {
+                // 直写原生格式：AWT 写路径会把 \n 放大成 \r\n，本机剪贴板将与本机内容不一致
+                if (!Win32Clipboard.writeText(content)) return@runCatching
+            } else {
+                Toolkit
+                    .getDefaultToolkit()
+                    .systemClipboard
+                    .setContents(java.awt.datatransfer.StringSelection(Win32Clipboard.normalizeNewlines(content)), null)
+            }
             // 同步本地内容签名：回写触发的下一次变更事件不应再被当作本机内容发出
-            lastSignature = content.hashCode()
+            lastSignature = Win32Clipboard.normalizeNewlines(content).hashCode()
         }.onFailure { Logger.w(TAG, "写入系统剪贴板失败", it) }
     }
 
@@ -211,9 +218,10 @@ class DesktopClipboardSyncPort(
                 runCatching { transferable.getTransferData(DataFlavor.stringFlavor) as? String }
                     .getOrNull()
             if (!raw.isNullOrEmpty()) {
-                // 内容原样传递：Rust core 与 Android 均不做换行归一，
-                // 在此改写会与另外两端产生内容差异（接收端看到被改写的文本）
-                return raw to MIME_TEXT
+                // 换行归一为 LF（与 Windows 端 ClipboardService 同口径）：
+                // AWT 读原生 CF_UNICODETEXT 时已把 CRLF 压成 LF，
+                // 但读本 JVM 自己写入的内容是逐字返回，此处再归一一遍以覆盖该情形
+                return Win32Clipboard.normalizeNewlines(raw) to MIME_TEXT
             }
         }
 
