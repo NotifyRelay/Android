@@ -14,12 +14,61 @@ package wtf.magma.audio
  * 其目录已加入 `jna.library.path` / `java.library.path`。
  */
 object SMTCLoader {
-    /** 库是否加载成功；失败时各方法返回空值，不抛异常。 */
-    val available: Boolean =
-        runCatching {
-            System.loadLibrary("smtc_jni")
-            true
-        }.getOrDefault(false)
+    private const val TAG = "SMTCLoader"
+
+    /** 库文件名。 */
+    private const val LIBRARY_NAME = "smtc_jni"
+
+    /**
+     * 库是否加载成功；失败时各方法返回空值，不抛异常。
+     *
+     * `System.loadLibrary` 的搜索路径在 JVM 首次加载原生库时即被缓存，
+     * 应用镜像里运行期补的 `java.library.path` 可能已不生效，
+     * 因此在按名加载失败后按绝对路径逐个候选目录尝试。
+     */
+    val available: Boolean = load()
+
+    /** 按「库名 → 候选目录绝对路径」的顺序尝试加载，失败时记录失败原因。 */
+    private fun load(): Boolean {
+        val byName = runCatching { System.loadLibrary(LIBRARY_NAME) }
+        if (byName.isSuccess) return true
+        val fileName = System.mapLibraryName(LIBRARY_NAME)
+        val tried = mutableListOf<String>()
+        for (dir in candidateDirs()) {
+            val file = java.io.File(dir, fileName)
+            if (!file.isFile) continue
+            if (runCatching { System.load(file.absolutePath) }.isSuccess) {
+                notifyrelay.base.log.Logger
+                    .i(TAG, "原生库按路径加载成功: " + file.absolutePath)
+                return true
+            }
+            tried.add(file.absolutePath)
+        }
+        notifyrelay.base.log.Logger.w(
+            TAG,
+            "原生库加载失败: " + byName.exceptionOrNull()?.message +
+                " 候选=" + tried.joinToString(","),
+        )
+        return false
+    }
+
+    /** 收集原生库候选目录：资源目录、两个库搜索路径与当前目录。 */
+    private fun candidateDirs(): List<String> {
+        val dirs = linkedSetOf<String>()
+        System
+            .getProperty("compose.application.resources.dir")
+            ?.takeIf { it.isNotBlank() }
+            ?.let { dirs.add(it) }
+        for (key in listOf("java.library.path", "jna.library.path")) {
+            System
+                .getProperty(key)
+                ?.split(java.io.File.pathSeparator)
+                ?.filter { it.isNotBlank() }
+                ?.let { dirs.addAll(it) }
+        }
+        dirs.add(System.getProperty("user.dir").orEmpty())
+        return dirs.toList()
+    }
 
     /**
      * 当前会话的媒体信息。
