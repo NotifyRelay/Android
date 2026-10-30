@@ -109,6 +109,32 @@ tasks
             it.name == "prepareAppResources"
     }.configureEach { dependsOn(prepareDistributableNatives) }
 
+tasks
+    .matching {
+        it.name.startsWith("createDistributable") || it.name.startsWith("package")
+    }.configureEach { dependsOn(generateIconIco) }
+
+// ===== 应用图标 =====
+// 图标源是矢量文件 src/jvmMain/resources/app_icon.svg：运行期按需要尺寸即时栅格化，
+// 打包期由 IconTool 生成 Windows .ico，不维护多档位像素图。
+val iconSvgFile = layout.projectDirectory.file("src/jvmMain/resources/app_icon.svg")
+val iconIcoFile = layout.buildDirectory.file("icon.ico")
+val jvmMainCompilation = kotlin.jvm().compilations.getByName("main")
+
+val generateIconIco =
+    tasks.register<JavaExec>("generateIconIco") {
+        description = "由矢量图标生成 Windows 图标文件"
+        group = "build"
+        dependsOn("jvmJar")
+        classpath = jvmMainCompilation.output.allOutputs + jvmMainCompilation.runtimeDependencyFiles
+        mainClass.set("notifyrelay.desktop.tool.IconTool")
+        inputs.file(iconSvgFile)
+        outputs.file(iconIcoFile)
+        doFirst {
+            args(iconSvgFile.asFile.absolutePath, iconIcoFile.get().asFile.absolutePath)
+        }
+    }
+
 // 原生库经 System.loadLibrary 载入，JDK 24+ 默认对未具名模块的原生访问告警；
 // 显式放行以消除 "A restricted method in java.lang.System has been called" 警告。
 val nativeAccessArgs = listOf("--enable-native-access=ALL-UNNAMED")
@@ -140,8 +166,6 @@ compose.desktop {
         jvmArgs += nativeAccessArgs
         jvmArgs +=
             listOf(
-                "-Djna.library.path=\$APPDIR/resources",
-                "-Djava.library.path=\$APPDIR/resources",
                 "-Dstdout.encoding=UTF-8",
                 "-Dstderr.encoding=UTF-8",
             )
@@ -153,6 +177,7 @@ compose.desktop {
             windows {
                 // 保留控制台，便于直接运行应用镜像时查看日志
                 console = true
+                iconFile.set(iconIcoFile)
             }
         }
     }

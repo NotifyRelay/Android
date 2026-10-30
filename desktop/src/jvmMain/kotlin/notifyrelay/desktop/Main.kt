@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
+import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
@@ -46,6 +47,7 @@ import notifyrelay.desktop.platform.DesktopNotificationActionPort
 import notifyrelay.desktop.platform.DesktopThemePort
 import notifyrelay.desktop.platform.DesktopToastHost
 import notifyrelay.desktop.platform.DesktopWindowController
+import notifyrelay.desktop.platform.DesktopWindowPlacement
 import notifyrelay.desktop.platform.ProvideDesktopExtraPorts
 import notifyrelay.desktop.platform.ProvideDesktopPairingDependencies
 import notifyrelay.desktop.platform.ProvideDesktopUiPorts
@@ -103,8 +105,40 @@ import kotlin.math.abs
 
 private const val TRAY_ICON_SIZE = 32
 
+/** 等待窗口尺寸就绪的上限。 */
+private const val MAX_WAIT_WINDOW_SIZE_MS = 1200
+
+/** 等待窗口尺寸就绪的轮询间隔。 */
+private const val WINDOW_SIZE_POLL_MS = 16L
+
+/** 首次启动时的默认窗口宽度。 */
+private const val DEFAULT_WINDOW_WIDTH = 900
+
+/** 首次启动时的默认窗口高度。 */
+private const val DEFAULT_WINDOW_HEIGHT = 640
+
+/**
+ * 补齐可分发镜像的原生库搜索路径。
+ *
+ * 应用镜像把 Rust 动态库放在 resources 目录，`compose.application.resources.dir`
+ * 在开发运行与镜像运行时都指向该目录；已显式配置库路径时不再覆盖。
+ */
+private fun applyDistributionLibraryPath() {
+    val resourcesDir = System.getProperty("compose.application.resources.dir").orEmpty()
+    if (resourcesDir.isEmpty()) return
+    val separator = java.io.File.pathSeparator
+    for (key in listOf("jna.library.path", "java.library.path")) {
+        val current = System.getProperty(key).orEmpty()
+        if (current.split(separator).any { it == resourcesDir }) continue
+        val merged = if (current.isEmpty()) resourcesDir else current + separator + resourcesDir
+        System.setProperty(key, merged)
+    }
+}
+
 /** 桌面端入口。 */
 fun main() {
+    applyDistributionLibraryPath()
+
     // 单实例：已有实例在运行时请求其显示窗口并退出，避免多进程共用同一份数据与端口
     if (!notifyrelay.desktop.platform.DesktopSingleInstance
             .acquire()
@@ -127,18 +161,36 @@ fun main() {
     // 通知历史、应用列表与图标的请求链路均取该管理器（与 Android 的 scanDeviceList 同口径）
     DataLayerDesktop.registerDeviceManager(deviceManager)
 
-    // 窗口图标与 UI 共用 :shared 的同一份资源
+    // 窗口图标由矢量源按需栅格化；矢量不可用时回退到 :shared 的位图资源
+    val fallbackIcons =
+        runCatching {
+            runBlocking { SharedAppIcon.preload() }?.let { WindowIcon.buildMultiSize(it) } ?: emptyList()
+        }.getOrDefault(emptyList())
     val iconImages =
         runCatching {
-            val bytes = runBlocking { SharedAppIcon.preload() } ?: return@runCatching emptyList()
-            WindowIcon.buildMultiSize(bytes)
+            notifyrelay.desktop.platform.AppIcon
+                .images()
         }.getOrDefault(emptyList())
+            .ifEmpty { fallbackIcons }
 
     application {
+        // 主窗口状态：上次的非最大化矩形与最大化标记，启动时还原、退出时保存
+        val savedBounds = remember { DesktopWindowPlacement.loadBounds() }
+        val savedMaximized = remember { DesktopWindowPlacement.loadMaximized() }
+        val mainWindow = remember { mutableStateOf<java.awt.Window?>(null) }
+        val mainMaximized = remember { mutableStateOf(savedMaximized) }
+
         // 窗口与托盘：关闭按钮隐藏窗口，托盘菜单负责显隐与退出
         val windowController =
             remember {
                 DesktopWindowController {
+                    // 退出前落盘窗口状态：最大化时保留最大化标记与还原尺寸
+                    mainWindow.value?.let { window ->
+                        if (!mainMaximized.value) {
+                            DesktopWindowPlacement.saveBounds(window.bounds)
+                        }
+                    }
+                    DesktopWindowPlacement.saveMaximized(mainMaximized.value)
                     deviceManager.stopPowerMonitor()
                     DataLayerDesktop.clipboardSync?.stop()
                     DataLayerDesktop.mediaControl?.stop()
@@ -190,19 +242,85 @@ fun main() {
             windowController.onMenuRequested = { point -> trayMenuPoint.value = point }
         }
 
+        // 还原上次的窗口矩形（裁剪到屏幕内）；没有记录时首次启动居中
+        val restoredBounds = remember { savedBounds?.let { DesktopWindowPlacement.clampToScreen(it) } }
+        val windowDensity = LocalDensity.current
+        val windowState =
+            rememberWindowState(
+                placement = WindowPlacement.Floating,
+                position =
+                    restoredBounds?.let {
+                        with(windowDensity) { WindowPosition.Absolute(it.x.toDp(), it.y.toDp()) }
+                    } ?: WindowPosition(Alignment.Center),
+                width = restoredBounds?.let { with(windowDensity) { it.width.toDp() } } ?: DEFAULT_WINDOW_WIDTH.dp,
+                height = restoredBounds?.let { with(windowDensity) { it.height.toDp() } } ?: DEFAULT_WINDOW_HEIGHT.dp,
+            )
+
         Window(
             onCloseRequest = { windowController.onCloseRequest() },
+            state = windowState,
             title = "NotifyRelay",
+            // 标题栏由应用自绘（DesktopTitleBar），窗口只保留内容区
+            undecorated = true,
         ) {
             LaunchedEffect(window) {
                 windowController.bindWindow(window)
+                mainWindow.value = window
                 window.setIconImages(iconImages)
+                notifyrelay.base.log.Logger.i(
+                    "DesktopWindow",
+                    "窗口状态: 矩形=" + restoredBounds + " 最大化=" + savedMaximized,
+                )
+                // 先把还原矩形落到窗口上：Compose 的窗口状态要晚一拍才生效，
+                // 若此时以 0×0 显示，系统会把窗口当作最小化处理
+                if (restoredBounds != null) {
+                    window.bounds = restoredBounds
+                } else {
+                    window.setSize(DEFAULT_WINDOW_WIDTH, DEFAULT_WINDOW_HEIGHT)
+                    window.setLocationRelativeTo(null)
+                }
+                if (savedMaximized) {
+                    window.bounds =
+                        java.awt.GraphicsEnvironment
+                            .getLocalGraphicsEnvironment()
+                            .maximumWindowBounds
+                }
+                // 无边框窗口：由 DWM 绘制圆角；最大化时窗口为直角
+                notifyrelay.desktop.platform.applyWindowCorners(window, rounded = !savedMaximized)
+                // 等窗口拿到非零尺寸后再显示，避免零尺寸窗口被系统当作最小化
+                var waitedMs = 0
+                while (window.width <= 0 || window.height <= 0) {
+                    if (waitedMs >= MAX_WAIT_WINDOW_SIZE_MS) break
+                    kotlinx.coroutines.delay(WINDOW_SIZE_POLL_MS)
+                    waitedMs += WINDOW_SIZE_POLL_MS.toInt()
+                }
+                // 清除可能的最小化标记并显示、前置
+                window.extendedState = window.extendedState and
+                    java.awt.Frame.ICONIFIED
+                        .inv()
+                window.isVisible = true
+                window.toFront()
+                window.requestFocus()
+                notifyrelay.base.log.Logger.i(
+                    "DesktopWindow",
+                    "窗口已显示: " + window.bounds + " 状态=" + window.extendedState,
+                )
                 // 剪贴板同步：默认开启；窗口就绪后才能取到 HWND 注册系统剪贴板事件
                 DataLayerDesktop.clipboardSync?.start(windowController.nativeHandle())
                 // 媒体会话读取：SMTC 桥只提供读取接口，按固定间隔取快照
                 DataLayerDesktop.mediaControl?.start()
                 // 本机通知采集：WinRT 桥轮询，新增通知经公共网关转发
                 DataLayerDesktop.localNotificationRelay?.start()
+            }
+
+            // 窗口底色跟随主题：无边框窗口移动时若有背景擦除，避免闪出默认白底
+            LaunchedEffect(window, darkTheme) {
+                window.background =
+                    if (darkTheme) {
+                        java.awt.Color(0x1C, 0x1C, 0x1E)
+                    } else {
+                        java.awt.Color.WHITE
+                    }
             }
 
             val actionPort = remember { DesktopNotificationActionPort() }
@@ -228,7 +346,30 @@ fun main() {
                                 LocalDevicePortsProvider provides devicePortsProvider,
                                 LocalNavigator provides navigator,
                             ) {
-                                DesktopRoot(navigator, darkTheme, devicePortsProvider)
+                                DesktopRoot(
+                                    navigator = navigator,
+                                    darkTheme = darkTheme,
+                                    devicePortsProvider = devicePortsProvider,
+                                    window = window,
+                                    titleIcon = iconImages.minByOrNull { abs(it.getWidth(null) - 32) },
+                                    title = "NotifyRelay",
+                                    initiallyMaximized = savedMaximized,
+                                    initialRestoreBounds = savedBounds,
+                                    onMaximizedChanged = { maximized, normalBounds ->
+                                        mainMaximized.value = maximized
+                                        DesktopWindowPlacement.saveMaximized(maximized)
+                                        DesktopWindowPlacement.saveBounds(normalBounds)
+                                    },
+                                    onGeometrySettled = { bounds ->
+                                        if (!mainMaximized.value) {
+                                            DesktopWindowPlacement.saveBounds(bounds)
+                                        }
+                                    },
+                                    onMinimize = {
+                                        window.extendedState = window.extendedState or java.awt.Frame.ICONIFIED
+                                    },
+                                    onClose = { windowController.onCloseRequest() },
+                                )
                             }
                         }
                     }
@@ -264,6 +405,15 @@ private fun DesktopRoot(
     navigator: Navigator,
     darkTheme: Boolean,
     devicePortsProvider: DesktopDevicePortsProvider,
+    window: java.awt.Frame,
+    titleIcon: java.awt.Image?,
+    title: String,
+    onMinimize: () -> Unit,
+    onClose: () -> Unit,
+    initiallyMaximized: Boolean,
+    initialRestoreBounds: java.awt.Rectangle?,
+    onMaximizedChanged: (Boolean, java.awt.Rectangle) -> Unit,
+    onGeometrySettled: (java.awt.Rectangle) -> Unit,
 ) {
     NotifyRelayTheme(darkTheme = darkTheme) {
         // 全局提示承载：桌面端 Toast 经此 Snackbar 展示（任意线程入队）
@@ -282,99 +432,111 @@ private fun DesktopRoot(
             }
         }
 
-        Scaffold(
-            modifier = Modifier.fillMaxSize(),
-            containerColor = MiuixTheme.colorScheme.background,
-            snackbarHost = { SnackbarHost(snackbarHostState) },
-        ) { paddingValues ->
-            Box(
-                modifier =
-                    Modifier
-                        .fillMaxSize()
-                        .padding(paddingValues)
-                        .background(MiuixTheme.colorScheme.background),
-            ) {
-                NavDisplay(
-                    backStack = navigator.backStack,
-                    onBack = {
-                        if (navigator.backStackSize() > 1) {
-                            navigator.pop()
-                        }
-                    },
+        notifyrelay.desktop.platform.DesktopWindowFrame(
+            window = window,
+            title = title,
+            icon = titleIcon,
+            onMinimize = onMinimize,
+            onClose = onClose,
+            initiallyMaximized = initiallyMaximized,
+            initialRestoreBounds = initialRestoreBounds,
+            onMaximizedChanged = onMaximizedChanged,
+            onGeometrySettled = onGeometrySettled,
+        ) {
+            Scaffold(
+                modifier = Modifier.fillMaxSize(),
+                containerColor = MiuixTheme.colorScheme.background,
+                snackbarHost = { SnackbarHost(snackbarHostState) },
+            ) { paddingValues ->
+                Box(
+                    modifier =
+                        Modifier
+                            .fillMaxSize()
+                            .padding(paddingValues)
+                            .background(MiuixTheme.colorScheme.background),
                 ) {
-                    entry<Route.Main> {
-                        MainScreen(
-                            navigator = navigator,
-                            deviceListContent = { args ->
-                                DeviceListScreenContent(
-                                    isLandscape = args.isLandscape,
-                                    discoveryEnabled = args.discoveryEnabled,
-                                    onDiscoveryChange = args.onDiscoveryChange,
-                                    allDevices = args.allDevices,
-                                    authedDeviceUuids = args.authedDeviceUuids,
-                                    deviceStates = args.deviceStates,
-                                    unauthedDevices = args.unauthedDevices,
-                                    selectedDevice = args.selectedDevice,
-                                    onSelectDevice = args.onSelectDevice,
-                                    onRequestDelete = args.onRequestDelete,
-                                    onShowRejectedDialog = args.onShowRejectedDialog,
-                                    localBatteryLevel = args.localBatteryLevel,
-                                    colorScheme = MiuixTheme.colorScheme,
-                                    textStyles = MiuixTheme.textStyles,
-                                )
-                            },
-                            historyContent = {
-                                HistoryScreen(
-                                    navigator,
-                                    notificationHistory = { NotificationHistoryScreen() },
-                                    superIslandHistory = { SuperIslandHistoryScreen() },
-                                    chatTest = {
-                                        UIChatTest(
-                                            deviceManager = devicePortsProviderChatPort(devicePortsProvider),
-                                            onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
-                                        )
-                                    },
-                                )
-                            },
-                            forwardContent = {
-                                DeviceForwardScreen(
-                                    filterViewModel = remoteFilterViewModel(),
-                                    clipboardSync = { ClipboardSyncPage() },
-                                    musicControl = { MusicControlPage() },
-                                    scrcpyScreen = { deviceInfo, _ ->
-                                        DesktopScrcpyScreen(devicePortsProvider, deviceInfo)
-                                    },
-                                )
-                            },
-                            settingsContent = { SettingsScreen() },
-                        )
+                    NavDisplay(
+                        backStack = navigator.backStack,
+                        onBack = {
+                            if (navigator.backStackSize() > 1) {
+                                navigator.pop()
+                            }
+                        },
+                    ) {
+                        entry<Route.Main> {
+                            MainScreen(
+                                navigator = navigator,
+                                deviceListContent = { args ->
+                                    DeviceListScreenContent(
+                                        isLandscape = args.isLandscape,
+                                        discoveryEnabled = args.discoveryEnabled,
+                                        onDiscoveryChange = args.onDiscoveryChange,
+                                        allDevices = args.allDevices,
+                                        authedDeviceUuids = args.authedDeviceUuids,
+                                        deviceStates = args.deviceStates,
+                                        unauthedDevices = args.unauthedDevices,
+                                        selectedDevice = args.selectedDevice,
+                                        onSelectDevice = args.onSelectDevice,
+                                        onRequestDelete = args.onRequestDelete,
+                                        onShowRejectedDialog = args.onShowRejectedDialog,
+                                        localBatteryLevel = args.localBatteryLevel,
+                                        colorScheme = MiuixTheme.colorScheme,
+                                        textStyles = MiuixTheme.textStyles,
+                                    )
+                                },
+                                historyContent = {
+                                    HistoryScreen(
+                                        navigator,
+                                        notificationHistory = { NotificationHistoryScreen() },
+                                        superIslandHistory = { SuperIslandHistoryScreen() },
+                                        chatTest = {
+                                            UIChatTest(
+                                                deviceManager = devicePortsProviderChatPort(devicePortsProvider),
+                                                onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
+                                            )
+                                        },
+                                    )
+                                },
+                                forwardContent = {
+                                    DeviceForwardScreen(
+                                        filterViewModel = remoteFilterViewModel(),
+                                        clipboardSync = { ClipboardSyncPage() },
+                                        musicControl = { MusicControlPage() },
+                                        scrcpyScreen = { deviceInfo, _ ->
+                                            DesktopScrcpyScreen(devicePortsProvider, deviceInfo)
+                                        },
+                                    )
+                                },
+                                settingsContent = { SettingsScreen() },
+                            )
+                        }
+                        // 与 MainScreen 页签同源：单独 push 这两个路由时复用同一内容，避免未注册 entry 报错
+                        entry<Route.History> {
+                            HistoryScreen(
+                                navigator,
+                                notificationHistory = { NotificationHistoryScreen() },
+                                superIslandHistory = { SuperIslandHistoryScreen() },
+                                chatTest = {
+                                    UIChatTest(
+                                        deviceManager = devicePortsProviderChatPort(devicePortsProvider),
+                                        onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
+                                    )
+                                },
+                            )
+                        }
+                        entry<Route.Settings> { SettingsScreen() }
+                        entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
+                        entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
+                        entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
+                        entry<Route.SettingsDeveloperMode> { DeveloperModeScreen() }
+                        entry<Route.SettingsAbout> { SettingsAboutScreen {} }
+                        entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
+                        entry<Route.SettingsScrcpy> { ScrcpySettingsPage() }
+                        // 高级设置与基础设置同页：桌面端参数集较移动端少，不再分组
+                        entry<Route.ScrcpyAdvanced> { ScrcpySettingsPage() }
+                        // 虚拟按钮排序在桌面端不接线（无触摸注入语义）
+                        entry<Route.ScrcpyVirtualButtonOrder> { DesktopUnavailableScreen("虚拟按钮排序") { navigator.pop() } }
                     }
-                    // 与 MainScreen 页签同源：单独 push 这两个路由时复用同一内容，避免未注册 entry 报错
-                    entry<Route.History> {
-                        HistoryScreen(
-                            navigator,
-                            notificationHistory = { NotificationHistoryScreen() },
-                            superIslandHistory = { SuperIslandHistoryScreen() },
-                            chatTest = {
-                                UIChatTest(
-                                    deviceManager = devicePortsProviderChatPort(devicePortsProvider),
-                                    onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
-                                )
-                            },
-                        )
-                    }
-                    entry<Route.Settings> { SettingsScreen() }
-                    entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
-                    entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
-                    entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
-                    entry<Route.SettingsDeveloperMode> { DeveloperModeScreen() }
-                    entry<Route.SettingsAbout> { SettingsAboutScreen {} }
-                    entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
-                    entry<Route.SettingsScrcpy> { ScrcpySettingsPage() }
-                    // 高级设置与基础设置同页：桌面端参数集较移动端少，不再分组
-                    entry<Route.ScrcpyAdvanced> { ScrcpySettingsPage() }
-                    // 虚拟按钮排序在桌面端不接线（无触摸注入语义）
-                    entry<Route.ScrcpyVirtualButtonOrder> { DesktopUnavailableScreen("虚拟按钮排序") { navigator.pop() } }
                 }
             }
         }
