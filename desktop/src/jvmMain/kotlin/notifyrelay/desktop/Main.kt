@@ -1,12 +1,10 @@
 package notifyrelay.desktop
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
@@ -18,14 +16,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.key.Key
-import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
-import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Window
 import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
@@ -82,9 +75,6 @@ import notifyrelay.shared.ui.screen.devicelist.DeviceListScreenContent
 import notifyrelay.shared.ui.screen.devicelist.LocalDeviceListPort
 import notifyrelay.shared.ui.viewmodel.LocalDevicePortsProvider
 import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
-import top.yukonga.miuix.kmp.basic.Card
-import top.yukonga.miuix.kmp.basic.CardDefaults
-import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
@@ -92,16 +82,7 @@ import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.awt.AWTEvent
-import java.awt.Point
-import java.awt.Toolkit
-import java.awt.event.AWTEventListener
-import java.awt.event.MouseEvent
-import java.awt.event.WindowAdapter
-import java.awt.event.WindowEvent
 import kotlin.math.abs
-
-private const val TRAY_ICON_SIZE = 32
 
 /** 等待窗口尺寸就绪的上限。 */
 private const val MAX_WAIT_WINDOW_SIZE_MS = 1200
@@ -192,20 +173,18 @@ fun main() {
                 }
             }
 
-        LaunchedEffect(Unit) {
-            val trayImage = iconImages.minByOrNull { abs(it.getWidth(null) - TRAY_ICON_SIZE) }
-            windowController.installTray(trayImage, "NotifyRelay")
-        }
+        // 托盘：原生图标与原生右键菜单，左键单击显示主窗口
+        notifyrelay.desktop.platform.DesktopTray(
+            tooltip = "NotifyRelay",
+            onShowWindow = { windowController.showWindow() },
+            onExit = { windowController.exit() },
+        )
 
         // 重复启动时的窗口唤起：报文来自监听线程，需投递到事件线程
         LaunchedEffect(windowController) {
             notifyrelay.desktop.platform.DesktopSingleInstance.onActivate = {
                 javax.swing.SwingUtilities.invokeLater { windowController.showWindow() }
             }
-        }
-
-        DisposableEffect(Unit) {
-            onDispose { windowController.disposeTray() }
         }
 
         // 叠加层：无边框透明置顶窗口，媒体卡/超级岛/弹幕均由本机 Compose 绘制
@@ -229,10 +208,8 @@ fun main() {
             }
 
         // 托盘右键菜单：Compose 弹层，位置取右键时的屏幕坐标
-        val trayMenuPoint = remember { mutableStateOf<Point?>(null) }
 
         LaunchedEffect(windowController) {
-            windowController.onMenuRequested = { point -> trayMenuPoint.value = point }
         }
 
         // 还原上次的窗口矩形（裁剪到屏幕内）；没有记录时首次启动居中
@@ -368,22 +345,6 @@ fun main() {
                     }
                 }
             }
-        }
-
-        trayMenuPoint.value?.let { point ->
-            TrayMenu(
-                point = point,
-                darkTheme = darkTheme,
-                onDismiss = { trayMenuPoint.value = null },
-                onToggleWindow = {
-                    trayMenuPoint.value = null
-                    windowController.toggleWindow()
-                },
-                onExit = {
-                    trayMenuPoint.value = null
-                    windowController.exit()
-                },
-            )
         }
     }
 }
@@ -598,124 +559,4 @@ private fun DesktopUnavailableScreen(
         top.yukonga.miuix.kmp.basic
             .TextButton(text = "返回", onClick = onBack)
     }
-}
-
-/** 托盘右键菜单：Miuix 样式的 Compose 弹层。 */
-@Composable
-private fun TrayMenu(
-    point: Point,
-    darkTheme: Boolean,
-    onDismiss: () -> Unit,
-    onToggleWindow: () -> Unit,
-    onExit: () -> Unit,
-) {
-    val density = LocalDensity.current
-    val menuWidth = 168.dp
-    val menuHeight = 84.dp
-    val position =
-        remember(point, density) {
-            val widthPx = with(density) { menuWidth.roundToPx() }
-            val heightPx = with(density) { menuHeight.roundToPx() }
-            val screen = Toolkit.getDefaultToolkit().screenSize
-            val x = point.x.coerceIn(0, (screen.width - widthPx).coerceAtLeast(0))
-            val y = point.y.coerceIn(0, (screen.height - heightPx).coerceAtLeast(0))
-            with(density) { WindowPosition.Absolute(x.toDp(), y.toDp()) }
-        }
-    val windowState =
-        rememberWindowState(
-            position = position,
-            size = DpSize(menuWidth, menuHeight),
-        )
-    Window(
-        onCloseRequest = onDismiss,
-        state = windowState,
-        title = "",
-        resizable = false,
-        undecorated = true,
-        transparent = true,
-        alwaysOnTop = true,
-        onPreviewKeyEvent = { event ->
-            if (event.type == KeyEventType.KeyDown && event.key == Key.Escape) {
-                onDismiss()
-                true
-            } else {
-                false
-            }
-        },
-    ) {
-        // 失焦或点击菜单外部时关闭
-        DisposableEffect(window) {
-            var hadFocus = false
-            val focusListener =
-                object : WindowAdapter() {
-                    override fun windowGainedFocus(event: WindowEvent) {
-                        hadFocus = true
-                    }
-
-                    override fun windowLostFocus(event: WindowEvent) {
-                        if (hadFocus) onDismiss()
-                    }
-                }
-            window.addWindowFocusListener(focusListener)
-            val globalClick =
-                AWTEventListener { event ->
-                    val mouse = event as? MouseEvent ?: return@AWTEventListener
-                    if (mouse.id == MouseEvent.MOUSE_PRESSED && !window.containsComponent(mouse.component)) {
-                        onDismiss()
-                    }
-                }
-            Toolkit.getDefaultToolkit().addAWTEventListener(globalClick, AWTEvent.MOUSE_EVENT_MASK)
-            runCatching { window.type = java.awt.Window.Type.UTILITY }
-            window.requestFocus()
-            onDispose {
-                window.removeWindowFocusListener(focusListener)
-                Toolkit.getDefaultToolkit().removeAWTEventListener(globalClick)
-            }
-        }
-        NotifyRelayTheme(darkTheme = darkTheme) {
-            Card(
-                modifier =
-                    Modifier
-                        .fillMaxWidth()
-                        .padding(4.dp),
-                cornerRadius = 10.dp,
-                colors = CardDefaults.defaultColors(color = MiuixTheme.colorScheme.surface),
-            ) {
-                Column {
-                    TrayMenuItem(text = "显示或隐藏窗口", onClick = onToggleWindow)
-                    HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
-                    TrayMenuItem(text = "退出", onClick = onExit)
-                }
-            }
-        }
-    }
-}
-
-/** 托盘菜单项。 */
-@Composable
-private fun TrayMenuItem(
-    text: String,
-    onClick: () -> Unit,
-) {
-    Box(
-        modifier =
-            Modifier
-                .fillMaxWidth()
-                .height(32.dp)
-                .clickable(onClick = onClick)
-                .padding(horizontal = 12.dp),
-        contentAlignment = Alignment.CenterStart,
-    ) {
-        Text(text = text, color = MiuixTheme.colorScheme.onSurface, fontSize = 13.sp)
-    }
-}
-
-/** 判断组件是否属于该窗口。 */
-private fun java.awt.Window.containsComponent(component: java.awt.Component): Boolean {
-    var current: java.awt.Component? = component
-    while (current != null) {
-        if (current === this) return true
-        current = current.parent
-    }
-    return false
 }

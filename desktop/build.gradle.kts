@@ -22,6 +22,9 @@ kotlin {
             // 超级岛公共 UI（含媒体浮窗 MediaIslandCompose）
             implementation(project(":superislandui"))
 
+            // 原生托盘与菜单（ComposeNativeTray 2.1.7，独立版本线）
+            implementation("dev.nucleusframework:composenativetray:2.1.7")
+
             // 与 :shared 一致的 UI 组件库（shared 侧为 implementation，不传递）
             implementation(libs.miuix.ui.kmp)
             implementation(libs.miuix.preference.kmp)

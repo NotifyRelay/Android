@@ -13,6 +13,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import notifyrelay.shared.generated.resources.Res
 import notifyrelay.shared.generated.resources.app_icon
+import org.jetbrains.compose.resources.DrawableResource
 import org.jetbrains.compose.resources.getDrawableResourceBytes
 import org.jetbrains.compose.resources.getSystemResourceEnvironment
 import org.jetbrains.compose.resources.painterResource
@@ -29,6 +30,10 @@ import org.jetbrains.compose.resources.painterResource
 object SharedAppIcon {
     /** 绘制位图时的默认边长。 */
     private const val DEFAULT_BITMAP_SIZE = 96
+
+    /** 矢量资源本身：托盘等原生图标场景直接交给平台按目标尺寸栅格化。 */
+    val drawable: DrawableResource
+        get() = Res.drawable.app_icon
 
     @Volatile
     private var cachedBytes: ByteArray? = null
