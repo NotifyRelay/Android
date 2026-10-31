@@ -162,3 +162,23 @@ fun SettingsAppearanceScreen() = SettingsSubPage("外观") { UIAppearance() }
 /** 叠加层设置子页（仅桌面端注册内容）。 */
 @Composable
 fun SettingsOverlayScreen(content: @Composable () -> Unit) = SettingsSubPage("叠加层") { content() }
+
+/** 叠加层-弹幕与媒体卡子页（仅桌面端注册内容）。 */
+@Composable
+fun SettingsOverlayDanmakuScreen(content: @Composable () -> Unit) = SettingsSubPage("弹幕与媒体卡") { content() }
+
+/** 叠加层-余额子页（仅桌面端注册内容）。 */
+@Composable
+fun SettingsOverlayBalanceScreen(content: @Composable () -> Unit) = SettingsSubPage("DeepSeek 余额") { content() }
+
+/** 叠加层-罗技电池子页（仅桌面端注册内容）。 */
+@Composable
+fun SettingsOverlayLogiScreen(content: @Composable () -> Unit) = SettingsSubPage("罗技电池") { content() }
+
+/** 叠加层-键盘子页（仅桌面端注册内容）。 */
+@Composable
+fun SettingsOverlayKeyboardScreen(content: @Composable () -> Unit) = SettingsSubPage("键盘监控") { content() }
+
+/** 叠加层-时间子页（仅桌面端注册内容）。 */
+@Composable
+fun SettingsOverlayClockScreen(content: @Composable () -> Unit) = SettingsSubPage("时间浮窗") { content() }

@@ -164,6 +164,18 @@ class DesktopOverlayFeatures(
     /** 罗技原生库是否可用。 */
     fun isLogiAvailable(): Boolean = logiSource.available
 
+    /** 立即枚举一次罗技设备，不改变轮询状态。 */
+    fun refreshLogiNow() = logiSource.refreshNow()
+
+    /** 设置或清除罗技设备自定义名；空名表示回退原生名。 */
+    fun setLogiDeviceName(
+        deviceId: String,
+        name: String?,
+    ) = logiSource.setDeviceNameOverride(deviceId, name)
+
+    /** 订阅罗技设备快照；供设置页展示设备列表。 */
+    fun observeLogiDevices(listener: (List<LogiBatteryDevice>) -> Unit): AutoCloseable = logiSource.observe(listener)
+
     /** 键盘监控是否可用。 */
     fun isKeyboardAvailable(): Boolean = keyboardSource.available
 }

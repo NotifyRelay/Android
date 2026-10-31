@@ -99,4 +99,34 @@ sealed interface Route : NavKey {
      */
     @Serializable
     data object SettingsOverlay : Route
+
+    /**
+     * 设置-叠加层-弹幕与媒体卡子页面（仅桌面端显示）
+     */
+    @Serializable
+    data object SettingsOverlayDanmaku : Route
+
+    /**
+     * 设置-叠加层-余额子页面（仅桌面端显示）
+     */
+    @Serializable
+    data object SettingsOverlayBalance : Route
+
+    /**
+     * 设置-叠加层-罗技电池子页面（仅桌面端显示）
+     */
+    @Serializable
+    data object SettingsOverlayLogi : Route
+
+    /**
+     * 设置-叠加层-键盘子页面（仅桌面端显示）
+     */
+    @Serializable
+    data object SettingsOverlayKeyboard : Route
+
+    /**
+     * 设置-叠加层-时间子页面（仅桌面端显示）
+     */
+    @Serializable
+    data object SettingsOverlayClock : Route
 }

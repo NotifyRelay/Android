@@ -36,6 +36,11 @@ import notifyrelay.desktop.device.DesktopDevicePortsProvider
 import notifyrelay.desktop.device.DesktopScrcpyScreen
 import notifyrelay.desktop.platform.DesktopDeviceListPort
 import notifyrelay.desktop.platform.DesktopNotificationActionPort
+import notifyrelay.desktop.platform.DesktopOverlayBalanceContent
+import notifyrelay.desktop.platform.DesktopOverlayClockContent
+import notifyrelay.desktop.platform.DesktopOverlayDanmakuContent
+import notifyrelay.desktop.platform.DesktopOverlayKeyboardContent
+import notifyrelay.desktop.platform.DesktopOverlayLogiContent
 import notifyrelay.desktop.platform.DesktopOverlaySettingsContent
 import notifyrelay.desktop.platform.DesktopThemePort
 import notifyrelay.desktop.platform.DesktopToastHost
@@ -69,6 +74,11 @@ import notifyrelay.shared.ui.screen.SettingsAboutScreen
 import notifyrelay.shared.ui.screen.SettingsAppearanceScreen
 import notifyrelay.shared.ui.screen.SettingsDeveloperModeScreen
 import notifyrelay.shared.ui.screen.SettingsLocalFilterScreen
+import notifyrelay.shared.ui.screen.SettingsOverlayBalanceScreen
+import notifyrelay.shared.ui.screen.SettingsOverlayClockScreen
+import notifyrelay.shared.ui.screen.SettingsOverlayDanmakuScreen
+import notifyrelay.shared.ui.screen.SettingsOverlayKeyboardScreen
+import notifyrelay.shared.ui.screen.SettingsOverlayLogiScreen
 import notifyrelay.shared.ui.screen.SettingsOverlayScreen
 import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
 import notifyrelay.shared.ui.screen.SettingsScreen
@@ -518,6 +528,21 @@ private fun DesktopRoot(
                         entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
                         entry<Route.SettingsOverlay> {
                             SettingsOverlayScreen { DesktopOverlaySettingsContent() }
+                        }
+                        entry<Route.SettingsOverlayDanmaku> {
+                            SettingsOverlayDanmakuScreen { DesktopOverlayDanmakuContent() }
+                        }
+                        entry<Route.SettingsOverlayBalance> {
+                            SettingsOverlayBalanceScreen { DesktopOverlayBalanceContent() }
+                        }
+                        entry<Route.SettingsOverlayLogi> {
+                            SettingsOverlayLogiScreen { DesktopOverlayLogiContent() }
+                        }
+                        entry<Route.SettingsOverlayKeyboard> {
+                            SettingsOverlayKeyboardScreen { DesktopOverlayKeyboardContent() }
+                        }
+                        entry<Route.SettingsOverlayClock> {
+                            SettingsOverlayClockScreen { DesktopOverlayClockContent() }
                         }
                         entry<Route.SettingsScrcpy> { ScrcpySettingsPage() }
                         // 高级设置与基础设置同页：桌面端参数集较移动端少，不再分组

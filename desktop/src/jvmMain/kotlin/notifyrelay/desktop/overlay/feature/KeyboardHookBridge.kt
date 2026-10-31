@@ -76,8 +76,6 @@ internal interface User32Ex : StdCallLibrary {
         lParam: LPARAM,
     ): Boolean
 
-    fun GetCurrentThreadId(): Int
-
     companion object {
         /** JNA 按接口代理加载 user32。 */
         val INSTANCE: User32Ex by lazy {
@@ -149,8 +147,8 @@ internal class KeyboardHookBridge(
         User32Ex.INSTANCE.PostThreadMessageW(threadId, Win32Keyboard.WM_QUIT, WPARAM(0), LPARAM(0))
     }
 
-    /** 当前线程 id，供 [postQuit] 使用。 */
-    fun currentThreadId(): Int = User32Ex.INSTANCE.GetCurrentThreadId()
+    /** 当前线程 id，供 [postQuit] 使用；该函数属于 kernel32 而非 user32。 */
+    fun currentThreadId(): Int = Kernel32.INSTANCE.GetCurrentThreadId()
 
     /** 切换键当前锁定状态。 */
     fun isToggled(vkCode: Int): Boolean = (User32Ex.INSTANCE.GetKeyState(vkCode).toInt() and 0x0001) != 0

@@ -64,7 +64,7 @@ class DesktopKeyboardSource(
     private val pushPending = AtomicBoolean(false)
 
     override val available: Boolean
-        get() = runCatching { User32Ex.INSTANCE.GetCurrentThreadId() }.isSuccess
+        get() = runCatching { User32Ex.INSTANCE }.isSuccess
 
     override fun state(): KeyboardStateSnapshot {
         val pressed =

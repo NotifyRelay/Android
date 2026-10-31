@@ -47,6 +47,19 @@ interface LogiBatterySource {
     /** 停止轮询；未启动时幂等。 */
     fun stop()
 
+    /** 立即枚举一次，不改变监控状态。 */
+    fun refreshNow()
+
+    /**
+     * 设置或清除设备自定义名。
+     *
+     * [name] 为空表示回退到 FFI 原始名；覆盖按 [LogiBatteryDevice.deviceId] 持久化，重启后保留。
+     */
+    fun setDeviceNameOverride(
+        deviceId: String,
+        name: String?,
+    )
+
     /** 设备集合变化订阅；返回取消订阅函数。 */
     fun observe(listener: (List<LogiBatteryDevice>) -> Unit): AutoCloseable
 }

@@ -1,13 +1,16 @@
 package notifyrelay.desktop.overlay
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,21 +19,26 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
+import notifyrelay.base.util.BatteryIconConverter
 import notifyrelay.overlay.api.BalanceSnapshot
 import notifyrelay.overlay.api.KeyboardSource
 import notifyrelay.overlay.api.KeyboardStateSnapshot
 import notifyrelay.overlay.api.LogiBatteryDevice
 import notifyrelay.overlay.api.OverlayAnchor
+import notifyrelay.shared.ui.common.deviceIconFontFamily
 import top.yukonga.miuix.kmp.basic.Text
 import java.awt.Toolkit
 import java.time.LocalTime
@@ -113,7 +121,12 @@ private fun changeLabel(change: Double): String =
         else -> ""
     }
 
-/** 罗技电池浮窗：逐设备一行，显示电量与设备名。 */
+/**
+ * 罗技电池浮窗：单列纵向卡片，每卡为电池图标 + 设备名。
+ *
+ * 卡片外观与 Windows 端 `LogiBatteryElement` 同口径：黑色 60% 圆角底、白色 35% 细边框、
+ * 电量图标用 Segoe MDL2 字形并按分段着色（复用 [BatteryIconConverter]），设备名超长以省略号截断。
+ */
 @Composable
 internal fun LogiBatteryElement(
     anchor: OverlayAnchor,
@@ -123,26 +136,100 @@ internal fun LogiBatteryElement(
     val visible = devices.filter { !hideWhenDisconnected || it.online }
     if (visible.isEmpty()) return
 
+    val density = LocalDensity.current
+    val scale = anchor.scale.coerceIn(0.5f, 4f)
+    // 卡片最大宽度：按屏宽比例，再夹到 120~540 像素（与 Windows 端一致）
+    val cardMaxWidth =
+        with(density) {
+            (screenWidthPx() * LOGI_CARD_MAX_WIDTH_FACTOR)
+                .coerceIn(LOGI_CARD_MIN_WIDTH_PX * scale, LOGI_CARD_MAX_WIDTH_PX * scale)
+                .toDp()
+        }
+    val iconSize = with(density) { (LOGI_ICON_SIZE * scale).toSp() }
+    val textSize = with(density) { (LOGI_TEXT_SIZE * scale).toSp() }
+    val iconFontFamily = deviceIconFontFamily()
+
     OverlayFloatingElement(anchor) {
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(
+            horizontalAlignment = Alignment.Start,
+            verticalArrangement = Arrangement.spacedBy(with(density) { (LOGI_CARD_SPACING * scale).toDp() }),
+        ) {
             visible.forEach { device ->
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedText(text = deviceBatteryLabel(device), anchor = anchor, fontSizePx = 16f)
-                    Spacer(Modifier.width(6.dp))
-                    OutlinedText(text = device.deviceName, anchor = anchor, fontSizePx = 16f)
+                val shape = RoundedCornerShape(with(density) { (LOGI_CARD_RADIUS * scale).toDp() })
+                Row(
+                    modifier =
+                        Modifier
+                            .widthIn(max = cardMaxWidth)
+                            .clip(shape)
+                            .background(Color(0x99000000))
+                            .border(
+                                width = with(density) { (1f * scale).toDp() },
+                                color = Color(0x59FFFFFF),
+                                shape = shape,
+                            ).padding(
+                                horizontal = with(density) { (LOGI_CARD_PADDING_X * scale).toDp() },
+                                vertical = with(density) { (LOGI_CARD_PADDING_Y * scale).toDp() },
+                            ),
+                    horizontalArrangement = Arrangement.spacedBy(with(density) { (LOGI_ICON_TEXT_GAP * scale).toDp() }),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = logiBatteryGlyph(device),
+                        color = logiBatteryColor(device),
+                        fontSize = iconSize,
+                        fontFamily = iconFontFamily,
+                    )
+                    Text(
+                        text = device.deviceName,
+                        color = Color(0xE6FFFFFF),
+                        fontSize = textSize,
+                        fontWeight = FontWeight.SemiBold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false),
+                    )
                 }
             }
         }
     }
 }
 
-/** 电池文案：电量百分比 + 充电标记；无电量时为占位符。 */
-private fun deviceBatteryLabel(device: LogiBatteryDevice): String =
-    when {
-        !device.hasBattery || device.batteryPercent < 0 -> "—"
-        device.isCharging -> device.batteryPercent.toString() + "% ⚡"
-        else -> device.batteryPercent.toString() + "%"
+/** 罗技设备电量图标；无电量时用满格未充电字形（与 Windows 端同口径）。 */
+internal fun logiBatteryGlyph(device: LogiBatteryDevice): String =
+    if (device.hasBattery && device.batteryPercent >= 0) {
+        BatteryIconConverter.getBatteryIcon(device.batteryPercent, if (device.isCharging) '1' else '0')
+    } else {
+        BatteryIconConverter.getBatteryIcon(100, '0')
     }
+
+/** 罗技设备电量图标颜色：无电量固定灰色，其余按电量分段着色。 */
+internal fun logiBatteryColor(device: LogiBatteryDevice): Color =
+    if (device.hasBattery && device.batteryPercent >= 0) {
+        BatteryIconConverter.getBatteryColor(device.batteryPercent)
+    } else {
+        Color(0xFF808080)
+    }
+
+/** 主屏宽度（物理像素）。 */
+private fun screenWidthPx(): Float =
+    Toolkit
+        .getDefaultToolkit()
+        .screenSize.width
+        .toFloat()
+
+/** 罗技卡片的尺寸基准（未缩放前，单位为像素）。 */
+private const val LOGI_ICON_SIZE = 20f
+private const val LOGI_TEXT_SIZE = 13f
+private const val LOGI_CARD_PADDING_X = 12f
+private const val LOGI_CARD_PADDING_Y = 8f
+private const val LOGI_CARD_SPACING = 6f
+private const val LOGI_CARD_RADIUS = 7f
+private const val LOGI_ICON_TEXT_GAP = 8f
+
+/** 罗技卡片宽度的屏宽占比与像素上下限。 */
+private const val LOGI_CARD_MAX_WIDTH_FACTOR = 0.35f
+private const val LOGI_CARD_MIN_WIDTH_PX = 120f
+private const val LOGI_CARD_MAX_WIDTH_PX = 540f
 
 /** 键盘状态浮窗：有映射提示时显示提示，否则显示按键与锁定键。 */
 @Composable
@@ -225,7 +312,7 @@ private fun OutlinedText(
     modifier: Modifier = Modifier,
 ) {
     val color = parseColor(anchor.colorHex)
-    val scale = anchor.scale.coerceIn(0.5f, 3f)
+    val scale = anchor.scale.coerceIn(0.5f, 4f)
     val style =
         TextStyle(
             fontSize = (fontSizePx * scale).sp,

@@ -35,6 +35,7 @@ object DesktopOverlaySettings {
 
     private const val KEY_LOGI_ENABLED = "desktop_overlay_logi_enabled"
     private const val KEY_LOGI_HIDE_DISCONNECTED = "desktop_overlay_logi_hide_disconnected"
+    private const val KEY_LOGI_DEVICE_NAMES = "desktop_overlay_logi_device_names"
 
     private const val KEY_KEYBOARD_ENABLED = "desktop_overlay_keyboard_enabled"
     private const val KEY_KEYBOARD_MAPPINGS = "desktop_overlay_keyboard_mappings"
@@ -43,39 +44,15 @@ object DesktopOverlaySettings {
     private const val KEY_CLOCK_SHOW_SECONDS = "desktop_overlay_clock_show_seconds"
     private const val KEY_CLOCK_USE_24_HOUR = "desktop_overlay_clock_use_24_hour"
 
-    /** 弹幕字号可选值（像素）：对应 FontSizePercent 25/50/75/100/150，字号 = 36 × 百分比。 */
-    val FONT_SIZE_OPTIONS = listOf(9, 18, 27, 36, 54)
-
-    /** 弹幕速度可选值（像素/秒）：对应 DanmakuSpeed 1/2/3/6/9，速度 = Speed × 60。 */
-    val SPEED_OPTIONS = listOf(60, 120, 180, 360, 540)
-
-    /** 弹幕显示区域可选值（占屏高百分比）。 */
-    val AREA_PERCENT_OPTIONS = listOf(30, 45, 60, 80, 100)
-
-    /** 媒体卡展开后自动收起时长可选值（毫秒）。 */
-    val MEDIA_AUTO_COLLAPSE_OPTIONS = listOf(3_000, 5_000, 8_000, 15_000)
-
-    /** 余额轮询间隔可选值（毫秒）。 */
-    val BALANCE_INTERVAL_OPTIONS = listOf(60_000L, 300_000L, 900_000L, 1_800_000L)
-
-    /** 元素位置可选值（占屏百分比）。 */
-    val POSITION_PERCENT_OPTIONS = listOf(10, 25, 50, 75, 90)
-
-    /** 缩放可选值。 */
-    val SCALE_OPTIONS = listOf(0.5f, 0.75f, 1.0f, 1.5f, 2.0f)
-
-    /** 描边宽度可选值（像素）。 */
-    val OUTLINE_WIDTH_OPTIONS = listOf(0f, 1f, 2f, 3f, 4f)
-
     /** 叠加层是否显示。 */
     var enabled: Boolean
         get() = Storage.getBoolean(KEY_ENABLED, true)
         set(value) = Storage.putBoolean(KEY_ENABLED, value)
 
-    /** 弹幕字号（dp）。 */
+    /** 弹幕字号（dp）：与设置页滑块同范围，避免写入时被夹导致滑块回弹。 */
     var danmakuFontSize: Float
         get() = Storage.getFloat(KEY_DANMAKU_FONT_SIZE, DEFAULT_FONT_SIZE)
-        set(value) = Storage.putFloat(KEY_DANMAKU_FONT_SIZE, value.coerceIn(12f, 48f))
+        set(value) = Storage.putFloat(KEY_DANMAKU_FONT_SIZE, value.coerceIn(9f, 54f))
 
     /** 弹幕速度（像素/秒）。 */
     var danmakuSpeed: Float
@@ -121,6 +98,11 @@ object DesktopOverlaySettings {
         get() = Storage.getBoolean(KEY_LOGI_HIDE_DISCONNECTED, true)
         set(value) = Storage.putBoolean(KEY_LOGI_HIDE_DISCONNECTED, value)
 
+    /** 罗技设备自定义名：键为 `VID:PID:槽位`，值为用户改名；重启后保留。 */
+    var logiDeviceNameOverrides: Map<String, String>
+        get() = LogiDeviceNameStore.decode(Storage.getString(KEY_LOGI_DEVICE_NAMES, ""))
+        set(value) = Storage.putString(KEY_LOGI_DEVICE_NAMES, LogiDeviceNameStore.encode(value))
+
     // ======== 键盘监控 ========
 
     /** 键盘浮窗是否显示，同时决定全局键盘钩子的安装。 */
@@ -151,48 +133,55 @@ object DesktopOverlaySettings {
         set(value) = Storage.putBoolean(KEY_CLOCK_USE_24_HOUR, value)
 
     /** 余额浮窗锚点。 */
-    val balanceAnchor = Anchor("desktop_overlay_balance")
+    val balanceAnchor = Anchor("desktop_overlay_balance", defaultX = 1f, defaultY = 99f, defaultScale = 0.75f)
 
     /** 罗技电池浮窗锚点。 */
-    val logiAnchor = Anchor("desktop_overlay_logi")
+    val logiAnchor = Anchor("desktop_overlay_logi", defaultX = 90f, defaultY = 99f, defaultOutlineWidth = 4f)
 
     /** 键盘浮窗锚点。 */
     val keyboardAnchor = Anchor("desktop_overlay_keyboard")
 
     /** 时间浮窗锚点。 */
-    val clockAnchor = Anchor("desktop_overlay_clock")
+    val clockAnchor =
+        Anchor("desktop_overlay_clock", defaultX = 49f, defaultY = 99f, defaultScale = 0.5f, defaultOutlineWidth = 3.25f)
 
     /**
      * 单个元素的位置与外观读写。
      *
      * 键为「前缀 + 字段名」，各元素的取值互不影响。
+     * 默认值按元素分别给出：各浮窗的实际摆放位置不同，共用一套默认值会全部重叠。
      */
     class Anchor(
         private val prefix: String,
+        private val defaultX: Float = DEFAULT_X_PERCENT,
+        private val defaultY: Float = DEFAULT_Y_PERCENT,
+        private val defaultScale: Float = 1f,
+        private val defaultOutlineWidth: Float = DEFAULT_OUTLINE_WIDTH,
+        private val defaultColor: String = DEFAULT_COLOR,
     ) {
         /** 水平位置（占屏宽百分比）。 */
         var xPercent: Float
-            get() = Storage.getFloat(prefix + "_x_percent", DEFAULT_X_PERCENT)
+            get() = Storage.getFloat(prefix + "_x_percent", defaultX)
             set(value) = Storage.putFloat(prefix + "_x_percent", value.coerceIn(0f, 100f))
 
         /** 垂直位置（占屏高百分比）。 */
         var yPercent: Float
-            get() = Storage.getFloat(prefix + "_y_percent", DEFAULT_Y_PERCENT)
+            get() = Storage.getFloat(prefix + "_y_percent", defaultY)
             set(value) = Storage.putFloat(prefix + "_y_percent", value.coerceIn(0f, 100f))
 
         /** 缩放倍数。 */
         var scale: Float
-            get() = Storage.getFloat(prefix + "_scale", 1f)
+            get() = Storage.getFloat(prefix + "_scale", defaultScale)
             set(value) = Storage.putFloat(prefix + "_scale", value.coerceIn(0.5f, 3f))
 
         /** 文本颜色，`#RRGGBB`。 */
         var colorHex: String
-            get() = Storage.getString(prefix + "_color", DEFAULT_COLOR)
+            get() = Storage.getString(prefix + "_color", defaultColor)
             set(value) = Storage.putString(prefix + "_color", value)
 
         /** 文本描边宽度（像素）。 */
         var outlineWidth: Float
-            get() = Storage.getFloat(prefix + "_outline_width", DEFAULT_OUTLINE_WIDTH)
+            get() = Storage.getFloat(prefix + "_outline_width", defaultOutlineWidth)
             set(value) = Storage.putFloat(prefix + "_outline_width", value.coerceIn(0f, 8f))
 
         /** 当前锚点快照。 */
@@ -210,10 +199,10 @@ object DesktopOverlaySettings {
     /**
      * 默认值：与 C# `GeneralSettingsService.Danmaku` 一致（不是 `DanmakuStyleSettings` 的类内默认值）。
      *
-     * `DanmakuFontSizePercent = 50` → 字号 18px；`DanmakuSpeed = 3` → 180 px/s；
-     * `DanmakuDisplayAreaPercent = 100`。
+     * `DanmakuSpeed = 3` → 180 px/s；`DanmakuDisplayAreaPercent = 100`。
+     * 字号默认 27px（基准 36px × 75%）。
      */
-    private const val DEFAULT_FONT_SIZE = 18f
+    private const val DEFAULT_FONT_SIZE = 27f
     private const val DEFAULT_SPEED = 180f
     private const val DEFAULT_AREA_PERCENT = 100f
     private const val DEFAULT_MEDIA_AUTO_COLLAPSE_MS = 5_000L
@@ -226,6 +215,7 @@ object DesktopOverlaySettings {
     private const val DEFAULT_KEYBOARD_ENABLED = true
     private const val DEFAULT_CLOCK_ENABLED = true
 
+    /** 未单独给出默认值的元素（键盘）回落到这些值。 */
     private const val DEFAULT_X_PERCENT = 50f
     private const val DEFAULT_Y_PERCENT = 10f
     private const val DEFAULT_COLOR = "#FFFFFF"
