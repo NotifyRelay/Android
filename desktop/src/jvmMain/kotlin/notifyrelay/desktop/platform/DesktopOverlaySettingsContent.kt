@@ -116,5 +116,10 @@ fun DesktopOverlaySettingsContent() {
                 DesktopOverlaySettings.mediaAutoCollapseMs = value
             },
         )
+
+        HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
+
+        // 扩展点浮窗：余额 / 罗技电池 / 键盘 / 时间
+        DesktopOverlayFeaturesContent()
     }
 }

@@ -14,3 +14,6 @@
 	path = desktop/smtc-rust
 	url = https://github.com/xzy-nine-common/SMTC_Rust.git
 	branch = master
+[submodule "desktop/logi-battery"]
+	path = desktop/logi-battery
+	url = https://github.com/xzy-nine/logi-battery.git

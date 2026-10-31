@@ -205,8 +205,26 @@ fun main() {
             }
         }
 
-        // 叠加层：无边框透明置顶窗口，媒体卡/超级岛/弹幕均由本机 Compose 绘制
-        notifyrelay.desktop.overlay.DesktopOverlayWindow()
+        // 叠加层：无边框透明置顶窗口，媒体卡/超级岛/弹幕与扩展点浮窗均由本机 Compose 绘制。
+        // 总开关关闭时不创建窗口，扩展点也一并不启动
+        val overlayEnabled = notifyrelay.desktop.platform.DesktopOverlaySettings.enabled
+        if (overlayEnabled) {
+            notifyrelay.desktop.overlay.DesktopOverlayWindow()
+
+            // 扩展点数据源（余额 / 罗技电池 / 键盘 / 时间）：窗口就绪后按各自开关启动
+            val features =
+                remember {
+                    notifyrelay.desktop.overlay.feature
+                        .DesktopOverlayFeatures()
+                }
+            DisposableEffect(features) {
+                features.start()
+                onDispose { features.close() }
+            }
+        } else {
+            notifyrelay.base.log.Logger
+                .i("DesktopOverlay", "叠加层总开关关闭，不创建窗口与扩展点")
+        }
 
         // 主题：索引经 ThemePort 持久化，跟随系统时读取系统深浅色
         val themePort = DesktopThemePort

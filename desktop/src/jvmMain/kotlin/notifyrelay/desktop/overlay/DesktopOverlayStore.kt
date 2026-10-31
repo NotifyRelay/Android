@@ -2,7 +2,11 @@ package notifyrelay.desktop.overlay
 
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import notifyrelay.domain.feature.media.MediaSessionSnapshot
+import notifyrelay.overlay.api.BalanceSnapshot
+import notifyrelay.overlay.api.KeyboardStateSnapshot
+import notifyrelay.overlay.api.LogiBatteryDevice
 
 /** 媒体业务标识。 */
 internal const val BUSINESS_MEDIA = "media"
@@ -81,6 +85,57 @@ internal object DesktopOverlayStore {
     /** 移除已结束的弹幕。 */
     fun removeDanmaku(entry: DanmakuEntry) {
         danmaku.remove(entry)
+    }
+
+    // ======== 扩展点数据（余额 / 罗技电池 / 键盘 / 时间）========
+
+    /** 当前余额快照；未启动或未配置时为 [BalanceSnapshot] 的默认值。 */
+    val balance = mutableStateOf(BalanceSnapshot())
+
+    /** 罗技电池设备快照；空集合表示无设备。 */
+    val logiDevices = mutableStateOf<List<LogiBatteryDevice>>(emptyList())
+
+    /** 当前按键状态。 */
+    val keyboardState = mutableStateOf(KeyboardStateSnapshot.EMPTY)
+
+    /** 最近一次映射提示文案；为空时不显示。 */
+    val keyboardHint = mutableStateOf("")
+
+    /** 最近一次映射提示的入队时刻（毫秒），用于超时清理。 */
+    val keyboardHintAt = mutableStateOf(0L)
+
+    /** 写入余额快照。 */
+    fun putBalance(snapshot: BalanceSnapshot) {
+        balance.value = snapshot
+    }
+
+    /** 写入罗技设备快照。 */
+    fun putLogiDevices(devices: List<LogiBatteryDevice>) {
+        logiDevices.value = devices
+    }
+
+    /** 写入按键状态。 */
+    fun putKeyboardState(snapshot: KeyboardStateSnapshot) {
+        keyboardState.value = snapshot
+    }
+
+    /** 写入映射提示并记录时刻。 */
+    fun putKeyboardHint(text: String) {
+        keyboardHint.value = text
+        keyboardHintAt.value = System.currentTimeMillis()
+    }
+
+    /** 清空映射提示。 */
+    fun clearKeyboardHint() {
+        keyboardHint.value = ""
+    }
+
+    /** 清空全部扩展点数据（停止时调用）。 */
+    fun clearFeatures() {
+        balance.value = BalanceSnapshot()
+        logiDevices.value = emptyList()
+        keyboardState.value = KeyboardStateSnapshot.EMPTY
+        keyboardHint.value = ""
     }
 }
 

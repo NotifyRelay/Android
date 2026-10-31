@@ -19,6 +19,11 @@ kotlin {
             implementation(project(":data"))
             implementation(project(":core"))
             implementation(project(":base"))
+            // 叠加层扩展点契约（数据模型与能力接口，无实现）
+            implementation(project(":overlay-api"))
+
+            // 叠加层扩展点的 JSON 持久化（映射规则、余额历史）
+            implementation(libs.kotlinx.serialization.json)
             // 超级岛公共 UI（含媒体浮窗 MediaIslandCompose）
             implementation(project(":superislandui"))
 
@@ -92,8 +97,42 @@ val smtcRustBuild =
 tasks.named("compileKotlinJvm") { dependsOn(smtcRustBuild) }
 val smtcLibDir = smtcRustDir.resolve("target/release")
 
+// 罗技电池 Rust 库（子模块 desktop/logi-battery）：C ABI 动态库，供桌面端枚举罗技设备电量。
+// 与 smtc-rust 同方式，只构建 host 目标（HID++ 实现仅 Windows 有实际后端）。
+val logiBatteryDir = project.projectDir.resolve("logi-battery")
+val logiBatteryBuild =
+    tasks.register<Exec>("logiBatteryBuild") {
+        description = "构建罗技电池 Rust 库（本机 host 目标，供桌面端枚举设备电量）"
+        group = "rust"
+        doFirst {
+            require(logiBatteryDir.exists()) { "罗技电池 Rust 子模块未同步，请执行 git submodule update --init" }
+        }
+        inputs.dir(logiBatteryDir.resolve("src"))
+        inputs.dir(logiBatteryDir.resolve("crates"))
+        inputs.file(logiBatteryDir.resolve("Cargo.toml"))
+        inputs.file(logiBatteryDir.resolve("Cargo.lock"))
+        val outDir = logiBatteryDir.resolve("target/release")
+        outputs.dir(outDir)
+        workingDir = logiBatteryDir
+        // crates.io 直连不可达，走 rsproxy 镜像（与本项目其他 Rust 构建一致）。
+        environment("CARGO_NET_OFFLINE", "false")
+        environment("CARGO_REGISTRIES_CRATES_IO_PROTOCOL", "sparse")
+        environment("CARGO_SOURCE_CRATES_IO_REPLACE_WITH", "rsproxy-sparse")
+        environment("CARGO_SOURCE_RSPROXY_SPARSE_REGISTRY", "sparse+https://rsproxy.cn/index/")
+        // 用 cargo 默认 target 目录：与仓库自身 .gitignore 及手工构建一致，避免两处产物
+        commandLine(
+            "cargo",
+            "build",
+            "--release",
+        )
+    }
+
+// 该库参与 :desktop 的编译与运行：先构建，再把产物目录并入库搜索路径。
+tasks.named("compileKotlinJvm") { dependsOn(logiBatteryBuild) }
+val logiBatteryLibDir = logiBatteryDir.resolve("target/release")
+
 // ===== 可分发包（createDistributable / runDistributable）的原生库 =====
-// 两个 Rust 动态库不随 jar 分发：复制进应用镜像的 app/resources，
+// 三个 Rust 动态库不随 jar 分发：复制进应用镜像的 app/resources，
 // 启动参数再把 JNA 与 System.loadLibrary 的搜索路径指向该目录。
 val distributableAppResources = layout.buildDirectory.dir("distributable/appResources")
 
@@ -104,8 +143,10 @@ val prepareDistributableNatives =
         into(distributableAppResources.map { it.dir("common") })
         dependsOn(":core:hostRustBuild")
         dependsOn(smtcRustBuild)
+        dependsOn(logiBatteryBuild)
         from(rustHostLibDir) { include("*.dll") }
         from(smtcLibDir) { include("*.dll") }
+        from(logiBatteryLibDir) { include("*.dll") }
     }
 
 tasks
@@ -147,11 +188,15 @@ val generateIconIco =
 // 显式放行以消除 "A restricted method in java.lang.System has been called" 警告。
 val nativeAccessArgs = listOf("--enable-native-access=ALL-UNNAMED")
 
+// 全部原生库产物目录：JNA 与 System.loadLibrary 各自按名字查找，故都要在搜索路径上。
+val nativeLibPath =
+    listOf(rustHostLibDir, smtcLibDir, logiBatteryLibDir)
+        .joinToString(File.pathSeparator) { it.absolutePath }
+
 tasks.withType<JavaExec>().configureEach {
     // JNA 优先读 jna.library.path；java.library.path 对 Native.register 不生效
-    // 两个 Rust 产物目录都要在搜索路径上：JNA 与 System.loadLibrary 各自按名字找
-    systemProperty("jna.library.path", rustHostLibDir.absolutePath + File.pathSeparator + smtcLibDir.absolutePath)
-    systemProperty("java.library.path", rustHostLibDir.absolutePath + File.pathSeparator + smtcLibDir.absolutePath)
+    systemProperty("jna.library.path", nativeLibPath)
+    systemProperty("java.library.path", nativeLibPath)
     jvmArgs(nativeAccessArgs)
     // 控制台输出编码：中文 Windows 默认按 GBK 编码 stdout/stderr，捕获端（Gradle/IDE）按 UTF-8 解码会乱码。
     // JDK 18+ 起 file.encoding 不再决定控制台编码，需显式指定 stdout.encoding / stderr.encoding。
@@ -160,8 +205,8 @@ tasks.withType<JavaExec>().configureEach {
 }
 
 tasks.withType<Test>().configureEach {
-    systemProperty("jna.library.path", rustHostLibDir.absolutePath + File.pathSeparator + smtcLibDir.absolutePath)
-    systemProperty("java.library.path", rustHostLibDir.absolutePath + File.pathSeparator + smtcLibDir.absolutePath)
+    systemProperty("jna.library.path", nativeLibPath)
+    systemProperty("java.library.path", nativeLibPath)
     systemProperty("stdout.encoding", "UTF-8")
     systemProperty("stderr.encoding", "UTF-8")
     jvmArgs(nativeAccessArgs)
@@ -182,6 +227,9 @@ compose.desktop {
             packageName = "NotifyRelay"
             packageVersion = "1.0.0"
             appResourcesRootDir.set(distributableAppResources)
+            // 余额轮询使用 java.net.http.HttpClient：该模块不在 jpackage 默认模块集内，
+            // 未声明时运行期报 NoClassDefFoundError（打包运行才会暴露，编译期无感）
+            modules("java.net.http")
             windows {
                 // 不显示控制台窗口：直接运行 exe 时无额外黑窗
                 console = false
