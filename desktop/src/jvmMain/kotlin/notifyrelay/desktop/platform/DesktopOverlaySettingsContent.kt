@@ -105,7 +105,7 @@ fun DesktopOverlayDanmakuContent() {
             range = 9f..54f,
             step = 1f,
             format = { it.roundToInt().toString() + "px" },
-            onValueChange = {
+            onValueChangeFinished = {
                 fontSize = it
                 DesktopOverlaySettings.danmakuFontSize = it
             },
@@ -118,7 +118,7 @@ fun DesktopOverlayDanmakuContent() {
             range = 60f..540f,
             step = 10f,
             format = { it.roundToInt().toString() + " px/s" },
-            onValueChange = {
+            onValueChangeFinished = {
                 speed = it
                 DesktopOverlaySettings.danmakuSpeed = it
             },
@@ -131,7 +131,7 @@ fun DesktopOverlayDanmakuContent() {
             range = 30f..100f,
             step = 1f,
             format = { it.roundToInt().toString() + "%" },
-            onValueChange = {
+            onValueChangeFinished = {
                 areaPercent = it
                 DesktopOverlaySettings.danmakuAreaPercent = it
             },
@@ -150,7 +150,7 @@ fun DesktopOverlayDanmakuContent() {
             range = 3f..20f,
             step = 1f,
             format = { it.roundToInt().toString() + " 秒" },
-            onValueChange = {
+            onValueChangeFinished = {
                 collapseSeconds = it
                 DesktopOverlaySettings.mediaAutoCollapseMs = (it * 1000).toLong()
             },
@@ -163,6 +163,11 @@ fun DesktopOverlayDanmakuContent() {
  *
  * 拖动期间用本地值跟手、不做吸附，松手时才吸附并提交：
  * 若在拖动回调里吸附，步进大于 1 时大多数位置吸附后仍是原值，受控滑块会回弹，表现为「拖不动」。
+ *
+ * 回调拆分：
+ * - [onValueChange] 在拖动过程中每帧调用，用于实时更新 UI（如浮窗位置跟手）；默认空实现。
+ * - [onValueChangeFinished] 在松手时调用吸附后的值，用于落盘持久化。
+ *
  * [format] 依据当前显示值生成文本；[steps] 为除两端外的离散值个数，Miuix 要求非负。
  */
 @Composable
@@ -174,7 +179,8 @@ internal fun OverlaySlider(
     step: Float,
     format: (Float) -> String,
     enabled: Boolean = true,
-    onValueChange: (Float) -> Unit,
+    onValueChange: (Float) -> Unit = {},
+    onValueChangeFinished: (Float) -> Unit,
 ) {
     val realStep = if (step > 0f) step else 1f
     var local by remember { mutableFloatStateOf(value) }
@@ -190,11 +196,15 @@ internal fun OverlaySlider(
         valueRange = range,
         steps = (((range.endInclusive - range.start) / realStep).roundToInt() - 1).coerceAtLeast(0),
         enabled = enabled,
-        onValueChange = { local = it },
+        onValueChange = {
+            local = it
+            onValueChange(it)
+        },
         onValueChangeFinished = {
             val snapped = snapToStep(local, range, realStep)
             local = snapped
-            if (snapped != value) onValueChange(snapped)
+            onValueChange(snapped)
+            onValueChangeFinished(snapped)
         },
     )
 }

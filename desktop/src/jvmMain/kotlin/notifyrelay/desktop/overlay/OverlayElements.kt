@@ -12,7 +12,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -31,7 +30,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
 import notifyrelay.base.util.BatteryIconConverter
 import notifyrelay.overlay.api.BalanceSnapshot
 import notifyrelay.overlay.api.KeyboardSource
@@ -41,8 +39,6 @@ import notifyrelay.overlay.api.OverlayAnchor
 import notifyrelay.shared.ui.common.deviceIconFontFamily
 import top.yukonga.miuix.kmp.basic.Text
 import java.awt.Toolkit
-import java.time.LocalTime
-import java.time.format.DateTimeFormatter
 import kotlin.math.roundToInt
 
 /**
@@ -262,36 +258,13 @@ private fun keyboardLabel(state: KeyboardStateSnapshot): String {
     return parts.joinToString("　")
 }
 
-/** 时间浮窗：秒级刷新；关闭秒显示时对齐到分钟边界，避免无谓重组。 */
+/** 时间浮窗：文案由 DesktopClockSource 经 Store 推送，本组件只读不自行计时。 */
 @Composable
 internal fun ClockElement(
     anchor: OverlayAnchor,
-    showSeconds: Boolean,
-    use24Hour: Boolean,
+    text: String,
 ) {
-    if (!anchor.enabled) return
-
-    val formatter =
-        remember(showSeconds, use24Hour) {
-            val pattern =
-                when {
-                    showSeconds && use24Hour -> "HH:mm:ss"
-                    showSeconds -> "hh:mm:ss a"
-                    use24Hour -> "HH:mm"
-                    else -> "hh:mm a"
-                }
-            DateTimeFormatter.ofPattern(pattern)
-        }
-
-    var text by remember { mutableStateOf(LocalTime.now().format(formatter)) }
-    LaunchedEffect(formatter) {
-        while (true) {
-            text = LocalTime.now().format(formatter)
-            // 无秒时等到下一分钟边界再刷新，减少无意义重组
-            val waitMs = if (showSeconds) 1_000L else (60L - LocalTime.now().second) * 1_000L
-            delay(waitMs.coerceAtLeast(200L))
-        }
-    }
+    if (!anchor.enabled || text.isBlank()) return
 
     OverlayFloatingElement(anchor) {
         OutlinedText(text = text, anchor = anchor, fontSizePx = 48f)

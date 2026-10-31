@@ -104,6 +104,9 @@ internal object DesktopOverlayStore {
     /** 最近一次映射提示的入队时刻（毫秒），用于超时清理。 */
     val keyboardHintAt = mutableStateOf(0L)
 
+    /** 当前时间浮窗文案；未启动时为空串。 */
+    val clockText = mutableStateOf("")
+
     /** 写入余额快照。 */
     fun putBalance(snapshot: BalanceSnapshot) {
         balance.value = snapshot
@@ -130,12 +133,18 @@ internal object DesktopOverlayStore {
         keyboardHint.value = ""
     }
 
+    /** 写入时间浮窗文案。 */
+    fun putClockText(text: String) {
+        clockText.value = text
+    }
+
     /** 清空全部扩展点数据（停止时调用）。 */
     fun clearFeatures() {
         balance.value = BalanceSnapshot()
         logiDevices.value = emptyList()
         keyboardState.value = KeyboardStateSnapshot.EMPTY
         keyboardHint.value = ""
+        clockText.value = ""
     }
 }
 

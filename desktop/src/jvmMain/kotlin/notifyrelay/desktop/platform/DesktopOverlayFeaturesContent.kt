@@ -104,7 +104,7 @@ fun DesktopOverlayBalanceContent() {
             range = 60f..1800f,
             step = 60f,
             format = { (it / 60f).roundToInt().toString() + " 分钟" },
-            onValueChange = {
+            onValueChangeFinished = {
                 intervalSeconds = it
                 DesktopOverlaySettings.balanceIntervalMs = (it * 1000).toLong()
             },
@@ -325,6 +325,7 @@ fun DesktopOverlayKeyboardContent() {
 @Composable
 fun DesktopOverlayClockContent() {
     val revision = DesktopOverlaySettings.revision.value
+    val features = DesktopOverlayFeatures.current
     val anchor = DesktopOverlaySettings.clockAnchor
 
     var enabled by remember(revision) { mutableStateOf(DesktopOverlaySettings.clockEnabled) }
@@ -346,6 +347,7 @@ fun DesktopOverlayClockContent() {
                 enabled = it
                 DesktopOverlaySettings.clockEnabled = it
                 DesktopOverlaySettings.notifyChanged()
+                features?.syncSwitches()
             },
         )
         SwitchPreference(
@@ -356,6 +358,7 @@ fun DesktopOverlayClockContent() {
                 showSeconds = it
                 DesktopOverlaySettings.clockShowSeconds = it
                 DesktopOverlaySettings.notifyChanged()
+                features?.syncClockConfig()
             },
         )
         SwitchPreference(
@@ -366,6 +369,7 @@ fun DesktopOverlayClockContent() {
                 use24Hour = it
                 DesktopOverlaySettings.clockUse24Hour = it
                 DesktopOverlaySettings.notifyChanged()
+                features?.syncClockConfig()
             },
         )
 
@@ -382,7 +386,9 @@ fun DesktopOverlayClockContent() {
 /**
  * 位置、缩放与描边的公共滑块组。
  *
- * 位置按屏幕宽高百分比（0~100），缩放 0.5~3 倍，描边 0~8 像素。
+ * 位置按屏幕宽高百分比（0~100），缩放 0.5~4 倍，描边 0~8 像素。
+ * 拖动期经 [onValueChange] 实时写入 Anchor 背景态，渲染侧读取即触发重组，浮窗位置跟手；
+ * 松手时经 [onValueChangeFinished] 落盘并 [DesktopOverlaySettings.notifyChanged]。
  */
 @Composable
 private fun AnchorPreferences(
@@ -397,8 +403,10 @@ private fun AnchorPreferences(
         range = 0f..100f,
         step = 1f,
         format = { it.roundToInt().toString() + "%" },
-        onValueChange = {
+        onValueChange = { anchor.xPercent = it },
+        onValueChangeFinished = {
             anchor.xPercent = it
+            anchor.persist()
             onChanged()
         },
     )
@@ -409,8 +417,10 @@ private fun AnchorPreferences(
         range = 0f..100f,
         step = 1f,
         format = { it.roundToInt().toString() + "%" },
-        onValueChange = {
+        onValueChange = { anchor.yPercent = it },
+        onValueChangeFinished = {
             anchor.yPercent = it
+            anchor.persist()
             onChanged()
         },
     )
@@ -418,11 +428,13 @@ private fun AnchorPreferences(
         title = prefixTitle + "缩放",
         summary = "文本按该倍数放大",
         value = anchor.scale,
-        range = 0.5f..3f,
+        range = 0.5f..4f,
         step = 0.05f,
         format = { formatDecimal(it, 2) + "×" },
-        onValueChange = {
+        onValueChange = { anchor.scale = it },
+        onValueChangeFinished = {
             anchor.scale = it
+            anchor.persist()
             onChanged()
         },
     )
@@ -433,8 +445,10 @@ private fun AnchorPreferences(
         range = 0f..8f,
         step = 0.25f,
         format = { formatDecimal(it, 2) + "px" },
-        onValueChange = {
+        onValueChange = { anchor.outlineWidth = it },
+        onValueChangeFinished = {
             anchor.outlineWidth = it
+            anchor.persist()
             onChanged()
         },
     )
