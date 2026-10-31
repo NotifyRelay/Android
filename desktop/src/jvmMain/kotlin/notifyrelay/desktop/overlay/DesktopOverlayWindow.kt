@@ -52,7 +52,6 @@ import notifyrelay.base.log.Logger
 import notifyrelay.desktop.DataLayerDesktop
 import notifyrelay.desktop.platform.DesktopOverlaySettings
 import notifyrelay.domain.feature.media.MediaSessionSnapshot
-import notifyrelay.overlay.api.OverlayAnchor
 import top.yukonga.miuix.kmp.basic.Text
 import java.awt.Dimension
 import java.awt.Toolkit
@@ -174,26 +173,19 @@ private fun OverlayContent() {
 /**
  * 扩展点浮窗渲染。
  *
- * 只读 [DesktopOverlayStore] 的快照与 [DesktopOverlaySettings] 的锚点配置；
- * 设置经 `revision` 观察，避免逐帧阻塞读存储。
+ * 只读 [DesktopOverlayStore] 的快照与 [DesktopOverlaySettings] 的锚点配置。
+ * 锚点各字段以 Compose mutableState 为背景态，拖动滑块时直接触发重组，浮窗位置实时跟手；
+ * 非锚点设置（开关、显示格式等）经 `revision` 观察，避免逐帧阻塞读存储。
  */
 @Composable
 private fun OverlayFeatureElements(now: Long) {
-    // 设置版本号：变化时重建锚点快照
+    // 非锚点设置经 revision 观察
     val revision = DesktopOverlaySettings.revision.value
-
-    val anchors =
-        remember(revision) {
-            FeatureAnchors(
-                balance = DesktopOverlaySettings.balanceAnchor.snapshot(DesktopOverlaySettings.balanceEnabled),
-                logi = DesktopOverlaySettings.logiAnchor.snapshot(DesktopOverlaySettings.logiEnabled),
-                keyboard = DesktopOverlaySettings.keyboardAnchor.snapshot(DesktopOverlaySettings.keyboardEnabled),
-                clock = DesktopOverlaySettings.clockAnchor.snapshot(DesktopOverlaySettings.clockEnabled),
-            )
-        }
+    val balanceEnabled = remember(revision) { DesktopOverlaySettings.balanceEnabled }
+    val logiEnabled = remember(revision) { DesktopOverlaySettings.logiEnabled }
+    val keyboardEnabled = remember(revision) { DesktopOverlaySettings.keyboardEnabled }
+    val clockEnabled = remember(revision) { DesktopOverlaySettings.clockEnabled }
     val hideDisconnected = remember(revision) { DesktopOverlaySettings.logiHideWhenDisconnected }
-    val showSeconds = remember(revision) { DesktopOverlaySettings.clockShowSeconds }
-    val use24Hour = remember(revision) { DesktopOverlaySettings.clockUse24Hour }
 
     // 映射提示超时清理：超过展示时长后清空
     val hint = DesktopOverlayStore.keyboardHint.value
@@ -205,27 +197,26 @@ private fun OverlayFeatureElements(now: Long) {
         }
     }
 
-    BalanceElement(anchor = anchors.balance, snapshot = DesktopOverlayStore.balance.value)
+    // 锚点直接读 Anchor 活态：拖动期 mutableState 变化即触发重组，位置实时跟手
+    BalanceElement(
+        anchor = DesktopOverlaySettings.balanceAnchor.snapshot(balanceEnabled),
+        snapshot = DesktopOverlayStore.balance.value,
+    )
     LogiBatteryElement(
-        anchor = anchors.logi,
+        anchor = DesktopOverlaySettings.logiAnchor.snapshot(logiEnabled),
         devices = DesktopOverlayStore.logiDevices.value,
         hideWhenDisconnected = hideDisconnected,
     )
     KeyboardElement(
-        anchor = anchors.keyboard,
+        anchor = DesktopOverlaySettings.keyboardAnchor.snapshot(keyboardEnabled),
         state = DesktopOverlayStore.keyboardState.value,
         hint = if (now - hintAt <= KEYBOARD_HINT_DURATION_MS) hint else "",
     )
-    ClockElement(anchor = anchors.clock, showSeconds = showSeconds, use24Hour = use24Hour)
+    ClockElement(
+        anchor = DesktopOverlaySettings.clockAnchor.snapshot(clockEnabled),
+        text = DesktopOverlayStore.clockText.value,
+    )
 }
-
-/** 四个扩展点浮窗的锚点快照。 */
-private data class FeatureAnchors(
-    val balance: OverlayAnchor,
-    val logi: OverlayAnchor,
-    val keyboard: OverlayAnchor,
-    val clock: OverlayAnchor,
-)
 
 /** 按键映射提示的展示时长（毫秒）。 */
 private const val KEYBOARD_HINT_DURATION_MS = 1_200L

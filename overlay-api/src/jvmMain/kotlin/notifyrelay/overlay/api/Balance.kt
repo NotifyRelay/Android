@@ -1,26 +1,5 @@
 package notifyrelay.overlay.api
 
-/**
- * 叠加层元素的锚点与外观配置。
- *
- * 坐标按屏幕宽高的百分比（0~100）表达，与 Windows 叠加层同口径；
- * JVM 叠加层为覆盖主屏的单一窗口，故无目标屏字段。
- */
-data class OverlayAnchor(
-    /** 是否显示该元素。 */
-    val enabled: Boolean = true,
-    /** 水平位置，占屏宽百分比（0~100）。 */
-    val xPercent: Float = 50f,
-    /** 垂直位置，占屏高百分比（0~100）。 */
-    val yPercent: Float = 10f,
-    /** 缩放倍数。 */
-    val scale: Float = 1f,
-    /** 文本颜色，`#RRGGBB`。 */
-    val colorHex: String = "#FFFFFF",
-    /** 文本描边宽度（像素）。 */
-    val outlineWidth: Float = 2f,
-)
-
 /** DeepSeek 余额历史条目。 */
 data class BalanceHistoryItem(
     /** 记录时刻（毫秒）。 */

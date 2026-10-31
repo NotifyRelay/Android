@@ -1,38 +1,135 @@
 package notifyrelay.desktop.overlay.feature
 
 import notifyrelay.base.log.Logger
-import notifyrelay.desktop.overlay.DesktopOverlayStore
-import notifyrelay.desktop.platform.DesktopOverlaySettings
 import notifyrelay.overlay.api.BalanceSnapshot
-import notifyrelay.overlay.api.BalanceSource
 import notifyrelay.overlay.api.KeyMapping
-import notifyrelay.overlay.api.KeyboardSource
 import notifyrelay.overlay.api.KeyboardStateSnapshot
 import notifyrelay.overlay.api.LogiBatteryDevice
-import notifyrelay.overlay.api.LogiBatterySource
+import notifyrelay.overlay.api.OverlayFeature
 import java.io.Closeable
 
 /**
  * 叠加层扩展点装配。
  *
- * 汇总四项能力的实现与设置，统一负责「按开关启动 / 停止」与「把数据推入叠加层状态」；
- * 不引入宿主编排器，由 [notifyrelay.desktop.overlay.DesktopOverlayWindow] 直接调用。
+ * 持有四项 [OverlayFeature] 实现并统一负责启停；具体生命周期与数据订阅由各 Feature 自管，
+ * 本类只做编排与供设置页访问的委托。新增能力只需实现 [OverlayFeature] 并在此注册，
+ * 不再修改启停与订阅逻辑。
  *
  * 装配口径（用户裁定）：
  * - 余额默认关闭，用户填入凭据并开启后启动轮询；
  * - 罗技电池、键盘、时间默认开启；罗技仅在枚举到设备时显示；
  * - 键盘项开关与叠加层总开关同时满足才安装全局键盘钩子。
  */
-class DesktopOverlayFeatures(
-    private val balanceSource: BalanceSource = DesktopBalanceSource(),
-    private val logiSource: LogiBatterySource = DesktopLogiBatterySource(),
-    private val keyboardSource: KeyboardSource =
-        DesktopKeyboardSource(
-            mappingsProvider = { DesktopOverlaySettings.keyboardMappings },
-            // 构造参数在实例初始化前求值，故引用伴生函数而非成员函数
-            enabledProvider = { keyboardActive() },
-        ),
-) : Closeable {
+class DesktopOverlayFeatures : Closeable {
+    private val balance = DesktopBalanceFeature()
+    private val logi = DesktopLogiBatteryFeature()
+    private val keyboard = DesktopKeyboardFeature()
+    private val clock = DesktopClockFeature()
+
+    private val features: List<OverlayFeature> = listOf(balance, logi, keyboard, clock)
+
+    @Volatile
+    private var started = false
+
+    init {
+        current = this
+    }
+
+    /** 启动：各 Feature 自行订阅数据源并按开关启停。 */
+    fun start() {
+        if (started) return
+        started = true
+        features.forEach { feature ->
+            if (feature.available) {
+                runCatching { feature.start() }
+                    .onFailure { Logger.w(TAG, "扩展点 ${feature.id} 启动失败", it) }
+            }
+        }
+        Logger.i(TAG, "叠加层扩展点已启动")
+    }
+
+    /** 停止：各 Feature 释放资源与订阅。 */
+    fun stop() {
+        if (!started) return
+        started = false
+        features.forEach { feature ->
+            runCatching { feature.stop() }
+                .onFailure { Logger.w(TAG, "扩展点 ${feature.id} 停止失败", it) }
+        }
+        Logger.i(TAG, "叠加层扩展点已停止")
+    }
+
+    /** 开关变化后重新同步各数据源的启停状态。 */
+    fun syncSwitches() {
+        if (!started) return
+        balance.syncSwitch(notifyrelay.desktop.platform.DesktopOverlaySettings.balanceEnabled)
+        logi.syncSwitch(notifyrelay.desktop.platform.DesktopOverlaySettings.logiEnabled)
+        keyboard.syncSwitch(notifyrelay.desktop.platform.DesktopOverlaySettings.keyboardEnabled)
+        clock.syncSwitch(notifyrelay.desktop.platform.DesktopOverlaySettings.clockEnabled)
+    }
+
+    /** 时间显示格式变更后同步刷新节奏。 */
+    fun syncClockConfig() {
+        clock.syncConfig()
+    }
+
+    /** 释放全部资源；等价于 [stop]。 */
+    override fun close() {
+        stop()
+        features.forEach { runCatching { (it as? Closeable)?.close() } }
+        if (current === this) current = null
+    }
+
+    // ======== 设置页委托 ========
+
+    /** 当前余额快照（供设置页展示）。 */
+    fun balanceSnapshot(): BalanceSnapshot = balance.source.snapshot
+
+    /** 当前罗技设备快照（供设置页展示）。 */
+    fun logiDevices(): List<LogiBatteryDevice> = logi.source.devices()
+
+    /** 当前按键状态（供设置页展示）。 */
+    fun keyboardState(): KeyboardStateSnapshot = keyboard.source.state()
+
+    /** 当前映射规则。 */
+    fun mappings(): List<KeyMapping> = keyboard.source.mappings()
+
+    /** 订阅按键状态；供设置页录入组合键使用。 */
+    fun observeKeyboard(listener: (KeyboardStateSnapshot) -> Unit): AutoCloseable = keyboard.source.observeState(listener)
+
+    /** 覆写映射规则并即时生效。 */
+    fun setMappings(mappings: List<KeyMapping>) {
+        notifyrelay.desktop.platform.DesktopOverlaySettings.keyboardMappings = mappings
+        keyboard.source.setMappings(mappings)
+    }
+
+    /** 立即查询一次余额；失败返回 null。 */
+    suspend fun fetchBalanceOnce(): Double? = balance.source.fetchOnce()
+
+    /** 清空余额历史。 */
+    fun clearBalanceHistory() = balance.source.clearHistory()
+
+    /** 是否已配置余额凭据。 */
+    fun isBalanceConfigured(): Boolean = balance.source.isConfigured
+
+    /** 罗技原生库是否可用。 */
+    fun isLogiAvailable(): Boolean = logi.source.available
+
+    /** 立即枚举一次罗技设备，不改变轮询状态。 */
+    fun refreshLogiNow() = logi.source.refreshNow()
+
+    /** 设置或清除罗技设备自定义名；空名表示回退原生名。 */
+    fun setLogiDeviceName(
+        deviceId: String,
+        name: String?,
+    ) = logi.source.setDeviceNameOverride(deviceId, name)
+
+    /** 订阅罗技设备快照；供设置页展示设备列表。 */
+    fun observeLogiDevices(listener: (List<LogiBatteryDevice>) -> Unit): AutoCloseable = logi.source.observe(listener)
+
+    /** 键盘监控是否可用。 */
+    fun isKeyboardAvailable(): Boolean = keyboard.source.available
+
     companion object {
         const val TAG = "OverlayFeatures"
 
@@ -45,137 +142,5 @@ class DesktopOverlayFeatures(
         @Volatile
         var current: DesktopOverlayFeatures? = null
             private set
-
-        /** 键盘项是否处于活动状态：叠加层总开关与键盘项开关同时开启。 */
-        fun keyboardActive(): Boolean = DesktopOverlaySettings.enabled && DesktopOverlaySettings.keyboardEnabled
     }
-
-    private val subscriptions = mutableListOf<AutoCloseable>()
-
-    @Volatile
-    private var started = false
-
-    init {
-        current = this
-    }
-
-    /** 启动：订阅数据源并推入叠加层状态，再按各自开关启停后台任务。 */
-    fun start() {
-        if (started) return
-        started = true
-
-        subscribe()
-
-        // 余额：仅在有凭据且开关开启时轮询
-        if (DesktopOverlaySettings.balanceEnabled) {
-            balanceSource.start()
-        } else {
-            Logger.d(TAG, "余额浮窗未开启，不启动轮询")
-        }
-
-        // 罗技：开关开启即轮询；无设备时不显示由渲染侧按空集合处理
-        if (DesktopOverlaySettings.logiEnabled) {
-            logiSource.start()
-        }
-
-        // 键盘：安装全局低级键盘钩子
-        keyboardSource.syncState()
-
-        Logger.i(TAG, "叠加层扩展点已启动")
-    }
-
-    /** 停止：卸载钩子、停止轮询并解除订阅。 */
-    fun stop() {
-        if (!started) return
-        started = false
-
-        keyboardSource.uninstall()
-        logiSource.stop()
-        balanceSource.stop()
-
-        subscriptions.forEach { runCatching { it.close() } }
-        subscriptions.clear()
-
-        DesktopOverlayStore.clearFeatures()
-        Logger.i(TAG, "叠加层扩展点已停止")
-    }
-
-    /** 开关变化后重新同步各数据源的启停状态。 */
-    fun syncSwitches() {
-        if (!started) return
-
-        if (DesktopOverlaySettings.balanceEnabled) balanceSource.start() else balanceSource.stop()
-        if (DesktopOverlaySettings.logiEnabled) logiSource.start() else logiSource.stop()
-        keyboardSource.syncState()
-    }
-
-    /** 释放全部资源；等价于 [stop]。 */
-    override fun close() {
-        stop()
-        if (current === this) current = null
-    }
-
-    /** 订阅四个数据源并把快照写入叠加层状态。 */
-    private fun subscribe() {
-        subscriptions.add(
-            balanceSource.observe { snapshot -> DesktopOverlayStore.putBalance(snapshot) },
-        )
-        subscriptions.add(
-            logiSource.observe { devices -> DesktopOverlayStore.putLogiDevices(devices) },
-        )
-        subscriptions.add(
-            keyboardSource.observeState { snapshot -> DesktopOverlayStore.putKeyboardState(snapshot) },
-        )
-        subscriptions.add(
-            keyboardSource.observeMappingHint { text -> DesktopOverlayStore.putKeyboardHint(text) },
-        )
-    }
-
-    /** 当前余额快照（供设置页展示）。 */
-    fun balanceSnapshot(): BalanceSnapshot = balanceSource.snapshot
-
-    /** 当前罗技设备快照（供设置页展示）。 */
-    fun logiDevices(): List<LogiBatteryDevice> = logiSource.devices()
-
-    /** 当前按键状态（供设置页展示）。 */
-    fun keyboardState(): KeyboardStateSnapshot = keyboardSource.state()
-
-    /** 当前映射规则。 */
-    fun mappings(): List<KeyMapping> = keyboardSource.mappings()
-
-    /** 订阅按键状态；供设置页录入组合键使用。 */
-    fun observeKeyboard(listener: (KeyboardStateSnapshot) -> Unit): AutoCloseable = keyboardSource.observeState(listener)
-
-    /** 覆写映射规则并即时生效。 */
-    fun setMappings(mappings: List<KeyMapping>) {
-        DesktopOverlaySettings.keyboardMappings = mappings
-        keyboardSource.setMappings(mappings)
-    }
-
-    /** 立即查询一次余额；失败返回 null。 */
-    suspend fun fetchBalanceOnce(): Double? = balanceSource.fetchOnce()
-
-    /** 清空余额历史。 */
-    fun clearBalanceHistory() = balanceSource.clearHistory()
-
-    /** 是否已配置余额凭据。 */
-    fun isBalanceConfigured(): Boolean = balanceSource.isConfigured
-
-    /** 罗技原生库是否可用。 */
-    fun isLogiAvailable(): Boolean = logiSource.available
-
-    /** 立即枚举一次罗技设备，不改变轮询状态。 */
-    fun refreshLogiNow() = logiSource.refreshNow()
-
-    /** 设置或清除罗技设备自定义名；空名表示回退原生名。 */
-    fun setLogiDeviceName(
-        deviceId: String,
-        name: String?,
-    ) = logiSource.setDeviceNameOverride(deviceId, name)
-
-    /** 订阅罗技设备快照；供设置页展示设备列表。 */
-    fun observeLogiDevices(listener: (List<LogiBatteryDevice>) -> Unit): AutoCloseable = logiSource.observe(listener)
-
-    /** 键盘监控是否可用。 */
-    fun isKeyboardAvailable(): Boolean = keyboardSource.available
 }

@@ -1,5 +1,7 @@
 package notifyrelay.desktop.platform
 
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import notifyrelay.data.Storage
 import notifyrelay.overlay.api.KeyMapping
 import notifyrelay.overlay.api.OverlayAnchor
@@ -148,6 +150,8 @@ object DesktopOverlaySettings {
     /**
      * 单个元素的位置与外观读写。
      *
+     * 各字段以 Compose mutableState 为背景态：拖动滑块时直接写入背景态，
+     * 渲染侧读取即触发重组，实现位置实时跟手；松手时经 [persist] 落盘。
      * 键为「前缀 + 字段名」，各元素的取值互不影响。
      * 默认值按元素分别给出：各浮窗的实际摆放位置不同，共用一套默认值会全部重叠。
      */
@@ -159,30 +163,55 @@ object DesktopOverlaySettings {
         private val defaultOutlineWidth: Float = DEFAULT_OUTLINE_WIDTH,
         private val defaultColor: String = DEFAULT_COLOR,
     ) {
+        private val _xPercent = mutableFloatStateOf(Storage.getFloat(prefix + "_x_percent", defaultX))
+        private val _yPercent = mutableFloatStateOf(Storage.getFloat(prefix + "_y_percent", defaultY))
+        private val _scale = mutableFloatStateOf(Storage.getFloat(prefix + "_scale", defaultScale))
+        private val _colorHex = mutableStateOf(Storage.getString(prefix + "_color", defaultColor))
+        private val _outlineWidth = mutableFloatStateOf(Storage.getFloat(prefix + "_outline_width", defaultOutlineWidth))
+
         /** 水平位置（占屏宽百分比）。 */
         var xPercent: Float
-            get() = Storage.getFloat(prefix + "_x_percent", defaultX)
-            set(value) = Storage.putFloat(prefix + "_x_percent", value.coerceIn(0f, 100f))
+            get() = _xPercent.value
+            set(value) {
+                _xPercent.value = value.coerceIn(0f, 100f)
+            }
 
         /** 垂直位置（占屏高百分比）。 */
         var yPercent: Float
-            get() = Storage.getFloat(prefix + "_y_percent", defaultY)
-            set(value) = Storage.putFloat(prefix + "_y_percent", value.coerceIn(0f, 100f))
+            get() = _yPercent.value
+            set(value) {
+                _yPercent.value = value.coerceIn(0f, 100f)
+            }
 
         /** 缩放倍数。 */
         var scale: Float
-            get() = Storage.getFloat(prefix + "_scale", defaultScale)
-            set(value) = Storage.putFloat(prefix + "_scale", value.coerceIn(0.5f, 3f))
+            get() = _scale.value
+            set(value) {
+                _scale.value = value.coerceIn(0.5f, 4f)
+            }
 
         /** 文本颜色，`#RRGGBB`。 */
         var colorHex: String
-            get() = Storage.getString(prefix + "_color", defaultColor)
-            set(value) = Storage.putString(prefix + "_color", value)
+            get() = _colorHex.value
+            set(value) {
+                _colorHex.value = value
+            }
 
         /** 文本描边宽度（像素）。 */
         var outlineWidth: Float
-            get() = Storage.getFloat(prefix + "_outline_width", defaultOutlineWidth)
-            set(value) = Storage.putFloat(prefix + "_outline_width", value.coerceIn(0f, 8f))
+            get() = _outlineWidth.value
+            set(value) {
+                _outlineWidth.value = value.coerceIn(0f, 8f)
+            }
+
+        /** 把当前背景态落盘；拖动结束后调用。 */
+        fun persist() {
+            Storage.putFloat(prefix + "_x_percent", _xPercent.value)
+            Storage.putFloat(prefix + "_y_percent", _yPercent.value)
+            Storage.putFloat(prefix + "_scale", _scale.value)
+            Storage.putString(prefix + "_color", _colorHex.value)
+            Storage.putFloat(prefix + "_outline_width", _outlineWidth.value)
+        }
 
         /** 当前锚点快照。 */
         fun snapshot(enabled: Boolean): OverlayAnchor =
