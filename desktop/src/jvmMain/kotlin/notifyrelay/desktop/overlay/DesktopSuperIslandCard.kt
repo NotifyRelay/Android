@@ -17,7 +17,9 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.floating.bigisland.components.SuperIslandTemplateCompose
 import github.xzynine.superislandui.floating.common.SuperIslandExpandableCard
+import github.xzynine.superislandui.floating.common.superIslandCardColor
 import github.xzynine.superislandui.floating.smallisland.compose.BigIslandCollapsedCompose
+import github.xzynine.superislandui.floating.smallisland.compose.collapsedCapsuleColor
 import github.xzynine.superislandui.model.core.ParamV2
 import github.xzynine.superislandui.model.core.parseParamV2
 import kotlinx.coroutines.delay
@@ -96,8 +98,11 @@ internal fun SuperIslandCard(
     // 摘要胶囊的入参解析只随内容变化重算：形变期间两态内容同时组合
     val bigIsland = remember(entry.paramV2Raw) { extractBigIsland(entry.paramV2Raw) }
 
+    // 展开与收起共用折叠态底色：背景由容器单层绘制，组件自身不再画表面
     SuperIslandExpandableCard(
         expanded = expanded,
+        expandedBackgroundColor = superIslandCardColor(isOverlapping = false),
+        collapsedBackgroundColor = collapsedCapsuleColor(isOverlapping = false),
         modifier = Modifier.then(regionModifier),
         expandedContent = { ExpandedSuperIslandCard(entry, paramV2) },
         collapsedContent = {
@@ -120,6 +125,7 @@ internal fun SuperIslandCard(
                     fallbackContent = entry.text,
                     picFunction = paramV2?.picFunction,
                     aodPic = paramV2?.aodPic,
+                    drawSurface = false,
                 )
             }
         },
@@ -141,6 +147,7 @@ private fun ExpandedSuperIslandCard(
             fallbackContent = entry.text,
             mediaAppName = entry.deviceName,
             mediaControlsVisible = false,
+            drawSurface = false,
         )
     }
 }

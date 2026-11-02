@@ -42,6 +42,7 @@ private const val COVER_PIC_KEY = "miui.focus.pic_cover"
  * @param onPrevious 上一首回调
  * @param onNext 下一首回调
  * @param onCollapseClick 收起回调
+ * @param drawSurface 是否自行绘制卡片背景与圆角；由外部形态变换容器统一绘制表面时传 false
  */
 @Composable
 fun SuperIslandTemplateCompose(
@@ -57,6 +58,7 @@ fun SuperIslandTemplateCompose(
     onPrevious: () -> Unit = {},
     onNext: () -> Unit = {},
     onCollapseClick: () -> Unit = {},
+    drawSurface: Boolean = true,
 ) {
     SuperIslandComposeRoot(
         content = {
@@ -116,6 +118,7 @@ fun SuperIslandTemplateCompose(
             }
         },
         isOverlapping = isOverlapping,
+        drawSurface = drawSurface,
     )
 }
 

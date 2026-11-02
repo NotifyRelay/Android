@@ -16,8 +16,11 @@ import androidx.compose.ui.platform.LocalContext
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import github.xzynine.superislandui.floating.bigisland.components.SuperIslandTemplateCompose
+import github.xzynine.superislandui.floating.common.SUPER_ISLAND_CARD_CORNER_RADIUS
 import github.xzynine.superislandui.floating.common.SuperIslandExpandableCard
+import github.xzynine.superislandui.floating.common.superIslandCardColor
 import github.xzynine.superislandui.floating.smallisland.compose.BigIslandCollapsedCompose
+import github.xzynine.superislandui.floating.smallisland.compose.collapsedCapsuleColor
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -171,9 +174,12 @@ fun FloatingWindowContainer(
                     val fallbackTitle = entry.title?.takeIf { it.isNotBlank() }
                     val fallbackContent = entry.appName?.takeIf { it.isNotBlank() }
 
-                    // 展开与收起之间做尺寸连续形变；两态内容均为纯渲染，状态已在容器外备好
+                    // 展开与收起共用折叠态底色：背景由容器单层绘制，组件自身不再画表面
                     SuperIslandExpandableCard(
                         expanded = entry.isExpanded,
+                        expandedBackgroundColor = superIslandCardColor(entry.isOverlapping),
+                        collapsedBackgroundColor = collapsedCapsuleColor(entry.isOverlapping),
+                        expandedCornerRadius = SUPER_ISLAND_CARD_CORNER_RADIUS,
                         expandedContent = {
                             SuperIslandTemplateCompose(
                                 paramV2 = entry.paramV2,
@@ -187,10 +193,10 @@ fun FloatingWindowContainer(
                                 onPrevious = { mediaViewModel.previousLocal() },
                                 onNext = { mediaViewModel.nextLocal() },
                                 onCollapseClick = { onEntryClick(entry.key) },
+                                drawSurface = false,
                             )
                         },
                         collapsedContent = {
-                            // 直接显示摘要态内容，不添加额外的Box包装，避免方形背景
                             BigIslandCollapsedCompose(
                                 bigIsland = bigIslandJson,
                                 picMap = entry.picMap,
@@ -199,6 +205,7 @@ fun FloatingWindowContainer(
                                 isOverlapping = entry.isOverlapping,
                                 picFunction = picFunction,
                                 aodPic = aodPic,
+                                drawSurface = false,
                             )
                         },
                     )

@@ -276,11 +276,14 @@ fun formatDuration(ms: Long): String {
 /**
  * 超级岛根布局组件
  * 提供统一的卡片样式和布局结构
+ *
+ * @param drawSurface 是否自行绘制卡片背景与圆角；由外部形态变换容器统一绘制表面时传 false
  */
 @Composable
 fun SuperIslandComposeRoot(
     content: @Composable () -> Unit,
     isOverlapping: Boolean = false,
+    drawSurface: Boolean = true,
 ) {
     Box(
         modifier =
@@ -288,21 +291,19 @@ fun SuperIslandComposeRoot(
                 .fillMaxWidth()
                 .padding(8.dp),
     ) {
-        Card(
-            cornerRadius = 16.dp,
-            colors =
-                CardDefaults.defaultColors(
-                    color =
-                        if (isOverlapping) {
-                            // 重叠时显示红色背景
-                            Color.Red.copy(alpha = 0.92f)
-                        } else {
-                            // 正常时显示黑色背景
-                            Color.Black.copy(alpha = 0.92f)
-                        },
-                ),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        if (drawSurface) {
+            Card(
+                cornerRadius = SUPER_ISLAND_CARD_CORNER_RADIUS,
+                colors = CardDefaults.defaultColors(color = superIslandCardColor(isOverlapping)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                ) {
+                    content()
+                }
+            }
+        } else {
             Column(
                 modifier = Modifier.padding(8.dp),
             ) {
@@ -311,6 +312,21 @@ fun SuperIslandComposeRoot(
         }
     }
 }
+
+/** 展开态卡片圆角。 */
+val SUPER_ISLAND_CARD_CORNER_RADIUS = 16.dp
+
+/**
+ * 超级岛卡片的表面色：重叠提示态为红色，常态为黑色。
+ *
+ * 形态变换容器以本函数返回值作唯一背景色，保证展开与收起共用同一底色。
+ */
+fun superIslandCardColor(isOverlapping: Boolean): Color =
+    if (isOverlapping) {
+        Color.Red.copy(alpha = 0.92f)
+    } else {
+        Color.Black.copy(alpha = 0.92f)
+    }
 
 @Preview(name = "通用文本块", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
 @Composable

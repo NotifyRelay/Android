@@ -1,8 +1,6 @@
 package notifyrelay.desktop.overlay
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -377,25 +375,22 @@ private fun OverlayMediaItem(
             Modifier
         }
 
+    // 背景由容器单层绘制并在两态颜色之间渐变，两态内容不再各自画表面
     SuperIslandExpandableCard(
         expanded = expanded,
+        expandedBackgroundColor = MEDIA_CARD_BACKGROUND,
+        collapsedBackgroundColor = CAPSULE_BACKGROUND,
         modifier = Modifier.then(regionModifier),
+        expandedCornerRadius = MEDIA_CARD_CORNER_RADIUS,
         expandedContent = {
-            Row(
-                Modifier
-                    .clip(RoundedCornerShape(24.dp))
-                    .background(MEDIA_CARD_BACKGROUND),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Box(Modifier.width(420.dp)) {
-                    MediaIslandCompose(
-                        mediaSession = mediaSession,
-                        showControls = interactiveEnabled && controlsEnabled && userExpanded,
-                        onPlayPause = onPlayPause,
-                        onPrevious = onPrevious,
-                        onNext = onNext,
-                    )
-                }
+            Box(Modifier.width(MEDIA_CARD_WIDTH)) {
+                MediaIslandCompose(
+                    mediaSession = mediaSession,
+                    showControls = interactiveEnabled && controlsEnabled && userExpanded,
+                    onPlayPause = onPlayPause,
+                    onPrevious = onPrevious,
+                    onNext = onNext,
+                )
             }
         },
         collapsedContent = {
@@ -436,17 +431,12 @@ private fun CollapsedMediaCapsule(
     spectrumEnabled: Boolean,
     frameNow: Long,
 ) {
-    val shape = RoundedCornerShape(percent = 50)
     val painter = rememberSuperIslandImagePainter(url = coverUrl)
     Row(
         modifier =
             Modifier
                 .width(COLLAPSED_WIDTH)
                 .height(COLLAPSED_HEIGHT)
-                .shadow(elevation = 6.dp, shape = shape)
-                .background(color = CAPSULE_BACKGROUND, shape = shape)
-                .border(width = 1.dp, color = CAPSULE_BORDER, shape = shape)
-                .clip(shape)
                 .padding(horizontal = COLLAPSED_HORIZONTAL_PADDING),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(COLLAPSED_ITEM_GAP),
@@ -681,14 +671,17 @@ private val COLLAPSED_ITEM_GAP = 6.dp
 private const val COLLAPSED_SPECTRUM_WIDTH = 20.5f
 private const val COLLAPSED_SPECTRUM_HEIGHT = 14f
 
-/** 收起态胶囊背景。 */
+/** 收起态胶囊底色；形变过程中由外框渐变到展开态媒体卡底色。 */
 private val CAPSULE_BACKGROUND = Color(0xCC000000)
 
-/** 收起态胶囊边框。 */
-private val CAPSULE_BORDER = Color(0x80FFFFFF)
-
-/** 媒体卡背景。 */
+/** 展开态媒体卡底色。 */
 private val MEDIA_CARD_BACKGROUND = Color(0xFF1C1C1E)
+
+/** 媒体卡展开态宽度。 */
+private val MEDIA_CARD_WIDTH = 420.dp
+
+/** 媒体卡展开态圆角：形变起点，收起过程中逐步增大到胶囊圆角。 */
+private val MEDIA_CARD_CORNER_RADIUS = 24.dp
 
 /** 叠加层文本样式。 */
 private object OverlayTypography {

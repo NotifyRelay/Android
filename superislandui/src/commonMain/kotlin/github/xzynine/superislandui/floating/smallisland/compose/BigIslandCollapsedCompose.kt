@@ -29,6 +29,8 @@ import kotlinx.serialization.json.JsonObject
 /**
  * 超级岛 摘要/收起态总装配渲染器：将 A区 与 B区 的组件解析并组装为一个横向容器
  * Compose实现版本
+ *
+ * @param drawSurface 是否自行绘制胶囊背景、描边与阴影；由外部形态变换容器统一绘制表面时传 false
  */
 @Composable
 fun BigIslandCollapsedCompose(
@@ -39,18 +41,13 @@ fun BigIslandCollapsedCompose(
     isOverlapping: Boolean = false,
     picFunction: String? = null,
     aodPic: String? = null,
+    drawSurface: Boolean = true,
 ) {
     // 使用真正的圆角形状
-    val cornerRadius = 999.dp
-    val roundedShape = RoundedCornerShape(cornerRadius)
+    val roundedShape = RoundedCornerShape(COLLAPSED_CAPSULE_CORNER_RADIUS)
 
     // 根据重叠状态选择背景色
-    val backgroundColor =
-        if (isOverlapping) {
-            Color(0xEEFF0000.toInt()) // 半透明红色
-        } else {
-            Color(0xCC000000.toInt()) // 半透明黑
-        }
+    val backgroundColor = collapsedCapsuleColor(isOverlapping)
 
     // 解析A区和B区组件，传入 picFunction 和 aodPic 作为 fallback
     // 解析器与入参同为 kotlinx JSON 树，无需再做文本往返转换
@@ -80,16 +77,22 @@ fun BigIslandCollapsedCompose(
     Box(
         modifier =
             Modifier
-                .shadow(elevation = 6.dp, shape = roundedShape)
-                .background(
-                    color = backgroundColor,
-                    shape = roundedShape,
-                ).border(
-                    width = 1.dp,
-                    color = Color(0x80FFFFFF), // 半透明白色边框
-                    shape = roundedShape,
-                ).clip(roundedShape)
-                .padding(horizontal = 10.dp, vertical = 6.dp)
+                .then(
+                    if (drawSurface) {
+                        Modifier
+                            .shadow(elevation = 6.dp, shape = roundedShape)
+                            .background(
+                                color = backgroundColor,
+                                shape = roundedShape,
+                            ).border(
+                                width = 1.dp,
+                                color = Color(0x80FFFFFF), // 半透明白色边框
+                                shape = roundedShape,
+                            ).clip(roundedShape)
+                    } else {
+                        Modifier
+                    },
+                ).padding(horizontal = 10.dp, vertical = 6.dp)
                 .wrapContentWidth(),
     ) {
         // 主布局：使用Row实现保证长侧显示完全，加宽侧与链接处的空隙宽度
@@ -123,6 +126,21 @@ fun BigIslandCollapsedCompose(
         }
     }
 }
+
+/** 收起态胶囊的目标圆角：大于任意高度，由形状裁切为胶囊端部。 */
+val COLLAPSED_CAPSULE_CORNER_RADIUS = 999.dp
+
+/**
+ * 收起态胶囊的表面色：重叠提示态为红色，常态为黑色。
+ *
+ * 形态变换容器以本函数返回值作唯一背景色，保证展开与收起共用同一底色。
+ */
+fun collapsedCapsuleColor(isOverlapping: Boolean): Color =
+    if (isOverlapping) {
+        Color(0xEEFF0000.toInt()) // 半透明红色
+    } else {
+        Color(0xCC000000.toInt()) // 半透明黑
+    }
 
 /**
  * 直接使用A区和B区组件渲染摘要态（用于预览）
