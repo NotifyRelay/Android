@@ -7,6 +7,8 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
 import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
 import notifyrelay.domain.feature.device.model.DeviceInfo
@@ -186,8 +188,7 @@ class DesktopClipboardSyncPort(
         if (targets.isEmpty()) return
         if (NativeCore.isReady().not()) return
 
-        val targetsJson =
-            targets.joinToString(prefix = "[", postfix = "]") { """ + it.uuid + """ }
+        val targetsJson = buildTargetsJson(targets.map { it.uuid })
         val result =
             runCatching {
                 NativeCore.clipboardOnChanged(
@@ -268,6 +269,17 @@ class DesktopClipboardSyncPort(
         override fun getTransferData(flavor: DataFlavor): Any = image
     }
 }
+
+/**
+ * 目标设备 uuid 数组的 JSON 文本。
+ *
+ * 手写引号与转义出过一次事故：字面量写坏会得到非法 JSON，Rust 侧解析失败后被当成"没有目标"，
+ * 发送静默不发生。此处统一由序列化库生成。
+ */
+internal fun buildTargetsJson(uuids: List<String>): String =
+    buildJsonArray {
+        uuids.forEach { add(it) }
+    }.toString()
 
 /**
  * 取 Rust 回包的顶层字符串字段。

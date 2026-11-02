@@ -1,6 +1,9 @@
 package notifyrelay.desktop.platform
 
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -68,6 +71,34 @@ class ClipboardResultDecodeTest {
             }
             assertEquals(sample, current)
         }
+    }
+}
+
+/**
+ * 发送目标列表的 JSON。
+ *
+ * 平台把它交给 `clipboardOnChanged`；非法 JSON 会被 Rust 当成"没有目标"而静默不发送。
+ */
+class ClipboardTargetsJsonTest {
+    @Test
+    fun buildsJsonStringArrayOfUuids() {
+        assertEquals("""["a","b"]""", buildTargetsJson(listOf("a", "b")))
+    }
+
+    @Test
+    fun roundTripsThroughJsonParser() {
+        val uuids = listOf("3d97367f-5d81-47c2-837d-10ec68e4bc4a", "0f0f", "a-\"b")
+        val parsed =
+            Json
+                .parseToJsonElement(buildTargetsJson(uuids))
+                .jsonArray
+                .map { it.jsonPrimitive.content }
+        assertEquals(uuids, parsed)
+    }
+
+    @Test
+    fun emptyListIsStillValidJson() {
+        assertEquals("[]", buildTargetsJson(emptyList()))
     }
 }
 
