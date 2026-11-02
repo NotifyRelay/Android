@@ -5,16 +5,19 @@ import android.graphics.Bitmap
 import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.nativecore.NativeCore
+import com.xzyht.notifyrelay.nativecore.device.service.callback.StateQueryPort
 import com.xzyht.notifyrelay.sync.MessageSender
 import github.xzynine.superislandui.common.SuperIslandManager
-import notifyrelay.base.util.Logger
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.image.ImageUtils
 import java.io.ByteArrayOutputStream
 
 /**
  * Rust 心跳「状态查询」的响应器。
  *
- * 差分/合并/ACK 与保活全部由 Rust 合并引擎完成（`nrc_push_*_state`），
+ * 差分/合并/ACK 与保活全部由 Rust 合并引擎完成（`NativeCore.pushMediaState()` / `NativeCore.pushSuperislandState()`），
  * 平台端只负责：按 featureId 找到对应会话 → 组装 full JSON → 以 `isQuery=1` 推回。
  *
  * 返回码约定（必须同步返回，无法异步）：
@@ -24,11 +27,14 @@ import java.io.ByteArrayOutputStream
  *
  * 性能：先用「轻量比较键」判断内容是否变化，未变则跳过昂贵的 `runBlocking` / fullJson 构造与推送。
  *
- * 注意：本类方法运行在 Rust 心跳线程且锁已释放，回调内可直接调用 `push`。
+ * 注意：本类方法运行在 Rust 心跳线程，回调内**不得**同步调用 NativeCore（会重入 core 导致崩溃），
+ * 推送一律经 [pushScope] 投递到其他线程执行。
  */
 class StateQueryResponder(
     private val context: Context,
-) {
+    /** 推送派发作用域；见 [pushState] 说明。 */
+    private val pushScope: CoroutineScope,
+) : StateQueryPort {
     companion object {
         private const val TAG = "CoreCb"
 
@@ -45,7 +51,7 @@ class StateQueryResponder(
     private val mediaCoverCacheLock = Any()
 
     /** 会话结束时清除该 featureId 的比较键。 */
-    fun removeKey(
+    override fun removeKey(
         remoteUuid: String,
         featureId: String,
     ) {
@@ -53,7 +59,7 @@ class StateQueryResponder(
     }
 
     /** 设备被移除时清除其全部比较键。 */
-    fun removeKeysForDevice(uuid: String) {
+    override fun removeKeysForDevice(uuid: String) {
         stateQueryKeys.keys.removeIf { it.startsWith("$uuid|") }
     }
 
@@ -63,7 +69,7 @@ class StateQueryResponder(
      * @param isMedia true=媒体会话查询，false=超级岛查询
      * @return 0=不存在 / 1=存在无变更 / 2=存在有变更
      */
-    fun handle(
+    override fun handle(
         remoteUuid: String,
         featureId: String,
         isMedia: Boolean,
@@ -127,10 +133,12 @@ class StateQueryResponder(
                     )
                 }
             // 仅当原生入队成功才写入比较键并返回“有变更”，否则保留原键以便下次查询重试
-            if (!pushState(remoteUuid, featureId, content, isMedia = false)) return 1
-            trimKeys(remoteUuid)
-            stateQueryKeys[cacheKey] = lightKey
-            return 2
+            val dispatched =
+                pushState(remoteUuid, featureId, content, isMedia = false) {
+                    trimKeys(remoteUuid)
+                    stateQueryKeys[cacheKey] = lightKey
+                }
+            return if (dispatched) 2 else 1
         }
         // 无匹配：平台上不存在该会话
         Logger.w(TAG, "状态查询: 超级岛会话不存在, fid=$featureId")
@@ -184,37 +192,49 @@ class StateQueryResponder(
                 System.currentTimeMillis(),
             )
         // 仅当原生入队成功才写入比较键并返回“有变更”，否则保留原键以便下次查询重试
-        if (!pushState(remoteUuid, featureId, content, isMedia = true)) return 1
-        trimKeys(remoteUuid)
-        stateQueryKeys[cacheKey] = lightKey
-        return 2
+        val dispatched =
+            pushState(remoteUuid, featureId, content, isMedia = true) {
+                trimKeys(remoteUuid)
+                stateQueryKeys[cacheKey] = lightKey
+            }
+        return if (dispatched) 2 else 1
     }
 
     /**
      * 查询响应推送：仅推给查询对应的远端设备（isQuery=1），差异/合并/保活由 Rust 负责。
      *
-     * @return true=原生入队成功；false=上下文/队列不可用、入队失败或异常（调用方可重试）
+     * 推送经 [pushScope] 异步执行：Rust 回调运行在 core 线程，在其中同步调用 NativeCore 会重入 core
+     * 并导致崩溃（实测栈：onStateQuery → pushMediaState → uniffi → detach while running code）。
+     *
+     * @param onSuccess 推送成功后执行（写入比较键）；失败时不执行，保留原键以便下次查询重试
+     * @return true=已派发；false=core/队列不可用
      */
     private fun pushState(
         remoteUuid: String,
         featureId: String,
         fullJson: String,
         isMedia: Boolean,
-    ): Boolean =
-        try {
-            val ctx = NativeCore.getContext() ?: return false
-            val queuePtr = NativeCore.senderQueuePtr
-            if (queuePtr == 0L) return false
-            val ok =
-                if (isMedia) {
-                    NativeCore.pushMediaState(ctx, queuePtr, remoteUuid, fullJson, false, true)
+        onSuccess: () -> Unit,
+    ): Boolean {
+        if (!NativeCore.isReady()) return false
+        if (!NativeCore.senderQueueReady) return false
+        pushScope.launch {
+            try {
+                val ok =
+                    if (isMedia) {
+                        NativeCore.pushMediaState(remoteUuid, fullJson, false, true)
+                    } else {
+                        NativeCore.pushSuperislandState(remoteUuid, fullJson, false, true)
+                    }
+                if (ok) {
+                    onSuccess()
                 } else {
-                    NativeCore.pushSuperislandState(ctx, queuePtr, remoteUuid, fullJson, false, true)
+                    Logger.w(TAG, "查询响应入队失败: " + remoteUuid + " fid=" + featureId)
                 }
-            if (!ok) Logger.w(TAG, "查询响应入队失败: $remoteUuid fid=$featureId")
-            ok
-        } catch (e: Exception) {
-            Logger.w(TAG, "查询响应推送失败: $remoteUuid fid=$featureId", e)
-            false
+            } catch (e: Exception) {
+                Logger.w(TAG, "查询响应推送失败: " + remoteUuid + " fid=" + featureId, e)
+            }
         }
+        return true
+    }
 }

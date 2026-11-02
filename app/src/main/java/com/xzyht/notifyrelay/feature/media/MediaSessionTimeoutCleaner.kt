@@ -2,7 +2,7 @@ package com.xzyht.notifyrelay.feature.media
 
 import android.content.Context
 import android.os.Handler
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 import java.util.concurrent.ConcurrentHashMap
 
 /**

@@ -5,23 +5,22 @@ import android.os.Build
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStore
-import com.xzyht.notifyrelay.feature.notification.superisland.history.SuperIslandHistoryStoreEntry
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaDisplayCache
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
-import com.xzyht.notifyrelay.feature.notification.superisland.tracker.LocalSuperIslandTracker
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.runBlocking
-import notifyrelay.base.util.Logger
+import notifyrelay.base.config.FilterConfigDefaults
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.data.FilterConfigDefaults
-import notifyrelay.data.StorageManager
+import notifyrelay.data.database.history.SuperIslandHistoryStore
+import notifyrelay.data.database.history.SuperIslandHistoryStoreEntry
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
+import notifyrelay.shared.feature.notification.superisland.replica.ReplicaDisplayCache
+import notifyrelay.shared.feature.notification.superisland.tracker.LocalSuperIslandTracker
 import org.json.JSONObject
 
 object SuperIslandProcessor {
@@ -49,8 +48,8 @@ object SuperIslandProcessor {
         manager: DeviceConnectionManager,
         dedupKey: String,
     ): Boolean {
-        val ctx = NativeCore.getContext() ?: return false
-        return NativeCore.dedup(ctx, 0, dedupKey, SI_DEDUP_TTL_MS, 0L) == 0
+        if (!NativeCore.isReady()) return false
+        return NativeCore.dedup(0, dedupKey, SI_DEDUP_TTL_MS, 0L) == 0
     }
 
     /** 清除锁屏去重登记（结束包 / 合并失败时调用） */
@@ -58,9 +57,9 @@ object SuperIslandProcessor {
         manager: DeviceConnectionManager,
         dedupKey: String,
     ) {
-        val ctx = NativeCore.getContext() ?: return
+        if (!NativeCore.isReady()) return
         try {
-            NativeCore.dedup(ctx, 2, dedupKey, 0L, 0L)
+            NativeCore.dedup(2, dedupKey, 0L, 0L)
         } catch (_: Exception) {
         }
     }
@@ -101,7 +100,7 @@ object SuperIslandProcessor {
             val time = json.optLong("time", System.currentTimeMillis())
 
             val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
-            val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
+            val mappedPkg = RemoteFilterPortRegistry.current?.mapToLocalPackage(pkg.orEmpty(), installedPkgs) ?: pkg.orEmpty()
 
             // 入站解析统一委托 core：字段抽取 + featureId + isEnd + sourceKey 一次完成
             val parsed =
@@ -125,11 +124,13 @@ object SuperIslandProcessor {
                     ""
                 }
 
-            val mirrorFilterEnabled = StorageManager.getBoolean(context, SuperIslandConfigUtils.MIRROR_FILTER_ENABLED_KEY, true)
+            val mirrorFilterEnabled =
+                notifyrelay.data.config.SuperIslandConfigPolicy
+                    .isMirrorFilterEnabled()
             if (mirrorFilterEnabled) {
                 val isMirrorEnabled =
                     runBlocking(Dispatchers.IO) {
-                        val repo = DatabaseRepository.getInstance(context)
+                        val repo = DatabaseRepository.getInstance()
                         val all = repo.getAllMirrorFilterPackages()
                         val entry = all.find { it.packageName == mappedPkg }
                         when {
@@ -372,21 +373,7 @@ object SuperIslandProcessor {
                         featureId = featureId,
                     )
 
-                try {
-                    SuperIslandHistoryStore.append(context, historyEntry)
-                } catch (_: Exception) {
-                    SuperIslandHistoryStore.append(
-                        context,
-                        SuperIslandHistoryStoreEntry(
-                            id = System.currentTimeMillis(),
-                            sourceDeviceUuid = remoteUuid,
-                            originalPackage = pkg,
-                            mappedPackage = mappedPkg,
-                            rawPayload = decrypted,
-                            featureId = featureId,
-                        ),
-                    )
-                }
+                SuperIslandHistoryStore.append(historyEntry)
             } else {
                 Logger.i("超级岛", "跳过保存测试数据到历史记录: pkg=$pkg")
             }

@@ -1,23 +1,22 @@
 package com.xzyht.notifyrelay.sync.notification
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.repository.remoteNotificationFilter
 import com.xzyht.notifyrelay.feature.device.repository.replicateNotification
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
-import com.xzyht.notifyrelay.feature.notification.data.ChatMemory
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
-import com.xzyht.notifyrelay.feature.notification.filter.RemoteFilterConfig
-import com.xzyht.notifyrelay.nativecore.NativeCore
+import com.xzyht.notifyrelay.nativecore.device.appsync.InboundNotificationProcessor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
+import kotlinx.coroutines.runBlocking
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.TextUtils
-import org.json.JSONObject
+import notifyrelay.domain.feature.notification.chat.ChatMemory
+import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 
 /**
  * 远程通知处理管线（单条通知级别，不负责网络收发）。
@@ -40,10 +39,18 @@ object NotificationProcessor {
     ) {
         val (header, data, remoteUuid) = input
 
-        // data 已由 ProtocolRouter 解密为明文，直接处理
-        handleJsonLevel(context, manager, header, data, remoteUuid)
+        // data 已由 ProtocolRouter 解密为明文，直接处理；返回值为落库记录与已入库检定结果
+        val inbound = handleJsonLevel(context, manager, header, data, remoteUuid)
 
-        handleFilterAndReplicate(context, manager, scope, data, remoteUuid)
+        // 已入库检定：命中则跳过复刻到系统通知中心（历史与聊天记忆照常）
+        if (inbound == null) {
+            handleFilterAndReplicate(context, manager, scope, data, remoteUuid)
+        } else if (inbound.duplicate) {
+            Logger.d(TAG, "远端通知已入库，跳过复刻: pkg=" + inbound.record.packageName)
+            ChatMemory.append("收到: " + data)
+        } else {
+            handleFilterAndReplicate(context, manager, scope, data, remoteUuid)
+        }
 
         notificationCallbacks.forEach { callback ->
             try {
@@ -54,42 +61,33 @@ object NotificationProcessor {
         }
     }
 
+    /**
+     * 解析并落库远端通知。
+     *
+     * 解析、包名映射与落库统一由公共端 [InboundNotificationProcessor] 完成；
+     * 本方法只补平台侧的内存态刷新（历史推送与设备列表扫描）。
+     */
     private fun handleJsonLevel(
         context: Context,
         manager: DeviceConnectionManager,
         header: String?,
         decrypted: String,
         remoteUuid: String?,
-    ) {
-        try {
-            if (remoteUuid != null) {
-                val parsedJson =
-                    try {
-                        NativeCore.parseNotificationInbound(decrypted)
-                    } catch (_: Exception) {
-                        null
-                    }
-                if (parsedJson == null) return
-                val parsed = JSONObject(parsedJson)
-                val pkg = parsed.optString("packageName")
-                val appName = parsed.optString("appName")
-                val title = parsed.optString("title")
-                val text = parsed.optString("text")
-                val timeRaw = parsed.optLong("time", 0L)
-                val time = if (timeRaw == 0L) System.currentTimeMillis() else timeRaw
-
-                val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
-                val mappedPkg = RemoteFilterConfig.mapToLocalPackage(pkg.orEmpty(), installedPkgs)
-
-                try {
-                    NotificationRepository.addRemoteNotification(mappedPkg, appName, title, text, time, remoteUuid, context)
-                    NotificationRepository.scanDeviceList(context)
-                } catch (e: Exception) {
-                    Logger.e(TAG, "存储远程通知失败: ${e.message}")
+    ): InboundNotificationProcessor.InboundResult? {
+        if (remoteUuid == null) return null
+        return try {
+            val result =
+                runBlocking {
+                    InboundNotificationProcessor.process(decrypted, remoteUuid)
                 }
+            if (result != null) {
+                NotificationRepository.notifyHistoryChanged(remoteUuid, context)
+                NotificationRepository.scanDeviceList(context)
             }
+            result
         } catch (e: Exception) {
-            Logger.e(TAG, "handleJsonLevel异常: ${e.message}")
+            Logger.e(TAG, "存储远程通知失败: ${e.message}")
+            null
         }
     }
 
@@ -107,7 +105,7 @@ object NotificationProcessor {
 
             if (result.needsDelay && localIsLocked) {
                 handleLockedScreenDelayed(context, scope, result)
-                ChatMemory.append(context, "收到: ${result.rawData}")
+                ChatMemory.append("收到: " + result.rawData)
             } else {
                 scope.launch {
                     replicateNotification(context, result, null, startMonitoring = true)
@@ -130,7 +128,7 @@ object NotificationProcessor {
                 }
             }
         } else {
-            ChatMemory.append(context, "收到: ${result.rawData}")
+            ChatMemory.append("收到: " + result.rawData)
         }
     }
 
@@ -140,7 +138,7 @@ object NotificationProcessor {
         result: BackendRemoteFilter.FilterResult,
     ) {
         try {
-            if (RemoteFilterConfig.enableDeduplication) {
+            if (RemoteFilterPortRegistry.current?.enableDedup == true) {
                 BackendRemoteFilter.addPlaceholder(result.title, result.text, result.mappedPkg, 15_000L)
             }
         } catch (_: Exception) {

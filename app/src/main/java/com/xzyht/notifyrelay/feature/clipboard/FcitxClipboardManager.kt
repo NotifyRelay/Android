@@ -9,7 +9,7 @@ import android.os.IBinder
 import android.security.keystore.KeyProperties
 import android.security.keystore.KeyProtection
 import android.util.Base64
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.SecureKeyStorage
 import org.fcitx.fcitx5.android.common.ipc.IBroadcastPairingService
 import java.security.KeyStore

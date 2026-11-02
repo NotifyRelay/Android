@@ -5,6 +5,7 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
     id("kotlin-parcelize")
 }
@@ -40,6 +41,24 @@ val injectedVersionCode =
             ?: System.getenv("VERSION_CODE")
             ?: fixedVersionCode.toString()
     ).toIntOrNull() ?: fixedVersionCode
+
+// AGP 9 的 KMP 库插件下，:shared 的 composeResources 不会自动进入安卓 assets，
+// 这里同步一份到应用 assets（路径与 compose 资源访问器的包名一致）。
+val sharedComposeAssetsDir = layout.buildDirectory.dir("generated/sharedComposeAssets")
+
+val syncSharedComposeResources =
+    tasks.register<Sync>("syncSharedComposeResources") {
+        description = "把 :shared 的 composeResources 同步到应用 assets"
+        group = "build"
+        from(rootProject.layout.projectDirectory.dir("shared/src/commonMain/composeResources")) {
+            into("composeResources/notifyrelay.shared.generated.resources")
+        }
+        into(sharedComposeAssetsDir)
+    }
+
+tasks
+    .matching { it.name.startsWith("mergeDebugAssets") || it.name.startsWith("mergeReleaseAssets") }
+    .configureEach { dependsOn(syncSharedComposeResources) }
 
 android {
     namespace = "com.xzyht.notifyrelay"
@@ -130,8 +149,10 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+        // miuix-nav 0.9.4 / miuix-ui 0.9.4 的发布字节码 major=65（Java 21）；
+        // 内联要求依赖类目标不高于使用方目标，故此处与 Kotlin jvmTarget 同为 21。
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     buildFeatures {
         compose = true
@@ -150,6 +171,8 @@ android {
         }
     }
 
+    sourceSets["main"].assets.srcDir(sharedComposeAssetsDir.get().asFile)
+
     // 配置资源打包选项，解决 META-INF/DEPENDENCIES 冲突问题
     packaging {
         resources {
@@ -164,7 +187,7 @@ android {
 
 kotlin {
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_11)
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }
 
@@ -173,28 +196,26 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)
     implementation(libs.material)
-    implementation(libs.androidx.ui.text)
-    implementation(libs.androidx.material3)
-    implementation(libs.androidx.foundation.layout)
-    implementation(libs.androidx.runtime)
-    implementation(libs.androidx.remote.creation.compose)
-    implementation(libs.runtime)
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 
-    // Jetpack Compose BOM 统一管理版本
-    implementation(platform(libs.androidx.compose.bom))
+    // Compose 运行时与 UI 采用 Compose Multiplatform 坐标（版本由 CMP 统一决定）
+    implementation(libs.compose.multiplatform.runtime)
+    implementation(libs.compose.multiplatform.foundation)
+    implementation(libs.compose.multiplatform.foundation.layout)
+    implementation(libs.compose.multiplatform.ui)
+    implementation(libs.compose.multiplatform.ui.text)
+    implementation(libs.compose.multiplatform.ui.tooling.preview)
+    debugImplementation(libs.compose.multiplatform.ui.tooling)
 
-    // Jetpack Compose 依赖（通过 BOM 统一管理版本）
-    implementation("androidx.activity:activity-compose")
-    implementation("androidx.compose.ui:ui")
-    implementation("androidx.compose.material3:material3")
-    implementation("androidx.compose.ui:ui-tooling-preview")
-    debugImplementation("androidx.compose.ui:ui-tooling")
-    implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.runtime:runtime")
-    implementation("androidx.compose.runtime:runtime-livedata")
+    // material3 保留 androidx 坐标（提供 KMP 元数据变体）
+    implementation(libs.androidx.material3)
+
+    // Android-only Compose 依赖
+    implementation(libs.androidx.activity.compose)
+    implementation(libs.androidx.compose.runtime.livedata)
+    implementation(libs.androidx.remote.creation.compose)
     // Compose Pager 用于实现滑动切换（直接指定有效版本）
     implementation(libs.accompanist.pager.indicators)
 
@@ -214,13 +235,14 @@ dependencies {
 
     // Miuix风格ui库
     implementation(libs.miuix.ui)
+    // miuix-nav：KMP 导航运行时（返回栈、路由 DSL、predictive back）
+    implementation(libs.miuix.nav)
+    // kotlinx-serialization-json：Route 的 @Serializable 序列化
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.miuix.preference)
     implementation(libs.miuix.icons)
-    implementation(libs.miuix.navigation3.ui)
-    // Navigation3
-    implementation(libs.androidx.navigation3.runtime)
-    implementation(libs.androidx.lifecycle.viewmodel.navigation3)
-    implementation(libs.androidx.navigationevent.compose)
+    // catalog 中 miuixNavigation3 / miuix-navigation3-ui 两个条目保留给 :scrcpy 子模块消费
+
     // DataStore 持久化（设备名、规则设置）
     implementation(libs.bundles.datastore)
     // Gson 用于通知历史 JSON 文件读写
@@ -238,7 +260,7 @@ dependencies {
 
     // 依赖数据模块
     implementation(project(":data"))
-    // 依赖core模块（Rust FFI 绑定 + JNA，源码目录 nativecore/）
+    // 依赖 core 模块（Rust 核心，UniFFI 绑定；源码目录 nativecore/）
     implementation(project(":core"))
     // 依赖base模块
     implementation(project(":base"))
@@ -248,6 +270,8 @@ dependencies {
     implementation(project(":superislandui"))
     // 依赖scrcpy模块
     implementation(project(":scrcpy"))
+    // KMP 公共端（平台标识、文本/摘要工具、存储 key、过滤默认常量）
+    implementation(project(":shared"))
 }
 
 tasks.register("printVersionName") {

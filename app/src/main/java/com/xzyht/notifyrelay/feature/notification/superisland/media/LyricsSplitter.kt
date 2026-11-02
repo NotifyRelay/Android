@@ -3,7 +3,7 @@ package com.xzyht.notifyrelay.feature.notification.superisland.media
 import android.content.Context
 import github.xzynine.superislandui.common.TextSplitter
 import notifyrelay.base.util.DeviceUtils
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
 
 /**
  * 歌词拆分（D2 去重）。
@@ -41,7 +41,7 @@ object LyricsSplitter {
         val lyricText = title.orEmpty()
 
         // 检查歌词分割模式设置：1=分割 2=不分割，其余按设备类型（平板不分割，手机分割）
-        val lyricsSplitMode = StorageManager.getInt(context, LYRICS_SPLIT_MODE_KEY, 0)
+        val lyricsSplitMode = Storage.getInt(LYRICS_SPLIT_MODE_KEY, 0)
         val shouldSplit =
             when (lyricsSplitMode) {
                 1 -> true

@@ -63,6 +63,7 @@
     <uses-permission android:name="org.fcitx.fcitx5.android.permission.CLIPBOARD_BROADCAST" />
 
     <application
+        android:name=".NotifyRelayApplication"
         android:enableOnBackInvokedCallback="true"
         android:allowBackup="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
@@ -171,6 +172,28 @@
             <meta-data
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/notification_dump_paths" />
+        </provider>
+
+        <!-- 私有目录文档提供者：让系统文件管理器能进入 Android/data/<包名>/files -->
+        <provider
+            android:name=".provider.LogDocumentsProvider"
+            android:authorities="${applicationId}.logs"
+            android:exported="true"
+            android:grantUriPermissions="true"
+            android:permission="android.permission.MANAGE_DOCUMENTS">
+            <intent-filter>
+                <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
+            </intent-filter>
+        </provider>
+        <!-- 运行日志目录的分享用 FileProvider（仅 externalFilesDir/logs 与 filesDir/logs） -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.logstorage"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/log_storage_paths" />
         </provider>
 
         <!-- 公平运行内存适配（小米 HyperOS / 金标联盟） -->

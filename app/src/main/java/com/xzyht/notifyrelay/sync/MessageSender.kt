@@ -1,11 +1,12 @@
 package com.xzyht.notifyrelay.sync
 
 import android.content.Context
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.HighPriorityNotifier
+import com.xzyht.notifyrelay.nativecore.device.SendGateway
 import com.xzyht.notifyrelay.sync.builder.ChatMessageBuilder
 import com.xzyht.notifyrelay.sync.builder.MediaMessageBuilder
 import com.xzyht.notifyrelay.sync.builder.SuperIslandMessageBuilder
+import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
 
 /**
  * 消息发送门面（整合聊天测试、普通通知转发、媒体与超级岛数据、本地高优先级通知）。
@@ -47,7 +48,7 @@ object MessageSender {
     fun sendChatMessage(
         context: Context,
         message: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
     ) = ChatMessageBuilder.sendChatMessage(context, message, deviceManager)
 
     /**
@@ -63,7 +64,7 @@ object MessageSender {
         text: String?,
         coverUrl: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
     ) = MediaMessageBuilder.sendMediaPlayNotification(
         context,
         packageName,
@@ -83,7 +84,7 @@ object MessageSender {
         packageName: String,
         appName: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
     ) = MediaMessageBuilder.sendMediaPlayEndNotification(
         context,
         packageName,
@@ -103,14 +104,14 @@ object MessageSender {
      * @param deviceManager 设备管理器
      * @param notificationKey 通知稳定标识键（NotificationListenerService 的 sbn.key），缺省时不写入 JSON
      */
-    fun sendNotificationMessage(
+    suspend fun sendNotificationMessage(
         context: Context,
         packageName: String,
         appName: String?,
         title: String?,
         text: String?,
         time: Long,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         notificationKey: String? = null,
     ) = ChatMessageBuilder.sendNotificationMessage(
         context,
@@ -162,7 +163,7 @@ object MessageSender {
         time: Long,
         paramV2Raw: String?,
         picMap: Map<String, String>?,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         featureIdOverride: String? = null,
     ) = SuperIslandMessageBuilder.sendSuperIslandData(
         context,
@@ -188,7 +189,7 @@ object MessageSender {
         paramV2Raw: String?,
         title: String?,
         text: String?,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         featureIdOverride: String? = null,
     ) = SuperIslandMessageBuilder.sendSuperIslandEnd(
         context,
@@ -220,7 +221,7 @@ object MessageSender {
      * @param deviceManager 设备管理器
      * @return 是否有可用的设备
      */
-    fun hasAvailableDevices(deviceManager: DeviceConnectionManager): Boolean = deviceManager.devices.value.isNotEmpty()
+    fun hasAvailableDevices(deviceManager: DeviceMessagePort): Boolean = deviceManager.devices.value.isNotEmpty()
 
     /**
      * 检查消息是否有效

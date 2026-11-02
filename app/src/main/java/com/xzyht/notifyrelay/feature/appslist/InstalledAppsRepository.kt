@@ -2,19 +2,19 @@ package com.xzyht.notifyrelay.feature.appslist
 
 import android.content.Context
 import android.content.pm.ApplicationInfo
-import com.xzyht.notifyrelay.feature.appslist.model.appMatchesQuery
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.AppListHelper
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.base.util.image.toPngByteArray
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.appslist.model.appMatchesQuery
 
 /**
  * 已安装应用仓库。
@@ -107,22 +107,22 @@ internal object InstalledAppsRepository {
                 // 因为 saveApps 使用 OnConflictStrategy.REPLACE，会先删除再插入，触发外键级联删除
                 val existingRemoteAssociations =
                     DatabaseRepository
-                        .getInstance(context)
+                        .getInstance()
                         .getAllAppDeviceAssociations()
                         .first()
                         .filter { it.sourceDevice != "local" }
 
-                DatabaseRepository.getInstance(context).saveApps(appEntities)
+                DatabaseRepository.getInstance().saveApps(appEntities)
 
                 // 重新保存远程设备的应用关联（本机的关联会在后面重新创建）
                 if (existingRemoteAssociations.isNotEmpty()) {
-                    DatabaseRepository.getInstance(context).saveAppDeviceAssociations(existingRemoteAssociations)
+                    DatabaseRepository.getInstance().saveAppDeviceAssociations(existingRemoteAssociations)
                 }
             }
 
             // 批量保存应用设备关联到数据库
             if (appDeviceEntities.isNotEmpty()) {
-                DatabaseRepository.getInstance(context).saveAppDeviceAssociations(appDeviceEntities)
+                DatabaseRepository.getInstance().saveAppDeviceAssociations(appDeviceEntities)
             }
 
             // Logger.d(TAG, "应用列表加载成功，共 ${apps.size} 个应用")
@@ -178,7 +178,7 @@ internal object InstalledAppsRepository {
         val installedPackages = getInstalledPackageNames(context)
         val cachedIconPackages = mutableSetOf<String>()
         // 从数据库获取所有应用包名
-        val apps = DatabaseRepository.getInstance(context).getAllApps().first()
+        val apps = DatabaseRepository.getInstance().getAllApps().first()
         apps.forEach {
             cachedIconPackages.add(it.packageName)
         }

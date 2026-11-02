@@ -11,12 +11,10 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.model.NotificationTextReader
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.filter.BackendLocalFilter
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
-import com.xzyht.notifyrelay.feature.notification.superisland.tracker.LocalSuperIslandTracker
 import com.xzyht.notifyrelay.sync.MessageSender
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import github.xzynine.superislandui.common.SuperIslandManager
@@ -30,11 +28,13 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import notifyrelay.base.SuperIslandStorageKeys
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.AppListHelper
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
-import notifyrelay.base.util.SuperIslandStorageKeys
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
+import notifyrelay.domain.feature.device.service.contract.DeviceDiscoveryPort
+import notifyrelay.shared.feature.notification.superisland.tracker.LocalSuperIslandTracker
 
 class NotifyRelayNotificationListenerService : NotificationListenerService() {
     companion object {
@@ -176,7 +176,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         // 确保本地历史缓存已加载，避免首次拉取时判重失效
         NotificationRepository.init(applicationContext)
         // 初始化设备连接管理器并启动发现
-        connectionManager = DeviceConnectionManagerSingleton.getDeviceManager(applicationContext)
+        connectionManager = DeviceConnectionManagerSingleton.getDeviceDiscovery(applicationContext)
         foregroundController =
             ListenerForegroundController(applicationContext, connectionManager) { id, notification ->
                 startForeground(id, notification)
@@ -238,8 +238,8 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
     private lateinit var foregroundController: ListenerForegroundController
 
     // 设备连接管理器
-    private lateinit var connectionManager: DeviceConnectionManager
-    internal val deviceManager by lazy { DeviceConnectionManagerSingleton.getDeviceManager(applicationContext) }
+    private lateinit var connectionManager: DeviceDiscoveryPort
+    internal val deviceManager by lazy { DeviceConnectionManagerSingleton.getDeviceMessage(applicationContext) }
 
     // 网络监听器
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
@@ -419,7 +419,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         processNotification(sbn)
     }
 
-    private fun forwardNotificationToRemoteDevices(sbn: StatusBarNotification) {
+    private suspend fun forwardNotificationToRemoteDevices(sbn: StatusBarNotification) {
         Logger.i(TAG, "[NotifyListener] forwardNotificationToRemoteDevices called, sbnKey=${sbn.key}, pkg=${sbn.packageName}")
         val appName = getAppName(sbn.packageName)
 
@@ -577,7 +577,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
         defaultValue: Boolean,
     ): Boolean =
         try {
-            StorageManager.getBoolean(applicationContext, key, defaultValue)
+            Storage.getBoolean(key, defaultValue)
         } catch (_: Exception) {
             defaultValue
         }

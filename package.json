@@ -1,0 +1,28 @@
+{
+  "name": "notifyrelay-doc-system",
+  "version": "0.1.0",
+  "scripts": {
+    "verify-md-wrap": "tsx scripts/verify-md-wrap.ts",
+    "verify-md-links": "tsx scripts/verify-md-links.ts",
+    "verify-doc-budgets": "tsx scripts/verify-doc-budgets.ts",
+    "verify-agent-note-format": "tsx scripts/verify-agent-note-format.ts",
+    "verify-agent-note-classification": "tsx scripts/verify-agent-note-classification.ts",
+    "verify-archived-agent-notes": "tsx scripts/verify-archived-agent-notes.ts",
+    "verify-skill-invocation-metadata": "tsx scripts/verify-skill-invocation-metadata.ts",
+    "verify-all": "tsx scripts/verify-all.ts",
+    "test:docs": "tsx scripts/verify-all.ts"
+  },
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/mdast": "^4.0.4",
+    "@types/node": "^22.20.1",
+    "js-yaml": "^4.1.0",
+    "mdast-util-from-markdown": "^2.0.2",
+    "mdast-util-gfm": "^3.1.0",
+    "micromark-extension-gfm": "^3.0.0",
+    "tsx": "^4.20.0",
+    "typescript": "^5.7.0"
+  },
+  "description": "可移植的 agent 指令、决策记录、技能与文档门禁体系。"
+}

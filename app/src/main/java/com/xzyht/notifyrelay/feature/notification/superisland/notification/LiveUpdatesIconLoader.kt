@@ -12,7 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.image.ImageUtils
 
 /**

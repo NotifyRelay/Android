@@ -24,13 +24,19 @@ dependencyResolutionManagement {
 
 rootProject.name = "NotifyRelay"
 include(":app")
+include(":desktop")
+// KMP 公共端（Compose Multiplatform 公共代码）
+include(":shared")
+include(":domain")
 include(":data")
 include(":base")
 include(":checkupdata")
 
 include(":superislandui")
 include(":scrcpy")
-// Rust 核心（JNA 绑定 + `notify-relay-core` 子模块）占用 `:core` 模块名；
+// 叠加层扩展点契约（纯接口与数据模型，无实现，仅桌面端消费）
+include(":overlay-api")
+// Rust 核心（UniFFI 绑定 + `notify-relay-core` 子模块）占用 `:core` 模块名；
 // 源码目录仍为 nativecore/，子模块路径不变，仅做 Gradle 模块名映射。
 // 原 `:core` 工具库（notifyrelay.core）已整体并入 `:base`（notifyrelay.base.util）。
 include(":core")

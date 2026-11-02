@@ -15,7 +15,7 @@ import notifyrelay.base.util.BatteryUtils
  * - 锁屏：[Intent.ACTION_SCREEN_OFF] / [Intent.ACTION_SCREEN_ON] / [Intent.ACTION_USER_PRESENT]
  *   → 回调 [onLockStateChanged]（由装配方同步心跳模式）；
  * - 电池：[Intent.ACTION_BATTERY_CHANGED] 为粘性广播，注册后立即回调一次当前状态，
- *   电量或充电状态变化时调用 `nrc_update_heartbeat_scheduler_params`，
+ *   电量或充电状态变化时调用 `NativeCore.updateHeartbeatSchedulerParams()`，
  *   使心跳报文携带实时电量（正=充电，负=放电）。相同值被防抖跳过。
  *
  * core 侧没有主动拉取本机电量的接口，因此这里必须由平台推送。
@@ -127,9 +127,9 @@ class SystemStateMonitor(
                                 status == BatteryManager.BATTERY_STATUS_FULL
                         val signed = if (charging) batteryLevel else -batteryLevel
                         if (signed == lastSentSignedBattery) return
-                        // 仅在上下文可用且上报调用未抛异常时才更新去重值；否则保留原值以便后续相同电量重试
-                        val ctx = NativeCore.getContext() ?: return
-                        NativeCore.updateHeartbeatSchedulerParams(ctx, localDisplayName(), signed, "android")
+                        // 仅在核心就绪且上报调用未抛异常时才更新去重值；否则保留原值以便后续相同电量重试
+                        if (!NativeCore.isReady()) return
+                        NativeCore.updateHeartbeatSchedulerParams(localDisplayName(), signed, "android")
                         lastSentSignedBattery = signed
                     } catch (_: Exception) {
                     }

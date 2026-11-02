@@ -7,11 +7,13 @@ import com.xzyht.notifyrelay.feature.notification.service.ListenerForegroundCont
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.list.FloatingReplicaListModeManager
-import com.xzyht.notifyrelay.feature.notification.superisland.list.SuperIslandListManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
+import notifyrelay.domain.feature.notification.superisland.list.SuperIslandListManager
+import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatching
+import notifyrelay.shared.feature.notification.superisland.replica.ReplicaDisplayCache
 
 object FloatingReplicaManager {
     private const val TAG = "超级岛复刻实现骨架"

@@ -4,7 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 
 class FcitxClipboardReceiver : BroadcastReceiver() {
     companion object {
@@ -33,7 +33,7 @@ class FcitxClipboardReceiver : BroadcastReceiver() {
 
         val decryptedText = FcitxClipboardManager.decryptClipboardData(context, encryptedData)
         if (decryptedText != null) {
-            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceQuery(context)
             ClipboardSyncManager.syncTextDirectly(deviceManager, decryptedText, context)
             Logger.d(TAG, "Fcitx5 剪贴板已转发至远端设备")
         }

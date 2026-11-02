@@ -1,0 +1,293 @@
+package com.xzyht.notifyrelay.nativecore.device.service.callback
+
+import com.xzyht.notifyrelay.nativecore.NativeCore
+import kotlinx.coroutines.launch
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonPrimitive
+import notifyrelay.base.log.Logger
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.model.PendingPairing
+
+/**
+ * `CoreCallbacks.onPairing` 回调处理器。
+ *
+ * 负责配对/握手相关的全部消息类型：
+ * - `HANDSHAKE`     对端发起握手（已配对设备由 Rust 自动 ACCEPT，平台只登记元数据）
+ * - `PAIRING_INIT`  对端发起配对，转交 UI 弹出配对码框
+ * - `PAIRING_RESP`  意外消息（平台上不应收到）
+ * - `ACCEPT`        对端接受并回传长期公钥 → 完成配对
+ * - `REJECT`        对端拒绝
+ * - `RESULT`        本机发起的配对结果
+ * - `HEARTBEAT_TCP` TCP 心跳（携带名称/电量/类型/IP）
+ *
+ * 时序（对端主动配对）：
+ * ```mermaid
+ * sequenceDiagram
+ *     participant Remote as 远端设备
+ *     participant Core as Rust Core
+ *     participant H as PairingCallbackHandler
+ *     participant UI as PairingCodeDialog
+ *     participant W as HandshakeWaiterRegistry
+ *
+ *     Remote->>Core: PAIRING_INIT(spake2_pub, ip)
+ *     Core->>H: onPairing(uuid, "PAIRING_INIT", data)
+ *     H->>H: pendingPairing = PendingPairing(...)
+ *     H->>UI: handshakeRequestHandler.onPairingInitRequest()
+ *     UI->>W: register(uuid)
+ *     Remote->>Core: RESULT(ok)
+ *     Core->>H: onPairing(uuid, "RESULT", intValue)
+ *     H->>Core: NativeCore.exportDeviceKey(uuid)
+ *     H->>H: completePairingWithLongTermKeys(uuid, ltPub)
+ *     H->>W: resolve(uuid, true)
+ * ```
+ */
+class PairingCallbackHandler(
+    private val host: DeviceCallbackHost,
+    private val heartbeatPort: HeartbeatMessagePort,
+) {
+    companion object {
+        private const val TAG = "CoreCb"
+
+        /**
+         * core 版本不兼容原因码，须与 Rust 侧 `codec::RejectReason::VERSION_MISMATCH` 保持一致。
+         *
+         * 两端 core 跨 major.minor 时无法通信，失败原因会随 REJECT/RESULT 上抛，
+         * 平台据此提示用户升级对端，而非笼统报"配对超时"。
+         */
+        const val REASON_VERSION_MISMATCH = "version_mismatch"
+    }
+
+    /** 配对/握手消息入口。 */
+    fun handle(
+        uuidStr: String,
+        messageTypeStr: String,
+        dataStr: String,
+        intValue: Int,
+        extraStr: String,
+    ) {
+        try {
+            when (messageTypeStr) {
+                "HANDSHAKE" -> handleHandshake(uuidStr, dataStr)
+                "PAIRING_INIT" -> handlePairingInit(uuidStr, dataStr)
+                "PAIRING_RESP" -> Logger.w(TAG, "收到意外的 PAIRING_RESP: $uuidStr")
+                "ACCEPT" -> handleAccept(uuidStr, dataStr)
+                "REJECT" -> handleReject(uuidStr, dataStr, extraStr)
+                "RESULT" -> handleResult(uuidStr, intValue, extraStr)
+                "HEARTBEAT_TCP" -> handleHeartbeatTcp(uuidStr, dataStr, extraStr, intValue)
+            }
+        } catch (e: Exception) {
+            Logger.e(TAG, "on_pairing error: ${e.message}")
+        }
+    }
+
+    /** 对端发起握手：登记元数据、重连目标与已知设备；按需回 ACCEPT/REJECT。 */
+    private fun handleHandshake(
+        uuid: String,
+        data: String?,
+    ) {
+        var pubKey = ""
+        var ip = ""
+        var deviceType = "unknown"
+        var autoAccept = false
+        data?.let {
+            try {
+                val json = parseJsonObject(it)
+                pubKey = json.stringOr("pub_key", "")
+                ip = json.stringOr("ip", "")
+                deviceType = json.stringOr("device_type", "unknown")
+                autoAccept = json.booleanOr("auto_accept", false)
+            } catch (_: Exception) {
+            }
+        }
+
+        synchronized(host.authenticatedDeviceTable) {
+            val auth = host.authenticatedDeviceTable[uuid]
+            if (auth != null) {
+                host.authenticatedDeviceTable[uuid] = auth.copy(lastIp = ip)
+                host.saveAuthedDevices()
+            }
+        }
+        host.registerReconnectTarget(uuid, ip)
+        host.registerKnownDevice(uuid, ip)
+
+        // Rust 侧已对已配对设备自动发送 ACCEPT（auto_accept=true），
+        // 平台侧仅做 UI 持久化/登记，无需重复发送 ACCEPT 或 REJECT
+        if (autoAccept) {
+            // 自动闭环分支同样清理不兼容标记并持久化 deviceType，避免标记残留
+            synchronized(host.incompatibleDeviceIds) { host.incompatibleDeviceIds.remove(uuid) }
+            synchronized(host.authenticatedDeviceTable) {
+                val auth = host.authenticatedDeviceTable[uuid]
+                if (auth != null && auth.deviceType != deviceType && deviceType != "unknown") {
+                    host.authenticatedDeviceTable[uuid] = auth.copy(deviceType = deviceType)
+                    host.saveAuthedDevices()
+                }
+            }
+            Logger.d(TAG, "HANDSHAKE 已自动闭环(Rust auto_accept): $uuid")
+            return
+        }
+
+        val alreadyAuthed =
+            synchronized(host.authenticatedDeviceTable) {
+                host.authenticatedDeviceTable[uuid]?.isAccepted == true
+            }
+        if (!alreadyAuthed) {
+            host.sendReject()
+            return
+        }
+
+        synchronized(host.authenticatedDeviceTable) {
+            val existingAuth = host.authenticatedDeviceTable[uuid]
+            if (existingAuth != null && existingAuth.publicKey != pubKey) {
+                host.sendReject()
+                Logger.w(TAG, "已认证设备公钥变化，要求重新配对: $uuid")
+                return
+            }
+        }
+        synchronized(host.incompatibleDeviceIds) { host.incompatibleDeviceIds.remove(uuid) }
+        host.sendAccept(deviceType)
+        synchronized(host.authenticatedDeviceTable) {
+            val auth = host.authenticatedDeviceTable[uuid]
+            if (auth != null) {
+                host.authenticatedDeviceTable[uuid] = auth.copy(deviceType = deviceType, lastIp = ip)
+                host.saveAuthedDevices()
+            }
+        }
+    }
+
+    /** 对端发起配对：暂存请求并转交 UI 展示配对码输入框。 */
+    private fun handlePairingInit(
+        uuid: String,
+        data: String?,
+    ) {
+        var spake2Pub = ""
+        var ip = ""
+        data?.let {
+            try {
+                val json = parseJsonObject(it)
+                spake2Pub = json.stringOr("spake2_pub", "")
+                ip = json.stringOr("ip", "")
+            } catch (_: Exception) {
+            }
+        }
+        synchronized(host.rejectedDeviceIds) {
+            if (host.rejectedDeviceIds.contains(uuid)) {
+                host.sendReject()
+                return
+            }
+        }
+        val existing = host.deviceInfoOf(uuid)
+        val displayName = existing?.displayName?.takeIf { it.isNotBlank() } ?: "未知设备"
+        host.pendingPairing = PendingPairing(remoteUuid = uuid, remotePubKey = spake2Pub, remoteIp = ip)
+        val remoteDevice = DeviceInfo(uuid, displayName, ip, existing?.port ?: 23333)
+        host.callbackScope.launch {
+            host.handshakeRequestHandler?.onPairingInitRequest(remoteDevice, spake2Pub)
+        }
+        Logger.d(TAG, "PAIRING_INIT 已处理: $uuid")
+    }
+
+    /** 对端接受：用长期公钥完成配对并唤醒等待者。 */
+    private fun handleAccept(
+        uuid: String,
+        data: String?,
+    ) {
+        var ltPubKey = ""
+        var ip = ""
+        data?.let {
+            try {
+                val json = parseJsonObject(it)
+                ltPubKey = json.stringOr("lt_pub_key", "")
+                ip = json.stringOr("ip", "")
+            } catch (_: Exception) {
+            }
+        }
+        val ok = host.completePairingWithLongTermKeys(uuid, ltPubKey, lastIp = ip)
+        host.handshakeWaiters.resolve(uuid, ok)
+        if (ok) {
+            // 登记已知设备（uuid+ip），心跳由 Rust 调度器自动启动
+            host.registerKnownDevice(uuid, ip)
+        }
+        Logger.d(TAG, "ACCEPT 已处理: $uuid")
+    }
+
+    /** 对端拒绝：唤醒等待者并记入拒绝集合，同时保留原因供 UI 明确提示。 */
+    private fun handleReject(
+        uuid: String,
+        data: String?,
+        extra: String?,
+    ) {
+        // core 在"版本不兼容"等主动拒绝场景会带上 reason（REJECT 负载第二段）。
+        val reason =
+            data
+                ?.let { runCatching { parseJsonObject(it).stringOr("reason", "") }.getOrDefault("") }
+                .orEmpty()
+                .ifEmpty { extra.orEmpty() }
+        if (reason == REASON_VERSION_MISMATCH) {
+            synchronized(host.incompatibleDeviceIds) { host.incompatibleDeviceIds.add(uuid) }
+        }
+        host.handshakeWaiters.resolve(uuid, false, reason.ifEmpty { null })
+        synchronized(host.rejectedDeviceIds) {
+            host.rejectedDeviceIds.add(uuid)
+        }
+        Logger.w(TAG, "REJECT 已处理: $uuid, reason=${reason.ifEmpty { "unspecified" }}")
+    }
+
+    /** 本机发起的配对结果。 */
+    private fun handleResult(
+        uuid: String,
+        intValue: Int,
+        extra: String?,
+    ) {
+        if (intValue == 0) {
+            val reason = extra.orEmpty()
+            if (reason == REASON_VERSION_MISMATCH) {
+                synchronized(host.incompatibleDeviceIds) { host.incompatibleDeviceIds.add(uuid) }
+            }
+            Logger.w(TAG, "配对失败: $uuid, error=${reason.ifEmpty { "unspecified" }}")
+            host.handshakeWaiters.resolve(uuid, false, reason.ifEmpty { null })
+            return
+        }
+        Logger.d(TAG, "配对成功: $uuid")
+        val keyJson = if (NativeCore.isReady()) NativeCore.exportDeviceKey(uuid) else null
+        val ltPub =
+            keyJson
+                ?.let { runCatching { parseJsonObject(it).stringOr("remote_pub_key", "") }.getOrDefault("") }
+                .orEmpty()
+        // 仅当长期密钥齐全且完成配对成功时，才登记已知设备并唤醒等待者
+        val completed = ltPub.isNotEmpty() && host.completePairingWithLongTermKeys(uuid, ltPub)
+        if (completed) {
+            // 登记已知设备（uuid+ip），心跳由 Rust 调度器自动启动
+            host.registerKnownDevice(uuid, host.deviceInfoOf(uuid)?.ip ?: "")
+        }
+        host.handshakeWaiters.resolve(uuid, completed)
+    }
+
+    /** TCP 心跳：把对端名称/电量/类型/IP 交给平台侧心跳处理器。 */
+    private fun handleHeartbeatTcp(
+        uuid: String,
+        data: String?,
+        extra: String?,
+        intValue: Int,
+    ) {
+        if (extra == null) return
+        if (uuid == host.localUuid) return
+        // 报文原文同时携带名称/电量/类型/IP，由平台侧端口解析
+        heartbeatPort.onHeartbeat(uuid, intValue, data.orEmpty())
+    }
+}
+
+/** 解析 JSON 对象；失败返回空对象。 */
+private fun parseJsonObject(raw: String): JsonObject = runCatching { Json.parseToJsonElement(raw) as? JsonObject }.getOrNull() ?: JsonObject(emptyMap())
+
+/** 读取字符串字段；缺失时用 [default]。 */
+private fun JsonObject.stringOr(
+    key: String,
+    default: String,
+): String = runCatching { this[key]?.jsonPrimitive?.content }.getOrNull() ?: default
+
+/** 读取布尔字段；缺失时用 [default]。 */
+private fun JsonObject.booleanOr(
+    key: String,
+    default: Boolean,
+): Boolean = runCatching { this[key]?.jsonPrimitive?.booleanOrNull }.getOrNull() ?: default

@@ -8,22 +8,22 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.domain.feature.device.service.contract.DeviceQueryPort
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
  * 剪贴板同步管理器
- * 去重、防循环、频率限制与发送全部由 Rust core 内部闭环（nrc_clipboard_on_changed / nrc_clipboard_on_received），
+ * 去重、防循环、频率限制与发送全部由 Rust core 内部闭环（`NativeCore.clipboardOnChanged()` / `NativeCore.clipboardOnReceived()`），
  * 平台端仅负责系统剪贴板读写与前台/Fcitx 权限判定。
  */
 object ClipboardSyncManager {
@@ -93,10 +93,9 @@ object ClipboardSyncManager {
         context: Context,
     ) {
         try {
-            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceQuery(context)
             val resultJson =
                 NativeCore.clipboardOnReceived(
-                    NativeCore.getContext(),
                     jsonData,
                     System.currentTimeMillis(),
                 )
@@ -251,7 +250,7 @@ object ClipboardSyncManager {
      * 此方法忽略前台检测，直接获取并发送当前剪贴板内容（force=true 跳过内容未变检查）
      */
     fun manualSyncClipboard(
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceQueryPort,
         context: Context,
     ) {
         Logger.d(TAG, "手动触发剪贴板同步")
@@ -283,8 +282,6 @@ object ClipboardSyncManager {
                             handleSendResult(
                                 context,
                                 NativeCore.clipboardOnChanged(
-                                    NativeCore.getContext(),
-                                    NativeCore.senderQueuePtr,
                                     buildTargetsJson(devices.map { it.uuid }),
                                     if (type == CLIPBOARD_TYPE_IMAGE) MIME_IMAGE else MIME_TEXT,
                                     content,
@@ -315,7 +312,7 @@ object ClipboardSyncManager {
      * 不触发系统剪贴板读取，不检查前台状态，用于特定场景（如验证码复制）
      */
     fun syncTextDirectly(
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceQueryPort,
         text: String,
         context: Context,
     ) {
@@ -332,8 +329,6 @@ object ClipboardSyncManager {
                 handleSendResult(
                     context,
                     NativeCore.clipboardOnChanged(
-                        NativeCore.getContext(),
-                        NativeCore.senderQueuePtr,
                         buildTargetsJson(devices.map { it.uuid }),
                         MIME_TEXT,
                         text,

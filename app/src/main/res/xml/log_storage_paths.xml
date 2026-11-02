@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    运行日志目录的 FileProvider 路径声明。
+
+    日志由 Rust core 与 Kotlin 共同写入 externalFilesDir/logs/，
+    外部存储不可用时回退到内部 filesDir/logs/，两条路径都要声明，
+    否则回退场景下 getUriForFile 会抛 IllegalArgumentException。
+-->
+<paths>
+    <external-files-path
+        name="logs_external"
+        path="logs/" />
+    <files-path
+        name="logs_internal"
+        path="logs/" />
+</paths>

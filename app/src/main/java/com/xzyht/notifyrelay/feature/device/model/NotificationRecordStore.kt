@@ -1,17 +1,17 @@
 package com.xzyht.notifyrelay.feature.device.model
 
 import android.content.Context
-import com.xzyht.notifyrelay.sync.notification.data.NotificationRecordDto
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.sync.notification.data.NotificationRecordDto
 
 class NotificationRecordStore private constructor(
     private val context: Context,
 ) {
     // 数据库仓库实例
-    private val repository = DatabaseRepository.getInstance(context)
+    private val repository = DatabaseRepository.getInstance()
 
     // 转换方法：将旧的NotificationRecordDto转换为新的Room实体
     private fun convertToRoomEntity(

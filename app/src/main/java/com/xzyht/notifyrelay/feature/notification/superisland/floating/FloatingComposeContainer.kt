@@ -6,11 +6,16 @@ import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.remember
 import androidx.compose.ui.platform.AbstractComposeView
 import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.ViewModelStore
+import androidx.lifecycle.ViewModelStoreOwner
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.theme.darkColorScheme
@@ -171,17 +176,30 @@ class FloatingComposeContainer
             // 只有当浮窗管理器初始化后才渲染内容
             if (::floatingWindowManager.isInitialized) {
                 val currentLifecycleOwner = lifecycleOwner
+                // 悬浮窗 ComposeView 不在 Activity 的视图树内，拿不到 ViewTreeViewModelStoreOwner，
+                // 这里自行提供；脱离窗口时清空，避免 ViewModel 残留
+                val viewModelStoreOwner =
+                    remember {
+                        object : ViewModelStoreOwner {
+                            override val viewModelStore = ViewModelStore()
+                        }
+                    }
+                DisposableEffect(viewModelStoreOwner) {
+                    onDispose { viewModelStoreOwner.viewModelStore.clear() }
+                }
                 val contentBlock: @Composable () -> Unit = {
                     // 悬浮窗为黑底深色设计，固定使用深色主题，避免Miuix组件恒取默认浅色样式
                     MiuixTheme(colors = darkColorScheme()) {
-                        FloatingWindowContainer(
-                            entries = floatingWindowManager.entriesList,
-                            onEntryClick = { key -> onEntryClick?.invoke(key) },
-                            onUpdateEntryHeight = { key, height ->
-                                floatingWindowManager.updateEntryHeight(key, height)
-                            },
-                            isContainerDragging = isDragging,
-                        )
+                        CompositionLocalProvider(LocalViewModelStoreOwner provides viewModelStoreOwner) {
+                            FloatingWindowContainer(
+                                entries = floatingWindowManager.entriesList,
+                                onEntryClick = { key -> onEntryClick?.invoke(key) },
+                                onUpdateEntryHeight = { key, height ->
+                                    floatingWindowManager.updateEntryHeight(key, height)
+                                },
+                                isContainerDragging = isDragging,
+                            )
+                        }
                     }
                 }
 

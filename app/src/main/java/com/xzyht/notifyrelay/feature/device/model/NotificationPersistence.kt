@@ -2,9 +2,9 @@ package com.xzyht.notifyrelay.feature.device.model
 
 import android.content.Context
 import com.xzyht.notifyrelay.sync.notification.data.NotificationRecord
-import com.xzyht.notifyrelay.sync.notification.data.NotificationRecordDto
 import kotlinx.coroutines.runBlocking
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
+import notifyrelay.domain.sync.notification.data.NotificationRecordDto
 
 /**
  * 通知历史的持久化写入。

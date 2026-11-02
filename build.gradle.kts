@@ -7,6 +7,12 @@ plugins {
     // 原先写在 buildscript { classpath(...) } 里，但 buildscript 块中拿不到版本目录，
     // 改用 plugins 块（apply false 只把 KGP 放进构建脚本 classpath，不会应用插件），效果等价。
     alias(libs.plugins.kotlin.android) apply false
+    // KMP 公共端（:shared）
+    alias(libs.plugins.kotlin.multiplatform) apply false
+    alias(libs.plugins.android.kotlin.multiplatform.library) apply false
+    alias(libs.plugins.compose.multiplatform) apply false
+    alias(libs.plugins.kotlin.serialization) apply false
+    base
 }
 
 // 对除 git 子模块（checkupdata/scrcpy）外的所有项目应用 ktlint；
@@ -44,4 +50,27 @@ gradle.projectsEvaluated {
             p.logger.debug("Skip androidCompileClasspath shim for ${p.path}", e)
         }
     }
+}
+
+// 文档系统门禁：经 npm 运行 scripts/verify-all.ts。
+// 首次运行前需要 `npm install`（Windows 下 Gradle 调用 npm.cmd，其余平台调用 npm）。
+val verifyDocs =
+    tasks.register<Exec>("verifyDocs") {
+        group = "verification"
+        description = "运行文档系统全部门禁（npm run verify-all）"
+        executable = if (System.getProperty("os.name").contains("windows", ignoreCase = true)) "npm.cmd" else "npm"
+        args("run", "verify-all")
+        inputs.files(
+            fileTree("Docs"),
+            fileTree(".agents"),
+            fileTree("scripts"),
+            "AGENTS.md",
+            "package.json",
+            "package-lock.json",
+        )
+    }
+
+// `./gradlew check` 聚合全部验证：文档门禁与各模块 check 一起执行。
+tasks.named("check") {
+    dependsOn(verifyDocs)
 }

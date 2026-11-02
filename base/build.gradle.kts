@@ -1,59 +1,72 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
-    alias(libs.plugins.android.library)
+    alias(libs.plugins.kotlin.multiplatform)
+    alias(libs.plugins.android.kotlin.multiplatform.library)
 }
 
-android {
-    namespace = "notifyrelay.base"
-    compileSdk =
-        libs.versions.compileSdk
-            .get()
-            .toInt()
+kotlin {
+    // JVM 目标：供桌面端复用公共端实现
+    jvm()
 
-    defaultConfig {
+    android {
+        namespace = "notifyrelay.base"
+        compileSdk =
+            libs.versions.compileSdk
+                .get()
+                .toInt()
+
         minSdk =
             libs.versions.minSdk
                 .get()
                 .toInt()
 
-        testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
-        consumerProguardFiles("consumer-rules.pro")
-    }
+        compilerOptions {
+            jvmTarget.set(JvmTarget.JVM_11)
+        }
 
-    buildTypes {
-        release {
-            isMinifyEnabled = false
-            proguardFiles(
-                getDefaultProguardFile("proguard-android-optimize.txt"),
-                "proguard-rules.pro",
-            )
+        optimization {
+            consumerKeepRules.file("consumer-rules.pro")
+        }
+
+        // 启用测试编译，使 KGP 默认创建的 commonTest 源集被挂到 Android 目标的 compilation 上
+        withHostTest {
+        }
+
+        withDeviceTest {
+            instrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         }
     }
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
+
+    sourceSets {
+        commonMain.dependencies {
+
+            // BatteryIconConverter 返回 Compose Color（CMP 公共端坐标）；
+            // SuperIslandImageUtils 的公开签名含 AnnotatedString，故须 api 传递
+            api(libs.compose.multiplatform.ui)
+        }
+
+        androidMain.dependencies {
+            implementation(libs.androidx.core.ktx)
+            implementation(libs.androidx.appcompat)
+            implementation(libs.androidx.lifecycle.process)
+
+            // 日志通道：DebugTree 输出与级别过滤（原 :shared androidMain）
+            implementation(libs.timber)
+
+            // BatteryIconConverter.getBatteryColor 返回 Compose Color
+            implementation(libs.androidx.compose.ui)
+            // ImageUtils.loadBitmap 基于 Coil（同时传递 kotlinx-coroutines）
+            implementation(libs.bundles.coil)
+        }
+
+        getByName("androidHostTest").dependencies {
+            implementation(libs.junit)
+        }
+
+        getByName("androidDeviceTest").dependencies {
+            implementation(libs.androidx.junit)
+            implementation(libs.androidx.espresso.core)
+        }
     }
-}
-
-kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_11)
-    }
-}
-
-dependencies {
-    implementation(libs.androidx.core.ktx)
-    implementation(libs.androidx.appcompat)
-    implementation(libs.timber)
-    implementation(libs.androidx.lifecycle.process)
-
-    // 原 :core 迁移而来：BatteryIconConverter.getBatteryColor 返回 Compose Color
-    implementation(libs.androidx.compose.ui)
-    // 原 :core 迁移而来：ImageUtils.loadBitmap 基于 Coil（同时传递 kotlinx-coroutines）
-    implementation(libs.bundles.coil)
-
-    testImplementation(libs.junit)
-    androidTestImplementation(libs.androidx.junit)
-    androidTestImplementation(libs.androidx.espresso.core)
 }

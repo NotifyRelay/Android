@@ -19,14 +19,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
-import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
-import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
-import com.xzyht.notifyrelay.ui.common.ScrollableTopAppBarPage
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.devtools.NotificationFieldDumpPage
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.IntentUtils
-import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
+import notifyrelay.shared.ui.common.NotifyRelayTheme
+import notifyrelay.shared.ui.common.ScrollableTopAppBarPage
 import top.yukonga.miuix.kmp.basic.DropdownEntry
 import top.yukonga.miuix.kmp.basic.DropdownItem
 import top.yukonga.miuix.kmp.preference.ArrowPreference
@@ -43,13 +42,13 @@ class DeveloperModeActivity : AppCompatActivity() {
         val FILTERED_NOTIFICATION_LOG_ENABLED: MutableState<Boolean> = mutableStateOf(true)
 
         fun initLogConfig(context: Context) {
-            val logLevelOrdinal = StorageManager.getInt(context, KEY_LOG_LEVEL, Logger.Level.INFO.ordinal)
+            val logLevelOrdinal = Storage.getInt(KEY_LOG_LEVEL, Logger.Level.INFO.ordinal)
             Logger.currentLevel = Logger.Level.entries.getOrElse(logLevelOrdinal) { Logger.Level.INFO }
         }
 
         fun initDebugUiConfig(context: Context) {
-            DEBUG_UI_ENABLED.value = StorageManager.getBoolean(context, KEY_DEBUG_UI_ENABLED, false)
-            FILTERED_NOTIFICATION_LOG_ENABLED.value = StorageManager.getBoolean(context, KEY_FILTERED_NOTIFICATION_LOG_ENABLED, true)
+            DEBUG_UI_ENABLED.value = Storage.getBoolean(KEY_DEBUG_UI_ENABLED, false)
+            FILTERED_NOTIFICATION_LOG_ENABLED.value = Storage.getBoolean(KEY_FILTERED_NOTIFICATION_LOG_ENABLED, true)
             Logger.enableFilteredNotificationLog = FILTERED_NOTIFICATION_LOG_ENABLED.value
         }
     }
@@ -63,34 +62,32 @@ class DeveloperModeActivity : AppCompatActivity() {
         this.window.addFlags(android.view.WindowManager.LayoutParams.FLAG_DRAWS_SYSTEM_BAR_BACKGROUNDS)
 
         setContent {
-            ProvideNavigationEventDispatcherOwner {
-                val isDarkTheme = isSystemInDarkTheme()
-                // 使用统一的主题
-                NotifyRelayTheme(darkTheme = isDarkTheme) {
-                    // 设置系统栏外观
-                    SetupSystemBars(isDarkTheme)
-                    // 页内切换：主设置页 ↔ 通知字段转储页（不新增 Activity 与 Manifest 条目）
-                    var showNotificationDump by remember { mutableStateOf(false) }
-                    // 系统返回键：在转储页时先回到开发者选项主页面，而不是直接退出 Activity
-                    androidx.activity.compose.BackHandler(enabled = showNotificationDump) {
-                        showNotificationDump = false
-                    }
-                    // 使用标准 TopAppBar 页面容器（内容区 colorScheme.background）
-                    ScrollableTopAppBarPage(
-                        title = if (showNotificationDump) "通知字段转储" else "开发者选项",
-                        onBack = {
-                            if (showNotificationDump) {
-                                showNotificationDump = false
-                            } else {
-                                finish()
-                            }
-                        },
-                    ) {
+            val isDarkTheme = isSystemInDarkTheme()
+            // 使用统一的主题
+            NotifyRelayTheme(darkTheme = isDarkTheme) {
+                // 设置系统栏外观
+                SetupSystemBars(isDarkTheme)
+                // 页内切换：主设置页 ↔ 通知字段转储页（不新增 Activity 与 Manifest 条目）
+                var showNotificationDump by remember { mutableStateOf(false) }
+                // 系统返回键：在转储页时先回到开发者选项主页面，而不是直接退出 Activity
+                androidx.activity.compose.BackHandler(enabled = showNotificationDump) {
+                    showNotificationDump = false
+                }
+                // 使用标准 TopAppBar 页面容器（内容区 colorScheme.background）
+                ScrollableTopAppBarPage(
+                    title = if (showNotificationDump) "通知字段转储" else "开发者选项",
+                    onBack = {
                         if (showNotificationDump) {
-                            NotificationFieldDumpPage()
+                            showNotificationDump = false
                         } else {
-                            DeveloperModeScreen(onOpenNotificationDump = { showNotificationDump = true })
+                            finish()
                         }
+                    },
+                ) {
+                    if (showNotificationDump) {
+                        NotificationFieldDumpPage()
+                    } else {
+                        DeveloperModeScreen(onOpenNotificationDump = { showNotificationDump = true })
                     }
                 }
             }
@@ -144,7 +141,7 @@ class DeveloperModeActivity : AppCompatActivity() {
                     checked = debugUiEnabled,
                     onCheckedChange = {
                         debugUiEnabled = it
-                        StorageManager.putBoolean(context, KEY_DEBUG_UI_ENABLED, it)
+                        Storage.putBoolean(KEY_DEBUG_UI_ENABLED, it)
                     },
                 )
 
@@ -193,7 +190,7 @@ class DeveloperModeActivity : AppCompatActivity() {
                     onCheckedChange = {
                         filteredNotificationLogEnabled = it
                         Logger.enableFilteredNotificationLog = it
-                        StorageManager.putBoolean(context, KEY_FILTERED_NOTIFICATION_LOG_ENABLED, it)
+                        Storage.putBoolean(KEY_FILTERED_NOTIFICATION_LOG_ENABLED, it)
                     },
                 )
 
@@ -206,7 +203,7 @@ class DeveloperModeActivity : AppCompatActivity() {
                         selectedLevelIndex.intValue = it
                         logLevel.value = logLevelOptions[it].second
                         Logger.currentLevel = logLevel.value
-                        StorageManager.putInt(context, KEY_LOG_LEVEL, logLevel.value.ordinal)
+                        Storage.putInt(KEY_LOG_LEVEL, logLevel.value.ordinal)
                     },
                 )
 

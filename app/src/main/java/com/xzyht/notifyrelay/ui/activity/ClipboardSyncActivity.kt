@@ -6,9 +6,9 @@ import android.os.Bundle
 import android.view.WindowManager
 import androidx.appcompat.app.AppCompatActivity
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
+import notifyrelay.domain.feature.device.service.contract.DeviceQueryPort
 
 /**
  * 透明Activity，用于解决Android 10+的剪贴板访问限制
@@ -50,7 +50,7 @@ class ClipboardSyncActivity : AppCompatActivity() {
 
                 if (clipboardData != null) {
                     // 2. 获取设备管理器实例
-                    val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(this)
+                    val deviceManager = DeviceConnectionManagerSingleton.getDeviceAdmin(this)
 
                     // 3. 发送剪贴板数据
                     sendClipboardData(deviceManager, clipboardData)
@@ -108,7 +108,7 @@ class ClipboardSyncActivity : AppCompatActivity() {
      * 发送剪贴板数据到设备
      */
     private fun sendClipboardData(
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceQueryPort,
         clipboardData: Pair<String, String>,
     ) {
         // 直接使用ClipboardSyncManager的手动同步方法

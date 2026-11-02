@@ -8,8 +8,8 @@ import com.xzyht.notifyrelay.sync.MessageSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
-import notifyrelay.data.StorageManager
+import notifyrelay.base.log.Logger
+import notifyrelay.data.Storage
 
 /*
  * 超级岛测试样例数据与触发入口。
@@ -48,11 +48,11 @@ fun showTestNotification(
     forceFullPackage: Boolean = true,
 ) {
     // 直接读取持久化值（与对话框开关 UI 同一真相源），避免重启后全局变量回退导致 UI 与实际行为不一致
-    if (StorageManager.getBoolean(context, "superisland_send_to_other_devices", false)) {
+    if (Storage.getBoolean("superisland_send_to_other_devices", false)) {
         // 发送开关开启时，仅发送通知给其他端
         try {
             // 获取设备管理器实例
-            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(context)
 
             // 强制发送全量包：固定 featureId（同一测试源多次点击刷新原有卡片，
             // 对齐真实通知增量更新语义：全量重发走合并而非新建）

@@ -27,9 +27,10 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.xzyht.notifyrelay.BuildConfig
+import com.xzyht.notifyrelay.core.ffi.abiProbe
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.ui.dialog.UpdateDialog
 import com.xzyht.notifyrelay.util.ApkArchMatcher
+import com.xzyht.notifyrelay.util.LogDirectoryOpener
 import github.xzynine.checkupdata.CheckUpdateManager
 import github.xzynine.checkupdata.model.ReleaseInfo
 import github.xzynine.checkupdata.model.UpdateResult
@@ -39,10 +40,13 @@ import kotlinx.coroutines.flow.debounce
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.LogFileStore
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ToastUtils
 import notifyrelay.base.util.image.toBitmapOrDefault
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
+import notifyrelay.shared.ui.dialog.UpdateDialog
+import notifyrelay.shared.ui.screen.LogStorageSection
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
@@ -73,10 +77,10 @@ fun UIAbout() {
     var hasUpdate by remember { mutableStateOf(false) }
     var allReleases by remember { mutableStateOf<List<ReleaseInfo>>(emptyList()) }
     var includePrerelease by remember {
-        mutableStateOf(StorageManager.getBoolean(context, "check_update_include_prerelease", false))
+        mutableStateOf(Storage.getBoolean("check_update_include_prerelease", false))
     }
     var proxyUrl by remember {
-        mutableStateOf(StorageManager.getString(context, PROXY_URL_KEY, DEFAULT_PROXY_URL))
+        mutableStateOf(Storage.getString(PROXY_URL_KEY, DEFAULT_PROXY_URL))
     }
 
     val checkUpdateManager = remember { CheckUpdateManager(context.applicationContext) }
@@ -85,7 +89,7 @@ fun UIAbout() {
         snapshotFlow { proxyUrl }
             .debounce(SAVE_DEBOUNCE_MS.milliseconds)
             .onEach { url ->
-                StorageManager.putString(context, PROXY_URL_KEY, url)
+                Storage.putString(PROXY_URL_KEY, url)
             }.launchIn(this)
     }
 
@@ -147,7 +151,7 @@ fun UIAbout() {
                     ToastUtils.showShortToast(context, "再点击 ${5 - clickCount} 次进入开发者模式")
                 } else if (clickCount >= 5) {
                     ToastUtils.showShortToast(context, "开发者模式已激活")
-                    StorageManager.putBoolean(context, "developer_mode_enabled", true)
+                    Storage.putBoolean("developer_mode_enabled", true)
                     clickCount = 0
                 }
             },
@@ -156,6 +160,18 @@ fun UIAbout() {
 
         Text(
             text = "Rust Core: ${NativeCore.getGitHash() ?: "未加载"}",
+            style = textStyles.body2,
+            color = colorScheme.onSurfaceSecondary,
+            modifier =
+                Modifier
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 4.dp),
+        )
+
+        // UniFFI 生成的绑定调用：与 NativeCore 走同一条 Rust 库的不同绑定路径，
+        // 用于显示由 UniFFI 元数据直接读取的 crate 版本。
+        Text(
+            text = "UniFFI ABI: ${runCatching { abiProbe() }.getOrElse { "未加载" }}",
             style = textStyles.body2,
             color = colorScheme.onSurfaceSecondary,
             modifier =
@@ -223,7 +239,7 @@ fun UIAbout() {
             summary = "检测更新时包含预发布版本(极其不稳定)",
             onCheckedChange = {
                 includePrerelease = it
-                StorageManager.putBoolean(context, "check_update_include_prerelease", it)
+                Storage.putBoolean("check_update_include_prerelease", it)
             },
             modifier = Modifier.padding(horizontal = 16.dp),
         )
@@ -241,6 +257,42 @@ fun UIAbout() {
             label = "需完整https地址，以/结尾，如：https://gh.llkk.cc/",
             modifier = Modifier.padding(horizontal = 16.dp),
             singleLine = true,
+        )
+
+        LogStorageSection(
+            onOpenDirectory = {
+                val info = LogFileStore.storageInfo()
+                if (info == null) {
+                    ToastUtils.showShortToast(context, "日志目录尚未初始化")
+                    return@LogStorageSection
+                }
+                // 私有目录经系统文件管理器定位；失败时退回复制路径
+                if (!LogDirectoryOpener.openLogDirectory(context, "logs")) {
+                    LogDirectoryOpener.reportFailure(context, info.directory)
+                }
+            },
+            onExport = {
+                runCatching {
+                    val info = LogFileStore.storageInfo() ?: return@runCatching
+                    val target =
+                        java.io.File(
+                            context.getExternalFilesDir(null) ?: context.filesDir,
+                            "notifyrelay-logs-" + System.currentTimeMillis() + ".zip",
+                        )
+                    val ok =
+                        notifyrelay.base.log.zipLogShards(
+                            info.directory,
+                            target.absolutePath,
+                        )
+                    if (ok) {
+                        ToastUtils.showShortToast(context, "已导出到 " + target.absolutePath)
+                    } else {
+                        ToastUtils.showShortToast(context, "没有可导出的日志")
+                    }
+                }.onFailure {
+                    ToastUtils.showShortToast(context, "导出失败: " + (it.message ?: ""))
+                }
+            },
         )
 
         Spacer(modifier = Modifier.height(16.dp))

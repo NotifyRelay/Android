@@ -5,7 +5,7 @@ import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ToastUtils
 import org.apache.ftpserver.FtpServer

@@ -3,19 +3,19 @@ package com.xzyht.notifyrelay.feature.appslist.sync
 import android.content.Context
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
 import com.xzyht.notifyrelay.feature.appslist.RemoteAppsCache
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.sync.ProtocolSender
+import com.xzyht.notifyrelay.nativecore.device.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.AppListHelper
-import notifyrelay.base.util.Logger
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -62,7 +62,7 @@ object AppListSyncManager {
      */
     fun requestAppListFromDevice(
         context: Context,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         targetDevice: DeviceInfo,
         scope: String = "user",
     ) {
@@ -79,7 +79,7 @@ object AppListSyncManager {
      */
     fun handleAppListRequest(
         requestData: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         sourceDevice: DeviceInfo,
         context: Context,
     ) {
@@ -126,7 +126,7 @@ object AppListSyncManager {
     }
 
     private fun sendAppListResponse(
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         target: DeviceInfo,
         responseData: String,
     ) {
@@ -143,7 +143,7 @@ object AppListSyncManager {
         responseData: String,
         context: Context,
         deviceUuid: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
     ) {
         try {
             // 解析由 Rust 完成
@@ -172,7 +172,7 @@ object AppListSyncManager {
                     RemoteAppsCache.cacheRemoteAppList(context, appsMap, deviceUuid)
 
                     // 关联应用包名与设备（替代原 associateAppsWithDevice 方法）
-                    val databaseRepository = DatabaseRepository.getInstance(context)
+                    val databaseRepository = DatabaseRepository.getInstance()
                     val appDeviceEntities =
                         packageNames.map {
                             AppDeviceEntity(
@@ -204,13 +204,13 @@ object AppListSyncManager {
     fun checkAndRequestMissingIcons(
         context: Context,
         packageNames: List<String>,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         sourceDevice: DeviceInfo,
     ) {
         val job =
             ioScope.launch {
                 // 检查缺失的图标（替代原 getMissingIconsForPackages 方法）
-                val databaseRepository = DatabaseRepository.getInstance(context)
+                val databaseRepository = DatabaseRepository.getInstance()
                 val missingIcons =
                     packageNames.filter { pkg ->
                         val app = databaseRepository.getAppByPackageName(pkg)

@@ -5,9 +5,10 @@ import android.content.Context
 import android.os.Build
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
-import com.xzyht.notifyrelay.feature.notification.superisland.notification.SuperIslandNotificationIds
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
+import notifyrelay.domain.feature.notification.superisland.notification.SuperIslandNotificationIds
+import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatching
 
 /**
  * 超级岛复刻通道中**带副作用的关闭动作**。

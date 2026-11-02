@@ -15,10 +15,10 @@ import androidx.core.app.NotificationCompat
 import com.xzyht.notifyrelay.R
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncReceiver
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
-import com.xzyht.notifyrelay.feature.notification.superisland.list.SuperIslandListManager
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
+import notifyrelay.domain.feature.device.service.contract.DeviceDiscoveryPort
+import notifyrelay.domain.feature.notification.superisland.list.SuperIslandListManager
 
 /**
  * 通知监听服务的前台常驻通知与 WakeLock 控制器。
@@ -28,7 +28,7 @@ import notifyrelay.base.util.Logger
  */
 internal class ListenerForegroundController(
     private val context: Context,
-    private val connectionManager: DeviceConnectionManager,
+    private val connectionManager: DeviceDiscoveryPort,
     private val startForeground: (Int, Notification) -> Unit,
 ) {
     companion object {

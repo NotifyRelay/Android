@@ -18,9 +18,12 @@ import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandS
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.IntentUtils
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
+import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatching
+import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatchingSuspend
+import notifyrelay.shared.feature.notification.superisland.replica.ReplicaDisplayCache
 import java.lang.ref.WeakReference
 
 object FloatingReplicaWindowManager {

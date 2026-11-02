@@ -4,8 +4,9 @@ import android.content.Context
 import androidx.compose.runtime.MutableState
 import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.feature.notification.filter.BackendRemoteFilter
+import com.xzyht.notifyrelay.nativecore.device.appsync.InboundNotificationProcessor
 import kotlinx.coroutines.delay
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.image.toBitmapOrDefault
 
 // 延迟去重缓存（10秒内）
@@ -145,9 +146,8 @@ suspend fun replicateNotification(
         }
 
         // Logger.d("智能去重", if (startMonitoring) "发送通知并启动监控 - 包名:$pkg, 标题:$title, 内容:$text, 通知ID:$notifyId" else "发送通知（不启用监控） - 包名:$pkg, 标题:$title, 内容:$text, 通知ID:$notifyId")
-        // 修复：发出通知前写入dedupCache，确保本地和远程都能去重
-        BackendRemoteFilter
-            .addToDedupCache(title, text)
+        // 确认展示后写入 core 的 10 秒内容窗口，供后续入站与同内容条目判定
+        InboundNotificationProcessor.markContentSeen(appName, title, text)
         notificationManager.notify(notifyId, builder.build())
         // Logger.d("智能去重", "通知已发送 - 通知ID:$notifyId")
 
@@ -160,9 +160,9 @@ suspend fun replicateNotification(
     } catch (e: Exception) {
         Logger.e("NotifyRelay(狂鼠)", "[立即]远程通知复刻失败", e)
     }
-    com.xzyht.notifyrelay.feature.notification.data.ChatMemory
-        .append(context, "收到: ${result.rawData}")
+    notifyrelay.domain.feature.notification.chat.ChatMemory
+        .append("收到: " + result.rawData)
     chatHistoryState?.value =
-        com.xzyht.notifyrelay.feature.notification.data.ChatMemory
-            .getChatHistory(context)
+        notifyrelay.domain.feature.notification.chat.ChatMemory
+            .getHistory()
 }

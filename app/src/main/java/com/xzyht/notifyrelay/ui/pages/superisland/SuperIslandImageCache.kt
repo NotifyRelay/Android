@@ -2,6 +2,7 @@ package com.xzyht.notifyrelay.ui.pages.superisland
 
 import android.graphics.Bitmap
 import notifyrelay.base.util.image.ImageUtils
+import notifyrelay.shared.ui.pages.superisland.SUPER_ISLAND_IMAGE_MAX_DIMENSION
 import kotlin.math.max
 
 internal object SuperIslandImageCache {

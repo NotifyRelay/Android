@@ -18,7 +18,7 @@ import kotlinx.coroutines.cancelAndJoin
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ToastUtils
 
 class AudioRelayPlayer(
@@ -49,8 +49,7 @@ class AudioRelayPlayer(
 
         when (direction) {
             "recv" -> {
-                val ctx = NativeCore.getContext()
-                if (ctx == null) {
+                if (!NativeCore.isReady()) {
                     isRunning = false
                     return false
                 }
@@ -106,8 +105,7 @@ class AudioRelayPlayer(
                 }
             }
             "send" -> {
-                val ctx = NativeCore.getContext()
-                if (ctx == null) {
+                if (!NativeCore.isReady()) {
                     isRunning = false
                     return false
                 }

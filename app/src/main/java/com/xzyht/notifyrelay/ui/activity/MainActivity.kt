@@ -12,14 +12,16 @@ import com.xzyht.notifyrelay.feature.appslist.launch.AppLaunchManager
 import com.xzyht.notifyrelay.feature.device.model.NotificationRepository
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
-import com.xzyht.notifyrelay.ui.navigation.Route
-import com.xzyht.notifyrelay.ui.navigation.rememberNavigator
+import com.xzyht.notifyrelay.ui.port.ProvideAndroidUiPorts
+import com.xzyht.notifyrelay.ui.port.ProvidePairingDependencies
 import io.github.miuzarte.scrcpyforandroid.pages.ShortcutLaunchActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.config.DeviceInfoManager
+import notifyrelay.shared.ui.navigation.Route
+import notifyrelay.shared.ui.navigation.rememberNavigator
 
 class MainActivity : FragmentActivity() {
     internal val showAutoStartBanner = mutableStateOf(false)
@@ -51,7 +53,7 @@ class MainActivity : FragmentActivity() {
         super.onCreate(savedInstanceState)
 
         ShortcutLaunchActivity.setAppLaunchCallback { deviceIp, packageName, displayId ->
-            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(this)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(this)
             val devices = deviceManager.getAuthenticatedOnlineDevices()
             val targetDevice = devices.find { it.ip == deviceIp }
             if (targetDevice != null) {
@@ -81,16 +83,20 @@ class MainActivity : FragmentActivity() {
         }
 
         setContent {
-            val navigator = rememberNavigator(Route.Main)
-            MainActivityContent(navigator)
+            ProvideAndroidUiPorts {
+                ProvidePairingDependencies {
+                    val navigator = rememberNavigator(Route.Main)
+                    MainActivityContent(navigator)
+                }
+            }
         }
 
         screenCaptureCoordinator.registerProjectionRequestCallback()
 
         // 后台初始化，避免阻塞 UI 线程
         lifecycleScope.launch(Dispatchers.Default) {
-            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(this@MainActivity)
-            DeviceInfoManager.generateDeviceInfoFile(this@MainActivity, deviceManager.localUuid)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceMessage(this@MainActivity)
+            DeviceInfoManager.generateDeviceInfoFile(deviceManager.localUuid)
             LiveUpdatesNotificationManager.initialize(this@MainActivity)
             NotificationRepository.init(this@MainActivity)
             InstalledAppsRepository.loadApps(this@MainActivity)

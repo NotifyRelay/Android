@@ -15,7 +15,7 @@ import androidx.lifecycle.Lifecycle
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.feature.media.service.MediaProjectionForegroundService
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ToastUtils
 
 /**
@@ -90,7 +90,7 @@ internal class ScreenCaptureCoordinator(
             if (projection != null) {
                 pendingScreenCapture = null
                 val audioRelay = DeviceConnectionManagerSingleton.getAudioRelay(activity)
-                audioRelay.player.stopSendCapture()
+                audioRelay.stopSendCapture()
                 NativeCore.mediaProjection?.stop()
                 NativeCore.mediaProjection = projection
                 projection.registerCallback(

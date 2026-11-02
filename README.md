@@ -1,8 +1,5 @@
 # 通知转发应用
-[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/NotifyRelay/Android)
-![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/NotifyRelay/Android/latest/total)
-![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/NotifyRelay/Android/total)
-![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/NotifyRelay/Android?utm_source=oss&utm_medium=github&utm_campaign=NotifyRelay%2FAndroid&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/NotifyRelay/Android) ![GitHub Downloads (all assets, latest release)](https://img.shields.io/github/downloads/NotifyRelay/Android/latest/total) ![GitHub Downloads (all assets, all releases)](https://img.shields.io/github/downloads/NotifyRelay/Android/total) ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/NotifyRelay/Android?utm_source=oss&utm_medium=github&utm_campaign=NotifyRelay%2FAndroid&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 ## 应用简介
 
 NotifyRelay 是一套**跨设备通知与状态同步**方案。Android 端与 Windows 端在局域网内直连配对，把一台设备上的通知、剪贴板、媒体状态等实时同步到另一台设备，数据不经过公网服务器。
@@ -28,8 +25,7 @@ NotifyRelay 是一套**跨设备通知与状态同步**方案。Android 端与 W
 
 
 ## 开始使用
-进入应用后显示欢迎界面,请授权所有的必须权限;
-权限使用说明如下:
+进入应用后显示欢迎界面，请授权所有必须权限；使用说明如下：
 
 ### 必须权限
 - **通知访问权限**: 用于读取通知内容，实现转发功能

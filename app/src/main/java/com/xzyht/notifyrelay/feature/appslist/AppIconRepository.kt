@@ -5,18 +5,18 @@ import android.content.pm.ApplicationInfo
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import com.xzyht.notifyrelay.feature.appslist.sync.IconSyncManager
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.AppListHelper
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.base.util.image.toPngByteArray
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.entity.AppEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.device.model.DeviceInfo
 
 /**
  * 应用图标仓库。
@@ -50,7 +50,7 @@ internal object AppIconRepository {
         }
 
         // 从数据库获取应用信息
-        val app = DatabaseRepository.getInstance(context).getAppByPackageName(packageName)
+        val app = DatabaseRepository.getInstance().getAppByPackageName(packageName)
         val iconBytes = app?.iconBytes
         if (iconBytes != null) {
             // 将字节数组转换为 Bitmap
@@ -78,7 +78,7 @@ internal object AppIconRepository {
         val iconBytes = icon?.toPngByteArray()
 
         // 检查应用是否已存在
-        val existingApp = DatabaseRepository.getInstance(context).getAppByPackageName(packageName)
+        val existingApp = DatabaseRepository.getInstance().getAppByPackageName(packageName)
         val appEntity =
             if (existingApp != null) {
                 // 更新现有应用
@@ -100,7 +100,7 @@ internal object AppIconRepository {
             }
 
         // 保存应用到数据库
-        DatabaseRepository.getInstance(context).saveApp(appEntity)
+        DatabaseRepository.getInstance().saveApp(appEntity)
 
         // 保存应用设备关联
         val appDeviceEntities = mutableListOf<AppDeviceEntity>()
@@ -111,7 +111,7 @@ internal object AppIconRepository {
                 lastUpdated = System.currentTimeMillis(),
             )
         appDeviceEntities.add(appDeviceEntity)
-        DatabaseRepository.getInstance(context).saveAppDeviceAssociations(appDeviceEntities)
+        DatabaseRepository.getInstance().saveAppDeviceAssociations(appDeviceEntities)
 
         // 通知UI层图标已更新
         _iconUpdates.value = Pair(packageName, System.currentTimeMillis())
@@ -131,7 +131,7 @@ internal object AppIconRepository {
         packageName: String,
     ): Bitmap? {
         // 从数据库获取应用信息
-        val app = DatabaseRepository.getInstance(context).getAppByPackageName(packageName)
+        val app = DatabaseRepository.getInstance().getAppByPackageName(packageName)
         val iconBytes = app?.iconBytes
         if (iconBytes != null) {
             // 将字节数组转换为 Bitmap
@@ -153,7 +153,7 @@ internal object AppIconRepository {
         packageNames: List<String>,
     ): Map<String, Bitmap?> {
         // 从数据库批量获取应用信息
-        val apps = DatabaseRepository.getInstance(context).getAppsByPackageNames(packageNames)
+        val apps = DatabaseRepository.getInstance().getAppsByPackageNames(packageNames)
         val appMap = apps.associateBy { it.packageName }
 
         // 构建包名到图标的映射
@@ -188,7 +188,7 @@ internal object AppIconRepository {
             // 将获取到的图标缓存到数据库
             val iconBytes = bitmap.toPngByteArray()
 
-            val existingApp = DatabaseRepository.getInstance(context).getAppByPackageName(packageName)
+            val existingApp = DatabaseRepository.getInstance().getAppByPackageName(packageName)
             val appEntity =
                 if (existingApp != null) {
                     existingApp.copy(
@@ -206,7 +206,7 @@ internal object AppIconRepository {
                         lastUpdated = System.currentTimeMillis(),
                     )
                 }
-            DatabaseRepository.getInstance(context).saveApp(appEntity)
+            DatabaseRepository.getInstance().saveApp(appEntity)
 
             // 保存应用设备关联，使用 "local" 作为 sourceDevice
             val appDeviceEntity =
@@ -215,7 +215,7 @@ internal object AppIconRepository {
                     sourceDevice = "local",
                     lastUpdated = System.currentTimeMillis(),
                 )
-            DatabaseRepository.getInstance(context).saveAppDeviceAssociations(listOf(appDeviceEntity))
+            DatabaseRepository.getInstance().saveAppDeviceAssociations(listOf(appDeviceEntity))
 
             bitmap
         } catch (e: Exception) {

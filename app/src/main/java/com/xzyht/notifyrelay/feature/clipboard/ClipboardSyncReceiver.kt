@@ -7,7 +7,7 @@ import android.net.Uri
 import android.provider.Settings
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.ui.activity.ClipboardSyncActivity
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.ToastUtils
 
 /**
@@ -41,7 +41,7 @@ class ClipboardSyncReceiver : BroadcastReceiver() {
         Logger.d(TAG, "执行手动同步")
 
         try {
-            val deviceManager = DeviceConnectionManagerSingleton.getDeviceManager(context)
+            val deviceManager = DeviceConnectionManagerSingleton.getDeviceQuery(context)
             val onlineDevices = deviceManager.getAuthenticatedOnlineCount()
 
             if (onlineDevices == 0) {

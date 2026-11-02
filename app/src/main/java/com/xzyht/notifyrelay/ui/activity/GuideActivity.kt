@@ -12,15 +12,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.view.WindowCompat
-import com.xzyht.notifyrelay.ui.common.NotifyRelayTheme
-import com.xzyht.notifyrelay.ui.common.ProvideNavigationEventDispatcherOwner
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.guide.GuideScreen
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.GuidePermissionRequester
-import notifyrelay.base.util.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.base.util.ThemeSettingsManager
-import notifyrelay.data.StorageManager
+import notifyrelay.data.Storage
+import notifyrelay.shared.ui.common.NotifyRelayTheme
 
 class GuideActivity : ComponentActivity() {
     private val permissionRequester =
@@ -31,7 +30,7 @@ class GuideActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        val isFirstLaunch = StorageManager.getBoolean(this, "isFirstLaunch", true, StorageManager.PrefsType.GENERAL)
+        val isFirstLaunch = Storage.getBoolean("isFirstLaunch", true, Storage.PrefsType.GENERAL)
         val fromInternal = intent.getBooleanExtra("fromInternal", false)
         val fromftp = intent.getBooleanExtra("fromftp", false)
         val reauthExtra = intent.getBooleanExtra("reauth", false)
@@ -42,11 +41,10 @@ class GuideActivity : ComponentActivity() {
         // 读取上次已同意的权限集合，与当前声明的权限集合做差集，得到「本次更新新增、需重新同意」的权限。
         val declaredPermissions = PermissionHelper.getApplicableDeclaredPermissions(this)
         val agreedPermissions =
-            StorageManager.getStringSet(
-                this,
+            Storage.getStringSet(
                 "agreedManifestPermissions",
                 emptySet(),
-                StorageManager.PrefsType.GENERAL,
+                Storage.PrefsType.GENERAL,
             )
         val newPermissions = declaredPermissions - agreedPermissions
 
@@ -87,51 +85,48 @@ class GuideActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
 
         setContent {
-            ProvideNavigationEventDispatcherOwner {
-                val appContext = LocalContext.current
-                val systemDarkTheme = isSystemInDarkTheme()
-                var themeBaseIndex by remember {
-                    mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(appContext))
+            val appContext = LocalContext.current
+            val systemDarkTheme = isSystemInDarkTheme()
+            var themeBaseIndex by remember {
+                mutableIntStateOf(ThemeSettingsManager.getThemeBaseIndex(appContext))
+            }
+            val isDarkTheme =
+                when (themeBaseIndex) {
+                    ThemeSettingsManager.THEME_LIGHT -> false
+                    ThemeSettingsManager.THEME_DARK -> true
+                    else -> systemDarkTheme
                 }
-                val isDarkTheme =
-                    when (themeBaseIndex) {
-                        ThemeSettingsManager.THEME_LIGHT -> false
-                        ThemeSettingsManager.THEME_DARK -> true
-                        else -> systemDarkTheme
-                    }
 
-                NotifyRelayTheme(darkTheme = isDarkTheme) {
-                    SetupSystemBars(isDarkTheme)
-                    GuideScreen(
-                        permissionRequester = permissionRequester,
-                        themeBaseIndex = themeBaseIndex,
-                        reauth = debugReauth,
-                        needConsent = debugNeedConsent,
-                        onThemeChanged = { newIndex ->
-                            ThemeSettingsManager.setThemeBaseIndex(appContext, newIndex)
-                            themeBaseIndex = newIndex
-                        },
-                        onContinue = {
-                            // 首次启动后标记为已启动
-                            StorageManager.putBoolean(this@GuideActivity, "isFirstLaunch", false, StorageManager.PrefsType.GENERAL)
-                            // 记录当前已声明的权限集合，作为「已同意」基线，供后续版本更新比对新增权限。
-                            StorageManager.putStringSet(
-                                this@GuideActivity,
-                                "agreedManifestPermissions",
-                                declaredPermissions,
-                                StorageManager.PrefsType.GENERAL,
-                            )
+            NotifyRelayTheme(darkTheme = isDarkTheme) {
+                SetupSystemBars(isDarkTheme)
+                GuideScreen(
+                    permissionRequester = permissionRequester,
+                    themeBaseIndex = themeBaseIndex,
+                    reauth = debugReauth,
+                    needConsent = debugNeedConsent,
+                    onThemeChanged = { newIndex ->
+                        ThemeSettingsManager.setThemeBaseIndex(appContext, newIndex)
+                        themeBaseIndex = newIndex
+                    },
+                    onContinue = {
+                        // 首次启动后标记为已启动
+                        Storage.putBoolean("isFirstLaunch", false, Storage.PrefsType.GENERAL)
+                        // 记录当前已声明的权限集合，作为「已同意」基线，供后续版本更新比对新增权限。
+                        Storage.putStringSet(
+                            "agreedManifestPermissions",
+                            declaredPermissions,
+                            Storage.PrefsType.GENERAL,
+                        )
 
-                            if (fromftp) {
-                                // 如果是从 FTP 请求跳转过来的，尝试重新启动 FTP 服务
-                                Logger.d("GuideActivity", "从 FTP 请求跳转，尝试重新启动 FTP 服务")
-                            }
+                        if (fromftp) {
+                            // 如果是从 FTP 请求跳转过来的，尝试重新启动 FTP 服务
+                            Logger.d("GuideActivity", "从 FTP 请求跳转，尝试重新启动 FTP 服务")
+                        }
 
-                            startActivity(Intent(this@GuideActivity, MainActivity::class.java))
-                            finish()
-                        },
-                    )
-                }
+                        startActivity(Intent(this@GuideActivity, MainActivity::class.java))
+                        finish()
+                    },
+                )
             }
         }
     }

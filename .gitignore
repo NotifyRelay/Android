@@ -1,6 +1,5 @@
 # IDE 相关文件
 *.iml
-.idea/
 .vscode/
 .trae/
 # 构建相关文件
@@ -27,4 +26,6 @@ local.properties
 /.kotlin
 /captures
 .qoder/
-.memory/
+
+# 文档门禁依赖
+node_modules/

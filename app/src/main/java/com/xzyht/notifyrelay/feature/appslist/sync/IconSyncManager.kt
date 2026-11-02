@@ -7,20 +7,20 @@ import android.graphics.drawable.BitmapDrawable
 import android.util.Base64
 import com.xzyht.notifyrelay.feature.appslist.AppIconRepository
 import com.xzyht.notifyrelay.feature.appslist.InstalledAppsRepository
-import com.xzyht.notifyrelay.feature.device.model.DeviceInfo
-import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManager
 import com.xzyht.notifyrelay.nativecore.NativeCore
-import com.xzyht.notifyrelay.sync.ProtocolSender
+import com.xzyht.notifyrelay.nativecore.device.ProtocolSender
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
-import notifyrelay.base.util.Logger
+import notifyrelay.base.log.Logger
 import notifyrelay.base.util.image.ImageUtils
 import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.data.database.entity.AppDeviceEntity
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.domain.feature.device.model.DeviceInfo
+import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
 import org.json.JSONArray
 import org.json.JSONObject
 
@@ -28,7 +28,7 @@ import org.json.JSONObject
  * 图标同步管理器
  *
  * 负责在已认证的设备之间同步应用图标，以避免重复传输并降低网络与性能开销。
- * 请求过滤（已缓存/已安装/pending/设备关联）与报文构造由 Rust core（nrc_app_sync_*）处理，
+ * 请求过滤（已缓存/已安装/pending/设备关联）与报文构造由 Rust core（`NativeCore.appSyncRequestIcons()` 等）处理，
  * 平台端仅负责位图编解码与本地缓存。
  */
 object IconSyncManager {
@@ -41,7 +41,7 @@ object IconSyncManager {
     fun checkAndSyncIcon(
         context: Context,
         packageName: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         sourceDevice: DeviceInfo,
     ) {
         // 检查本机已安装应用
@@ -51,7 +51,7 @@ object IconSyncManager {
         }
         val appDeviceUuids =
             runBlocking {
-                val databaseRepository = DatabaseRepository.getInstance(context)
+                val databaseRepository = DatabaseRepository.getInstance()
                 val appDevices = databaseRepository.getAppDevicesByPackageName(packageName).first()
                 appDevices.map { appDevice -> appDevice.sourceDevice }
             }
@@ -66,7 +66,6 @@ object IconSyncManager {
         // Rust 内部解除旧登记并完成过滤（缓存/已安装/pending/设备关联）、构造请求报文
         val requestJson =
             NativeCore.appSyncRequestIcons(
-                NativeCore.getContext(),
                 listOf(packageName),
                 installedPackages.toList(),
                 cachedPackages,
@@ -80,7 +79,7 @@ object IconSyncManager {
             try {
                 requestIconsFromDevice(context, requestJson, deviceManager, sourceDevice)
                 // 请求成功，关联应用包名与当前设备
-                val databaseRepository = DatabaseRepository.getInstance(context)
+                val databaseRepository = DatabaseRepository.getInstance()
                 val appDeviceEntity =
                     AppDeviceEntity(
                         packageName = packageName,
@@ -100,7 +99,7 @@ object IconSyncManager {
     suspend fun requestIconsBatch(
         context: Context,
         packageNames: List<String>,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         sourceDevice: DeviceInfo,
     ) {
         if (packageNames.size == 0) return
@@ -111,7 +110,7 @@ object IconSyncManager {
         val iconMap = AppIconRepository.getExternalAppIcons(context, packageNames)
         val cachedPackages = packageNames.filter { iconMap[it] != null }
 
-        val databaseRepository = DatabaseRepository.getInstance(context)
+        val databaseRepository = DatabaseRepository.getInstance()
         val appDevices = databaseRepository.getAppDevicesByPackageNames(packageNames)
         val appDeviceMap =
             appDevices
@@ -121,7 +120,6 @@ object IconSyncManager {
         // Rust 内部解除旧登记并完成过滤（缓存/已安装/pending/设备关联）、构造请求报文
         val requestJson =
             NativeCore.appSyncRequestIcons(
-                NativeCore.getContext(),
                 packageNames,
                 installedPackages.toList(),
                 cachedPackages,
@@ -168,7 +166,7 @@ object IconSyncManager {
     private suspend fun requestIconsFromDevice(
         context: Context,
         requestJson: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         sourceDevice: DeviceInfo,
     ) {
         val result =
@@ -190,7 +188,7 @@ object IconSyncManager {
      */
     fun handleIconRequest(
         requestData: String,
-        deviceManager: DeviceConnectionManager,
+        deviceManager: DeviceMessagePort,
         sourceDevice: DeviceInfo,
         context: Context,
     ) {
@@ -301,7 +299,7 @@ object IconSyncManager {
                     val missingPkg = missingArray.optString(i)
                     if (missingPkg.isNotEmpty()) {
                         runBlocking {
-                            val databaseRepository = DatabaseRepository.getInstance(context)
+                            val databaseRepository = DatabaseRepository.getInstance()
                             databaseRepository.markAppIconAsMissing(missingPkg)
                         }
                     }
