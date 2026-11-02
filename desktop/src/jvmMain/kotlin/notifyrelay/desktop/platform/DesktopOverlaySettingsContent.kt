@@ -157,7 +157,7 @@ fun DesktopOverlayDanmakuContent() {
 
         OverlaySlider(
             title = "媒体卡自动收起",
-            summary = "媒体卡展开后经过该时长收起为胶囊；换曲时重新展开",
+            summary = "媒体卡展开后经过该时长收起为胶囊；换曲时重新展开（不显示操作按钮）",
             value = collapseSeconds,
             range = 2f..15f,
             step = 1f,
@@ -174,7 +174,7 @@ fun DesktopOverlayDanmakuContent() {
         var mediaControlsEnabled by remember { mutableStateOf(DesktopOverlaySettings.mediaControlsEnabled) }
         SwitchPreference(
             title = "显示媒体操作按钮",
-            summary = "媒体卡展开时显示播放/暂停、上一首、下一首按钮",
+            summary = "媒体卡展开时显示播放/暂停、上一首、下一首按钮；换曲自动展开时不显示，需点击胶囊展开",
             checked = mediaControlsEnabled,
             onCheckedChange = {
                 mediaControlsEnabled = it

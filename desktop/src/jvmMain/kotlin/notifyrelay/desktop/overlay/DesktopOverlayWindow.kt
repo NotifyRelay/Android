@@ -46,6 +46,7 @@ import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.rememberWindowState
 import github.xzynine.superislandui.common.AutoScrollText
 import github.xzynine.superislandui.floating.bigisland.components.MediaIslandCompose
+import github.xzynine.superislandui.floating.common.SuperIslandExpandableCard
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.model.components.MediaSessionData
 import kotlinx.coroutines.delay
@@ -288,8 +289,8 @@ private fun mediaDeviceLabel(deviceUuid: String): String =
 /**
  * 媒体条目：展开态复用媒体大岛，超时后收起为摘要胶囊。
  *
- * 标题或艺术家变化视为换曲，重新展开。
- * [interactiveEnabled] 开启时收起态可点击展开，展开态显示操作按钮。
+ * 标题或艺术家变化视为换曲，重新展开且属于自动展开：该次展开不显示操作按钮。
+ * [interactiveEnabled] 开启时收起态可点击展开，仅用户点开的展开显示操作按钮。
  * [spectrumEnabled] 开启时右侧显示频谱条。
  */
 @Composable
@@ -304,13 +305,19 @@ private fun OverlayMediaItem(
 ) {
     val trackKey = snapshot.title.orEmpty() + "\u0001" + snapshot.artist.orEmpty()
     var expanded by remember { mutableStateOf(true) }
+    // 展开是否由用户点开：换曲与首次出现均为自动展开，操作按钮只对用户点开的展开显示
+    var userExpanded by remember { mutableStateOf(false) }
     var expandGeneration by remember { mutableLongStateOf(0L) }
     val collapseMs = remember { DesktopOverlaySettings.mediaAutoCollapseMs }
     val controlsEnabled = remember { DesktopOverlaySettings.mediaControlsEnabled }
+    LaunchedEffect(trackKey) {
+        userExpanded = false
+    }
     LaunchedEffect(trackKey, expandGeneration, collapseMs) {
         expanded = true
         delay(collapseMs)
         expanded = false
+        userExpanded = false
     }
 
     val mediaSession =
@@ -370,45 +377,50 @@ private fun OverlayMediaItem(
             Modifier
         }
 
-    if (expanded) {
-        Row(
-            Modifier
-                .then(regionModifier)
-                .clip(RoundedCornerShape(24.dp))
-                .background(MEDIA_CARD_BACKGROUND),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Box(Modifier.width(420.dp)) {
-                MediaIslandCompose(
-                    mediaSession = mediaSession,
-                    showControls = interactiveEnabled && controlsEnabled,
-                    onPlayPause = onPlayPause,
-                    onPrevious = onPrevious,
-                    onNext = onNext,
+    SuperIslandExpandableCard(
+        expanded = expanded,
+        modifier = Modifier.then(regionModifier),
+        expandedContent = {
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(MEDIA_CARD_BACKGROUND),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(Modifier.width(420.dp)) {
+                    MediaIslandCompose(
+                        mediaSession = mediaSession,
+                        showControls = interactiveEnabled && controlsEnabled && userExpanded,
+                        onPlayPause = onPlayPause,
+                        onPrevious = onPrevious,
+                        onNext = onNext,
+                    )
+                }
+            }
+        },
+        collapsedContent = {
+            Box(
+                Modifier.then(
+                    if (interactiveEnabled) {
+                        Modifier.clickable {
+                            userExpanded = true
+                            expanded = true
+                            expandGeneration++
+                        }
+                    } else {
+                        Modifier
+                    },
+                ),
+            ) {
+                CollapsedMediaCapsule(
+                    title = snapshot.title,
+                    coverUrl = snapshot.coverUrl,
+                    spectrumEnabled = spectrumEnabled,
+                    frameNow = frameNow,
                 )
             }
-        }
-    } else {
-        Box(
-            Modifier.then(regionModifier).then(
-                if (interactiveEnabled) {
-                    Modifier.clickable {
-                        expanded = true
-                        expandGeneration++
-                    }
-                } else {
-                    Modifier
-                },
-            ),
-        ) {
-            CollapsedMediaCapsule(
-                title = snapshot.title,
-                coverUrl = snapshot.coverUrl,
-                spectrumEnabled = spectrumEnabled,
-                frameNow = frameNow,
-            )
-        }
-    }
+        },
+    )
 }
 
 /**

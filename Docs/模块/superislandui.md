@@ -21,11 +21,11 @@
 | `CapsuleScrollManager` | 胶囊滚动管理 |
 | `BitmapUtils` | Bitmap 处理（缩放、圆角、缓存等） |
 | `PreviewData` | 预览数据 |
-| `SuperIslandTextComponents` | 文本组件：`AutoFitText`、`AutoScrollText`（超宽进入滚动并占满容器宽，未超宽随容器对齐规则放置） |
+| `SuperIslandTextComponents` | 文本组件：`AutoFitText`、`AutoScrollText`（超宽进入滚动并占满容器宽） |
 | `AParser` / `BParser` | 小岛 A/B 区组件解析器 |
 | `SuperIslandImageUtil` | 图片加载与变换 |
 | `FocusIconResolver` | 焦点图标解析 |
-| `CommonCompose` | 通用 Compose 组件 |
+| `CommonCompose` / `SuperIslandExpandableCard` | 通用 Compose 组件；展开与收起之间的尺寸形变容器 |
 | `ParamV2` / `ParamIsland` / `SuperIslandData` | 核心数据模型 |
 | `BaseInfo` / `ChatInfo` / `HighlightInfo` / `HintInfo` / `PicInfo` | 模板数据模型 |
 | `ActionInfo` / `AnimTextInfo` / `MediaSessionData` / `MultiProgressInfo` / `ProgressInfo` / `TextButton` / `TimerInfo` | 组件数据模型 |

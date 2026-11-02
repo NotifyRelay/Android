@@ -74,7 +74,7 @@ object DesktopOverlaySettings {
         get() = Storage.getBoolean(KEY_SPECTRUM_ENABLED, false)
         set(value) = Storage.putBoolean(KEY_SPECTRUM_ENABLED, value)
 
-    /** 媒体卡展开时显示操作按钮（播放/暂停、上一首、下一首）；默认开启。 */
+    /** 媒体卡展开时显示操作按钮（播放/暂停、上一首、下一首）；仅用户点开的展开生效，换曲自动展开不显示。默认开启。 */
     var mediaControlsEnabled: Boolean
         get() = Storage.getBoolean(KEY_MEDIA_CONTROLS_ENABLED, true)
         set(value) = Storage.putBoolean(KEY_MEDIA_CONTROLS_ENABLED, value)

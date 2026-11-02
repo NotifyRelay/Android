@@ -16,6 +16,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
 import github.xzynine.superislandui.floating.bigisland.components.SuperIslandTemplateCompose
+import github.xzynine.superislandui.floating.common.SuperIslandExpandableCard
 import github.xzynine.superislandui.floating.smallisland.compose.BigIslandCollapsedCompose
 import github.xzynine.superislandui.model.core.ParamV2
 import github.xzynine.superislandui.model.core.parseParamV2
@@ -92,33 +93,37 @@ internal fun SuperIslandCard(
             Modifier
         }
 
-    if (expanded) {
-        Box(Modifier.then(regionModifier)) {
-            ExpandedSuperIslandCard(entry, paramV2)
-        }
-    } else {
-        Box(
-            Modifier.then(regionModifier).then(
-                if (interactiveEnabled) {
-                    Modifier.clickable {
-                        expanded = true
-                        expandGeneration++
-                    }
-                } else {
-                    Modifier
-                },
-            ),
-        ) {
-            BigIslandCollapsedCompose(
-                bigIsland = extractBigIsland(entry.paramV2Raw),
-                picMap = entry.pics,
-                fallbackTitle = entry.title,
-                fallbackContent = entry.text,
-                picFunction = paramV2?.picFunction,
-                aodPic = paramV2?.aodPic,
-            )
-        }
-    }
+    // 摘要胶囊的入参解析只随内容变化重算：形变期间两态内容同时组合
+    val bigIsland = remember(entry.paramV2Raw) { extractBigIsland(entry.paramV2Raw) }
+
+    SuperIslandExpandableCard(
+        expanded = expanded,
+        modifier = Modifier.then(regionModifier),
+        expandedContent = { ExpandedSuperIslandCard(entry, paramV2) },
+        collapsedContent = {
+            Box(
+                Modifier.then(
+                    if (interactiveEnabled) {
+                        Modifier.clickable {
+                            expanded = true
+                            expandGeneration++
+                        }
+                    } else {
+                        Modifier
+                    },
+                ),
+            ) {
+                BigIslandCollapsedCompose(
+                    bigIsland = bigIsland,
+                    picMap = entry.pics,
+                    fallbackTitle = entry.title,
+                    fallbackContent = entry.text,
+                    picFunction = paramV2?.picFunction,
+                    aodPic = paramV2?.aodPic,
+                )
+            }
+        },
+    )
 }
 
 /** 展开态：复用共享的超级岛总装（媒体大岛 / 摘要区 / 模板组件）。 */

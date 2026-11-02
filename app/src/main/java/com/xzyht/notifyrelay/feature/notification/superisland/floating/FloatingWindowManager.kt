@@ -6,6 +6,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
 import github.xzynine.superislandui.model.core.ParamV2
 import java.util.concurrent.ConcurrentHashMap
+import kotlin.math.abs
 
 /**
  * 浮窗条目管理器，负责管理所有浮窗条目的状态
@@ -16,6 +17,7 @@ class FloatingWindowManager {
     private val expandedDurationMs = 3000L // 展开态持续时间
     private val autoDismissDurationMs = 12000L // 自动移除时间（非媒体类型）
     private val autoDismissDurationMsMedia = 45_000L // 媒体类型自动移除时间，需长于 30s 轮询刷新周期
+    private val heightUpdateThresholdPx = 4 // 高度变化去抖阈值，抑制形变动画期间的逐帧写入
 
     // 用于处理延迟任务的Handler
     private val handler = Handler(Looper.getMainLooper())
@@ -372,7 +374,10 @@ class FloatingWindowManager {
     }
 
     /**
-     * 更新条目的实际高度
+     * 更新条目的实际高度。
+     *
+     * 尺寸形变期间该回调每帧触发：变化小于 [heightUpdateThresholdPx] 时忽略，
+     * 且就地替换列表元素而非重建整表，避免动画被逐帧打断。
      */
     fun updateEntryHeight(
         key: String,
@@ -382,19 +387,21 @@ class FloatingWindowManager {
         if (entryWithTimestamp != null) {
             val currentEntry = entryWithTimestamp.entry
 
-            // 如果高度没有变化，直接返回
-            if (currentEntry.height == height) {
+            if (abs(currentEntry.height - height) < heightUpdateThresholdPx) {
                 return
             }
 
             val updatedEntry = currentEntry.copy(height = height)
-            val updatedWithTimestamp =
+            entriesMap[key] =
                 entryWithTimestamp.copy(
                     entry = updatedEntry,
                     timestamp = System.currentTimeMillis(),
                 )
-            entriesMap[key] = updatedWithTimestamp
-            updateEntriesList()
+            // 就地替换：条目位置由 initialTimestamp 排序决定，高度变化不改变其位置
+            val index = entriesList.indexOfFirst { it.key == key }
+            if (index >= 0) {
+                entriesList[index] = updatedEntry
+            }
         }
     }
 
