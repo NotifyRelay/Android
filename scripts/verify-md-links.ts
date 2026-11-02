@@ -5,8 +5,8 @@
  * 相对源文件的解析。检查器从不改写；符号链接形式的指令文件会被去重。
  */
 
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, relative, resolve } from 'node:path'
+import { existsSync, readdirSync, readFileSync } from 'node:fs'
+import { dirname, join, relative, resolve, sep } from 'node:path'
 import type { Nodes } from 'mdast'
 import { markdownHeadingLines, parseMarkdown, visitMarkdown } from './markdown.ts'
 import { isArchivedAgentNotePath, uniqueRepoFiles } from './repo-files.ts'
@@ -25,13 +25,13 @@ export function markdownLinkSourcePaths(scanRoot: string = root): string[] {
     .map(file => relative(scanRoot, file.abs).replaceAll('\\', '/'))
 }
 
-/** 一处失效的相对链接：目标路径缺失，或目标上缺少锚点。 */
+/** 一处失效的相对链接：目标路径缺失（或大小写与实际名字不符），或目标上缺少锚点。 */
 interface Violation {
   file: string
   /** 链接/图片/定义节点起始处的 1 基行号。 */
   line: number
   url: string
-  /** 失败对象：目标文件或其上的 fragment。 */
+  /** 失败对象：目标文件（含大小写不符）或其上的 fragment。 */
   reason: 'target' | 'anchor'
 }
 
@@ -139,6 +139,45 @@ export interface MarkdownLinkCache {
   document: (absPath: string) => MarkdownLinkDocument
   /** 已解析的链接目标是否存在，每个路径至多探测一次。 */
   exists: (absPath: string) => boolean
+  /**
+   * 该路径的每一段是否与磁盘上的实际名字逐字符同大小写。
+   *
+   * 不区分大小写的文件系统（Windows、macOS 默认）让大小写写错的链接照常打开，
+   * 同一份文档在区分大小写的 Linux 上却是断链。因此本门禁不依赖文件系统的宽容度，
+   * 自己逐段核对。缓存按绝对路径记忆，每条路径至多枚举一次目录。
+   */
+  caseExact: (absPath: string) => boolean
+}
+
+/**
+ * 逐段核对路径与磁盘上的实际名字是否同大小写。
+ *
+ * 从根开始逐段枚举父目录，要求每一段都精确出现在条目里；任一段不存在即返回
+ * false。盘符段（`C:`）没有大小写变体，按原样拼接。
+ *
+ * @param absPath - 待核对的绝对路径。
+ * @returns 每一段都精确匹配时为 true；某一级目录无法枚举或某段不存在时为 false。
+ */
+function isCaseExact(absPath: string): boolean {
+  const absolute = resolve(absPath)
+  const parts = absolute.split(/[\\/]/).filter((part) => part !== '')
+  let current = absolute.startsWith('/') ? '/' : ''
+  for (const part of parts) {
+    // 盘符段（`C:`）没有大小写变体，按原样拼接。
+    if (/^[A-Za-z]:$/.test(part)) {
+      current = part + sep
+      continue
+    }
+    let entries: string[]
+    try {
+      entries = readdirSync(current === '' ? '.' : current)
+    } catch {
+      return false
+    }
+    if (!entries.includes(part)) return false
+    current = current === '' ? part : join(current, part)
+  }
+  return true
 }
 
 function markdownLinkDocument(source: string): MarkdownLinkDocument {
@@ -160,6 +199,7 @@ function markdownLinkDocument(source: string): MarkdownLinkDocument {
 export function markdownLinkCache(): MarkdownLinkCache {
   const documents = new Map<string, MarkdownLinkDocument>()
   const existence = new Map<string, boolean>()
+  const casing = new Map<string, boolean>()
   return {
     document: (absPath) => {
       const hit = documents.get(absPath)
@@ -174,6 +214,13 @@ export function markdownLinkCache(): MarkdownLinkCache {
       const exists = existsSync(absPath)
       existence.set(absPath, exists)
       return exists
+    },
+    caseExact: (absPath) => {
+      const hit = casing.get(absPath)
+      if (hit !== undefined) return hit
+      const exact = isCaseExact(absPath)
+      casing.set(absPath, exact)
+      return exact
     },
   }
 }
@@ -200,7 +247,8 @@ export function findViolations(
     if (isExternal(url)) continue
     const target = pathPart(url)
     const resolved = target === '' ? absPath : resolve(dir, target)
-    if (!cache.exists(resolved)) {
+    // 不区分大小写的文件系统会让写错大小写的目标照样存在，因此再核对一次实际名字。
+    if (!cache.exists(resolved) || !cache.caseExact(resolved)) {
       out.push({ file, line, url, reason: 'target' })
       continue
     }

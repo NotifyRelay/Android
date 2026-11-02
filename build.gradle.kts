@@ -52,13 +52,13 @@ gradle.projectsEvaluated {
     }
 }
 
-// 文档系统门禁：经 npm 运行 scripts/verify-all.ts。
-// 首次运行前需要 `npm install`（Windows 下 Gradle 调用 npm.cmd，其余平台调用 npm）。
+// 文档系统门禁：经 pnpm 运行 scripts/verify-all.ts。
+// 首次运行前需要 `pnpm install`（Windows 下 Gradle 调用 pnpm.cmd，其余平台调用 pnpm）。
 val verifyDocs =
     tasks.register<Exec>("verifyDocs") {
         group = "verification"
-        description = "运行文档系统全部门禁（npm run verify-all）"
-        executable = if (System.getProperty("os.name").contains("windows", ignoreCase = true)) "npm.cmd" else "npm"
+        description = "运行文档系统全部门禁（pnpm run verify-all）"
+        executable = if (System.getProperty("os.name").contains("windows", ignoreCase = true)) "pnpm.cmd" else "pnpm"
         args("run", "verify-all")
         inputs.files(
             fileTree("Docs"),
@@ -66,7 +66,8 @@ val verifyDocs =
             fileTree("scripts"),
             "AGENTS.md",
             "package.json",
-            "package-lock.json",
+            "pnpm-lock.yaml",
+            "pnpm-workspace.yaml",
         )
     }
 

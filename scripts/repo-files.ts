@@ -51,6 +51,13 @@ export function splitLines(source: string): string[] {
  * 判断模式段是否匹配一个目录或文件名。支持段内的 `*`、`?`，并遵循 node
  * glob 的 `dot: false`：首字符为通配符的段不匹配点开头的名字。`**` 由
  * 遍历器整体处理，不进入此函数。
+ *
+ * 匹配忽略大小写：同一份模式要在 Windows 与 Linux 上扫到同一批文件，而目录
+ * 与文件的实际大小写随检出平台与历史重命名而变（例如 `docs/` 在磁盘上是
+ * `Docs/`）。区分大小写会让同一份配置在两种平台上覆盖不同的语料。
+ *
+ * 这份宽容只管「扫哪些文件」，不管链接能否解析：链接目标由 `verify-md-links`
+ * 逐段核对实际名字的大小写，写错的链接不会因为本函数而通过。
  */
 function segmentMatches(pattern: string, name: string): boolean {
   if (name.startsWith('.') && (pattern.startsWith('*') || pattern.startsWith('?'))) return false
@@ -60,7 +67,7 @@ function segmentMatches(pattern: string, name: string): boolean {
     else if (character === '?') expression += '.'
     else expression += character.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
   }
-  return new RegExp(`^${expression}$`).test(name)
+  return new RegExp(`^${expression}$`, 'i').test(name)
 }
 
 /**

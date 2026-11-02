@@ -53,7 +53,7 @@
 
 更新已经拥有该决策的 Agent Note 即可满足规则；不要创建重复记录。机械性或局部编辑均可豁免，包括局部 UI 展示和交互调整。Agent Note 永远不会被编辑为一个*不同的决策*：用新 Agent Note 取代旧记录，并让两个记录保持互相链接，除非后续依据下方规则完全合并旧记录。编辑 `implemented/` Agent Note 以跟踪其现有决策的所在位置是必需的，而非禁止的；见 [implemented/AGENTS.md](implemented/AGENTS.md)。
 
-被完全取代的 implemented Agent Note 可以合并到当前持有该决策的记录中，并删除原文件。删除前，当前记录必须保存所有独有的决策依据、备选方案、影响、必需的验证和明确指出的覆盖缺口；修复所有入站链接；并在同一变更中删除中文对侧文件和一致性记录。仅部分被取代的记录不符合此条件：保留两个记录并让它们互相链接，同时更新所有仍然适用的事实。合并不得将旧文件改写成与其相反的决策，也不得让 git 历史成为决策依据的唯一副本。
+被完全取代的 implemented Agent Note 可以合并到当前持有该决策的记录中，并删除原文件。删除前，当前记录必须保存所有独有的决策依据、备选方案、影响、必需的验证和明确指出的覆盖缺口；修复所有入站链接。仅部分被取代的记录不符合此条件：保留两个记录并让它们互相链接，同时更新所有仍然适用的事实。合并不得将旧文件改写成与其相反的决策，也不得让 git 历史成为决策依据的唯一副本。
 
 只有当一项功能已从生产代码、配置、schema、持久化格式或协议格式、迁移和兼容行为中完全消失，当前文档不再将其描述为可用，且没有测试把它作为受支持行为来执行时，新增该功能的 Agent Note 才可合并进后续的移除记录。移除决策的依据和验证该功能已不存在的测试可以保留。移除决策的持有记录必须保留最初动机、为什么该动机已不足以证明保留该功能的合理性、完全移除之外的备选方案、放弃的能力、重新引入的条件，以及证明已彻底移除的验证。过时的实现清单和只验证已删除行为的测试不属于当前验证证据。仅移除一种传输、默认值、实现或展示属于部分取代；仍有任何持久数据或兼容处理也同样如此。
 
@@ -61,7 +61,7 @@
 
 ## 文件格式
 
-每份活跃 Agent Note 遵循统一的文件内格式，由 `pnpm run verify-agent-note-format`（[scripts/verify-agent-note-format.ts](../../scripts/verify-agent-note-format.ts)，`doc-sync`（文档同步门禁）的一环）强制执行；该格式的设计动机及其否决的替代方案见已归档的统一格式 Agent Note。归档记录保留封存时的格式，并增加上述归档日期行。
+每份活跃 Agent Note 遵循统一的文件内格式，由 `pnpm run verify-agent-note-format`（[scripts/verify-agent-note-format.ts](../../scripts/verify-agent-note-format.ts)，`test:docs`（文档同步门禁）的一环）强制执行；该格式的设计动机及其否决的替代方案见已归档的统一格式 Agent Note。归档记录保留封存时的格式，并增加上述归档日期行。
 
 <a id="the-header-block"></a>
 
@@ -135,9 +135,3 @@ Status: <status>
 ### 在生命周期之间移动
 
 将文件在生命周期文件夹之间移动意味着在同一个变更中更新 `Status:` 行并满足目标文件夹的骨架要求——否则门禁会失败。具体而言，`proposed/` → `implemented/` 将 `## Proposal` 改写为现在时态的 `## Decision`，将 `## Acceptance criteria` 和 `## Risks` 折入 `## Consequences`（或折入一个现在时态的 `## Testing`/`## Verification` 章节，用于描述现在锁定该行为的内容），并用实际交付的内容替换计划——也就是将 [implemented/AGENTS.md](implemented/AGENTS.md) 所要求的改写变成可机械检查的规则。`proposed/` → `rejected/` 仅在 `Status:` 行添加原因并冻结文件。
-
-<a id="chinese-counterparts"></a>
-
-### 中文对侧文件
-
-`.zh.md` 对侧文件按 i18n 约定逐章节与其英文对侧文件保持相同结构；机器检查的头部标记（`# Agent Note: ` 和 `Status:` 行）保持英文原样不翻译。格式门禁跳过 `.zh.md` 文件；配对门禁检查它们的一致性。

@@ -58,9 +58,6 @@ export function walkAgentNoteTree(): { notes: AgentNote[]; errors: string[] } {
       const segs = match.split('/')
       // 白名单文件直接位于生命周期根目录（如 implemented/AGENTS.md）。
       if (segs.length === 2 && ROOT_ALLOWLIST.has(segs[1] ?? '')) continue
-      // 中文对侧是同一个 Agent Note，通过其英文文件名索引；一致性由配对
-      // 门禁负责。
-      if (docSystem.bilingual && match.endsWith('.zh.md')) continue
       const cls = segs[1]
       const base = segs[2]
       if (segs.length !== 3 || cls === undefined || base === undefined) {

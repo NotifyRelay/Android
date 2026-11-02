@@ -1,0 +1,7 @@
+packages:
+  - .
+
+# tsx 经 esbuild 提供运行时；esbuild 的 postinstall 需要显式批准，
+# 否则 pnpm 停止安装并提示忽略的构建脚本。
+allowBuilds:
+  esbuild: true

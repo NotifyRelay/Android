@@ -17,9 +17,9 @@
 ## 命令
 
 ```sh
-npm install            # 安装门禁依赖
-npm run verify-all     # 全部门禁
-npm run test:docs      # 快速文档门禁
+pnpm install           # 安装门禁依赖
+pnpm run verify-all    # 全部门禁
+pnpm run test:docs     # 快速文档门禁
 ./gradlew ktlintFormat # Kotlin 代码格式化
 ```
 
@@ -50,6 +50,7 @@ npm run test:docs      # 快速文档门禁
   skills/     按场景加载的工作流
 Docs/
   AGENTS.md              文档标准（层级、预算、写作规则）
+  模块/                  各模块的文件用途与类职责
 scripts/                 文档门禁实现
 ```
 
@@ -59,9 +60,9 @@ scripts/                 文档门禁实现
 
 | 改动 | 最小证据 |
 |---|---|
-| 文档、Agent Note、目录页 | `npm run test:docs` |
+| 文档、Agent Note、目录页 | `pnpm run test:docs` |
 | Kotlin 源码 | 对应模块 `compileDebugKotlin` 加相关单元测试 |
 | 门禁脚本本身 | 该脚本的单元测试，加上一次故意违规的负向验证 |
-| 指令文件（`AGENTS.md`、技能） | `npm run verify-all` |
+| 指令文件（`AGENTS.md`、技能） | `pnpm run verify-all` |
 
 **新增门禁必须自证**：写一个非法用例，看它变红，再回退。只证明它能通过，等于没证明它有用。

@@ -33,13 +33,14 @@ export interface DocSystemConfig {
   readonly markdownPatterns: readonly string[]
   /** 词数上限清单的相对仓库路径。 */
   readonly budgetManifest: string
+  /**
+   * 必须逐篇出现在预算清单里的常驻文档 glob。覆盖范围由脚本强制，不靠
+   * 散文约定：清单缺其中任何一篇，预算门禁即失败。技能按场景加载、
+   * Agent Note 记录不在文档结构规则范围内，两者都不在此列。
+   */
+  readonly budgetCoveragePatterns: readonly string[]
   /** Agent Note 树布局。 */
   readonly agentNotes: AgentNoteLayout
-  /**
-   * 仓库是否维护英文/中文三元组。为 false 时，配对门禁不启用，归档笔记
-   * 以无对侧的方式封印。
-   */
-  readonly bilingual: boolean
 }
 
 /** 文档系统配置的范围。 */
@@ -52,11 +53,17 @@ export const docSystem: DocSystemConfig = {
     '.agents/skills/**/*.md',
   ],
   budgetManifest: 'scripts/doc-budgets.manifest.json',
+  budgetCoveragePatterns: [
+    'README.md',
+    'AGENTS.md',
+    'Docs/**/*.md',
+    '.agents/notes/README.md',
+    '.agents/notes/**/AGENTS.md',
+  ],
   agentNotes: {
     root: '.agents/notes',
     lifecycles: ['proposed', 'implemented', 'rejected'],
     classes: ['feature', 'bug-fix', 'simplification', 'architecture', 'process', 'testing'],
     archived: 'archived',
   },
-  bilingual: false,
 }

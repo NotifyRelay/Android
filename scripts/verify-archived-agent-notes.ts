@@ -58,7 +58,7 @@ for (const entry of readdirSync(archiveRoot, { withFileTypes: true })) {
       continue
     }
     // 版本控制占位文件让空的 kind 目录留在树中；它们不是归档产物，永不封印。
-    if (!child.name.endsWith('.md') && !child.name.endsWith('.i18n.yaml')) continue
+    if (!child.name.endsWith('.md')) continue
     artifacts.set(rel, readFileSync(resolve(archiveRoot, rel)))
   }
 }

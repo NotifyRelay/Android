@@ -24,7 +24,7 @@ description: 审计或修复读起来像泄漏的推理记录的散文时使用�
 5. **面向评审者的论证** —— "the cast is safe — it simply…"、"this is correct because…"。为自身正确性辩护的注释面向评审者，不面向维护者。陈述使代码安全的不变量；若代码已展示该不变量，就删除注释。
 6. **复述与推导记录** —— 控制流叙述（"first we X, then we Y"）、测试走查、显然分支的证明。删除；只保留非显然的契约或不变量。
 7. **含糊措辞与规划残留** —— "probably fine for now"、"should be enough"、没有标记的推迟。提升为 `TODO`/`FIXME`，或重述为实际的边界；删除含糊措辞。
-8. **编写语言残留** —— 在其余语言为英文的散文中混入未翻译的工作语言片段（端、设计稿、`---- 私有 ----` 分隔线），或在中文对侧反过来。翻译或删除。
+8. **编写语言残留** —— 在英文散文中混入未翻译的工作语言片段（端、设计稿、`---- 私有 ----` 分隔线）。翻译或删除。
 
 <a id="what-is-not-leakage"></a>
 
@@ -48,6 +48,6 @@ description: 审计或修复读起来像泄漏的推理记录的散文时使用�
 
 1. 范围与排除按 [notifyrelay-prose-standard](../notifyrelay-prose-standard/SKILL.md)：要求显式范围；绝不触碰 `vendor/` 或 `.agents/notes/archived/`。录制 fixture 与快照是派生物，不是散文目标：改动拥有它们的源或场景，并且只有授权行为变更需要新证据时才重新生成。
 2. 先做只读审计：运行[召回题库](references/recall-batteries.md)（带 `--hidden` 以便搜到 `.agents/`），用已知正例与近似负例校准每个探针，再信任其输出，然后按语义判断每个命中。题库是探针而不是定义——原清理的每一轮评审都发现了题库漏掉的案例，所以还要在没有具体模式的情况下，读范围内最密集的散文（模块 JSDoc、README、Agent Note）。
-3. 按面先修所有者：生成的目录 → 追踪每个消费方，修源 JSDoc 或生成器模板，再重新生成所有派生物；类型等价围栏 → 修源 JSDoc，再重新粘贴两个双语页（`verify-type-equiv` 钉住它们）；双语散文 → 最小化更新对侧，并经由[轻量例行流程](../../../Docs/AGENTS.md#writing-rules)重新记录；双语围栏 → 把修正后的逐字块逐字节复制到两侧，再重新记录配对；面向模型或用户的字符串 → 经 [notifyrelay-prose-standard](../notifyrelay-prose-standard/SKILL.md) 路由，且只有拿到所属行为证据时才改动，否则保持不变并报告推迟。
+3. 按面先修所有者：生成的目录 → 追踪每个消费方，修源 JSDoc 或生成器模板，再重新生成所有派生物；类型等价围栏 → 修源 JSDoc，再重新粘贴围栏；面向模型或用户的字符串 → 经 [notifyrelay-prose-standard](../notifyrelay-prose-standard/SKILL.md) 路由，且只有拿到所属行为证据时才改动，否则保持不变并报告推迟。
 4. 删除任何内容之前，枚举该段落的命题（prose-standard 规则），并对照[过度纠正陷阱](references/examples.md#overcorrection-traps)：那些把义务翻转成认可、把假设提升为已交付特性、删掉真实事实，或丢掉证据来源的精简。
-5. 校验：重跑题库，预期只剩获准保留项、本技能自身目录，以及所属记录中被引用的证据；确认每个剩余引用在 HEAD 上可解析；对触及的面运行门禁（文档用 `doc-sync`，以及 `verify-type-equiv`、`verify-translation-pairing`）。
+5. 校验：重跑题库，预期只剩获准保留项、本技能自身目录，以及所属记录中被引用的证据；确认每个剩余引用在 HEAD 上可解析；对触及的面运行门禁（文档用 `pnpm run test:docs`，技能与指令文件用 `pnpm run verify-all`）。

@@ -9,7 +9,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  # 文档系统门禁：Node 拉取 npm 依赖后运行 verify-all，先于构建失败即中止
+  # 文档系统门禁：拉取 pnpm 依赖后运行 verify-all，先于构建失败即中止
   docs:
     runs-on: ubuntu-latest
     steps:
@@ -18,17 +18,21 @@ jobs:
         with:
           fetch-depth: 1
 
+      # pnpm 版本取自 package.json 的 packageManager 字段。
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
       - name: 安装文档门禁依赖
-        run: npm ci --no-audit --no-fund
+        run: pnpm install --frozen-lockfile
 
       - name: 运行文档门禁
-        run: npm run verify-all
+        run: pnpm run verify-all
 
   build-check:
     runs-on: ubuntu-latest

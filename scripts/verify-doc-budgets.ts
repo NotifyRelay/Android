@@ -1,7 +1,12 @@
 /**
- * 执行来自已配置预算清单的 `wc -w` 式上限。缺文件与非法上限都会失败；
- * `--list` 报告当前用量。只有清单列出的常驻文档受预算约束。上限以至少
- * 5% 余量向下棘轮；上调上限需要 `Docs/AGENTS.md` 定义的正当理由。
+ * 执行来自已配置预算清单的 `wc -w` 式上限，并强制清单覆盖配置声明的全部
+ * 常驻文档。缺文件、非法上限与漏配的常驻文档都会失败；`--list` 报告当前
+ * 用量。上限以至少 5% 余量向下棘轮；上调上限需要 `Docs/AGENTS.md` 定义的
+ * 正当理由。
+ *
+ * 覆盖由 `docSystem.budgetCoveragePatterns` 决定：匹配到的每一篇都必须在
+ * 清单里有一条上限，因此新增常驻文档时漏配预算会让门禁变红，不依赖散文
+ * 约定或人工记性。
  *
  * @module scripts/verify-doc-budgets
  */
@@ -9,6 +14,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { docSystem, repoRoot } from './doc-system.config.ts'
+import { uniqueRepoFiles } from './repo-files.ts'
 
 const root = repoRoot
 
@@ -30,11 +36,35 @@ function countWords(text: string): number {
   return cjk + latin
 }
 
+/** 把绝对路径转成清单使用的斜杠相对路径。 */
+function toRepoPath(absolute: string): string {
+  return relative(root, absolute).replaceAll('\\', '/')
+}
+
+/**
+ * 覆盖比较与清单键都按大小写不敏感归一。清单键是配置里写定的形态，磁盘
+ * 上的实际名字随检出平台与历史重命名而变；按字面比较会把同一篇文档判成
+ * 缺失。
+ */
+function normalizePath(path: string): string {
+  return path.toLowerCase()
+}
+
 const manifest = JSON.parse(readFileSync(MANIFEST_PATH, 'utf8')) as Record<string, number>
 
 const listOnly = process.argv.includes('--list')
 const failures: string[] = []
 const rows: string[] = []
+
+/** 配置声明必须配预算的常驻文档。 */
+const covered = uniqueRepoFiles(root, docSystem.budgetCoveragePatterns).map(file => toRepoPath(file.abs))
+const budgeted = new Set(Object.keys(manifest).map(normalizePath))
+
+for (const path of covered) {
+  if (!budgeted.has(normalizePath(path))) {
+    failures.push(`${path}: standing doc has no budget entry — add one to ${docSystem.budgetManifest} in the same change`)
+  }
+}
 
 for (const [path, ceiling] of Object.entries(manifest)) {
   if (!Number.isInteger(ceiling) || ceiling <= 0) {
@@ -67,4 +97,4 @@ if (failures.length > 0) {
   process.exit(1)
 }
 
-console.log(`verify-doc-budgets: ${Object.keys(manifest).length} budgeted docs within ceiling.`)
+console.log(`verify-doc-budgets: ${Object.keys(manifest).length} budgeted docs within ceiling, covering ${covered.length} standing doc(s).`)

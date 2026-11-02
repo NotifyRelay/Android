@@ -46,10 +46,15 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
+      # pnpm 版本取自 package.json 的 packageManager 字段。
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
       - name: Set up Node
         uses: actions/setup-node@v5
         with:
           node-version: 24
+          cache: pnpm
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -65,13 +70,19 @@ jobs:
           package.json
           release.config.mjs
           node_modules/
-          package-lock.json
+          pnpm-lock.yaml
+          pnpm-workspace.yaml
           EXCLUDE
           cat > package.json <<'JSON'
           {
-            "name": "notifyrelay-android",
-            "version": "2.167.0",
-            "private": true
+            "name": "notifyrelay-release-tools",
+            "private": true,
+            "devDependencies": {
+              "semantic-release": "25.0.9",
+              "@semantic-release/exec": "7.1.0",
+              "@semantic-release/git": "11.0.1",
+              "conventional-changelog-conventionalcommits": "9.3.1"
+            }
           }
           JSON
           cat > release.config.mjs <<'CONFIG'
@@ -127,11 +138,9 @@ jobs:
       # 升级时需确认 conventional-changelog-writer 在两侧的主版本一致。
       - name: 安装 semantic-release 及插件（不写入仓库，node_modules 已排除）
         run: |
-          npm install --no-save --no-package-lock --no-audit --no-fund \
-            semantic-release@25.0.9 \
-            @semantic-release/exec@7.1.0 \
-            @semantic-release/git@11.0.1 \
-            conventional-changelog-conventionalcommits@9.3.1
+          # --ignore-workspace 不读仓库的 pnpm-workspace.yaml；--no-lockfile 不读也不写 pnpm-lock.yaml，
+          # 因此安装结果只落在本次运行的 node_modules，工作树保持干净。
+          pnpm install --ignore-workspace --no-lockfile --reporter=append-only
 
       - name: 执行 semantic-release（推断版本、回写、打 tag、PAT 推送）
         id: release
@@ -142,7 +151,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           # 无 releasable 提交时 semantic-release 正常退出（不回写不打 tag）
-          npx --yes semantic-release
+          pnpm exec semantic-release
 
           # semantic-release 把 tag 打在自己新建的 chore(release) 提交上（即当前 HEAD），故直接取 HEAD 上的 tag；
           # 无 releasable 提交时既不回写也不打 tag，此处取到空值 → 后续打包与预发布整体跳过。

@@ -232,16 +232,6 @@ alternatives-considered 体裁是获准的归属地；评审者与轮次不属�
 
 工作语言片段与会话分隔线是转录残留。Figma 画板名保留：那是按设计在仓库外解析的外部来源。
 
-<a id="authoring-language-slip-inside-a-paired-fence"></a>
-
-### 双语围栏内的编写语言残留
-
-**两侧文件中的泄漏：** 逐字代码块内的 `// 更新这里 before returning`。
-
-**两侧文件中的修复：** `// Update this before returning.`
-
-修正代码块一次，并把该逐字节精确的围栏复制进两个语言文件。即使两条注释各自都通顺，用中文对侧以不同方式翻译该代码注释也会破坏配对契约。
-
 <a id="behavior-visible-candidates"></a>
 
 ## 行为可见的候选
@@ -338,11 +328,11 @@ alternatives-considered 体裁是获准的归属地；评审者与轮次不属�
 
 ### 连同周围的记录一起删掉真实事实
 
-**原始：** "The gate notice narrates the check order; the notice text is also what `verify-doc-typecheck` compiles against."
+**原始：** "The gate notice narrates the check order; the notice text is also what `verify-md-wrap` compiles against."
 
 **过度纠正：** "…"（整句作为叙述被删除。）
 
-**正确：** "The notice text is what `verify-doc-typecheck` compiles against."
+**正确：** "The notice text is what `verify-md-wrap` compiles against."
 
 句子一半是叙述，另一半是承重的耦合。当命题共享一行时，删除分句，不是删除整句。
 
