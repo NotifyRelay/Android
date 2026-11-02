@@ -58,6 +58,8 @@ internal interface User32Ex : StdCallLibrary {
 
     fun GetKeyState(nVirtKey: Int): Short
 
+    fun GetAsyncKeyState(nVirtKey: Int): Short
+
     fun GetMessageW(
         lpMsg: MSG,
         hWnd: HWND?,
@@ -158,8 +160,13 @@ internal class KeyboardHookBridge(
     /** 切换键当前锁定状态。 */
     fun isToggled(vkCode: Int): Boolean = (User32Ex.INSTANCE.GetKeyState(vkCode).toInt() and 0x0001) != 0
 
-    /** 按键当前是否物理按下。 */
-    fun isDown(vkCode: Int): Boolean = (User32Ex.INSTANCE.GetKeyState(vkCode).toInt() and 0x8000) != 0
+    /**
+     * 按键当前是否物理按下（全局异步真值）。
+     *
+     * GetAsyncKeyState 返回系统级实时状态，任意线程可读；
+     * GetKeyState 语义是「调用线程消息队列的最后状态」，仅钩子线程自身读取有效。
+     */
+    fun isAsyncDown(vkCode: Int): Boolean = (User32Ex.INSTANCE.GetAsyncKeyState(vkCode).toInt() and 0x8000) != 0
 
     /** 回调主体：只做状态判定与转发，不做任何可能阻塞的工作。 */
     private fun handleCallback(

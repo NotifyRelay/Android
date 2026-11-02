@@ -3,6 +3,7 @@ package notifyrelay.desktop.overlay.feature
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
 import notifyrelay.overlay.api.KeyMapping
@@ -29,6 +30,9 @@ class DesktopKeyboardSource(
 ) : KeyboardSource {
     private companion object {
         const val TAG = "DesktopKeyboard"
+
+        /** 修饰键自愈轮询间隔（毫秒）。 */
+        const val MODIFIER_POLL_MS = 50L
     }
 
     /** 按键状态：虚拟键码 → 是否按下。 */
@@ -63,15 +67,19 @@ class DesktopKeyboardSource(
     /** 按键推送是否已在途：合并高频按键，避免每次按下都触发界面重组。 */
     private val pushPending = AtomicBoolean(false)
 
+    /** 上次推送的快照：等值跳过，避免轮询空转触发界面重组。 */
+    @Volatile
+    private var lastPushed: KeyboardStateSnapshot? = null
+
     override val available: Boolean
         get() = runCatching { User32Ex.INSTANCE }.isSuccess
 
     override fun state(): KeyboardStateSnapshot {
         val pressed =
             buildList {
-                // 修饰键按实时状态补偿：钩子可能漏掉在安装前就已按下的边沿
+                // 修饰键以全局异步真值为准：钩子漏掉按下/抬起边沿时也能在下次快照自愈
                 Win32Keyboard.MODIFIER_KEYS.forEach { vk ->
-                    val down = keyStates[vk] == true || (bridge?.isDown(vk) ?: false)
+                    val down = bridge?.isAsyncDown(vk) ?: (keyStates[vk] == true)
                     if (down) add(vk)
                 }
                 keyStates.forEach { (vk, down) ->
@@ -123,6 +131,14 @@ class DesktopKeyboardSource(
                         toggleStates[vk] = localBridge.isToggled(vk)
                     }
                     Logger.i(TAG, "键盘钩子已安装")
+
+                    // 修饰键自愈轮询：钩子漏掉抬起边沿时，靠全局异步真值在下次轮询清除
+                    scope.launch {
+                        while (running.get()) {
+                            delay(MODIFIER_POLL_MS)
+                            notifyState()
+                        }
+                    }
 
                     // 消息循环：GetMessage 阻塞直到有消息或收到 WM_QUIT
                     while (running.get() && localBridge.pumpOnce()) {
@@ -209,6 +225,8 @@ class DesktopKeyboardSource(
 
     private fun notifyState() {
         val snapshot = state()
+        if (snapshot == lastPushed) return
+        lastPushed = snapshot
         stateListeners.forEach { listener ->
             runCatching { listener(snapshot) }
                 .onFailure { Logger.w(TAG, "键盘状态回调失败", it) }

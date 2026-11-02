@@ -9,7 +9,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -113,7 +113,7 @@ fun CommonTextBlockCompose(
     titleFontSize: TextUnit = 14.sp,
     contentColor: Color = Color(0xCCFFFFFF),
     contentFontSize: TextUnit = 12.sp,
-    maxWidth: Dp = 160.dp, // 适当增加最大宽度，确保内容完整显示
+    maxWidth: Dp = 160.dp, // 文本块宽度上限：短文本按内容宽，超宽进入滚动
 ) {
     // 确定字体家族
     val fontFamily =
@@ -126,7 +126,8 @@ fun CommonTextBlockCompose(
     Column(
         modifier =
             Modifier
-                .wrapContentWidth()
+                // 上限内自适应：短文本按内容宽，超宽文本进入 AutoScrollText 滚动
+                .widthIn(max = maxWidth)
                 .padding(start = horizontalPadding),
     ) {
         // 前置标题
