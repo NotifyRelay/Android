@@ -8,10 +8,13 @@ import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.os.Handler
 import android.os.Looper
+import android.util.Base64
+import androidx.core.content.FileProvider
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
@@ -20,11 +23,17 @@ import notifyrelay.base.util.image.ImageUtils
 import notifyrelay.domain.feature.device.service.contract.DeviceQueryPort
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
 
 /**
- * 剪贴板同步管理器
- * 去重、防循环、频率限制与发送全部由 Rust core 内部闭环（`NativeCore.clipboardOnChanged()` / `NativeCore.clipboardOnReceived()`），
- * 平台端仅负责系统剪贴板读写与前台/Fcitx 权限判定。
+ * 剪贴板同步管理器。
+ *
+ * 去重、防循环、频率限制与发送全部由 Rust core 内部闭环（`NativeCore.clipboardOnChanged()` /
+ * `NativeCore.clipboardOnReceived()`），平台端只负责系统剪贴板读写与前台/Fcitx 权限判定。
+ *
+ * 写回剪贴板的形态决定它会不会被 Fcitx5 的剪贴板广播原样带回：文本按原样写入，回灌由 Rust 的
+ * 防循环按内容排除；图片写成内容 URI，Fcitx5 只广播条目文本非空的剪贴板，图片因此不进入这条
+ * 回灌路径（按 data URL 文本写入时它会被当作文本转发回对端）。
  */
 object ClipboardSyncManager {
     private const val TAG = "ClipboardSyncManager"
@@ -33,40 +42,20 @@ object ClipboardSyncManager {
     private const val MIME_TEXT = "text/plain"
     private const val MIME_IMAGE = "image/png"
 
+    /** 剪贴板图片临时目录名，与 `res/xml/clipboard_paths.xml` 的 `path` 必须一致。 */
+    private const val IMAGE_DIR_NAME = "clipboard"
+
+    /** FileProvider authority，与 `AndroidManifest.xml` 中的声明必须一致。 */
+    private const val AUTHORITY_SUFFIX = ".clipboard"
+
+    /** 剪贴板读写自身的协程归属者，避免每次调用新建作用域。 */
+    private val clipboardScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
     private var clipboardManager: ClipboardManager? = null
-    private var isManualSyncMode = false
 
     fun isFcitx5Paired(context: Context): Boolean {
         FcitxClipboardManager.restorePairedState(context)
         return FcitxClipboardManager.isPaired
-    }
-
-    fun setManualSyncMode(
-        context: Context,
-        enabled: Boolean,
-    ) {
-        isManualSyncMode = enabled
-        if (enabled) {
-            Logger.d(TAG, "已启用手动同步模式，将通过通知点击触发剪贴板同步")
-        } else {
-            Logger.d(TAG, "已禁用手动同步模式")
-        }
-    }
-
-    private fun canSyncClipboard(context: Context): Pair<Boolean, String> {
-        if (isManualSyncMode) {
-            return Pair(true, "手动同步模式")
-        }
-
-        if (isFcitx5Paired(context)) {
-            return Pair(true, "Fcitx5 已配对")
-        }
-
-        if (PermissionHelper.isAppInForeground(context)) {
-            return Pair(true, "应用处于前台")
-        }
-
-        return Pair(false, "应用不在前台，需要通过透明Activity获取剪贴板")
     }
 
     fun init(context: Context) {
@@ -114,15 +103,11 @@ object ClipboardSyncManager {
     }
 
     /**
-     * 获取当前剪贴板数据
+     * 读取系统剪贴板当前内容：文本优先，其次图片；返回（类型, 内容），读不到时为 null。
+     *
+     * 不做前台/Fcitx 判定：调用方（透明 Activity）已经拿到前台，Android 10+ 只有前台才能读剪贴板。
      */
-    private fun getCurrentClipboardData(context: Context): Pair<String, String>? {
-        // 先检查是否可以访问剪贴板
-        val (canSync, _) = canSyncClipboard(context)
-        if (!canSync) {
-            return null
-        }
-
+    fun readPrimaryClip(context: Context): Pair<String, String>? {
         try {
             getClipboardManager(context)?.let { cm ->
                 // 尝试获取剪贴板内容，捕获可能的权限异常
@@ -203,15 +188,19 @@ object ClipboardSyncManager {
     }
 
     /**
-     * 更新本地剪贴板
+     * 更新本地剪贴板。
+     *
+     * 图片写成内容 URI：剪贴板里的图片必须是 URI，写成 data URL 文本会被 Fcitx5 记成剪贴板条目
+     * 并由它的剪贴板广播当作文本转发回对端。
      */
     private fun updateLocalClipboardContent(
         type: String,
         content: String,
         context: Context,
     ) {
+        val appContext = context.applicationContext
         try {
-            getClipboardManager(context)?.let { cm ->
+            getClipboardManager(appContext)?.let { cm ->
                 when (type) {
                     CLIPBOARD_TYPE_TEXT -> {
                         // 使用便捷方法创建文本剪贴板内容
@@ -220,17 +209,24 @@ object ClipboardSyncManager {
                         Logger.d(TAG, "已更新本地剪贴板为文本内容")
                     }
                     CLIPBOARD_TYPE_IMAGE -> {
-                        val dataUrl = "data:image/png;base64,$content"
-                        CoroutineScope(Dispatchers.IO).launch {
+                        clipboardScope.launch {
                             try {
-                                val bitmap = ImageUtils.decodeDataUrlToBitmap(context, dataUrl)
-                                if (bitmap != null) {
-                                    val clipItem = ClipData.Item(dataUrl)
-                                    val mimeTypes = arrayOf(ClipDescription.MIMETYPE_TEXT_PLAIN)
-                                    val clip = ClipData("synced_image", mimeTypes, clipItem)
-                                    cm.setPrimaryClip(clip)
-                                    Logger.d(TAG, "已更新剪贴板，包含图片数据URL")
+                                val file = writeClipboardImage(appContext, content)
+                                if (file == null) {
+                                    Logger.w(TAG, "剪贴板图片写入失败，保持原剪贴板内容")
+                                    return@launch
                                 }
+                                val uri =
+                                    FileProvider.getUriForFile(
+                                        appContext,
+                                        appContext.packageName + AUTHORITY_SUFFIX,
+                                        file,
+                                    )
+                                cm.setPrimaryClip(
+                                    ClipData.newUri(appContext.contentResolver, "synced_image", uri),
+                                )
+                                removeOtherClipboardImages(appContext, file)
+                                Logger.d(TAG, "已更新剪贴板为图片：" + uri)
                             } catch (e: Exception) {
                                 Logger.e(TAG, "更新剪贴板图片失败", e)
                             }
@@ -246,70 +242,102 @@ object ClipboardSyncManager {
     }
 
     /**
-     * 手动触发剪贴板同步（通过通知点击调用）
-     * 此方法忽略前台检测，直接获取并发送当前剪贴板内容（force=true 跳过内容未变检查）
+     * 把 [base64] 解码后写入剪贴板图片目录，返回文件；内容不是可解码的图片时返回 null。
+     *
+     * 只解码图片头（`inJustDecodeBounds`）校验，不分配整张位图。
      */
-    fun manualSyncClipboard(
-        deviceManager: DeviceQueryPort,
+    private fun writeClipboardImage(
         context: Context,
-    ) {
-        Logger.d(TAG, "手动触发剪贴板同步")
-
-        // 临时启用手动同步模式
-        val previousMode = isManualSyncMode
-        isManualSyncMode = true
-
-        // 先在UI线程获取剪贴板数据，然后再在后台线程调用 Rust
-        CoroutineScope(Dispatchers.Main).launch {
+        base64: String,
+    ): File? {
+        val bytes =
             try {
-                // 1. 在UI线程获取剪贴板数据
-                val clipboardData = getCurrentClipboardData(context)
-
-                if (clipboardData != null) {
-                    Logger.d(TAG, "手动同步：剪贴板读取成功")
-
-                    val (type, content) = clipboardData
-
-                    // 2. 切换到后台线程调用 Rust 发送
-                    CoroutineScope(Dispatchers.IO).launch {
-                        try {
-                            val devices = deviceManager.getAuthenticatedOnlineDevices()
-                            if (devices.isEmpty()) {
-                                Logger.d(TAG, "没有可用于发送剪贴板内容的在线设备")
-                                return@launch
-                            }
-
-                            handleSendResult(
-                                context,
-                                NativeCore.clipboardOnChanged(
-                                    buildTargetsJson(devices.map { it.uuid }),
-                                    if (type == CLIPBOARD_TYPE_IMAGE) MIME_IMAGE else MIME_TEXT,
-                                    content,
-                                    System.currentTimeMillis(),
-                                    force = true,
-                                ),
-                                type,
-                            )
-                        } catch (e: Exception) {
-                            Logger.e(TAG, "手动同步：发送剪贴板失败", e)
-                        } finally {
-                            isManualSyncMode = previousMode
-                        }
-                    }
-                } else {
-                    Logger.d(TAG, "手动同步：剪贴板为空或无法获取")
-                    isManualSyncMode = previousMode
-                }
+                Base64.decode(base64, Base64.DEFAULT)
             } catch (e: Exception) {
-                Logger.e(TAG, "手动同步：获取剪贴板失败", e)
-                isManualSyncMode = previousMode
+                Logger.e(TAG, "剪贴板图片 Base64 解码失败", e)
+                return null
+            }
+        if (bytes.isEmpty()) {
+            Logger.w(TAG, "剪贴板图片内容为空")
+            return null
+        }
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
+        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) {
+            Logger.w(TAG, "剪贴板图片无法解码，跳过写入")
+            return null
+        }
+        val dir = File(context.cacheDir, IMAGE_DIR_NAME)
+        if (!dir.exists() && !dir.mkdirs()) {
+            Logger.w(TAG, "剪贴板图片目录创建失败：" + dir.absolutePath)
+            return null
+        }
+        return try {
+            File(dir, "clipboard_" + System.currentTimeMillis() + ".png").also { it.writeBytes(bytes) }
+        } catch (e: Exception) {
+            Logger.e(TAG, "剪贴板图片落盘失败", e)
+            null
+        }
+    }
+
+    /** 清掉本次写入之外的剪贴板图片，避免缓存目录堆积。 */
+    private fun removeOtherClipboardImages(
+        context: Context,
+        keep: File,
+    ) {
+        try {
+            File(context.cacheDir, IMAGE_DIR_NAME)
+                .listFiles()
+                ?.filter { it.isFile && it.absolutePath != keep.absolutePath }
+                ?.forEach { it.delete() }
+        } catch (e: Exception) {
+            Logger.w(TAG, "清理剪贴板图片失败：" + e.message)
+        }
+    }
+
+    /**
+     * 把一份已读到的剪贴板内容发送给在线设备。
+     *
+     * @param type [CLIPBOARD_TYPE_TEXT] 或 [CLIPBOARD_TYPE_IMAGE]
+     * @param force 跳过 Rust 的"内容未改变"判定；防循环仍然生效
+     */
+    fun sendClipboardData(
+        deviceManager: DeviceQueryPort,
+        type: String,
+        content: String,
+        context: Context,
+        force: Boolean,
+    ) {
+        // 发送可能晚于调用方生命周期：只保留应用上下文
+        val appContext = context.applicationContext
+        clipboardScope.launch {
+            try {
+                val devices = deviceManager.getAuthenticatedOnlineDevices()
+                if (devices.isEmpty()) {
+                    Logger.d(TAG, "没有可用于发送剪贴板内容的在线设备")
+                    return@launch
+                }
+
+                handleSendResult(
+                    appContext,
+                    NativeCore.clipboardOnChanged(
+                        buildTargetsJson(devices.map { it.uuid }),
+                        if (type == CLIPBOARD_TYPE_IMAGE) MIME_IMAGE else MIME_TEXT,
+                        content,
+                        System.currentTimeMillis(),
+                        force,
+                    ),
+                    type,
+                )
+            } catch (e: Exception) {
+                Logger.e(TAG, "发送剪贴板失败", e)
             }
         }
     }
 
     /**
      * 直接同步文本内容到其他设备
-     * 不触发系统剪贴板读取，不检查前台状态，用于特定场景（如验证码复制）
+     * 不触发系统剪贴板读取，不检查前台状态，用于特定场景（如验证码复制、Fcitx5 广播）
      */
     fun syncTextDirectly(
         deviceManager: DeviceQueryPort,
@@ -317,30 +345,7 @@ object ClipboardSyncManager {
         context: Context,
     ) {
         if (text.isBlank()) return
-
-        CoroutineScope(Dispatchers.IO).launch {
-            try {
-                val devices = deviceManager.getAuthenticatedOnlineDevices()
-                if (devices.isEmpty()) {
-                    Logger.d(TAG, "直接同步：没有在线设备")
-                    return@launch
-                }
-
-                handleSendResult(
-                    context,
-                    NativeCore.clipboardOnChanged(
-                        buildTargetsJson(devices.map { it.uuid }),
-                        MIME_TEXT,
-                        text,
-                        System.currentTimeMillis(),
-                        force = false,
-                    ),
-                    CLIPBOARD_TYPE_TEXT,
-                )
-            } catch (e: Exception) {
-                Logger.e(TAG, "直接同步失败", e)
-            }
-        }
+        sendClipboardData(deviceManager, CLIPBOARD_TYPE_TEXT, text, context, force = false)
     }
 
     private fun buildTargetsJson(deviceUuids: List<String>): String {
@@ -365,7 +370,7 @@ object ClipboardSyncManager {
                 return
             }
         when (action) {
-            "sent" -> Logger.d(TAG, "剪贴板已发送（Rust 处理）：$type")
+            "sent" -> Logger.d(TAG, "剪贴板已发送（Rust 处理）：" + type)
             "skipped" -> Logger.d(TAG, "剪贴板已跳过（Rust 处理）")
             "file_transfer" -> {
                 Logger.w(TAG, "剪贴板大内容需走文件传输通道，同步失败")
@@ -373,7 +378,7 @@ object ClipboardSyncManager {
                     ToastUtils.showShortToast(context, "剪贴板内容过大（超过 2MB），同步失败")
                 }
             }
-            else -> Logger.d(TAG, "剪贴板结果未知：$action")
+            else -> Logger.d(TAG, "剪贴板结果未知：" + action)
         }
     }
 }

@@ -4,15 +4,18 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
 import notifyrelay.domain.feature.device.model.DeviceInfo
-import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
 import notifyrelay.shared.ui.port.ClipboardSyncPort
 import java.awt.Image
 import java.awt.Toolkit
 import java.awt.datatransfer.Clipboard
 import java.awt.datatransfer.DataFlavor
+import java.awt.datatransfer.StringSelection
 import java.awt.datatransfer.Transferable
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
@@ -24,15 +27,19 @@ import javax.imageio.ImageIO
  *
  * 与 Windows `ClipboardService` 同口径：
  * - 监听系统剪贴板变更事件（`AddClipboardFormatListener`，见 [ClipboardChangeMonitor]）；
- * - 文本经 [Win32Clipboard] 直写，绕开 AWT 写 `CF_UNICODETEXT` 时把 `\n` 换成 `\r\n` 的行为；
- * - 采集文本时归一换行为 `\n`（`CRLF` → `LF`，其余字符不变），图片走 AWT（PNG → Base64）；
+ * - 文本经 [Win32Clipboard] 直写，绕开 AWT 写 `CF_UNICODETEXT` 时把换行换成 `CRLF` 的行为；
+ * - 采集文本时归一换行为 `LF`（`CRLF` → `LF`，其余字符不变），图片走 AWT（PNG → Base64）；
  * - 去重、防循环、频率限制与 2MB 阈值全部交给 Rust core（`clipboardOnChanged`）；
  * - 收到远端报文经 `clipboardOnReceived` 解析后写回系统剪贴板。
+ *
+ * 平台侧不持有任何同步状态：本机复制与远端回灌的区分、重复内容是否跳过，全部由 Rust core 判定。
+ * 平台对 Rust 的义务是口径一致——写回前把换行归一到 `LF`，交给 `clipboardOnChanged` 的内容必须是
+ * 回读时的那一个字符串（含按 JSON 语法解码，见 [decodeResultField]）；口径不一致时 Rust 的
+ * 内容相等前提失效，回灌会被当成新的本机复制重新发出。
  *
  * 与 Android 的 Fcitx 方案不同：桌面直接读写系统剪贴板，不需要输入法配对。
  */
 class DesktopClipboardSyncPort(
-    private val deviceMessagePort: () -> DeviceMessagePort?,
     private val onlineDevices: () -> List<DeviceInfo>,
 ) : ClipboardSyncPort {
     private companion object {
@@ -60,10 +67,6 @@ class DesktopClipboardSyncPort(
 
     @Volatile
     private var running = false
-
-    /** 上次采集到的内容签名，用于判断是否需要交给 Rust 判定。 */
-    @Volatile
-    private var lastSignature: Int = 0
 
     /**
      * 启动剪贴板监听。
@@ -126,7 +129,7 @@ class DesktopClipboardSyncPort(
             }
     }
 
-    /** 处理一条入站剪贴板报文，写回系统剪贴板。 */
+    /** 处理一条入站剪贴板报文，写回系统剪贴板。回灌由 Rust 在判定时按内容排除。 */
     fun onReceived(payload: String) {
         if (!enabledState.value) return
         val resultJson =
@@ -134,27 +137,38 @@ class DesktopClipboardSyncPort(
                 .getOrNull()
         if (resultJson.isNullOrBlank()) return
 
-        val content = parseField(resultJson, "content") ?: return
-        val type = parseField(resultJson, "type") ?: "text"
-        if (content.isEmpty()) return
+        val content = decodeResultField(resultJson, "content")
+        if (content.isNullOrEmpty()) {
+            Logger.w(TAG, "剪贴板回包无可用内容，放弃写入剪贴板")
+            return
+        }
+        val type = decodeResultField(resultJson, "type") ?: "text"
 
-        runCatching {
+        try {
             if (type == CLIPBOARD_TYPE_IMAGE) {
                 val bytes = Base64.getDecoder().decode(content)
-                val image = ImageIO.read(bytes.inputStream()) ?: return@runCatching
+                val image = ImageIO.read(bytes.inputStream()) ?: return
                 Toolkit.getDefaultToolkit().systemClipboard.setContents(ImageSelection(image), null)
-            } else if (Win32Clipboard.isAvailable()) {
-                // 直写原生格式：AWT 写路径会把 \n 放大成 \r\n，本机剪贴板将与本机内容不一致
-                if (!Win32Clipboard.writeText(content)) return@runCatching
             } else {
-                Toolkit
-                    .getDefaultToolkit()
-                    .systemClipboard
-                    .setContents(java.awt.datatransfer.StringSelection(Win32Clipboard.normalizeNewlines(content)), null)
+                // 归一换行后再写：与本机采集口径一致，Rust 的内容相等判定才能成立
+                val text = Win32Clipboard.normalizeNewlines(content)
+                if (Win32Clipboard.isAvailable()) {
+                    // 直写原生格式：AWT 写路径会把换行改写为 CRLF，本机剪贴板将与本机内容不一致
+                    if (!Win32Clipboard.writeText(text)) {
+                        Logger.w(TAG, "Win32 剪贴板写入失败")
+                        return
+                    }
+                } else {
+                    Toolkit
+                        .getDefaultToolkit()
+                        .systemClipboard
+                        .setContents(StringSelection(text), null)
+                }
             }
-            // 同步本地内容签名：回写触发的下一次变更事件不应再被当作本机内容发出
-            lastSignature = Win32Clipboard.normalizeNewlines(content).hashCode()
-        }.onFailure { Logger.w(TAG, "写入系统剪贴板失败", it) }
+            Logger.d(TAG, "写回系统剪贴板：类型=" + type + " " + describe(content))
+        } catch (e: Exception) {
+            Logger.w(TAG, "写入系统剪贴板失败", e)
+        }
     }
 
     /** 处理一次剪贴板变化：采集内容并交给 Rust 判定与发送。 */
@@ -166,11 +180,7 @@ class DesktopClipboardSyncPort(
         if (!enabledState.value) return
 
         val captured = capture(clipboard) ?: return
-
-        // 内容签名未变则跳过：避免同一内容被重复交给 Rust 判定
-        val signature = captured.first.hashCode()
-        if (!force && signature == lastSignature) return
-        lastSignature = signature
+        Logger.d(TAG, "剪贴板事件：" + describe(captured.first))
 
         val targets = onlineDevices().filter { it.uuid.isNotBlank() }
         if (targets.isEmpty()) return
@@ -189,8 +199,10 @@ class DesktopClipboardSyncPort(
                 )
             }.getOrNull()
 
-        val action = result?.let { parseField(it, "action") }
-        val reason = result?.let { parseField(it, "reason") }
+        val action = result?.let { decodeResultField(it, "action") }
+        val reason = result?.let { decodeResultField(it, "reason") }
+        // reason 是区分"本机复制"与"远端回灌"的唯一依据：回灌会得到"内容来自远程，跳过发送"
+        Logger.d(TAG, "Rust 判定：action=" + action + " reason=" + reason)
         lastResultState.value =
             when (action) {
                 "sent" -> "已发送到 " + targets.size + " 台设备"
@@ -245,22 +257,6 @@ class DesktopClipboardSyncPort(
         return null
     }
 
-    /** 从 JSON 字符串中取字段值（顶层字符串字段）。 */
-    private fun parseField(
-        json: String,
-        field: String,
-    ): String? =
-        runCatching {
-            val marker = "\"" + field + "\":"
-            val start = json.indexOf(marker)
-            if (start < 0) return null
-            val from = json.indexOf('"', start + marker.length)
-            if (from < 0) return null
-            val to = json.indexOf('"', from + 1)
-            if (to < 0) return null
-            json.substring(from + 1, to)
-        }.getOrNull()
-
     /** 把 AWT 图像包装成可放入剪贴板的 [Transferable]。 */
     private class ImageSelection(
         private val image: Image,
@@ -272,3 +268,30 @@ class DesktopClipboardSyncPort(
         override fun getTransferData(flavor: DataFlavor): Any = image
     }
 }
+
+/**
+ * 取 Rust 回包的顶层字符串字段。
+ *
+ * Rust 侧以 `serde_json` 输出，内容按 JSON 规则转义；此处按 JSON 语法解码，路径中的反斜杠与
+ * 文本中的换行原样还原。JSON 非法、字段缺失或字段不是字符串时返回 null。
+ */
+internal fun decodeResultField(
+    json: String,
+    field: String,
+): String? =
+    runCatching {
+        val element = (Json.parseToJsonElement(json) as? JsonObject)?.get(field) as? JsonPrimitive
+        if (element == null || !element.isString) null else element.content
+    }.getOrNull()
+
+/**
+ * 剪贴板内容的日志摘要：长度、反斜杠数、换行数与关联标记。
+ *
+ * 不输出内容本身（剪贴板可能承载凭据）；配合 Rust 回包里的 reason，可在日志里区分
+ * 本机复制与远端回灌，并暴露转义叠加与换行丢失。
+ */
+private fun describe(text: String): String =
+    "长度=" + text.length +
+        " 反斜杠=" + text.count { it == '\\' } +
+        " 换行=" + text.count { it == '\n' } +
+        " 标记=" + text.hashCode().toUInt().toString(16)

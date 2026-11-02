@@ -258,7 +258,7 @@ object FcitxClipboardManager {
         val protectionParams =
             KeyProtection
                 .Builder(
-                    Cipher.DECRYPT_MODE,
+                    KeyProperties.PURPOSE_DECRYPT,
                 ).setBlockModes(KeyProperties.BLOCK_MODE_GCM)
                 .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
                 .build()

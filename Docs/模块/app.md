@@ -9,7 +9,7 @@
 | `sync` | `HeartbeatProcessor` / `ProtocolSender` / `MessageSender` | 心跳、协议封装、消息发送（`MessageSender` 为门面，`SendGateway` 与 `builder/*` 为具体实现） |
 | `sync/notification` | `NotificationProcessor` / `StatusProcessor` / `SuperIslandProcessor` | 三类协议的处理 |
 | `feature/appslist` | `InstalledAppsRepository` / `AppIconRepository` / `PinnedAppsRepository` / `RemoteAppsCache` / `AppListSyncManager` / `IconSyncManager` / `AppLaunchManager` | 应用列表采集与枚举、图标缓存、跨端同步与远程拉起（枚举与标签获取工具在 `:base` 的 `AppListHelper`） |
-| `feature/clipboard` | `ClipboardSyncManager` / `ClipboardProcessor` / `ClipboardSyncReceiver` / `FcitxClipboardManager` / `FcitxClipboardReceiver` | 剪贴板同步（含 Fcitx 输入法适配） |
+| `feature/clipboard` | `ClipboardSyncManager` / `ClipboardProcessor` / `ClipboardSyncReceiver` / `FcitxClipboardManager` / `FcitxClipboardReceiver` | 剪贴板同步（含 Fcitx 输入法适配）：系统剪贴板监听即 Fcitx5 的剪贴板广播（仅条目文本非空时广播），另一条取剪贴板路径是通知点按经透明 Activity；写回文本按原样、图片写成内容 URI。判定在 [`:core`](core.md) |
 | `feature/audio` | `AudioRelayPlayer` / `AudioRelayForegroundService` / `AudioRelayController` | 音频转发播放 |
 | `feature/device` | `DeviceConnectionManager`(+`Singleton`) | 设备连接总控；单例获取唯一入口为 `DeviceConnectionManagerSingleton.getDeviceManager(context)` |
 | `feature/device/service/core` | `RustCoreSession` | 封装 `NativeCore` 会话 |

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    收到远端图片后写回系统剪贴板的临时文件路径声明。
+
+    剪贴板里的图片必须是内容 URI：写成 data URL 文本会被 Fcitx5 记成剪贴板条目并由它的
+    剪贴板广播当作文本转发回对端。文件只放内部 cacheDir/clipboard/，每次写入后清掉旧文件。
+-->
+<paths>
+    <cache-path
+        name="clipboard"
+        path="clipboard/" />
+</paths>

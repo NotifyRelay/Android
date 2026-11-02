@@ -293,7 +293,7 @@ object LiveUpdatesNotificationManager {
      * 校验可提升特性后发送通知，并触发异步图标加载以获得二次更新。
      *
      * 注意：`hasPromotableCharacteristics()` 的校验**只记日志、不影响流程**
-     * （与原实现一致，不要改成提前 return）。
+     * （与原实现一致，不要改成提前 return）。该接口自 API 36 起存在，低版本跳过校验。
      */
     private fun postNotification(
         sourceId: String,
@@ -302,16 +302,18 @@ object LiveUpdatesNotificationManager {
         picMap: Map<String, String>,
         notification: Notification?,
     ) {
-        // 验证通知是否具有可提升特性
-        try {
-            val hasPromotable = notification?.hasPromotableCharacteristics()
-            hasPromotable?.let {
-                if (!it) {
-                    Logger.w(TAG, "通知不具有可提升特性 - Live Updates可能无法正常显示")
+        // 验证通知是否具有可提升特性；该接口自 API 36 起存在，低版本跳过
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.BAKLAVA) {
+            try {
+                val hasPromotable = notification?.hasPromotableCharacteristics()
+                hasPromotable?.let {
+                    if (!it) {
+                        Logger.w(TAG, "通知不具有可提升特性 - Live Updates可能无法正常显示")
+                    }
                 }
+            } catch (e: Exception) {
+                Logger.w(TAG, "检查通知可提升特性失败 " + e.message)
             }
-        } catch (e: Exception) {
-            Logger.w(TAG, "检查通知可提升特性失败 ${e.message}")
         }
 
         // 发送通知

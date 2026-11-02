@@ -195,7 +195,6 @@ object DataLayerDesktop {
             // 剪贴板同步：收发判定在 Rust core，平台只做系统剪贴板读写
             clipboardSync =
                 notifyrelay.desktop.platform.DesktopClipboardSyncPort(
-                    { deviceMessagePort() },
                     { onlineDevices() },
                 )
 

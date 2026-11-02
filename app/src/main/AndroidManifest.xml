@@ -185,6 +185,17 @@
                 <action android:name="android.content.action.DOCUMENTS_PROVIDER" />
             </intent-filter>
         </provider>
+        <!-- 收到的剪贴板图片写回系统剪贴板用 FileProvider（仅 cacheDir/clipboard/） -->
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.clipboard"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/clipboard_paths" />
+        </provider>
+
         <!-- 运行日志目录的分享用 FileProvider（仅 externalFilesDir/logs 与 filesDir/logs） -->
         <provider
             android:name="androidx.core.content.FileProvider"

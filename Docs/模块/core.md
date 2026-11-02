@@ -39,3 +39,9 @@ commonMain 的 `device/` 子包承载跨平台编排，两平台共用：
 | `device/service/**` | 配对、设备目录与快照、在线设备缓存、回调适配与安装 |
 
 本机通知的过滤规则位于 `:data` `filter/LocalFilterRepository.shouldForward`，纯判定部分抽为 `LocalForwardRules`（可脱离数据库单测）。
+
+## 剪贴板同步
+
+判定在 core。`clipboardOnChanged` 在收发两侧把内容归一到同一口径（`data:image/...;base64,` 去前缀、换行统一为 `LF`），再按归一化内容排除回灌：内容与最近一次接收一致且在 1000ms 窗口内即跳过，不要求类型一致；图片在剪贴板中的形态是平台重编码后的 PNG，内容不可比，按类型与时间窗兜底。其后依次是"内容未改变"（`force` 时跳过）、1000ms 频率限制与 2MB 阈值。
+
+平台对 core 的义务是口径一致：交给 `clipboardOnChanged` 的内容必须是回读时的那一个字符串（回包按 JSON 语法解码），写回剪贴板前后用同一口径归一；口径不一致时内容相等前提不成立，回灌会被当成新的本机复制再次发出。写回形态见[桌面端](../桌面端.md#clipboard)与 [`:app`](app.md)。
