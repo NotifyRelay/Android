@@ -1,6 +1,6 @@
 ---
 name: notifyrelay-prose-standard
-description: 在 notifyrelay 仓库中撰写、评审、恢复、精简或审计散文时使用，包括判断 Markdown、JSDoc、代码与测试注释、提示词、描述、诊断以及 CLI 或 UI 字符串中哪些位置必须写文档或注释。
+description: 在 NotifyRelay 仓库中撰写、评审、恢复、精简或审计散文时使用，包括判断 Markdown、JSDoc、代码与测试注释、提示词、描述、诊断以及 CLI 或 UI 字符串中哪些位置必须写文档或注释。
 ---
 
 # NotifyRelay 散文标准
@@ -25,7 +25,7 @@ description: 在 notifyrelay 仓库中撰写、评审、恢复、精简或审计
 
 散文评审与编辑同时排除 `.agents/notes/archived/`。归档 Agent Note 是冻结快照；只有为了理解某条历史入站引用时才查看确切目标，绝不为了现代化其散文或出站链接。
 
-把生成的目录、快照与 fixture 视为派生物。编辑前追踪每个消费方：源 JSDoc 也可能供给一份生成的面相模型的目录。先编辑拥有该内容的源或场景，再重新生成每个派生物。当生成器从拥有者散文中抽取摘要时，让被抽取的句子在该面上自足。遵循[轻量例行路径](../../../Docs/AGENTS.md#writing-rules)，只改需要改的那一面。
+把生成的目录、快照与 fixture 视为派生物。编辑前追踪每个消费方：源 JSDoc 也可能供给一份生成的面相模型的目录。先编辑拥有该内容的源或场景，再重新生成每个派生物。当生成器从拥有者散文中抽取摘要时，让被抽取的句子在该面上自足。改动遵循[轻量例行路径](../../../Docs/AGENTS.md#writing-rules)，只触及该事实的所有者。
 
 <a id="preserve-the-complete-proposition"></a>
 

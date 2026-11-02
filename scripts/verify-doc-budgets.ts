@@ -1,7 +1,7 @@
 /**
  * 执行来自已配置预算清单的 `wc -w` 式上限，并强制清单覆盖配置声明的全部
  * 常驻文档。缺文件、非法上限与漏配的常驻文档都会失败；`--list` 报告当前
- * 用量。上限以至少 5% 余量向下棘轮；上调上限需要 `Docs/AGENTS.md` 定义的
+ * 用量。上限以至少 5% 余量向下棘轮；上调上限需要 `docs/AGENTS.md` 定义的
  * 正当理由。
  *
  * 覆盖由 `docSystem.budgetCoveragePatterns` 决定：匹配到的每一篇都必须在
@@ -42,9 +42,9 @@ function toRepoPath(absolute: string): string {
 }
 
 /**
- * 覆盖比较与清单键都按大小写不敏感归一。清单键是配置里写定的形态，磁盘
- * 上的实际名字随检出平台与历史重命名而变；按字面比较会把同一篇文档判成
- * 缺失。
+ * 覆盖比较与清单键都按大小写不敏感归一。磁盘上的实际大小写随检出平台与
+ * 历史重命名而变（例如 `docs/` 在磁盘上是 `Docs/`），而清单键是配置里
+ * 写定的形态；按字面比较会把同一篇文档判成缺失。
  */
 function normalizePath(path: string): string {
   return path.toLowerCase()
@@ -81,7 +81,7 @@ for (const [path, ceiling] of Object.entries(manifest)) {
   const words = countWords(readFileSync(abs, 'utf8'))
   rows.push(`${words <= ceiling ? 'ok  ' : 'OVER'}  ${String(words).padStart(6)} / ${String(ceiling).padEnd(6)} ${path}`)
   if (words > ceiling) {
-    failures.push(`${path}: ${words} words exceeds the ${ceiling}-word ceiling — relocate or condense per Docs/AGENTS.md (raising the ceiling requires justification in the change)`)
+    failures.push(`${path}: ${words} words exceeds the ${ceiling}-word ceiling — relocate or condense per docs/AGENTS.md (raising the ceiling requires justification in the change)`)
   }
 }
 
@@ -93,7 +93,7 @@ if (listOnly) {
 if (failures.length > 0) {
   console.error('verify-doc-budgets failed:\n')
   for (const failure of failures) console.error(`  ${failure}`)
-  console.error(`\nSee Docs/AGENTS.md for the documentation standard and the relocation-first rule. Manifest: ${relative(root, MANIFEST_PATH)}`)
+  console.error(`\nSee docs/AGENTS.md for the documentation standard and the relocation-first rule. Manifest: ${relative(root, MANIFEST_PATH)}`)
   process.exit(1)
 }
 

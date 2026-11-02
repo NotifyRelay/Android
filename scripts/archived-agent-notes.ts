@@ -9,7 +9,6 @@
 import { createHash } from 'node:crypto'
 import { basename } from 'node:path'
 import { AGENT_NOTE_CLASSES } from './agent-note-tree.ts'
-import { docSystem } from './doc-system.config.ts'
 import { splitLines } from './repo-files.ts'
 
 /** 冻结内容清单中的版本化字段。 */
@@ -97,15 +96,15 @@ function validateMetadata(path: string, content: Buffer, sourceBase: string): { 
 }
 
 /**
- * 校验封闭 kind 树与归档笔记元数据。每条笔记封印为一个 `.md`。
+ * 校验封闭 kind 树与归档笔记元数据。每条笔记封印一个 `.md`。
  * @param artifacts - 以相对归档根的路径为键的归档文件。
- * @returns 每条结构、元数据或配对违规对应一条诊断。
+ * @returns 每条结构或元数据违规对应一条诊断。
  */
 export function validateArchiveArtifacts(artifacts: ReadonlyMap<string, Buffer>): string[] {
   const errors: string[] = []
   const notes = new Map<string, Buffer>()
   for (const [path, content] of artifacts) {
-    const match = /^([^/]+)\/(\d{4}-\d{2}-\d{2}-.+?)(\.md)$/.exec(path)
+    const match = /^([^/]+)\/(\d{4}-\d{2}-\d{2}-.+?)\.md$/.exec(path)
     if (match?.[1] === undefined || match[2] === undefined) {
       errors.push(`${path}: expected {kind}/yyyy-mm-dd-topic.md`)
       continue
@@ -114,8 +113,7 @@ export function validateArchiveArtifacts(artifacts: ReadonlyMap<string, Buffer>)
       errors.push(`${path}: unknown Agent Note kind ${JSON.stringify(match[1])}`)
       continue
     }
-    const key = `${match[1]}/${match[2]}`
-    notes.set(key, content)
+    notes.set(`${match[1]}/${match[2]}`, content)
   }
 
   for (const [key, content] of [...notes].sort(([left], [right]) => left.localeCompare(right))) {
