@@ -8,6 +8,7 @@
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 import type { Nodes } from 'mdast'
+import { gateHint } from './gate-hint.ts'
 import { markdownHeadingLines, parseMarkdown, visitMarkdown } from './markdown.ts'
 import { isArchivedAgentNotePath, uniqueRepoFiles } from './repo-files.ts'
 import { docSystem, repoRoot } from './doc-system.config.ts'
@@ -276,5 +277,6 @@ if (process.argv[1] && import.meta.filename === resolve(process.argv[1])) {
   for (const v of all) {
     console.error(`  ${v.file}:${v.line}  ${v.url}  (${v.reason === 'target' ? 'target does not exist' : 'no such anchor in target'})`)
   }
+  console.error(gateHint('verify-md-links'))
   process.exit(1)
 }

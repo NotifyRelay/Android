@@ -14,6 +14,7 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { docSystem, repoRoot } from './doc-system.config.ts'
+import { gateHint } from './gate-hint.ts'
 import { uniqueRepoFiles } from './repo-files.ts'
 
 const root = repoRoot
@@ -93,7 +94,8 @@ if (listOnly) {
 if (failures.length > 0) {
   console.error('verify-doc-budgets failed:\n')
   for (const failure of failures) console.error(`  ${failure}`)
-  console.error(`\nSee docs/AGENTS.md for the documentation standard and the relocation-first rule. Manifest: ${relative(root, MANIFEST_PATH)}`)
+  console.error(`\nManifest: ${relative(root, MANIFEST_PATH)}`)
+  console.error(gateHint('verify-doc-budgets'))
   process.exit(1)
 }
 
