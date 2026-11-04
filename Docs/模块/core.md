@@ -9,18 +9,11 @@ Kotlin 绑定由 `:core:uniffiBindgen`（`gobley-uniffi-bindgen`）从 `cargo-nd
 | commonMain | UniFFI 绑定的 `expect` 声明（`Core`、`CoreCallbacks`、顶层函数）；`NativeCore` 门面；`PlatformMediaProjection` 的 expect 声明 |
 | androidMain | UniFFI 绑定的 `actual` 实现（JNA）；`PlatformMediaProjection` 的 actual typealias |
 
-`NativeCore`（object）是 `:core` 的对外门面，位于 commonMain，覆盖：
+`NativeCore`（object）是 `:core` 的对外门面，位于 commonMain，按域分组：会话与加密、设备与配对、消息与过滤、剪贴板与应用列表同步、状态推送。方法清单以源码为本，本页只记无法从签名读出的契约：
 
-- 会话：`createContext()`, `isReady()`, `exportState()`, `importState()`, `encryptLocalState()`, `decryptLocalState()`, `deserializeLocalState()`
-- 加密：`generateKeypair()`, `getPublicKey()`, `hasKeypair()`, `deriveSharedSecret()`, `migrateSharedSecret()`, `deriveFtpCredentials()`, `derivePasswordHash()`, `generateRandomPassword()`
-- 设备：`getLocalUuid()`, `renameDevice()`, `getDeviceList()`, `removeDevice()`, `removeDeviceSession()`
-- 连接/配对：`periodicBroadcast()`, `sendHandshake()`, `connectDevice()`, `sendPairingInit()`, `sendPairingResp()`, `sendAccept()`, `sendReject()`, `generatePairingCode()`, `clearPairingCode()`
-- 消息：`enqueueMessage()`, `computeFeatureId()`, `dedup()`, `contentDedup()`, `shouldDeduplicate()`
-- 过滤：`setFilterConfig()`, `mapLocalPackage()`, `checkFilterMode()`
-- 同步：`clipboardOnChanged()`, `clipboardOnReceived()`, `appSyncPrepareIconRequest()`, `appSyncRequestIcons()`, `appSyncClearIconPending()`, `appSyncParseIconResponse()`, `appSyncBuildApplistRequest()`, `appSyncParseApplistResponse()`
-- 状态推送：`pushSuperislandState()`, `pushMediaState()`, `onNetworkChanged()`, `getLocalIp()`, `updateHeartbeatSchedulerParams()`
-- 回调：`setCallbacks(CoreCallbacks)`（配对/数据/设备事件/状态查询/音频/日志合一）
 - 就绪判定：`isReady()`（上下文已创建）、`senderQueueReady`（`startCore` 已建立发送队列）
+- 生命周期：`requestShutdown()` 置位关停信号（不取核心锁），`createContext()` 重建实例
+- 回调：`setCallbacks(CoreCallbacks)` 一处登记配对、数据、设备事件、状态查询、音频与日志
 
 `NativeCore` 不持有上下文句柄；上下文由 UniFFI 生成的 `Core` 对象单一持有。
 
@@ -34,11 +27,21 @@ commonMain 的 `device/` 子包承载跨平台编排，两平台共用：
 | `device/appsync/RemoteAppIconCache` | 远端应用图标字节缓存 |
 | `device/appsync/AppListSyncManagerCore` / `IconSyncManagerCore` | 应用列表与图标的请求/响应编排 |
 | `device/appsync/ChatSendGateway` | 聊天测试报文构造与广播 |
-| `device/appsync/InboundNotificationProcessor` | 入站通知解析、已入库检定、落库与裁剪；同时提供本机设备标识与记录键。**已入库检定的唯一判定处**为 `isDuplicate()`：10 秒内容窗口 → 24 小时内同包名候选的应用名 + 标题 + 正文相似度 → 更早记录完全一致；`markContentSeen()` 仅在确认展示后写窗口 |
-| `device/notification/LocalNotificationForwardGateway` | **两平台共用**的本机通知出站网关：过滤（`LocalFilterRepository.shouldForward`）→ 可选按应用名反查远端包名 → 已入库检定 → 构造 `DATA_NOTIFICATION` → 可选落库 → 广播全部已认证设备。平台差异经参数表达：Android 传 `resolvePackage=false`、不重复落库并传 `existingKey` 排除自身，Windows 传 `true` 并由网关落库。**检定为重复时仍落库与广播，仅不上屏**（返回值 `ForwardResult.showOnScreen`）。**只发送新增通知**：本应用非镜像通知，不承担撤回语义 |
+| `device/appsync/InboundNotificationProcessor` | 入站通知解析、已入库检定、落库与裁剪；已入库检定的唯一判定处为 `isDuplicate()` |
+| `device/notification/LocalNotificationForwardGateway` | 两平台共用的本机通知出站网关，平台差异经参数表达；检定为重复时仍落库与广播，仅不上屏 |
 | `device/service/**` | 配对、设备目录与快照、在线设备缓存、回调适配与安装 |
 
 本机通知的过滤规则位于 `:data` `filter/LocalFilterRepository.shouldForward`，纯判定部分抽为 `LocalForwardRules`（可脱离数据库单测）。
+
+<a id="locking"></a>
+
+## 锁与阻塞边界
+
+全部核心状态由单一 `SafeContext`（`Mutex<CoreContext>`）保护。锁内只取句柄与读写字段；网络收发、拨号、mDNS 重注册与线程 `join` 在锁外执行且自带超时（发送 5s / 握手 8s）。后台线程锁序恒为「上下文锁 → 组件锁」。
+
+设备离线是正常状态：发送队列只记信息级日志并退避重试，已在线却失败才告警。
+
+`CoreWatchdog` 统计核心调用在途数量，超过 10 秒未返回即 `requestShutdown()`。该接口只置位 `lifecycle` 原子信号、不取核心锁；后台循环据信号退出，协调线程有界等待内释放 mDNS 与传输层。恢复依赖 `createContext()` 重建实例。
 
 ## 剪贴板同步
 
