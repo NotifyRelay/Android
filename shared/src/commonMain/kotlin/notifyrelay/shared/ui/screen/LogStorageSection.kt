@@ -129,14 +129,12 @@ fun DesktopAboutContent(
             color = colorScheme.primary,
             modifier = Modifier.padding(horizontal = 16.dp),
         )
-        Text(
-            text = "版本 " + versionName,
-            style = textStyles.body2,
-            color = colorScheme.onSurfaceSecondary,
-            modifier =
-                Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 4.dp),
+        // 版本信息同时是开发者模式的激活入口：连续点击 5 次激活
+        ArrowPreference(
+            title = "版本信息",
+            summary = "版本 " + versionName,
+            onClick = rememberDeveloperModeActivation(),
+            modifier = Modifier.padding(horizontal = 16.dp),
         )
 
         onCheckUpdate?.let {

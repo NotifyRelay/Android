@@ -13,8 +13,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -47,13 +45,13 @@ import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.data.Storage
 import notifyrelay.shared.ui.dialog.UpdateDialog
 import notifyrelay.shared.ui.screen.LogStorageSection
+import notifyrelay.shared.ui.screen.rememberDeveloperModeActivation
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.util.Date
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val DEFAULT_PROXY_URL = "https://gh.llkk.cc/"
@@ -67,9 +65,6 @@ fun UIAbout() {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
-
-    var clickCount by remember { mutableIntStateOf(0) }
-    var lastClickTime by remember { mutableLongStateOf(0L) }
 
     var isCheckingUpdate by remember { mutableStateOf(false) }
     val showUpdateDialog = remember { mutableStateOf(false) }
@@ -138,23 +133,7 @@ fun UIAbout() {
         ArrowPreference(
             title = "版本信息",
             summary = "主版本: ${BuildConfig.VERSION_NAME}\n内部版本: ${BuildConfig.VERSION_CODE}",
-            onClick = {
-                val currentTime = Date().time
-                if (currentTime - lastClickTime < 3000) {
-                    clickCount++
-                } else {
-                    clickCount = 1
-                }
-                lastClickTime = currentTime
-
-                if (clickCount in 3..<5) {
-                    ToastUtils.showShortToast(context, "再点击 ${5 - clickCount} 次进入开发者模式")
-                } else if (clickCount >= 5) {
-                    ToastUtils.showShortToast(context, "开发者模式已激活")
-                    Storage.putBoolean("developer_mode_enabled", true)
-                    clickCount = 0
-                }
-            },
+            onClick = rememberDeveloperModeActivation(),
             modifier = Modifier.padding(horizontal = 16.dp),
         )
 
