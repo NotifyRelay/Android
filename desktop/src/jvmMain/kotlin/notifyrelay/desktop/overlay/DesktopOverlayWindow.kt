@@ -242,7 +242,10 @@ private fun OverlayContent(
                         )
                     }
 
-                    LogiIslandCard(interactiveEnabled = interactiveEnabled)
+                    LogiIslandCard(
+                        interactiveEnabled = interactiveEnabled,
+                        interactiveRegions = interactiveRegions,
+                    )
 
                     NotificationCardsLayer(
                         interactiveEnabled = interactiveEnabled,
@@ -303,10 +306,11 @@ private fun StatusElementsRow(now: Long) {
         }
     }
 
+    // 三者紧贴排列：条目之间只留固定间距，不用等分把空档撑开
     FlowRow(
         modifier = Modifier.width(OVERLAY_COLUMN_WIDTH).padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(STATUS_ITEM_GAP),
+        verticalArrangement = Arrangement.spacedBy(STATUS_ROW_GAP),
     ) {
         ClockElement(
             style = DesktopOverlaySettings.clockStyle.snapshot(clockEnabled),
@@ -570,6 +574,12 @@ private const val FULLSCREEN_CHECK_INTERVAL_MS = 500L
 
 /** 屏幕尺寸轮询间隔（毫秒）：分辨率变化时重新居中。 */
 private const val SCREEN_SIZE_POLL_MS = 2_000L
+
+/** 状态元素之间的横向间距。 */
+private val STATUS_ITEM_GAP = 12.dp
+
+/** 状态元素换行后的行间距。 */
+private val STATUS_ROW_GAP = 4.dp
 
 /** 收起态胶囊宽度。 */
 private val COLLAPSED_WIDTH = 260.dp
