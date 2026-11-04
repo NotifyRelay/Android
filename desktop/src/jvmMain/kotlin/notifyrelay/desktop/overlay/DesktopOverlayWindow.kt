@@ -525,6 +525,8 @@ private fun OverlayMediaItem(
         collapsedBackgroundColor = CAPSULE_BACKGROUND,
         modifier = Modifier.then(regionModifier),
         expandedCornerRadius = MEDIA_CARD_CORNER_RADIUS,
+        // 收起态把白色描边换成绿色进度环；无进度信息时仍用白色描边
+        collapsedProgress = snapshot.progressFraction,
         expandedContent = {
             Box(Modifier.width(MEDIA_CARD_WIDTH)) {
                 MediaIslandCompose(

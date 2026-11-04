@@ -103,7 +103,12 @@ internal object DesktopMediaSessionSource {
         val coverDataUrl: String? = null,
     )
 
-    /** Windows `MediaPlaybackStatus` 取值。 */
+    /**
+     * Windows `GlobalSystemMediaTransportControlsSessionPlaybackStatus` 取值。
+     *
+     * 依次为 Closed=0、Opened=1、Changing=2、Stopped=3、Playing=4、Paused=5；
+     * 播放态必须取 4，取 3 会把「已停止」当成播放中。
+     */
     private const val STATUS_CLOSED = 0
-    private const val STATUS_PLAYING = 3
+    private const val STATUS_PLAYING = 4
 }

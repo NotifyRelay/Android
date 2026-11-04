@@ -16,7 +16,15 @@ data class MediaSessionSnapshot(
     val durationMs: Long? = null,
     /** 是否正在播放；用于进度推进与按钮文案。 */
     val isPlaying: Boolean = false,
-)
+) {
+    /** 播放进度比例 0~1；无位置或时长未知时为 null。 */
+    val progressFraction: Float?
+        get() {
+            val total = durationMs?.takeIf { it > 0L } ?: return null
+            val current = positionMs ?: return null
+            return (current.toFloat() / total).coerceIn(0f, 1f)
+        }
+}
 
 /**
  * 媒体控制端口。
