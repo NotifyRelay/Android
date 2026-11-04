@@ -1,0 +1,7 @@
+{
+  "note": "当前已接受的重复；只允许调低。调高须先确认无法消除，并在提交信息里说明理由。",
+  "minLines": 5,
+  "minTokens": 50,
+  "count": 0,
+  "fingerprints": []
+}

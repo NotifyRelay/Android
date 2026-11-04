@@ -69,6 +69,30 @@ val verifyDocs =
             "pnpm-lock.yaml",
             "pnpm-workspace.yaml",
         )
+        // 重复代码门禁的语料是全部 Kotlin、Rust 与 TypeScript 源码，必须一并声明为 inputs，
+        // 否则只改源码时本任务被判为最新而跳过，门禁不会运行。
+        inputs.files(
+            listOf(
+                "app",
+                "base",
+                "data",
+                "desktop",
+                "domain",
+                "nativecore",
+                "overlay-api",
+                "shared",
+                "superislandui",
+                "scrcpy",
+                "checkupdata",
+            ).map { module ->
+                fileTree(module) {
+                    include("**/*.kt", "**/*.kts", "**/*.rs", "**/*.ts")
+                    exclude("**/build/**", "**/target/**", "**/node_modules/**")
+                }
+            },
+            "build.gradle.kts",
+            "settings.gradle.kts",
+        )
     }
 
 // `./gradlew check` 聚合全部验证：文档门禁与各模块 check 一起执行。
