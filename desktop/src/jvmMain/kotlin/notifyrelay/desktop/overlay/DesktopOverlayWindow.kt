@@ -463,6 +463,9 @@ private fun OverlayMediaItem(
             text = snapshot.artist.orEmpty(),
             coverUrl = snapshot.coverUrl,
             deviceName = deviceName,
+            positionMs = snapshot.positionMs,
+            durationMs = snapshot.durationMs,
+            isPlaying = snapshot.isPlaying,
         )
 
     val mediaControl = DataLayerDesktop.mediaControl
@@ -551,6 +554,7 @@ private fun OverlayMediaItem(
                     title = snapshot.title,
                     coverUrl = snapshot.coverUrl,
                     spectrumEnabled = spectrumEnabled,
+                    playing = snapshot.isPlaying,
                     frameNow = frameNow,
                 )
             }
@@ -569,6 +573,7 @@ private fun CollapsedMediaCapsule(
     title: String?,
     coverUrl: String?,
     spectrumEnabled: Boolean,
+    playing: Boolean,
     frameNow: Long,
 ) {
     val painter = rememberSuperIslandImagePainter(url = coverUrl)
@@ -609,6 +614,7 @@ private fun CollapsedMediaCapsule(
         if (spectrumEnabled) {
             OverlaySpectrum(
                 positionMs = frameNow,
+                playing = playing,
                 widthDp = COLLAPSED_SPECTRUM_WIDTH,
                 heightDp = COLLAPSED_SPECTRUM_HEIGHT,
             )

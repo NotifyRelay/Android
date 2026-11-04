@@ -165,6 +165,9 @@ class DesktopMediaControlPort(
                     title = it.title,
                     artist = it.artist,
                     coverUrl = it.coverDataUrl,
+                    positionMs = it.positionMs,
+                    durationMs = it.durationMs.takeIf { duration -> duration > 0L },
+                    isPlaying = it.playing,
                 )
             }
         // 本机会话单独占一个键，不与远端设备的会话互相覆盖

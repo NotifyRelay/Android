@@ -1,8 +1,11 @@
 package notifyrelay.desktop.overlay
 
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -36,6 +39,12 @@ private const val SPECTRUM_PHASE_STEP = 1.1f
 private const val SPECTRUM_OSC_BASE = 0.55f
 private const val SPECTRUM_OSC_SWING = 0.45f
 
+/** 暂停时的残留高度占比：不收成零，保留一条细底以指示元素仍在。 */
+private const val SPECTRUM_PAUSED_FACTOR = 0.08f
+
+/** 起停过渡时长（毫秒）：暂停与恢复都走一次短缓动，避免瞬间跳变。 */
+private const val SPECTRUM_TRANSITION_MS = 220
+
 /** 频谱条颜色。 */
 private val SPECTRUM_COLOR = Color(0xFFFFFFFF)
 
@@ -45,16 +54,27 @@ private val SPECTRUM_COLOR = Color(0xFFFFFFFF)
  * 波峰位于第 2、4 条，离波峰越远基础高度越低；每条带独立相位正弦摆动，
  * 峰值条可达区域满高。数据为合成波形，不接音频采集。
  *
+ * 暂停时全部收起到 [SPECTRUM_PAUSED_FACTOR] 的残留高度，恢复播放再涨回震荡高度；
+ * 两个方向都按 [SPECTRUM_TRANSITION_MS] 缓动，不逐帧跳变。
+ *
  * @param positionMs 当前时间戳（毫秒），驱动动画
+ * @param playing 是否正在播放；为 false 时收起到残留高度
  * @param widthDp 频谱区域宽度
  * @param heightDp 频谱区域高度
  */
 @Composable
 internal fun OverlaySpectrum(
     positionMs: Long,
+    playing: Boolean,
     widthDp: Float = 28f,
     heightDp: Float = 80f,
 ) {
+    val amplitude by animateFloatAsState(
+        targetValue = if (playing) 1f else SPECTRUM_PAUSED_FACTOR,
+        animationSpec = tween(durationMillis = SPECTRUM_TRANSITION_MS),
+        label = "OverlaySpectrum-amplitude",
+    )
+
     Canvas(modifier = Modifier.size(widthDp.dp, heightDp.dp)) {
         val barSlot = size.width / SPECTRUM_BANDS
         val barWidth = barSlot * (1f - SPECTRUM_BAR_GAP)
@@ -66,7 +86,9 @@ internal fun OverlaySpectrum(
             val dist = min(abs(i - SPECTRUM_PEAK_A), abs(i - SPECTRUM_PEAK_B))
             val baseFactor = 1f - dist * SPECTRUM_PEAK_DECAY
             val osc = (SPECTRUM_OSC_BASE + SPECTRUM_OSC_SWING * sin(phase + i * SPECTRUM_PHASE_STEP)).toFloat()
-            val barHeight = max(1f, size.height * baseFactor * osc)
+            // 残留高度不受波峰位置影响：暂停时各条齐平
+            val heightFactor = SPECTRUM_PAUSED_FACTOR + (baseFactor * osc - SPECTRUM_PAUSED_FACTOR) * amplitude
+            val barHeight = max(1f, size.height * heightFactor)
             val x = i * barSlot + gap / 2f
             val y = (size.height - barHeight) / 2f
             drawRect(

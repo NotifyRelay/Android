@@ -10,6 +10,12 @@ data class MediaSessionSnapshot(
     val artist: String?,
     /** 封面：data URL 或 http(s) 地址；无封面为 null。 */
     val coverUrl: String? = null,
+    /** 当前播放位置（毫秒）；无进度信息时为 null。 */
+    val positionMs: Long? = null,
+    /** 曲目总时长（毫秒）；未知或直播为 null。 */
+    val durationMs: Long? = null,
+    /** 是否正在播放；用于进度推进与按钮文案。 */
+    val isPlaying: Boolean = false,
 )
 
 /**

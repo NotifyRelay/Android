@@ -12,4 +12,18 @@ data class MediaSessionData(
     val appIconUrl: String? = null,
     val deviceName: String,
     val timestamp: Long = currentTimeMillis(),
-)
+    /** 当前播放位置（毫秒）；null 表示无进度信息。 */
+    val positionMs: Long? = null,
+    /** 曲目总时长（毫秒）；null 表示未知或直播。 */
+    val durationMs: Long? = null,
+    /** 是否正在播放。 */
+    val isPlaying: Boolean = false,
+) {
+    /** 进度比例 0~1；无时长或无进度时为 null。 */
+    val progressFraction: Float?
+        get() {
+            val total = durationMs?.takeIf { it > 0L } ?: return null
+            val current = positionMs ?: return null
+            return (current.toFloat() / total).coerceIn(0f, 1f)
+        }
+}
