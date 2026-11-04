@@ -41,8 +41,8 @@ import kotlin.math.roundToInt
 /** 罗技汇总岛展开后的自动收起时长。 */
 private const val LOGI_EXPAND_MS = 3_000L
 
-/** 展开态的卡片最大宽度，与超级岛卡同列宽。 */
-private val LOGI_CARD_MAX_WIDTH = 420.dp
+/** 展开态的卡片最大宽度：等于状态行去掉左右内边距后的可用宽度。 */
+private val LOGI_CARD_MAX_WIDTH = 404.dp
 
 /** 折叠胶囊的最大宽度。 */
 private val LOGI_CAPSULE_MAX_WIDTH = 320.dp
@@ -78,9 +78,11 @@ private const val LOGI_REGION_KEY = "logi-island"
 /**
  * 罗技电池汇总岛。
  *
- * 所有罗技设备合并为一条与超级岛同形的卡片。折叠态只给电量图标与百分比，
- * 展开态逐台列出设备名、电量图标、百分比与充电状态；电量、充电状态或在线状态变化时展开
- * [LOGI_EXPAND_MS]，无可用设备时不绘制。
+ * 所有罗技设备合并为一条与超级岛同形的卡片。折叠态以设备名与电量图标为外显内容、
+ * 不给具体电量值，设备名超宽时滚动显示；展开态补上电量值与充电状态。
+ * 电量、充电状态或在线状态变化时展开 [LOGI_EXPAND_MS]，无可用设备时不绘制。
+ *
+ * 本卡片与时间、键盘、余额同处状态行，宽度取自身内容而不撑满整行。
  *
  * 设备集合由 [DesktopOverlaySettings.logiEnabled] 与隐藏离线开关决定。
  *
@@ -97,10 +99,7 @@ internal fun LogiIslandCard(
     val hideDisconnected = remember(revision) { DesktopOverlaySettings.logiHideWhenDisconnected }
     if (!enabled) return
 
-    val devices =
-        DesktopOverlayStore.logiDevices.value.filter { device ->
-            !hideDisconnected || device.online
-        }
+    val devices = visibleLogiDevices(hideDisconnected)
     if (devices.isEmpty()) return
 
     // 电量、充电状态或在线状态变化均视为一次更新：重新展开并重置计时
@@ -266,6 +265,18 @@ private fun CollapsedLogiDeviceItem(device: LogiBatteryDevice) {
         }
     }
 }
+
+/**
+ * 汇总岛当前要显示的设备。
+ *
+ * 直接读设备快照而不经缓存：快照变化时调用方需要重新组合。
+ *
+ * @param hideDisconnected 是否隐藏离线设备
+ */
+internal fun visibleLogiDevices(hideDisconnected: Boolean): List<LogiBatteryDevice> =
+    DesktopOverlayStore.logiDevices.value.filter { device ->
+        !hideDisconnected || device.online
+    }
 
 /** 电量文案：无电量数据时用占位符，设备名另有位置，不在此重复。 */
 private fun logiPercentLabel(device: LogiBatteryDevice): String = if (device.batteryPercent >= 0) device.batteryPercent.toString() + "%" else "--"

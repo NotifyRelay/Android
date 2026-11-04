@@ -6,9 +6,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -16,8 +14,6 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -46,7 +42,7 @@ internal const val NOTIFICATION_ICON_LIFETIME_MS = 12_000L
 /** 同时处于展开态的卡片数量上限；超出的排队，等前面的收起后再展开。 */
 internal const val NOTIFICATION_MAX_EXPANDED = 2
 
-/** 通知内容宽度，与媒体卡同宽。 */
+/** 通知卡片宽度，与媒体卡同宽。 */
 internal val NOTIFICATION_CARD_WIDTH = 420.dp
 
 /** 状态巡检间隔：驱动收起与图标到期。 */
@@ -62,127 +58,117 @@ private val CARD_BACKGROUND = Color(0xE6000000)
 private val ICON_SLOT = 24.dp
 private val ICON_CORNER = 8.dp
 
-/** 卡片内图标与文本、图标方块之间的间距。 */
+/** 卡片内图标与文本之间的间距。 */
 private val ITEM_GAP = 8.dp
 
 /**
- * 通知卡片层。
+ * 通知卡片的显示状态。
  *
- * 展示形式与 Gamebar 通知块同口径：最多 [NOTIFICATION_MAX_EXPANDED] 张卡片同时展开，
- * 其余按到达顺序排队，等前面的收起后再展开；每张展开 [NOTIFICATION_COLLAPSE_MS] 后
- * 收起为图标方块，图标自收起时刻起存活 [NOTIFICATION_ICON_LIFETIME_MS] 后移除。
- *
- * 所有计时集中在本组件的巡检循环内：展开开始、收起与到期的判定不分散在各卡片里，
- * 排队中的卡片因此能复用同一套规则。
- *
- * @param interactiveEnabled 开启时图标方块可点击重新展开
- * @param interactiveRegions 可交互区域集合，供原生层切换点击穿透
+ * 展开集合与两套时刻表由本类持有，渲染拆成两处：展开态卡片独占一行，
+ * 收起态图标方块并入叠加层的状态行。计时只由 [rememberNotificationCardsState]
+ * 的巡检循环推进，两处渲染都只读状态。
  */
-@Composable
-internal fun NotificationCardsLayer(
-    interactiveEnabled: Boolean,
-    interactiveRegions: androidx.compose.runtime.snapshots.SnapshotStateMap<String, java.awt.Rectangle>,
-) {
-    val entries = DesktopOverlayStore.notifications
-    if (entries.isEmpty()) return
+internal class NotificationCardsState {
+    /** 各条目的展开起始时刻。 */
+    internal val expandedAt = mutableStateMapOf<Long, Long>()
 
-    // 各条目的展开起始时刻与收起时刻；两者都只在本组件的巡检循环里写入
-    val expandedAt = remember { mutableStateMapOf<Long, Long>() }
-    val collapsedAt = remember { mutableStateMapOf<Long, Long>() }
+    /** 各条目的收起时刻；自该时刻起图标开始计算存活时长。 */
+    internal val collapsedAt = mutableStateMapOf<Long, Long>()
 
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(NOTIFICATION_TICK_MS)
-            val now = System.currentTimeMillis()
-            val alive = DesktopOverlayStore.notifications.toList()
+    /** 当前处于展开态的条目 id，按到达顺序取前 [NOTIFICATION_MAX_EXPANDED] 条。 */
+    val expandedIds: List<Long>
+        get() =
+            DesktopOverlayStore.notifications
+                .filter { collapsedAt[it.id] == null }
+                .map { it.id }
+                .take(NOTIFICATION_MAX_EXPANDED)
 
-            // 展开集合按到达顺序取前若干条未收起的条目：前面的收起后，排队者自然顶上
-            val expandedIds =
-                alive
-                    .asSequence()
-                    .filter { collapsedAt[it.id] == null }
-                    .map { it.id }
-                    .take(NOTIFICATION_MAX_EXPANDED)
-                    .toList()
-
-            // 新进入展开集合的条目从未登记时才起算，重新展开由点击处登记
-            expandedIds.forEach { id ->
-                if (expandedAt[id] == null) expandedAt[id] = now
-            }
-            expandedAt.keys.retainAll(expandedIds.toSet())
-
-            expandedIds
-                .filter { now - (expandedAt[it] ?: now) >= NOTIFICATION_COLLAPSE_MS }
-                .forEach { id ->
-                    collapsedAt[id] = now
-                    expandedAt.remove(id)
+    /**
+     * 点击图标方块：把该条目提到展开态。
+     *
+     * 已满额时先让最早展开的条目收起，点击的这张才能进入展开集合。
+     */
+    fun expand(id: Long) {
+        val now = System.currentTimeMillis()
+        val current = expandedIds
+        if (current.size >= NOTIFICATION_MAX_EXPANDED) {
+            current
+                .take(current.size - NOTIFICATION_MAX_EXPANDED + 1)
+                .forEach { old ->
+                    collapsedAt[old] = now
+                    expandedAt.remove(old)
                 }
-
-            val expiredIcons =
-                alive.filter { entry ->
-                    val since = collapsedAt[entry.id] ?: return@filter false
-                    now - since >= NOTIFICATION_ICON_LIFETIME_MS
-                }
-            expiredIcons.forEach { DesktopOverlayStore.removeNotification(it) }
-
-            val remaining = DesktopOverlayStore.notifications.map { it.id }.toSet()
-            collapsedAt.keys.retainAll(remaining)
-            expandedAt.keys.retainAll(remaining)
         }
+        collapsedAt.remove(id)
+        expandedAt[id] = now
     }
 
-    val expandedIds =
-        entries
-            .filter { collapsedAt[it.id] == null }
-            .map { it.id }
-            .take(NOTIFICATION_MAX_EXPANDED)
-            .toSet()
+    /** 巡检一轮：登记新展开项、推进收起、移除到期图标。 */
+    internal fun tick(now: Long) {
+        val alive = DesktopOverlayStore.notifications.toList()
+
+        val current = expandedIds
+        current.forEach { id ->
+            if (expandedAt[id] == null) expandedAt[id] = now
+        }
+        expandedAt.keys.retainAll(current.toSet())
+
+        current
+            .filter { now - (expandedAt[it] ?: now) >= NOTIFICATION_COLLAPSE_MS }
+            .forEach { id ->
+                collapsedAt[id] = now
+                expandedAt.remove(id)
+            }
+
+        alive
+            .filter { entry ->
+                val since = collapsedAt[entry.id] ?: return@filter false
+                now - since >= NOTIFICATION_ICON_LIFETIME_MS
+            }.forEach { DesktopOverlayStore.removeNotification(it) }
+
+        val remaining = DesktopOverlayStore.notifications.map { it.id }.toSet()
+        collapsedAt.keys.retainAll(remaining)
+        expandedAt.keys.retainAll(remaining)
+    }
+}
+
+/**
+ * 建立并驱动通知卡片状态。
+ *
+ * 巡检循环只在叠加层内容里启动一次；展开与收起由同一处推进，
+ * 因此独占一行的卡片与状态行里的图标始终看到同一份状态。
+ */
+@Composable
+internal fun rememberNotificationCardsState(): NotificationCardsState {
+    val state = remember { NotificationCardsState() }
+    LaunchedEffect(state) {
+        while (true) {
+            delay(NOTIFICATION_TICK_MS)
+            state.tick(System.currentTimeMillis())
+        }
+    }
+    return state
+}
+
+/**
+ * 展开态通知卡片列：每条独占一行并居中。
+ *
+ * 条目为空时不占位，整列不参与布局。
+ */
+@Composable
+internal fun NotificationExpandedCards(state: NotificationCardsState) {
+    val expanded = state.expandedIds
+    if (expanded.isEmpty()) return
+    val entries = DesktopOverlayStore.notifications.associateBy { it.id }
 
     Column(
         modifier = Modifier.width(NOTIFICATION_CARD_WIDTH),
         verticalArrangement = Arrangement.spacedBy(ITEM_GAP),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        entries.forEach { entry ->
-            key(entry.id) {
-                if (entry.id in expandedIds) {
-                    NotificationCard(entry)
-                }
-            }
-        }
-        FlowRow(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(ITEM_GAP),
-            verticalArrangement = Arrangement.spacedBy(ITEM_GAP),
-        ) {
-            entries.forEach { entry ->
-                if (entry.id in expandedIds) return@forEach
-                key(entry.id) {
-                    NotificationIcon(
-                        entry = entry,
-                        interactiveEnabled = interactiveEnabled,
-                        interactiveRegions = interactiveRegions,
-                        onClick = {
-                            // 已满额时先让最早展开的那张收起，点击的这张才能进入展开集合
-                            val expanded =
-                                entries
-                                    .filter { collapsedAt[it.id] == null }
-                                    .map { it.id }
-                            if (expanded.size >= NOTIFICATION_MAX_EXPANDED) {
-                                val now = System.currentTimeMillis()
-                                expanded
-                                    .take(expanded.size - NOTIFICATION_MAX_EXPANDED + 1)
-                                    .forEach { id ->
-                                        collapsedAt[id] = now
-                                        expandedAt.remove(id)
-                                    }
-                            }
-                            collapsedAt.remove(entry.id)
-                            expandedAt[entry.id] = System.currentTimeMillis()
-                        },
-                    )
-                }
-            }
+        expanded.forEach { id ->
+            val entry = entries[id] ?: return@forEach
+            NotificationCard(entry)
         }
     }
 }
@@ -249,7 +235,7 @@ private fun NotificationCard(entry: NotificationEntry) {
  * 只有可点击元素登记可交互区域，点击穿透仅在鼠标位于图标方块上时关闭。
  */
 @Composable
-private fun NotificationIcon(
+internal fun NotificationIconItem(
     entry: NotificationEntry,
     interactiveEnabled: Boolean,
     interactiveRegions: androidx.compose.runtime.snapshots.SnapshotStateMap<String, java.awt.Rectangle>,
