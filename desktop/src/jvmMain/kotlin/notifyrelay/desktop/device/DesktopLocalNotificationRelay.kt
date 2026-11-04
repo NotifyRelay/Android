@@ -66,8 +66,8 @@ class DesktopLocalNotificationRelay(
                     registerLocalApp(item)
                     val icon = cachedIcon(item)
                     withContext(Dispatchers.Main) {
-                        notifyrelay.desktop.overlay.DesktopOverlayStore.addDanmaku(
-                            notifyrelay.desktop.overlay.DanmakuEntry(
+                        notifyrelay.desktop.overlay.DesktopOverlayStore.addNotification(
+                            notifyrelay.desktop.overlay.NotificationEntry(
                                 id = item.id.hashCode().toLong(),
                                 appName = item.appName,
                                 title = item.title,

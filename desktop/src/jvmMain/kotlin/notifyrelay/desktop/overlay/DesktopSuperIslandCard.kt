@@ -4,6 +4,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -78,6 +79,9 @@ internal fun SuperIslandCard(
     }
 
     val regionKey = "super-" + entry.sourceKey
+    DisposableEffect(regionKey) {
+        onDispose { regions?.remove(regionKey) }
+    }
     val regionModifier =
         if (interactiveEnabled && regions != null) {
             Modifier.onGloballyPositioned { coords ->

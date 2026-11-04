@@ -23,8 +23,8 @@ internal object DesktopOverlayStore {
     /** 超级岛条目，键为 sourceKey。 */
     val superIslands = mutableStateMapOf<String, SuperIslandEntry>()
 
-    /** 待显示弹幕（按入队顺序）。 */
-    val danmaku = mutableStateListOf<DanmakuEntry>()
+    /** 通知卡片，按到达顺序入队；收起后转图标态，超时移除。 */
+    val notifications = mutableStateListOf<NotificationEntry>()
 
     /** 本机会话的键。 */
     const val LOCAL_KEY = "local"
@@ -68,23 +68,19 @@ internal object DesktopOverlayStore {
         expired.forEach { superIslands.remove(it) }
     }
 
-    /** 弹幕轨道运行态：不入 Compose 状态，避免每帧触发重组。 */
-    val danmakuTracks = java.util.concurrent.ConcurrentHashMap<Long, DanmakuTracks.Occupancy>()
-
-    /** 入队一条弹幕。 */
-    fun addDanmaku(entry: DanmakuEntry) {
-        danmaku.add(entry)
+    /** 入队一条通知卡片。 */
+    fun addNotification(entry: NotificationEntry) {
+        notifications.add(entry)
     }
 
-    /** 移除弹幕并清理其轨道占用。 */
-    fun removeDanmakuWithTrack(entry: DanmakuEntry) {
-        danmaku.remove(entry)
-        danmakuTracks.remove(entry.id)
+    /** 移除一条通知卡片。 */
+    fun removeNotification(entry: NotificationEntry) {
+        notifications.remove(entry)
     }
 
-    /** 移除已结束的弹幕。 */
-    fun removeDanmaku(entry: DanmakuEntry) {
-        danmaku.remove(entry)
+    /** 清空全部通知卡片。 */
+    fun clearNotifications() {
+        notifications.clear()
     }
 
     // ======== 扩展点数据（余额 / 罗技电池 / 键盘 / 时间）========
@@ -156,14 +152,14 @@ internal data class SuperIslandEntry(
     val text: String?,
     val paramV2Raw: String?,
     val pics: Map<String, String>?,
-    /** 业务标识（如 media / miui_flashlight）。 */
+    /** 业务标识（如 media / miui_flashlight / logi_battery）。 */
     val business: String? = null,
     /** 最近更新时间（毫秒），用于超时回收。 */
     val updatedAt: Long = System.currentTimeMillis(),
 )
 
-/** 一条弹幕显示数据。 */
-internal data class DanmakuEntry(
+/** 一条通知卡片数据。 */
+internal data class NotificationEntry(
     val id: Long,
     val appName: String,
     val title: String,
@@ -172,8 +168,8 @@ internal data class DanmakuEntry(
     /** 来源应用图标（PNG/JPEG 原始字节）；缺失时为 null，占位不绘制。 */
     val iconPng: ByteArray? = null,
     /** 入队时刻（毫秒）。 */
-    val spawnAt: Long = System.currentTimeMillis(),
+    val receivedAt: Long = System.currentTimeMillis(),
 ) {
-    /** 弹幕文本（应用名 + 标题 + 内容）。 */
-    val displayText: String get() = appName + ": " + title + " - " + text
+    /** 卡片首行的来源文案。 */
+    val sourceLabel: String get() = appName + " · " + deviceName
 }

@@ -41,7 +41,7 @@ fun DesktopOverlaySettingsContent() {
     ) {
         SwitchPreference(
             title = "显示叠加层",
-            summary = "在屏幕顶部绘制媒体卡、超级岛、弹幕与各浮窗；关闭后不创建叠加层窗口",
+            summary = "在屏幕顶部居中绘制媒体卡、超级岛、通知卡与状态元素；关闭后不创建叠加层窗口",
             checked = enabled,
             onCheckedChange = {
                 enabled = it
@@ -52,7 +52,7 @@ fun DesktopOverlaySettingsContent() {
         var interactiveEnabled by remember { mutableStateOf(DesktopOverlaySettings.interactiveEnabled) }
         SwitchPreference(
             title = "允许点击交互",
-            summary = "鼠标悬停在媒体卡或超级岛上时可点击；离开区域自动恢复点击穿透",
+            summary = "鼠标悬停在媒体卡、超级岛或通知图标上时可点击；离开区域自动恢复点击穿透",
             checked = interactiveEnabled,
             onCheckedChange = {
                 interactiveEnabled = it
@@ -64,43 +64,40 @@ fun DesktopOverlaySettingsContent() {
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
 
         ArrowPreference(
-            title = "弹幕与媒体卡",
-            summary = "字号、速度、显示区域、测试弹幕与媒体卡收起",
-            onClick = { navigator.push(Route.SettingsOverlayDanmaku) },
+            title = "通知与媒体卡",
+            summary = "测试通知卡片与媒体卡收起、操作按钮、频谱",
+            onClick = { navigator.push(Route.SettingsOverlayNotifications) },
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
         ArrowPreference(
             title = "DeepSeek 余额",
-            summary = "凭据、轮询间隔与浮窗位置",
+            summary = "凭据、轮询间隔与外观",
             onClick = { navigator.push(Route.SettingsOverlayBalance) },
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
         ArrowPreference(
             title = "罗技电池",
-            summary = "设备电量显示与浮窗位置",
+            summary = "设备电量显示与离线处理",
             onClick = { navigator.push(Route.SettingsOverlayLogi) },
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
         ArrowPreference(
             title = "键盘监控",
-            summary = "按键显示、快捷键映射与浮窗位置",
+            summary = "按键显示、快捷键映射与外观",
             onClick = { navigator.push(Route.SettingsOverlayKeyboard) },
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
         ArrowPreference(
-            title = "时间浮窗",
-            summary = "显示格式与浮窗位置",
+            title = "时间元素",
+            summary = "显示格式与外观",
             onClick = { navigator.push(Route.SettingsOverlayClock) },
         )
     }
 }
 
-/** 弹幕与媒体卡子页。 */
+/** 通知与媒体卡子页。 */
 @Composable
-fun DesktopOverlayDanmakuContent() {
-    var fontSize by remember { mutableFloatStateOf(DesktopOverlaySettings.danmakuFontSize) }
-    var speed by remember { mutableFloatStateOf(DesktopOverlaySettings.danmakuSpeed) }
-    var areaPercent by remember { mutableFloatStateOf(DesktopOverlaySettings.danmakuAreaPercent) }
+fun DesktopOverlayNotificationContent() {
     var collapseSeconds by remember { mutableFloatStateOf(DesktopOverlaySettings.mediaAutoCollapseMs / 1000f) }
 
     Column(
@@ -110,48 +107,7 @@ fun DesktopOverlayDanmakuContent() {
                 .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        OverlaySlider(
-            title = "弹幕字号",
-            summary = "基准 36px × 百分比；字号越大可用轨道越少",
-            value = fontSize,
-            range = 9f..54f,
-            step = 1f,
-            format = { it.roundToInt().toString() + "px" },
-            onValueChangeFinished = {
-                fontSize = it
-                DesktopOverlaySettings.danmakuFontSize = it
-            },
-        )
-
-        OverlaySlider(
-            title = "弹幕速度",
-            summary = "数值越大滚动越快",
-            value = speed,
-            range = 60f..540f,
-            step = 10f,
-            format = { it.roundToInt().toString() + " px/s" },
-            onValueChangeFinished = {
-                speed = it
-                DesktopOverlaySettings.danmakuSpeed = it
-            },
-        )
-
-        OverlaySlider(
-            title = "弹幕显示区域",
-            summary = "占用屏幕高度的百分比，剩余部分不分配轨道",
-            value = areaPercent,
-            range = 30f..100f,
-            step = 1f,
-            format = { it.roundToInt().toString() + "%" },
-            onValueChangeFinished = {
-                areaPercent = it
-                DesktopOverlaySettings.danmakuAreaPercent = it
-            },
-        )
-
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
-
-        DesktopDanmakuTestEntry()
+        DesktopNotificationTestEntry()
 
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
 
@@ -204,7 +160,7 @@ fun DesktopOverlayDanmakuContent() {
  * 若在拖动回调里吸附，步进大于 1 时大多数位置吸附后仍是原值，受控滑块会回弹，表现为「拖不动」。
  *
  * 回调拆分：
- * - [onValueChange] 在拖动过程中每帧调用，用于实时更新 UI（如浮窗位置跟手）；默认空实现。
+ * - [onValueChange] 在拖动过程中每帧调用，用于实时更新 UI；默认空实现。
  * - [onValueChangeFinished] 在松手时调用吸附后的值，用于落盘持久化。
  *
  * [format] 依据当前显示值生成文本；[steps] 为除两端外的离散值个数，Miuix 要求非负。

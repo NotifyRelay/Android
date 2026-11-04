@@ -4,7 +4,7 @@
 
 | 文件 | 类/接口 | 职责 |
 |---|---|---|
-| `OverlayFeature.kt` | `OverlayAnchor`、`OverlayFeature`、`OverlayFeatureRegistry` | 锚点与外观配置（位置百分比、缩放、颜色、描边）；扩展点统一生命周期契约（id / available / start / stop / syncSwitch）；注册表（register / unregister / all） |
+| `OverlayFeature.kt` | `OverlayStyle`、`OverlayFeature`、`OverlayFeatureRegistry` | 状态元素外观配置（缩放、颜色、描边）；扩展点统一生命周期契约（id / available / start / stop / syncSwitch）；注册表（register / unregister / all） |
 | `ClockConfig.kt` | `ClockConfig`、`ClockSource` | 时间浮窗配置与数据源契约；实现侧纯 JVM（`java.time`），不使用 JNA |
 | `Balance.kt` | `BalanceHistoryItem`、`BalanceSnapshot`、`BalanceSource` | 余额数据源契约：快照与历史查询、启停轮询、立即查询、清空历史、订阅变更 |
 | `LogiBattery.kt` | `LogiBatteryDevice`、`LogiBatterySource` | 罗技电池设备快照与枚举数据源契约（可用性、快照、启停、立即刷新、设备名覆盖、订阅） |

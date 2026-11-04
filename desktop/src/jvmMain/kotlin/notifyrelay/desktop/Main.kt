@@ -39,13 +39,14 @@ import kotlinx.coroutines.launch
 import notifyrelay.desktop.device.DesktopDeviceManager
 import notifyrelay.desktop.device.DesktopDevicePortsProvider
 import notifyrelay.desktop.device.DesktopScrcpyScreen
+import notifyrelay.desktop.platform.DesktopDeveloperContent
 import notifyrelay.desktop.platform.DesktopDeviceListPort
 import notifyrelay.desktop.platform.DesktopNotificationActionPort
 import notifyrelay.desktop.platform.DesktopOverlayBalanceContent
 import notifyrelay.desktop.platform.DesktopOverlayClockContent
-import notifyrelay.desktop.platform.DesktopOverlayDanmakuContent
 import notifyrelay.desktop.platform.DesktopOverlayKeyboardContent
 import notifyrelay.desktop.platform.DesktopOverlayLogiContent
+import notifyrelay.desktop.platform.DesktopOverlayNotificationContent
 import notifyrelay.desktop.platform.DesktopOverlaySettingsContent
 import notifyrelay.desktop.platform.DesktopThemePort
 import notifyrelay.desktop.platform.DesktopToastHost
@@ -81,9 +82,9 @@ import notifyrelay.shared.ui.screen.SettingsDeveloperModeScreen
 import notifyrelay.shared.ui.screen.SettingsLocalFilterScreen
 import notifyrelay.shared.ui.screen.SettingsOverlayBalanceScreen
 import notifyrelay.shared.ui.screen.SettingsOverlayClockScreen
-import notifyrelay.shared.ui.screen.SettingsOverlayDanmakuScreen
 import notifyrelay.shared.ui.screen.SettingsOverlayKeyboardScreen
 import notifyrelay.shared.ui.screen.SettingsOverlayLogiScreen
+import notifyrelay.shared.ui.screen.SettingsOverlayNotificationsScreen
 import notifyrelay.shared.ui.screen.SettingsOverlayScreen
 import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
 import notifyrelay.shared.ui.screen.SettingsScreen
@@ -534,7 +535,11 @@ private fun DesktopRoot(
                         entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
                         entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
                         entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
-                        entry<Route.SettingsDeveloperMode> { SettingsDeveloperModeScreen { DeveloperModeScreen() } }
+                        entry<Route.SettingsDeveloperMode> {
+                            SettingsDeveloperModeScreen {
+                                DeveloperModeScreen(desktopExtraContent = { DesktopDeveloperContent() })
+                            }
+                        }
                         entry<Route.SettingsAbout> {
                             SettingsAboutScreen {
                                 val aboutScope = rememberCoroutineScope()
@@ -605,8 +610,8 @@ private fun DesktopRoot(
                         entry<Route.SettingsOverlay> {
                             SettingsOverlayScreen { DesktopOverlaySettingsContent() }
                         }
-                        entry<Route.SettingsOverlayDanmaku> {
-                            SettingsOverlayDanmakuScreen { DesktopOverlayDanmakuContent() }
+                        entry<Route.SettingsOverlayNotifications> {
+                            SettingsOverlayNotificationsScreen { DesktopOverlayNotificationContent() }
                         }
                         entry<Route.SettingsOverlayBalance> {
                             SettingsOverlayBalanceScreen { DesktopOverlayBalanceContent() }

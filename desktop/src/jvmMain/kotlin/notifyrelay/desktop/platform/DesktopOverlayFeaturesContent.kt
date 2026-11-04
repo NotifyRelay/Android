@@ -17,8 +17,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import notifyrelay.desktop.overlay.feature.DesktopOverlayFeatures
-import notifyrelay.desktop.overlay.logiBatteryColor
-import notifyrelay.desktop.overlay.logiBatteryGlyph
+import notifyrelay.desktop.overlay.logiSummaryColor
+import notifyrelay.desktop.overlay.logiSummaryGlyph
 import notifyrelay.overlay.api.KeyMapping
 import notifyrelay.overlay.api.KeyboardSource
 import notifyrelay.overlay.api.LogiBatteryDevice
@@ -35,16 +35,14 @@ import kotlin.math.roundToInt
 /**
  * 叠加层扩展点子页内容：余额、罗技电池、键盘、时间。
  *
- * 位置/缩放/描边等数值项一律用滑块；开关变化后经
- * [DesktopOverlayFeatures.current] 即时同步各数据源的启停。
- *
- * 以下依次为四个子页的入口函数与公共控件。
+ * 位置由叠加层固定列决定，本页只暴露开关、格式与外观（缩放、描边）。
+ * 开关变化后经 [DesktopOverlayFeatures.current] 即时同步各数据源的启停。
  */
 @Composable
 fun DesktopOverlayBalanceContent() {
     val revision = DesktopOverlaySettings.revision.value
     val features = DesktopOverlayFeatures.current
-    val anchor = DesktopOverlaySettings.balanceAnchor
+    val style = DesktopOverlaySettings.balanceStyle
 
     var enabled by remember(revision) { mutableStateOf(DesktopOverlaySettings.balanceEnabled) }
     var token by remember(revision) { mutableStateOf(DesktopOverlaySettings.balanceApiToken) }
@@ -58,7 +56,7 @@ fun DesktopOverlayBalanceContent() {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SwitchPreference(
-            title = "显示余额浮窗",
+            title = "显示余额",
             summary = "需先填入 API 凭据；开启后按下方间隔轮询",
             checked = enabled,
             onCheckedChange = {
@@ -110,9 +108,9 @@ fun DesktopOverlayBalanceContent() {
             },
         )
 
-        AnchorPreferences(
-            prefixTitle = "余额浮窗",
-            anchor = anchor,
+        ElementStylePreferences(
+            prefixTitle = "余额",
+            style = style,
             onChanged = { DesktopOverlaySettings.notifyChanged() },
         )
     }
@@ -123,7 +121,6 @@ fun DesktopOverlayBalanceContent() {
 fun DesktopOverlayLogiContent() {
     val revision = DesktopOverlaySettings.revision.value
     val features = DesktopOverlayFeatures.current
-    val anchor = DesktopOverlaySettings.logiAnchor
 
     var enabled by remember(revision) { mutableStateOf(DesktopOverlaySettings.logiEnabled) }
     var hideDisconnected by remember(revision) { mutableStateOf(DesktopOverlaySettings.logiHideWhenDisconnected) }
@@ -136,12 +133,12 @@ fun DesktopOverlayLogiContent() {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SwitchPreference(
-            title = "显示罗技电池浮窗",
+            title = "显示罗技电池",
             summary =
                 if (features?.isLogiAvailable() != true) {
                     "原生库不可用；枚举到设备后才会显示"
                 } else {
-                    "按罗技 HID++ 设备枚举电量，无设备时不显示"
+                    "所有设备合并为一条超级岛卡片，电量变动时展开，无设备时不显示"
                 },
             checked = enabled,
             onCheckedChange = {
@@ -153,7 +150,7 @@ fun DesktopOverlayLogiContent() {
         )
         SwitchPreference(
             title = "隐藏离线设备",
-            summary = "关闭后离线设备也占一行并显示占位电量",
+            summary = "关闭后离线设备也计入汇总卡片",
             checked = hideDisconnected,
             onCheckedChange = {
                 hideDisconnected = it
@@ -165,21 +162,13 @@ fun DesktopOverlayLogiContent() {
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
 
         LogiDeviceListSection(features = features)
-
-        HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
-
-        AnchorPreferences(
-            prefixTitle = "罗技浮窗",
-            anchor = anchor,
-            onChanged = { DesktopOverlaySettings.notifyChanged() },
-        )
     }
 }
 
 /**
  * 罗技设备列表与设备名修改。
  *
- * 列表项复用浮窗同一套电量图标与分段着色；点击设备名可改写显示名，
+ * 列表项复用汇总卡片同一套电量图标与分段着色；点击设备名可改写显示名，
  * 空名提交时回退到原生名。设备名覆盖按设备标识持久化。
  */
 @Composable
@@ -224,8 +213,8 @@ private fun LogiDeviceListSection(features: DesktopOverlayFeatures?) {
                 },
                 endActions = {
                     Text(
-                        text = logiBatteryGlyph(device),
-                        color = logiBatteryColor(device),
+                        text = logiSummaryGlyph(device),
+                        color = logiSummaryColor(device),
                         fontSize = 20.sp,
                         fontFamily = iconFontFamily,
                     )
@@ -284,7 +273,7 @@ private fun logiDeviceSummary(device: LogiBatteryDevice): String {
 fun DesktopOverlayKeyboardContent() {
     val revision = DesktopOverlaySettings.revision.value
     val features = DesktopOverlayFeatures.current
-    val anchor = DesktopOverlaySettings.keyboardAnchor
+    val style = DesktopOverlaySettings.keyboardStyle
 
     var enabled by remember(revision) { mutableStateOf(DesktopOverlaySettings.keyboardEnabled) }
 
@@ -296,7 +285,7 @@ fun DesktopOverlayKeyboardContent() {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SwitchPreference(
-            title = "显示按键浮窗",
+            title = "显示按键",
             summary = "开启后安装全局低级键盘钩子，显示当前按键与锁定键；关闭即卸载钩子",
             checked = enabled,
             onCheckedChange = {
@@ -309,9 +298,9 @@ fun DesktopOverlayKeyboardContent() {
 
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
 
-        AnchorPreferences(
-            prefixTitle = "键盘浮窗",
-            anchor = anchor,
+        ElementStylePreferences(
+            prefixTitle = "按键",
+            style = style,
             onChanged = { DesktopOverlaySettings.notifyChanged() },
         )
 
@@ -321,12 +310,12 @@ fun DesktopOverlayKeyboardContent() {
     }
 }
 
-/** 时间浮窗子页。 */
+/** 时间元素子页。 */
 @Composable
 fun DesktopOverlayClockContent() {
     val revision = DesktopOverlaySettings.revision.value
     val features = DesktopOverlayFeatures.current
-    val anchor = DesktopOverlaySettings.clockAnchor
+    val style = DesktopOverlaySettings.clockStyle
 
     var enabled by remember(revision) { mutableStateOf(DesktopOverlaySettings.clockEnabled) }
     var showSeconds by remember(revision) { mutableStateOf(DesktopOverlaySettings.clockShowSeconds) }
@@ -340,8 +329,8 @@ fun DesktopOverlayClockContent() {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SwitchPreference(
-            title = "显示时间浮窗",
-            summary = "在主屏按下方位置显示当前时间",
+            title = "显示时间",
+            summary = "在叠加层底部状态行显示当前时间",
             checked = enabled,
             onCheckedChange = {
                 enabled = it
@@ -375,80 +364,52 @@ fun DesktopOverlayClockContent() {
 
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
 
-        AnchorPreferences(
-            prefixTitle = "时间浮窗",
-            anchor = anchor,
+        ElementStylePreferences(
+            prefixTitle = "时间",
+            style = style,
             onChanged = { DesktopOverlaySettings.notifyChanged() },
         )
     }
 }
 
 /**
- * 位置、缩放与描边的公共滑块组。
+ * 缩放与描边的公共滑块组。
  *
- * 位置按屏幕宽高百分比（0~100），缩放 0.5~4 倍，描边 0~8 像素。
- * 拖动期经 [onValueChange] 实时写入 Anchor 背景态，渲染侧读取即触发重组，浮窗位置跟手；
+ * 位置由叠加层固定列决定，故不再提供位置项。缩放 0.5~4 倍，描边 0~8 像素。
+ * 拖动期经 [onValueChange] 实时写入背景态，渲染侧读取即触发重组；
  * 松手时经 [onValueChangeFinished] 落盘并 [DesktopOverlaySettings.notifyChanged]。
  */
 @Composable
-private fun AnchorPreferences(
+private fun ElementStylePreferences(
     prefixTitle: String,
-    anchor: DesktopOverlaySettings.Anchor,
+    style: DesktopOverlaySettings.Style,
     onChanged: () -> Unit,
 ) {
     OverlaySlider(
-        title = prefixTitle + "水平位置",
-        summary = "占屏幕宽度的百分比，元素以该点水平居中",
-        value = anchor.xPercent,
-        range = 0f..100f,
-        step = 1f,
-        format = { it.roundToInt().toString() + "%" },
-        onValueChange = { anchor.xPercent = it },
-        onValueChangeFinished = {
-            anchor.xPercent = it
-            anchor.persist()
-            onChanged()
-        },
-    )
-    OverlaySlider(
-        title = prefixTitle + "垂直位置",
-        summary = "占屏幕高度的百分比，元素以该点垂直居中",
-        value = anchor.yPercent,
-        range = 0f..100f,
-        step = 1f,
-        format = { it.roundToInt().toString() + "%" },
-        onValueChange = { anchor.yPercent = it },
-        onValueChangeFinished = {
-            anchor.yPercent = it
-            anchor.persist()
-            onChanged()
-        },
-    )
-    OverlaySlider(
         title = prefixTitle + "缩放",
         summary = "文本按该倍数放大",
-        value = anchor.scale,
+        value = style.scale,
         range = 0.5f..4f,
         step = 0.05f,
         format = { formatDecimal(it, 2) + "×" },
-        onValueChange = { anchor.scale = it },
+        onValueChange = { style.scale = it },
         onValueChangeFinished = {
-            anchor.scale = it
-            anchor.persist()
+            style.scale = it
+            style.persist()
             onChanged()
         },
     )
     OverlaySlider(
         title = prefixTitle + "文本描边",
         summary = "0 表示不描边",
-        value = anchor.outlineWidth,
+        value = style.outlineWidth,
         range = 0f..8f,
         step = 0.25f,
         format = { formatDecimal(it, 2) + "px" },
-        onValueChange = { anchor.outlineWidth = it },
+        onValueChange = { style.outlineWidth = it },
         onValueChangeFinished = {
-            anchor.outlineWidth = it
-            anchor.persist()
+            style.outlineWidth = it
+            style.persist()
             onChanged()
         },
     )

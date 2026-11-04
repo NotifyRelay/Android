@@ -19,10 +19,18 @@ object DebugFlags {
     /** 是否输出被过滤通知的详细日志。 */
     val FILTERED_NOTIFICATION_LOG_ENABLED: MutableState<Boolean> = mutableStateOf(true)
 
+    /**
+     * 叠加层可点击区域调试：以红色绘出桌面端叠加层的可交互矩形与窗口边框。
+     *
+     * 只影响绘制，不改变点击穿透：穿透仍由叠加层的交互开关与区域判定决定。
+     */
+    val OVERLAY_REGION_DEBUG: MutableState<Boolean> = mutableStateOf(false)
+
     /** 从偏好装载初值；[read] 以（键, 默认值）读取布尔偏好。 */
     fun load(read: (String, Boolean) -> Boolean) {
         DEBUG_UI_ENABLED.value = read(KEY_DEBUG_UI_ENABLED, false)
         FILTERED_NOTIFICATION_LOG_ENABLED.value = read(KEY_FILTERED_NOTIFICATION_LOG_ENABLED, true)
+        OVERLAY_REGION_DEBUG.value = read(KEY_OVERLAY_REGION_DEBUG, false)
         Logger.enableFilteredNotificationLog = FILTERED_NOTIFICATION_LOG_ENABLED.value
     }
 
@@ -45,9 +53,21 @@ object DebugFlags {
         write(KEY_FILTERED_NOTIFICATION_LOG_ENABLED, enabled)
     }
 
+    /** 写入叠加层可点击区域调试开关并持久化。 */
+    fun setOverlayRegionDebug(
+        enabled: Boolean,
+        write: (String, Boolean) -> Unit,
+    ) {
+        OVERLAY_REGION_DEBUG.value = enabled
+        write(KEY_OVERLAY_REGION_DEBUG, enabled)
+    }
+
     /** 调试 UI 开关的偏好键。 */
     const val KEY_DEBUG_UI_ENABLED = "debug_ui_enabled"
 
     /** 过滤日志开关的偏好键。 */
     const val KEY_FILTERED_NOTIFICATION_LOG_ENABLED = "filtered_notification_log_enabled"
+
+    /** 叠加层可点击区域调试开关的偏好键。 */
+    const val KEY_OVERLAY_REGION_DEBUG = "overlay_region_debug"
 }

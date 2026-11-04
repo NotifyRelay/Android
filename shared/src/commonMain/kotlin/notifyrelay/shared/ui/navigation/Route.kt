@@ -101,10 +101,10 @@ sealed interface Route : NavKey {
     data object SettingsOverlay : Route
 
     /**
-     * 设置-叠加层-弹幕与媒体卡子页面（仅桌面端显示）
+     * 设置-叠加层-通知与媒体卡子页面（仅桌面端显示）
      */
     @Serializable
-    data object SettingsOverlayDanmaku : Route
+    data object SettingsOverlayNotifications : Route
 
     /**
      * 设置-叠加层-余额子页面（仅桌面端显示）

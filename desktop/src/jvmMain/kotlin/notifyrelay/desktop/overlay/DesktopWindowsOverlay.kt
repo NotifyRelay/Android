@@ -17,7 +17,6 @@ import com.sun.jna.platform.win32.WinUser.WS_MINIMIZE
 import notifyrelay.base.log.Logger
 import java.awt.MouseInfo
 import java.awt.Rectangle
-import java.awt.Toolkit
 import java.awt.Window
 import java.util.concurrent.atomic.AtomicLong
 import java.util.concurrent.atomic.AtomicReference
@@ -27,12 +26,14 @@ import kotlin.concurrent.thread
 /**
  * 叠加层 Win32 原生能力：窗口样式、置顶强化、点击穿透、前台全屏检测。
  *
- * 实例化绑定一个叠加层窗口，守护线程周期校准置顶与几何；
- * 原生操作失败后经 [nativeAvailable] 降级，避免永久重试。
+ * 实例化绑定一个叠加层窗口，守护线程周期校准置顶；原生操作失败后经 [nativeAvailable] 降级，
+ * 避免永久重试。
  * - 用 JNA 平台库 `User32.INSTANCE`，不自定义 StdCallLibrary；
  * - [reinforceTopmost] 含 peer 变化检测、最小化恢复、调用后验证；
  * - [clickThrough] 可切换，始终保留 LAYERED；
  * - [foregroundIsFullscreen] 同显示器全屏检测。
+ *
+ * 窗口几何由调用方随内容测量结果设置（见 [moveTo]），本类不改窗口位置与尺寸。
  */
 internal class DesktopWindowsOverlay(
     private val report: (Throwable) -> Unit = { Logger.w(TAG, "叠加层原生操作失败", it) },
@@ -76,11 +77,30 @@ internal class DesktopWindowsOverlay(
     /**
      * 更新可交互区域。
      *
-     * 区域以 AWT 逻辑像素表示，窗口原点即屏幕原点（窗口铺满主屏且 undecorated）。
-     * 守护线程据此轮询鼠标位置，仅在鼠标位于某区域内时关闭点击穿透。
+     * 区域以窗口坐标表示；守护线程据此轮询鼠标位置，仅在鼠标位于某区域内时关闭点击穿透。
      */
     fun setInteractiveRegions(regions: List<Rectangle>) {
         interactiveRegions.set(regions.toTypedArray())
+    }
+
+    /** 当前可交互区域快照；供区域调试绘制。 */
+    fun interactiveRegionsSnapshot(): List<Rectangle> = interactiveRegions.get().toList()
+
+    /**
+     * 把窗口移动到目标矩形。
+     *
+     * 由渲染侧按内容实测尺寸给出的屏幕坐标调用；尺寸与位置一次性提交，
+     * 与置顶强化共用 EDT 投递，避免与 Skiko 渲染线程并发。
+     */
+    fun moveTo(
+        window: Window,
+        bounds: Rectangle,
+    ) {
+        if (window.bounds == bounds) return
+        SwingUtilities.invokeLater {
+            runCatching { window.setBounds(bounds) }
+                .onFailure { report(it) }
+        }
     }
 
     /**
@@ -206,7 +226,7 @@ internal class DesktopWindowsOverlay(
     }
 
     /**
-     * 开始监控：守护线程周期强化置顶与同步几何。
+     * 开始监控：守护线程周期强化置顶。
      *
      * [interactiveMode] 开启时，鼠标位于可交互区域内则关闭点击穿透，离开则恢复；
      * 关闭时保持全程点击穿透。
@@ -223,7 +243,7 @@ internal class DesktopWindowsOverlay(
         running = true
         clickThroughActive = true
         lastFrameAt.set(System.currentTimeMillis())
-        Logger.i(TAG, "叠加层置顶与几何监控已启动 interactive=" + interactiveMode)
+        Logger.i(TAG, "叠加层置顶监控已启动 interactive=" + interactiveMode)
         worker =
             thread(isDaemon = true, name = "desktop-overlay-topmost") {
                 while (running) {
@@ -236,7 +256,6 @@ internal class DesktopWindowsOverlay(
                         Logger.w(TAG, "叠加层窗口句柄失效，停止监控")
                         break
                     }
-                    syncBounds(w)
                     if (interactiveMode && nativeAvailable) {
                         syncClickThrough(w, api, hwnd)
                     }
@@ -288,6 +307,7 @@ internal class DesktopWindowsOverlay(
      * 按鼠标位置切换点击穿透：位于可交互区域内则关闭穿透，离开则恢复。
      *
      * 仅在状态变化时投递 SetWindowLong 到 EDT，避免与 Skiko 渲染线程并发导致窗口过程回调崩溃。
+     * 区域以窗口坐标登记，故先把指针换算到窗口坐标系。
      */
     private fun syncClickThrough(
         window: Window,
@@ -296,7 +316,9 @@ internal class DesktopWindowsOverlay(
     ) {
         val regions = interactiveRegions.get()
         val pointer = runCatching { MouseInfo.getPointerInfo()?.location }.getOrNull() ?: return
-        val overContent = regions.any { it.contains(pointer) }
+        val origin = window.location
+        val local = java.awt.Point(pointer.x - origin.x, pointer.y - origin.y)
+        val overContent = regions.any { it.contains(local) }
         val wantClickThrough = !overContent
         if (wantClickThrough == clickThroughActive) return
         clickThroughActive = wantClickThrough
@@ -315,15 +337,6 @@ internal class DesktopWindowsOverlay(
                 report(it)
             }
         }
-    }
-
-    /** 跟随显示器尺寸同步叠加层窗口。 */
-    private fun syncBounds(window: Window) {
-        val screen = runCatching { Toolkit.getDefaultToolkit().screenSize }.getOrNull() ?: return
-        val bounds = window.bounds
-        if (bounds.x == 0 && bounds.y == 0 && bounds.width == screen.width && bounds.height == screen.height) return
-        Logger.i(TAG, "显示器尺寸变化，同步叠加层窗口: " + screen.width + "x" + screen.height)
-        SwingUtilities.invokeLater { window.setBounds(0, 0, screen.width, screen.height) }
     }
 
     /** 清除 TOPMOST 扩展样式；不依赖窗口消息泵，渲染卡死时同样生效。 */
