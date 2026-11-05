@@ -4,7 +4,7 @@
 
 扫描参数 `minLines: 5`、`minTokens: 50`，语料为 `git ls-files` 列出的 Kotlin、Rust 与 TypeScript 源码。jscpd 会把同一处重复按滑动窗口拆成多条克隆，下表按「文件对 + 字节区间重叠」合并为独立重复点，因此条目数少于门禁报出的 423 条克隆。
 
-**共 413 个重复点，合计 6591 行。**「行数」取两侧中较长的一侧；位置为 1 基行号区间，按字节偏移换算。
+**共 413 个重复点，合计 6577 行。**「行数」取两侧中较长的一侧；位置为 1 基行号区间，按字节偏移换算。
 
 ## 优先级总览
 
@@ -12,22 +12,21 @@
 
 | 优先级 | 类别 | 重复点 | 行数 | 处理归属 |
 |---|---|---|---|---|
-| P0 | 主仓跨模块生产逻辑 | 3 | 44 | 本仓 |
+| P0 | 主仓跨模块生产逻辑 | 2 | 26 | 本仓 |
 | P1 | 主仓同模块生产逻辑 | 61 | 840 | 本仓 |
 | P2 | 主仓平台镜像实现 | 4 | 105 | 本仓 |
-| P3 | 主仓 import 与包声明块 | 152 | 1302 | 本仓 |
-| P4 | 子模块生产代码 | 119 | 2352 | 子模块仓库 |
+| P3 | 主仓 import 与包声明块 | 153 | 1308 | 本仓 |
+| P4 | 子模块生产代码 | 119 | 2350 | 子模块仓库 |
 | P6 | 子模块测试代码 | 74 | 1948 | 子模块仓库 |
 
 ## P0 主仓跨模块生产逻辑
 
-两侧是不同模块的生产实现，同一段逻辑被各写一遍，应抽到 `shared` 或 `domain` 的公共实现共用；不合并则两端行为会各自漂移。共 3 个重复点、44 行。
+两侧是不同模块的生产实现，同一段逻辑被各写一遍，应抽到 `shared` 或 `domain` 的公共实现共用；不合并则两端行为会各自漂移。共 2 个重复点、26 行。
 
 | # | 行数 | 一侧 | 另一侧 | 简述 |
 |---|---|---|---|---|
-| 1 | 18 | `app/src/main/java/com/xzyht/notifyrelay/ui/activity/MainActivityContent.kt` :95-112 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/Main.kt` :454-471 | `val chatPort = devicePortsViewModel().chatPort()` 与 `val snackbarHostState = remember { SnackbarHostState() }`，重合起点 `colorScheme.background), ) { NavDisplay( backStack = navigator.backStack,` |
-| 2 | 16 | `data/src/commonMain/kotlin/notifyrelay/data/database/entity/SuperIslandHistoryEntity.kt` :19-27 | `domain/src/commonMain/kotlin/notifyrelay/domain/feature/notification/history/NotificationHistoryModels.kt` :19-34 | `data class SuperIslandHistoryEntity(` 与 `val notifications: List<NotificationHistoryEntry>,`，重合起点 `val id: Long, val sourceDeviceUuid: String? = null, val originalPackage: String? = null, v` |
-| 3 | 10 | `data/src/commonMain/kotlin/notifyrelay/data/database/entity/SuperIslandHistorySummary.kt` :6-15 | `domain/src/commonMain/kotlin/notifyrelay/domain/feature/notification/history/NotificationHistoryModels.kt` :33-42 | `data class SuperIslandHistorySummary(` 与 `data class SuperIslandHistoryEntry(`，重合起点 `( val id: Long, val sourceDeviceUuid: String? = null, val originalPackage: String? = null,` |
+| 1 | 16 | `data/src/commonMain/kotlin/notifyrelay/data/database/entity/SuperIslandHistoryEntity.kt` :19-27 | `domain/src/commonMain/kotlin/notifyrelay/domain/feature/notification/history/NotificationHistoryModels.kt` :19-34 | `data class SuperIslandHistoryEntity(` 与 `val notifications: List<NotificationHistoryEntry>,`，重合起点 `val id: Long, val sourceDeviceUuid: String? = null, val originalPackage: String? = null, v` |
+| 2 | 10 | `data/src/commonMain/kotlin/notifyrelay/data/database/entity/SuperIslandHistorySummary.kt` :6-15 | `domain/src/commonMain/kotlin/notifyrelay/domain/feature/notification/history/NotificationHistoryModels.kt` :33-42 | `data class SuperIslandHistorySummary(` 与 `data class SuperIslandHistoryEntry(`，重合起点 `( val id: Long, val sourceDeviceUuid: String? = null, val originalPackage: String? = null,` |
 
 ## P1 主仓同模块生产逻辑
 
@@ -110,7 +109,7 @@
 
 ## P3 主仓 import 与包声明块
 
-两侧重合的是 import 与包声明，多来自同一套框架的固定引入；改写价值低于其余类别，已接受为基线。共 152 个重复点、1302 行。
+两侧重合的是 import 与包声明，多来自同一套框架的固定引入；改写价值低于其余类别，已接受为基线。共 153 个重复点、1308 行。
 
 | # | 行数 | 一侧 | 另一侧 | 简述 |
 |---|---|---|---|---|
@@ -139,7 +138,7 @@
 | 23 | 11 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/NotificationHistoryScaffold.kt` :1-11 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/SuperIslandHistoryScreen.kt` :1-11 | 相同的 import 与包声明组 |
 | 24 | 11 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/ScrcpySettingsPage.kt` :12-19 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/smallisland/compose/BCompose.kt` :10-20 | 相同的 import 与包声明组 |
 | 25 | 11 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/UIRemoteFilter.kt` :14-24 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/SuperIslandHistoryScreen.kt` :10-20 | 相同的 import 与包声明组 |
-| 26 | 10 | `app/src/main/java/com/xzyht/notifyrelay/ui/activity/MainActivityContent.kt` :34-43 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/Main.kt` :66-75 | 相同的 import 与包声明组 |
+| 26 | 10 | `app/src/main/java/com/xzyht/notifyrelay/ui/activity/MainActivityContent.kt` :31-40 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/Main.kt` :66-75 | 相同的 import 与包声明组 |
 | 27 | 10 | `data/src/commonMain/kotlin/notifyrelay/data/database/AppDatabase.kt` :47-56 | `data/src/commonMain/kotlin/notifyrelay/data/database/repository/DatabaseRepository.kt` :13-22 | 相同的 import 与包声明组 |
 | 28 | 10 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/feature/DesktopBalanceSource.kt` :1-10 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/feature/DesktopLogiBatterySource.kt` :1-10 | 相同的 import 与包声明组 |
 | 29 | 10 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/feature/DesktopClockSource.kt` :1-10 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/feature/DesktopLogiBatterySource.kt` :1-10 | 相同的 import 与包声明组 |
@@ -154,7 +153,7 @@
 | 38 | 9 | `app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideBasicSettingsPage.kt` :12-20 | `app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideRequiredPermissionPage.kt` :12-20 | 相同的 import 与包声明组 |
 | 39 | 9 | `app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideOptionalPermissionPage.kt` :26-34 | `app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideRequiredPermissionPage.kt` :21-29 | 相同的 import 与包声明组 |
 | 40 | 9 | `app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideRequiredPermissionPage.kt` :7-13 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/remoteapps/RemoteAppItem.kt` :7-15 | 相同的 import 与包声明组 |
-| 41 | 9 | `app/src/main/java/com/xzyht/notifyrelay/ui/pages/ClipboardSyncPage.kt` :13-21 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/Main.kt` :11-19 | 相同的 import 与包声明组 |
+| 41 | 9 | `app/src/main/java/com/xzyht/notifyrelay/ui/pages/ClipboardSyncPage.kt` :13-21 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/Main.kt` :10-18 | 相同的 import 与包声明组 |
 | 42 | 9 | `app/src/main/java/com/xzyht/notifyrelay/ui/pages/UIAbout.kt` :7-15 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/screen/SettingsScreen.kt` :7-15 | 相同的 import 与包声明组 |
 | 43 | 9 | `data/src/commonMain/kotlin/notifyrelay/data/database/dao/AppDao.kt` :1-9 | `data/src/commonMain/kotlin/notifyrelay/data/database/dao/AppDeviceDao.kt` :1-9 | 相同的 import 与包声明组 |
 | 44 | 9 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/DesktopSuperIslandCard.kt` :6-14 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/LogiIslandCard.kt` :11-19 | 相同的 import 与包声明组 |
@@ -196,7 +195,7 @@
 | 80 | 7 | `app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideScreen.kt` :12-18 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/dialog/PairingCodeDialog.kt` :11-17 | 相同的 import 与包声明组 |
 | 81 | 7 | `app/src/main/java/com/xzyht/notifyrelay/ui/guide/GuideScreen.kt` :14-20 | `app/src/main/java/com/xzyht/notifyrelay/ui/pages/ClipboardSyncPage.kt` :17-23 | 相同的 import 与包声明组 |
 | 82 | 7 | `app/src/main/java/com/xzyht/notifyrelay/ui/pages/UIAbout.kt` :5-11 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/ScrcpySettingsPage.kt` :6-12 | 相同的 import 与包声明组 |
-| 83 | 7 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/Main.kt` :15-21 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/superisland/SuperIslandHistoryCards.kt` :31-37 | 相同的 import 与包声明组 |
+| 83 | 7 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/Main.kt` :14-20 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/superisland/SuperIslandHistoryCards.kt` :31-37 | 相同的 import 与包声明组 |
 | 84 | 7 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/feature/DesktopBalanceHistoryStore.kt` :3-9 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/platform/KeyboardMappingStore.kt` :3-9 | 相同的 import 与包声明组 |
 | 85 | 7 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/LogiIslandCard.kt` :3-9 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :4-10 | 相同的 import 与包声明组 |
 | 86 | 7 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/NotificationCards.kt` :4-10 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :3-9 | 相同的 import 与包声明组 |
@@ -234,42 +233,43 @@
 | 118 | 6 | `app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/floating/FloatingWindowContainer.kt` :20-25 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/DesktopSuperIslandCard.kt` :20-25 | 相同的 import 与包声明组 |
 | 119 | 6 | `app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/notification/MediaReplicaNotifier.kt` :7-12 | `app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/notification/ReplicaSmallIconInjector.kt` :8-13 | 相同的 import 与包声明组 |
 | 120 | 6 | `app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/replica/FloatingReplicaNotificationManager.kt` :9-14 | `app/src/main/java/com/xzyht/notifyrelay/feature/notification/superisland/replica/FloatingReplicaWindowManager.kt` :15-20 | 相同的 import 与包声明组 |
-| 121 | 6 | `app/src/main/java/com/xzyht/notifyrelay/ui/pages/UIAbout.kt` :3-8 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/screen/LogStorageSection.kt` :3-8 | 相同的 import 与包声明组 |
-| 122 | 6 | `app/src/main/java/com/xzyht/notifyrelay/ui/pages/UIAbout.kt` :4-9 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/MusicControlPage.kt` :8-13 | 相同的 import 与包声明组 |
-| 123 | 6 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/NotificationCards.kt` :10-15 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :13-18 | 相同的 import 与包声明组 |
-| 124 | 6 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/NotificationCards.kt` :11-16 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/platform/DesktopWindowChrome.kt` :20-25 | 相同的 import 与包声明组 |
-| 125 | 6 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/platform/DesktopOverlayFeaturesContent.kt` :6-11 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/UIAppearance.kt` :4-9 | 相同的 import 与包声明组 |
-| 126 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/dialog/AddKeywordDialog.kt` :6-11 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/screen/LogStorageSection.kt` :4-9 | 相同的 import 与包声明组 |
-| 127 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/dialog/PairingCodeInputField.kt` :7-12 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MultiProgressCompose.kt` :4-9 | 相同的 import 与包声明组 |
-| 128 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/guide/GuideCompletePage.kt` :11-16 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :10-15 | 相同的 import 与包声明组 |
-| 129 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/guide/GuideComponents.kt` :13-18 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/screen/devicelist/DeviceListButtons.kt` :5-10 | 相同的 import 与包声明组 |
-| 130 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/guide/GuideWelcomePage.kt` :7-12 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :3-8 | 相同的 import 与包声明组 |
-| 131 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/NotificationCard.kt` :7-12 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :11-16 | 相同的 import 与包声明组 |
-| 132 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/NotificationHistoryScaffold.kt` :21-26 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/SuperIslandHistoryScreen.kt` :32-37 | 相同的 import 与包声明组 |
-| 133 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/NotificationListBlock.kt` :5-10 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/superisland/SuperIslandHistoryCards.kt` :6-11 | 相同的 import 与包声明组 |
-| 134 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/remoteapps/LocalAppItem.kt` :16-21 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/superisland/SuperIslandHistoryImages.kt` :16-21 | 相同的 import 与包声明组 |
-| 135 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/UILocalFilter.kt` :4-9 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/chat/ChatTest.kt` :6-11 | 相同的 import 与包声明组 |
-| 136 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/screen/devicelist/DeviceListDialogs.kt` :4-9 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/SuperIslandTemplateCompose.kt` :5-10 | 相同的 import 与包声明组 |
-| 137 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/builder/SuperIslandComponentSerializer.kt` :4-9 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/model/core/ParamV2.kt` :7-12 | 相同的 import 与包声明组 |
-| 138 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/builder/SuperIslandParamBuilder.kt` :6-11 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/model/core/ParamV2.kt` :7-12 | 相同的 import 与包声明组 |
-| 139 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/AnimTextInfoCompose.kt` :16-21 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/TimerInfoCompose.kt` :11-16 | 相同的 import 与包声明组 |
-| 140 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/BaseInfoCompose.kt` :14-19 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/SuperIslandTemplateCompose.kt` :12-17 | 相同的 import 与包声明组 |
-| 141 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/BaseInfoCompose.kt` :12-17 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/smallisland/compose/BigIslandCollapsedCompose.kt` :11-16 | 相同的 import 与包声明组 |
-| 142 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/BaseInfoCompose.kt` :18-23 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MultiProgressCompose.kt` :27-29 | 相同的 import 与包声明组 |
-| 143 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/DefaultCompose.kt` :10-15 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/common/ActionInfoButton.kt` :11-16 | 相同的 import 与包声明组 |
-| 144 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/HighlightInfoCompose.kt` :18-23 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/TimerInfoCompose.kt` :11-16 | 相同的 import 与包声明组 |
-| 145 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/HighlightInfoV3Compose.kt` :5-10 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/PicInfoCompose.kt` :3-8 | 相同的 import 与包声明组 |
-| 146 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/HintInfoCompose.kt` :6-11 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/ParamIslandCompose.kt` :3-8 | 相同的 import 与包声明组 |
-| 147 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/HintInfoCompose.kt` :18-23 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/TimerInfoCompose.kt` :10-15 | 相同的 import 与包声明组 |
-| 148 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :23-28 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MultiProgressCompose.kt` :27-32 | 相同的 import 与包声明组 |
-| 149 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MultiProgressCompose.kt` :7-12 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/ProgressCompose.kt` :5-10 | 相同的 import 与包声明组 |
-| 150 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/ProgressInfoCompose.kt` :7-12 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/smallisland/compose/BCompose.kt` :15-20 | 相同的 import 与包声明组 |
-| 151 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/common/ActionInfoButton.kt` :10-15 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/smallisland/compose/BigIslandCollapsedCompose.kt` :12-17 | 相同的 import 与包声明组 |
-| 152 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/smallisland/compose/BCompose.kt` :28-33 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/parser/BParser.kt` :3-8 | 相同的 import 与包声明组 |
+| 121 | 6 | `app/src/main/java/com/xzyht/notifyrelay/ui/activity/MainActivityContent.kt` :23-28 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/Main.kt` :53-58 | 相同的 import 与包声明组 |
+| 122 | 6 | `app/src/main/java/com/xzyht/notifyrelay/ui/pages/UIAbout.kt` :3-8 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/screen/LogStorageSection.kt` :3-8 | 相同的 import 与包声明组 |
+| 123 | 6 | `app/src/main/java/com/xzyht/notifyrelay/ui/pages/UIAbout.kt` :4-9 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/MusicControlPage.kt` :8-13 | 相同的 import 与包声明组 |
+| 124 | 6 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/NotificationCards.kt` :10-15 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :13-18 | 相同的 import 与包声明组 |
+| 125 | 6 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/NotificationCards.kt` :11-16 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/platform/DesktopWindowChrome.kt` :20-25 | 相同的 import 与包声明组 |
+| 126 | 6 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/platform/DesktopOverlayFeaturesContent.kt` :6-11 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/UIAppearance.kt` :4-9 | 相同的 import 与包声明组 |
+| 127 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/dialog/AddKeywordDialog.kt` :6-11 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/screen/LogStorageSection.kt` :4-9 | 相同的 import 与包声明组 |
+| 128 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/dialog/PairingCodeInputField.kt` :7-12 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MultiProgressCompose.kt` :4-9 | 相同的 import 与包声明组 |
+| 129 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/guide/GuideCompletePage.kt` :11-16 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :10-15 | 相同的 import 与包声明组 |
+| 130 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/guide/GuideComponents.kt` :13-18 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/screen/devicelist/DeviceListButtons.kt` :5-10 | 相同的 import 与包声明组 |
+| 131 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/guide/GuideWelcomePage.kt` :7-12 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :3-8 | 相同的 import 与包声明组 |
+| 132 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/NotificationCard.kt` :7-12 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :11-16 | 相同的 import 与包声明组 |
+| 133 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/NotificationHistoryScaffold.kt` :21-26 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/SuperIslandHistoryScreen.kt` :32-37 | 相同的 import 与包声明组 |
+| 134 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/NotificationListBlock.kt` :5-10 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/superisland/SuperIslandHistoryCards.kt` :6-11 | 相同的 import 与包声明组 |
+| 135 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/remoteapps/LocalAppItem.kt` :16-21 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/superisland/SuperIslandHistoryImages.kt` :16-21 | 相同的 import 与包声明组 |
+| 136 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/UILocalFilter.kt` :4-9 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/chat/ChatTest.kt` :6-11 | 相同的 import 与包声明组 |
+| 137 | 6 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/screen/devicelist/DeviceListDialogs.kt` :4-9 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/SuperIslandTemplateCompose.kt` :5-10 | 相同的 import 与包声明组 |
+| 138 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/builder/SuperIslandComponentSerializer.kt` :4-9 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/model/core/ParamV2.kt` :7-12 | 相同的 import 与包声明组 |
+| 139 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/builder/SuperIslandParamBuilder.kt` :6-11 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/model/core/ParamV2.kt` :7-12 | 相同的 import 与包声明组 |
+| 140 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/AnimTextInfoCompose.kt` :16-21 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/TimerInfoCompose.kt` :11-16 | 相同的 import 与包声明组 |
+| 141 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/BaseInfoCompose.kt` :14-19 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/SuperIslandTemplateCompose.kt` :12-17 | 相同的 import 与包声明组 |
+| 142 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/BaseInfoCompose.kt` :12-17 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/smallisland/compose/BigIslandCollapsedCompose.kt` :11-16 | 相同的 import 与包声明组 |
+| 143 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/BaseInfoCompose.kt` :18-23 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MultiProgressCompose.kt` :27-29 | 相同的 import 与包声明组 |
+| 144 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/DefaultCompose.kt` :10-15 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/common/ActionInfoButton.kt` :11-16 | 相同的 import 与包声明组 |
+| 145 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/HighlightInfoCompose.kt` :18-23 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/TimerInfoCompose.kt` :11-16 | 相同的 import 与包声明组 |
+| 146 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/HighlightInfoV3Compose.kt` :5-10 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/PicInfoCompose.kt` :3-8 | 相同的 import 与包声明组 |
+| 147 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/HintInfoCompose.kt` :6-11 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/ParamIslandCompose.kt` :3-8 | 相同的 import 与包声明组 |
+| 148 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/HintInfoCompose.kt` :18-23 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/TimerInfoCompose.kt` :10-15 | 相同的 import 与包声明组 |
+| 149 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MediaIslandCompose.kt` :23-28 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MultiProgressCompose.kt` :27-32 | 相同的 import 与包声明组 |
+| 150 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/MultiProgressCompose.kt` :7-12 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/ProgressCompose.kt` :5-10 | 相同的 import 与包声明组 |
+| 151 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/bigisland/components/ProgressInfoCompose.kt` :7-12 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/smallisland/compose/BCompose.kt` :15-20 | 相同的 import 与包声明组 |
+| 152 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/common/ActionInfoButton.kt` :10-15 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/smallisland/compose/BigIslandCollapsedCompose.kt` :12-17 | 相同的 import 与包声明组 |
+| 153 | 6 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/smallisland/compose/BCompose.kt` :28-33 | `superislandui/src/commonMain/kotlin/github/xzynine/superislandui/parser/BParser.kt` :3-8 | 相同的 import 与包声明组 |
 
 ## P4 子模块生产代码
 
-两侧位于子模块，只能在所属仓库修改，本仓门禁与 CI 不覆盖它们；处理后需更新子模块指针。共 119 个重复点、2352 行。
+两侧位于子模块，只能在所属仓库修改，本仓门禁与 CI 不覆盖它们；处理后需更新子模块指针。共 119 个重复点、2350 行。
 
 | # | 行数 | 一侧 | 另一侧 | 简述 |
 |---|---|---|---|---|
@@ -347,23 +347,23 @@
 | 72 | 10 | `nativecore/notify-relay-core/src/ffi/send.rs` :142-151 | `nativecore/notify-relay-core/src/ffi/send.rs` :16-25 | 同一文件内两处重复代码，重合起点 `: *const c_char, target_ip: *const c_char, battery: i32, device_type: *const c_char,` |
 | 73 | 10 | `nativecore/notify-relay-core/src/quic.rs` :807-816 | `nativecore/notify-relay-core/src/quic.rs` :798-807 | 同一文件内两处重复实现，位于 `fn verify_tls13_signature(`，重合起点 `( &self, _message: &[u8], _cert: &CertificateDer<'_>,` |
 | 74 | 10 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/pages/AdvancedConfigPage.kt` :3-10 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/screen/devicelist/DeviceListDialogs.kt` :3-12 | 相同的 import 与包声明组 |
-| 75 | 9 | `app/src/main/java/com/xzyht/notifyrelay/ui/activity/MainActivityContent.kt` :9-17 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/pages/VirtualButtonOrderPage.kt` :9-17 | 相同的 import 与包声明组 |
-| 76 | 9 | `desktop/logi-battery/crates/openlogi-core/src/config/file.rs` :415-423 | `desktop/logi-battery/crates/openlogi-core/src/config/file.rs` :403-411 | 同一文件内两处重复实现，位于 `fn backup_config_once(path: &Path) -> io::Result<()>`，重合起点 `) -> io::Result<PathBuf> { let Some(file_name) = path.file_name() else { return Err(io::Er` |
-| 77 | 9 | `desktop/logi-battery/crates/openlogi-hidpp/src/feature/device_friendly_name.rs` :78-86 | `desktop/logi-battery/crates/openlogi-hidpp/src/feature/device_type_and_name.rs` :58-66 | `pub async fn get_whole_friendly_name(&self) -> Result<String, Hidpp20E` 与 `pub async fn get_whole_device_name(&self) -> Result<String, Hidpp20Err`，重合起点 `).await?; string.push_str(str::from_utf8(&part).map_err(\|_\| Hidpp20Error::UnsupportedRespo` |
-| 78 | 9 | `nativecore/notify-relay-core/src/ffi/discovery.rs` :12-20 | `nativecore/notify-relay-core/src/ffi/reconnect.rs` :12-20 | 重合起点 `( ctx_ptr: *mut c_void, uuid: *const c_char, ip: *const c_char,` |
-| 79 | 9 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/pages/SettingsPage.kt` :5-11 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/NotificationCard.kt` :4-12 | 相同的 import 与包声明组 |
-| 80 | 9 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/pages/ShortcutLaunchActivity.kt` :191-199 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/pages/ShortcutLaunchActivity.kt` :135-143 | 同一文件内两处重复实现，位于 `fun startFullscreenControl(`，重合起点 `: String, startApp: String = "", useScrcpyStartApp: Boolean = false, ) {` |
-| 81 | 9 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/services/NativeAacRecorder.kt` :324-332 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/services/NativeAudioRecorder.kt` :329-337 | `private const val SAMPLE_RATE = 48_000`，重合起点 `private const val SAMPLE_RATE = 48_000 private const val CHANNEL_COUNT = 2 private const v` |
-| 82 | 8 | `checkupdata/src/commonMain/kotlin/github/xzynine/checkupdata/CheckUpdateManager.kt` :100-106 | `checkupdata/src/commonMain/kotlin/github/xzynine/checkupdata/version/VersionComparator.kt` :65-72 | `val filteredReleases =` 与 `private fun filterReleasesByRule(`，重合起点 `= when (rule) { VersionRule.STABLE -> releases.filter { !it.isPrerelease && !it.isDraft } ` |
-| 83 | 8 | `desktop/logi-battery/crates/openlogi-core/src/config/identity.rs` :517-524 | `desktop/logi-battery/crates/openlogi-core/src/config/identity.rs` :464-471 | 同一文件内两处重复实现，位于 `fn a_canonical_entry_holding_only_metadata_does_not_shadow_the_legacy_`，重合起点 `); let unit = DeviceIdentity::Unit([0x6b, 0xe9, 0xd3, 0x00]); let key = config .resolve_de` |
-| 84 | 8 | `desktop/logi-battery/crates/openlogi-core/src/config/identity.rs` :717-724 | `desktop/logi-battery/crates/openlogi-core/src/config/identity.rs` :686-693 | 同一文件内两处重复实现，位于 `fn folding_keeps_the_canonical_custom_name_when_both_are_named()`，重合起点 `); let canonical = PhysicalDeviceKey::parse("unit:6be9d300").expect("valid"); assert!(conf` |
-| 85 | 8 | `desktop/logi-battery/crates/openlogi-device/src/channel/registry.rs` :444-451 | `desktop/logi-battery/crates/openlogi-device/src/channel/registry.rs` :390-396 | 同一文件内两处重复实现，位于 `async fn change_between_current_check_and_wait_is_not_missed()`，重合起点 `() { let route = direct(0xb35b); let first_channel = Arc::new(()); let replacement = Arc::` |
-| 86 | 8 | `desktop/logi-battery/crates/openlogi-device/src/pairing.rs` :208-215 | `desktop/logi-battery/crates/openlogi-device/src/pairing.rs` :175-182 | 同一文件内两处重复实现，位于 `async fn open_receiver(`，重合起点 `for node in backend.enumerate_hidpp().await? { let Some(channel) = backend.open_hidpp(&nod` |
-| 87 | 8 | `desktop/logi-battery/crates/openlogi-device/src/write/diagnostics.rs` :153-160 | `desktop/logi-battery/crates/openlogi-device/src/write/smartshift.rs` :281-287 | `pub async fn read_battery_raw(` 与 `pub async fn set_smartshift_sensitivity(`，重合起点 `, WriteError> { let index = route.device_index(); with_route(backend, route, move \|channel` |
-| 88 | 8 | `desktop/logi-battery/crates/openlogi-hidpp/src/feature/backlight.rs` :340-347 | `desktop/logi-battery/crates/openlogi-hidpp/src/feature/backlight.rs` :318-325 | 同一文件内两处重复实现，位于 `fn from_payload(payload: &[u8; 16]) -> Result<Self, Hidpp20Error>`，重合起点 `{ nb_levels: payload[0], current_level: payload[1], status: BacklightStatus::try_from(payl` |
-| 89 | 8 | `desktop/logi-battery/crates/openlogi-hidpp/src/protocol/v10.rs` :91-98 | `desktop/logi-battery/crates/openlogi-hidpp/src/protocol/v20.rs` :106-113 | `fn from(msg: Message) -> Self`，重合起点 `..].copy_from_slice(&payload); HidppMessage::Short(data) } Message::Long(header, payload) ` |
-| 90 | 8 | `desktop/smtc-rust/src/notifications.rs` :56-63 | `desktop/smtc-rust/src/smtc/windows.rs` :88-95 | `fn read_stream_bytes(` 与 `fn read_thumbnail_bytes() -> Option<Vec<u8>>`，重合起点 `.OpenReadAsync().ok()?.get().ok()?; let size = stream.Size().ok()?; if size == 0 { return ` |
-| 91 | 8 | `nativecore/notify-relay-core/src/quic.rs` :502-509 | `nativecore/notify-relay-core/src/quic.rs` :461-468 | 同一文件内两处重复实现，位于 `pub fn request(`，重合起点 `, QuicError> { let conn = { let map = self.conns.lock().map_err(\|_\| QuicError::NotReady)?;` |
+| 75 | 9 | `desktop/logi-battery/crates/openlogi-core/src/config/file.rs` :415-423 | `desktop/logi-battery/crates/openlogi-core/src/config/file.rs` :403-411 | 同一文件内两处重复实现，位于 `fn backup_config_once(path: &Path) -> io::Result<()>`，重合起点 `) -> io::Result<PathBuf> { let Some(file_name) = path.file_name() else { return Err(io::Er` |
+| 76 | 9 | `desktop/logi-battery/crates/openlogi-hidpp/src/feature/device_friendly_name.rs` :78-86 | `desktop/logi-battery/crates/openlogi-hidpp/src/feature/device_type_and_name.rs` :58-66 | `pub async fn get_whole_friendly_name(&self) -> Result<String, Hidpp20E` 与 `pub async fn get_whole_device_name(&self) -> Result<String, Hidpp20Err`，重合起点 `).await?; string.push_str(str::from_utf8(&part).map_err(\|_\| Hidpp20Error::UnsupportedRespo` |
+| 77 | 9 | `nativecore/notify-relay-core/src/ffi/discovery.rs` :12-20 | `nativecore/notify-relay-core/src/ffi/reconnect.rs` :12-20 | 重合起点 `( ctx_ptr: *mut c_void, uuid: *const c_char, ip: *const c_char,` |
+| 78 | 9 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/pages/SettingsPage.kt` :5-11 | `shared/src/commonMain/kotlin/notifyrelay/shared/ui/pages/history/NotificationCard.kt` :4-12 | 相同的 import 与包声明组 |
+| 79 | 9 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/pages/ShortcutLaunchActivity.kt` :191-199 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/pages/ShortcutLaunchActivity.kt` :135-143 | 同一文件内两处重复实现，位于 `fun startFullscreenControl(`，重合起点 `: String, startApp: String = "", useScrcpyStartApp: Boolean = false, ) {` |
+| 80 | 9 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/services/NativeAacRecorder.kt` :324-332 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/services/NativeAudioRecorder.kt` :329-337 | `private const val SAMPLE_RATE = 48_000`，重合起点 `private const val SAMPLE_RATE = 48_000 private const val CHANNEL_COUNT = 2 private const v` |
+| 81 | 8 | `checkupdata/src/commonMain/kotlin/github/xzynine/checkupdata/CheckUpdateManager.kt` :100-106 | `checkupdata/src/commonMain/kotlin/github/xzynine/checkupdata/version/VersionComparator.kt` :65-72 | `val filteredReleases =` 与 `private fun filterReleasesByRule(`，重合起点 `= when (rule) { VersionRule.STABLE -> releases.filter { !it.isPrerelease && !it.isDraft } ` |
+| 82 | 8 | `desktop/logi-battery/crates/openlogi-core/src/config/identity.rs` :517-524 | `desktop/logi-battery/crates/openlogi-core/src/config/identity.rs` :464-471 | 同一文件内两处重复实现，位于 `fn a_canonical_entry_holding_only_metadata_does_not_shadow_the_legacy_`，重合起点 `); let unit = DeviceIdentity::Unit([0x6b, 0xe9, 0xd3, 0x00]); let key = config .resolve_de` |
+| 83 | 8 | `desktop/logi-battery/crates/openlogi-core/src/config/identity.rs` :717-724 | `desktop/logi-battery/crates/openlogi-core/src/config/identity.rs` :686-693 | 同一文件内两处重复实现，位于 `fn folding_keeps_the_canonical_custom_name_when_both_are_named()`，重合起点 `); let canonical = PhysicalDeviceKey::parse("unit:6be9d300").expect("valid"); assert!(conf` |
+| 84 | 8 | `desktop/logi-battery/crates/openlogi-device/src/channel/registry.rs` :444-451 | `desktop/logi-battery/crates/openlogi-device/src/channel/registry.rs` :390-396 | 同一文件内两处重复实现，位于 `async fn change_between_current_check_and_wait_is_not_missed()`，重合起点 `() { let route = direct(0xb35b); let first_channel = Arc::new(()); let replacement = Arc::` |
+| 85 | 8 | `desktop/logi-battery/crates/openlogi-device/src/pairing.rs` :208-215 | `desktop/logi-battery/crates/openlogi-device/src/pairing.rs` :175-182 | 同一文件内两处重复实现，位于 `async fn open_receiver(`，重合起点 `for node in backend.enumerate_hidpp().await? { let Some(channel) = backend.open_hidpp(&nod` |
+| 86 | 8 | `desktop/logi-battery/crates/openlogi-device/src/write/diagnostics.rs` :153-160 | `desktop/logi-battery/crates/openlogi-device/src/write/smartshift.rs` :281-287 | `pub async fn read_battery_raw(` 与 `pub async fn set_smartshift_sensitivity(`，重合起点 `, WriteError> { let index = route.device_index(); with_route(backend, route, move \|channel` |
+| 87 | 8 | `desktop/logi-battery/crates/openlogi-hidpp/src/feature/backlight.rs` :340-347 | `desktop/logi-battery/crates/openlogi-hidpp/src/feature/backlight.rs` :318-325 | 同一文件内两处重复实现，位于 `fn from_payload(payload: &[u8; 16]) -> Result<Self, Hidpp20Error>`，重合起点 `{ nb_levels: payload[0], current_level: payload[1], status: BacklightStatus::try_from(payl` |
+| 88 | 8 | `desktop/logi-battery/crates/openlogi-hidpp/src/protocol/v10.rs` :91-98 | `desktop/logi-battery/crates/openlogi-hidpp/src/protocol/v20.rs` :106-113 | `fn from(msg: Message) -> Self`，重合起点 `..].copy_from_slice(&payload); HidppMessage::Short(data) } Message::Long(header, payload) ` |
+| 89 | 8 | `desktop/smtc-rust/src/notifications.rs` :56-63 | `desktop/smtc-rust/src/smtc/windows.rs` :88-95 | `fn read_stream_bytes(` 与 `fn read_thumbnail_bytes() -> Option<Vec<u8>>`，重合起点 `.OpenReadAsync().ok()?.get().ok()?; let size = stream.Size().ok()?; if size == 0 { return ` |
+| 90 | 8 | `nativecore/notify-relay-core/src/quic.rs` :502-509 | `nativecore/notify-relay-core/src/quic.rs` :461-468 | 同一文件内两处重复实现，位于 `pub fn request(`，重合起点 `, QuicError> { let conn = { let map = self.conns.lock().map_err(\|_\| QuicError::NotReady)?;` |
+| 91 | 7 | `app/src/main/java/com/xzyht/notifyrelay/ui/activity/MainActivityContent.kt` :6-12 | `scrcpy/src/main/java/io/github/miuzarte/scrcpyforandroid/pages/VirtualButtonOrderPage.kt` :9-15 | 相同的 import 与包声明组 |
 | 92 | 7 | `desktop/logi-battery/crates/openlogi-core/src/bindings.rs` :212-218 | `desktop/logi-battery/crates/openlogi-core/src/bindings.rs` :155-161 | 同一文件内两处重复实现，位于 `fn explicit_gesture_click_overrides_default_in_projection()`，重合起点 `); cfg.set_binding("2b042", ButtonId::GestureButton, Binding::Gesture(map)); let projected` |
 | 93 | 7 | `desktop/logi-battery/crates/openlogi-device/src/inventory/ledger.rs` :183-189 | `desktop/logi-battery/crates/openlogi-device/src/inventory/ledger.rs` :168-174 | 同一文件内两处重复实现，位于 `fn a_healthy_tick_resets_the_failure_count()`，重合起点 `() { let mut ledger = NodeLedger::default(); ledger.settle(&1, true, Some(inventory("bolt"` |
 | 94 | 7 | `desktop/logi-battery/crates/openlogi-device/src/session/gesture/liveness.rs` :192-198 | `desktop/logi-battery/crates/openlogi-device/src/session/gesture/liveness.rs` :179-185 | 同一文件内两处重复实现，位于 `async fn idle_ping_is_scheduled_after_each_full_interval()`，重合起点 `); tokio::time::advance(almost_idle).await; assert!(!liveness.ping_due(Instant::now(), act` |

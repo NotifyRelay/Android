@@ -1,7 +1,6 @@
 package notifyrelay.desktop
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -52,6 +51,7 @@ import notifyrelay.desktop.platform.ProvideDesktopExtraPorts
 import notifyrelay.desktop.platform.ProvideDesktopPairingDependencies
 import notifyrelay.desktop.platform.ProvideDesktopUiPorts
 import notifyrelay.shared.ui.common.NotifyRelayTheme
+import notifyrelay.shared.ui.navigation.AppNavDisplay
 import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
@@ -89,7 +89,6 @@ import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.abs
 
@@ -446,155 +445,143 @@ private fun DesktopRoot(
                 containerColor = MiuixTheme.colorScheme.background,
                 snackbarHost = { SnackbarHost(snackbarHostState) },
             ) { paddingValues ->
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues)
-                            .background(MiuixTheme.colorScheme.background),
+                AppNavDisplay(
+                    navigator = navigator,
+                    modifier = Modifier.padding(paddingValues),
                 ) {
-                    NavDisplay(
-                        backStack = navigator.backStack,
-                        onBack = {
-                            if (navigator.backStackSize() > 1) {
-                                navigator.pop()
-                            }
-                        },
-                    ) {
-                        entry<Route.Main> {
-                            MainScreen(
-                                navigator = navigator,
-                                deviceListContent = { args -> DeviceListTabContent(args) },
-                                historyContent = {
-                                    HistoryTabContent(navigator) {
-                                        UIChatTest(
-                                            deviceManager = devicePortsProviderChatPort(devicePortsProvider),
-                                            onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
-                                        )
-                                    }
-                                },
-                                forwardContent = {
-                                    DeviceForwardScreen(
-                                        filterViewModel = remoteFilterViewModel(),
-                                        clipboardSync = { ClipboardSyncPage() },
-                                        musicControl = { MusicControlPage() },
-                                        scrcpyScreen = { deviceInfo, _ ->
-                                            DesktopScrcpyScreen(devicePortsProvider, deviceInfo)
-                                        },
+                    entry<Route.Main> {
+                        MainScreen(
+                            navigator = navigator,
+                            deviceListContent = { args -> DeviceListTabContent(args) },
+                            historyContent = {
+                                HistoryTabContent(navigator) {
+                                    UIChatTest(
+                                        deviceManager = devicePortsProviderChatPort(devicePortsProvider),
+                                        onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
                                     )
-                                },
-                                settingsContent = { SettingsScreen(showOverlayEntry = true) },
+                                }
+                            },
+                            forwardContent = {
+                                DeviceForwardScreen(
+                                    filterViewModel = remoteFilterViewModel(),
+                                    clipboardSync = { ClipboardSyncPage() },
+                                    musicControl = { MusicControlPage() },
+                                    scrcpyScreen = { deviceInfo, _ ->
+                                        DesktopScrcpyScreen(devicePortsProvider, deviceInfo)
+                                    },
+                                )
+                            },
+                            settingsContent = { SettingsScreen(showOverlayEntry = true) },
+                        )
+                    }
+                    // 与 MainScreen 页签同源：单独 push 这两个路由时复用同一内容，避免未注册 entry 报错
+                    entry<Route.History> {
+                        HistoryTabContent(navigator) {
+                            UIChatTest(
+                                deviceManager = devicePortsProviderChatPort(devicePortsProvider),
+                                onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
                             )
                         }
-                        // 与 MainScreen 页签同源：单独 push 这两个路由时复用同一内容，避免未注册 entry 报错
-                        entry<Route.History> {
-                            HistoryTabContent(navigator) {
-                                UIChatTest(
-                                    deviceManager = devicePortsProviderChatPort(devicePortsProvider),
-                                    onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
-                                )
-                            }
-                        }
-                        entry<Route.Settings> { SettingsScreen(showOverlayEntry = true) }
-                        entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
-                        entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
-                        entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
-                        entry<Route.SettingsDeveloperMode> {
-                            SettingsDeveloperModeScreen {
-                                DeveloperModeScreen(desktopExtraContent = { DesktopDeveloperContent() })
-                            }
-                        }
-                        entry<Route.SettingsAbout> {
-                            SettingsAboutScreen {
-                                val aboutScope = rememberCoroutineScope()
-                                var checking by remember { mutableStateOf(false) }
-                                val versionName = notifyrelay.desktop.BuildInfo.VERSION_NAME
-                                val updateManager =
-                                    remember {
-                                        github.xzynine.checkupdata.CheckUpdateManager(
-                                            java.io
-                                                .File(
-                                                    System.getProperty("user.home"),
-                                                    ".notifyrelay/cache",
-                                                ).absolutePath,
-                                        )
-                                    }
-                                val iconBitmap =
-                                    remember {
-                                        notifyrelay.desktop.platform.DesktopLogActions
-                                            .appIcon()
-                                            ?.let {
-                                                org.jetbrains.skia.Image
-                                                    .makeFromEncoded(
-                                                        java.io
-                                                            .ByteArrayOutputStream()
-                                                            .also { bos ->
-                                                                javax.imageio.ImageIO.write(it, "png", bos)
-                                                            }.toByteArray(),
-                                                    ).toComposeImageBitmap()
-                                            }
-                                    }
-                                notifyrelay.shared.ui.screen.DesktopAboutContent(
-                                    versionName = versionName,
-                                    appIcon = iconBitmap,
-                                    isCheckingUpdate = checking,
-                                    onCheckUpdate = {
-                                        if (!checking) {
-                                            checking = true
-                                            aboutScope.launch {
-                                                runCatching {
-                                                    updateManager.checkUpdate(
-                                                        owner = "NotifyRelay",
-                                                        repo = "Android",
-                                                        currentVersion = versionName,
-                                                        rule =
-                                                            github.xzynine.checkupdata.version
-                                                                .VersionRule.STABLE,
-                                                    )
-                                                }
-                                                checking = false
-                                            }
-                                        }
-                                    },
-                                    onOpenDirectory = {
-                                        notifyrelay.desktop.platform.DesktopLogActions
-                                            .openDirectory()
-                                    },
-                                    onExport = {
-                                        notifyrelay.desktop.platform.DesktopLogActions
-                                            .exportArchive()
-                                    },
-                                    autoLaunchSlot = {
-                                        notifyrelay.desktop.platform.DesktopAboutAutoLaunch()
-                                    },
-                                )
-                            }
-                        }
-                        entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
-                        entry<Route.SettingsOverlay> {
-                            SettingsOverlayScreen { DesktopOverlaySettingsContent() }
-                        }
-                        entry<Route.SettingsOverlayNotifications> {
-                            SettingsOverlayNotificationsScreen { DesktopOverlayNotificationContent() }
-                        }
-                        entry<Route.SettingsOverlayBalance> {
-                            SettingsOverlayBalanceScreen { DesktopOverlayBalanceContent() }
-                        }
-                        entry<Route.SettingsOverlayLogi> {
-                            SettingsOverlayLogiScreen { DesktopOverlayLogiContent() }
-                        }
-                        entry<Route.SettingsOverlayKeyboard> {
-                            SettingsOverlayKeyboardScreen { DesktopOverlayKeyboardContent() }
-                        }
-                        entry<Route.SettingsOverlayClock> {
-                            SettingsOverlayClockScreen { DesktopOverlayClockContent() }
-                        }
-                        entry<Route.SettingsScrcpy> { ScrcpySettingsPage() }
-                        // 高级设置与基础设置同页：桌面端参数集较移动端少，不再分组
-                        entry<Route.ScrcpyAdvanced> { ScrcpySettingsPage() }
-                        // 虚拟按钮排序在桌面端不接线（无触摸注入语义）
-                        entry<Route.ScrcpyVirtualButtonOrder> { DesktopUnavailableScreen("虚拟按钮排序") { navigator.pop() } }
                     }
+                    entry<Route.Settings> { SettingsScreen(showOverlayEntry = true) }
+                    entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
+                    entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
+                    entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
+                    entry<Route.SettingsDeveloperMode> {
+                        SettingsDeveloperModeScreen {
+                            DeveloperModeScreen(desktopExtraContent = { DesktopDeveloperContent() })
+                        }
+                    }
+                    entry<Route.SettingsAbout> {
+                        SettingsAboutScreen {
+                            val aboutScope = rememberCoroutineScope()
+                            var checking by remember { mutableStateOf(false) }
+                            val versionName = notifyrelay.desktop.BuildInfo.VERSION_NAME
+                            val updateManager =
+                                remember {
+                                    github.xzynine.checkupdata.CheckUpdateManager(
+                                        java.io
+                                            .File(
+                                                System.getProperty("user.home"),
+                                                ".notifyrelay/cache",
+                                            ).absolutePath,
+                                    )
+                                }
+                            val iconBitmap =
+                                remember {
+                                    notifyrelay.desktop.platform.DesktopLogActions
+                                        .appIcon()
+                                        ?.let {
+                                            org.jetbrains.skia.Image
+                                                .makeFromEncoded(
+                                                    java.io
+                                                        .ByteArrayOutputStream()
+                                                        .also { bos ->
+                                                            javax.imageio.ImageIO.write(it, "png", bos)
+                                                        }.toByteArray(),
+                                                ).toComposeImageBitmap()
+                                        }
+                                }
+                            notifyrelay.shared.ui.screen.DesktopAboutContent(
+                                versionName = versionName,
+                                appIcon = iconBitmap,
+                                isCheckingUpdate = checking,
+                                onCheckUpdate = {
+                                    if (!checking) {
+                                        checking = true
+                                        aboutScope.launch {
+                                            runCatching {
+                                                updateManager.checkUpdate(
+                                                    owner = "NotifyRelay",
+                                                    repo = "Android",
+                                                    currentVersion = versionName,
+                                                    rule =
+                                                        github.xzynine.checkupdata.version
+                                                            .VersionRule.STABLE,
+                                                )
+                                            }
+                                            checking = false
+                                        }
+                                    }
+                                },
+                                onOpenDirectory = {
+                                    notifyrelay.desktop.platform.DesktopLogActions
+                                        .openDirectory()
+                                },
+                                onExport = {
+                                    notifyrelay.desktop.platform.DesktopLogActions
+                                        .exportArchive()
+                                },
+                                autoLaunchSlot = {
+                                    notifyrelay.desktop.platform.DesktopAboutAutoLaunch()
+                                },
+                            )
+                        }
+                    }
+                    entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
+                    entry<Route.SettingsOverlay> {
+                        SettingsOverlayScreen { DesktopOverlaySettingsContent() }
+                    }
+                    entry<Route.SettingsOverlayNotifications> {
+                        SettingsOverlayNotificationsScreen { DesktopOverlayNotificationContent() }
+                    }
+                    entry<Route.SettingsOverlayBalance> {
+                        SettingsOverlayBalanceScreen { DesktopOverlayBalanceContent() }
+                    }
+                    entry<Route.SettingsOverlayLogi> {
+                        SettingsOverlayLogiScreen { DesktopOverlayLogiContent() }
+                    }
+                    entry<Route.SettingsOverlayKeyboard> {
+                        SettingsOverlayKeyboardScreen { DesktopOverlayKeyboardContent() }
+                    }
+                    entry<Route.SettingsOverlayClock> {
+                        SettingsOverlayClockScreen { DesktopOverlayClockContent() }
+                    }
+                    entry<Route.SettingsScrcpy> { ScrcpySettingsPage() }
+                    // 高级设置与基础设置同页：桌面端参数集较移动端少，不再分组
+                    entry<Route.ScrcpyAdvanced> { ScrcpySettingsPage() }
+                    // 虚拟按钮排序在桌面端不接线（无触摸注入语义）
+                    entry<Route.ScrcpyVirtualButtonOrder> { DesktopUnavailableScreen("虚拟按钮排序") { navigator.pop() } }
                 }
             }
         }
