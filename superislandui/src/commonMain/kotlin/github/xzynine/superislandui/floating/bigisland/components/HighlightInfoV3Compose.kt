@@ -21,9 +21,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.ActionInfoButton
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.model.templates.HighlightInfoV3
 import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.SuperIslandImageUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -64,7 +64,7 @@ fun HighlightInfoV3Compose(
             // 高亮文本
             highlightInfoV3.primaryText?.let { text ->
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                     color = primaryColor,
                     fontSize = 17.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -74,7 +74,7 @@ fun HighlightInfoV3Compose(
             // 补充文本（可划线）
             highlightInfoV3.secondaryText?.let { text ->
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                     color = secondaryColor,
                     fontSize = 14.sp,
                     style =

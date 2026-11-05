@@ -14,9 +14,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.model.templates.PicInfo
 import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.SuperIslandImageUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -48,7 +48,7 @@ fun PicInfoCompose(
         picInfo.title?.let {
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                 color = Color(ColorUtils.parseColor(picInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
                 fontSize = 14.sp,
             )

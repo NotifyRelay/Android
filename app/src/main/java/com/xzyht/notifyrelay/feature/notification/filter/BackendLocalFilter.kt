@@ -46,37 +46,37 @@ object BackendLocalFilter {
         }
 
     /** 内置关键词集合。 */
-    fun getBuiltinKeywords(): Set<String> = LocalFilterRepository.getBuiltinKeywords()
+    fun getBuiltinKeywords(): Set<String> = LocalFilterRepository.builtinKeywords()
 
     /** 默认包名过滤集合。 */
-    fun getDefaultPackageFilters(): Set<String> = LocalFilterRepository.getDefaultPackageFilters()
+    fun getDefaultPackageFilters(): Set<String> = LocalFilterRepository.defaultPackageFilters()
 
     /** 全部过滤条目。 */
-    suspend fun getFilterEntries(context: Context): Set<FilterEntry> = LocalFilterRepository.getFilterEntries()
+    suspend fun getFilterEntries(context: Context): Set<FilterEntry> = LocalFilterRepository.entries()
 
     /** 已启用的过滤条目。 */
-    suspend fun getEnabledFilterEntries(context: Context): Set<FilterEntry> = LocalFilterRepository.getEnabledFilterEntries()
+    suspend fun getEnabledFilterEntries(context: Context): Set<FilterEntry> = LocalFilterRepository.enabledEntries()
 
     /** 设置条目启用状态。 */
     suspend fun setFilterEntryEnabled(
         context: Context,
         entry: FilterEntry,
         enabled: Boolean,
-    ) = LocalFilterRepository.setFilterEntryEnabled(entry, enabled)
+    ) = LocalFilterRepository.setEntryEnabled(entry, enabled)
 
     /** 新增条目。 */
     suspend fun addFilterEntry(
         context: Context,
         keyword: String,
         packageName: String,
-    ) = LocalFilterRepository.addFilterEntry(keyword, packageName)
+    ) = LocalFilterRepository.addEntry(keyword, packageName)
 
     /** 删除条目。 */
     suspend fun removeFilterEntry(
         context: Context,
         keyword: String,
         packageName: String,
-    ) = LocalFilterRepository.removeFilterEntry(keyword, packageName)
+    ) = LocalFilterRepository.removeEntry(keyword, packageName)
 
     /**
      * 判断本机通知是否应该被转发（suspend 版本，热路径仅一次查询）。
@@ -91,7 +91,7 @@ object BackendLocalFilter {
         if (LocalFilterRepository.filterSelf && sbn.packageName == context.packageName) return false
 
         // 单次查询：基于同一份 rows 派生 enabled 与 all，避免热路径上重复查询
-        val rows = LocalFilterRepository.getEnabledFilterEntries()
+        val rows = LocalFilterRepository.enabledEntries()
         val enabledEntries = rows
         val enabledPackageFilters = enabledEntries.filter { it.keyword.isBlank() && it.packageName.isNotBlank() }.map { it.packageName }.toSet()
         if (enabledPackageFilters.contains(sbn.packageName)) return false

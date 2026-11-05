@@ -20,13 +20,13 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.model.templates.HighlightInfo
 import kotlinx.coroutines.delay
 import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.SuperIslandImageUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -67,7 +67,7 @@ fun HighlightInfoCompose(
         } else {
             primaryText?.let {
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                     color = Color(primaryColor),
                     fontSize = 20.sp,
                     modifier = Modifier.padding(end = 4.dp),
@@ -80,7 +80,7 @@ fun HighlightInfoCompose(
             ?.takeIf { it.isNotBlank() && it != renderedPrimaryText }
             ?.let {
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                     color = Color(ColorUtils.parseColor(highlightInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(start = 8.dp),
@@ -104,7 +104,7 @@ fun HighlightInfoCompose(
             ?.takeIf { it.isNotBlank() && it != renderedPrimaryText }
             ?.let {
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                     color = Color(ColorUtils.parseColor(highlightInfo.colorSubContent) ?: 0xFF9EA3FF.toInt()),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(start = 8.dp),

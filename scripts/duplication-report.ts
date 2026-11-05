@@ -13,7 +13,7 @@
  */
 
 import { execFileSync } from 'node:child_process'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { relative, resolve } from 'node:path'
 import { detectClones } from 'jscpd'
 import { repoRoot } from './doc-system.config.ts'
@@ -49,8 +49,11 @@ export function sourceFiles(): string[] {
     execFileSync('git', ['ls-files', '-z', ...extra, '--', ...SOURCE_PATTERNS], { cwd: root, encoding: 'utf8' })
       .split('\0')
       .filter(Boolean)
+  // 已从工作区删除但尚未暂存的路径仍在索引里；jscpd 对不存在的路径会整次扫描抛错，
+  // 因此先滤掉，使门禁在删除文件后立刻可用而不必先 git add。
   return [...list(['--cached', '--recurse-submodules']), ...list(['--others', '--exclude-standard'])]
     .map(path => resolve(root, path).replaceAll('\\', '/'))
+    .filter(path => existsSync(path))
 }
 
 /**
@@ -166,21 +169,45 @@ function linesOf(file: string, span: ByteRange): readonly [number, number] {
  * @returns 两侧都是纯 import 时为 true。
  */
 export function isImportOnlyClone(clone: Clone): boolean {
-  return isImportOnlyFragment(clone.duplicationA.fragment ?? '') && isImportOnlyFragment(clone.duplicationB.fragment ?? '')
+  const a = relative(root, clone.duplicationA.sourceId).split('\\').join('/')
+  const b = relative(root, clone.duplicationB.sourceId).split('\\').join('/')
+  return (
+    isImportOnlyRange(a, range(clone, 'duplicationA'), clone.duplicationA.fragment ?? '') &&
+    isImportOnlyRange(b, range(clone, 'duplicationB'), clone.duplicationB.fragment ?? '')
+  )
 }
 
 /**
- * 判断一段片段是否只由 import、use 与 package 声明构成。
+ * 判断某个字节区间覆盖的源码行是否只由 import、use 与 package 声明构成。
+ *
+ * 按行判定而不按片段判定：jscpd 的片段区间对齐到词元，可能从词中间开始（出现裸 `impo`），
+ * 按片段判会把整段 import 误判成逻辑重复。
  *
  * 空行与注释不计入：它们是分组与说明，不改变这段代码的性质。
  *
- * @param fragment - 片段原文。
+ * @param file - 相对仓库的路径。
+ * @param span - 字节区间。
  * @returns 去掉空行与注释后全部是声明行时为 true。
  */
-function isImportOnlyFragment(fragment: string): boolean {
-  const payload = fragment
-    .replace(/\r\n?/g, '\n')
-    .split('\n')
+function isImportOnlyRange(file: string, span: ByteRange, fragment: string): boolean {
+  // 行数取自片段、内容取自源码：jscpd 的字节区间常把下一段的首行一并圈进来，而片段本身
+  // 不会；反过来片段又可能从词中间开始（出现裸 `impo`），所以两边各取所长。
+  const [first] = linesOf(file, span)
+  const count = fragment.replace(/\r\n?/g, '\n').split('\n').length
+  if (first < 1 || count < 1) return isDeclarationsOnly(fragment.split(/\r?\n/))
+  return isDeclarationsOnly(sourceText(file).split(/\r?\n/).slice(first - 1, first - 1 + count))
+}
+
+/**
+ * 判断一组源码行去掉空行与注释后，是否只剩下 import、use 与 package 声明。
+ *
+ * 空行与注释不计入：它们是分组与说明，不改变这段代码的性质。
+ *
+ * @param lines - 源码行，可含空行与注释。
+ * @returns 至少有一行声明，且每一行都是声明时为 true。
+ */
+function isDeclarationsOnly(lines: readonly string[]): boolean {
+  const payload = lines
     .map(line => line.trim())
     .filter(line => line !== '' && !/^(\/\/|\/\*|\*|#(?!include))/.test(line))
   return payload.length > 0 && payload.every(line => /^(import |use |package |#include |extern crate |mod )/.test(line))
@@ -295,7 +322,8 @@ export function mergeIntoBlocks(clones: readonly Clone[]): Block[] {
       const text = item.fragmentA.split(/\r?\n/).map(line => line.trim()).filter(Boolean)
       // 两侧都必须是纯 import 才归入 import 块：只判一侧会让「一侧 import、另一侧是代码」
       // 的克隆冒充成 import 重复。
-      const importOnly = isImportOnlyFragment(item.fragmentA) && isImportOnlyFragment(item.fragmentB)
+      const importOnly =
+        isImportOnlyRange(item.fileA, item.a, item.fragmentA) && isImportOnlyRange(item.fileB, item.b, item.fragmentB)
       blocks.push({
         a: { file: item.fileA, lines: linesA },
         b: { file: item.fileB, lines: linesB },

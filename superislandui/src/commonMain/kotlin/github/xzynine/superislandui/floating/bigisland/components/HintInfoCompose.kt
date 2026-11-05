@@ -21,11 +21,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.ActionInfoButton
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.templates.HintInfo
 import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.SuperIslandImageUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -62,7 +62,7 @@ fun HintInfoCompose(
                 // 按钮组件3：主要文本
                 hintInfo.title?.let { text ->
                     Text(
-                        text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                        text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                         color = colorOf(hintInfo.colorTitle, hintInfo.colorTitleDark, 0xFFFFFFFF.toInt()),
                         fontSize = 16.sp,
                         maxLines = 1,
@@ -103,7 +103,7 @@ fun HintInfoCompose(
                 Column {
                     hintInfo.content?.let { text ->
                         Text(
-                            text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                            text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                             color = colorOf(hintInfo.colorContent, hintInfo.colorContentDark, 0xFFDDDDDD.toInt()),
                             fontSize = 12.sp,
                             maxLines = 1,
@@ -111,7 +111,7 @@ fun HintInfoCompose(
                     }
                     hintInfo.title?.let { text ->
                         Text(
-                            text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                            text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                             color = colorOf(hintInfo.colorTitle, hintInfo.colorTitleDark, 0xFFFFFFFF.toInt()),
                             fontSize = 16.sp,
                             maxLines = 1,
@@ -123,7 +123,7 @@ fun HintInfoCompose(
                     Column(modifier = Modifier.padding(start = 12.dp)) {
                         hintInfo.subContent?.let { text ->
                             Text(
-                                text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                                text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                                 color = colorOf(hintInfo.colorSubContent, hintInfo.colorSubContentDark, 0xFFDDDDDD.toInt()),
                                 fontSize = 12.sp,
                                 maxLines = 1,
@@ -131,7 +131,7 @@ fun HintInfoCompose(
                         }
                         hintInfo.subTitle?.let { text ->
                             Text(
-                                text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                                text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                                 color = colorOf(hintInfo.colorSubTitle, hintInfo.colorSubTitleDark, 0xFFFFFFFF.toInt()),
                                 fontSize = 16.sp,
                                 maxLines = 1,
