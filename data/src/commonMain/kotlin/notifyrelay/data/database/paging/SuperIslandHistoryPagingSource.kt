@@ -1,8 +1,5 @@
 package notifyrelay.data.database.paging
 
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.history.SuperIslandHistoryStore
 import notifyrelay.data.database.repository.DatabaseRepository
@@ -17,7 +14,6 @@ import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 class SuperIslandHistoryPagingSource(
     private val repository: DatabaseRepository,
 ) : GroupedPagingSource<GroupedSuperIslandHistory>() {
-    private val json = Json { ignoreUnknownKeys = true }
     private var cachedGroups: List<PackageGroup>? = null
 
     override suspend fun loadGroupCount(): Int {
@@ -57,7 +53,7 @@ class SuperIslandHistoryPagingSource(
     }
 
     private suspend fun SuperIslandHistoryEntity.toDomainEntry(): SuperIslandHistoryEntry {
-        val resolvedMap = resolvePicMap(parsePicMap(picMap))
+        val resolvedMap = resolvePicMap(picMap)
         return SuperIslandHistoryEntry(
             id = id,
             sourceDeviceUuid = sourceDeviceUuid,
@@ -71,17 +67,6 @@ class SuperIslandHistoryPagingSource(
             rawPayload = rawPayload,
             featureId = featureId,
         )
-    }
-
-    /** 解析 `picMap` 的 JSON 字符串；非法 JSON 退化为空表。 */
-    private fun parsePicMap(raw: String?): Map<String, String> {
-        if (raw.isNullOrBlank()) return emptyMap()
-        return try {
-            val obj = json.parseToJsonElement(raw) as? JsonObject ?: return emptyMap()
-            obj.entries.associate { (key, value) -> key to value.jsonPrimitive.content }
-        } catch (e: IllegalArgumentException) {
-            emptyMap()
-        }
     }
 
     /** 把数字图片 id 解析为图片原文；实现与历史详情共用。 */

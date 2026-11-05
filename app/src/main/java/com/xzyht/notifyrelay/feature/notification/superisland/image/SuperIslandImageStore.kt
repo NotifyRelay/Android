@@ -57,16 +57,6 @@ object SuperIslandImageStore {
         return input.toMap()
     }
 
-    /** 把图片原文绑定到（包名, 图片键）；实现与历史写入共用 [SuperIslandHistoryStore.bindAll]。 */
-    suspend fun bindAll(
-        context: Context,
-        packageName: String?,
-        input: Map<String, String>?,
-    ): Map<String, String> {
-        ensureMigrated(context)
-        return SuperIslandHistoryStore.bindAll(packageName, input)
-    }
-
     /** 把图片 id 解析为原文；实现与历史详情共用 [SuperIslandHistoryStore.resolvePicMap]。 */
     suspend fun resolvePicMap(
         context: Context,
@@ -182,7 +172,7 @@ object SuperIslandImageStore {
 
         val historyEntries = repo.getSuperIslandHistoryFull()
         for (entry in historyEntries) {
-            val oldMap = parsePicMap(entry.picMap)
+            val oldMap = entry.picMap
             if (oldMap.isEmpty()) continue
 
             val packageName = resolvePackageName(entry)
@@ -202,20 +192,11 @@ object SuperIslandImageStore {
                 }
             }
 
-            val updatedEntry = entry.copy(picMap = gson.toJson(newMap))
-            repo.saveSuperIslandHistory(updatedEntry)
+            entry.picMap = newMap
+            repo.saveSuperIslandHistory(entry)
         }
 
         deleteLegacyStoreFile(context)
-    }
-
-    private fun parsePicMap(raw: String?): Map<String, String> {
-        if (raw.isNullOrBlank()) return emptyMap()
-        return try {
-            gson.fromJson(raw, stringStringMapType) ?: emptyMap()
-        } catch (_: Exception) {
-            emptyMap()
-        }
     }
 
     private fun resolvePackageName(entry: SuperIslandHistoryEntity): String {

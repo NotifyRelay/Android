@@ -6,6 +6,7 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
+import notifyrelay.data.database.entity.SuperIslandHistoryImageEntity
 import notifyrelay.data.database.entity.SuperIslandHistorySummary
 
 data class SuperIslandPackageCount(
@@ -29,7 +30,7 @@ interface SuperIslandHistoryDao {
     /**
      * 获取所有超级岛历史记录的摘要（不包含 rawPayload），用于列表/摘要态展示，避免一次性载入大字段
      */
-    @Query("SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, picMap, featureId FROM super_island_history ORDER BY id DESC")
+    @Query("SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, featureId FROM super_island_history ORDER BY id DESC")
     suspend fun getAllHistorySummary(): List<SuperIslandHistorySummary>
 
     /**
@@ -148,7 +149,7 @@ interface SuperIslandHistoryDao {
      */
     @Query(
         """
-        SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, picMap, featureId
+        SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, featureId
         FROM super_island_history
         WHERE 
             CASE 
@@ -170,7 +171,7 @@ interface SuperIslandHistoryDao {
      */
     @Query(
         """
-        SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, picMap, featureId
+        SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, featureId
         FROM super_island_history
         WHERE 
             CASE 
@@ -208,4 +209,20 @@ interface SuperIslandHistoryDao {
      */
     @Query("SELECT COUNT(*) FROM super_island_history")
     suspend fun getCount(): Int
+
+    /** 取单条历史的图片引用。 */
+    @Query("SELECT * FROM super_island_history_images WHERE historyId = :historyId")
+    suspend fun imagesOf(historyId: Long): List<SuperIslandHistoryImageEntity>
+
+    /** 批量取一组历史的图片引用。 */
+    @Query("SELECT * FROM super_island_history_images WHERE historyId IN (:historyIds)")
+    suspend fun imagesOf(historyIds: List<Long>): List<SuperIslandHistoryImageEntity>
+
+    /** 写入图片引用（同键覆盖）。 */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertImages(images: List<SuperIslandHistoryImageEntity>)
+
+    /** 删除某条历史的全部图片引用。 */
+    @Query("DELETE FROM super_island_history_images WHERE historyId = :historyId")
+    suspend fun deleteImagesOf(historyId: Long)
 }

@@ -8,6 +8,7 @@ import androidx.sqlite.SQLiteException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.withContext
+import notifyrelay.base.util.sha256
 import notifyrelay.data.database.AppDatabase
 import notifyrelay.data.database.dao.PackageCount
 import notifyrelay.data.database.entity.AppConfigEntity
@@ -19,6 +20,7 @@ import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.PackageGroupEntity
 import notifyrelay.data.database.entity.PackageGroupItemEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
+import notifyrelay.data.database.entity.SuperIslandHistoryImageEntity
 import notifyrelay.data.database.entity.SuperIslandHistorySummary
 import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
 import notifyrelay.data.database.entity.SuperIslandImageEntity
@@ -341,9 +343,35 @@ open class DatabaseRepository(
      */
     suspend fun getSuperIslandHistory(): List<SuperIslandHistoryEntity> {
         val summaries = superIslandHistoryDao.getAllHistorySummary()
-        return summaries.map { mapToSuperIslandHistoryEntity(it) }
+        return attachImages(summaries.map { mapToSuperIslandHistoryEntity(it) })
     }
 
+    /**
+     * 把图片关联行装回实体的 [SuperIslandHistoryEntity.picMap]。
+     *
+     * 关联值是图片行 id；原文留在 `super_island_images`，由调用方按需解析。
+     * 一次查询取回整批引用，避免逐条查库。
+     *
+     * @param entries 已从表读出的历史条目。
+     * @returns 填好 `picMap` 的同一批条目。
+     */
+    private suspend fun attachImages(entries: List<SuperIslandHistoryEntity>): List<SuperIslandHistoryEntity> {
+        if (entries.isEmpty()) return entries
+        val refs = superIslandHistoryDao.imagesOf(entries.map { it.id })
+        if (refs.isEmpty()) return entries
+        val byHistory = refs.groupBy { it.historyId }
+        for (entry in entries) {
+            val rows = byHistory[entry.id] ?: continue
+            entry.picMap = rows.associate { it.imageKey to it.imageId.toString() }
+        }
+        return entries
+    }
+
+    /**
+     * 把摘要投影装回完整实体；图片引用由调用方另行装配。
+     *
+     * `picMap` 不在投影里：它来自关联表，需要单独一次查询。
+     */
     private fun mapToSuperIslandHistoryEntity(s: SuperIslandHistorySummary): SuperIslandHistoryEntity =
         SuperIslandHistoryEntity(
             id = s.id,
@@ -354,7 +382,6 @@ open class DatabaseRepository(
             title = s.title,
             text = s.text,
             paramV2Raw = s.paramV2Raw,
-            picMap = s.picMap,
             rawPayload = null,
             featureId = s.featureId,
         )
@@ -381,10 +408,23 @@ open class DatabaseRepository(
     suspend fun getLatestSuperIslandHistoryByFeatureId(featureId: String): SuperIslandHistoryEntity? = superIslandHistoryDao.getLatestByFeatureId(featureId)
 
     /**
-     * 保存单条超级岛历史记录
+     * 保存单条超级岛历史记录，并把 [SuperIslandHistoryEntity.picMap] 拆成图片关联行。
+     *
+     * 图片先按内容去重落 `super_island_images` 再写关联；同键旧关联先清后写，
+     * 使保存整条记录的语义与直接覆盖一致。
      */
     suspend fun saveSuperIslandHistory(history: SuperIslandHistoryEntity) {
         superIslandHistoryDao.insert(history)
+        superIslandHistoryDao.deleteImagesOf(history.id)
+        if (history.picMap.isEmpty()) return
+        val now = System.currentTimeMillis()
+        val refs = mutableListOf<SuperIslandHistoryImageEntity>()
+        for ((key, value) in history.picMap) {
+            if (key.isBlank() || value.isBlank()) continue
+            val imageId = upsertSuperIslandImageBinding(history.id, key, value, now)
+            if (imageId > 0) refs.add(SuperIslandHistoryImageEntity(history.id, key, imageId))
+        }
+        if (refs.isNotEmpty()) superIslandHistoryDao.upsertImages(refs)
     }
 
     /**
@@ -410,7 +450,7 @@ open class DatabaseRepository(
     /**
      * 按 id 获取完整的超级岛历史记录（包含 rawPayload），按需调用以避免一次性加载大字段
      */
-    suspend fun getSuperIslandHistoryById(id: Long): SuperIslandHistoryEntity? = superIslandHistoryDao.getById(id)
+    suspend fun getSuperIslandHistoryById(id: Long): SuperIslandHistoryEntity? = superIslandHistoryDao.getById(id)?.let { attachImages(listOf(it)).first() }
 
     /**
      * 获取指定 id 的 rawPayload（仅字符串），按需使用以减少内存峰值
@@ -448,7 +488,7 @@ open class DatabaseRepository(
      */
     suspend fun getSuperIslandHistoryByPackage(packageName: String?): List<SuperIslandHistoryEntity> {
         val summaries = superIslandHistoryDao.getAllByPackage(packageName)
-        return summaries.map { mapToSuperIslandHistoryEntity(it) }
+        return attachImages(summaries.map { mapToSuperIslandHistoryEntity(it) })
     }
 
     /**
@@ -523,6 +563,25 @@ open class DatabaseRepository(
 
         return imageId
     }
+
+    /**
+     * 插入或复用图片，并把它绑定到一条历史记录的图片键上。
+     *
+     * 与按包名绑定的重载分开：历史条目按自身 id 归属图片，包名绑定服务的是
+     * 「同一应用的图标跨条目复用」那条路径，两者互不覆盖。
+     *
+     * @param historyId 历史条目 id。
+     * @param imageKey 图片键。
+     * @param data 图片原文；同内容图片只存一份。
+     * @param lastUpdated 本次写入时间。
+     * @returns 图片行 id；写入失败时为 -1。
+     */
+    suspend fun upsertSuperIslandImageBinding(
+        historyId: Long,
+        imageKey: String,
+        data: String,
+        lastUpdated: Long,
+    ): Long = upsertOrReuseImage(sha256(data), data, lastUpdated)
 
     /**
      * 插入或复用图片（无绑定）并返回图片ID

@@ -1,7 +1,10 @@
 package notifyrelay.data.database.entity
 
 /**
- * 超级岛历史记录的摘要（不包含大文本/二进制字段），用于在列表/摘要视图中显示
+ * 超级岛历史记录的摘要投影（不含 rawPayload 大字段）。
+ *
+ * 只是查询列的子集，不是表：字段取自 [SuperIslandHistoryEntity] 的同名列，
+ * 图片引用从关联表单独装配。
  */
 data class SuperIslandHistorySummary(
     val id: Long,
@@ -12,6 +15,5 @@ data class SuperIslandHistorySummary(
     val title: String? = null,
     val text: String? = null,
     val paramV2Raw: String? = null,
-    val picMap: String = "{}", // 图片键到数据库ID
-    val featureId: String? = null, // 特征ID，用于标识同一座“岛”的一次会话
+    val featureId: String? = null,
 )

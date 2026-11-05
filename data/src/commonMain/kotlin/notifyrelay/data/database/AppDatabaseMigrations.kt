@@ -6,9 +6,11 @@ import androidx.room.migration.Migration
 import androidx.sqlite.SQLiteConnection
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import notifyrelay.base.config.FilterConfigDefaults
 import notifyrelay.base.log.Logger
 import notifyrelay.data.database.migration.execSQL
+import notifyrelay.data.database.migration.forEachRow
 import notifyrelay.data.database.migration.querySingleLong
 import notifyrelay.data.database.migration.querySingleString
 
@@ -31,6 +33,7 @@ object AppDatabaseMigrations {
                 MIGRATION_6_7,
                 MIGRATION_7_8,
                 MIGRATION_8_9,
+                MIGRATION_9_10,
             )
 
     private val MIGRATION_1_2 =
@@ -464,6 +467,62 @@ object AppDatabaseMigrations {
                 )
             }
         }
+    }
+
+    /**
+     * MIGRATION_9_10：`super_island_history.picMap` 的 JSON 列拆为关联表。
+     *
+     * 旧列把「图片键 → 图片 id」塞进一个 JSON 字符串：无法建索引、无法查询、外键管不到，
+     * 目录列表还得整列读出来才能知道有几张图。新表每行一条引用，图片原文仍在
+     * `super_island_images`，同内容图片跨条目共用。
+     *
+     * 只搬运指向已存在图片行的引用：旧列里可能残留非数字值（更早版本直接存 URL 或 data URI），
+     * 那些值没有对应图片行，搬过去会破坏外键，因此在迁移中丢弃。
+     */
+    private val MIGRATION_9_10 =
+        object : Migration(9, 10) {
+            override fun migrate(connection: SQLiteConnection) {
+                connection.execSQL(
+                    "CREATE TABLE IF NOT EXISTS super_island_history_images (" +
+                        "historyId INTEGER NOT NULL, " +
+                        "imageKey TEXT NOT NULL, " +
+                        "imageId INTEGER NOT NULL, " +
+                        "PRIMARY KEY (historyId, imageKey), " +
+                        "FOREIGN KEY (historyId) REFERENCES super_island_history(id) ON DELETE CASCADE, " +
+                        "FOREIGN KEY (imageId) REFERENCES super_island_images(id) ON DELETE CASCADE)",
+                )
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_super_island_history_images_historyId ON super_island_history_images(historyId)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_super_island_history_images_imageId ON super_island_history_images(imageId)")
+
+                // 逐条搬运：解析旧 JSON，只保留能对上图片行的数字 id
+                connection.forEachRow("SELECT id, picMap FROM super_island_history") { row ->
+                    val historyId = row.getLong(0)
+                    val raw = if (row.isNull(1)) null else row.getText(1)
+                    for ((key, value) in parsePicMapJson(raw)) {
+                        val imageId = value.toLongOrNull() ?: continue
+                        if (imageId <= 0) continue
+                        connection.execSQL(
+                            "INSERT OR IGNORE INTO super_island_history_images (historyId, imageKey, imageId) VALUES (?, ?, ?)",
+                            listOf(historyId, key, imageId),
+                        )
+                    }
+                }
+            }
+        }
+
+    /**
+     * 解析旧 `picMap` 列：JSON 对象，键为图片键、值为图片 id 字符串。
+     *
+     * 非法或空值退化为空表，让迁移继续处理其余行而不是整批失败。
+     */
+    private fun parsePicMapJson(raw: String?): Map<String, String> {
+        if (raw.isNullOrBlank()) return emptyMap()
+        val parsed: Map<String, String> =
+            runCatching {
+                val obj = Json.parseToJsonElement(raw) as? JsonObject ?: return@runCatching emptyMap<String, String>()
+                obj.entries.associate { (key, value) -> key to value.toString().trim('"') }
+            }.getOrDefault(emptyMap())
+        return parsed
     }
 
     /** 镜像过滤默认包名禁用集 → super_island_mirror_filters 行 */
