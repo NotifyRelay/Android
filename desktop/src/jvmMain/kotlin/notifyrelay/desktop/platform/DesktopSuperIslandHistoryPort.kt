@@ -36,7 +36,7 @@ class DesktopSuperIslandHistoryPort(
             )
         }
 
-    override suspend fun loadEntryDetail(id: Long): SuperIslandHistoryEntry? = SuperIslandHistoryStore.loadEntryDetail(id)?.toDomainEntry()
+    override suspend fun loadEntryDetail(id: Long): SuperIslandHistoryEntry? = SuperIslandHistoryStore.loadEntryDetail(id)
 
     override suspend fun deleteEntry(id: Long) {
         repository.deleteSuperIslandHistoryById(id)
@@ -52,21 +52,6 @@ class DesktopSuperIslandHistoryPort(
         repository.deleteOldSuperIslandHistory(0)
         historyChangedState.value = historyChangedState.value + 1
     }
-
-    private fun notifyrelay.data.database.history.SuperIslandHistoryStoreEntry.toDomainEntry(): SuperIslandHistoryEntry =
-        SuperIslandHistoryEntry(
-            id = id,
-            sourceDeviceUuid = sourceDeviceUuid,
-            originalPackage = originalPackage,
-            mappedPackage = mappedPackage,
-            appName = appName,
-            title = title,
-            text = text,
-            paramV2Raw = paramV2Raw,
-            picMap = picMap,
-            rawPayload = rawPayload,
-            featureId = featureId,
-        )
 
     private companion object {
         /** 无法归属到具体包名时的分组标签。 */

@@ -1,11 +1,10 @@
 package notifyrelay.data.database.paging
 
-import androidx.paging.PagingSource
-import androidx.paging.PagingState
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
+import notifyrelay.data.database.history.SuperIslandHistoryStore
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.domain.feature.notification.history.GroupedSuperIslandHistory
 import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
@@ -17,69 +16,44 @@ import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
  */
 class SuperIslandHistoryPagingSource(
     private val repository: DatabaseRepository,
-) : PagingSource<Int, GroupedSuperIslandHistory>() {
+) : GroupedPagingSource<GroupedSuperIslandHistory>() {
     private val json = Json { ignoreUnknownKeys = true }
     private var cachedGroups: List<PackageGroup>? = null
 
-    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, GroupedSuperIslandHistory> {
-        return try {
-            val offset = params.key ?: 0
-            val groups =
-                cachedGroups ?: run {
-                    val packageCounts = repository.getSuperIslandPackageCount()
-                    val groupedPackages =
-                        packageCounts.map { count ->
-                            PackageGroup(
-                                packageName = count.packageName,
-                                count = count.count,
-                                latestTime = count.latestTime,
-                            )
-                        }
-                    cachedGroups = groupedPackages
-                    groupedPackages
-                }
-
-            if (groups.isEmpty()) {
-                return LoadResult.Page(emptyList(), prevKey = null, nextKey = null)
+    override suspend fun loadGroupCount(): Int {
+        val packageCounts = repository.getSuperIslandPackageCount()
+        cachedGroups =
+            packageCounts.map { count ->
+                PackageGroup(packageName = count.packageName, count = count.count, latestTime = count.latestTime)
             }
+        return packageCounts.size
+    }
 
-            val pageGroups = groups.drop(offset).take(params.loadSize)
-            val data =
-                pageGroups.map { group ->
-                    val entities =
-                        repository.getSuperIslandHistoryByPackage(
-                            if (group.packageName == UNKNOWN_PACKAGE_LABEL) null else group.packageName,
-                        )
-                    val entries = entities.map { it.toDomainEntry() }
-                    val appName =
-                        entries.firstOrNull()?.appName?.takeIf { it.isNotBlank() }
-                            ?: group.packageName
-
-                    GroupedSuperIslandHistory(
-                        packageName = group.packageName,
-                        appName = appName,
-                        latestTime = group.latestTime,
-                        entries = entries,
-                    )
-                }
-
-            val nextKey = if (offset + pageGroups.size >= groups.size) null else offset + pageGroups.size
-            val prevKey = if (offset == 0) null else maxOf(offset - params.loadSize, 0)
-
-            LoadResult.Page(
-                data = data,
-                prevKey = prevKey,
-                nextKey = nextKey,
+    override suspend fun loadPage(
+        offset: Int,
+        limit: Int,
+    ): List<GroupedSuperIslandHistory> {
+        val groups = cachedGroups ?: emptyList()
+        return groups.drop(offset).take(limit).map { group ->
+            val entities =
+                repository.getSuperIslandHistoryByPackage(
+                    if (group.packageName == UNKNOWN_PACKAGE_LABEL) null else group.packageName,
+                )
+            val entries = entities.map { it.toDomainEntry() }
+            val appName = entries.firstOrNull()?.appName?.takeIf { it.isNotBlank() } ?: group.packageName
+            GroupedSuperIslandHistory(
+                packageName = group.packageName,
+                appName = appName,
+                latestTime = group.latestTime,
+                entries = entries,
             )
-        } catch (e: IllegalStateException) {
-            LoadResult.Error(e)
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, GroupedSuperIslandHistory>): Int? {
-        val anchorPosition = state.anchorPosition ?: return null
-        val page = state.closestPageToPosition(anchorPosition) ?: return null
-        return page.prevKey?.let { it + state.config.pageSize } ?: page.nextKey?.let { it - state.config.pageSize }
+    override fun onLoadError(cause: Exception): LoadResult.Error<Int, GroupedSuperIslandHistory> {
+        // 数据库不可用是唯一可恢复的失败；其余异常继续按原样暴露。
+        if (cause !is IllegalStateException) throw cause
+        return LoadResult.Error(cause)
     }
 
     private suspend fun SuperIslandHistoryEntity.toDomainEntry(): SuperIslandHistoryEntry {
@@ -110,22 +84,8 @@ class SuperIslandHistoryPagingSource(
         }
     }
 
-    /** 把数字图片 id 解析为图片原文；非数字或反查失败时保留原值。 */
-    private suspend fun resolvePicMap(picMap: Map<String, String>): Map<String, String> {
-        if (picMap.isEmpty()) return emptyMap()
-        val out = mutableMapOf<String, String>()
-        for ((key, value) in picMap) {
-            if (value.isBlank()) continue
-            val imageId = value.toLongOrNull()
-            if (imageId == null || imageId <= 0) {
-                out[key] = value
-            } else {
-                val data = repository.resolveSuperIslandImageById(imageId)
-                out[key] = if (!data.isNullOrBlank()) data else value
-            }
-        }
-        return out
-    }
+    /** 把数字图片 id 解析为图片原文；实现与历史详情共用。 */
+    private suspend fun resolvePicMap(picMap: Map<String, String>): Map<String, String> = SuperIslandHistoryStore.resolvePicMap(picMap) { imageId -> repository.resolveSuperIslandImageById(imageId) }
 
     private data class PackageGroup(
         val packageName: String,

@@ -14,21 +14,7 @@ import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.data.platform.LegacyStoragePort
 import notifyrelay.data.platform.LegacyStoragePortRegistry
-
-/** 超级岛历史的写入与详情读取条目。 */
-data class SuperIslandHistoryStoreEntry(
-    val id: Long,
-    val sourceDeviceUuid: String? = null,
-    val originalPackage: String? = null,
-    val mappedPackage: String? = null,
-    val appName: String? = null,
-    val title: String? = null,
-    val text: String? = null,
-    val paramV2Raw: String? = null,
-    val picMap: Map<String, String> = emptyMap(),
-    val rawPayload: String? = null,
-    val featureId: String? = null,
-)
+import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 
 /**
  * 超级岛历史存储：写入、清空与按 id 读取详情。
@@ -45,7 +31,7 @@ object SuperIslandHistoryStore {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** 按 id 读取详情（含图片解析）。 */
-    suspend fun loadEntryDetail(id: Long): SuperIslandHistoryStoreEntry? {
+    suspend fun loadEntryDetail(id: Long): SuperIslandHistoryEntry? {
         val repo = DatabaseRepository.getInstance()
         val entity =
             try {
@@ -56,7 +42,7 @@ object SuperIslandHistoryStore {
             }
         return entity?.let { e ->
             val resolvedPicMap = resolvePicMap(parsePicMap(e.picMap))
-            SuperIslandHistoryStoreEntry(
+            SuperIslandHistoryEntry(
                 id = e.id,
                 sourceDeviceUuid = e.sourceDeviceUuid,
                 originalPackage = e.originalPackage,
@@ -73,7 +59,7 @@ object SuperIslandHistoryStore {
     }
 
     /** 追加一条历史；图片值先绑定为数字 id，写入后裁剪历史条数。 */
-    fun append(entry: SuperIslandHistoryStoreEntry) {
+    fun append(entry: SuperIslandHistoryEntry) {
         scope.launch {
             try {
                 val repository = DatabaseRepository.getInstance()
@@ -102,7 +88,7 @@ object SuperIslandHistoryStore {
     }
 
     /** 把图片原文绑定到（包名, 图片键）并返回「图片键 → 图片 id」映射。 */
-    private suspend fun bindAll(
+    suspend fun bindAll(
         packageName: String?,
         input: Map<String, String>?,
     ): Map<String, String> {
@@ -122,7 +108,7 @@ object SuperIslandHistoryStore {
     }
 
     /** 解析条目所属包名：映射包名优先，其次原始包名，最后应用名。 */
-    private fun resolvePackageName(entry: SuperIslandHistoryStoreEntry): String? {
+    private fun resolvePackageName(entry: SuperIslandHistoryEntry): String? {
         entry.mappedPackage?.takeIf { it.isNotBlank() }?.let { return it }
         entry.originalPackage?.takeIf { it.isNotBlank() }?.let { return it }
         return entry.appName?.takeIf { it.isNotBlank() }
@@ -184,9 +170,23 @@ object SuperIslandHistoryStore {
         }
     }
 
-    private suspend fun resolvePicMap(picMap: Map<String, String>): Map<String, String> {
+    /** 把 `picMap` 中的数字图片 id 解析为图片原文；非数字或反查失败时保留原值。 */
+    suspend fun resolvePicMap(picMap: Map<String, String>): Map<String, String> = resolvePicMap(picMap) { imageId -> DatabaseRepository.getInstance().resolveSuperIslandImageById(imageId) }
+
+    /**
+     * 图片 id 反查原文的共享实现。
+     *
+     * 反查入口由调用方给出：历史、分页源与图片存储读的是同一张绑定表，但取的仓储入口不同。
+     *
+     * @param picMap 图片键到「图片 id 或原文」的映射。
+     * @param lookup 按图片 id 取原文；取不到时返回 null 或空串。
+     * @returns 解析后的映射。
+     */
+    suspend fun resolvePicMap(
+        picMap: Map<String, String>,
+        lookup: suspend (Long) -> String?,
+    ): Map<String, String> {
         if (picMap.isEmpty()) return emptyMap()
-        val repo = DatabaseRepository.getInstance()
         val out = mutableMapOf<String, String>()
         for ((key, value) in picMap) {
             if (value.isBlank()) continue
@@ -194,7 +194,7 @@ object SuperIslandHistoryStore {
             if (imageId == null || imageId <= 0) {
                 out[key] = value
             } else {
-                val data = repo.resolveSuperIslandImageById(imageId)
+                val data = lookup(imageId)
                 out[key] = if (!data.isNullOrBlank()) data else value
             }
         }
