@@ -2,9 +2,9 @@
 
 本文是 `pnpm run verify-duplication` 扫描结果的完整列表，由 `pnpm run verify-duplication:report` 生成；重扫会整体重写，不要手工编辑。门禁口径、基线规则与调高基线的做法见 `Docs/构建与验证.md` 的「重复代码门禁」。
 
-扫描参数 `minLines: 5`、`minTokens: 50`，语料为 `git ls-files` 列出的 Kotlin、Rust 与 TypeScript 源码。jscpd 会把同一处重复按滑动窗口拆成多条克隆，下表按「文件对 + 字节区间重叠」合并为独立重复点，因此条目数少于门禁报出的 428 条克隆。
+扫描参数 `minLines: 5`、`minTokens: 50`，语料为 `git ls-files` 列出的 Kotlin、Rust 与 TypeScript 源码。jscpd 会把同一处重复按滑动窗口拆成多条克隆，下表按「文件对 + 字节区间重叠」合并为独立重复点，因此条目数少于门禁报出的 426 条克隆。
 
-**共 418 个重复点，合计 6675 行。**「行数」取两侧中较长的一侧；位置为 1 基行号区间，按字节偏移换算。
+**共 416 个重复点，合计 6656 行。**「行数」取两侧中较长的一侧；位置为 1 基行号区间，按字节偏移换算。
 
 ## 优先级总览
 
@@ -12,7 +12,7 @@
 
 | 优先级 | 类别 | 重复点 | 行数 | 处理归属 |
 |---|---|---|---|---|
-| P0 | 主仓跨模块生产逻辑 | 5 | 84 | 本仓 |
+| P0 | 主仓跨模块生产逻辑 | 3 | 65 | 本仓 |
 | P1 | 主仓同模块生产逻辑 | 64 | 885 | 本仓 |
 | P2 | 主仓平台镜像实现 | 4 | 105 | 本仓 |
 | P3 | 主仓 import 与包声明块 | 152 | 1301 | 本仓 |
@@ -21,15 +21,13 @@
 
 ## P0 主仓跨模块生产逻辑
 
-两侧是不同模块的生产实现，同一段逻辑被各写一遍，应抽到 `shared` 或 `domain` 的公共实现共用；不合并则两端行为会各自漂移。共 5 个重复点、84 行。
+两侧是不同模块的生产实现，同一段逻辑被各写一遍，应抽到 `shared` 或 `domain` 的公共实现共用；不合并则两端行为会各自漂移。共 3 个重复点、65 行。
 
 | # | 行数 | 一侧 | 另一侧 | 简述 |
 |---|---|---|---|---|
 | 1 | 39 | `app/src/main/java/com/xzyht/notifyrelay/ui/activity/MainActivityContent.kt` :97-135 | `desktop/src/jvmMain/kotlin/notifyrelay/desktop/Main.kt` :456-494 | `val chatPort = devicePortsViewModel().chatPort()` 与 `val snackbarHostState = remember { SnackbarHostState() }`，重合起点 `colorScheme.background), ) { NavDisplay( backStack = navigator.backStack,` |
 | 2 | 16 | `data/src/commonMain/kotlin/notifyrelay/data/database/entity/SuperIslandHistoryEntity.kt` :19-27 | `domain/src/commonMain/kotlin/notifyrelay/domain/feature/notification/history/NotificationHistoryModels.kt` :19-34 | `data class SuperIslandHistoryEntity(` 与 `val notifications: List<NotificationHistoryEntry>,`，重合起点 `val id: Long, val sourceDeviceUuid: String? = null, val originalPackage: String? = null, v` |
-| 3 | 13 | `app/build.gradle.kts` :204-210 | `superislandui/build.gradle.kts` :46-58 | 重合起点 `implementation(libs.compose.multiplatform.runtime) implementation(libs.compose.multiplatfo` |
-| 4 | 10 | `data/src/commonMain/kotlin/notifyrelay/data/database/entity/SuperIslandHistorySummary.kt` :6-15 | `domain/src/commonMain/kotlin/notifyrelay/domain/feature/notification/history/NotificationHistoryModels.kt` :33-42 | `data class SuperIslandHistorySummary(` 与 `data class SuperIslandHistoryEntry(`，重合起点 `( val id: Long, val sourceDeviceUuid: String? = null, val originalPackage: String? = null,` |
-| 5 | 6 | `shared/build.gradle.kts` :37-42 | `superislandui/build.gradle.kts` :58-63 | 重合起点 `implementation(libs.compose.multiplatform.runtime) implementation(libs.compose.multiplatfo` |
+| 3 | 10 | `data/src/commonMain/kotlin/notifyrelay/data/database/entity/SuperIslandHistorySummary.kt` :6-15 | `domain/src/commonMain/kotlin/notifyrelay/domain/feature/notification/history/NotificationHistoryModels.kt` :33-42 | `data class SuperIslandHistorySummary(` 与 `data class SuperIslandHistoryEntry(`，重合起点 `( val id: Long, val sourceDeviceUuid: String? = null, val originalPackage: String? = null,` |
 
 ## P1 主仓同模块生产逻辑
 

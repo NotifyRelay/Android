@@ -207,6 +207,16 @@ coil = ["coil", "coil-compose"]
 datastore = ["androidx-datastore-preferences", "androidx-datastore"]
 kotlinx-coroutines = ["kotlinx-coroutines-core", "kotlinx-coroutines-android"]
 paging = ["androidx-paging-runtime", "androidx-paging-compose"]
+# :app、:shared、:superislandui 的公共源集都声明同一组 Compose Multiplatform 坐标；
+# 收进 bundle 后三处引用同一份清单，新增共同依赖只需改这里。
+compose-multiplatform-common = [
+    "compose-multiplatform-runtime",
+    "compose-multiplatform-foundation",
+    "compose-multiplatform-foundation-layout",
+    "compose-multiplatform-ui",
+    "compose-multiplatform-ui-text",
+    "compose-multiplatform-ui-tooling-preview",
+]
 
 
 [plugins]
