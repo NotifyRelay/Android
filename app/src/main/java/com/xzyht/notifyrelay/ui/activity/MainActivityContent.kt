@@ -14,7 +14,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.pages.ClipboardSyncPage
@@ -46,8 +45,8 @@ import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
 import notifyrelay.shared.ui.screen.SettingsScreen
 import notifyrelay.shared.ui.screen.SettingsSuperIslandScreen
 import notifyrelay.shared.ui.screen.devicelist.DeviceListScreenContent
-import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
 import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
+import notifyrelay.shared.ui.viewmodel.remoteFilterViewModel
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -84,22 +83,7 @@ internal fun MainActivityContent(navigator: Navigator) {
         val colorScheme = MiuixTheme.colorScheme
         SetupSystemBars(isDarkTheme)
 
-        val filterViewModel =
-            viewModel<RemoteFilterViewModel>(
-                factory =
-                    object : androidx.lifecycle.ViewModelProvider.Factory {
-                        @Suppress("UNCHECKED_CAST")
-                        override fun <T : androidx.lifecycle.ViewModel> create(modelClass: Class<T>): T =
-                            RemoteFilterViewModel(
-                                notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry.current
-                                    ?: error("RemoteFilterPort 未注册"),
-                                notifyrelay.shared.feature.appslist.LocalAppsPortRegistry.current
-                                    ?: error("LocalAppsPort 未注册"),
-                                notifyrelay.shared.feature.appslist.AppIconPortRegistry.current
-                                    ?: error("AppIconPort 未注册"),
-                            ) as T
-                    },
-            )
+        val filterViewModel = remoteFilterViewModel()
         // chatPort 在组合期取一次，发送回调内复用（ViewModel 取用本身是 @Composable）
         val chatPort = devicePortsViewModel().chatPort()
 

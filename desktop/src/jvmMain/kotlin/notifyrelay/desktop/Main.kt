@@ -27,13 +27,9 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
-import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
-import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import kotlinx.coroutines.launch
 import notifyrelay.desktop.device.DesktopDeviceManager
@@ -55,9 +51,6 @@ import notifyrelay.desktop.platform.DesktopWindowPlacement
 import notifyrelay.desktop.platform.ProvideDesktopExtraPorts
 import notifyrelay.desktop.platform.ProvideDesktopPairingDependencies
 import notifyrelay.desktop.platform.ProvideDesktopUiPorts
-import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
-import notifyrelay.shared.feature.appslist.AppIconPortRegistry
-import notifyrelay.shared.feature.appslist.LocalAppsPortRegistry
 import notifyrelay.shared.ui.common.NotifyRelayTheme
 import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
@@ -92,7 +85,7 @@ import notifyrelay.shared.ui.screen.SettingsSuperIslandScreen
 import notifyrelay.shared.ui.screen.devicelist.DeviceListScreenContent
 import notifyrelay.shared.ui.screen.devicelist.LocalDeviceListPort
 import notifyrelay.shared.ui.viewmodel.LocalDevicePortsProvider
-import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
+import notifyrelay.shared.ui.viewmodel.remoteFilterViewModel
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
@@ -651,30 +644,6 @@ private fun sendChatMessage(
         deviceManager = provider.message(),
     )
 }
-
-/** 以公共端端口注册表构造远端过滤 ViewModel。 */
-@Composable
-private fun remoteFilterViewModel(): RemoteFilterViewModel =
-    viewModel(
-        factory =
-            factoryOf {
-                RemoteFilterViewModel(
-                    RemoteFilterPortRegistry.current ?: error("RemoteFilterPort 未注册"),
-                    LocalAppsPortRegistry.current ?: error("LocalAppsPort 未注册"),
-                    AppIconPortRegistry.current ?: error("AppIconPort 未注册"),
-                )
-            },
-    )
-
-/** 由无参构造器函数构造 ViewModel 的工厂。 */
-private inline fun <reified VM : ViewModel> factoryOf(crossinline create: () -> VM): ViewModelProvider.Factory =
-    object : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(
-            modelClass: kotlin.reflect.KClass<T>,
-            extras: CreationExtras,
-        ): T = create() as T
-    }
 
 /** 桌面端未接线功能的占位页。 */
 @Composable

@@ -1,14 +1,11 @@
 package com.xzyht.notifyrelay.ui.pages
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -20,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -44,6 +40,7 @@ import notifyrelay.base.util.ToastUtils
 import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.data.Storage
 import notifyrelay.shared.ui.dialog.UpdateDialog
+import notifyrelay.shared.ui.screen.AboutHeader
 import notifyrelay.shared.ui.screen.LogStorageSection
 import notifyrelay.shared.ui.screen.rememberDeveloperModeActivation
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -107,28 +104,7 @@ fun UIAbout() {
                 .fillMaxWidth()
                 .verticalScroll(scrollState),
     ) {
-        appIcon?.let {
-            Image(
-                bitmap = it,
-                contentDescription = "应用图标",
-                modifier =
-                    Modifier
-                        .padding(top = 24.dp)
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .align(Alignment.CenterHorizontally),
-            )
-        }
-
-        Text(
-            text = "Notify Relay",
-            style = textStyles.title1,
-            color = colorScheme.primary,
-            modifier =
-                Modifier
-                    .padding(top = if (appIcon != null) 16.dp else 24.dp, bottom = 16.dp)
-                    .align(Alignment.CenterHorizontally),
-        )
+        AboutHeader(appIcon)
 
         ArrowPreference(
             title = "版本信息",
