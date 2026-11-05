@@ -31,11 +31,10 @@ import notifyrelay.shared.ui.navigation.Route
 import notifyrelay.shared.ui.pages.MusicControlPage
 import notifyrelay.shared.ui.pages.UISuperIslandSettings
 import notifyrelay.shared.ui.pages.chat.UIChatTest
-import notifyrelay.shared.ui.pages.history.NotificationHistoryScreen
-import notifyrelay.shared.ui.pages.history.SuperIslandHistoryScreen
 import notifyrelay.shared.ui.screen.DeveloperModeScreen
 import notifyrelay.shared.ui.screen.DeviceForwardScreen
-import notifyrelay.shared.ui.screen.HistoryScreen
+import notifyrelay.shared.ui.screen.DeviceListTabContent
+import notifyrelay.shared.ui.screen.HistoryTabContent
 import notifyrelay.shared.ui.screen.MainScreen
 import notifyrelay.shared.ui.screen.SettingsAboutScreen
 import notifyrelay.shared.ui.screen.SettingsAppearanceScreen
@@ -44,7 +43,6 @@ import notifyrelay.shared.ui.screen.SettingsLocalFilterScreen
 import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
 import notifyrelay.shared.ui.screen.SettingsScreen
 import notifyrelay.shared.ui.screen.SettingsSuperIslandScreen
-import notifyrelay.shared.ui.screen.devicelist.DeviceListScreenContent
 import notifyrelay.shared.ui.viewmodel.devicePortsViewModel
 import notifyrelay.shared.ui.viewmodel.remoteFilterViewModel
 import top.yukonga.miuix.kmp.nav.core.NavDisplay
@@ -107,65 +105,38 @@ internal fun MainActivityContent(navigator: Navigator) {
                     entry<Route.Main> {
                         MainScreen(
                             navigator = navigator,
-                            deviceListContent = { args ->
-                                DeviceListScreenContent(
-                                    isLandscape = args.isLandscape,
-                                    discoveryEnabled = args.discoveryEnabled,
-                                    onDiscoveryChange = args.onDiscoveryChange,
-                                    allDevices = args.allDevices,
-                                    authedDeviceUuids = args.authedDeviceUuids,
-                                    deviceStates = args.deviceStates,
-                                    unauthedDevices = args.unauthedDevices,
-                                    selectedDevice = args.selectedDevice,
-                                    onSelectDevice = args.onSelectDevice,
-                                    onRequestDelete = args.onRequestDelete,
-                                    onShowRejectedDialog = args.onShowRejectedDialog,
-                                    localBatteryLevel = args.localBatteryLevel,
-                                    colorScheme = MiuixTheme.colorScheme,
-                                    textStyles = MiuixTheme.textStyles,
-                                )
-                            },
+                            deviceListContent = { args -> DeviceListTabContent(args) },
                             historyContent = {
-                                HistoryScreen(
-                                    navigator,
-                                    notificationHistory = { NotificationHistoryScreen() },
-                                    superIslandHistory = { SuperIslandHistoryScreen() },
-                                    chatTest = {
-                                        UIChatTest(
-                                            deviceManager = chatPort,
-                                            onSendMessage = { input ->
-                                                com.xzyht.notifyrelay.sync.MessageSender.sendChatMessage(
-                                                    context,
-                                                    input,
-                                                    chatPort,
-                                                )
-                                            },
-                                        )
-                                    },
-                                )
+                                HistoryTabContent(navigator) {
+                                    UIChatTest(
+                                        deviceManager = chatPort,
+                                        onSendMessage = { input ->
+                                            com.xzyht.notifyrelay.sync.MessageSender.sendChatMessage(
+                                                context,
+                                                input,
+                                                chatPort,
+                                            )
+                                        },
+                                    )
+                                }
                             },
                             forwardContent = { DeviceForwardScreen(filterViewModel = filterViewModel, clipboardSync = { ClipboardSyncPage() }, musicControl = { MusicControlPage() }, scrcpyScreen = { device, onAdvanced -> ScrcpyScreenHost(startScreen = ScrcpyRootScreen.Device, selectedDevice = device?.let { notifyrelay.data.model.SelectedDeviceInfo(it.displayName, it.ip, it.deviceType) }, onOpenAdvanced = onAdvanced) }) },
                             settingsContent = { SettingsScreen() },
                         )
                     }
                     entry<Route.History> {
-                        HistoryScreen(
-                            navigator,
-                            notificationHistory = { NotificationHistoryScreen() },
-                            superIslandHistory = { SuperIslandHistoryScreen() },
-                            chatTest = {
-                                UIChatTest(
-                                    deviceManager = chatPort,
-                                    onSendMessage = { input ->
-                                        com.xzyht.notifyrelay.sync.MessageSender.sendChatMessage(
-                                            context,
-                                            input,
-                                            chatPort,
-                                        )
-                                    },
-                                )
-                            },
-                        )
+                        HistoryTabContent(navigator) {
+                            UIChatTest(
+                                deviceManager = chatPort,
+                                onSendMessage = { input ->
+                                    com.xzyht.notifyrelay.sync.MessageSender.sendChatMessage(
+                                        context,
+                                        input,
+                                        chatPort,
+                                    )
+                                },
+                            )
+                        }
                     }
                     entry<Route.Settings> { SettingsScreen() }
                     entry<Route.ScrcpyAdvanced> { ScrcpyAdvancedScreen(navigator) }

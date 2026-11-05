@@ -62,12 +62,11 @@ import notifyrelay.shared.ui.pages.ScrcpySettingsPage
 import notifyrelay.shared.ui.pages.UISuperIslandSettings
 import notifyrelay.shared.ui.pages.chat.UIChatTest
 import notifyrelay.shared.ui.pages.history.LocalNotificationActionPort
-import notifyrelay.shared.ui.pages.history.NotificationHistoryScreen
-import notifyrelay.shared.ui.pages.history.SuperIslandHistoryScreen
 import notifyrelay.shared.ui.port.ThemeBaseIndex
 import notifyrelay.shared.ui.screen.DeveloperModeScreen
 import notifyrelay.shared.ui.screen.DeviceForwardScreen
-import notifyrelay.shared.ui.screen.HistoryScreen
+import notifyrelay.shared.ui.screen.DeviceListTabContent
+import notifyrelay.shared.ui.screen.HistoryTabContent
 import notifyrelay.shared.ui.screen.MainScreen
 import notifyrelay.shared.ui.screen.SettingsAboutScreen
 import notifyrelay.shared.ui.screen.SettingsAppearanceScreen
@@ -82,7 +81,6 @@ import notifyrelay.shared.ui.screen.SettingsOverlayScreen
 import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
 import notifyrelay.shared.ui.screen.SettingsScreen
 import notifyrelay.shared.ui.screen.SettingsSuperIslandScreen
-import notifyrelay.shared.ui.screen.devicelist.DeviceListScreenContent
 import notifyrelay.shared.ui.screen.devicelist.LocalDeviceListPort
 import notifyrelay.shared.ui.viewmodel.LocalDevicePortsProvider
 import notifyrelay.shared.ui.viewmodel.remoteFilterViewModel
@@ -466,36 +464,14 @@ private fun DesktopRoot(
                         entry<Route.Main> {
                             MainScreen(
                                 navigator = navigator,
-                                deviceListContent = { args ->
-                                    DeviceListScreenContent(
-                                        isLandscape = args.isLandscape,
-                                        discoveryEnabled = args.discoveryEnabled,
-                                        onDiscoveryChange = args.onDiscoveryChange,
-                                        allDevices = args.allDevices,
-                                        authedDeviceUuids = args.authedDeviceUuids,
-                                        deviceStates = args.deviceStates,
-                                        unauthedDevices = args.unauthedDevices,
-                                        selectedDevice = args.selectedDevice,
-                                        onSelectDevice = args.onSelectDevice,
-                                        onRequestDelete = args.onRequestDelete,
-                                        onShowRejectedDialog = args.onShowRejectedDialog,
-                                        localBatteryLevel = args.localBatteryLevel,
-                                        colorScheme = MiuixTheme.colorScheme,
-                                        textStyles = MiuixTheme.textStyles,
-                                    )
-                                },
+                                deviceListContent = { args -> DeviceListTabContent(args) },
                                 historyContent = {
-                                    HistoryScreen(
-                                        navigator,
-                                        notificationHistory = { NotificationHistoryScreen() },
-                                        superIslandHistory = { SuperIslandHistoryScreen() },
-                                        chatTest = {
-                                            UIChatTest(
-                                                deviceManager = devicePortsProviderChatPort(devicePortsProvider),
-                                                onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
-                                            )
-                                        },
-                                    )
+                                    HistoryTabContent(navigator) {
+                                        UIChatTest(
+                                            deviceManager = devicePortsProviderChatPort(devicePortsProvider),
+                                            onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
+                                        )
+                                    }
                                 },
                                 forwardContent = {
                                     DeviceForwardScreen(
@@ -512,17 +488,12 @@ private fun DesktopRoot(
                         }
                         // 与 MainScreen 页签同源：单独 push 这两个路由时复用同一内容，避免未注册 entry 报错
                         entry<Route.History> {
-                            HistoryScreen(
-                                navigator,
-                                notificationHistory = { NotificationHistoryScreen() },
-                                superIslandHistory = { SuperIslandHistoryScreen() },
-                                chatTest = {
-                                    UIChatTest(
-                                        deviceManager = devicePortsProviderChatPort(devicePortsProvider),
-                                        onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
-                                    )
-                                },
-                            )
+                            HistoryTabContent(navigator) {
+                                UIChatTest(
+                                    deviceManager = devicePortsProviderChatPort(devicePortsProvider),
+                                    onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
+                                )
+                            }
                         }
                         entry<Route.Settings> { SettingsScreen(showOverlayEntry = true) }
                         entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
