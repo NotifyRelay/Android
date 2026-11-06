@@ -478,10 +478,53 @@ object AppDatabaseMigrations {
      *
      * 只搬运指向已存在图片行的引用：旧列里可能残留非数字值（更早版本直接存 URL 或 data URI），
      * 那些值没有对应图片行，搬过去会破坏外键，因此在迁移中丢弃。
+     *
+     * 列不能直接 DROP：Room 的版本校验按建表语句比对，`ALTER TABLE ... DROP COLUMN` 留下的
+     * 表结构与注解声明对不上，因此按「建新表、搬数据、换名」重建。
+     *
+     * 顺序是硬要求：先把 `picMap` 读进内存再重建表；若先建关联表再 DROP 旧表，
+     * SQLite 的隐式删除会顺着外键把刚搬好的引用级联删掉。
      */
     private val MIGRATION_9_10 =
         object : Migration(9, 10) {
             override fun migrate(connection: SQLiteConnection) {
+                // 1. 读出旧图片映射。历史上限 600 条，整批放内存不会失控
+                val oldPicMaps = mutableListOf<Pair<Long, Map<String, String>>>()
+                connection.forEachRow("SELECT id, picMap FROM super_island_history") { row ->
+                    val historyId = row.getLong(0)
+                    val raw = if (row.isNull(1)) null else row.getText(1)
+                    oldPicMaps.add(historyId to parsePicMapJson(raw))
+                }
+
+                // 2. 重建历史表：新结构不含 picMap
+                connection.execSQL(
+                    "CREATE TABLE IF NOT EXISTS super_island_history_new (" +
+                        "id INTEGER NOT NULL, " +
+                        "sourceDeviceUuid TEXT, " +
+                        "originalPackage TEXT, " +
+                        "mappedPackage TEXT, " +
+                        "appName TEXT, " +
+                        "title TEXT, " +
+                        "text TEXT, " +
+                        "paramV2Raw TEXT, " +
+                        "rawPayload TEXT, " +
+                        "featureId TEXT, " +
+                        "PRIMARY KEY (id))",
+                )
+                connection.execSQL(
+                    "INSERT INTO super_island_history_new " +
+                        "(id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, rawPayload, featureId) " +
+                        "SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, rawPayload, featureId " +
+                        "FROM super_island_history",
+                )
+                connection.execSQL("DROP TABLE super_island_history")
+                connection.execSQL("ALTER TABLE super_island_history_new RENAME TO super_island_history")
+
+                // 索引随旧表一起丢弃，按实体声明重建
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_super_island_feature_id ON super_island_history(featureId)")
+                connection.execSQL("CREATE INDEX IF NOT EXISTS index_super_island_device_feature ON super_island_history(sourceDeviceUuid, featureId)")
+
+                // 3. 建关联表并回填
                 connection.execSQL(
                     "CREATE TABLE IF NOT EXISTS super_island_history_images (" +
                         "historyId INTEGER NOT NULL, " +
@@ -494,11 +537,8 @@ object AppDatabaseMigrations {
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_super_island_history_images_historyId ON super_island_history_images(historyId)")
                 connection.execSQL("CREATE INDEX IF NOT EXISTS index_super_island_history_images_imageId ON super_island_history_images(imageId)")
 
-                // 逐条搬运：解析旧 JSON，只保留能对上图片行的数字 id
-                connection.forEachRow("SELECT id, picMap FROM super_island_history") { row ->
-                    val historyId = row.getLong(0)
-                    val raw = if (row.isNull(1)) null else row.getText(1)
-                    for ((key, value) in parsePicMapJson(raw)) {
+                for ((historyId, picMap) in oldPicMaps) {
+                    for ((key, value) in picMap) {
                         val imageId = value.toLongOrNull() ?: continue
                         if (imageId <= 0) continue
                         connection.execSQL(
