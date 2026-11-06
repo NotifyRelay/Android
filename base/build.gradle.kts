@@ -39,12 +39,6 @@ kotlin {
     }
 
     sourceSets {
-        // Android 与 JVM 都跑在 JDK 上：日志落盘、归档这类只用 java.util / java.io 的实现
-        // 在两处逐字相同，收敛到两者共同的中间源集，避免同一份分片逻辑维护两遍。
-        val jdkMain by creating { dependsOn(commonMain.get()) }
-        jvmMain.get().dependsOn(jdkMain)
-        androidMain.get().dependsOn(jdkMain)
-
         commonMain.dependencies {
 
             // BatteryIconConverter 返回 Compose Color（CMP 公共端坐标）；
