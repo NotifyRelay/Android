@@ -21,7 +21,6 @@ import notifyrelay.data.database.entity.PackageGroupEntity
 import notifyrelay.data.database.entity.PackageGroupItemEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryImageEntity
-import notifyrelay.data.database.entity.SuperIslandHistorySummary
 import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
 import notifyrelay.data.database.entity.SuperIslandImageEntity
 import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
@@ -341,10 +340,7 @@ open class DatabaseRepository(
      * 获取所有超级岛历史记录（摘要）——不加载 rawPayload，避免占用大量内存
      * 包含所有记录，不进行去重，用于调试
      */
-    suspend fun getSuperIslandHistory(): List<SuperIslandHistoryEntity> {
-        val summaries = superIslandHistoryDao.getAllHistorySummary()
-        return attachImages(summaries.map { mapToSuperIslandHistoryEntity(it) })
-    }
+    suspend fun getSuperIslandHistory(): List<SuperIslandHistoryEntity> = attachImages(superIslandHistoryDao.getAllHistorySummary())
 
     /**
      * 把图片关联行装回实体的 [SuperIslandHistoryEntity.picMap]。
@@ -366,25 +362,6 @@ open class DatabaseRepository(
         }
         return entries
     }
-
-    /**
-     * 把摘要投影装回完整实体；图片引用由调用方另行装配。
-     *
-     * `picMap` 不在投影里：它来自关联表，需要单独一次查询。
-     */
-    private fun mapToSuperIslandHistoryEntity(s: SuperIslandHistorySummary): SuperIslandHistoryEntity =
-        SuperIslandHistoryEntity(
-            id = s.id,
-            sourceDeviceUuid = s.sourceDeviceUuid,
-            originalPackage = s.originalPackage,
-            mappedPackage = s.mappedPackage,
-            appName = s.appName,
-            title = s.title,
-            text = s.text,
-            paramV2Raw = s.paramV2Raw,
-            rawPayload = null,
-            featureId = s.featureId,
-        )
 
     /**
      * 获取完整的超级岛历史记录（包含 rawPayload），仅用于迁移与后台处理
@@ -486,10 +463,7 @@ open class DatabaseRepository(
     /**
      * 按包名获取所有历史记录摘要（用于分组内展示）
      */
-    suspend fun getSuperIslandHistoryByPackage(packageName: String?): List<SuperIslandHistoryEntity> {
-        val summaries = superIslandHistoryDao.getAllByPackage(packageName)
-        return attachImages(summaries.map { mapToSuperIslandHistoryEntity(it) })
-    }
+    suspend fun getSuperIslandHistoryByPackage(packageName: String?): List<SuperIslandHistoryEntity> = attachImages(superIslandHistoryDao.getAllByPackage(packageName))
 
     /**
      * 按包名删除历史记录

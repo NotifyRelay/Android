@@ -5,9 +5,9 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RoomWarnings
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryImageEntity
-import notifyrelay.data.database.entity.SuperIslandHistorySummary
 
 data class SuperIslandPackageCount(
     val packageName: String,
@@ -28,10 +28,13 @@ interface SuperIslandHistoryDao {
     suspend fun getAllHistory(): List<SuperIslandHistoryEntity>
 
     /**
-     * 获取所有超级岛历史记录的摘要（不包含 rawPayload），用于列表/摘要态展示，避免一次性载入大字段
+     * 读取列表用的历史条目（不含 rawPayload 大字段）。
+     *
+     * 返回完整实体而不是单独的投影类型：`picMap` 是 `@Ignore` 的装配字段，查不到也不会报缺失。
      */
     @Query("SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, featureId FROM super_island_history ORDER BY id DESC")
-    suspend fun getAllHistorySummary(): List<SuperIslandHistorySummary>
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    suspend fun getAllHistorySummary(): List<SuperIslandHistoryEntity>
 
     /**
      * 根据特征ID获取最新的历史记录
@@ -160,11 +163,12 @@ interface SuperIslandHistoryDao {
         LIMIT :limit OFFSET :offset
     """,
     )
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     suspend fun getByPackage(
         packageName: String?,
         limit: Int,
         offset: Int,
-    ): List<SuperIslandHistorySummary>
+    ): List<SuperIslandHistoryEntity>
 
     /**
      * 按包名获取所有历史记录摘要（不分页，用于分组内展示）
@@ -181,7 +185,8 @@ interface SuperIslandHistoryDao {
         ORDER BY id DESC
     """,
     )
-    suspend fun getAllByPackage(packageName: String?): List<SuperIslandHistorySummary>
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    suspend fun getAllByPackage(packageName: String?): List<SuperIslandHistoryEntity>
 
     /**
      * 按包名删除历史记录

@@ -8,14 +8,13 @@ import java.util.logging.LogRecord
 import java.util.logging.Logger
 
 /**
- * Android 侧日志文件通道。
+ * 日志文件通道（JDK 目标共用实现）。
  *
- * 落盘与分片完全交给 JDK 的 [FileHandler]：
- * - `limit` 为单个分片字节上限，写出后自动切到下一个分片；
- * - `count` 为保留的分片数量，写满后自动覆盖最旧分片；
- * - 分片命名为 `app.log.0`、`app.log.1`…，即按大小分片而非改名备份。
+ * Android 与桌面都跑在 JVM 上，落盘与分片语义没有平台差异，因此只有这一份实现。
  *
- * 保留天数清理在安装时执行一次，避免启动期产生额外 IO。
+ * 滚动交给 JDK 的 [FileHandler]：`limit` 是单分片字节上限，`count` 是保留分片数，
+ * 分片命名形如 `app.log.0`、`app.log.1`，写满后覆盖最旧分片而非改名备份。
+ * 保留天数清理只在安装时执行一次，避免启动期额外 IO。
  */
 actual object LogFileStore {
     private const val FILE_PATTERN = "app.log"
@@ -42,7 +41,7 @@ actual object LogFileStore {
         val h =
             try {
                 // FileHandler 从 app.log.0 开始编号，写满 limit 后切到 app.log.1，
-                // 达到 count 后覆盖最旧分片，即按大小分片而非改名备份。
+                // 达到 count 后覆盖最旧分片。
                 FileHandler(dir.resolve(FILE_PATTERN).absolutePath, maxFileBytes.toInt(), shardCount, true)
             } catch (_: Throwable) {
                 return
@@ -89,13 +88,10 @@ actual object LogFileStore {
         return removed
     }
 
-    /** 当前日志分片（含锁文件排除）。 */
+    /** 当前日志分片（排除 FileHandler 的锁文件）。 */
     private fun shardFiles(dir: File): List<File> =
         dir
             .listFiles { f -> f.isFile && f.name.startsWith(FILE_PATTERN) && !f.name.endsWith(".lck") }
             ?.toList()
             .orEmpty()
-
-    /** 供日志通道输出。 */
-    internal fun emit(formatted: String) = write(formatted)
 }
