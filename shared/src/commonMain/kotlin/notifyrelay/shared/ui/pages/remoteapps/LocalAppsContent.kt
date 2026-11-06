@@ -1,12 +1,14 @@
 package notifyrelay.shared.ui.pages.remoteapps
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.Modifier
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import notifyrelay.base.log.Logger
@@ -14,26 +16,26 @@ import notifyrelay.domain.feature.appslist.model.LocalAppInfo
 import notifyrelay.domain.feature.appslist.model.appMatchesQuery
 import notifyrelay.shared.feature.appslist.LocalAppsPortRegistry
 import notifyrelay.shared.ui.viewmodel.AppsState
-import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Delete
 import top.yukonga.miuix.kmp.icon.extended.Settings
-import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+/**
+ * 本机应用网格。
+ *
+ * 三类空态与网格参数与远端列表共用，见 [AppsErrorState]、[AppsLoadingState]、[AppsEmptyState]。
+ *
+ * @param state 应用列表状态。
+ * @param onAppClick 单击应用。
+ * @param onAppLongClick 长按应用。
+ */
 @Composable
 fun LocalAppsContent(
     state: AppsState<LocalAppInfo>,
     onAppClick: (LocalAppInfo) -> Unit,
     onAppLongClick: (LocalAppInfo) -> Unit,
 ) {
-    val colorScheme = MiuixTheme.colorScheme
-    val textStyles = MiuixTheme.textStyles
     val appsPort = LocalAppsPortRegistry.current ?: error("LocalAppsPort 未注册")
-
     val apps = state.apps.filter { appMatchesQuery(it.appName, it.packageName, state.searchQuery) }
-
     val iconCache = remember { mutableStateMapOf<String, ImageBitmap?>() }
 
     LaunchedEffect(apps) {
@@ -51,60 +53,15 @@ fun LocalAppsContent(
     }
 
     when {
-        state.error != null -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = MiuixIcons.Delete,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = colorScheme.error,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = state.error,
-                        color = colorScheme.error,
-                    )
-                }
-            }
-        }
-        state.isLoading -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                CircularProgressIndicator()
-            }
-        }
-        apps.isEmpty() -> {
-            Box(
-                modifier = Modifier.fillMaxSize(),
-                contentAlignment = Alignment.Center,
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = MiuixIcons.Settings,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = colorScheme.onSurfaceSecondary,
-                    )
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "暂无应用",
-                        color = colorScheme.onSurfaceSecondary,
-                    )
-                }
-            }
-        }
-        else -> {
+        state.error != null -> AppsErrorState(state.error)
+        state.isLoading -> AppsLoadingState()
+        apps.isEmpty() -> AppsEmptyState("暂无应用", MiuixIcons.Settings)
+        else ->
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 80.dp),
                 contentPadding = PaddingValues(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                horizontalArrangement = Arrangement.spacedBy(AppsGridHorizontalSpacing),
+                verticalArrangement = Arrangement.spacedBy(AppsGridVerticalSpacing),
             ) {
                 items(apps, key = { it.packageName }) { app ->
                     LocalAppItem(
@@ -115,6 +72,5 @@ fun LocalAppsContent(
                     )
                 }
             }
-        }
     }
 }

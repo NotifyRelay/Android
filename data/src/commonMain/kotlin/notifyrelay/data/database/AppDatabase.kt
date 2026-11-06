@@ -1,36 +1,4 @@
-@file:Suppress(
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-)
+@file:Suppress("SpellCheckingInspection")
 
 package notifyrelay.data.database
 
@@ -75,39 +43,7 @@ import notifyrelay.data.database.entity.WhiteListEntryEntity
  * v9: devices 表退役，数据转存到 device_migration 供应用层一次性交给 Rust
  * v10: super_island_history.picMap 的 JSON 列拆为 super_island_history_images 关联表
  */
-@Suppress(
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-)
+
 @Database(
     entities = [
         AppConfigEntity::class,

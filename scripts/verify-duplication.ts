@@ -9,10 +9,12 @@
  * 同一指纹在基线与当前各出现 N 次时视为未新增：jscpd 会把一处重复按相邻窗口合并成多条
  * 克隆，只比对实例存在与否会让基线随首处重复的条数变化而失效。
  *
- * 用法：tsx scripts/verify-duplication.ts [--update | --accept <layer> | --report]
+ * 用法：tsx scripts/verify-duplication.ts [--update | --accept <layer> | --pin <layer> | --report]
  *   --update         按当前扫描结果整体重写基线，并清空整层接受记录。
  *   --accept <layer> 把该层整层接受进基线（记层标识而非逐条指纹），其余层仍按原基线判定。
  *                    该层此后新出现的重复同样不再拦截，因此接受须在提交信息里说明理由。
+ *   --pin <layer>    把该层当前的克隆逐条固定进基线。用于「这一层确实是无法消除的结构重复，
+ *                    但同类新重复仍须拦截」的情形：整层接受会放过该层今后出现的任何重复。
  *   --report         按当前扫描结果重写 `duplication-report.md`；清单不参与门禁判定，门禁也
  *                    不会自动刷新它。
  *
@@ -178,6 +180,23 @@ if (acceptIndex !== -1) {
   const nextLayers = layers.includes(layer) ? layers : [...layers, layer]
   writeBaseline(existing, nextLayers)
   console.log(`verify-duplication: layer ${layer} accepted (${picked.length} clone(s) today); accepted layers now ${nextLayers.join(', ')}.`)
+  process.exit(0)
+}
+
+const pinIndex = process.argv.indexOf('--pin')
+if (pinIndex !== -1) {
+  const layer = process.argv[pinIndex + 1]
+  if (layer === undefined || !(LAYERS as readonly string[]).includes(layer)) {
+    console.error(`verify-duplication: --pin needs one of ${LAYERS.join(', ')}`)
+    process.exit(1)
+  }
+  const read = readBaseline()
+  const existing = 'baseline' in read ? read.baseline.fingerprints : []
+  const layers = 'baseline' in read ? (read.baseline.acceptedLayers ?? []) : []
+  const picked = current.filter(fingerprint => layerByFingerprint.get(fingerprint) === layer)
+  // 逐条固定而不是整层接受：该层被认定为无法消除的结构重复，但新出现的同类重复仍要拦。
+  writeBaseline([...existing, ...picked], layers)
+  console.log(`verify-duplication: pinned ${picked.length} clone(s) in layer ${layer}; baseline now ${existing.length + picked.length}.`)
   process.exit(0)
 }
 
