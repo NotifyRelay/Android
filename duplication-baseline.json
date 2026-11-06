@@ -2,8 +2,9 @@
   "note": "已接受的重复指纹；只允许调低。调高须先确认无法消除，并在提交信息里说明理由。",
   "minLines": 5,
   "minTokens": 50,
-  "count": 1,
+  "count": 2,
   "fingerprints": [
+    "app/src/main/java/com/xzyht/notifyrelay/feature/appslist/AndroidRemoteAppsPort.kt|desktop/src/jvmMain/kotlin/notifyrelay/desktop/platform/DesktopAppPorts.kt|18|b7680061ea1f3cd6",
     "data/src/commonMain/kotlin/notifyrelay/data/database/entity/SuperIslandHistoryEntity.kt|domain/src/commonMain/kotlin/notifyrelay/domain/feature/notification/history/NotificationHistoryModels.kt|9|e8e5ed32a6d24b8c"
   ],
   "acceptedLayers": [

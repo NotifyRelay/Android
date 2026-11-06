@@ -61,7 +61,7 @@ class NotifyRelayApplication : Application() {
 
         AppIconPortRegistry.install(AndroidAppIconPort(this))
         LocalAppsPortRegistry.install(AndroidLocalAppsPort(this))
-        PinnedAppsPortRegistry.install(AndroidPinnedAppsPort())
+        PinnedAppsPortRegistry.install(AndroidPinnedAppsPort)
         RemoteAppsPortRegistry.install(AndroidRemoteAppsPort(this))
         LocalFilterPortRegistry.install(LocalFilterRepository)
         RemoteFilterPortRegistry.install(RemoteFilterRepository())

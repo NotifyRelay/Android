@@ -1,6 +1,7 @@
 package notifyrelay.shared.feature.appslist
 
 import kotlinx.coroutines.flow.StateFlow
+import notifyrelay.data.repository.applist.PinnedAppsRepository
 
 /**
  * 应用置顶状态端口。
@@ -31,4 +32,30 @@ interface PinnedAppsPort {
         deviceUuid: String,
         packageName: String,
     ): Boolean
+}
+
+/**
+ * 以 [PinnedAppsRepository] 为唯一来源的置顶端口实现。
+ *
+ * 两端没有平台差异：置顶状态存在公共数据层，UI 与远端列表读的是同一份。
+ */
+object RepositoryPinnedAppsPort : PinnedAppsPort {
+    override val pinnedApps: StateFlow<Map<String, Set<String>>> get() = PinnedAppsRepository.pinnedApps
+
+    override fun load(deviceUuid: String) = PinnedAppsRepository.loadPinnedApps(deviceUuid)
+
+    override fun pin(
+        deviceUuid: String,
+        packageName: String,
+    ) = PinnedAppsRepository.pinApp(deviceUuid, packageName)
+
+    override fun unpin(
+        deviceUuid: String,
+        packageName: String,
+    ) = PinnedAppsRepository.unpinApp(deviceUuid, packageName)
+
+    override fun isPinned(
+        deviceUuid: String,
+        packageName: String,
+    ): Boolean = PinnedAppsRepository.isAppPinned(deviceUuid, packageName)
 }

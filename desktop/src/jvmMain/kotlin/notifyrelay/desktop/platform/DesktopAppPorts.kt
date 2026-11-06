@@ -14,7 +14,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
 import notifyrelay.data.database.repository.DatabaseRepository
-import notifyrelay.data.repository.applist.PinnedAppsRepository
 import notifyrelay.domain.feature.appslist.RemoteAppsPort
 import notifyrelay.domain.feature.appslist.model.LocalAppInfo
 import notifyrelay.domain.feature.appslist.model.RemoteAppInfo
@@ -23,6 +22,7 @@ import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
 import notifyrelay.shared.feature.appslist.AppIconPort
 import notifyrelay.shared.feature.appslist.LocalAppsPort
+import notifyrelay.shared.feature.appslist.RepositoryPinnedAppsPort
 
 /**
  * 桌面端远端应用列表端口。
@@ -37,21 +37,21 @@ class DesktopRemoteAppsPort(
 ) : RemoteAppsPort {
     override val iconUpdates: StateFlow<Pair<String, Long>?> get() = RemoteAppIconCache.iconUpdates
 
-    override val pinnedApps: StateFlow<Map<String, Set<String>>> get() = PinnedAppsRepository.pinnedApps
+    override val pinnedApps: StateFlow<Map<String, Set<String>>> get() = RepositoryPinnedAppsPort.pinnedApps
 
     override suspend fun remoteApps(deviceUuid: String): List<RemoteAppInfo> = RemoteAppsCacheCore.list(deviceUuid)
 
-    override fun loadPinned(deviceUuid: String) = PinnedAppsRepository.loadPinnedApps(deviceUuid)
+    override fun loadPinned(deviceUuid: String) = RepositoryPinnedAppsPort.load(deviceUuid)
 
     override fun pin(
         deviceUuid: String,
         packageName: String,
-    ) = PinnedAppsRepository.pinApp(deviceUuid, packageName)
+    ) = RepositoryPinnedAppsPort.pin(deviceUuid, packageName)
 
     override fun unpin(
         deviceUuid: String,
         packageName: String,
-    ) = PinnedAppsRepository.unpinApp(deviceUuid, packageName)
+    ) = RepositoryPinnedAppsPort.unpin(deviceUuid, packageName)
 
     override suspend fun requestAppList(deviceUuid: String): Boolean {
         val manager = deviceMessagePort() ?: return false

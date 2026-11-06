@@ -197,7 +197,7 @@ object DataLayerDesktop {
                 )
 
             // 置顶应用由公共仓库承担，端口直接暴露其状态流
-            PinnedAppsPortRegistry.install(DesktopPinnedAppsPort())
+            PinnedAppsPortRegistry.install(DesktopPinnedAppsPort)
 
             // 本机通知采集与转发：采集经 smtc-rust 的 WinRT 桥，转发委托公共网关
             localNotificationRelay = notifyrelay.desktop.device.DesktopLocalNotificationRelay { deviceMessagePort() }

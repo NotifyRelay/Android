@@ -193,8 +193,14 @@ if (pinIndex !== -1) {
   const read = readBaseline()
   const existing = 'baseline' in read ? read.baseline.fingerprints : []
   const layers = 'baseline' in read ? (read.baseline.acceptedLayers ?? []) : []
-  const picked = current.filter(fingerprint => layerByFingerprint.get(fingerprint) === layer)
+  const known = countByFingerprint(existing)
+  const seen = countByFingerprint(current.filter(fingerprint => layerByFingerprint.get(fingerprint) === layer))
   // 逐条固定而不是整层接受：该层被认定为无法消除的结构重复，但新出现的同类重复仍要拦。
+  // 只补「当前次数超出已记录次数」的部分：重复执行 --pin 不得把同一指纹叠加进基线。
+  const picked: string[] = []
+  for (const [item, times] of seen) {
+    for (let index = known.get(item) ?? 0; index < times; index += 1) picked.push(item)
+  }
   writeBaseline([...existing, ...picked], layers)
   console.log(`verify-duplication: pinned ${picked.length} clone(s) in layer ${layer}; baseline now ${existing.length + picked.length}.`)
   process.exit(0)
