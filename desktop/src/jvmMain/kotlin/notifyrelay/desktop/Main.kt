@@ -1,7 +1,6 @@
 package notifyrelay.desktop
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -27,13 +26,9 @@ import androidx.compose.ui.window.WindowPlacement
 import androidx.compose.ui.window.WindowPosition
 import androidx.compose.ui.window.application
 import androidx.compose.ui.window.rememberWindowState
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
 import androidx.lifecycle.ViewModelStoreOwner
-import androidx.lifecycle.viewmodel.CreationExtras
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
-import androidx.lifecycle.viewmodel.compose.viewModel
 import dev.nucleusframework.darkmodedetector.isSystemInDarkMode
 import kotlinx.coroutines.launch
 import notifyrelay.desktop.device.DesktopDeviceManager
@@ -55,10 +50,8 @@ import notifyrelay.desktop.platform.DesktopWindowPlacement
 import notifyrelay.desktop.platform.ProvideDesktopExtraPorts
 import notifyrelay.desktop.platform.ProvideDesktopPairingDependencies
 import notifyrelay.desktop.platform.ProvideDesktopUiPorts
-import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
-import notifyrelay.shared.feature.appslist.AppIconPortRegistry
-import notifyrelay.shared.feature.appslist.LocalAppsPortRegistry
 import notifyrelay.shared.ui.common.NotifyRelayTheme
+import notifyrelay.shared.ui.navigation.AppNavDisplay
 import notifyrelay.shared.ui.navigation.LocalNavigator
 import notifyrelay.shared.ui.navigation.Navigator
 import notifyrelay.shared.ui.navigation.Route
@@ -69,12 +62,11 @@ import notifyrelay.shared.ui.pages.ScrcpySettingsPage
 import notifyrelay.shared.ui.pages.UISuperIslandSettings
 import notifyrelay.shared.ui.pages.chat.UIChatTest
 import notifyrelay.shared.ui.pages.history.LocalNotificationActionPort
-import notifyrelay.shared.ui.pages.history.NotificationHistoryScreen
-import notifyrelay.shared.ui.pages.history.SuperIslandHistoryScreen
 import notifyrelay.shared.ui.port.ThemeBaseIndex
 import notifyrelay.shared.ui.screen.DeveloperModeScreen
 import notifyrelay.shared.ui.screen.DeviceForwardScreen
-import notifyrelay.shared.ui.screen.HistoryScreen
+import notifyrelay.shared.ui.screen.DeviceListTabContent
+import notifyrelay.shared.ui.screen.HistoryTabContent
 import notifyrelay.shared.ui.screen.MainScreen
 import notifyrelay.shared.ui.screen.SettingsAboutScreen
 import notifyrelay.shared.ui.screen.SettingsAppearanceScreen
@@ -89,16 +81,14 @@ import notifyrelay.shared.ui.screen.SettingsOverlayScreen
 import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
 import notifyrelay.shared.ui.screen.SettingsScreen
 import notifyrelay.shared.ui.screen.SettingsSuperIslandScreen
-import notifyrelay.shared.ui.screen.devicelist.DeviceListScreenContent
 import notifyrelay.shared.ui.screen.devicelist.LocalDeviceListPort
 import notifyrelay.shared.ui.viewmodel.LocalDevicePortsProvider
-import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
+import notifyrelay.shared.ui.viewmodel.remoteFilterViewModel
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SnackbarDuration
 import top.yukonga.miuix.kmp.basic.SnackbarHost
 import top.yukonga.miuix.kmp.basic.SnackbarHostState
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.nav.core.NavDisplay
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.abs
 
@@ -455,182 +445,143 @@ private fun DesktopRoot(
                 containerColor = MiuixTheme.colorScheme.background,
                 snackbarHost = { SnackbarHost(snackbarHostState) },
             ) { paddingValues ->
-                Box(
-                    modifier =
-                        Modifier
-                            .fillMaxSize()
-                            .padding(paddingValues)
-                            .background(MiuixTheme.colorScheme.background),
+                AppNavDisplay(
+                    navigator = navigator,
+                    modifier = Modifier.padding(paddingValues),
                 ) {
-                    NavDisplay(
-                        backStack = navigator.backStack,
-                        onBack = {
-                            if (navigator.backStackSize() > 1) {
-                                navigator.pop()
-                            }
-                        },
-                    ) {
-                        entry<Route.Main> {
-                            MainScreen(
-                                navigator = navigator,
-                                deviceListContent = { args ->
-                                    DeviceListScreenContent(
-                                        isLandscape = args.isLandscape,
-                                        discoveryEnabled = args.discoveryEnabled,
-                                        onDiscoveryChange = args.onDiscoveryChange,
-                                        allDevices = args.allDevices,
-                                        authedDeviceUuids = args.authedDeviceUuids,
-                                        deviceStates = args.deviceStates,
-                                        unauthedDevices = args.unauthedDevices,
-                                        selectedDevice = args.selectedDevice,
-                                        onSelectDevice = args.onSelectDevice,
-                                        onRequestDelete = args.onRequestDelete,
-                                        onShowRejectedDialog = args.onShowRejectedDialog,
-                                        localBatteryLevel = args.localBatteryLevel,
-                                        colorScheme = MiuixTheme.colorScheme,
-                                        textStyles = MiuixTheme.textStyles,
-                                    )
-                                },
-                                historyContent = {
-                                    HistoryScreen(
-                                        navigator,
-                                        notificationHistory = { NotificationHistoryScreen() },
-                                        superIslandHistory = { SuperIslandHistoryScreen() },
-                                        chatTest = {
-                                            UIChatTest(
-                                                deviceManager = devicePortsProviderChatPort(devicePortsProvider),
-                                                onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
-                                            )
-                                        },
-                                    )
-                                },
-                                forwardContent = {
-                                    DeviceForwardScreen(
-                                        filterViewModel = remoteFilterViewModel(),
-                                        clipboardSync = { ClipboardSyncPage() },
-                                        musicControl = { MusicControlPage() },
-                                        scrcpyScreen = { deviceInfo, _ ->
-                                            DesktopScrcpyScreen(devicePortsProvider, deviceInfo)
-                                        },
-                                    )
-                                },
-                                settingsContent = { SettingsScreen(showOverlayEntry = true) },
-                            )
-                        }
-                        // 与 MainScreen 页签同源：单独 push 这两个路由时复用同一内容，避免未注册 entry 报错
-                        entry<Route.History> {
-                            HistoryScreen(
-                                navigator,
-                                notificationHistory = { NotificationHistoryScreen() },
-                                superIslandHistory = { SuperIslandHistoryScreen() },
-                                chatTest = {
+                    entry<Route.Main> {
+                        MainScreen(
+                            navigator = navigator,
+                            deviceListContent = { args -> DeviceListTabContent(args) },
+                            historyContent = {
+                                HistoryTabContent(navigator) {
                                     UIChatTest(
                                         deviceManager = devicePortsProviderChatPort(devicePortsProvider),
                                         onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
                                     )
+                                }
+                            },
+                            forwardContent = {
+                                DeviceForwardScreen(
+                                    filterViewModel = remoteFilterViewModel(),
+                                    clipboardSync = { ClipboardSyncPage() },
+                                    musicControl = { MusicControlPage() },
+                                    scrcpyScreen = { deviceInfo, _ ->
+                                        DesktopScrcpyScreen(devicePortsProvider, deviceInfo)
+                                    },
+                                )
+                            },
+                            settingsContent = { SettingsScreen(showOverlayEntry = true) },
+                        )
+                    }
+                    // 与 MainScreen 页签同源：单独 push 这两个路由时复用同一内容，避免未注册 entry 报错
+                    entry<Route.History> {
+                        HistoryTabContent(navigator) {
+                            UIChatTest(
+                                deviceManager = devicePortsProviderChatPort(devicePortsProvider),
+                                onSendMessage = { input -> sendChatMessage(devicePortsProvider, input) },
+                            )
+                        }
+                    }
+                    entry<Route.Settings> { SettingsScreen(showOverlayEntry = true) }
+                    entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
+                    entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
+                    entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
+                    entry<Route.SettingsDeveloperMode> {
+                        SettingsDeveloperModeScreen {
+                            DeveloperModeScreen(desktopExtraContent = { DesktopDeveloperContent() })
+                        }
+                    }
+                    entry<Route.SettingsAbout> {
+                        SettingsAboutScreen {
+                            val aboutScope = rememberCoroutineScope()
+                            var checking by remember { mutableStateOf(false) }
+                            val versionName = notifyrelay.desktop.BuildInfo.VERSION_NAME
+                            val updateManager =
+                                remember {
+                                    github.xzynine.checkupdata.CheckUpdateManager(
+                                        java.io
+                                            .File(
+                                                System.getProperty("user.home"),
+                                                ".notifyrelay/cache",
+                                            ).absolutePath,
+                                    )
+                                }
+                            val iconBitmap =
+                                remember {
+                                    notifyrelay.desktop.platform.DesktopLogActions
+                                        .appIcon()
+                                        ?.let {
+                                            org.jetbrains.skia.Image
+                                                .makeFromEncoded(
+                                                    java.io
+                                                        .ByteArrayOutputStream()
+                                                        .also { bos ->
+                                                            javax.imageio.ImageIO.write(it, "png", bos)
+                                                        }.toByteArray(),
+                                                ).toComposeImageBitmap()
+                                        }
+                                }
+                            notifyrelay.shared.ui.screen.DesktopAboutContent(
+                                versionName = versionName,
+                                appIcon = iconBitmap,
+                                isCheckingUpdate = checking,
+                                onCheckUpdate = {
+                                    if (!checking) {
+                                        checking = true
+                                        aboutScope.launch {
+                                            runCatching {
+                                                updateManager.checkUpdate(
+                                                    owner = "NotifyRelay",
+                                                    repo = "Android",
+                                                    currentVersion = versionName,
+                                                    rule =
+                                                        github.xzynine.checkupdata.version
+                                                            .VersionRule.STABLE,
+                                                )
+                                            }
+                                            checking = false
+                                        }
+                                    }
+                                },
+                                onOpenDirectory = {
+                                    notifyrelay.desktop.platform.DesktopLogActions
+                                        .openDirectory()
+                                },
+                                onExport = {
+                                    notifyrelay.desktop.platform.DesktopLogActions
+                                        .exportArchive()
+                                },
+                                autoLaunchSlot = {
+                                    notifyrelay.desktop.platform.DesktopAboutAutoLaunch()
                                 },
                             )
                         }
-                        entry<Route.Settings> { SettingsScreen(showOverlayEntry = true) }
-                        entry<Route.SettingsRemoteFilter> { SettingsRemoteFilterScreen() }
-                        entry<Route.SettingsLocalFilter> { SettingsLocalFilterScreen() }
-                        entry<Route.SettingsSuperIsland> { SettingsSuperIslandScreen { UISuperIslandSettings() } }
-                        entry<Route.SettingsDeveloperMode> {
-                            SettingsDeveloperModeScreen {
-                                DeveloperModeScreen(desktopExtraContent = { DesktopDeveloperContent() })
-                            }
-                        }
-                        entry<Route.SettingsAbout> {
-                            SettingsAboutScreen {
-                                val aboutScope = rememberCoroutineScope()
-                                var checking by remember { mutableStateOf(false) }
-                                val versionName = notifyrelay.desktop.BuildInfo.VERSION_NAME
-                                val updateManager =
-                                    remember {
-                                        github.xzynine.checkupdata.CheckUpdateManager(
-                                            java.io
-                                                .File(
-                                                    System.getProperty("user.home"),
-                                                    ".notifyrelay/cache",
-                                                ).absolutePath,
-                                        )
-                                    }
-                                val iconBitmap =
-                                    remember {
-                                        notifyrelay.desktop.platform.DesktopLogActions
-                                            .appIcon()
-                                            ?.let {
-                                                org.jetbrains.skia.Image
-                                                    .makeFromEncoded(
-                                                        java.io
-                                                            .ByteArrayOutputStream()
-                                                            .also { bos ->
-                                                                javax.imageio.ImageIO.write(it, "png", bos)
-                                                            }.toByteArray(),
-                                                    ).toComposeImageBitmap()
-                                            }
-                                    }
-                                notifyrelay.shared.ui.screen.DesktopAboutContent(
-                                    versionName = versionName,
-                                    appIcon = iconBitmap,
-                                    isCheckingUpdate = checking,
-                                    onCheckUpdate = {
-                                        if (!checking) {
-                                            checking = true
-                                            aboutScope.launch {
-                                                runCatching {
-                                                    updateManager.checkUpdate(
-                                                        owner = "NotifyRelay",
-                                                        repo = "Android",
-                                                        currentVersion = versionName,
-                                                        rule =
-                                                            github.xzynine.checkupdata.version
-                                                                .VersionRule.STABLE,
-                                                    )
-                                                }
-                                                checking = false
-                                            }
-                                        }
-                                    },
-                                    onOpenDirectory = {
-                                        notifyrelay.desktop.platform.DesktopLogActions
-                                            .openDirectory()
-                                    },
-                                    onExport = {
-                                        notifyrelay.desktop.platform.DesktopLogActions
-                                            .exportArchive()
-                                    },
-                                    autoLaunchSlot = {
-                                        notifyrelay.desktop.platform.DesktopAboutAutoLaunch()
-                                    },
-                                )
-                            }
-                        }
-                        entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
-                        entry<Route.SettingsOverlay> {
-                            SettingsOverlayScreen { DesktopOverlaySettingsContent() }
-                        }
-                        entry<Route.SettingsOverlayNotifications> {
-                            SettingsOverlayNotificationsScreen { DesktopOverlayNotificationContent() }
-                        }
-                        entry<Route.SettingsOverlayBalance> {
-                            SettingsOverlayBalanceScreen { DesktopOverlayBalanceContent() }
-                        }
-                        entry<Route.SettingsOverlayLogi> {
-                            SettingsOverlayLogiScreen { DesktopOverlayLogiContent() }
-                        }
-                        entry<Route.SettingsOverlayKeyboard> {
-                            SettingsOverlayKeyboardScreen { DesktopOverlayKeyboardContent() }
-                        }
-                        entry<Route.SettingsOverlayClock> {
-                            SettingsOverlayClockScreen { DesktopOverlayClockContent() }
-                        }
-                        entry<Route.SettingsScrcpy> { ScrcpySettingsPage() }
-                        // 高级设置与基础设置同页：桌面端参数集较移动端少，不再分组
-                        entry<Route.ScrcpyAdvanced> { ScrcpySettingsPage() }
-                        // 虚拟按钮排序在桌面端不接线（无触摸注入语义）
-                        entry<Route.ScrcpyVirtualButtonOrder> { DesktopUnavailableScreen("虚拟按钮排序") { navigator.pop() } }
                     }
+                    entry<Route.SettingsAppearance> { SettingsAppearanceScreen() }
+                    entry<Route.SettingsOverlay> {
+                        SettingsOverlayScreen { DesktopOverlaySettingsContent() }
+                    }
+                    entry<Route.SettingsOverlayNotifications> {
+                        SettingsOverlayNotificationsScreen { DesktopOverlayNotificationContent() }
+                    }
+                    entry<Route.SettingsOverlayBalance> {
+                        SettingsOverlayBalanceScreen { DesktopOverlayBalanceContent() }
+                    }
+                    entry<Route.SettingsOverlayLogi> {
+                        SettingsOverlayLogiScreen { DesktopOverlayLogiContent() }
+                    }
+                    entry<Route.SettingsOverlayKeyboard> {
+                        SettingsOverlayKeyboardScreen { DesktopOverlayKeyboardContent() }
+                    }
+                    entry<Route.SettingsOverlayClock> {
+                        SettingsOverlayClockScreen { DesktopOverlayClockContent() }
+                    }
+                    entry<Route.SettingsScrcpy> { ScrcpySettingsPage() }
+                    // 高级设置与基础设置同页：桌面端参数集较移动端少，不再分组
+                    entry<Route.ScrcpyAdvanced> { ScrcpySettingsPage() }
+                    // 虚拟按钮排序在桌面端不接线（无触摸注入语义）
+                    entry<Route.ScrcpyVirtualButtonOrder> { DesktopUnavailableScreen("虚拟按钮排序") { navigator.pop() } }
                 }
             }
         }
@@ -651,30 +602,6 @@ private fun sendChatMessage(
         deviceManager = provider.message(),
     )
 }
-
-/** 以公共端端口注册表构造远端过滤 ViewModel。 */
-@Composable
-private fun remoteFilterViewModel(): RemoteFilterViewModel =
-    viewModel(
-        factory =
-            factoryOf {
-                RemoteFilterViewModel(
-                    RemoteFilterPortRegistry.current ?: error("RemoteFilterPort 未注册"),
-                    LocalAppsPortRegistry.current ?: error("LocalAppsPort 未注册"),
-                    AppIconPortRegistry.current ?: error("AppIconPort 未注册"),
-                )
-            },
-    )
-
-/** 由无参构造器函数构造 ViewModel 的工厂。 */
-private inline fun <reified VM : ViewModel> factoryOf(crossinline create: () -> VM): ViewModelProvider.Factory =
-    object : ViewModelProvider.Factory {
-        @Suppress("UNCHECKED_CAST")
-        override fun <T : ViewModel> create(
-            modelClass: kotlin.reflect.KClass<T>,
-            extras: CreationExtras,
-        ): T = create() as T
-    }
 
 /** 桌面端未接线功能的占位页。 */
 @Composable

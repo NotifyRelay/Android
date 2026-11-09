@@ -97,15 +97,7 @@ object DesktopScrcpyLauncher {
         val settings = ScrcpySettingsStore.load(deviceUuid)
 
         // 解析实际可用的 adb 序列号；失败时不再退化为固定端口
-        val serial =
-            DesktopAdbDeviceResolver.resolveSerial(
-                adbPath = adbPath(),
-                deviceUuid = deviceUuid,
-                deviceName = deviceName,
-                deviceIp = deviceIp,
-                preference = settings.devicePreference,
-                tcpipEnabled = settings.adbTcpipModeEnabled,
-            )
+        val serial = resolveSerialWith(deviceUuid, deviceName, deviceIp, settings)
         if (serial.isNullOrBlank()) {
             DesktopToastHost.show("未找到该设备的 adb 连接，请确认已开启 USB 调试或无线调试", DesktopToastHost.Duration.LONG)
             return false
@@ -123,15 +115,7 @@ object DesktopScrcpyLauncher {
             val command = listOf(executable.absolutePath) + args
             Logger.i(TAG, "启动 scrcpy: " + command.joinToString(" "))
             // 不合并 stderr：错误输出单独回收，异常退出时用于提示与日志
-            val builder =
-                ProcessBuilder(command)
-                    .redirectErrorStream(false)
-            // 图标路径：仅在已配置时注入，供 scrcpy 作为窗口图标
-            windowIconPath()?.let { builder.environment()[ENV_ICON_PATH] = it }
-            val process = builder.start()
-            runningProcesses[serial] = process
-            rememberSerial(deviceUuid, serial)
-            watchProcess(serial, process)
+            launchAndTrack(command, deviceUuid, serial)
             true
         } catch (e: java.io.IOException) {
             Logger.e(TAG, "启动 scrcpy 失败: " + serial, e)
@@ -161,15 +145,7 @@ object DesktopScrcpyLauncher {
             return false
         }
         val settings = ScrcpySettingsStore.load(deviceUuid)
-        val serial =
-            DesktopAdbDeviceResolver.resolveSerial(
-                adbPath = adbPath(),
-                deviceUuid = deviceUuid,
-                deviceName = deviceName,
-                deviceIp = deviceIp,
-                preference = settings.devicePreference,
-                tcpipEnabled = settings.adbTcpipModeEnabled,
-            )
+        val serial = resolveSerialWith(deviceUuid, deviceName, deviceIp, settings)
         if (serial.isNullOrBlank()) {
             DesktopToastHost.show("未找到该设备的 adb 连接，无法转发音频", DesktopToastHost.Duration.LONG)
             return false
@@ -187,12 +163,7 @@ object DesktopScrcpyLauncher {
         return try {
             val command = listOf(executable.absolutePath) + args
             Logger.i(TAG, "启动 scrcpy 音频转发: " + command.joinToString(" "))
-            val builder = ProcessBuilder(command).redirectErrorStream(false)
-            windowIconPath()?.let { builder.environment()[ENV_ICON_PATH] = it }
-            val process = builder.start()
-            runningProcesses[serial] = process
-            rememberSerial(deviceUuid, serial)
-            watchProcess(serial, process)
+            launchAndTrack(command, deviceUuid, serial)
             true
         } catch (e: java.io.IOException) {
             Logger.e(TAG, "启动 scrcpy 音频转发失败: " + serial, e)
@@ -206,9 +177,24 @@ object DesktopScrcpyLauncher {
         deviceUuid: String,
         deviceName: String,
         deviceIp: String,
-    ): String? {
-        val settings = ScrcpySettingsStore.load(deviceUuid)
-        return DesktopAdbDeviceResolver.resolveSerial(
+    ): String? = resolveSerialWith(deviceUuid, deviceName, deviceIp, ScrcpySettingsStore.load(deviceUuid))
+
+    /**
+     * 以已加载的设置解析设备当前可用的 adb 序列号。
+     *
+     * @param deviceUuid 设备 UUID。
+     * @param deviceName 设备名。
+     * @param deviceIp 设备 IP。
+     * @param settings 该设备的 scrcpy 设置。
+     * @returns adb 序列号；无连接时返回 null。
+     */
+    fun resolveSerialWith(
+        deviceUuid: String,
+        deviceName: String,
+        deviceIp: String,
+        settings: ScrcpySettings,
+    ): String? =
+        DesktopAdbDeviceResolver.resolveSerial(
             adbPath = adbPath(),
             deviceUuid = deviceUuid,
             deviceName = deviceName,
@@ -216,7 +202,6 @@ object DesktopScrcpyLauncher {
             preference = settings.devicePreference,
             tcpipEnabled = settings.adbTcpipModeEnabled,
         )
-    }
 
     /** 按设备 UUID 停止该设备的 scrcpy 进程（投屏与音频共用一张进程表）。 */
     fun stopByDeviceUuid(
@@ -395,5 +380,27 @@ object DesktopScrcpyLauncher {
     private fun windowIconPath(): String? {
         val file = File(System.getProperty("user.home"), ".notifyrelay/scrcpy_icon.png")
         return if (file.exists()) file.absolutePath else null
+    }
+
+    /**
+     * 启动进程并登记到运行表，随后交给进程监视器。
+     *
+     * @param command 命令行。
+     * @param deviceUuid 设备 UUID。
+     * @param serial 该设备当前使用的 adb 序列号。
+     * @returns 启动的进程。
+     */
+    private fun launchAndTrack(
+        command: List<String>,
+        deviceUuid: String,
+        serial: String,
+    ): Process {
+        val builder = ProcessBuilder(command).redirectErrorStream(false)
+        windowIconPath()?.let { builder.environment()[ENV_ICON_PATH] = it }
+        val process = builder.start()
+        runningProcesses[serial] = process
+        rememberSerial(deviceUuid, serial)
+        watchProcess(serial, process)
+        return process
     }
 }

@@ -21,8 +21,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 import notifyrelay.shared.feature.appslist.AppIconPortRegistry
@@ -33,6 +31,7 @@ import notifyrelay.shared.ui.pages.FilterListSection
 import notifyrelay.shared.ui.viewmodel.AppIconViewModel
 import notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel
 import notifyrelay.shared.ui.viewmodel.appIconViewModel
+import notifyrelay.shared.ui.viewmodel.factoryOf
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
@@ -289,14 +288,5 @@ private fun remoteFilterViewModel(): RemoteFilterViewModel {
     val filterPort = RemoteFilterPortRegistry.current ?: error("RemoteFilterPort 未注册")
     val appsPort = LocalAppsPortRegistry.current ?: error("LocalAppsPort 未注册")
     val iconPort = AppIconPortRegistry.current ?: error("AppIconPort 未注册")
-    return viewModel(
-        factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(
-                    modelClass: kotlin.reflect.KClass<T>,
-                    extras: androidx.lifecycle.viewmodel.CreationExtras,
-                ): T = RemoteFilterViewModel(filterPort, appsPort, iconPort) as T
-            },
-    )
+    return viewModel(factory = factoryOf { RemoteFilterViewModel(filterPort, appsPort, iconPort) })
 }

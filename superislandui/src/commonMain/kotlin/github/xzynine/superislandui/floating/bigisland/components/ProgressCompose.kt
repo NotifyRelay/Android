@@ -18,9 +18,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.ProgressInfo
 import notifyrelay.base.util.ColorUtils
@@ -188,31 +186,4 @@ fun ProgressCompose(
             }
         }
     }
-}
-
-@Preview(name = "进度条60%", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun ProgressComposePreview() {
-    ProgressCompose(
-        progressInfo = PreviewData.sampleProgressInfo,
-        picMap = PreviewData.samplePicMap,
-    )
-}
-
-@Preview(name = "进度条25%", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun ProgressComposeLowPreview() {
-    ProgressCompose(
-        progressInfo = PreviewData.sampleProgressInfoLow,
-        picMap = PreviewData.samplePicMap,
-    )
-}
-
-@Preview(name = "进度组件1(带节点)", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun ProgressComposeWithNodesPreview() {
-    ProgressCompose(
-        progressInfo = PreviewData.sampleProgressInfoWithNodes,
-        picMap = PreviewData.samplePicMap,
-    )
 }

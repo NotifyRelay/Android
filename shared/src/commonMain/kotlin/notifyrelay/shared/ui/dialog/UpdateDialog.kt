@@ -23,10 +23,8 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.PressFeedbackType
-import top.yukonga.miuix.kmp.window.WindowDialog
 
 @Composable
 fun UpdateDialog(
@@ -53,10 +51,15 @@ fun UpdateDialog(
         expandedGroups[releaseInfo.version] = true
     }
 
-    WindowDialog(show = showDialog.value, modifier = Modifier, title = "版本检查结果", titleColor = DialogDefaults.titleColor(), summary = "当前版本: $currentVersion | 远端版本: $remoteVersion", summaryColor = DialogDefaults.summaryColor(), backgroundColor = DialogDefaults.backgroundColor(), enableWindowDim = true, onDismissRequest = {
-        showDialog.value = false
-        onDismiss()
-    }, onDismissFinished = null, outsideMargin = DialogDefaults.outsideMargin, insideMargin = DialogDefaults.insideMargin, defaultWindowInsetsPadding = true, content = {
+    NotifyRelayDialog(
+        show = showDialog.value,
+        title = "版本检查结果",
+        summary = "当前版本: $currentVersion | 远端版本: $remoteVersion",
+        onDismissRequest = {
+            showDialog.value = false
+            onDismiss()
+        },
+    ) {
         Column(
             modifier =
                 Modifier
@@ -167,5 +170,5 @@ fun UpdateDialog(
                 }
             }
         }
-    })
+    }
 }

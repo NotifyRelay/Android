@@ -3,67 +3,45 @@ package notifyrelay.desktop.overlay.feature
 import notifyrelay.desktop.overlay.DesktopOverlayStore
 import notifyrelay.desktop.platform.DesktopOverlaySettings
 import notifyrelay.overlay.api.ClockConfig
-import notifyrelay.overlay.api.OverlayFeature
-import notifyrelay.overlay.api.OverlayFeatureRegistry
-import java.io.Closeable
 
 /**
  * 时间扩展点：封装 [DesktopClockSource] 的生命周期与数据订阅。
  *
- * 时间完全在 JVM 内完成（`java.time.LocalTime`），不使用 JNA。
- * 实现 [OverlayFeature] 并注册到 [notifyrelay.overlay.api.OverlayFeatureRegistry]。
+ * 时间格式化在 JVM 内完成（`java.time.LocalTime`），不使用 JNA。
+ * 启停骨架见 [DesktopOverlayFeature]。
  */
 class DesktopClockFeature(
-    val source: DesktopClockSource =
+    private val source: DesktopClockSource =
         DesktopClockSource(
             ClockConfig(
                 showSeconds = DesktopOverlaySettings.clockShowSeconds,
                 use24Hour = DesktopOverlaySettings.clockUse24Hour,
             ),
         ),
-) : OverlayFeature,
-    Closeable {
-    override val id = ID
-    override val available = true
-
-    private var subscription: AutoCloseable? = null
-
-    @Volatile
-    private var started = false
-
+) : DesktopOverlayFeature(ID) {
     init {
-        OverlayFeatureRegistry.register(this)
+        register()
     }
 
-    override fun start() {
-        if (started) return
-        started = true
+    override fun beforeSubscribe() {
         source.updateConfig(currentConfig())
-        subscription = source.observe { text -> DesktopOverlayStore.putClockText(text) }
+    }
+
+    override fun subscribe(): AutoCloseable = source.observe { text -> DesktopOverlayStore.putClockText(text) }
+
+    override fun startSource() {
         if (DesktopOverlaySettings.clockEnabled) source.start()
     }
 
-    override fun stop() {
-        if (!started) return
-        started = false
-        source.stop()
-        runCatching { subscription?.close() }
-        subscription = null
-        DesktopOverlayStore.clockText.value = ""
-    }
+    override fun stopSource() = source.stop()
 
-    override fun syncSwitch(enabled: Boolean) {
-        if (enabled) source.start() else source.stop()
+    override fun clearSink() {
+        DesktopOverlayStore.clockText.value = ""
     }
 
     /** 设置变更后同步显示格式与刷新节奏。 */
     fun syncConfig() {
         source.updateConfig(currentConfig())
-    }
-
-    override fun close() {
-        stop()
-        OverlayFeatureRegistry.unregister(id)
     }
 
     private fun currentConfig(): ClockConfig =

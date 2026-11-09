@@ -1,11 +1,13 @@
 package notifyrelay.desktop
 
 import com.xzyht.notifyrelay.nativecore.device.appsync.IconCodecPortRegistry
+import com.xzyht.notifyrelay.nativecore.device.filter.NativeFilterBridge
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import notifyrelay.data.Storage
 import notifyrelay.data.database.AppDatabaseJvmFactory
 import notifyrelay.data.database.repository.DatabaseRepository
+import notifyrelay.data.filter.LocalFilterRepository
 import notifyrelay.data.filter.RemoteFilterRepository
 import notifyrelay.desktop.platform.DesktopAppIconPort
 import notifyrelay.desktop.platform.DesktopAudioRelayPort
@@ -14,12 +16,9 @@ import notifyrelay.desktop.platform.DesktopHistoryPort
 import notifyrelay.desktop.platform.DesktopIconCodecPort
 import notifyrelay.desktop.platform.DesktopInstalledPackagesPort
 import notifyrelay.desktop.platform.DesktopLocalAppsPort
-import notifyrelay.desktop.platform.DesktopLocalFilterPort
 import notifyrelay.desktop.platform.DesktopMediaControlPort
-import notifyrelay.desktop.platform.DesktopNativeFilterPort
 import notifyrelay.desktop.platform.DesktopPinnedAppsPort
 import notifyrelay.desktop.platform.DesktopRemoteAppsPort
-import notifyrelay.desktop.platform.DesktopRemoteFilterPort
 import notifyrelay.desktop.platform.DesktopSuperIslandConfigPort
 import notifyrelay.desktop.platform.DesktopSuperIslandHistoryPort
 import notifyrelay.domain.feature.appslist.InstalledPackagesPortRegistry
@@ -127,7 +126,7 @@ object DataLayerDesktop {
             // 平台能力端口
             FormFactorPortRegistry.install(DesktopFormFactorPort)
             InstalledPackagesPortRegistry.install(DesktopInstalledPackagesPort)
-            NativeFilterPortRegistry.install(DesktopNativeFilterPort)
+            NativeFilterPortRegistry.install(NativeFilterBridge)
             IconCodecPortRegistry.install(DesktopIconCodecPort)
 
             // 有数据源的端口：通知历史与超级岛历史直接读 Room
@@ -135,9 +134,8 @@ object DataLayerDesktop {
             SuperIslandHistoryPortRegistry.install(DesktopSuperIslandHistoryPort(repository))
 
             // 与 Android 共用仓储的端口
-            val remoteFilterRepository = RemoteFilterRepository()
-            RemoteFilterPortRegistry.install(DesktopRemoteFilterPort(remoteFilterRepository))
-            LocalFilterPortRegistry.install(DesktopLocalFilterPort())
+            RemoteFilterPortRegistry.install(RemoteFilterRepository())
+            LocalFilterPortRegistry.install(LocalFilterRepository)
             AppIconPortRegistry.install(DesktopAppIconPort { deviceMessagePort() })
             LocalAppsPortRegistry.install(DesktopLocalAppsPort())
             RemoteAppsPortRegistry.install(DesktopRemoteAppsPort { deviceMessagePort() })
@@ -199,7 +197,7 @@ object DataLayerDesktop {
                 )
 
             // 置顶应用由公共仓库承担，端口直接暴露其状态流
-            PinnedAppsPortRegistry.install(DesktopPinnedAppsPort())
+            PinnedAppsPortRegistry.install(DesktopPinnedAppsPort)
 
             // 本机通知采集与转发：采集经 smtc-rust 的 WinRT 桥，转发委托公共网关
             localNotificationRelay = notifyrelay.desktop.device.DesktopLocalNotificationRelay { deviceMessagePort() }

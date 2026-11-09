@@ -1,35 +1,12 @@
 package com.xzyht.notifyrelay.feature.appslist
 
-import kotlinx.coroutines.flow.StateFlow
-import notifyrelay.data.repository.applist.PinnedAppsRepository
 import notifyrelay.shared.feature.appslist.PinnedAppsPort
+import notifyrelay.shared.feature.appslist.RepositoryPinnedAppsPort
 
 /**
- * 以 [PinnedAppsRepository] 实现 [PinnedAppsPort]。
+ * Android 的置顶端口。
+ *
+ * 置顶状态存在公共数据层，两端读同一份；本类只作为平台侧的注册名，行为全部来自
+ * [RepositoryPinnedAppsPort]，不再重复实现四个转发方法。
  */
-class AndroidPinnedAppsPort : PinnedAppsPort {
-    override val pinnedApps: StateFlow<Map<String, Set<String>>> get() = PinnedAppsRepository.pinnedApps
-
-    override fun load(deviceUuid: String) {
-        PinnedAppsRepository.loadPinnedApps(deviceUuid)
-    }
-
-    override fun pin(
-        deviceUuid: String,
-        packageName: String,
-    ) {
-        PinnedAppsRepository.pinApp(deviceUuid, packageName)
-    }
-
-    override fun unpin(
-        deviceUuid: String,
-        packageName: String,
-    ) {
-        PinnedAppsRepository.unpinApp(deviceUuid, packageName)
-    }
-
-    override fun isPinned(
-        deviceUuid: String,
-        packageName: String,
-    ): Boolean = PinnedAppsRepository.isAppPinned(deviceUuid, packageName)
-}
+object AndroidPinnedAppsPort : PinnedAppsPort by RepositoryPinnedAppsPort

@@ -18,9 +18,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -36,7 +34,6 @@ import notifyrelay.desktop.platform.DesktopOverlaySettings
 import notifyrelay.overlay.api.LogiBatteryDevice
 import notifyrelay.shared.ui.common.deviceIconFontFamily
 import top.yukonga.miuix.kmp.basic.Text
-import kotlin.math.roundToInt
 
 /** 罗技汇总岛展开后的自动收起时长。 */
 private const val LOGI_EXPAND_MS = 3_000L
@@ -122,17 +119,7 @@ internal fun LogiIslandCard(
     }
     val regionModifier =
         if (clickable) {
-            Modifier.onGloballyPositioned { coords ->
-                val pos = coords.localToRoot(Offset.Zero)
-                val sz = coords.size
-                interactiveRegions[regionKey] =
-                    java.awt.Rectangle(
-                        pos.x.roundToInt(),
-                        pos.y.roundToInt(),
-                        sz.width,
-                        sz.height,
-                    )
-            }
+            Modifier.trackInteractiveRegion(interactiveRegions, regionKey)
         } else {
             Modifier
         }

@@ -13,12 +13,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.domain.feature.notification.filter.FilterEntry
 import notifyrelay.domain.feature.notification.filter.LocalFilterPortRegistry
 import notifyrelay.shared.ui.viewmodel.LocalFilterViewModel
+import notifyrelay.shared.ui.viewmodel.factoryOf
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.Text
@@ -156,14 +155,5 @@ private fun localFilterViewModel(): LocalFilterViewModel {
     val port =
         LocalFilterPortRegistry.current
             ?: error("LocalFilterPort 未注册")
-    return viewModel(
-        factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(
-                    modelClass: kotlin.reflect.KClass<T>,
-                    extras: androidx.lifecycle.viewmodel.CreationExtras,
-                ): T = LocalFilterViewModel(port) as T
-            },
-    )
+    return viewModel(factory = factoryOf { LocalFilterViewModel(port) })
 }

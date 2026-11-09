@@ -16,9 +16,9 @@ import notifyrelay.base.config.FilterConfigDefaults
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.data.database.history.SuperIslandHistoryStore
-import notifyrelay.data.database.history.SuperIslandHistoryStoreEntry
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
+import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 import notifyrelay.shared.feature.notification.superisland.replica.ReplicaDisplayCache
 import notifyrelay.shared.feature.notification.superisland.tracker.LocalSuperIslandTracker
 import org.json.JSONObject
@@ -359,7 +359,7 @@ object SuperIslandProcessor {
             // 检查是否为测试数据，如果是则跳过保存到历史记录
             if (!pkg.startsWith("test_")) {
                 val historyEntry =
-                    SuperIslandHistoryStoreEntry(
+                    SuperIslandHistoryEntry(
                         id = System.currentTimeMillis(),
                         sourceDeviceUuid = remoteUuid,
                         originalPackage = pkg,

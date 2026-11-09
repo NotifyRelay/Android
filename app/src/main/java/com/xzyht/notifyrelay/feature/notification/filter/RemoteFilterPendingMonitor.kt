@@ -62,52 +62,49 @@ internal class RemoteFilterPendingMonitor(
         }
     }
 
+    /**
+     * 撤回匹配的待监控通知并返回被移除项。
+     *
+     * 调用方持锁调用，谓词在锁内求值。
+     *
+     * @param predicate 匹配条件。
+     * @returns 被移除的通知，供调用方写去重缓存。
+     */
+    private fun cancelMatchingLocked(predicate: (PendingNotification) -> Boolean): List<PendingNotification> {
+        val matches = pendingNotifications.filter(predicate)
+        matches.forEach { matched ->
+            try {
+                cancelNotification(matched.notifyId, matched.context)
+            } catch (e: Exception) {
+                Logger.e("智能去重", "被动撤回失败 - 通知ID:${matched.notifyId}", e)
+            }
+        }
+        if (matches.isNotEmpty()) pendingNotifications.removeAll(matches)
+        return matches
+    }
+
     /** 撤回匹配的待监控通知（由被动入队命中时调用，按标准化标题匹配）。返回被移除的通知（供调用方写去重缓存）。 */
     fun cancelMatching(
         normalizedTitle: String,
         pendingText: String,
         packageName: String,
-    ): List<PendingNotification> {
+    ): List<PendingNotification> =
         synchronized(pendingNotifications) {
-            val matches =
-                pendingNotifications.filter { pending ->
-                    TextUtils.normalizeTitle(pending.title) == normalizedTitle && pending.text == pendingText && pending.packageName == packageName
-                }
-            matches.forEach { matched ->
-                try {
-                    cancelNotification(matched.notifyId, matched.context)
-                    // Logger.d("智能去重", "被动撤回成功 - 通知ID:${matched.notifyId}, 标题:${matched.title}")
-                } catch (e: Exception) {
-                    Logger.e("智能去重", "被动撤回失败 - 通知ID:${matched.notifyId}", e)
-                }
+            cancelMatchingLocked { pending ->
+                TextUtils.normalizeTitle(pending.title) == normalizedTitle &&
+                    pending.text == pendingText &&
+                    pending.packageName == packageName
             }
-            if (matches.isNotEmpty()) pendingNotifications.removeAll(matches)
-            return matches
         }
-    }
 
     /** 撤回匹配的待监控通知（命中 10 秒去重缓存时调用，按原始标题/文本匹配，与缓存写入口径一致）。返回被移除的通知。 */
     fun cancelMatchingRaw(
         rawTitle: String,
         rawText: String,
-    ): List<PendingNotification> {
+    ): List<PendingNotification> =
         synchronized(pendingNotifications) {
-            val matches =
-                pendingNotifications.filter { pending ->
-                    pending.title == rawTitle && pending.text == rawText
-                }
-            matches.forEach { matched ->
-                try {
-                    cancelNotification(matched.notifyId, matched.context)
-                    // Logger.d("智能去重", "被动撤回成功 - 通知ID:${matched.notifyId}, 标题:${matched.title}")
-                } catch (e: Exception) {
-                    Logger.e("智能去重", "被动撤回失败 - 通知ID:${matched.notifyId}", e)
-                }
-            }
-            if (matches.isNotEmpty()) pendingNotifications.removeAll(matches)
-            return matches
+            cancelMatchingLocked { pending -> pending.title == rawTitle && pending.text == rawText }
         }
-    }
 
     fun clear() {
         synchronized(pendingNotifications) { pendingNotifications.clear() }

@@ -36,6 +36,7 @@ import notifyrelay.shared.ui.screen.DeviceListScreenState
 import notifyrelay.shared.ui.screen.HistoryScreen
 import notifyrelay.shared.ui.screen.LocalMainScreenPort
 import notifyrelay.shared.ui.screen.SettingsScreen
+import notifyrelay.shared.ui.viewmodel.remoteFilterViewModel
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -60,22 +61,7 @@ fun MainScreen(
     forwardContent: @Composable () -> Unit,
     settingsContent: @Composable () -> Unit,
 ) {
-    val filterViewModel =
-        androidx.lifecycle.viewmodel.compose.viewModel<notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel>(
-            factory =
-                object : androidx.lifecycle.ViewModelProvider.Factory {
-                    @Suppress("UNCHECKED_CAST")
-                    override fun <T : androidx.lifecycle.ViewModel> create(
-                        modelClass: kotlin.reflect.KClass<T>,
-                        extras: androidx.lifecycle.viewmodel.CreationExtras,
-                    ): T =
-                        notifyrelay.shared.ui.viewmodel.RemoteFilterViewModel(
-                            notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry.current ?: error("RemoteFilterPort 未注册"),
-                            notifyrelay.shared.feature.appslist.LocalAppsPortRegistry.current ?: error("LocalAppsPort 未注册"),
-                            notifyrelay.shared.feature.appslist.AppIconPortRegistry.current ?: error("AppIconPort 未注册"),
-                        ) as T
-                },
-        )
+    val filterViewModel = remoteFilterViewModel()
     val colorScheme = MiuixTheme.colorScheme
 
     val mainPort = LocalMainScreenPort.current ?: error("LocalMainScreenPort 未提供")
