@@ -14,9 +14,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CircularProgressCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.CommonImagePlaceholder
@@ -262,45 +260,4 @@ fun BCompose(
             }
         }
     }
-}
-
-@Preview(name = "B区文本组件", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun BComposeTextInfoPreview() {
-    BCompose(
-        bComp =
-            BTextInfo(
-                title = "B区标题",
-                content = "B区内容",
-            ),
-        picMap = PreviewData.samplePicMap,
-    )
-}
-
-@Preview(name = "B区图文组件2", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun BComposeImageText2Preview() {
-    BCompose(
-        bComp =
-            BImageText2(
-                title = "图文标题",
-                content = "图文内容",
-                picKey = "icon_key",
-            ),
-        picMap = PreviewData.samplePicMap,
-    )
-}
-
-@Preview(name = "B区进度文本组件", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun BComposeProgressTextInfoPreview() {
-    BCompose(
-        bComp =
-            BProgressTextInfo(
-                title = "下载中",
-                content = "60%",
-                progress = 60,
-            ),
-        picMap = PreviewData.samplePicMap,
-    )
 }

@@ -16,10 +16,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CircularProgressCompose
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.model.core.ParamV2
@@ -127,13 +125,4 @@ fun ChatInfoCompose(
             }
         }
     }
-}
-
-@Preview(name = "聊天信息", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun ChatInfoComposePreview() {
-    ChatInfoCompose(
-        paramV2 = PreviewData.sampleParamV2WithChat,
-        picMap = PreviewData.samplePicMap,
-    )
 }

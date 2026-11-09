@@ -15,10 +15,8 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
@@ -174,22 +172,4 @@ private fun selectIconKey(highlightInfo: HighlightInfo): String? {
     candidates.add(highlightInfo.picFunction ?: "")
     candidates.add(highlightInfo.picFunctionDark ?: "")
     return candidates.firstOrNull { it.isNotBlank() }
-}
-
-@Preview(name = "强调图文", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun HighlightInfoComposePreview() {
-    HighlightInfoCompose(
-        highlightInfo = PreviewData.sampleHighlightInfo,
-        picMap = PreviewData.samplePicMap,
-    )
-}
-
-@Preview(name = "强调图文带计时器", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun HighlightInfoComposeWithTimerPreview() {
-    HighlightInfoCompose(
-        highlightInfo = PreviewData.sampleHighlightInfoWithTimer,
-        picMap = PreviewData.samplePicMap,
-    )
 }

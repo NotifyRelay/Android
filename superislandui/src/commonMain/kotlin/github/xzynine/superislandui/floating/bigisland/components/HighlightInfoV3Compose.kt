@@ -16,10 +16,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.ActionInfoButton
 import github.xzynine.superislandui.model.templates.HighlightInfoV3
 import notifyrelay.base.util.ColorUtils
@@ -120,25 +118,4 @@ fun HighlightInfoV3Compose(
             ActionInfoButton(action = action, picMap = picMap)
         }
     }
-}
-
-@Preview(name = "按钮组件5", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun HighlightInfoV3ComposePreview() {
-    HighlightInfoV3Compose(
-        highlightInfoV3 = PreviewData.sampleHighlightInfoV3,
-        picMap = PreviewData.samplePicMap,
-    )
-}
-
-@Preview(name = "按钮组件5-无图标", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun HighlightInfoV3ComposeNoIconPreview() {
-    HighlightInfoV3Compose(
-        highlightInfoV3 =
-            PreviewData.sampleHighlightInfoV3.copy(
-                actionInfo = PreviewData.sampleHighlightInfoV3.actionInfo?.copy(actionIcon = null),
-            ),
-        picMap = PreviewData.samplePicMap,
-    )
 }
