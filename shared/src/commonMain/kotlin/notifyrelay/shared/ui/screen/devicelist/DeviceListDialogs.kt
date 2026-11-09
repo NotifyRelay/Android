@@ -54,17 +54,7 @@ fun DeviceListPairingCodeDialog(
                 deviceManager.cancelPendingPairing()
                 state.showPairingCodeDialog = false
             },
-            onPairingComplete = { success, _ ->
-                if (success) {
-                    state.showPairingCodeDialog = false
-                    try {
-                        deviceManager.triggerDeviceListRefresh()
-                        val authMap = deviceManager.getAuthenticatedDevices()
-                        onAuthedUuidsChange(authMap.filter { (_, auth) -> auth.isAccepted }.keys.toSet())
-                    } catch (_: Exception) {
-                    }
-                }
-            },
+            onPairingComplete = { success, _ -> onPairingFinished(success, state, deviceManager, onAuthedUuidsChange) },
         )
     }
 
@@ -80,16 +70,7 @@ fun DeviceListPairingCodeDialog(
                 state.pendingConnectDevice = null
             },
             onPairingComplete = { success: Boolean, _: String ->
-                if (success) {
-                    state.showPairingCodeDialog = false
-                    state.pendingConnectDevice = null
-                    try {
-                        deviceManager.triggerDeviceListRefresh()
-                        val authMap = deviceManager.getAuthenticatedDevices()
-                        onAuthedUuidsChange(authMap.filter { (_, auth) -> auth.isAccepted }.keys.toSet())
-                    } catch (_: Exception) {
-                    }
-                }
+                onPairingFinished(success, state, deviceManager, onAuthedUuidsChange, clearPendingDevice = true)
             },
         )
     }
@@ -229,4 +210,31 @@ private fun RowScope.DeleteDeviceButton(
         },
         modifier = Modifier.weight(1f),
     )
+}
+
+/**
+ * 配对结束后的收尾：成功时关闭对话框并刷新已认证设备集合。
+ *
+ * @param success 配对是否成功；失败时不改动界面状态。
+ * @param state 设备列表界面状态。
+ * @param deviceManager 提供认证表快照。
+ * @param onAuthedUuidsChange 接收刷新后的已认证 uuid 集合。
+ * @param clearPendingDevice 是否同时清空待连接设备。
+ */
+private fun onPairingFinished(
+    success: Boolean,
+    state: DeviceListScreenState,
+    deviceManager: DeviceAdminPort,
+    onAuthedUuidsChange: (Set<String>) -> Unit,
+    clearPendingDevice: Boolean = false,
+) {
+    if (!success) return
+    state.showPairingCodeDialog = false
+    if (clearPendingDevice) state.pendingConnectDevice = null
+    try {
+        deviceManager.triggerDeviceListRefresh()
+        val authMap = deviceManager.getAuthenticatedDevices()
+        onAuthedUuidsChange(authMap.filter { (_, auth) -> auth.isAccepted }.keys.toSet())
+    } catch (_: Exception) {
+    }
 }

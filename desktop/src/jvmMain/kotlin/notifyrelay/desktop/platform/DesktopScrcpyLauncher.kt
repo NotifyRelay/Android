@@ -97,15 +97,7 @@ object DesktopScrcpyLauncher {
         val settings = ScrcpySettingsStore.load(deviceUuid)
 
         // 解析实际可用的 adb 序列号；失败时不再退化为固定端口
-        val serial =
-            DesktopAdbDeviceResolver.resolveSerial(
-                adbPath = adbPath(),
-                deviceUuid = deviceUuid,
-                deviceName = deviceName,
-                deviceIp = deviceIp,
-                preference = settings.devicePreference,
-                tcpipEnabled = settings.adbTcpipModeEnabled,
-            )
+        val serial = resolveSerialWith(deviceUuid, deviceName, deviceIp, settings)
         if (serial.isNullOrBlank()) {
             DesktopToastHost.show("未找到该设备的 adb 连接，请确认已开启 USB 调试或无线调试", DesktopToastHost.Duration.LONG)
             return false
@@ -161,15 +153,7 @@ object DesktopScrcpyLauncher {
             return false
         }
         val settings = ScrcpySettingsStore.load(deviceUuid)
-        val serial =
-            DesktopAdbDeviceResolver.resolveSerial(
-                adbPath = adbPath(),
-                deviceUuid = deviceUuid,
-                deviceName = deviceName,
-                deviceIp = deviceIp,
-                preference = settings.devicePreference,
-                tcpipEnabled = settings.adbTcpipModeEnabled,
-            )
+        val serial = resolveSerialWith(deviceUuid, deviceName, deviceIp, settings)
         if (serial.isNullOrBlank()) {
             DesktopToastHost.show("未找到该设备的 adb 连接，无法转发音频", DesktopToastHost.Duration.LONG)
             return false
@@ -206,9 +190,24 @@ object DesktopScrcpyLauncher {
         deviceUuid: String,
         deviceName: String,
         deviceIp: String,
-    ): String? {
-        val settings = ScrcpySettingsStore.load(deviceUuid)
-        return DesktopAdbDeviceResolver.resolveSerial(
+    ): String? = resolveSerialWith(deviceUuid, deviceName, deviceIp, ScrcpySettingsStore.load(deviceUuid))
+
+    /**
+     * 以已加载的设置解析设备当前可用的 adb 序列号。
+     *
+     * @param deviceUuid 设备 UUID。
+     * @param deviceName 设备名。
+     * @param deviceIp 设备 IP。
+     * @param settings 该设备的 scrcpy 设置。
+     * @returns adb 序列号；无连接时返回 null。
+     */
+    fun resolveSerialWith(
+        deviceUuid: String,
+        deviceName: String,
+        deviceIp: String,
+        settings: ScrcpySettings,
+    ): String? =
+        DesktopAdbDeviceResolver.resolveSerial(
             adbPath = adbPath(),
             deviceUuid = deviceUuid,
             deviceName = deviceName,
@@ -216,7 +215,6 @@ object DesktopScrcpyLauncher {
             preference = settings.devicePreference,
             tcpipEnabled = settings.adbTcpipModeEnabled,
         )
-    }
 
     /** 按设备 UUID 停止该设备的 scrcpy 进程（投屏与音频共用一张进程表）。 */
     fun stopByDeviceUuid(

@@ -6,6 +6,8 @@ import androidx.annotation.RequiresApi
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import androidx.core.graphics.toColorInt
+import github.xzynine.superislandui.model.components.MultiProgressInfo
+import github.xzynine.superislandui.model.components.ProgressInfo
 import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.log.Logger
 
@@ -59,13 +61,7 @@ internal object LiveUpdatesProgressStyleBuilder {
                     .setContentText(processedContent)
             }
 
-            // 获取颜色配置
-            val progressColor = progressInfo?.colorProgress ?: multiProgressInfo?.color
-            val progressEndColor = progressInfo?.colorProgressEnd ?: multiProgressInfo?.color
-
-            // 解析颜色配置
-            val pointColor = progressColor?.toColorInt() ?: Color.BLUE
-            val segmentColor = progressEndColor?.toColorInt() ?: Color.CYAN
+            val (pointColor, segmentColor) = resolveProgressColors(progressInfo, multiProgressInfo)
 
             // 直接创建ProgressStyle实例
             val progressStyle = NotificationCompat.ProgressStyle()
@@ -183,13 +179,7 @@ internal object LiveUpdatesProgressStyleBuilder {
         val progressInfo = paramV2.progressInfo
         val multiProgressInfo = paramV2.multiProgressInfo
 
-        // 获取颜色配置
-        val progressColor = progressInfo?.colorProgress ?: multiProgressInfo?.color
-        val progressEndColor = progressInfo?.colorProgressEnd ?: multiProgressInfo?.color
-
-        // 解析颜色配置
-        val pointColor = progressColor?.toColorInt() ?: Color.BLUE
-        val segmentColor = progressEndColor?.toColorInt() ?: Color.CYAN
+        val (pointColor, segmentColor) = resolveProgressColors(progressInfo, multiProgressInfo)
 
         // 直接创建ProgressStyle实例
         val progressStyle = NotificationCompat.ProgressStyle()
@@ -219,6 +209,22 @@ internal object LiveUpdatesProgressStyleBuilder {
         }
 
         return progressStyle
+    }
+
+    /**
+     * 进度条配色：普通进度的颜色优先，缺失时取多段进度的颜色。
+     *
+     * @param progressInfo 普通进度。
+     * @param multiProgressInfo 多段进度。
+     * @returns 进度点颜色与分段颜色。
+     */
+    private fun resolveProgressColors(
+        progressInfo: ProgressInfo?,
+        multiProgressInfo: MultiProgressInfo?,
+    ): Pair<Int, Int> {
+        val pointColor = (progressInfo?.colorProgress ?: multiProgressInfo?.color)?.toColorInt() ?: Color.BLUE
+        val segmentColor = (progressInfo?.colorProgressEnd ?: multiProgressInfo?.color)?.toColorInt() ?: Color.CYAN
+        return pointColor to segmentColor
     }
 
     /**
