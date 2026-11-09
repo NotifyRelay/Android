@@ -125,33 +125,6 @@ object MessageSender {
     )
 
     /**
-     * 组装「全量」超级岛状态（与 Rust 合并引擎对齐，供主动推送与查询回调共用）。
-     * 图片处理：本地 URI/file 路径读取并编码为 base64 data URI，http(s) 地址或其他字符串保持不变。
-     */
-    suspend fun buildSuperIslandFullContent(
-        context: Context,
-        superPkg: String,
-        appName: String?,
-        title: String?,
-        text: String?,
-        time: Long,
-        paramV2Raw: String?,
-        picMap: Map<String, String>?,
-        featureIdOverride: String?,
-    ): String =
-        SuperIslandMessageBuilder.buildSuperIslandFullContent(
-            context,
-            superPkg,
-            appName,
-            title,
-            text,
-            time,
-            paramV2Raw,
-            picMap,
-            featureIdOverride,
-        )
-
-    /**
      * 发送超级岛专用数据（包含 param_v2 原始 JSON 与图片 map）
      */
     suspend fun sendSuperIslandData(

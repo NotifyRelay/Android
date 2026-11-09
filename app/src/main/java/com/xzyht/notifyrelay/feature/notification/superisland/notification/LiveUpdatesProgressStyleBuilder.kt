@@ -93,15 +93,7 @@ internal object LiveUpdatesProgressStyleBuilder {
                     Logger.d(TAG, "生成节点 $i，位置: $position%")
                 }
 
-                // 生成进度分段
-                val progressSegments = mutableListOf<NotificationCompat.ProgressStyle.Segment>()
-                for (i in 0 until segmentCount) {
-                    progressSegments.add(NotificationCompat.ProgressStyle.Segment(segmentSize).setColor(segmentColor))
-                }
-
-                // 设置进度点和分段
-                progressStyle.setProgressPoints(progressPoints)
-                progressStyle.setProgressSegments(progressSegments)
+                val progressSegments = applyProgressSegments(progressStyle, progressPoints, segmentCount, segmentSize, segmentColor)
 
                 // 记录节点和分段数量
                 progressPointsCount = progressPoints.size
@@ -223,17 +215,35 @@ internal object LiveUpdatesProgressStyleBuilder {
                 progressPoints.add(NotificationCompat.ProgressStyle.Point(position).setColor(pointColor))
             }
 
-            // 生成进度分段
-            val progressSegments = mutableListOf<NotificationCompat.ProgressStyle.Segment>()
-            for (i in 0 until segmentCount) {
-                progressSegments.add(NotificationCompat.ProgressStyle.Segment(segmentSize).setColor(segmentColor))
-            }
-
-            // 设置进度点和分段
-            progressStyle.setProgressPoints(progressPoints)
-            progressStyle.setProgressSegments(progressSegments)
+            applyProgressSegments(progressStyle, progressPoints, segmentCount, segmentSize, segmentColor)
         }
 
         return progressStyle
+    }
+
+    /**
+     * 生成进度分段并连同进度点写入样式。
+     *
+     * @param progressStyle 目标样式。
+     * @param progressPoints 已生成的进度点。
+     * @param segmentCount 分段数量。
+     * @param segmentSize 单段长度。
+     * @param segmentColor 分段颜色。
+     * @returns 生成的分段列表。
+     */
+    private fun applyProgressSegments(
+        progressStyle: NotificationCompat.ProgressStyle,
+        progressPoints: List<NotificationCompat.ProgressStyle.Point>,
+        segmentCount: Int,
+        segmentSize: Int,
+        segmentColor: Int,
+    ): List<NotificationCompat.ProgressStyle.Segment> {
+        val progressSegments = mutableListOf<NotificationCompat.ProgressStyle.Segment>()
+        for (i in 0 until segmentCount) {
+            progressSegments.add(NotificationCompat.ProgressStyle.Segment(segmentSize).setColor(segmentColor))
+        }
+        progressStyle.setProgressPoints(progressPoints)
+        progressStyle.setProgressSegments(progressSegments)
+        return progressSegments
     }
 }
