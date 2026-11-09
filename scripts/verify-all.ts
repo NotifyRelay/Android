@@ -27,6 +27,7 @@ const gates: Gate[] = [
   { script: 'verify-agent-note-format', purpose: 'Agent Note headers, sections, and alternatives' },
   { script: 'verify-archived-agent-notes', purpose: 'sealed archive is frozen and append-only' },
   { script: 'verify-skill-invocation-metadata', purpose: 'cross-product skill invocation policy' },
+  { script: 'verify-duplication', purpose: 'no clone beyond the accepted duplication baseline' },
 ]
 
 /** 一次门禁运行的结果。 */

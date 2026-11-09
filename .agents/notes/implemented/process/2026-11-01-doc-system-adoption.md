@@ -13,7 +13,7 @@ Status: implemented
 - `Docs/` 承载人读文档，`Docs/AGENTS.md` 定义层级、写作规则与词数预算。
 - `.agents/notes/` 承载决策记录，`implemented/` 之外的记录按生命周期与类别分目录。
 - `.agents/skills/` 承载按场景加载的技能，前缀为本仓库身份 `notifyrelay`。
-- `scripts/` 承载七道门禁，由 `npm run verify-all` 串起；`verifyDocs` Gradle 任务把它挂到 `check` 上，PR 工作流的 `docs` job 作为构建的前置。
+- `scripts/` 承载八道门禁，由 `npm run verify-all` 串起；`verifyDocs` Gradle 任务把它挂到 `check` 上，PR 工作流的 `docs` job 作为构建的前置。
 
 模板的槽位机制（`instantiate-template.mjs`、`verify-template-placeholders.ts`、`template.placeholders.json`）在实例化完成后整体删除：本仓库不是模板，保留槽位只会让身份字符串与真实名字并存。
 

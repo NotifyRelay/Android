@@ -6,29 +6,13 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.jsonPrimitive
 import notifyrelay.base.log.Logger
-import notifyrelay.base.util.sha256
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.data.platform.LegacyStoragePort
 import notifyrelay.data.platform.LegacyStoragePortRegistry
-
-/** 超级岛历史的写入与详情读取条目。 */
-data class SuperIslandHistoryStoreEntry(
-    val id: Long,
-    val sourceDeviceUuid: String? = null,
-    val originalPackage: String? = null,
-    val mappedPackage: String? = null,
-    val appName: String? = null,
-    val title: String? = null,
-    val text: String? = null,
-    val paramV2Raw: String? = null,
-    val picMap: Map<String, String> = emptyMap(),
-    val rawPayload: String? = null,
-    val featureId: String? = null,
-)
+import notifyrelay.domain.feature.notification.history.SuperIslandHistoryEntry
 
 /**
  * 超级岛历史存储：写入、清空与按 id 读取详情。
@@ -39,13 +23,12 @@ object SuperIslandHistoryStore {
     private const val TAG = "SuperIslandHistoryStore"
     private const val MAX_ENTRIES = 600
     private const val LEGACY_IMAGE_STORE_FILE = "super_island_images.json"
-    private const val DEFAULT_PACKAGE_NAME = "unknown"
 
     private val json = Json { ignoreUnknownKeys = true }
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     /** 按 id 读取详情（含图片解析）。 */
-    suspend fun loadEntryDetail(id: Long): SuperIslandHistoryStoreEntry? {
+    suspend fun loadEntryDetail(id: Long): SuperIslandHistoryEntry? {
         val repo = DatabaseRepository.getInstance()
         val entity =
             try {
@@ -55,8 +38,8 @@ object SuperIslandHistoryStore {
                 null
             }
         return entity?.let { e ->
-            val resolvedPicMap = resolvePicMap(parsePicMap(e.picMap))
-            SuperIslandHistoryStoreEntry(
+            val resolvedPicMap = resolvePicMap(e.picMap)
+            SuperIslandHistoryEntry(
                 id = e.id,
                 sourceDeviceUuid = e.sourceDeviceUuid,
                 originalPackage = e.originalPackage,
@@ -73,11 +56,10 @@ object SuperIslandHistoryStore {
     }
 
     /** 追加一条历史；图片值先绑定为数字 id，写入后裁剪历史条数。 */
-    fun append(entry: SuperIslandHistoryStoreEntry) {
+    fun append(entry: SuperIslandHistoryEntry) {
         scope.launch {
             try {
                 val repository = DatabaseRepository.getInstance()
-                val boundPicMap = bindAll(resolvePackageName(entry), entry.picMap)
                 val entity =
                     SuperIslandHistoryEntity(
                         id = entry.id,
@@ -88,10 +70,12 @@ object SuperIslandHistoryStore {
                         title = entry.title,
                         text = entry.text,
                         paramV2Raw = entry.paramV2Raw,
-                        picMap = json.encodeToString(JsonObject.serializer(), toJsonObject(boundPicMap)),
                         rawPayload = entry.rawPayload,
                         featureId = entry.featureId,
-                    )
+                    ).apply {
+                        // 图片原文的绑定与去重由仓储在保存时完成，这里只传原值。
+                        picMap = entry.picMap
+                    }
 
                 repository.saveSuperIslandHistory(entity)
                 repository.deleteOldSuperIslandHistory(MAX_ENTRIES)
@@ -99,33 +83,6 @@ object SuperIslandHistoryStore {
                 Logger.w(TAG, "写入超级岛历史失败: id=" + entry.id, e)
             }
         }
-    }
-
-    /** 把图片原文绑定到（包名, 图片键）并返回「图片键 → 图片 id」映射。 */
-    private suspend fun bindAll(
-        packageName: String?,
-        input: Map<String, String>?,
-    ): Map<String, String> {
-        if (input.isNullOrEmpty()) return emptyMap()
-        val repo = DatabaseRepository.getInstance()
-        val normalizedPackage = normalizePackageName(packageName)
-        val now = System.currentTimeMillis()
-        val out = mutableMapOf<String, String>()
-        for ((key, value) in input) {
-            if (value.isBlank()) continue
-            val imageId = repo.upsertSuperIslandImageBinding(normalizedPackage, key, sha256(value), value, now)
-            if (imageId > 0) {
-                out[key] = imageId.toString()
-            }
-        }
-        return out
-    }
-
-    /** 解析条目所属包名：映射包名优先，其次原始包名，最后应用名。 */
-    private fun resolvePackageName(entry: SuperIslandHistoryStoreEntry): String? {
-        entry.mappedPackage?.takeIf { it.isNotBlank() }?.let { return it }
-        entry.originalPackage?.takeIf { it.isNotBlank() }?.let { return it }
-        return entry.appName?.takeIf { it.isNotBlank() }
     }
 
     /** 清空全部历史。 */
@@ -173,20 +130,23 @@ object SuperIslandHistoryStore {
             emptyMap()
         }
 
-    private fun parsePicMap(raw: String?): Map<String, String> {
-        if (raw.isNullOrBlank()) return emptyMap()
-        return try {
-            val obj = json.parseToJsonElement(raw) as? JsonObject ?: return emptyMap()
-            obj.entries.associate { (key, value) -> key to value.jsonPrimitive.content }
-        } catch (e: IllegalArgumentException) {
-            Logger.w(TAG, "picMap 解析失败", e)
-            emptyMap()
-        }
-    }
+    /** 把 `picMap` 中的数字图片 id 解析为图片原文；非数字或反查失败时保留原值。 */
+    suspend fun resolvePicMap(picMap: Map<String, String>): Map<String, String> = resolvePicMap(picMap) { imageId -> DatabaseRepository.getInstance().resolveSuperIslandImageById(imageId) }
 
-    private suspend fun resolvePicMap(picMap: Map<String, String>): Map<String, String> {
+    /**
+     * 图片 id 反查原文的共享实现。
+     *
+     * 反查入口由调用方给出：历史、分页源与图片存储读的是同一张绑定表，但取的仓储入口不同。
+     *
+     * @param picMap 图片键到「图片 id 或原文」的映射。
+     * @param lookup 按图片 id 取原文；取不到时返回 null 或空串。
+     * @returns 解析后的映射。
+     */
+    suspend fun resolvePicMap(
+        picMap: Map<String, String>,
+        lookup: suspend (Long) -> String?,
+    ): Map<String, String> {
         if (picMap.isEmpty()) return emptyMap()
-        val repo = DatabaseRepository.getInstance()
         val out = mutableMapOf<String, String>()
         for ((key, value) in picMap) {
             if (value.isBlank()) continue
@@ -194,18 +154,10 @@ object SuperIslandHistoryStore {
             if (imageId == null || imageId <= 0) {
                 out[key] = value
             } else {
-                val data = repo.resolveSuperIslandImageById(imageId)
+                val data = lookup(imageId)
                 out[key] = if (!data.isNullOrBlank()) data else value
             }
         }
         return out
-    }
-
-    private fun toJsonObject(source: Map<String, String>): JsonObject = JsonObject(source.mapValues { (_, value) -> JsonPrimitive(value) })
-
-    /** 归一化包名，空值落到 [DEFAULT_PACKAGE_NAME]。 */
-    fun normalizePackageName(packageName: String?): String {
-        val trimmed = packageName?.trim().orEmpty()
-        return if (trimmed.isBlank()) DEFAULT_PACKAGE_NAME else trimmed
     }
 }

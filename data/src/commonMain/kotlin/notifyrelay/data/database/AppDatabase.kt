@@ -1,36 +1,4 @@
-@file:Suppress(
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-)
+@file:Suppress("SpellCheckingInspection")
 
 package notifyrelay.data.database
 
@@ -53,6 +21,7 @@ import notifyrelay.data.database.entity.NotificationRecordEntity
 import notifyrelay.data.database.entity.PackageGroupEntity
 import notifyrelay.data.database.entity.PackageGroupItemEntity
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
+import notifyrelay.data.database.entity.SuperIslandHistoryImageEntity
 import notifyrelay.data.database.entity.SuperIslandImageBindingEntity
 import notifyrelay.data.database.entity.SuperIslandImageEntity
 import notifyrelay.data.database.entity.SuperIslandMirrorFilterEntity
@@ -71,40 +40,10 @@ import notifyrelay.data.database.entity.WhiteListEntryEntity
  * v6: 新增超级岛图片去重表与绑定表
  * v7: 新增super_island_mirror_filters表
  * v8: 名单类配置从app_config移出为独立表（black_list_entries、white_list_entries、filter_entries、package_groups、package_group_items），镜像过滤默认包名入库
+ * v9: devices 表退役，数据转存到 device_migration 供应用层一次性交给 Rust
+ * v10: super_island_history.picMap 的 JSON 列拆为 super_island_history_images 关联表
  */
-@Suppress(
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-    "SpellCheckingInspection",
-)
+
 @Database(
     entities = [
         AppConfigEntity::class,
@@ -112,6 +51,7 @@ import notifyrelay.data.database.entity.WhiteListEntryEntity
         AppDeviceEntity::class,
         NotificationRecordEntity::class,
         SuperIslandHistoryEntity::class,
+        SuperIslandHistoryImageEntity::class,
         SuperIslandImageEntity::class,
         SuperIslandImageBindingEntity::class,
         SuperIslandMirrorFilterEntity::class,
@@ -121,7 +61,7 @@ import notifyrelay.data.database.entity.WhiteListEntryEntity
         PackageGroupEntity::class,
         PackageGroupItemEntity::class,
     ],
-    version = 9,
+    version = 10,
     exportSchema = false,
 )
 abstract class AppDatabase : RoomDatabase() {

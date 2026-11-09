@@ -1,6 +1,6 @@
 package github.xzynine.superislandui.model.templates
 
-import github.xzynine.superislandui.json.optStringOr
+import github.xzynine.superislandui.json.optNonEmptyString
 import kotlinx.serialization.json.JsonObject
 
 // 封面组件：coverInfo（OS3 新增模板 19）
@@ -21,14 +21,14 @@ data class CoverInfo(
 // 解析封面组件（coverInfo）
 fun parseCoverInfo(json: JsonObject): CoverInfo =
     CoverInfo(
-        picCover = json.optStringOr("picCover", "").takeIf { it.isNotEmpty() },
-        title = json.optStringOr("title", "").takeIf { it.isNotEmpty() },
-        content = json.optStringOr("content", "").takeIf { it.isNotEmpty() },
-        subContent = json.optStringOr("subContent", "").takeIf { it.isNotEmpty() },
-        colorTitle = json.optStringOr("colorTitle", "").takeIf { it.isNotEmpty() },
-        colorTitleDark = json.optStringOr("colorTitleDark", "").takeIf { it.isNotEmpty() },
-        colorContent = json.optStringOr("colorContent", "").takeIf { it.isNotEmpty() },
-        colorContentDark = json.optStringOr("colorContentDark", "").takeIf { it.isNotEmpty() },
-        colorSubContent = json.optStringOr("colorSubContent", "").takeIf { it.isNotEmpty() },
-        colorSubContentDark = json.optStringOr("colorSubContentDark", "").takeIf { it.isNotEmpty() },
+        picCover = json.optNonEmptyString("picCover"),
+        title = json.optNonEmptyString("title"),
+        content = json.optNonEmptyString("content"),
+        subContent = json.optNonEmptyString("subContent"),
+        colorTitle = json.optNonEmptyString("colorTitle"),
+        colorTitleDark = json.optNonEmptyString("colorTitleDark"),
+        colorContent = json.optNonEmptyString("colorContent"),
+        colorContentDark = json.optNonEmptyString("colorContentDark"),
+        colorSubContent = json.optNonEmptyString("colorSubContent"),
+        colorSubContentDark = json.optNonEmptyString("colorSubContentDark"),
     )

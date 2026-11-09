@@ -9,6 +9,8 @@
     "verify-agent-note-classification": "tsx scripts/verify-agent-note-classification.ts",
     "verify-archived-agent-notes": "tsx scripts/verify-archived-agent-notes.ts",
     "verify-skill-invocation-metadata": "tsx scripts/verify-skill-invocation-metadata.ts",
+    "verify-duplication": "tsx scripts/verify-duplication.ts",
+    "verify-duplication:report": "tsx scripts/verify-duplication.ts --report",
     "verify-all": "tsx scripts/verify-all.ts",
     "test:docs": "tsx scripts/verify-all.ts"
   },
@@ -19,6 +21,7 @@
     "@types/mdast": "^4.0.4",
     "@types/node": "^22.20.1",
     "js-yaml": "^4.1.0",
+    "jscpd": "3.5.10",
     "mdast-util-from-markdown": "^2.0.2",
     "mdast-util-gfm": "^3.1.0",
     "micromark-extension-gfm": "^3.0.0",

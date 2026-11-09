@@ -13,17 +13,15 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.common.PreviewData
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.components.AnimTextInfo
 import kotlinx.coroutines.delay
 import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.SuperIslandImageUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -57,7 +55,7 @@ fun AnimTextInfoCompose(
 
         // 2. 如果失败，尝试 picMap 中以 "miui.focus.pic_" 开头的第二个 key
         if (finalIconUrl.isNullOrEmpty() && picMap != null) {
-            finalIconUrl = SuperIslandImageUtil.resolveFallbackIconUrl(picMap)
+            finalIconUrl = SuperIslandImageUtils.resolveFallbackIconUrl(picMap)
         }
 
         // 显示图标，使用统一的图片加载工具
@@ -113,7 +111,7 @@ fun AnimTextInfoCompose(
             majorText?.let { text ->
                 val isTimeLike = text.matches(Regex("[0-9: ]{2,}"))
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                     fontSize = 15.sp,
                     color = Color(majorColor),
                     maxLines = 1,
@@ -132,7 +130,7 @@ fun AnimTextInfoCompose(
                 } ?: 0xFFDDDDDD.toInt()
             secondaryText?.let { text ->
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                     fontSize = 12.sp,
                     color = Color(secondaryColor),
                     maxLines = 1,
@@ -140,22 +138,4 @@ fun AnimTextInfoCompose(
             }
         }
     }
-}
-
-@Preview(name = "动画文本信息", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun AnimTextInfoComposePreview() {
-    AnimTextInfoCompose(
-        animTextInfo = PreviewData.sampleAnimTextInfo,
-        picMap = PreviewData.samplePicMap,
-    )
-}
-
-@Preview(name = "动画文本带计时器", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun AnimTextInfoComposeWithTimerPreview() {
-    AnimTextInfoCompose(
-        animTextInfo = PreviewData.sampleAnimTextInfoWithTimer,
-        picMap = PreviewData.samplePicMap,
-    )
 }

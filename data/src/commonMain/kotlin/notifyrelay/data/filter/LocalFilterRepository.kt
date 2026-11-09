@@ -5,6 +5,7 @@ import kotlinx.coroutines.sync.withLock
 import notifyrelay.data.database.entity.FilterEntryEntity
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.domain.feature.notification.filter.FilterEntry
+import notifyrelay.domain.feature.notification.filter.LocalFilterPort
 
 /**
  * 本机通知过滤条目仓库。
@@ -12,18 +13,18 @@ import notifyrelay.domain.feature.notification.filter.FilterEntry
  * 只承载条目与开关的读写；「本机通知是否应转发」的判定依赖 Android 通知对象，留在平台侧。
  * 表为空时写入内置条目；内置条目不可删除。
  */
-object LocalFilterRepository {
+object LocalFilterRepository : LocalFilterPort {
     /** 过滤本应用通知。 */
-    var filterSelf: Boolean = true
+    override var filterSelf: Boolean = true
 
     /** 过滤持久化（常驻）通知。 */
-    var filterOngoing: Boolean = true
+    override var filterOngoing: Boolean = true
 
     /** 过滤无标题或无内容通知。 */
-    var filterNoTitleOrText: Boolean = true
+    override var filterNoTitleOrText: Boolean = true
 
     /** 过滤重要性为无的通知。 */
-    var filterImportanceNone: Boolean = true
+    override var filterImportanceNone: Boolean = true
 
     /** 内置过滤条目（文本关键词与默认包名，均为不可删除的默认黑名单）。 */
     private val builtinFilterEntries: Set<FilterEntry> =
@@ -59,19 +60,19 @@ object LocalFilterRepository {
     private var cachedRows: List<FilterEntryEntity>? = null
 
     /** 内置关键词集合。 */
-    fun getBuiltinKeywords(): Set<String> = builtinFilterEntries.filter { it.keyword.isNotBlank() }.map { it.keyword }.toSet()
+    override fun builtinKeywords(): Set<String> = builtinFilterEntries.filter { it.keyword.isNotBlank() }.map { it.keyword }.toSet()
 
     /** 默认包名过滤集合。 */
-    fun getDefaultPackageFilters(): Set<String> = builtinFilterEntries.filter { it.packageName.isNotBlank() }.map { it.packageName }.toSet()
+    override fun defaultPackageFilters(): Set<String> = builtinFilterEntries.filter { it.packageName.isNotBlank() }.map { it.packageName }.toSet()
 
     /** 全部过滤条目（含内置条目），表为空时初始化内置条目。 */
-    suspend fun getFilterEntries(): Set<FilterEntry> = rowsCached().map { FilterEntry(it.keyword, it.packageName) }.toSet()
+    override suspend fun entries(): Set<FilterEntry> = rowsCached().map { FilterEntry(it.keyword, it.packageName) }.toSet()
 
     /** 已启用的过滤条目（允许用户禁用内置条目）。 */
-    suspend fun getEnabledFilterEntries(): Set<FilterEntry> = rowsCached().filter { it.enabled }.map { FilterEntry(it.keyword, it.packageName) }.toSet()
+    override suspend fun enabledEntries(): Set<FilterEntry> = rowsCached().filter { it.enabled }.map { FilterEntry(it.keyword, it.packageName) }.toSet()
 
     /** 设置条目启用状态。 */
-    suspend fun setFilterEntryEnabled(
+    override suspend fun setEntryEnabled(
         entry: FilterEntry,
         enabled: Boolean,
     ) {
@@ -90,7 +91,7 @@ object LocalFilterRepository {
     }
 
     /** 新增条目（已存在同条目时不重复添加）。 */
-    suspend fun addFilterEntry(
+    override suspend fun addEntry(
         keyword: String,
         packageName: String,
     ) {
@@ -107,7 +108,7 @@ object LocalFilterRepository {
     }
 
     /** 删除条目；内置条目不可删除。 */
-    suspend fun removeFilterEntry(
+    override suspend fun removeEntry(
         keyword: String,
         packageName: String,
     ) {
@@ -125,14 +126,14 @@ object LocalFilterRepository {
     }
 
     /** 已启用的包名过滤集合。 */
-    suspend fun getEnabledPackageFilters(): Set<String> = getEnabledFilterEntries().filter { it.keyword.isBlank() && it.packageName.isNotBlank() }.map { it.packageName }.toSet()
+    suspend fun getEnabledPackageFilters(): Set<String> = enabledEntries().filter { it.keyword.isBlank() && it.packageName.isNotBlank() }.map { it.packageName }.toSet()
 
     /** 设置包名条目启用状态。 */
     suspend fun setPackageEnabled(
         packageName: String,
         enabled: Boolean,
     ) {
-        setFilterEntryEnabled(FilterEntry("", packageName), enabled)
+        setEntryEnabled(FilterEntry("", packageName), enabled)
     }
 
     /**
@@ -156,7 +157,7 @@ object LocalFilterRepository {
         title: String,
         text: String,
     ): Boolean {
-        val enabledEntries = getEnabledFilterEntries()
+        val enabledEntries = enabledEntries()
         return LocalForwardRules.shouldForward(
             filterSelf = filterSelf,
             filterNoTitleOrText = filterNoTitleOrText,

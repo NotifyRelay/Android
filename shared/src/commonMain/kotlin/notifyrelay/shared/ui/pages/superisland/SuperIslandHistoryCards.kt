@@ -40,6 +40,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.paging.compose.LazyPagingItems
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import notifyrelay.base.util.SuperIslandImageUtils
 import notifyrelay.base.util.TimestampFormatter
@@ -356,6 +357,39 @@ private fun SuperIslandHistoryGroupCard(
     }
 }
 
+/**
+ * 历史条目的点击手势：单击请求复刻，长按载入完整条目后复制。
+ *
+ * @param entry 目标条目。
+ * @param coroutineScope 承载载入协程的作用域。
+ * @param loadEntryDetail 按 id 载入完整条目。
+ * @param onReplicaRequest 单击回调；null 时单击不动作。
+ * @param onCopyEntry 复制回调。
+ */
+private fun Modifier.historyEntryClickable(
+    entry: SuperIslandHistoryEntry,
+    coroutineScope: CoroutineScope,
+    loadEntryDetail: suspend (Long) -> SuperIslandHistoryEntry?,
+    onReplicaRequest: ((SuperIslandHistoryEntry) -> Unit)?,
+    onCopyEntry: (SuperIslandHistoryEntry) -> Unit,
+): Modifier =
+    combinedClickable(
+        onClick = {
+            onReplicaRequest?.invoke(entry)
+        },
+        onLongClick = {
+            coroutineScope.launch {
+                val full =
+                    try {
+                        loadEntryDetail(entry.id)
+                    } catch (e: IllegalStateException) {
+                        null
+                    }
+                onCopyEntry(full ?: entry)
+            }
+        },
+    )
+
 @Composable
 private fun SuperIslandHistorySummaryRow(
     entry: SuperIslandHistoryEntry,
@@ -384,22 +418,7 @@ private fun SuperIslandHistorySummaryRow(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .combinedClickable(
-                    onClick = {
-                        onReplicaRequest?.invoke(entry)
-                    },
-                    onLongClick = {
-                        coroutineScope.launch {
-                            val full =
-                                try {
-                                    loadEntryDetail(entry.id)
-                                } catch (e: IllegalStateException) {
-                                    null
-                                }
-                            onCopyEntry(full ?: entry)
-                        }
-                    },
-                ),
+                .historyEntryClickable(entry, coroutineScope, loadEntryDetail, onReplicaRequest, onCopyEntry),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -484,22 +503,7 @@ private fun SuperIslandHistoryEntryCard(
         modifier =
             Modifier
                 .fillMaxWidth()
-                .combinedClickable(
-                    onClick = {
-                        onReplicaRequest?.invoke(entry)
-                    },
-                    onLongClick = {
-                        coroutineScope.launch {
-                            val full =
-                                try {
-                                    loadEntryDetail(entry.id)
-                                } catch (e: IllegalStateException) {
-                                    null
-                                }
-                            onCopyEntry(full ?: entry)
-                        }
-                    },
-                ),
+                .historyEntryClickable(entry, coroutineScope, loadEntryDetail, onReplicaRequest, onCopyEntry),
     ) {
         val titleText =
             entry.appName?.takeIf { it.isNotBlank() }

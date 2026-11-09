@@ -1,7 +1,7 @@
 package github.xzynine.superislandui.model.templates
 
+import github.xzynine.superislandui.json.optNonEmptyString
 import github.xzynine.superislandui.json.optObjectOrNull
-import github.xzynine.superislandui.json.optStringOr
 import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.model.components.parseTimerInfo
 import kotlinx.serialization.json.JsonObject
@@ -23,14 +23,14 @@ data class ChatInfo(
 // 解析聊天信息组件（IM图文组件�?
 fun parseChatInfo(json: JsonObject): ChatInfo =
     ChatInfo(
-        picProfile = json.optStringOr("picProfile", "").takeIf { it.isNotEmpty() },
-        picProfileDark = json.optStringOr("picProfileDark", "").takeIf { it.isNotEmpty() },
-        appIconPkg = json.optStringOr("appIconPkg", "").takeIf { it.isNotEmpty() },
-        title = json.optStringOr("title", "").takeIf { it.isNotEmpty() },
-        content = json.optStringOr("content", "").takeIf { it.isNotEmpty() },
+        picProfile = json.optNonEmptyString("picProfile"),
+        picProfileDark = json.optNonEmptyString("picProfileDark"),
+        appIconPkg = json.optNonEmptyString("appIconPkg"),
+        title = json.optNonEmptyString("title"),
+        content = json.optNonEmptyString("content"),
         timerInfo = json.optObjectOrNull("timerInfo")?.let { parseTimerInfo(it) },
-        colorTitle = json.optStringOr("colorTitle", "").takeIf { it.isNotEmpty() },
-        colorTitleDark = json.optStringOr("colorTitleDark", "").takeIf { it.isNotEmpty() },
-        colorContent = json.optStringOr("colorContent", "").takeIf { it.isNotEmpty() },
-        colorContentDark = json.optStringOr("colorContentDark", "").takeIf { it.isNotEmpty() },
+        colorTitle = json.optNonEmptyString("colorTitle"),
+        colorTitleDark = json.optNonEmptyString("colorTitleDark"),
+        colorContent = json.optNonEmptyString("colorContent"),
+        colorContentDark = json.optNonEmptyString("colorContentDark"),
     )

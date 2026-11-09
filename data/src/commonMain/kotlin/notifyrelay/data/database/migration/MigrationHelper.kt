@@ -83,9 +83,8 @@ object MigrationHelper {
                             title = entry.stringOr("title"),
                             text = entry.stringOr("text"),
                             paramV2Raw = entry.stringOr("paramV2Raw"),
-                            picMap = entry.stringOr("picMap") ?: "{}",
                             rawPayload = entry.stringOr("rawPayload"),
-                        )
+                        ).apply { picMap = parseLegacyPicMap(entry.stringOr("picMap")) }
                     } catch (_: Exception) {
                         null
                     }

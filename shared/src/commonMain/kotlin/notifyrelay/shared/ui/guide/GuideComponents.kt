@@ -1,20 +1,25 @@
 package notifyrelay.shared.ui.guide
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -23,7 +28,11 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -33,6 +42,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
@@ -267,4 +277,66 @@ fun GuidePageFooter(
 @Composable
 fun GuideAppLogoSlot(modifier: Modifier = Modifier) {
     LocalGuideAppLogo.current?.invoke(modifier)
+}
+
+/**
+ * 引导页的淡入上滑包装。
+ *
+ * @param visible 是否可见。
+ * @param durationMillis 动画时长。
+ * @param content 内容。
+ */
+@Composable
+fun GuideReveal(
+    visible: Boolean,
+    durationMillis: Int,
+    content: @Composable () -> Unit,
+) {
+    AnimatedVisibility(
+        visible = visible,
+        enter =
+            fadeIn(animationSpec = tween(durationMillis = durationMillis)) +
+                slideInVertically(
+                    animationSpec = tween(durationMillis = durationMillis),
+                    initialOffsetY = { it / 3 },
+                ),
+    ) {
+        content()
+    }
+}
+
+/**
+ * 引导页外壳：光晕背景、居中内容列，内容在 [delayMillis] 后淡入上滑。
+ *
+ * @param delayMillis 淡入前的等待毫秒数。
+ * @param verticalArrangement 内容列的纵向排布。
+ * @param content 内容，入参为淡入状态。
+ */
+@Composable
+fun GuideScaffold(
+    delayMillis: Long,
+    verticalArrangement: Arrangement.Vertical = Arrangement.Top,
+    content: @Composable ColumnScope.(revealed: Boolean) -> Unit,
+) {
+    var revealed by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        delay(delayMillis)
+        revealed = true
+    }
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        GuideGlowBackground(modifier = Modifier.fillMaxSize())
+
+        Column(
+            modifier =
+                Modifier
+                    .fillMaxSize()
+                    .padding(horizontal = 32.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = verticalArrangement,
+        ) {
+            content(revealed)
+        }
+    }
 }

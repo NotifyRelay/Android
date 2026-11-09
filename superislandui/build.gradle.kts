@@ -55,13 +55,8 @@ kotlin {
         commonMain.dependencies {
             // Compose 运行时与 UI 采用 Compose Multiplatform 坐标（版本由 CMP 统一决定）；
             // 平台无关的 UI 主体位于 commonMain，故这些依赖声明在公共源集。
-            implementation(libs.compose.multiplatform.runtime)
-            implementation(libs.compose.multiplatform.foundation)
-            implementation(libs.compose.multiplatform.foundation.layout)
-            implementation(libs.compose.multiplatform.ui)
-            implementation(libs.compose.multiplatform.ui.text)
-            // @Preview 注解由该构件提供，公共端与 Android 端共用同一注解
-            implementation(libs.compose.multiplatform.ui.tooling.preview)
+            // bundle 内含 runtime、foundation、foundation-layout、ui、ui-text 与 @Preview 注解。
+            implementation(libs.bundles.compose.multiplatform.common)
             // 动画 API（AnimatedVisibility、animate*AsState 等）
             implementation(libs.compose.multiplatform.animation)
 

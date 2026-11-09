@@ -6,8 +6,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -33,7 +31,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
@@ -67,9 +64,6 @@ internal val OVERLAY_COLUMN_WIDTH = 420.dp
 
 /** 叠加层距屏幕顶部的距离。 */
 private val OVERLAY_TOP_MARGIN = 10.dp
-
-/** 列内各卡片之间的纵向间距。 */
-private val OVERLAY_ITEM_GAP = 8.dp
 
 /** 窗口初始高度：首帧测量出真实内容高度后立即被替换。 */
 private val INITIAL_WINDOW_HEIGHT = 120.dp
@@ -209,56 +203,16 @@ private fun OverlayContent(
     }
 
     val regionDebug = DebugFlags.OVERLAY_REGION_DEBUG.value
+    // 通知卡片的展开/收起状态：展开态卡片与状态行里的图标方块共用同一份
+    val cardsState = rememberNotificationCardsState()
 
     Box(Modifier.wrapContentSize()) {
-        // 内容列按不限高测量：窗口初始高度小于内容时仍能测出真实高度，否则高度会自我锁定
-        Layout(
-            modifier = Modifier.width(OVERLAY_COLUMN_WIDTH),
-            content = {
-                Column(
-                    modifier = Modifier.onSizeChanged(onContentSizeChanged),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.spacedBy(OVERLAY_ITEM_GAP),
-                ) {
-                    DesktopOverlayStore.mediaSessions.forEach { (deviceUuid, snapshot) ->
-                        key(deviceUuid) {
-                            OverlayMediaItem(
-                                snapshot = snapshot,
-                                deviceName = mediaDeviceLabel(deviceUuid),
-                                deviceUuid = deviceUuid,
-                                interactiveEnabled = interactiveEnabled,
-                                spectrumEnabled = spectrumEnabled,
-                                frameNow = frameNow,
-                                regions = interactiveRegions,
-                            )
-                        }
-                    }
-
-                    DesktopOverlayStore.superIslands.values.forEach { entry ->
-                        SuperIslandCard(
-                            entry = entry,
-                            interactiveEnabled = interactiveEnabled,
-                            regions = interactiveRegions,
-                        )
-                    }
-
-                    LogiIslandCard(interactiveEnabled = interactiveEnabled)
-
-                    NotificationCardsLayer(
-                        interactiveEnabled = interactiveEnabled,
-                        interactiveRegions = interactiveRegions,
-                    )
-
-                    StatusElementsRow(now = frameNow)
-                }
-            },
-        ) { measurables, constraints ->
-            val placeable =
-                measurables.first().measure(
-                    constraints.copy(minHeight = 0, maxHeight = androidx.compose.ui.unit.Constraints.Infinity),
-                )
-            layout(placeable.width, placeable.height) { placeable.place(0, 0) }
-        }
+        // 独立行（卡片与罗技胶囊）居中，状态条目与通知图标填进它们左右剩下的空档
+        OverlayColumn(
+            modifier = Modifier.width(OVERLAY_COLUMN_WIDTH).onSizeChanged(onContentSizeChanged),
+            anchors = overlayAnchors(interactiveEnabled, spectrumEnabled, frameNow, cardsState, interactiveRegions),
+            fillers = overlayFillers(frameNow, cardsState, interactiveEnabled, interactiveRegions),
+        )
 
         if (regionDebug) {
             RegionDebugOverlay(
@@ -281,13 +235,82 @@ private fun OverlayContent(
 }
 
 /**
- * 状态元素行：时间、键盘、余额横向共处一行，放不下时换行。
+ * 独立行内容：媒体卡、超级岛卡片、通知卡片、罗技汇总岛。
  *
- * 只读 [DesktopOverlayStore] 的快照与 [DesktopOverlaySettings] 的外观配置；
- * 非外观设置（开关、显示格式）经 `revision` 观察，避免逐帧阻塞读存储。
+ * 每个条目独占一行并水平居中；罗技汇总岛排在最后，作为状态条目的主要落点。
  */
 @Composable
-private fun StatusElementsRow(now: Long) {
+private fun overlayAnchors(
+    interactiveEnabled: Boolean,
+    spectrumEnabled: Boolean,
+    frameNow: Long,
+    cardsState: NotificationCardsState,
+    interactiveRegions: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Rectangle>,
+): List<OverlayColumnItem> {
+    val anchors = mutableListOf<OverlayColumnItem>()
+
+    DesktopOverlayStore.mediaSessions.forEach { (deviceUuid, snapshot) ->
+        anchors.add(
+            OverlayColumnItem(key = "media-" + deviceUuid) {
+                OverlayMediaItem(
+                    snapshot = snapshot,
+                    deviceName = mediaDeviceLabel(deviceUuid),
+                    deviceUuid = deviceUuid,
+                    interactiveEnabled = interactiveEnabled,
+                    spectrumEnabled = spectrumEnabled,
+                    frameNow = frameNow,
+                    regions = interactiveRegions,
+                )
+            },
+        )
+    }
+
+    DesktopOverlayStore.superIslands.values.forEach { entry ->
+        anchors.add(
+            OverlayColumnItem(key = "super-" + entry.sourceKey) {
+                SuperIslandCard(
+                    entry = entry,
+                    interactiveEnabled = interactiveEnabled,
+                    regions = interactiveRegions,
+                )
+            },
+        )
+    }
+
+    if (cardsState.expandedIds.isNotEmpty()) {
+        anchors.add(OverlayColumnItem(key = "notifications-expanded") { NotificationExpandedCards(cardsState) })
+    }
+
+    val revision = DesktopOverlaySettings.revision.value
+    val logiEnabled = remember(revision) { DesktopOverlaySettings.logiEnabled }
+    val logiHideDisconnected = remember(revision) { DesktopOverlaySettings.logiHideWhenDisconnected }
+    if (logiEnabled && visibleLogiDevices(logiHideDisconnected).isNotEmpty()) {
+        anchors.add(
+            OverlayColumnItem(key = "logi") {
+                LogiIslandCard(
+                    interactiveEnabled = interactiveEnabled,
+                    interactiveRegions = interactiveRegions,
+                )
+            },
+        )
+    }
+
+    return anchors
+}
+
+/**
+ * 流式条目：时间、键盘、余额、收起态通知图标。
+ *
+ * 按此顺序依次尝试填进各独立行左右剩下的空档，填不下的留到后续独立行，
+ * 所有独立行都试过后仍未安置的排在最下方并整体居中。
+ */
+@Composable
+private fun overlayFillers(
+    now: Long,
+    cardsState: NotificationCardsState,
+    interactiveEnabled: Boolean,
+    interactiveRegions: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Rectangle>,
+): List<OverlayColumnItem> {
     val revision = DesktopOverlaySettings.revision.value
     val balanceEnabled = remember(revision) { DesktopOverlaySettings.balanceEnabled }
     val keyboardEnabled = remember(revision) { DesktopOverlaySettings.keyboardEnabled }
@@ -303,26 +326,54 @@ private fun StatusElementsRow(now: Long) {
         }
     }
 
-    FlowRow(
-        modifier = Modifier.width(OVERLAY_COLUMN_WIDTH).padding(horizontal = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalArrangement = Arrangement.spacedBy(4.dp),
-    ) {
-        ClockElement(
-            style = DesktopOverlaySettings.clockStyle.snapshot(clockEnabled),
-            text = DesktopOverlayStore.clockText.value,
-        )
-        KeyboardElement(
-            style = DesktopOverlaySettings.keyboardStyle.snapshot(keyboardEnabled),
-            state = DesktopOverlayStore.keyboardState.value,
-            hint = hint,
-            hintElapsedMs = now - hintAt,
-        )
-        BalanceElement(
-            style = DesktopOverlaySettings.balanceStyle.snapshot(balanceEnabled),
-            snapshot = DesktopOverlayStore.balance.value,
-        )
-    }
+    // 元素本身在关闭或无内容时不发出节点，列布局按零尺寸跳过
+    val fillers = mutableListOf<OverlayColumnItem>()
+    fillers.add(
+        OverlayColumnItem(key = "clock") {
+            ClockElement(
+                style = DesktopOverlaySettings.clockStyle.snapshot(clockEnabled),
+                text = DesktopOverlayStore.clockText.value,
+            )
+        },
+    )
+    fillers.add(
+        OverlayColumnItem(key = "keyboard") {
+            KeyboardElement(
+                style = DesktopOverlaySettings.keyboardStyle.snapshot(keyboardEnabled),
+                state = DesktopOverlayStore.keyboardState.value,
+                hint = hint,
+                hintElapsedMs = now - hintAt,
+            )
+        },
+    )
+    fillers.add(
+        OverlayColumnItem(key = "balance") {
+            BalanceElement(
+                style = DesktopOverlaySettings.balanceStyle.snapshot(balanceEnabled),
+                snapshot = DesktopOverlayStore.balance.value,
+            )
+        },
+    )
+
+    // 收起态通知图标：每条一个流式条目，按到达顺序参与填空隙
+    val expanded = cardsState.expandedIds.toSet()
+    DesktopOverlayStore.notifications
+        .filter { it.id !in expanded }
+        .filter { cardsState.collapsedAt[it.id] != null }
+        .forEach { entry ->
+            fillers.add(
+                OverlayColumnItem(key = "notification-" + entry.id) {
+                    NotificationIconItem(
+                        entry = entry,
+                        interactiveEnabled = interactiveEnabled,
+                        interactiveRegions = interactiveRegions,
+                        onClick = { cardsState.expand(entry.id) },
+                    )
+                },
+            )
+        }
+
+    return fillers
 }
 
 /**
@@ -412,6 +463,9 @@ private fun OverlayMediaItem(
             text = snapshot.artist.orEmpty(),
             coverUrl = snapshot.coverUrl,
             deviceName = deviceName,
+            positionMs = snapshot.positionMs,
+            durationMs = snapshot.durationMs,
+            isPlaying = snapshot.isPlaying,
         )
 
     val mediaControl = DataLayerDesktop.mediaControl
@@ -471,6 +525,8 @@ private fun OverlayMediaItem(
         collapsedBackgroundColor = CAPSULE_BACKGROUND,
         modifier = Modifier.then(regionModifier),
         expandedCornerRadius = MEDIA_CARD_CORNER_RADIUS,
+        // 收起态把白色描边换成绿色进度环；无进度信息时仍用白色描边
+        collapsedProgress = snapshot.progressFraction,
         expandedContent = {
             Box(Modifier.width(MEDIA_CARD_WIDTH)) {
                 MediaIslandCompose(
@@ -500,6 +556,7 @@ private fun OverlayMediaItem(
                     title = snapshot.title,
                     coverUrl = snapshot.coverUrl,
                     spectrumEnabled = spectrumEnabled,
+                    playing = snapshot.isPlaying,
                     frameNow = frameNow,
                 )
             }
@@ -518,6 +575,7 @@ private fun CollapsedMediaCapsule(
     title: String?,
     coverUrl: String?,
     spectrumEnabled: Boolean,
+    playing: Boolean,
     frameNow: Long,
 ) {
     val painter = rememberSuperIslandImagePainter(url = coverUrl)
@@ -558,6 +616,7 @@ private fun CollapsedMediaCapsule(
         if (spectrumEnabled) {
             OverlaySpectrum(
                 positionMs = frameNow,
+                playing = playing,
                 widthDp = COLLAPSED_SPECTRUM_WIDTH,
                 heightDp = COLLAPSED_SPECTRUM_HEIGHT,
             )

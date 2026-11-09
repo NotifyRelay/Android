@@ -26,11 +26,9 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.model.components.MultiProgressInfo
 import notifyrelay.base.util.ColorUtils
@@ -277,22 +275,4 @@ fun MultiProgressCompose(
             }
         }
     }
-}
-
-@Preview(name = "多进度条50%", showBackground = true, backgroundColor = 0xFFFFFFFF, widthDp = 360)
-@Composable
-fun MultiProgressComposePreview() {
-    MultiProgressCompose(
-        multiProgressInfo = PreviewData.sampleMultiProgressInfo,
-        picMap = PreviewData.samplePicMap,
-    )
-}
-
-@Preview(name = "多进度条完成", showBackground = true, backgroundColor = 0xFFFFFFFF, widthDp = 360)
-@Composable
-fun MultiProgressComposeCompletePreview() {
-    MultiProgressCompose(
-        multiProgressInfo = PreviewData.sampleMultiProgressInfoComplete,
-        picMap = PreviewData.samplePicMap,
-    )
 }

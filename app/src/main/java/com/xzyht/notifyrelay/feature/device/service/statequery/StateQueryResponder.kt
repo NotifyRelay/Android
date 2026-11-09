@@ -7,6 +7,7 @@ import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificatio
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.device.service.callback.StateQueryPort
 import com.xzyht.notifyrelay.sync.MessageSender
+import com.xzyht.notifyrelay.sync.builder.SuperIslandMessageBuilder
 import github.xzynine.superislandui.common.SuperIslandManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -120,7 +121,7 @@ class StateQueryResponder(
             // 仅本地 file/content URI 时才会发生实际文件读取，故在此包装 runBlocking 是必要且可接受的。
             val content =
                 kotlinx.coroutines.runBlocking {
-                    MessageSender.buildSuperIslandFullContent(
+                    SuperIslandMessageBuilder.buildSuperIslandFullContent(
                         context,
                         superPkg,
                         superData.appName ?: "超级岛",

@@ -13,13 +13,18 @@ import androidx.compose.ui.unit.dp
 import notifyrelay.domain.feature.device.model.HandshakeRequest
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.layout.DialogDefaults
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.window.WindowDialog
 
 /**
- * 握手请求弹窗
- * 返回逻辑由父组件的 NavigationBackHandler 统一处理
+ * 握手请求弹窗。
+ *
+ * 关闭逻辑由父组件的 NavigationBackHandler 统一处理。
+ *
+ * @param showDialog 显示状态。
+ * @param handshakeRequest 待确认的请求；null 时本组件不渲染。
+ * @param onAccept 同意。
+ * @param onReject 拒绝。
+ * @param onDismiss 关闭。
  */
 @Composable
 fun HandshakeRequestDialog(
@@ -35,10 +40,15 @@ fun HandshakeRequestDialog(
     val textStyles = MiuixTheme.textStyles
     val req = handshakeRequest
 
-    WindowDialog(show = showDialog.value, modifier = Modifier, title = "新设备连接请求", titleColor = DialogDefaults.titleColor(), summary = null, summaryColor = DialogDefaults.summaryColor(), backgroundColor = DialogDefaults.backgroundColor(), enableWindowDim = true, onDismissRequest = {
-        onReject(req)
-        onDismiss()
-    }, onDismissFinished = null, outsideMargin = DialogDefaults.outsideMargin, insideMargin = DialogDefaults.insideMargin, defaultWindowInsetsPadding = true, content = {
+    NotifyRelayDialog(
+        show = showDialog.value,
+        title = "新设备连接请求",
+        summary = null,
+        onDismissRequest = {
+            onReject(req)
+            onDismiss()
+        },
+    ) {
         Column {
             Text(
                 text = "设备名: ${req.device.displayName}",
@@ -88,5 +98,5 @@ fun HandshakeRequestDialog(
                 )
             }
         }
-    })
+    }
 }

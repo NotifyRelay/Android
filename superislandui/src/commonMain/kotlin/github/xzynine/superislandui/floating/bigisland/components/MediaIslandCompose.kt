@@ -1,5 +1,6 @@
 package github.xzynine.superislandui.floating.bigisland.components
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -21,12 +22,10 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoFitText
 import github.xzynine.superislandui.common.AutoScrollText
-import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.model.components.MediaSessionData
 import top.yukonga.miuix.kmp.basic.Text
@@ -147,6 +146,17 @@ private fun ExpandedMediaIsland(
             }
         }
 
+        // 进度条与时间：仅有进度信息时显示，位于正文与操作按钮之间
+        val progressFraction = mediaSession.progressFraction
+        if (progressFraction != null) {
+            Spacer(modifier = Modifier.height(10.dp))
+            MediaProgressRow(
+                fraction = progressFraction,
+                positionMs = mediaSession.positionMs ?: 0L,
+                durationMs = mediaSession.durationMs ?: 0L,
+            )
+        }
+
         if (!showControls) return@Column
 
         Spacer(modifier = Modifier.height(12.dp))
@@ -176,7 +186,7 @@ private fun ExpandedMediaIsland(
                         .padding(8.dp),
             ) {
                 Text(
-                    text = "播放/暂停",
+                    text = if (mediaSession.isPlaying) "暂停" else "播放",
                     style = MiuixTheme.textStyles.body2,
                     color = Color(0xFFFFFFFF.toInt()),
                 )
@@ -198,10 +208,73 @@ private fun ExpandedMediaIsland(
     }
 }
 
-@Preview(name = "媒体播放器", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+/**
+ * 播放进度：一条细进度条加两端时间。
+ *
+ * 进度比例由调用方按已播时长与总时长算出，本组件只负责绘制，
+ * 因此暂停时进度停在原处、不自行推进。
+ */
 @Composable
-fun MediaIslandComposePreview() {
-    MediaIslandCompose(
-        mediaSession = PreviewData.sampleMediaSessionData,
-    )
+private fun MediaProgressRow(
+    fraction: Float,
+    positionMs: Long,
+    durationMs: Long,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Box(
+            modifier =
+                Modifier
+                    .fillMaxWidth()
+                    .height(PROGRESS_TRACK_HEIGHT)
+                    .clip(RoundedCornerShape(PROGRESS_TRACK_HEIGHT / 2))
+                    .background(Color(0x33FFFFFF)),
+        ) {
+            Box(
+                modifier =
+                    Modifier
+                        .fillMaxWidth(fraction.coerceIn(0f, 1f))
+                        .fillMaxSize()
+                        .clip(RoundedCornerShape(PROGRESS_TRACK_HEIGHT / 2))
+                        .background(PROGRESS_COLOR),
+            )
+        }
+        Spacer(modifier = Modifier.height(4.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+        ) {
+            Text(
+                text = formatDuration(positionMs),
+                style = MiuixTheme.textStyles.body2,
+                color = Color(0xB3FFFFFF),
+                fontSize = 11.sp,
+            )
+            Text(
+                text = formatDuration(durationMs),
+                style = MiuixTheme.textStyles.body2,
+                color = Color(0xB3FFFFFF),
+                fontSize = 11.sp,
+            )
+        }
+    }
 }
+
+/** 毫秒格式化为 `m:ss` 或 `h:mm:ss`；非正数返回 `0:00`。 */
+internal fun formatDuration(ms: Long): String {
+    if (ms <= 0L) return "0:00"
+    val totalSeconds = ms / 1000
+    val hours = totalSeconds / 3600
+    val minutes = (totalSeconds % 3600) / 60
+    val seconds = totalSeconds % 60
+    return if (hours > 0) {
+        hours.toString() + ":" + minutes.toString().padStart(2, '0') + ":" + seconds.toString().padStart(2, '0')
+    } else {
+        minutes.toString() + ":" + seconds.toString().padStart(2, '0')
+    }
+}
+
+/** 进度条高度。 */
+private val PROGRESS_TRACK_HEIGHT = 3.dp
+
+/** 已播进度颜色。 */
+private val PROGRESS_COLOR = Color(0xFF40C4FF)

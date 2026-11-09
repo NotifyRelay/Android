@@ -1,12 +1,15 @@
 package notifyrelay.data.database.entity
 
 import androidx.room.Entity
+import androidx.room.Ignore
 import androidx.room.Index
 import androidx.room.PrimaryKey
 
 /**
- * 超级岛历史记录实体类
- * 用于持久化超级岛历史记录数据
+ * 超级岛历史记录。
+ *
+ * 图片引用不在本表：`super_island_history_images` 按（条目, 图片键）存指向 [SuperIslandImageEntity]
+ * 的外键。读取时由仓储装配回 [picMap]，写入时由仓储拆成关联行。
  */
 @Entity(
     tableName = "super_island_history",
@@ -24,7 +27,14 @@ data class SuperIslandHistoryEntity(
     val title: String? = null,
     val text: String? = null,
     val paramV2Raw: String? = null,
-    val picMap: String = "{}", // 存储为JSON字符串（图片键到数据库ID）
     val rawPayload: String? = null,
-    val featureId: String? = null, // 特征ID，用于标识同一座“岛”的一次会话
-)
+    val featureId: String? = null,
+) {
+    /**
+     * 图片键到图片原文（或历史遗留的图片 id）的映射。
+     *
+     * 不落库：由仓储在读取时从关联表装配，写入时拆回关联行。
+     */
+    @Ignore
+    var picMap: Map<String, String> = emptyMap()
+}

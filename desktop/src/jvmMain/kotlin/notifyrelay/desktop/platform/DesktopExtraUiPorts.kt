@@ -27,6 +27,7 @@ import notifyrelay.shared.ui.port.ImageDecodePort
 import notifyrelay.shared.ui.port.LocalImageDecodePort
 import notifyrelay.shared.ui.port.LocalPreferencePort
 import notifyrelay.shared.ui.port.PreferencePort
+import notifyrelay.shared.ui.screen.KEY_DEVELOPER_MODE_ENABLED
 import notifyrelay.shared.ui.screen.LocalMainScreenPort
 import notifyrelay.shared.ui.screen.LocalSettingsPort
 import notifyrelay.shared.ui.screen.MainScreenPort
@@ -241,11 +242,14 @@ internal class DesktopMainScreenPort(
     }
 }
 
-/** 设置端口：开发者模式开关落到公共端 Storage，入口页面未接线。 */
+/** 设置端口：开发者模式开关落到公共端 Storage，由关于页的连点激活写入。 */
 internal object DesktopSettingsPort : SettingsPort {
-    private const val KEY_DEVELOPER_MODE = "developer_mode_enabled"
+    override fun isDeveloperModeEnabled(): Boolean = Storage.getBoolean(KEY_DEVELOPER_MODE_ENABLED, false)
 
-    override fun isDeveloperModeEnabled(): Boolean = Storage.getBoolean(KEY_DEVELOPER_MODE, false)
+    override fun enableDeveloperMode() {
+        Storage.putBoolean(KEY_DEVELOPER_MODE_ENABLED, true)
+        Logger.i("DesktopSettings", "开发者模式已激活")
+    }
 }
 
 /** 窗口是否横向：取主窗口容器尺寸的宽高比，未附着窗口（尺寸为 0）时为 false。 */

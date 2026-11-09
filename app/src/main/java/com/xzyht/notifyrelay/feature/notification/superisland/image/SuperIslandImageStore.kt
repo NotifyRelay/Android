@@ -16,6 +16,7 @@ import notifyrelay.base.util.image.ImageUtils
 import notifyrelay.base.util.sha256
 import notifyrelay.data.Storage
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
+import notifyrelay.data.database.history.SuperIslandHistoryStore
 import notifyrelay.data.database.repository.DatabaseRepository
 import java.io.File
 
@@ -56,47 +57,13 @@ object SuperIslandImageStore {
         return input.toMap()
     }
 
-    suspend fun bindAll(
-        context: Context,
-        packageName: String?,
-        input: Map<String, String>?,
-    ): Map<String, String> {
-        if (input.isNullOrEmpty()) return emptyMap()
-        ensureMigrated(context)
-        val repo = DatabaseRepository.getInstance()
-        val normalizedPackage = normalizePackageName(packageName)
-        val now = System.currentTimeMillis()
-        val out = mutableMapOf<String, String>()
-        for ((key, value) in input) {
-            if (value.isBlank()) continue
-            val hash = sha256(value)
-            val imageId = repo.upsertSuperIslandImageBinding(normalizedPackage, key, hash, value, now)
-            if (imageId > 0) {
-                out[key] = imageId.toString()
-            }
-        }
-        return out
-    }
-
+    /** 把图片 id 解析为原文；实现与历史详情共用 [SuperIslandHistoryStore.resolvePicMap]。 */
     suspend fun resolvePicMap(
         context: Context,
         picMap: Map<String, String>?,
     ): Map<String, String> {
-        if (picMap.isNullOrEmpty()) return emptyMap()
         ensureMigrated(context)
-        val repo = DatabaseRepository.getInstance()
-        val out = mutableMapOf<String, String>()
-        for ((key, value) in picMap) {
-            if (value.isBlank()) continue
-            val imageId = value.toLongOrNull()
-            if (imageId == null || imageId <= 0) {
-                out[key] = value
-            } else {
-                val data = repo.resolveSuperIslandImageById(imageId)
-                out[key] = if (!data.isNullOrBlank()) data else value
-            }
-        }
-        return out
+        return SuperIslandHistoryStore.resolvePicMap(picMap.orEmpty())
     }
 
     suspend fun resolveSuspend(
@@ -205,7 +172,7 @@ object SuperIslandImageStore {
 
         val historyEntries = repo.getSuperIslandHistoryFull()
         for (entry in historyEntries) {
-            val oldMap = parsePicMap(entry.picMap)
+            val oldMap = entry.picMap
             if (oldMap.isEmpty()) continue
 
             val packageName = resolvePackageName(entry)
@@ -225,20 +192,11 @@ object SuperIslandImageStore {
                 }
             }
 
-            val updatedEntry = entry.copy(picMap = gson.toJson(newMap))
-            repo.saveSuperIslandHistory(updatedEntry)
+            entry.picMap = newMap
+            repo.saveSuperIslandHistory(entry)
         }
 
         deleteLegacyStoreFile(context)
-    }
-
-    private fun parsePicMap(raw: String?): Map<String, String> {
-        if (raw.isNullOrBlank()) return emptyMap()
-        return try {
-            gson.fromJson(raw, stringStringMapType) ?: emptyMap()
-        } catch (_: Exception) {
-            emptyMap()
-        }
     }
 
     private fun resolvePackageName(entry: SuperIslandHistoryEntity): String {

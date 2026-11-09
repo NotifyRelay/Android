@@ -26,8 +26,8 @@ class DesktopDevicePortsProvider(
 }
 
 /** 桌面端消息端口：设备视图与认证表快照；发送经 [DesktopDeviceManager.sendDataMessage]。 */
-private class DesktopMessagePort(
-    private val manager: DesktopDeviceManager,
+private open class DesktopMessagePort(
+    protected val manager: DesktopDeviceManager,
 ) : DeviceMessagePort {
     override val devices get() = manager.devices
 
@@ -50,30 +50,15 @@ private class DesktopMessagePort(
     override val localUuid: String get() = manager.localUuid
 }
 
-/** 桌面端聊天端口：在消息端口之上补入站通知订阅（与管理器共用同一回调集合）。 */
+/**
+ * 桌面端聊天端口：消息端口 + 入站通知订阅。
+ *
+ * 转发部分继承 [DesktopMessagePort]；额外两条订阅入口与管理器共用同一回调集合。
+ */
 private class DesktopChatPort(
-    private val manager: DesktopDeviceManager,
-) : DeviceChatPort {
-    override val devices get() = manager.devices
-
-    override fun getAuthenticatedDevices(): Map<String, AuthInfo> = manager.getAuthenticatedDevices()
-
-    override fun getPairedDeviceUuids(): Set<String> = manager.getPairedDeviceUuids()
-
-    override fun getAuthenticatedOnlineCount(): Int = manager.getAuthenticatedOnlineCount()
-
-    override fun getAuthenticatedOnlineDevices() = manager.getAuthenticatedOnlineDevices()
-
-    override fun resolveDeviceInfo(
-        uuid: String,
-        fallbackIp: String?,
-        fallbackPort: Int,
-    ) = manager.resolveDeviceInfo(uuid, fallbackIp, fallbackPort)
-
-    override fun authenticatedSnapshot(): Map<String, AuthInfo> = manager.authenticatedSnapshot()
-
-    override val localUuid: String get() = manager.localUuid
-
+    manager: DesktopDeviceManager,
+) : DesktopMessagePort(manager),
+    DeviceChatPort {
     override fun registerOnNotificationDataReceived(callback: (String) -> Unit) = manager.registerNotificationDataCallback(callback)
 
     override fun unregisterOnNotificationDataReceived(callback: (String) -> Unit) = manager.unregisterNotificationDataCallback(callback)
