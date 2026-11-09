@@ -12,6 +12,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
@@ -25,6 +28,7 @@ import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoScrollText
 import github.xzynine.superislandui.currentTimeMillis
 import github.xzynine.superislandui.model.components.TimerInfo
+import kotlinx.coroutines.delay
 import notifyrelay.base.util.ColorUtils
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
@@ -326,3 +330,25 @@ fun superIslandCardColor(isOverlapping: Boolean): Color =
     } else {
         Color.Black.copy(alpha = 0.92f)
     }
+
+/**
+ * 计时器文本随时间刷新。
+ *
+ * 仅计时进行中（正计时 `timerType=1` / 倒计时 `timerType=-1`）每秒重算，暂停与无效类型保持首次格式化的结果。
+ *
+ * @param timerInfo 计时器信息。
+ * @returns 随时间更新的格式化文本。
+ */
+@Composable
+fun rememberTimerText(timerInfo: TimerInfo): String {
+    val displayState = remember(timerInfo) { mutableStateOf(formatTimerInfo(timerInfo)) }
+    val isTimerRunning = timerInfo.timerType == 1 || timerInfo.timerType == -1
+    LaunchedEffect(timerInfo) {
+        if (!isTimerRunning) return@LaunchedEffect
+        while (true) {
+            displayState.value = formatTimerInfo(timerInfo)
+            delay(1000)
+        }
+    }
+    return displayState.value
+}

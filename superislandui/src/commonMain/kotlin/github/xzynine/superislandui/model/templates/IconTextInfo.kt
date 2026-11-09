@@ -1,6 +1,7 @@
 package github.xzynine.superislandui.model.templates
 
 import github.xzynine.superislandui.json.optIntOr
+import github.xzynine.superislandui.json.optNonEmptyString
 import github.xzynine.superislandui.json.optObjectOrNull
 import github.xzynine.superislandui.json.optStringOr
 import kotlinx.serialization.json.JsonObject
@@ -36,11 +37,11 @@ fun parseIconTextInfo(json: JsonObject): IconTextInfo =
                     srcDark = obj.optStringOr("srcDark", "").takeIf { it.isNotEmpty() },
                 )
             },
-        title = json.optStringOr("title", "").takeIf { it.isNotEmpty() },
-        content = json.optStringOr("content", "").takeIf { it.isNotEmpty() },
-        subContent = json.optStringOr("subContent", "").takeIf { it.isNotEmpty() },
-        colorTitle = json.optStringOr("colorTitle", "").takeIf { it.isNotEmpty() },
-        colorTitleDark = json.optStringOr("colorTitleDark", "").takeIf { it.isNotEmpty() },
-        colorContent = json.optStringOr("colorContent", "").takeIf { it.isNotEmpty() },
-        colorContentDark = json.optStringOr("colorContentDark", "").takeIf { it.isNotEmpty() },
+        title = json.optNonEmptyString("title"),
+        content = json.optNonEmptyString("content"),
+        subContent = json.optNonEmptyString("subContent"),
+        colorTitle = json.optNonEmptyString("colorTitle"),
+        colorTitleDark = json.optNonEmptyString("colorTitleDark"),
+        colorContent = json.optNonEmptyString("colorContent"),
+        colorContentDark = json.optNonEmptyString("colorContentDark"),
     )

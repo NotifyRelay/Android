@@ -90,18 +90,7 @@ object SuperIslandMessageBuilder {
         val finalPics: Map<String, String> = if (processedPics.isNotEmpty()) processedPics.toMap() else (picMap?.toMap() ?: emptyMap())
         val isLocked = PermissionHelper.isDeviceLocked(context)
 
-        return JSONObject()
-            .apply {
-                put("packageName", superPkg)
-                put("appName", appName ?: superPkg)
-                put("title", title ?: "")
-                put("text", text ?: "")
-                put("param_v2_raw", paramV2Raw ?: "")
-                put("time", time)
-                put("isLocked", isLocked)
-                put("featureIdOverride", featureIdOverride ?: "")
-                put("pics", JSONObject(finalPics))
-            }.toString()
+        return buildStatePayload(superPkg, appName, title, text, paramV2Raw, time, featureIdOverride, isLocked, finalPics)
     }
 
     /**
@@ -174,17 +163,7 @@ object SuperIslandMessageBuilder {
             if (!NativeCore.isReady()) return
             if (!NativeCore.senderQueueReady) return
 
-            val content =
-                JSONObject()
-                    .apply {
-                        put("packageName", superPkg)
-                        put("appName", appName ?: superPkg)
-                        put("title", title ?: "")
-                        put("text", text ?: "")
-                        put("param_v2_raw", paramV2Raw ?: "")
-                        put("time", time)
-                        put("featureIdOverride", featureIdOverride ?: "")
-                    }.toString()
+            val content = buildStatePayload(superPkg, appName, title, text, paramV2Raw, time, featureIdOverride)
 
             SendGateway.getAuthenticatedDevices(deviceManager).forEach { device ->
                 try {
@@ -198,3 +177,44 @@ object SuperIslandMessageBuilder {
         }
     }
 }
+
+/**
+ * 构造超级岛状态报文。
+ *
+ * 字段名与 Rust 合并引擎对齐，不可改名。`isLocked` 与 `pics` 只在需要完整状态时出现，
+ * 结束标记报文不带这两项。
+ *
+ * @param superPkg 超级岛包名。
+ * @param appName 应用名；为空时用包名。
+ * @param title 标题。
+ * @param text 正文。
+ * @param paramV2Raw 原始 param_v2。
+ * @param time 事件时间。
+ * @param featureIdOverride 覆盖用的特征 id。
+ * @param isLocked 设备是否锁屏；null 时不写入该字段。
+ * @param pics 图片映射；null 时不写入该字段。
+ * @returns 报文的 JSON 文本。
+ */
+private fun buildStatePayload(
+    superPkg: String,
+    appName: String?,
+    title: String?,
+    text: String?,
+    paramV2Raw: String?,
+    time: Long,
+    featureIdOverride: String?,
+    isLocked: Boolean? = null,
+    pics: Map<String, String>? = null,
+): String =
+    JSONObject()
+        .apply {
+            put("packageName", superPkg)
+            put("appName", appName ?: superPkg)
+            put("title", title ?: "")
+            put("text", text ?: "")
+            put("param_v2_raw", paramV2Raw ?: "")
+            put("time", time)
+            put("featureIdOverride", featureIdOverride ?: "")
+            isLocked?.let { put("isLocked", it) }
+            pics?.let { put("pics", JSONObject(it)) }
+        }.toString()

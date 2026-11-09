@@ -26,6 +26,14 @@ fun JsonObject.optStringOrNull(key: String): String? =
     }
 
 /**
+ * 取非空字符串字段；缺失、空白或 JSON null 都返回 null。
+ *
+ * @param key 字段名。
+ * @returns 非空值或 null。
+ */
+fun JsonObject.optNonEmptyString(key: String): String? = optStringOr(key, "").takeIf { it.isNotEmpty() }
+
+/**
  * 按顺序取第一个非空白字符串字段。
  *
  * @param keys 候选键，越靠前优先级越高。

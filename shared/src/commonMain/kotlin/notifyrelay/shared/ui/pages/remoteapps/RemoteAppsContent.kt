@@ -1,7 +1,6 @@
 package notifyrelay.shared.ui.pages.remoteapps
 
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -73,7 +72,7 @@ fun RemoteAppsContent(
         else ->
             LazyVerticalGrid(
                 columns = GridCells.Adaptive(minSize = 80.dp),
-                contentPadding = PaddingValues(4.dp),
+                contentPadding = AppsGridContentPadding,
                 horizontalArrangement = Arrangement.spacedBy(AppsGridHorizontalSpacing),
                 verticalArrangement = Arrangement.spacedBy(AppsGridVerticalSpacing),
             ) {

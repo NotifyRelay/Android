@@ -394,11 +394,7 @@ fun UnauthenticatedDeviceButton(
     val isOnline = deviceStates[device.uuid] == true
     Button(
         onClick = { onSelectDevice(device) },
-        modifier =
-            Modifier
-                .then(if (isLandscape) Modifier.fillMaxWidth() else Modifier)
-                .defaultMinSize(minHeight = ButtonMinHeight)
-                .then(if (isLandscape) Modifier.padding(vertical = 2.dp) else Modifier.padding(end = 6.dp)),
+        modifier = Modifier.deviceButtonLayout(isLandscape),
         insideMargin = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
         colors = ButtonDefaults.buttonColors(color = colorScheme.surface),
     ) {
@@ -422,11 +418,7 @@ fun RejectedDevicesButton(
 ) {
     Button(
         onClick = onShowRejectedDialog,
-        modifier =
-            Modifier
-                .then(if (isLandscape) Modifier.fillMaxWidth() else Modifier)
-                .defaultMinSize(minHeight = ButtonMinHeight)
-                .then(if (isLandscape) Modifier.padding(vertical = 2.dp) else Modifier.padding(end = 6.dp)),
+        modifier = Modifier.deviceButtonLayout(isLandscape),
         insideMargin = PaddingValues(horizontal = 4.dp, vertical = 2.dp),
         colors = ButtonDefaults.buttonColors(color = colorScheme.secondaryContainer),
     ) {
@@ -437,3 +429,14 @@ fun RejectedDevicesButton(
         )
     }
 }
+
+/**
+ * 设备列表按钮的统一尺寸与间距：横屏占满整行，竖屏按内容宽度并留出右侧间隔。
+ *
+ * @param isLandscape 是否横屏。
+ */
+private fun Modifier.deviceButtonLayout(isLandscape: Boolean): Modifier =
+    this
+        .then(if (isLandscape) Modifier.fillMaxWidth() else Modifier)
+        .defaultMinSize(minHeight = ButtonMinHeight)
+        .then(if (isLandscape) Modifier.padding(vertical = 2.dp) else Modifier.padding(end = 6.dp))

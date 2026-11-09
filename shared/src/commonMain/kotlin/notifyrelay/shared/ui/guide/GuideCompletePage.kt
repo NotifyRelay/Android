@@ -1,9 +1,5 @@
 package notifyrelay.shared.ui.guide
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.defaultMinSize
@@ -30,15 +26,7 @@ fun GuideCompletePage(
     GuideScaffold(delayMillis = 300) { revealed ->
         Spacer(modifier = Modifier.weight(1f))
 
-        AnimatedVisibility(
-            visible = revealed,
-            enter =
-                fadeIn(animationSpec = tween(durationMillis = 800)) +
-                    slideInVertically(
-                        animationSpec = tween(durationMillis = 800),
-                        initialOffsetY = { it / 3 },
-                    ),
-        ) {
+        GuideReveal(visible = revealed, durationMillis = 800) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 GuideAppLogoSlot(modifier = Modifier.size(92.dp))
                 Spacer(modifier = Modifier.height(28.dp))

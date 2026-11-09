@@ -115,15 +115,7 @@ object DesktopScrcpyLauncher {
             val command = listOf(executable.absolutePath) + args
             Logger.i(TAG, "启动 scrcpy: " + command.joinToString(" "))
             // 不合并 stderr：错误输出单独回收，异常退出时用于提示与日志
-            val builder =
-                ProcessBuilder(command)
-                    .redirectErrorStream(false)
-            // 图标路径：仅在已配置时注入，供 scrcpy 作为窗口图标
-            windowIconPath()?.let { builder.environment()[ENV_ICON_PATH] = it }
-            val process = builder.start()
-            runningProcesses[serial] = process
-            rememberSerial(deviceUuid, serial)
-            watchProcess(serial, process)
+            launchAndTrack(command, deviceUuid, serial)
             true
         } catch (e: java.io.IOException) {
             Logger.e(TAG, "启动 scrcpy 失败: " + serial, e)
@@ -171,12 +163,7 @@ object DesktopScrcpyLauncher {
         return try {
             val command = listOf(executable.absolutePath) + args
             Logger.i(TAG, "启动 scrcpy 音频转发: " + command.joinToString(" "))
-            val builder = ProcessBuilder(command).redirectErrorStream(false)
-            windowIconPath()?.let { builder.environment()[ENV_ICON_PATH] = it }
-            val process = builder.start()
-            runningProcesses[serial] = process
-            rememberSerial(deviceUuid, serial)
-            watchProcess(serial, process)
+            launchAndTrack(command, deviceUuid, serial)
             true
         } catch (e: java.io.IOException) {
             Logger.e(TAG, "启动 scrcpy 音频转发失败: " + serial, e)
@@ -393,5 +380,27 @@ object DesktopScrcpyLauncher {
     private fun windowIconPath(): String? {
         val file = File(System.getProperty("user.home"), ".notifyrelay/scrcpy_icon.png")
         return if (file.exists()) file.absolutePath else null
+    }
+
+    /**
+     * 启动进程并登记到运行表，随后交给进程监视器。
+     *
+     * @param command 命令行。
+     * @param deviceUuid 设备 UUID。
+     * @param serial 该设备当前使用的 adb 序列号。
+     * @returns 启动的进程。
+     */
+    private fun launchAndTrack(
+        command: List<String>,
+        deviceUuid: String,
+        serial: String,
+    ): Process {
+        val builder = ProcessBuilder(command).redirectErrorStream(false)
+        windowIconPath()?.let { builder.environment()[ENV_ICON_PATH] = it }
+        val process = builder.start()
+        runningProcesses[serial] = process
+        rememberSerial(deviceUuid, serial)
+        watchProcess(serial, process)
+        return process
     }
 }

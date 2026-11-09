@@ -19,11 +19,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -31,7 +29,6 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import notifyrelay.desktop.platform.DesktopIconCodecPort
 import top.yukonga.miuix.kmp.basic.Text
-import kotlin.math.roundToInt
 
 /** 卡片展开后自动收起的时长。 */
 internal const val NOTIFICATION_COLLAPSE_MS = 3_000L
@@ -252,18 +249,8 @@ internal fun NotificationIconItem(
                 .size(ICON_SLOT)
                 .clip(RoundedCornerShape(ICON_CORNER))
                 .background(CARD_BACKGROUND)
-                .onGloballyPositioned { coords ->
-                    if (!interactiveEnabled) return@onGloballyPositioned
-                    val pos = coords.localToRoot(Offset.Zero)
-                    val sz = coords.size
-                    interactiveRegions[regionKey] =
-                        java.awt.Rectangle(
-                            pos.x.roundToInt(),
-                            pos.y.roundToInt(),
-                            sz.width,
-                            sz.height,
-                        )
-                }.let { if (interactiveEnabled) it.clickable { onClick() } else it },
+                .trackInteractiveRegion(interactiveRegions, regionKey, interactiveEnabled)
+                .let { if (interactiveEnabled) it.clickable { onClick() } else it },
         contentAlignment = Alignment.Center,
     ) {
         if (icon != null) {

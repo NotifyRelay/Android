@@ -6,11 +6,11 @@ import androidx.room.migration.Migration
 import androidx.sqlite.SQLiteConnection
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonObject
 import notifyrelay.base.config.FilterConfigDefaults
 import notifyrelay.base.log.Logger
 import notifyrelay.data.database.migration.execSQL
 import notifyrelay.data.database.migration.forEachRow
+import notifyrelay.data.database.migration.parseLegacyPicMap
 import notifyrelay.data.database.migration.querySingleLong
 import notifyrelay.data.database.migration.querySingleString
 
@@ -493,7 +493,7 @@ object AppDatabaseMigrations {
                 connection.forEachRow("SELECT id, picMap FROM super_island_history") { row ->
                     val historyId = row.getLong(0)
                     val raw = if (row.isNull(1)) null else row.getText(1)
-                    oldPicMaps.add(historyId to parsePicMapJson(raw))
+                    oldPicMaps.add(historyId to parseLegacyPicMap(raw))
                 }
 
                 // 2. 重建历史表：新结构不含 picMap
@@ -549,21 +549,6 @@ object AppDatabaseMigrations {
                 }
             }
         }
-
-    /**
-     * 解析旧 `picMap` 列：JSON 对象，键为图片键、值为图片 id 字符串。
-     *
-     * 非法或空值退化为空表，让迁移继续处理其余行而不是整批失败。
-     */
-    private fun parsePicMapJson(raw: String?): Map<String, String> {
-        if (raw.isNullOrBlank()) return emptyMap()
-        val parsed: Map<String, String> =
-            runCatching {
-                val obj = Json.parseToJsonElement(raw) as? JsonObject ?: return@runCatching emptyMap<String, String>()
-                obj.entries.associate { (key, value) -> key to value.toString().trim('"') }
-            }.getOrDefault(emptyMap())
-        return parsed
-    }
 
     /** 镜像过滤默认包名禁用集 → super_island_mirror_filters 行 */
     private fun migrateMirrorFilterDefaults(connection: SQLiteConnection) {

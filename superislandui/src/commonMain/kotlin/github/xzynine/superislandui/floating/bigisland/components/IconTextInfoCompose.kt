@@ -90,33 +90,39 @@ fun IconTextInfoCompose(
             // 次要文本1 + 次要文本2：同一行
             if (iconTextInfo.content != null || iconTextInfo.subContent != null) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    iconTextInfo.content?.let { text ->
-                        Text(
-                            text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
-                            fontSize = 12.sp,
-                            color =
-                                Color(
-                                    (if (preferDark) ColorUtils.parseColor(iconTextInfo.colorContentDark) else ColorUtils.parseColor(iconTextInfo.colorContent))
-                                        ?: 0xFFDDDDDD.toInt(),
-                                ),
-                            maxLines = 1,
+                    val contentColor =
+                        Color(
+                            (if (preferDark) ColorUtils.parseColor(iconTextInfo.colorContentDark) else ColorUtils.parseColor(iconTextInfo.colorContent))
+                                ?: 0xFFDDDDDD.toInt(),
                         )
-                    }
-                    iconTextInfo.subContent?.let { text ->
-                        Text(
-                            text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
-                            fontSize = 12.sp,
-                            color =
-                                Color(
-                                    (if (preferDark) ColorUtils.parseColor(iconTextInfo.colorContentDark) else ColorUtils.parseColor(iconTextInfo.colorContent))
-                                        ?: 0xFFDDDDDD.toInt(),
-                                ),
-                            maxLines = 1,
-                            modifier = Modifier.padding(start = 8.dp),
-                        )
-                    }
+                    ContentText(iconTextInfo.content, contentColor)
+                    ContentText(iconTextInfo.subContent, contentColor, Modifier.padding(start = 8.dp))
                 }
             }
         }
+    }
+}
+
+/**
+ * 次要文本：解析简单 HTML，颜色按深浅色主题取正文色。
+ *
+ * @param text 原始文本；为空时不渲染。
+ * @param preferDark 是否使用深色主题配色。
+ * @param modifier 文本修饰符。
+ */
+@Composable
+private fun ContentText(
+    text: String?,
+    color: Color,
+    modifier: Modifier = Modifier,
+) {
+    text?.let {
+        Text(
+            text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
+            fontSize = 12.sp,
+            color = color,
+            maxLines = 1,
+            modifier = modifier,
+        )
     }
 }

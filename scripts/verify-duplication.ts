@@ -132,6 +132,22 @@ function writeBaseline(accepted: readonly string[], layers: readonly string[]): 
  *
  * @returns 基线，或失败原因。
  */
+/**
+ * 读取并校验层级参数，非法时直接终止进程。
+ *
+ * @param flag 触发本次调用的参数名，用于错误提示。
+ * @param index 该参数在 argv 中的下标。
+ * @returns 合法的层标识。
+ */
+function requireLayerArg(flag: string, index: number): string {
+  const layer = process.argv[index + 1]
+  if (layer === undefined || !(LAYERS as readonly string[]).includes(layer)) {
+    console.error(`verify-duplication: ${flag} needs one of ${LAYERS.join(', ')}`)
+    process.exit(1)
+  }
+  return layer
+}
+
 function readBaseline(): { baseline: Baseline } | { error: string } {
   if (!existsSync(baselinePath)) {
     return { error: `missing baseline ${relative(root, baselinePath).replaceAll('\\', '/')}; regenerate it with --update` }
@@ -166,11 +182,7 @@ if (process.argv.includes('--update')) {
 
 const acceptIndex = process.argv.indexOf('--accept')
 if (acceptIndex !== -1) {
-  const layer = process.argv[acceptIndex + 1]
-  if (layer === undefined || !(LAYERS as readonly string[]).includes(layer)) {
-    console.error(`verify-duplication: --accept needs one of ${LAYERS.join(', ')}`)
-    process.exit(1)
-  }
+  const layer = requireLayerArg('--accept', acceptIndex)
   const read = readBaseline()
   const existing = 'baseline' in read ? read.baseline.fingerprints : []
   const layers = 'baseline' in read ? (read.baseline.acceptedLayers ?? []) : []
@@ -185,11 +197,7 @@ if (acceptIndex !== -1) {
 
 const pinIndex = process.argv.indexOf('--pin')
 if (pinIndex !== -1) {
-  const layer = process.argv[pinIndex + 1]
-  if (layer === undefined || !(LAYERS as readonly string[]).includes(layer)) {
-    console.error(`verify-duplication: --pin needs one of ${LAYERS.join(', ')}`)
-    process.exit(1)
-  }
+  const layer = requireLayerArg('--pin', pinIndex)
   const read = readBaseline()
   const existing = 'baseline' in read ? read.baseline.fingerprints : []
   const layers = 'baseline' in read ? (read.baseline.acceptedLayers ?? []) : []

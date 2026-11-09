@@ -168,24 +168,6 @@ private fun kotlinx.serialization.json.JsonElement.asArrayOfObjects(): List<Json
 /** 读取字符串字段；缺失或非字符串返回 null。 */
 private fun JsonObject.stringOr(key: String): String? = (this[key] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
-/**
- * 解析旧导出文件里的 `picMap`：JSON 对象，键为图片键、值为图片 id 字符串。
- *
- * 旧文件可能没有该字段或存着非法 JSON，两种都退化为空表。
- *
- * @param raw 旧字段原文。
- * @returns 图片键到图片 id 的映射。
- */
-private fun parseLegacyPicMap(raw: String?): Map<String, String> {
-    if (raw.isNullOrBlank()) return emptyMap()
-    val parsed: Map<String, String> =
-        runCatching {
-            val obj = Json.parseToJsonElement(raw) as? JsonObject ?: return@runCatching emptyMap<String, String>()
-            obj.entries.associate { (key, value) -> key to value.toString().trim('"') }
-        }.getOrDefault(emptyMap())
-    return parsed
-}
-
 /** 读取长整数字段；缺失时用 [default]。 */
 private fun JsonObject.longOr(
     key: String,

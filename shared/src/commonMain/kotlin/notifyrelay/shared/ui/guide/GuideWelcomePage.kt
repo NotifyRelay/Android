@@ -3,7 +3,6 @@ package notifyrelay.shared.ui.guide
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
-import androidx.compose.animation.slideInVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -33,15 +32,7 @@ fun GuideWelcomePage(
     val colorScheme = MiuixTheme.colorScheme
 
     GuideScaffold(delayMillis = 350, verticalArrangement = Arrangement.Center) { revealed ->
-        AnimatedVisibility(
-            visible = revealed,
-            enter =
-                fadeIn(animationSpec = tween(durationMillis = 900)) +
-                    slideInVertically(
-                        animationSpec = tween(durationMillis = 900),
-                        initialOffsetY = { it / 3 },
-                    ),
-        ) {
+        GuideReveal(visible = revealed, durationMillis = 900) {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 GuideAppLogoSlot(modifier = Modifier.size(92.dp))
                 Spacer(modifier = Modifier.height(28.dp))
