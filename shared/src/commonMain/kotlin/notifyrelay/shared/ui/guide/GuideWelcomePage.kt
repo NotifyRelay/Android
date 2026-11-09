@@ -10,23 +10,16 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
-import kotlinx.coroutines.delay
-import notifyrelay.shared.ui.guide.GuideGlowBackground
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
@@ -38,94 +31,77 @@ fun GuideWelcomePage(
     needConsent: Boolean = false,
 ) {
     val colorScheme = MiuixTheme.colorScheme
-    var revealed by remember { mutableStateOf(false) }
 
-    LaunchedEffect(Unit) {
-        delay(350)
-        revealed = true
-    }
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        GuideGlowBackground(modifier = Modifier.fillMaxSize())
-
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(horizontal = 32.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.Center,
+    GuideScaffold(delayMillis = 350, verticalArrangement = Arrangement.Center) { revealed ->
+        AnimatedVisibility(
+            visible = revealed,
+            enter =
+                fadeIn(animationSpec = tween(durationMillis = 900)) +
+                    slideInVertically(
+                        animationSpec = tween(durationMillis = 900),
+                        initialOffsetY = { it / 3 },
+                    ),
         ) {
-            AnimatedVisibility(
-                visible = revealed,
-                enter =
-                    fadeIn(animationSpec = tween(durationMillis = 900)) +
-                        slideInVertically(
-                            animationSpec = tween(durationMillis = 900),
-                            initialOffsetY = { it / 3 },
-                        ),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    GuideAppLogoSlot(modifier = Modifier.size(92.dp))
-                    Spacer(modifier = Modifier.height(28.dp))
-                    Text(
-                        text = "NotifyRelay",
-                        style = MiuixTheme.textStyles.title1,
-                        color = colorScheme.onBackground,
-                    )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    Text(
-                        text = "跨设备通知转发 · 设备互联",
-                        style = MiuixTheme.textStyles.subtitle,
-                        color = colorScheme.onBackgroundVariant,
-                    )
-                    Spacer(modifier = Modifier.height(6.dp))
-                    Text(
-                        text =
-                            if (reauth) {
-                                "版本更新后系统收回了部分必须权限，仅需重新开启恢复正常使用"
-                            } else if (needConsent) {
-                                "版本更新新增了权限声明，请重新阅读并同意以继续使用"
-                            } else {
-                                "首次使用前，需要完成几项简单设置"
-                            },
-                        style = MiuixTheme.textStyles.body2,
-                        color = colorScheme.onSurfaceVariantSummary,
-                    )
-                }
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                GuideAppLogoSlot(modifier = Modifier.size(92.dp))
+                Spacer(modifier = Modifier.height(28.dp))
+                Text(
+                    text = "NotifyRelay",
+                    style = MiuixTheme.textStyles.title1,
+                    color = colorScheme.onBackground,
+                )
+                Spacer(modifier = Modifier.height(10.dp))
+                Text(
+                    text = "跨设备通知转发 · 设备互联",
+                    style = MiuixTheme.textStyles.subtitle,
+                    color = colorScheme.onBackgroundVariant,
+                )
+                Spacer(modifier = Modifier.height(6.dp))
+                Text(
+                    text =
+                        if (reauth) {
+                            "版本更新后系统收回了部分必须权限，仅需重新开启恢复正常使用"
+                        } else if (needConsent) {
+                            "版本更新新增了权限声明，请重新阅读并同意以继续使用"
+                        } else {
+                            "首次使用前，需要完成几项简单设置"
+                        },
+                    style = MiuixTheme.textStyles.body2,
+                    color = colorScheme.onSurfaceVariantSummary,
+                )
             }
+        }
 
-            AnimatedVisibility(
-                visible = revealed,
-                enter = fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = 450)),
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Spacer(modifier = Modifier.height(52.dp))
-                    Box(
-                        modifier =
-                            Modifier
-                                .size(68.dp)
-                                .clip(CircleShape)
-                                .background(colorScheme.primary)
-                                .clickable(onClick = onStart),
-                        contentAlignment = Alignment.Center,
-                    ) {
-                        Icon(
-                            painter =
-                                LocalGuideResources.current?.drawablePainter("guide_icon_arrow") ?: androidx.compose.ui.graphics.painter
-                                    .ColorPainter(androidx.compose.ui.graphics.Color.Transparent),
-                            contentDescription = "开始",
-                            modifier = Modifier.size(width = 31.dp, height = 22.dp),
-                            tint = colorScheme.onPrimary,
-                        )
-                    }
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        text = "开始",
-                        style = MiuixTheme.textStyles.body2,
-                        color = colorScheme.onBackground,
+        AnimatedVisibility(
+            visible = revealed,
+            enter = fadeIn(animationSpec = tween(durationMillis = 500, delayMillis = 450)),
+        ) {
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Spacer(modifier = Modifier.height(52.dp))
+                Box(
+                    modifier =
+                        Modifier
+                            .size(68.dp)
+                            .clip(CircleShape)
+                            .background(colorScheme.primary)
+                            .clickable(onClick = onStart),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(
+                        painter =
+                            LocalGuideResources.current?.drawablePainter("guide_icon_arrow") ?: androidx.compose.ui.graphics.painter
+                                .ColorPainter(androidx.compose.ui.graphics.Color.Transparent),
+                        contentDescription = "开始",
+                        modifier = Modifier.size(width = 31.dp, height = 22.dp),
+                        tint = colorScheme.onPrimary,
                     )
                 }
+                Spacer(modifier = Modifier.height(12.dp))
+                Text(
+                    text = "开始",
+                    style = MiuixTheme.textStyles.body2,
+                    color = colorScheme.onBackground,
+                )
             }
         }
     }

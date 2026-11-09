@@ -2,10 +2,10 @@ package github.xzynine.superislandui.model.core
 
 import github.xzynine.superislandui.floating.smallisland.core.BigIslandArea
 import github.xzynine.superislandui.floating.smallisland.core.parseBigIslandArea
+import github.xzynine.superislandui.json.firstNonBlankString
 import github.xzynine.superislandui.json.optArrayOrNull
 import github.xzynine.superislandui.json.optObjectOrNull
 import github.xzynine.superislandui.json.optStringOr
-import github.xzynine.superislandui.json.optStringOrNull
 import github.xzynine.superislandui.model.components.ProgressInfo
 import github.xzynine.superislandui.model.components.parseProgressInfo
 import kotlinx.serialization.json.JsonArray
@@ -63,7 +63,7 @@ private fun parseSmallIslandArea(obj: JsonObject): SmallIslandArea {
 }
 
 private fun extractPrimaryText(obj: JsonObject): String? {
-    val direct = firstString(obj, PRIMARY_TEXT_KEYS)
+    val direct = obj.firstNonBlankString(PRIMARY_TEXT_KEYS)
     if (direct != null) return direct
     for (nestedKey in NESTED_TEXT_KEYS) {
         obj.optObjectOrNull(nestedKey)?.let { nested ->
@@ -76,7 +76,7 @@ private fun extractPrimaryText(obj: JsonObject): String? {
 }
 
 private fun extractSecondaryText(obj: JsonObject): String? {
-    val direct = firstString(obj, SECONDARY_TEXT_KEYS)
+    val direct = obj.firstNonBlankString(SECONDARY_TEXT_KEYS)
     if (direct != null) return direct
     for (nestedKey in NESTED_TEXT_KEYS) {
         obj.optObjectOrNull(nestedKey)?.let { nested ->
@@ -89,7 +89,7 @@ private fun extractSecondaryText(obj: JsonObject): String? {
 }
 
 private fun extractIconKey(obj: JsonObject): String? {
-    val direct = firstString(obj, ICON_TEXT_KEYS)
+    val direct = obj.firstNonBlankString(ICON_TEXT_KEYS)
     if (!direct.isNullOrBlank()) return direct
     for (nestedKey in ICON_OBJECT_KEYS) {
         obj.optObjectOrNull(nestedKey)?.let { nested ->
@@ -99,17 +99,6 @@ private fun extractIconKey(obj: JsonObject): String? {
     }
     val fromArray = firstFromArrays(obj, ARRAY_KEYS) { extractIconKey(it) }
     return fromArray?.takeIf { it.isNotBlank() }
-}
-
-private fun firstString(
-    obj: JsonObject,
-    keys: Array<String>,
-): String? {
-    for (key in keys) {
-        val value = obj.optStringOrNull(key)
-        if (!value.isNullOrBlank()) return value
-    }
-    return null
 }
 
 private fun <T> firstFromArrays(

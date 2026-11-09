@@ -25,6 +25,20 @@ fun JsonObject.optStringOrNull(key: String): String? =
         (element as? JsonPrimitive)?.content ?: element.toString()
     }
 
+/**
+ * 按顺序取第一个非空白字符串字段。
+ *
+ * @param keys 候选键，越靠前优先级越高。
+ * @returns 首个非空白值；候选键都缺失或均为空白时返回 null。
+ */
+fun JsonObject.firstNonBlankString(keys: Array<String>): String? {
+    for (key in keys) {
+        val value = optStringOrNull(key)
+        if (!value.isNullOrBlank()) return value
+    }
+    return null
+}
+
 fun JsonObject.optIntOr(
     key: String,
     fallback: Int = 0,
