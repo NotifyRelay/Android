@@ -164,12 +164,12 @@ internal fun DesktopOverlayWindow() {
 
         if (!fullscreen) {
             OverlayContent(
-                overlay = overlay,
                 interactiveEnabled = interactiveEnabled,
                 spectrumEnabled = spectrumEnabled,
                 interactiveRegions = interactiveRegions,
                 contentSize = contentSize,
                 onContentSizeChanged = { contentSize = it },
+                onFrame = overlay::onFrame,
             )
         }
     }
@@ -182,13 +182,15 @@ internal fun DesktopOverlayWindow() {
  * 高度随各行内容变化，上层内容把下层内容整体下压。
  */
 @Composable
-private fun OverlayContent(
-    overlay: DesktopWindowsOverlay,
+internal fun OverlayContent(
     interactiveEnabled: Boolean,
     spectrumEnabled: Boolean,
     interactiveRegions: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Rectangle>,
     contentSize: IntSize,
     onContentSizeChanged: (IntSize) -> Unit,
+    // 帧心跳：窗口侧用于判定渲染是否卡死；场景导出方只录制单帧，传入空实现
+    onFrame: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     // 帧时钟：驱动频谱与映射提示淡出
     var frameNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
@@ -196,8 +198,7 @@ private fun OverlayContent(
         while (true) {
             withFrameMillis {
                 frameNow = System.currentTimeMillis()
-                // 帧心跳：置顶监控据此判定渲染是否卡死
-                overlay.onFrame()
+                onFrame()
             }
         }
     }
@@ -206,7 +207,7 @@ private fun OverlayContent(
     // 通知卡片的展开/收起状态：展开态卡片与状态行里的图标方块共用同一份
     val cardsState = rememberNotificationCardsState()
 
-    Box(Modifier.wrapContentSize()) {
+    Box(modifier.then(Modifier.wrapContentSize())) {
         // 独立行（卡片与罗技胶囊）居中，状态条目与通知图标填进它们左右剩下的空档
         OverlayColumn(
             modifier = Modifier.width(OVERLAY_COLUMN_WIDTH).onSizeChanged(onContentSizeChanged),

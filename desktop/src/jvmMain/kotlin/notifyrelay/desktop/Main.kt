@@ -223,6 +223,17 @@ fun main() {
         if (overlayEnabled) {
             notifyrelay.desktop.overlay.DesktopOverlayWindow()
 
+            // 矢量场景服务：把同一份叠加层内容录成 SVG 推给 Gamebar 小组件。
+            // 无客户端订阅时不录制，因此开启本服务本身不产生额外开销
+            val sceneBridge =
+                remember {
+                    notifyrelay.desktop.overlay.scene.OverlaySceneBridge()
+                }
+            DisposableEffect(sceneBridge) {
+                sceneBridge.start()
+                onDispose { sceneBridge.close() }
+            }
+
             // 扩展点数据源（余额 / 罗技电池 / 键盘 / 时间）：窗口就绪后按各自开关启动
             val features =
                 remember {
