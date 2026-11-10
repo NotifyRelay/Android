@@ -65,8 +65,95 @@ internal class OverlaySceneRecorder(
             composeScene.draw(skiaCanvas.asComposeCanvas())
             skiaCanvas.close()
         }
-        return extractImages(out.toString(UTF_8))
+        val raw = out.toString(UTF_8)
+        return extractImages(injectAnimations(raw))
     }
+
+    /**
+     * 把哨兵色标记的动态元素改写成 SMIL 动画。
+     *
+     * 时钟、滚动文本与频谱原本都要靠逐帧重推场景来表达，
+     * 接收端每帧重新解析整份文档，动画因此很卡。
+     * 改为把「随时间如何变化」写进文档，由接收端按自己的时钟推进：
+     * JVM 只在内容变化时推一次，静止期间零开销。
+     */
+    private fun injectAnimations(svg: String): String {
+        var result = svg
+        result = rewriteSpectrum(result)
+        result = rewriteScroll(result)
+        return result
+    }
+
+    /** 频谱条：哨兵色矩形改为正弦形态的位移动画。 */
+    private fun rewriteSpectrum(svg: String): String =
+        SPECTRUM_RECT.replace(svg) { match ->
+            val band = match.groupValues[1].toInt(16)
+            if (band !in 0 until SPECTRUM_BAND_COUNT) return@replace match.value
+            val x = match.groupValues[2].toDoubleOrNull() ?: return@replace match.value
+            val y = match.groupValues[3].toDoubleOrNull() ?: return@replace match.value
+            val w = match.groupValues[4].toDoubleOrNull() ?: return@replace match.value
+            val h = match.groupValues[5].toDoubleOrNull() ?: return@replace match.value
+
+            val center = y + h / 2
+            val regionHeight = SPECTRUM_REGION_HEIGHT
+            val ys = StringBuilder()
+            val heights = StringBuilder()
+            val times = StringBuilder()
+            for (k in 0..SPECTRUM_KEYFRAMES) {
+                val frac = k.toDouble() / SPECTRUM_KEYFRAMES
+                val phase = frac * 2 * Math.PI + band * SPECTRUM_PHASE_STEP
+                val osc = SPECTRUM_OSC_BASE + SPECTRUM_OSC_SWING * kotlin.math.sin(phase)
+                val dist = kotlin.math.min(kotlin.math.abs(band - 1), kotlin.math.abs(band - 3)).toDouble()
+                val baseFactor = 1 - dist * SPECTRUM_PEAK_DECAY
+                val barH =
+                    kotlin.math
+                        .max(1.0, regionHeight * baseFactor * osc)
+                val top = center - barH / 2
+                if (k > 0) {
+                    ys.append(';')
+                    heights.append(';')
+                    times.append(';')
+                }
+                ys.append("%.2f".format(java.util.Locale.ROOT, top))
+                heights.append("%.2f".format(java.util.Locale.ROOT, barH))
+                times.append("%.3f".format(java.util.Locale.ROOT, frac))
+            }
+            val dur = "%.4f".format(java.util.Locale.ROOT, 1.0 / SPECTRUM_PHASE_PER_SEC)
+
+            "<rect x=\"" + x + "\" width=\"" + w + "\" fill=\"white\">" +
+                "<animate attributeName=\"y\" values=\"" + ys + "\" keyTimes=\"" + times +
+                "\" dur=\"" + dur + "s\" repeatCount=\"indefinite\"/>" +
+                "<animate attributeName=\"height\" values=\"" + heights + "\" keyTimes=\"" + times +
+                "\" dur=\"" + dur + "s\" repeatCount=\"indefinite\"/>" +
+                "</rect>"
+        }
+
+    /** 滚动文本：哨兵色的 <text> 改为水平往返位移动画。 */
+    private fun rewriteScroll(svg: String): String =
+        SCROLL_TEXT.replace(svg) { match ->
+            val before = match.groupValues[1]
+            val tx = match.groupValues[2].toDoubleOrNull() ?: return@replace match.value
+            val ty = match.groupValues[3].toDoubleOrNull() ?: return@replace match.value
+            val after = match.groupValues[4]
+            val body = match.groupValues[5]
+
+            // 初始平移必须并入动画取值：外层 animateTransform 会整体覆盖内层 transform，
+            // 若从 0 0 开始，文本会被拉回原点而不是留在原布局位置。
+            val start =
+                "%.2f".format(java.util.Locale.ROOT, tx) + " " +
+                    "%.2f".format(java.util.Locale.ROOT, ty)
+            val end =
+                "%.2f".format(java.util.Locale.ROOT, tx - SCROLL_WIDTH) + " " +
+                    "%.2f".format(java.util.Locale.ROOT, ty)
+
+            // 哨兵色只用于识别，落到文档里要换回正常颜色
+            val attrs = (before + after).replace(SCROLL_SENTINEL_FILL, "fill=\"white\"")
+
+            "<g><animateTransform attributeName=\"transform\" type=\"translate\" " +
+                "values=\"" + start + ";" + end + ";" + start + "\" keyTimes=\"0;0.5;1\" " +
+                "dur=\"" + SCROLL_PERIOD_SEC + "s\" repeatCount=\"indefinite\"/>" +
+                "<text " + attrs + ">" + body + "</text></g>"
+        }
 
     /**
      * 抽出位图数据，并把渲染所需的引用改成可解析形式。
@@ -153,6 +240,58 @@ internal class OverlaySceneRecorder(
          * 渲染器会把 <image> 当作引用自身，最终什么也画不出来。
          */
         private const val IMAGE_URI_PREFIX = "nrimg:"
+
+        /** 频谱哨兵色蓝色的起始值；与 SceneSentinels 保持一致。 */
+        private const val SPECTRUM_SENTINEL_BASE = 0x10
+
+        /** 频谱条数量。 */
+        private const val SPECTRUM_BAND_COUNT = 5
+
+        /** 每周期采样数：16 段足以让正弦曲线看起来平滑。 */
+        private const val SPECTRUM_KEYFRAMES = 16
+
+        /** 频谱区域高度（dp）；与绘制时使用的区域尺寸一致。 */
+        private const val SPECTRUM_REGION_HEIGHT = 80.0
+
+        /** 震荡速度：每秒相位。 */
+        private const val SPECTRUM_PHASE_PER_SEC = 3.5
+
+        /** 每条独立相位偏移。 */
+        private const val SPECTRUM_PHASE_STEP = 1.1
+
+        /** 震荡下限与摆幅。 */
+        private const val SPECTRUM_OSC_BASE = 0.55
+
+        private const val SPECTRUM_OSC_SWING = 0.45
+
+        /** 离波峰每远一格的衰减。 */
+        private const val SPECTRUM_PEAK_DECAY = 0.35
+
+        /** 滚动文本哨兵色的字面量；改写时替换回正常颜色。 */
+        private const val SCROLL_SENTINEL_FILL = "fill=\"#F10240\""
+
+        /** 滚动文本的位移幅度。 */
+        private const val SCROLL_WIDTH = 100.0
+
+        /** 滚动文本的一个往返周期（秒）。 */
+        private const val SCROLL_PERIOD_SEC = 6.0
+
+        /** 匹配哨兵色频谱条：条序（颜色末位）、x、y、width、height。 */
+        private val SPECTRUM_RECT =
+            Regex(
+                """<rect fill="#F1023([0-9A-Fa-f])" x="([^"]*)" y="([^"]*)" width="([^"]*)" height="([^"]*)"/>""",
+            )
+
+        /**
+         * 匹配哨兵色滚动文本。
+         *
+         * 分组：1=平移 X，2=平移 Y，3=除 transform 外的其余属性，4=文本内容。
+         * 其余属性必须原样保留：字号、字体与逐字定位都在其中，丢了文本就无法正常排版。
+         */
+        private val SCROLL_TEXT =
+            Regex(
+                """<text ([^>]*?)transform="translate\(([^ ]+) ([^)]+)\)"([^>]*)>([\s\S]*?)</text>""",
+            )
 
         /**
          * 匹配 <defs> 内的位图定义：捕获 id、base64 与其余几何属性。

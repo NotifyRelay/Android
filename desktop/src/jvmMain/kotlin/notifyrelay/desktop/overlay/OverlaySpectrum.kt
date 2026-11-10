@@ -69,6 +69,8 @@ internal fun OverlaySpectrum(
     widthDp: Float = 28f,
     heightDp: Float = 80f,
 ) {
+    // 导出矢量场景时改用哨兵色：录制器识别后改写为接收端可自行推进的动画
+    val export = notifyrelay.desktop.overlay.scene.LocalSceneExport.current
     val amplitude by animateFloatAsState(
         targetValue = if (playing) 1f else SPECTRUM_PAUSED_FACTOR,
         animationSpec = tween(durationMillis = SPECTRUM_TRANSITION_MS),
@@ -92,7 +94,7 @@ internal fun OverlaySpectrum(
             val x = i * barSlot + gap / 2f
             val y = (size.height - barHeight) / 2f
             drawRect(
-                color = SPECTRUM_COLOR,
+                color = export?.spectrumColors?.getOrNull(i) ?: SPECTRUM_COLOR,
                 topLeft = Offset(x, y),
                 size = Size(barWidth, barHeight),
             )

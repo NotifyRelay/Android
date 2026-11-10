@@ -221,12 +221,11 @@ internal class OverlaySceneBridge {
      * 用「是否有内容」判定比逐项枚举可靠，新增动态元素也不会漏掉。
      */
     private fun hasAnimatedContent(): Boolean =
-        DesktopOverlayStore.clockText.value.isNotEmpty() ||
-            DesktopOverlayStore.mediaSessions.isNotEmpty() ||
+        // 时钟每秒才变一次文本，不需要逐帧重录；频谱与滚动文本的动画已写进文档，
+        // 由接收端自行推进，因此这里只剩「内容是否仍在变化」的判定。
+        DesktopOverlayStore.mediaSessions.isNotEmpty() ||
             DesktopOverlayStore.superIslands.isNotEmpty() ||
-            DesktopOverlayStore.notifications.isNotEmpty() ||
-            DesktopOverlayStore.keyboardHint.value.isNotEmpty() ||
-            (DesktopOverlaySettings.spectrumEnabled && DesktopOverlayStore.hasPlayingMedia())
+            DesktopOverlayStore.notifications.isNotEmpty()
 
     private fun fingerprintOf(
         document: String,

@@ -484,7 +484,10 @@ private fun CollapsedMediaCapsule(
             AutoScrollText(
                 text = title.orEmpty().ifBlank { "未在播放" },
                 style = TextStyle(fontSize = 12.sp),
-                color = Color.White,
+                // 导出矢量场景时改用哨兵色：录制器据此给文本加上位移动画
+                color =
+                    notifyrelay.desktop.overlay.scene.LocalSceneExport.current
+                        ?.scrollColor ?: Color.White,
                 baseSpeedPxPerSec = 100f,
                 pauseMillis = 0,
                 endPauseMillis = CAPSULE_END_PAUSE_MS,
