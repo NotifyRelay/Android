@@ -131,9 +131,14 @@ internal class OverlaySceneRecorder(
     private companion object {
         private const val UTF_8 = "UTF-8"
 
-        /** 匹配 <image ... id="X" ... xlink:href="data:image/png;base64,YYY">。 */
+        /**
+         * 匹配 <image ... id="X" ... xlink:href="data:image/png;base64,YYY">。
+         *
+         * 末尾的闭合引号必须一并吃掉：否则替换时补引号会与原有引号重复，
+         * 产出的 XML 属性边界错乱，解析时因引号非法而失败。
+         */
         private val IMAGE_HREF =
-            Regex("""\s+id="([^"]*)"(?:[^>]*?)xlink:href="data:image/[a-z]+;base64,([A-Za-z0-9+/=]+)""")
+            Regex("""\s+id="([^"]*)"(?:[^>]*?)xlink:href="data:image/[a-z]+;base64,([A-Za-z0-9+/=]+)"""")
 
         private val SCENE_FIELD: Field =
             ImageComposeScene::class.java
