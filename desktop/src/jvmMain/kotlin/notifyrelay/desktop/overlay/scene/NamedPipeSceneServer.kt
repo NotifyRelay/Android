@@ -49,6 +49,9 @@ internal class NamedPipeSceneServer(
     /** 待推送的位图；按顺序完整发送，发送后清空。 */
     private val pendingImages = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, ByteArray>>()
 
+    /** 待发的控制报文（如心跳回应）；优先于位图与场景发出。 */
+    private val pendingControl = AtomicReference<SceneMessage?>(null)
+
     /** 当前会话是否已有客户端订阅；无客户端时不录制场景。 */
     private val subscribed = AtomicBoolean(false)
 
@@ -105,10 +108,22 @@ internal class NamedPipeSceneServer(
 
     override fun close() {
         running.set(false)
+
+        // 唤醒可能空闲中的发送线程，并让会话循环尽快看到停止标志
+        pendingControl.set(null)
+        pending.set(null)
+        pendingImages.clear()
+
         // 先关句柄：无客户端时线程阻塞在 ConnectNamedPipe 上，
-        // 仅置标志位无法让它返回，必须由关闭句柄打断
+        // 仅置标志位无法让它返回，必须由关闭句柄打断。
         closePipe()
-        worker?.join(1_000)
+
+        // 必须等监听线程真正退出：它退出时还会走一次会话收尾，
+        // 若此时调用方已开始下一轮（测试里同名管道重建），两个会话会互相干扰。
+        worker?.join(CLOSE_JOIN_TIMEOUT_MS)
+        if (worker?.isAlive == true) {
+            Logger.w(TAG, "监听线程未在 " + CLOSE_JOIN_TIMEOUT_MS + "ms 内退出")
+        }
         worker = null
     }
 
@@ -199,83 +214,112 @@ internal class NamedPipeSceneServer(
         runCatching { onSessionEstablished?.invoke() }
 
         // ---- 收发循环 ----
+        // 发送独立成线程：管道写满时 WriteFile 会阻塞到对端读取为止，
+        // 若与读取、心跳同线程，写阻塞会让心跳停摆，双方互相判定失效。
+        val sendRunning =
+            java.util.concurrent.atomic
+                .AtomicBoolean(true)
+        val sender =
+            thread(isDaemon = true, name = "overlay-scene-sender") {
+                while (sendRunning.get() && running.get()) {
+                    // 控制报文最优先：心跳回包不能被大帧压后
+                    val control = pendingControl.getAndSet(null)
+
+                    val line =
+                        when {
+                            control != null -> control.encodeLine()
+
+                            // 位图优先于场景：接收端解析场景时已有图可查
+                            pendingImages.isNotEmpty() -> {
+                                val image = pendingImages.poll()
+                                image?.let {
+                                    SceneMessage(
+                                        type = SceneMessage.TYPE_IMAGE,
+                                        imageId = it.first,
+                                        imageData =
+                                            java.util.Base64
+                                                .getEncoder()
+                                                .encodeToString(it.second),
+                                    ).encodeLine()
+                                }
+                            }
+
+                            else -> {
+                                val snapshot = pending.getAndSet(null)
+                                snapshot?.let {
+                                    SceneMessage(
+                                        type = SceneMessage.TYPE_SCENE,
+                                        revision = it.revision,
+                                        width = it.widthDp,
+                                        height = it.heightDp,
+                                        document = it.document,
+                                        regions = it.regions,
+                                    ).encodeLine()
+                                }
+                            }
+                        }
+
+                    if (line == null) {
+                        Thread.sleep(SEND_POLL_MS)
+                        continue
+                    }
+
+                    if (!sendLine(handle, line)) {
+                        sendRunning.set(false)
+                        return@thread
+                    }
+                }
+            }
+
         var lastInboundAt = System.currentTimeMillis()
-        while (running.get()) {
-            // 先把待发位图发完，再发场景：接收端解析场景时已有图可查
-            while (true) {
-                val image = pendingImages.poll() ?: break
-                val message =
-                    SceneMessage(
-                        type = SceneMessage.TYPE_IMAGE,
-                        imageId = image.first,
-                        imageData =
-                            java.util.Base64
-                                .getEncoder()
-                                .encodeToString(image.second),
-                    ).encodeLine()
-                if (!sendLine(handle, message)) return
-            }
-
-            // 优先推送待发场景：场景与心跳共用一条管道，心跳的时效由下面的空轮询保证
-            val snapshot = pending.getAndSet(null)
-            if (snapshot != null) {
-                val scene =
-                    SceneMessage(
-                        type = SceneMessage.TYPE_SCENE,
-                        revision = snapshot.revision,
-                        width = snapshot.widthDp,
-                        height = snapshot.heightDp,
-                        document = snapshot.document,
-                        regions = snapshot.regions,
-                    ).encodeLine()
-                if (!sendLine(handle, scene)) return
-            }
-
-            val message = reader.readMessage(POLL_INTERVAL_MS)
-            if (message != null) {
-                lastInboundAt = System.currentTimeMillis()
-                when (message.type) {
-                    SceneMessage.TYPE_PING ->
-                        if (!sendLine(
-                                handle,
+        try {
+            while (running.get()) {
+                val message = reader.readMessage(POLL_INTERVAL_MS)
+                if (message != null) {
+                    lastInboundAt = System.currentTimeMillis()
+                    when (message.type) {
+                        SceneMessage.TYPE_PING ->
+                            // 回包同样交给发送线程，读线程不直接写管道
+                            pendingControl.set(
                                 SceneMessage(
                                     type = SceneMessage.TYPE_PONG,
                                     revision = lastRevision,
-                                ).encodeLine(),
+                                ),
                             )
-                        ) {
-                            return
+
+                        SceneMessage.TYPE_CLICK -> {
+                            val key = message.key ?: continue
+                            val phase = message.phase ?: PHASE_UP
+                            clickListener?.invoke(key, phase, message.x, message.y)
                         }
 
-                    SceneMessage.TYPE_CLICK -> {
-                        val key = message.key ?: continue
-                        val phase = message.phase ?: PHASE_UP
-                        clickListener?.invoke(key, phase, message.x, message.y)
-                    }
-
-                    SceneMessage.TYPE_SUBSCRIBE -> {
-                        // 尺寸变化不重建会话：按新约束重新录制即可
-                        val newWidth = message.width ?: continue
-                        val newHeight = message.height ?: continue
-                        if (newWidth > 0f && newHeight > 0f) {
-                            clientSize.set(
-                                ClientViewport(newWidth, newHeight, message.dpi ?: 1f, message.theme),
-                            )
+                        SceneMessage.TYPE_SUBSCRIBE -> {
+                            // 尺寸变化不重建会话：按新约束重新录制即可
+                            val newWidth = message.width ?: continue
+                            val newHeight = message.height ?: continue
+                            if (newWidth > 0f && newHeight > 0f) {
+                                clientSize.set(
+                                    ClientViewport(newWidth, newHeight, message.dpi ?: 1f, message.theme),
+                                )
+                            }
                         }
-                    }
 
-                    else -> Unit
+                        else -> Unit
+                    }
+                } else if (reader.closed) {
+                    break
                 }
-            } else if (reader.closed) {
-                return
-            }
 
-            // 心跳：超过判定阈值未收到任何对端报文即视为僵尸会话
-            val silentMs = System.currentTimeMillis() - lastInboundAt
-            if (silentMs > SCENE_HEARTBEAT_TIMEOUT_MS) {
-                Logger.w(TAG, "心跳超时 " + silentMs + "ms，结束会话")
-                return
+                // 心跳：超过判定阈值未收到任何对端报文即视为僵尸会话
+                val silentMs = System.currentTimeMillis() - lastInboundAt
+                if (silentMs > SCENE_HEARTBEAT_TIMEOUT_MS) {
+                    Logger.w(TAG, "心跳超时 " + silentMs + "ms，结束会话")
+                    break
+                }
             }
+        } finally {
+            sendRunning.set(false)
+            sender.join(1_000)
         }
     }
 
@@ -290,8 +334,12 @@ internal class NamedPipeSceneServer(
     private fun teardown(handle: WinNT.HANDLE) {
         subscribed.set(false)
         clientSize.set(null)
-        // 会话结束即丢弃未发位图，避免跨会话累积
+
+        // 会话结束即丢弃全部待发内容，避免跨会话累积与旧报文串入新会话
         pendingImages.clear()
+        pendingControl.set(null)
+        pending.set(null)
+
         closePipe(handle)
         onClientGone()
     }
@@ -325,12 +373,17 @@ internal class NamedPipeSceneServer(
         return handle
     }
 
+    /**
+     * 关闭管道实例。
+     *
+     * 只调 CloseHandle：它本身就会终止连接并唤醒阻塞中的读写。
+     * 不先调 DisconnectNamedPipe——该调用在对端尚未确认断开时会阻塞，
+     * 而本方法常从会话收尾与关闭路径调用，阻塞会让调用方（含 UI 线程与测试线程）卡死。
+     * 每次会话都重建实例，不需要复用同一个实例。
+     */
     private fun closePipe(handle: WinNT.HANDLE? = pipe) {
         if (handle == null) return
-        runCatching {
-            kernel32.DisconnectNamedPipe(handle)
-            kernel32.CloseHandle(handle)
-        }
+        runCatching { kernel32.CloseHandle(handle) }
         if (handle === pipe) pipe = null
     }
 
@@ -429,7 +482,12 @@ internal class NamedPipeSceneServer(
         private const val PIPE_READMODE_BYTE = 0x00000000
         private const val PIPE_WAIT = 0x00000000
         private const val MAX_INSTANCES = 1
-        private const val BUFFER_SIZE = 64 * 1024
+
+        /** 管道缓冲：按典型一帧场景的大小留出数帧余量，吸收突发推送。 */
+        private const val BUFFER_SIZE = 4 * 1024 * 1024
+
+        /** 以重叠方式打开读写端，使读写互不阻塞。 */
+        private const val FILE_FLAG_OVERLAPPED = 0x40000000
 
         /**
          * 管道 DACL：所有应用包、Everyone、LocalSystem、所有者均可读写。
@@ -449,12 +507,21 @@ internal class NamedPipeSceneServer(
         private const val ERROR_BROKEN_PIPE = 109
         private const val ERROR_NO_DATA = 232
 
+        /** 重叠写已排入队列，需等待完成事件。 */
+        private const val ERROR_IO_PENDING = 997
+
         /** 单次写入的等待上限；超时即认为对端停止读取。 */
         private const val WRITE_TIMEOUT_MS = 3_000L
 
         private const val HANDSHAKE_TIMEOUT_MS = 10_000L
         private const val POLL_INTERVAL_MS = 250L
         private const val RETRY_INTERVAL_MS = 500L
+
+        /** 发送线程空闲时的轮询间隔。 */
+        private const val SEND_POLL_MS = 2L
+
+        /** 关闭时等待监听线程退出的上限。 */
+        private const val CLOSE_JOIN_TIMEOUT_MS = 5_000L
 
         /** 命名管道完整路径前缀。 */
         private val PIPE_PREFIX = "\\\\.\\pipe\\"
