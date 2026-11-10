@@ -95,6 +95,7 @@ internal class NamedPipeSceneServer(
         revision: Long,
         width: Int,
         height: Int,
+        contentHeight: Int,
         regions: List<SceneRegion>,
         frame: RasterFrame,
     ): Boolean {
@@ -110,6 +111,7 @@ internal class NamedPipeSceneServer(
                 width = width.toFloat(),
                 height = height.toFloat(),
                 length = frame.byteCount,
+                contentHeight = contentHeight.toFloat(),
                 regions = regions,
             ).encodeLine().toByteArray(Charsets.UTF_8)
 

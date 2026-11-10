@@ -51,6 +51,8 @@ internal data class SceneMessage(
     val regions: List<SceneRegion>? = null,
     /** 帧报文的像素字节数；紧随本行之后原样传输。 */
     val length: Int? = null,
+    /** 内容实际占用高度（dp）；用于接收端把窗口收缩到可见区域。 */
+    val contentHeight: Float? = null,
     val key: String? = null,
     val phase: String? = null,
     /** 点击位置（dp）；用于把点击送回 Compose 的输入分发。 */
@@ -69,6 +71,7 @@ internal data class SceneMessage(
             theme?.let { put("theme", it) }
             revision?.let { put("revision", it) }
             length?.let { put("length", it) }
+            contentHeight?.let { put("contentHeight", it) }
             key?.let { put("key", it) }
             phase?.let { put("phase", it) }
             x?.let { put("x", it) }
@@ -119,6 +122,7 @@ internal data class SceneMessage(
                 theme = root.stringOrNull("theme"),
                 revision = root.longOrNull("revision"),
                 length = root.intOrNull("length"),
+                contentHeight = root.floatOrNull("contentHeight"),
                 key = root.stringOrNull("key"),
                 phase = root.stringOrNull("phase"),
                 x = root.floatOrNull("x"),

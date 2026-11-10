@@ -49,6 +49,9 @@ internal class OverlaySceneBridge {
     private var recordedWidth = 0
     private var recordedHeight = 0
 
+    /** 内容实际占用的高度（dp）；由组合树测量后写入。 */
+    private var contentHeightDp = 0
+
     /** 叠加层当前的可交互区域，键与场景里的区域 key 一致。 */
     private val regions = SnapshotStateMap<String, Rectangle>()
 
@@ -199,7 +202,9 @@ internal class OverlaySceneBridge {
 
             revision += 1
             // 用实际帧尺寸而不是请求尺寸：两者不一致时接收端会算错行距，画面错位
-            if (!server.sendFrame(revision, frame.width, frame.height, payload, frame)) {
+            // 内容高度只用于接收端收缩窗口，不参与像素尺寸
+            val visibleHeight = contentHeightDp.coerceAtMost(frame.height).coerceAtLeast(1)
+            if (!server.sendFrame(revision, frame.width, frame.height, visibleHeight, payload, frame)) {
                 Logger.w(TAG, "推送帧失败 revision=" + revision)
             }
         }
@@ -243,7 +248,7 @@ internal class OverlaySceneBridge {
                     spectrumEnabled = DesktopOverlaySettings.spectrumEnabled,
                     interactiveRegions = regions,
                     contentSize = IntSize(widthPx, heightPx),
-                    onContentSizeChanged = {},
+                    onContentSizeChanged = { size -> contentHeightDp = size.height },
                     modifier = Modifier,
                 )
             }
