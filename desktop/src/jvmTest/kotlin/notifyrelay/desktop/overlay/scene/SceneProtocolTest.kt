@@ -10,11 +10,11 @@ class SceneProtocolTest {
     fun roundTripSceneMessage() {
         val message =
             SceneMessage(
-                type = SceneMessage.TYPE_SCENE,
+                type = SceneMessage.TYPE_FRAME,
                 revision = 7,
                 width = 320f,
                 height = 625f,
-                document = "<svg/>",
+                length = 800000,
                 regions = listOf(SceneRegion("notification:1", 0f, 0f, 24f, 24f)),
             )
         val line = message.encodeLine()
@@ -22,9 +22,10 @@ class SceneProtocolTest {
         assertTrue(!line.dropLast(1).contains("\n"), "报文体内部不得含换行")
 
         val decoded = SceneMessage.parse(line.trim())
-        assertEquals(SceneMessage.TYPE_SCENE, decoded.type)
+        assertEquals(SceneMessage.TYPE_FRAME, decoded.type)
         assertEquals(7L, decoded.revision)
         assertEquals(320f, decoded.width)
+        assertEquals(800000, decoded.length)
         assertEquals(1, decoded.regions?.size)
         assertEquals("notification:1", decoded.regions?.first()?.key)
         assertEquals(24f, decoded.regions?.first()?.width)
@@ -43,7 +44,7 @@ class SceneProtocolTest {
         val decoded =
             SceneMessage.parse(
                 SceneMessage(
-                    type = SceneMessage.TYPE_SCENE,
+                    type = SceneMessage.TYPE_FRAME,
                     regions = listOf(region),
                 ).encodeLine().trim(),
             )

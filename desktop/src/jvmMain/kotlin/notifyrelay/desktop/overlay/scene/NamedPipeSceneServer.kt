@@ -43,14 +43,20 @@ internal class NamedPipeSceneServer(
 ) : AutoCloseable {
     private val running = AtomicBoolean(false)
 
-    /** 待推送的场景；由渲染侧写入，会话线程取走后清空。 */
-    private val pending = AtomicReference<SceneSnapshot?>(null)
-
-    /** 待推送的位图；按顺序完整发送，发送后清空。 */
-    private val pendingImages = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, ByteArray>>()
-
-    /** 待发的控制报文（如心跳回应）；优先于位图与场景发出。 */
+    /** 待发的控制报文（如心跳回应）。 */
     private val pendingControl = AtomicReference<SceneMessage?>(null)
+
+    /**
+     * 当前会话的管道句柄；无会话时为 0。
+     *
+     * 帧由渲染线程直接写出，不再经过队列：像素缓冲复用且只在渲染回调内有效，
+     * 排队会让缓冲在写出前被下一帧覆盖。
+     */
+    @Volatile
+    private var activePipe: WinNT.HANDLE? = null
+
+    /** 串行化写管道：帧与心跳回应来自不同线程。 */
+    private val writeLock = Any()
 
     /** 当前会话是否已有客户端订阅；无客户端时不录制场景。 */
     private val subscribed = AtomicBoolean(false)
@@ -79,22 +85,94 @@ internal class NamedPipeSceneServer(
     /** 当前客户端声明的画布尺寸；未订阅时为 null。 */
     fun viewport(): ClientViewport? = clientSize.get()
 
-    /** 提交一个待推送场景；后续场景覆盖前面的，只保证送达最新一帧。 */
-    fun publish(snapshot: SceneSnapshot) {
-        pending.set(snapshot)
+    /**
+     * 推送一帧位图：先写一行报文头，再原样写出像素。
+     *
+     * 像素从 [RasterFrame.address] 直接写出，不经 Java 堆中转。
+     * 必须在渲染回调内调用：该地址在那之后即失效。
+     */
+    fun sendFrame(
+        revision: Long,
+        widthDp: Int,
+        heightDp: Int,
+        regions: List<SceneRegion>,
+        frame: RasterFrame,
+    ): Boolean {
+        val handle = activePipe
+        if (handle == null || !subscribed.get()) {
+            return false
+        }
+
+        val header =
+            SceneMessage(
+                type = SceneMessage.TYPE_FRAME,
+                revision = revision,
+                width = widthDp.toFloat(),
+                height = heightDp.toFloat(),
+                length = frame.byteCount,
+                regions = regions,
+            ).encodeLine().toByteArray(Charsets.UTF_8)
+
+        // 头部与像素必须连续写入，中间不能插入心跳回应
+        synchronized(writeLock) {
+            if (!writeHeader(handle, header)) {
+                return false
+            }
+            return writeAll(handle, Pointer(frame.address), frame.byteCount)
+        }
+    }
+
+    /** 写一条控制报文；与帧写出互斥。 */
+    private fun sendControl(
+        handle: WinNT.HANDLE,
+        message: SceneMessage,
+    ): Boolean {
+        val line = message.encodeLine().toByteArray(Charsets.UTF_8)
+        synchronized(writeLock) { return writeHeader(handle, line) }
+    }
+
+    /** 写报文头；体积远小于管道缓冲，一次写完。 */
+    private fun writeHeader(
+        handle: WinNT.HANDLE,
+        header: ByteArray,
+    ): Boolean {
+        val written = IntByReference()
+        if (!kernel32.WriteFile(handle, header, header.size, written, null)) {
+            val error = kernel32.GetLastError()
+            if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA) {
+                Logger.w(TAG, "写入报文头失败 错误码=" + error)
+            }
+            return false
+        }
+        return written.value == header.size
     }
 
     /**
-     * 提交一张待推送位图。
+     * 从原生地址写满 [count] 字节。
      *
-     * 每次都是完整数据，不依赖接收端缓存命中；队列在发送后立即清空，
-     * 因此不会随会话时长累积。
+     * 大块写在字节模式管道的缓冲写满后会只写入一部分，必须循环推进偏移。
      */
-    fun publishImage(
-        id: String,
-        png: ByteArray,
-    ) {
-        pendingImages.add(id to png)
+    private fun writeAll(
+        handle: WinNT.HANDLE,
+        data: Pointer,
+        count: Int,
+    ): Boolean {
+        var offset = 0
+        while (offset < count) {
+            val written = IntByReference()
+            if (!pipeWrite.WriteFile(handle, data.share(offset.toLong()), count - offset, written, null)) {
+                val error = kernel32.GetLastError()
+                if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA) {
+                    Logger.w(TAG, "写入管道失败 错误码=" + error)
+                }
+                return false
+            }
+            if (written.value <= 0) {
+                return false
+            }
+            offset += written.value
+        }
+        return true
     }
 
     /** 启动监听线程。 */
@@ -111,8 +189,7 @@ internal class NamedPipeSceneServer(
 
         // 唤醒可能空闲中的发送线程，并让会话循环尽快看到停止标志
         pendingControl.set(null)
-        pending.set(null)
-        pendingImages.clear()
+        activePipe = null
 
         // 先关句柄：无客户端时线程阻塞在 ConnectNamedPipe 上，
         // 仅置标志位无法让它返回，必须由关闭句柄打断。
@@ -211,63 +288,28 @@ internal class NamedPipeSceneServer(
         Logger.i(TAG, "客户端已订阅 尺寸=" + width + "x" + height + " dpi=" + subscribe.dpi)
 
         // ---- 收发循环 ----
-        // 发送独立成线程：管道写满时 WriteFile 会阻塞到对端读取为止，
-        // 若与读取、心跳同线程，写阻塞会让心跳停摆，双方互相判定失效。
+        // 心跳回应独立成线程：管道写满时 WriteFile 会阻塞到对端读取为止，
+        // 若与读取、心跳判定同线程，写阻塞会让心跳停摆，双方互相判定失效。
+        // 帧不走这条线程：像素缓冲复用且只在渲染回调内有效，排队会被下一帧覆盖。
         val sendRunning =
             java.util.concurrent.atomic
                 .AtomicBoolean(true)
         val sender =
             thread(isDaemon = true, name = "overlay-scene-sender") {
                 while (sendRunning.get() && running.get()) {
-                    // 控制报文最优先：心跳回包不能被大帧压后
-                    val control = pendingControl.getAndSet(null)
-
-                    val line =
-                        when {
-                            control != null -> control.encodeLine()
-
-                            // 位图优先于场景：接收端解析场景时已有图可查
-                            pendingImages.isNotEmpty() -> {
-                                val image = pendingImages.poll()
-                                image?.let {
-                                    SceneMessage(
-                                        type = SceneMessage.TYPE_IMAGE,
-                                        imageId = it.first,
-                                        imageData =
-                                            java.util.Base64
-                                                .getEncoder()
-                                                .encodeToString(it.second),
-                                    ).encodeLine()
-                                }
-                            }
-
-                            else -> {
-                                val snapshot = pending.getAndSet(null)
-                                snapshot?.let {
-                                    SceneMessage(
-                                        type = SceneMessage.TYPE_SCENE,
-                                        revision = it.revision,
-                                        width = it.widthDp,
-                                        height = it.heightDp,
-                                        document = it.document,
-                                        regions = it.regions,
-                                    ).encodeLine()
-                                }
-                            }
+                    val control =
+                        pendingControl.getAndSet(null) ?: run {
+                            Thread.sleep(SEND_POLL_MS)
+                            continue
                         }
-
-                    if (line == null) {
-                        Thread.sleep(SEND_POLL_MS)
-                        continue
-                    }
-
-                    if (!sendLine(handle, line)) {
+                    if (!sendControl(handle, control)) {
                         sendRunning.set(false)
                         return@thread
                     }
                 }
             }
 
+        activePipe = handle
         var lastInboundAt = System.currentTimeMillis()
         try {
             while (running.get()) {
@@ -329,10 +371,9 @@ internal class NamedPipeSceneServer(
         subscribed.set(false)
         clientSize.set(null)
 
-        // 会话结束即丢弃全部待发内容，避免跨会话累积与旧报文串入新会话
-        pendingImages.clear()
+        // 会话结束即清掉待发内容，避免旧报文串入新会话
         pendingControl.set(null)
-        pending.set(null)
+        activePipe = null
 
         closePipe(handle)
         onClientGone()
@@ -523,6 +564,8 @@ internal class NamedPipeSceneServer(
         /** 命名管道与文件调用；JNA 自带实现的创建与连接均已验证可用。 */
         private val kernel32: Kernel32 = Kernel32.INSTANCE
 
+        private val pipeWrite: PipeWriteApi = Native.load("kernel32", PipeWriteApi::class.java)
+
         /**
          * SDDL 转换接口。
          *
@@ -541,14 +584,16 @@ internal data class ClientViewport(
     val theme: String?,
 )
 
-/** 一次待推送的完整场景。 */
-internal data class SceneSnapshot(
-    val revision: Long,
-    val widthDp: Float,
-    val heightDp: Float,
-    val document: String,
-    val regions: List<SceneRegion>,
-)
+/** 从原生地址写管道；JNA 自带的 WriteFile 只接受 Java 数组。 */
+internal interface PipeWriteApi : StdCallLibrary {
+    fun WriteFile(
+        hFile: WinNT.HANDLE,
+        buffer: Pointer,
+        bytesToWrite: Int,
+        bytesWritten: IntByReference,
+        overlapped: Pointer?,
+    ): Boolean
+}
 
 /** advapi32 的 SDDL 转换入口；返回的安全描述符需用 LocalFree 释放。 */
 internal interface SddlApi : StdCallLibrary {

@@ -5,6 +5,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntSize
+import com.sun.jna.Pointer
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -38,8 +39,11 @@ internal class OverlaySceneBridge {
     /** 已推送的场景版本，单调递增。 */
     private var revision = 0L
 
-    /** 已推送内容的指纹，用于跳过无变化的帧。 */
-    private var lastFingerprint: String? = null
+    /** 上一帧的像素摘要；用于跳过无变化的帧。 */
+    private var lastPixelHash: Long = 0L
+
+    /** 摘要计算用的复用缓冲；按帧尺寸增长，不随帧数累积。 */
+    private var hashBuffer = ByteArray(0)
 
     /** 最近一次录制尺寸；订阅尺寸变化时重建录制场景。 */
     private var recordedWidth = 0
@@ -96,7 +100,7 @@ internal class OverlaySceneBridge {
             }
             // 抬起后内容可能已变（例如卡片展开），立刻重录一次
             if (phase == PHASE_UP) {
-                lastFingerprint = null
+                lastPixelHash = 0L
             }
         }
     }
@@ -116,14 +120,15 @@ internal class OverlaySceneBridge {
      */
     private suspend fun publishLoop() {
         while (true) {
-            delay(if (hasAnimatedContent()) ACTIVE_FRAME_MS else IDLE_FRAME_MS)
+            val animated = hasAnimatedContent()
+            delay(if (animated) ACTIVE_FRAME_MS else IDLE_FRAME_MS)
             val current = server.viewport()
             if (!server.isSubscribed() || current == null) {
                 releaseRecorder()
                 continue
             }
             sceneLock.withLock {
-                runCatching { publishFrame(current) }
+                runCatching { publishFrame(current, animated) }
                     .onFailure { Logger.w(TAG, "录制并推送场景失败", it) }
             }
         }
@@ -135,10 +140,18 @@ internal class OverlaySceneBridge {
         recorder = null
         recordedWidth = 0
         recordedHeight = 0
-        lastFingerprint = null
     }
 
-    private suspend fun publishFrame(current: ClientViewport) {
+    /**
+     * 渲染并推送一帧。
+     *
+     * 动画态逐帧推送：动画由内容本身驱动，比较像素只会浪费一次读回。
+     * 空闲态先比较内容：画面静止时不再重复占用 CPU 与管道带宽。
+     */
+    private suspend fun publishFrame(
+        current: ClientViewport,
+        animated: Boolean,
+    ) {
         val widthPx = current.widthDp.toInt().coerceAtLeast(1)
         val heightPx = current.heightDp.toInt().coerceAtLeast(1)
 
@@ -153,70 +166,85 @@ internal class OverlaySceneBridge {
                 )
             recordedWidth = widthPx
             recordedHeight = heightPx
-            lastFingerprint = null
+            lastPixelHash = 0L
         }
 
-        val recorded = recorder!!.record(System.nanoTime())
-        val document = recorded.document
-
-        // 内容无变化时不推：静止场景只有内容变化才会重录
         val regionSnapshot = regions.toMap()
-        val fingerprint = fingerprintOf(document, regionSnapshot)
-        if (fingerprint == lastFingerprint) return
-        lastFingerprint = fingerprint
+        val payload =
+            regionSnapshot.entries
+                .sortedBy { it.key }
+                .map { (key, rect) ->
+                    SceneRegion(
+                        key = key,
+                        x = rect.x.toFloat(),
+                        y = rect.y.toFloat(),
+                        width = rect.width.toFloat(),
+                        height = rect.height.toFloat(),
+                    )
+                }
 
-        revision += 1
+        // 像素地址只在回调内有效，写出必须在回调里完成
+        recorder!!.render(System.nanoTime()) { frame ->
+            val byteCount = frame.byteCount
+            if (byteCount <= 0) return@render
 
-        // 先发图片再发场景：接收端解析场景时已有对应位图可查。
-        // 每帧完整发送：不依赖接收端缓存命中，避免任何一侧状态不一致导致的缺图。
-        recorded.images.forEach { (id, bytes) ->
-            server.publishImage(id, bytes)
+            if (!animated) {
+                if (hashBuffer.size < byteCount) {
+                    hashBuffer = ByteArray(byteCount)
+                }
+                val digest = hashPixels(frame)
+                if (digest == lastPixelHash) return@render
+                lastPixelHash = digest
+            }
+
+            revision += 1
+            if (!server.sendFrame(revision, widthPx, heightPx, payload, frame)) {
+                Logger.w(TAG, "推送帧失败 revision=" + revision)
+            }
         }
-
-        server.publish(
-            SceneSnapshot(
-                revision = revision,
-                widthDp = widthPx.toFloat(),
-                heightDp = heightPx.toFloat(),
-                document = document,
-                regions =
-                    regionSnapshot.entries
-                        .sortedBy { it.key }
-                        .map { (key, rect) ->
-                            SceneRegion(
-                                key = key,
-                                x = rect.x.toFloat(),
-                                y = rect.y.toFloat(),
-                                width = rect.width.toFloat(),
-                                height = rect.height.toFloat(),
-                            )
-                        },
-            ),
-        )
     }
 
     /**
-     * 叠加层内容；与窗口共用同一份组合树。
+     * 像素内容摘要。
      *
-     * 外层提供导出标记：动态元素据此改用哨兵色绘制，
-     * 录制器识别后改写成接收端可自行推进的动画。
+     * 静止场景不重复推送：不比较内容就只能按固定周期盲推，
+     * 画面完全静止时仍在白耗 CPU 与管道带宽。
+     *
+     * 必须整块参与：采样会漏掉时钟这类小范围变化。
+     * 本方法只在非动画态调用，此时推送周期本来就低。
      */
+    private fun hashPixels(frame: RasterFrame): Long {
+        val size = frame.byteCount
+        var hash = FNV_OFFSET
+
+        // 分块读入复用缓冲：一次整块读回比逐字节跨 JNA 调用快得多
+        var offset = 0
+        while (offset < size) {
+            val chunk = minOf(HASH_CHUNK, size - offset)
+            Pointer(frame.address + offset).read(0, hashBuffer, 0, chunk)
+            for (i in 0 until chunk) {
+                hash = (hash xor (hashBuffer[i].toInt().and(0xFF)).toLong()) * FNV_PRIME
+            }
+            offset += chunk
+        }
+        return hash
+    }
+
+    /** 叠加层内容；与窗口共用同一份组合树。 */
     private fun overlayContent(
         widthPx: Int,
         heightPx: Int,
     ): @Composable () -> Unit =
         {
-            ProvideSceneExport(SceneExport()) {
-                Box {
-                    OverlayContent(
-                        interactiveEnabled = DesktopOverlaySettings.interactiveEnabled,
-                        spectrumEnabled = DesktopOverlaySettings.spectrumEnabled,
-                        interactiveRegions = regions,
-                        contentSize = IntSize(widthPx, heightPx),
-                        onContentSizeChanged = {},
-                        modifier = Modifier,
-                    )
-                }
+            Box {
+                OverlayContent(
+                    interactiveEnabled = DesktopOverlaySettings.interactiveEnabled,
+                    spectrumEnabled = DesktopOverlaySettings.spectrumEnabled,
+                    interactiveRegions = regions,
+                    contentSize = IntSize(widthPx, heightPx),
+                    onContentSizeChanged = {},
+                    modifier = Modifier,
+                )
             }
         }
 
@@ -234,17 +262,6 @@ internal class OverlaySceneBridge {
             DesktopOverlayStore.superIslands.isNotEmpty() ||
             DesktopOverlayStore.notifications.isNotEmpty()
 
-    private fun fingerprintOf(
-        document: String,
-        regionSnapshot: Map<String, Rectangle>,
-    ): String {
-        val regionPart =
-            regionSnapshot.entries.sortedBy { it.key }.joinToString("|") { (k, r) ->
-                k + "@" + r.x + "," + r.y + "," + r.width + "," + r.height
-            }
-        return document.hashCode().toString() + "#" + regionPart
-    }
-
     private companion object {
         private const val TAG = "OverlaySceneBridge"
 
@@ -256,5 +273,12 @@ internal class OverlaySceneBridge {
 
         private const val PHASE_UP = "up"
         private const val PHASE_DOWN = "down"
+
+        /** 像素摘要的装载基数与乘子（FNV-1a 64 位）。 */
+        private const val FNV_OFFSET = -3750763034362895579L
+        private const val FNV_PRIME = 1099511628211L
+
+        /** 摘要的分块长度。 */
+        private const val HASH_CHUNK = 64 * 1024
     }
 }

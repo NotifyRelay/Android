@@ -11,23 +11,26 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.sun.jna.Pointer
 import top.yukonga.miuix.kmp.basic.Text
 import kotlin.test.Test
+import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
- * 验证叠加层实际使用的绘制原语都能被录成标准 SVG。
+ * 验证叠加层实际使用的绘制原语能录成位图。
  *
- * 覆盖卡片底色、圆角裁切、文本与进度环路径：
- * 这些正是接收端渲染器必须能消费的子集。
+ * 覆盖卡片底色、圆角裁切与文本：这些是接收端必须能消费的内容。
  */
 class OverlayRecordingTest {
     @Test
     fun recordsOverlayPrimitives() {
+        val width = 420
+        val height = 160
         val recorder =
             OverlaySceneRecorder(
-                widthDp = 420,
-                heightDp = 160,
+                widthDp = width,
+                heightDp = height,
                 coroutineContext = kotlinx.coroutines.Dispatchers.Unconfined,
             ) {
                 Box(
@@ -45,20 +48,26 @@ class OverlayRecordingTest {
                 }
             }
 
-        val svg = recorder.record(System.nanoTime()).document
+        var frameWidth = 0
+        var frameHeight = 0
+        var stride = 0
+        var nonZero = 0
+        recorder.render(System.nanoTime()) { frame ->
+            frameWidth = frame.width
+            frameHeight = frame.height
+            stride = frame.stride
+            val sample = ByteArray(frame.byteCount)
+            Pointer(frame.address).read(0, sample, 0, frame.byteCount)
+            nonZero = sample.count { it.toInt() != 0 }
+        }
         recorder.close()
 
-        java.io.File("build/overlay-scene.svg").writeText(svg)
-        println("SVG_LEN=" + svg.length)
-        println("HAS_SVG_ROOT=" + svg.contains("<svg"))
-        println("HAS_TEXT=" + svg.contains("<text"))
-        println("HAS_RECT=" + svg.contains("<rect"))
-        println("HAS_CLIPPATH=" + svg.contains("clipPath"))
-        println("HAS_TITLE=" + svg.contains("新消息"))
-        println("SVG_HEAD=" + svg.replace("\n", " ").replace("\t", " ").take(500))
+        println("FRAME=" + frameWidth + "x" + frameHeight + " stride=" + stride + " nonZero=" + nonZero)
 
-        assertTrue(svg.contains("<svg"), "应产出 SVG 根元素")
-        assertTrue(svg.contains("<text"), "应包含文本节点")
-        assertTrue(svg.contains("<rect"), "应包含矩形节点")
+        assertEquals(width, frameWidth, "帧宽应与录制尺寸一致")
+        assertEquals(height, frameHeight, "帧高应与录制尺寸一致")
+        // BGRA 每像素四字节，行距不得小于像素宽度
+        assertTrue(stride >= width * 4, "行距应至少容纳一行像素")
+        assertTrue(nonZero > 0, "画面应有内容，不能是空白帧")
     }
 }

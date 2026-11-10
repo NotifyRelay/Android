@@ -48,17 +48,14 @@ internal data class SceneMessage(
     val dpi: Float? = null,
     val theme: String? = null,
     val revision: Long? = null,
-    val document: String? = null,
     val regions: List<SceneRegion>? = null,
+    /** 帧报文的像素字节数；紧随本行之后原样传输。 */
+    val length: Int? = null,
     val key: String? = null,
     val phase: String? = null,
     /** 点击位置（dp）；用于把点击送回 Compose 的输入分发。 */
     val x: Float? = null,
     val y: Float? = null,
-    /** 位图资源的内容标识；见 [TYPE_IMAGE]。 */
-    val imageId: String? = null,
-    /** 位图资源的 PNG 字节（base64）；随 [TYPE_IMAGE] 一次性完整传输。 */
-    val imageData: String? = null,
 ) {
     /** 编码为单行 JSON；空字段直接省略，减少报文体积。 */
     fun toJson(): String =
@@ -71,13 +68,12 @@ internal data class SceneMessage(
             dpi?.let { put("dpi", it) }
             theme?.let { put("theme", it) }
             revision?.let { put("revision", it) }
-            document?.let { put("document", it) }
+            length?.let { put("length", it) }
             key?.let { put("key", it) }
             phase?.let { put("phase", it) }
             x?.let { put("x", it) }
             y?.let { put("y", it) }
-            imageId?.let { put("imageId", it) }
-            imageData?.let { put("imageData", it) }
+
             regions?.let { list ->
                 put(
                     "regions",
@@ -104,19 +100,11 @@ internal data class SceneMessage(
         const val TYPE_WELCOME = "WELCOME"
         const val TYPE_REJECT = "REJECT"
         const val TYPE_SUBSCRIBE = "SUBSCRIBE"
-        const val TYPE_SCENE = "SCENE"
+        const val TYPE_FRAME = "FRAME"
         const val TYPE_PING = "PING"
         const val TYPE_PONG = "PONG"
         const val TYPE_CLICK = "CLICK"
         const val TYPE_ERROR = "ERROR"
-
-        /**
-         * 位图资源。
-         *
-         * 场景文档以 imageId 引用位图，本报文每次完整携带 PNG 数据：
-         * 场景体积因此保持在几 KB，而图片按需整体传输，不依赖接收端缓存命中。
-         */
-        const val TYPE_IMAGE = "IMAGE"
 
         /** 由单行 JSON 解析报文；结构不合法时抛出，由调用方记录并丢弃。 */
         fun parse(line: String): SceneMessage {
@@ -130,13 +118,11 @@ internal data class SceneMessage(
                 dpi = root.floatOrNull("dpi"),
                 theme = root.stringOrNull("theme"),
                 revision = root.longOrNull("revision"),
-                document = root.stringOrNull("document"),
+                length = root.intOrNull("length"),
                 key = root.stringOrNull("key"),
                 phase = root.stringOrNull("phase"),
                 x = root.floatOrNull("x"),
                 y = root.floatOrNull("y"),
-                imageId = root.stringOrNull("imageId"),
-                imageData = root.stringOrNull("imageData"),
                 regions = root["regions"]?.jsonArray?.map { it.toRegion() },
             )
         }
