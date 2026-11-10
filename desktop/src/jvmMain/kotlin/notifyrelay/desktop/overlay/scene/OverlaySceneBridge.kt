@@ -198,7 +198,8 @@ internal class OverlaySceneBridge {
             }
 
             revision += 1
-            if (!server.sendFrame(revision, widthPx, heightPx, payload, frame)) {
+            // 用实际帧尺寸而不是请求尺寸：两者不一致时接收端会算错行距，画面错位
+            if (!server.sendFrame(revision, frame.width, frame.height, payload, frame)) {
                 Logger.w(TAG, "推送帧失败 revision=" + revision)
             }
         }

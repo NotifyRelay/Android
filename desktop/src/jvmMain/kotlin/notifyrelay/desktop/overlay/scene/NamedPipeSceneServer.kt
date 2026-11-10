@@ -93,8 +93,8 @@ internal class NamedPipeSceneServer(
      */
     fun sendFrame(
         revision: Long,
-        widthDp: Int,
-        heightDp: Int,
+        width: Int,
+        height: Int,
         regions: List<SceneRegion>,
         frame: RasterFrame,
     ): Boolean {
@@ -107,8 +107,8 @@ internal class NamedPipeSceneServer(
             SceneMessage(
                 type = SceneMessage.TYPE_FRAME,
                 revision = revision,
-                width = widthDp.toFloat(),
-                height = heightDp.toFloat(),
+                width = width.toFloat(),
+                height = height.toFloat(),
                 length = frame.byteCount,
                 regions = regions,
             ).encodeLine().toByteArray(Charsets.UTF_8)
