@@ -1,19 +1,13 @@
 package notifyrelay.desktop.overlay.scene
 
-import com.sun.jna.Library
-import com.sun.jna.Memory
 import com.sun.jna.Native
 import com.sun.jna.Pointer
-import com.sun.jna.platform.win32.Advapi32
-import com.sun.jna.platform.win32.Advapi32Util
 import com.sun.jna.platform.win32.Kernel32
 import com.sun.jna.platform.win32.WinBase
-import com.sun.jna.platform.win32.WinDef
 import com.sun.jna.platform.win32.WinNT
 import com.sun.jna.ptr.IntByReference
 import com.sun.jna.ptr.PointerByReference
 import com.sun.jna.win32.StdCallLibrary
-import com.sun.jna.win32.W32APIFunctionMapper
 import notifyrelay.base.log.Logger
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicReference
@@ -313,24 +307,42 @@ internal class NamedPipeSceneServer(
         Logger.w(TAG, "已回报错误 code=" + code + " " + message)
     }
 
-    /** 写入一行；返回 false 表示管道已断。 */
+    /**
+     * 写入一行；返回 false 表示管道已断或超时。
+     *
+     * 写操作在独立线程上执行并限时等待：管道写满时 WriteFile 会一直阻塞到
+     * 对端读取为止，而会话线程同时负责心跳与超时判定，
+     * 一旦它卡在写上，僵尸会话就再也不会被判定出来。
+     */
     private fun sendLine(
         handle: WinNT.HANDLE,
         line: String,
     ): Boolean {
         val bytes = line.toByteArray(Charsets.UTF_8)
-        val written = IntByReference()
-        val ok = kernel32.WriteFile(handle, bytes, bytes.size, written, null)
-        if (!ok) {
-            val error = kernel32.GetLastError()
-            // ERROR_BROKEN_PIPE / ERROR_NO_DATA 表示客户端已走，属正常断开
-            if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA) {
-                Logger.w(TAG, "写入管道失败 错误码=" + error)
+        val result =
+            java.util.concurrent.atomic
+                .AtomicBoolean(false)
+        val writer =
+            thread(isDaemon = true, name = "overlay-scene-write") {
+                val written = IntByReference()
+                val ok = kernel32.WriteFile(handle, bytes, bytes.size, written, null)
+                if (ok) {
+                    kernel32.FlushFileBuffers(handle)
+                    result.set(true)
+                } else {
+                    val error = kernel32.GetLastError()
+                    // ERROR_BROKEN_PIPE / ERROR_NO_DATA 表示客户端已走，属正常断开
+                    if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA) {
+                        Logger.w(TAG, "写入管道失败 错误码=" + error)
+                    }
+                }
             }
+        writer.join(WRITE_TIMEOUT_MS)
+        if (writer.isAlive) {
+            Logger.w(TAG, "写入管道超时 " + WRITE_TIMEOUT_MS + "ms，判定对端不再读取")
             return false
         }
-        kernel32.FlushFileBuffers(handle)
-        return true
+        return result.get()
     }
 
     /**
@@ -408,6 +420,9 @@ internal class NamedPipeSceneServer(
         private const val ERROR_PIPE_CONNECTED = 535
         private const val ERROR_BROKEN_PIPE = 109
         private const val ERROR_NO_DATA = 232
+
+        /** 单次写入的等待上限；超时即认为对端停止读取。 */
+        private const val WRITE_TIMEOUT_MS = 3_000L
 
         private const val HANDSHAKE_TIMEOUT_MS = 10_000L
         private const val POLL_INTERVAL_MS = 250L

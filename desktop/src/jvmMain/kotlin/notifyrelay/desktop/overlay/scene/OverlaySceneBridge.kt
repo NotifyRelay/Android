@@ -200,7 +200,6 @@ internal class OverlaySceneBridge {
                     interactiveRegions = regions,
                     contentSize = IntSize(widthPx, heightPx),
                     onContentSizeChanged = {},
-                    onFrame = {},
                     modifier = Modifier,
                 )
             }
@@ -209,19 +208,26 @@ internal class OverlaySceneBridge {
     /**
      * 判断当前是否存在需要连续刷新的内容。
      *
-     * 频谱与收起态进度环按时间推进，静止时也必须持续产生新帧；
-     * 其余内容只在状态变化时变，可按空闲周期轮询。
+     * 时钟按秒变化、滚动文本与频谱按帧推进、进度环随播放进度前进，
+     * 这些都只在叠加层有内容时出现。因此只要存在可见内容就按动画周期录制：
+     * 用「是否有内容」判定比逐项枚举可靠，新增动态元素也不会漏掉。
      */
     private fun hasAnimatedContent(): Boolean =
-        DesktopOverlaySettings.spectrumEnabled && DesktopOverlayStore.hasPlayingMedia()
+        DesktopOverlayStore.clockText.value.isNotEmpty() ||
+            DesktopOverlayStore.mediaSessions.isNotEmpty() ||
+            DesktopOverlayStore.superIslands.isNotEmpty() ||
+            DesktopOverlayStore.notifications.isNotEmpty() ||
+            DesktopOverlayStore.keyboardHint.value.isNotEmpty() ||
+            (DesktopOverlaySettings.spectrumEnabled && DesktopOverlayStore.hasPlayingMedia())
 
     private fun fingerprintOf(
         document: String,
         regionSnapshot: Map<String, Rectangle>,
     ): String {
-        val regionPart = regionSnapshot.entries.sortedBy { it.key }.joinToString("|") { (k, r) ->
-            k + "@" + r.x + "," + r.y + "," + r.width + "," + r.height
-        }
+        val regionPart =
+            regionSnapshot.entries.sortedBy { it.key }.joinToString("|") { (k, r) ->
+                k + "@" + r.x + "," + r.y + "," + r.width + "," + r.height
+            }
         return document.hashCode().toString() + "#" + regionPart
     }
 

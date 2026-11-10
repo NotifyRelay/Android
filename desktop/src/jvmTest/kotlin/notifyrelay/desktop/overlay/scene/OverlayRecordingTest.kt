@@ -4,7 +4,6 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.Modifier
@@ -12,9 +11,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import top.yukonga.miuix.kmp.basic.Text
 import kotlin.test.Test
 import kotlin.test.assertTrue
-import top.yukonga.miuix.kmp.basic.Text
 
 /**
  * 验证叠加层实际使用的绘制原语都能被录成标准 SVG。
@@ -25,25 +24,26 @@ import top.yukonga.miuix.kmp.basic.Text
 class OverlayRecordingTest {
     @Test
     fun recordsOverlayPrimitives() {
-        val recorder = OverlaySceneRecorder(
-            widthDp = 420,
-            heightDp = 160,
-            coroutineContext = kotlinx.coroutines.Dispatchers.Unconfined,
-        ) {
-            Box(
-                Modifier
-                    .width(420.dp)
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Color(0xE6000000))
-                    .padding(12.dp),
+        val recorder =
+            OverlaySceneRecorder(
+                widthDp = 420,
+                heightDp = 160,
+                coroutineContext = kotlinx.coroutines.Dispatchers.Unconfined,
             ) {
-                Column {
-                    Text(text = "微信 · 手机", color = Color(0xB3FFFFFF), fontSize = 11.sp)
-                    Text(text = "新消息", color = Color.White, fontSize = 14.sp)
-                    Text(text = "这是一条测试通知", color = Color(0xE6FFFFFF), fontSize = 12.sp)
+                Box(
+                    Modifier
+                        .width(420.dp)
+                        .clip(RoundedCornerShape(16.dp))
+                        .background(Color(0xE6000000))
+                        .padding(12.dp),
+                ) {
+                    Column {
+                        Text(text = "微信 · 手机", color = Color(0xB3FFFFFF), fontSize = 11.sp)
+                        Text(text = "新消息", color = Color.White, fontSize = 14.sp)
+                        Text(text = "这是一条测试通知", color = Color(0xE6FFFFFF), fontSize = 12.sp)
+                    }
                 }
             }
-        }
 
         val svg = recorder.record(System.nanoTime())
         recorder.close()

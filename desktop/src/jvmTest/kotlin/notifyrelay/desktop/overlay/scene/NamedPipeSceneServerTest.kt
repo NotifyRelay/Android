@@ -4,7 +4,6 @@ import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.concurrent.thread
 
 /**
  * 命名管道服务端与客户端的会话级验证。
@@ -154,7 +153,9 @@ class NamedPipeSceneServerTest {
         // CreateFile 失败返回 INVALID_HANDLE_VALUE（-1），调用方以 0 表示失败，
         // 故这里必须归一化，否则 -1 会被当成有效句柄
         if (handle == null || handle.pointer == null) return 0L
-        val raw = com.sun.jna.Pointer.nativeValue(handle.pointer)
+        val raw =
+            com.sun.jna.Pointer
+                .nativeValue(handle.pointer)
         return if (raw == -1L) 0L else raw
     }
 
@@ -162,10 +163,21 @@ class NamedPipeSceneServerTest {
         value: Long,
         message: SceneMessage,
     ) {
-        val handle = com.sun.jna.platform.win32.WinNT.HANDLE(com.sun.jna.Pointer(value))
+        val handle =
+            com.sun.jna.platform.win32.WinNT
+                .HANDLE(com.sun.jna.Pointer(value))
         val bytes = message.encodeLine().toByteArray(Charsets.UTF_8)
-        com.sun.jna.platform.win32.Kernel32.INSTANCE.WriteFile(handle, bytes, bytes.size, com.sun.jna.ptr.IntByReference(), null)
-        com.sun.jna.platform.win32.Kernel32.INSTANCE.FlushFileBuffers(handle)
+        com.sun.jna.platform.win32.Kernel32.INSTANCE
+            .WriteFile(
+                handle,
+                bytes,
+                bytes.size,
+                com.sun.jna.ptr
+                    .IntByReference(),
+                null,
+            )
+        com.sun.jna.platform.win32.Kernel32.INSTANCE
+            .FlushFileBuffers(handle)
     }
 
     private fun readLine(
@@ -173,11 +185,15 @@ class NamedPipeSceneServerTest {
         timeoutMs: Long = 3_000,
     ): SceneMessage? {
         val kernel32 = com.sun.jna.platform.win32.Kernel32.INSTANCE
-        val handle = com.sun.jna.platform.win32.WinNT.HANDLE(com.sun.jna.Pointer(value))
+        val handle =
+            com.sun.jna.platform.win32.WinNT
+                .HANDLE(com.sun.jna.Pointer(value))
         val buffer = java.io.ByteArrayOutputStream()
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
-            val available = com.sun.jna.ptr.IntByReference()
+            val available =
+                com.sun.jna.ptr
+                    .IntByReference()
             if (!kernel32.PeekNamedPipe(handle, null, 0, null, available, null)) return null
             if (available.value <= 0) {
                 Thread.sleep(10)
@@ -185,7 +201,9 @@ class NamedPipeSceneServerTest {
             }
 
             val chunk = ByteArray(available.value)
-            val read = com.sun.jna.ptr.IntByReference()
+            val read =
+                com.sun.jna.ptr
+                    .IntByReference()
             if (!kernel32.ReadFile(handle, chunk, chunk.size, read, null) || read.value <= 0) return null
             buffer.write(chunk, 0, read.value)
 
@@ -201,7 +219,11 @@ class NamedPipeSceneServerTest {
     }
 
     private fun closeHandle(value: Long) {
-        com.sun.jna.platform.win32.Kernel32.INSTANCE.CloseHandle(com.sun.jna.platform.win32.WinNT.HANDLE(com.sun.jna.Pointer(value)))
+        com.sun.jna.platform.win32.Kernel32.INSTANCE
+            .CloseHandle(
+                com.sun.jna.platform.win32.WinNT
+                    .HANDLE(com.sun.jna.Pointer(value)),
+            )
     }
 
     private companion object {

@@ -33,22 +33,16 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Window
-import androidx.compose.ui.window.WindowPlacement
-import androidx.compose.ui.window.WindowPosition
-import androidx.compose.ui.window.rememberWindowState
 import github.xzynine.superislandui.common.AutoScrollText
 import github.xzynine.superislandui.floating.bigisland.components.MediaIslandCompose
 import github.xzynine.superislandui.floating.common.SuperIslandExpandableCard
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.model.components.MediaSessionData
 import kotlinx.coroutines.delay
-import notifyrelay.base.log.Logger
 import notifyrelay.desktop.DataLayerDesktop
 import notifyrelay.desktop.platform.DesktopOverlaySettings
 import notifyrelay.domain.feature.media.MediaControlAction
@@ -56,124 +50,10 @@ import notifyrelay.domain.feature.media.MediaSessionSnapshot
 import notifyrelay.shared.ui.common.DebugFlags
 import top.yukonga.miuix.kmp.basic.Text
 import java.awt.Rectangle
-import java.awt.Toolkit
 import kotlin.math.roundToInt
 
 /** 叠加层内容宽度：媒体卡、超级岛卡与通知卡共用同一列宽。 */
 internal val OVERLAY_COLUMN_WIDTH = 420.dp
-
-/** 叠加层距屏幕顶部的距离。 */
-private val OVERLAY_TOP_MARGIN = 10.dp
-
-/** 窗口初始高度：首帧测量出真实内容高度后立即被替换。 */
-private val INITIAL_WINDOW_HEIGHT = 120.dp
-
-/**
- * 叠加层窗口。
- *
- * 无边框、透明、置顶、点击穿透、不抢焦点；窗口尺寸随内容实测结果收缩，
- * 固定停留在屏幕顶部居中，不铺满屏幕。媒体卡、通知卡、超级岛与状态元素均由本机 Compose 绘制，
- * 不经位图编码与跨进程传输。
- */
-@Composable
-internal fun DesktopOverlayWindow() {
-    val density = LocalDensity.current
-    // 显示器分辨率变化后需要重新居中：轮询屏幕尺寸，变化时触发一次重组
-    var screen by remember { mutableStateOf(Toolkit.getDefaultToolkit().screenSize) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(SCREEN_SIZE_POLL_MS)
-            val current = Toolkit.getDefaultToolkit().screenSize
-            if (current != screen) screen = current
-        }
-    }
-    val windowState =
-        rememberWindowState(
-            placement = WindowPlacement.Floating,
-            position = WindowPosition(0.dp, 0.dp),
-            width = OVERLAY_COLUMN_WIDTH,
-            height = INITIAL_WINDOW_HEIGHT,
-        )
-
-    Window(
-        onCloseRequest = {},
-        state = windowState,
-        title = "NotifyRelayOverlay",
-        undecorated = true,
-        transparent = true,
-        resizable = false,
-        alwaysOnTop = true,
-    ) {
-        val overlay =
-            remember {
-                DesktopWindowsOverlay(report = { Logger.w("DesktopOverlayWin", "叠加层原生操作失败", it) })
-            }
-
-        // 非外观设置经 revision 观察：切换开关立即生效，无需重开叠加层窗口
-        val settingsRevision = DesktopOverlaySettings.revision.value
-        val interactiveEnabled = remember(settingsRevision) { DesktopOverlaySettings.interactiveEnabled }
-        val spectrumEnabled = remember(settingsRevision) { DesktopOverlaySettings.spectrumEnabled }
-
-        LaunchedEffect(Unit) {
-            window.isAlwaysOnTop = true
-            val applied = overlay.applyOverlayStyle(window)
-            overlay.clickThrough(window, true)
-            Logger.i("DesktopOverlayWin", "叠加层窗口已就绪 点击穿透=" + applied)
-        }
-
-        LaunchedEffect(interactiveEnabled) {
-            overlay.start(window, interactiveMode = interactiveEnabled)
-        }
-
-        DisposableEffect(Unit) {
-            onDispose { overlay.close() }
-        }
-
-        // 前台全屏检测：开启时隐藏叠加层内容，避免遮挡全屏游戏/视频
-        val hideFullscreen = remember { DesktopOverlaySettings.hideFullscreen }
-        var fullscreen by remember { mutableStateOf(false) }
-        if (hideFullscreen) {
-            LaunchedEffect(Unit) {
-                while (true) {
-                    fullscreen = overlay.foregroundIsFullscreen(window)
-                    delay(FULLSCREEN_CHECK_INTERVAL_MS)
-                }
-            }
-        }
-
-        // 可交互区域：媒体卡、超级岛卡与通知图标方块，供原生层切换点击穿透
-        val interactiveRegions = remember { androidx.compose.runtime.mutableStateMapOf<String, Rectangle>() }
-        if (interactiveEnabled) {
-            LaunchedEffect(Unit) {
-                androidx.compose.runtime.snapshotFlow { interactiveRegions.toMap() }.collect { map ->
-                    overlay.setInteractiveRegions(map.values.toList())
-                }
-            }
-        } else {
-            LaunchedEffect(Unit) { overlay.setInteractiveRegions(emptyList()) }
-        }
-
-        // 内容实测尺寸决定窗口尺寸与位置：屏幕顶部居中，宽度固定为一列内容宽度
-        var contentSize by remember { mutableStateOf(IntSize.Zero) }
-        val topMarginPx = with(density) { OVERLAY_TOP_MARGIN.roundToPx() }
-        LaunchedEffect(contentSize, topMarginPx) {
-            if (contentSize.width <= 0 || contentSize.height <= 0) return@LaunchedEffect
-            val x = ((screen.width - contentSize.width) / 2f).roundToInt()
-            overlay.moveTo(window, Rectangle(x, topMarginPx, contentSize.width, contentSize.height))
-        }
-
-        if (!fullscreen) {
-            OverlayContent(
-                interactiveEnabled = interactiveEnabled,
-                spectrumEnabled = spectrumEnabled,
-                interactiveRegions = interactiveRegions,
-                contentSize = contentSize,
-                onContentSizeChanged = { contentSize = it },
-                onFrame = overlay::onFrame,
-            )
-        }
-    }
-}
 
 /**
  * 叠加层内容：媒体卡 → 超级岛（含罗技汇总）→ 通知卡 → 状态元素。
@@ -188,8 +68,6 @@ internal fun OverlayContent(
     interactiveRegions: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Rectangle>,
     contentSize: IntSize,
     onContentSizeChanged: (IntSize) -> Unit,
-    // 帧心跳：窗口侧用于判定渲染是否卡死；场景导出方只录制单帧，传入空实现
-    onFrame: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     // 帧时钟：驱动频谱与映射提示淡出
@@ -198,7 +76,6 @@ internal fun OverlayContent(
         while (true) {
             withFrameMillis {
                 frameNow = System.currentTimeMillis()
-                onFrame()
             }
         }
     }
@@ -624,12 +501,6 @@ private fun CollapsedMediaCapsule(
         }
     }
 }
-
-/** 前台全屏检测轮询间隔（毫秒）。 */
-private const val FULLSCREEN_CHECK_INTERVAL_MS = 500L
-
-/** 屏幕尺寸轮询间隔（毫秒）：分辨率变化时重新居中。 */
-private const val SCREEN_SIZE_POLL_MS = 2_000L
 
 /** 收起态胶囊宽度。 */
 private val COLLAPSED_WIDTH = 260.dp

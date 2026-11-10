@@ -44,10 +44,11 @@ class FullSessionTest {
                     widthDp = 320f,
                     heightDp = 625f,
                     document = "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"320\" height=\"625\"><rect width=\"320\" height=\"625\" fill=\"#1C1C1E\"/></svg>",
-                    regions = listOf(
-                        SceneRegion("notification:7", 10f, 20f, 24f, 24f),
-                        SceneRegion("media:local", 0f, 100f, 320f, 46f),
-                    ),
+                    regions =
+                        listOf(
+                            SceneRegion("notification:7", 10f, 20f, 24f, 24f),
+                            SceneRegion("media:local", 0f, 100f, 320f, 46f),
+                        ),
                 ),
             )
             val scene = read(handle, timeoutMs = 5000)
@@ -75,7 +76,10 @@ class FullSessionTest {
             assertEquals("media:local" to "up", clicks.first())
         } finally {
             com.sun.jna.platform.win32.Kernel32.INSTANCE
-                .CloseHandle(com.sun.jna.platform.win32.WinNT.HANDLE(com.sun.jna.Pointer(handle)))
+                .CloseHandle(
+                    com.sun.jna.platform.win32.WinNT
+                        .HANDLE(com.sun.jna.Pointer(handle)),
+                )
             server.close()
         }
     }
@@ -87,7 +91,9 @@ class FullSessionTest {
         repeat(40) {
             val h = k32.CreateFile(PREFIX + name, GENERIC_RW, 0, null, OPEN_EXISTING, 0, null)
             if (h != null && h.pointer != null) {
-                val raw = com.sun.jna.Pointer.nativeValue(h.pointer)
+                val raw =
+                    com.sun.jna.Pointer
+                        .nativeValue(h.pointer)
                 if (raw != -1L) return raw
             }
             Thread.sleep(100)
@@ -95,25 +101,49 @@ class FullSessionTest {
         return 0L
     }
 
-    private fun write(value: Long, message: SceneMessage) {
+    private fun write(
+        value: Long,
+        message: SceneMessage,
+    ) {
         val k32 = com.sun.jna.platform.win32.Kernel32.INSTANCE
-        val h = com.sun.jna.platform.win32.WinNT.HANDLE(com.sun.jna.Pointer(value))
+        val h =
+            com.sun.jna.platform.win32.WinNT
+                .HANDLE(com.sun.jna.Pointer(value))
         val bytes = message.encodeLine().toByteArray(Charsets.UTF_8)
-        k32.WriteFile(h, bytes, bytes.size, com.sun.jna.ptr.IntByReference(), null)
+        k32.WriteFile(
+            h,
+            bytes,
+            bytes.size,
+            com.sun.jna.ptr
+                .IntByReference(),
+            null,
+        )
         k32.FlushFileBuffers(h)
     }
 
-    private fun read(value: Long, timeoutMs: Long = 3000): SceneMessage? {
+    private fun read(
+        value: Long,
+        timeoutMs: Long = 3000,
+    ): SceneMessage? {
         val k32 = com.sun.jna.platform.win32.Kernel32.INSTANCE
-        val h = com.sun.jna.platform.win32.WinNT.HANDLE(com.sun.jna.Pointer(value))
+        val h =
+            com.sun.jna.platform.win32.WinNT
+                .HANDLE(com.sun.jna.Pointer(value))
         val buffer = java.io.ByteArrayOutputStream()
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
-            val avail = com.sun.jna.ptr.IntByReference()
+            val avail =
+                com.sun.jna.ptr
+                    .IntByReference()
             if (!k32.PeekNamedPipe(h, null, 0, null, avail, null)) return null
-            if (avail.value <= 0) { Thread.sleep(10); continue }
+            if (avail.value <= 0) {
+                Thread.sleep(10)
+                continue
+            }
             val chunk = ByteArray(avail.value)
-            val read = com.sun.jna.ptr.IntByReference()
+            val read =
+                com.sun.jna.ptr
+                    .IntByReference()
             if (!k32.ReadFile(h, chunk, chunk.size, read, null) || read.value <= 0) return null
             buffer.write(chunk, 0, read.value)
             val text = buffer.toString("UTF-8")

@@ -31,7 +31,11 @@ import kotlin.test.assertTrue
 class SvgRecordingTest {
     private var counter by mutableIntStateOf(0)
 
-    private fun capture(scene: ComposeScene, w: Int, h: Int): String {
+    private fun capture(
+        scene: ComposeScene,
+        w: Int,
+        h: Int,
+    ): String {
         val out = ByteArrayOutputStream()
         OutputWStream(out).use { stream ->
             val canvas = SVGCanvas.make(Rect.makeWH(w.toFloat(), h.toFloat()), stream)
@@ -48,14 +52,15 @@ class SvgRecordingTest {
 
     @Test
     fun persistentSceneRendersMultipleFrames() {
-        val imageScene = ImageComposeScene(
-            width = 120,
-            height = 40,
-            density = Density(1f),
-            coroutineContext = kotlinx.coroutines.Dispatchers.Unconfined,
-        ) {
-            Box(Modifier.size((20 + counter * 10).dp, 40.dp).background(Color(0xFF00FF00)))
-        }
+        val imageScene =
+            ImageComposeScene(
+                width = 120,
+                height = 40,
+                density = Density(1f),
+                coroutineContext = kotlinx.coroutines.Dispatchers.Unconfined,
+            ) {
+                Box(Modifier.size((20 + counter * 10).dp, 40.dp).background(Color(0xFF00FF00)))
+            }
         val field = ImageComposeScene::class.java.getDeclaredField("scene").apply { isAccessible = true }
         val inner = field.get(imageScene) as ComposeScene
 

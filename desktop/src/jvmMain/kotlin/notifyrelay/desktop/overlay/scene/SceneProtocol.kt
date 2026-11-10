@@ -6,12 +6,10 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.float
 import kotlinx.serialization.json.floatOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
-import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.longOrNull
 import kotlinx.serialization.json.put
 
@@ -127,17 +125,13 @@ internal data class SceneMessage(
             )
         }
 
-        private fun JsonObject.stringOrNull(name: String): String? =
-            (this[name] as? JsonPrimitive)?.takeIf { it.isString }?.content
+        private fun JsonObject.stringOrNull(name: String): String? = (this[name] as? JsonPrimitive)?.takeIf { it.isString }?.content
 
-        private fun JsonObject.intOrNull(name: String): Int? =
-            (this[name] as? JsonPrimitive)?.intOrNull
+        private fun JsonObject.intOrNull(name: String): Int? = (this[name] as? JsonPrimitive)?.intOrNull
 
-        private fun JsonObject.longOrNull(name: String): Long? =
-            (this[name] as? JsonPrimitive)?.longOrNull
+        private fun JsonObject.longOrNull(name: String): Long? = (this[name] as? JsonPrimitive)?.longOrNull
 
-        private fun JsonObject.floatOrNull(name: String): Float? =
-            (this[name] as? JsonPrimitive)?.floatOrNull
+        private fun JsonObject.floatOrNull(name: String): Float? = (this[name] as? JsonPrimitive)?.floatOrNull
 
         private fun JsonElement.toRegion(): SceneRegion {
             val obj = jsonObject
