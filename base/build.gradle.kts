@@ -60,6 +60,10 @@ kotlin {
             implementation(libs.bundles.coil)
         }
 
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
+
         getByName("androidHostTest").dependencies {
             implementation(libs.junit)
         }

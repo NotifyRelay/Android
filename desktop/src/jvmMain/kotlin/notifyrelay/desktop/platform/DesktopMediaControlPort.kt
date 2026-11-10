@@ -10,6 +10,9 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
 import notifyrelay.domain.feature.device.model.DeviceInfo
@@ -25,6 +28,7 @@ import notifyrelay.domain.feature.media.MediaSessionSnapshot
  * - **本机会话读取**：经 SMTC Rust 桥（`desktop/smtc-rust`）取标题、艺术家、进度与播放态，周期刷新；
  * - **控制下发**：远端的播放/暂停/切歌指令以系统媒体键注入（[DesktopMediaKeySender]），
  *   由当前持有会话的应用响应；
+ * - **状态上报**：本机会话按「换曲」与固定周期经 Rust 合并引擎推给在线设备；
  * - **接收模式**：与 Android 同键（`media_message_receive_mode`），落公共 `Storage`。
  *
  * 音频转发不在本端口内，见 [DesktopAudioRelayPort]。
@@ -33,16 +37,29 @@ class DesktopMediaControlPort(
     private val onlineDevices: () -> List<DeviceInfo>,
     /** 向指定设备发送一条 `DATA_MEDIA_CONTROL` 报文；返回是否已交给发送链路。 */
     private val sendControl: (DeviceInfo, String) -> Boolean = { _, _ -> false },
+    /** 向指定设备推送本机媒体全量状态；`isEnd` 为真表示会话已结束。返回是否已入队。 */
+    private val sendMediaState: (DeviceInfo, String, Boolean) -> Boolean = { _, _, _ -> false },
 ) : MediaControlPort {
     private companion object {
         const val TAG = "DesktopMedia"
         const val KEY_RECEIVE_MODE = "media_message_receive_mode"
+
+        /** 与 Android 同键：上报本机媒体状态的总开关。 */
+        const val KEY_SEND_ENABLED = "send_media_notifications_enabled"
 
         /** 本机会话在分设备表里的键。 */
         const val LOCAL_KEY = "local"
 
         /** 会话轮询间隔：SMTC 桥只提供读取接口，无变更事件，故周期取快照。 */
         const val POLL_INTERVAL_MS = 1_000L
+
+        /**
+         * 状态上报的固定周期。
+         *
+         * 与 Rust 媒体心跳（6s）一致：进度本身由接收端按本地时钟推进，
+         * 这里定期刷新只是重发计时基准，避免长曲目累积偏差。
+         */
+        const val PUSH_INTERVAL_MS = 6_000L
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -65,6 +82,18 @@ class DesktopMediaControlPort(
     @Volatile
     private var currentDeviceState: DeviceInfo? = null
 
+    /** 上一次上报的曲目签名（标题 + 艺术家 + 总时长）：变化即视为换曲。 */
+    @Volatile
+    private var lastPushedTrack: String? = null
+
+    /** 上一次上报的时刻（毫秒）：固定周期的基准。 */
+    @Volatile
+    private var lastPushedAt: Long = 0L
+
+    /** 是否已上报过本机会话：用于判定「从有到无」并发出结束标记。 */
+    @Volatile
+    private var localStatePublished: Boolean = false
+
     override fun currentSession(): MediaSessionSnapshot? = sessionState.value
 
     override fun currentDevice(): DeviceInfo? = currentDeviceState
@@ -84,7 +113,28 @@ class DesktopMediaControlPort(
 
     override fun setReceiveMode(mode: MediaMessageReceiveMode) {
         Storage.putString(KEY_RECEIVE_MODE, mode.name)
+        if (!acceptsRemoteUnder(mode)) {
+            // 不再接受远端媒体时立即撤下远端会话，避免界面残留已弃用的状态；本机会话不受影响
+            sessionsByDevice.update { current -> current.filterKeys { it == LOCAL_KEY } }
+            currentDeviceState = null
+            sessionState.value = sessionsByDevice.value[LOCAL_KEY]
+        }
     }
+
+    /**
+     * 该接收模式下是否接受远端媒体。
+     *
+     * 与 Android 侧同口径：仅音频模式要求本机正在接收音频。
+     */
+    private fun acceptsRemoteUnder(mode: MediaMessageReceiveMode): Boolean =
+        when (mode) {
+            MediaMessageReceiveMode.On -> true
+            MediaMessageReceiveMode.Off -> false
+            MediaMessageReceiveMode.AudioOnly -> notifyrelay.desktop.platform.DesktopPcmPlayer.isRunning
+        }
+
+    /** 是否上报本机媒体状态；默认开启。 */
+    fun isSendEnabled(): Boolean = Storage.getBoolean(KEY_SEND_ENABLED, true)
 
     /** 控制本机播放器：以系统媒体键下发。 */
     override fun localControl(action: MediaControlAction) {
@@ -168,6 +218,7 @@ class DesktopMediaControlPort(
                     positionMs = it.positionMs,
                     durationMs = it.durationMs.takeIf { duration -> duration > 0L },
                     isPlaying = it.playing,
+                    sampledAtMs = if (it.durationMs > 0L) System.currentTimeMillis() else 0L,
                 )
             }
         // 本机会话单独占一个键，不与远端设备的会话互相覆盖
@@ -181,6 +232,91 @@ class DesktopMediaControlPort(
         } else if (currentDeviceState == null) {
             sessionState.value = null
         }
+        publishLocalState(mapped)
+    }
+
+    /**
+     * 上报本机会话。
+     *
+     * 触发条件：曲目签名变化（换曲）或距上次上报已满 [PUSH_INTERVAL_MS]；
+     * 会话结束只上报一次结束标记。进度不单独触发上报。
+     */
+    private fun publishLocalState(mapped: MediaSessionSnapshot?) {
+        if (!isSendEnabled()) {
+            if (localStatePublished) {
+                publishEnd()
+            }
+            return
+        }
+        if (mapped == null) {
+            if (localStatePublished) publishEnd()
+            return
+        }
+        val signature =
+            listOf(
+                mapped.title.orEmpty(),
+                mapped.artist.orEmpty(),
+                (mapped.durationMs ?: 0L).toString(),
+            ).joinToString("")
+        val now = System.currentTimeMillis()
+        val changed = signature != lastPushedTrack
+        val due = now - lastPushedAt >= PUSH_INTERVAL_MS
+        if (!changed && !due) return
+
+        val content = buildMediaFullContent(mapped)
+        var enqueued = false
+        onlineDevices().forEach { device ->
+            val ok = sendMediaState(device, content, false)
+            enqueued = enqueued || ok
+            if (!ok) Logger.w(TAG, "本机媒体状态上报失败: 设备=" + device.displayName)
+        }
+        if (enqueued) {
+            lastPushedTrack = signature
+            lastPushedAt = now
+            localStatePublished = true
+        }
+    }
+
+    /** 上报会话结束标记；成功后清空上报状态，避免重复发送。 */
+    private fun publishEnd() {
+        var enqueued = false
+        onlineDevices().forEach { device ->
+            val ok = sendMediaState(device, "{}", true)
+            enqueued = enqueued || ok
+        }
+        if (enqueued) {
+            lastPushedTrack = null
+            lastPushedAt = 0L
+            localStatePublished = false
+        }
+    }
+
+    /**
+     * 组装媒体全量状态。
+     *
+     * 进度按超级岛计时器口径表达（`timerWhen`/`timerTotal`/`timerSystemCurrent`/`timerType`），
+     * 与 Android 侧同一套字段：接收端据此在本地推进，发送端不按进度高频推送。
+     */
+    private fun buildMediaFullContent(snapshot: MediaSessionSnapshot): String {
+        val pkg = snapshot.packageName.orEmpty()
+        val now = System.currentTimeMillis()
+        val position = snapshot.positionMs
+        val total = snapshot.durationMs
+        return buildJsonObject {
+            put("packageName", JsonPrimitive(pkg))
+            put("appName", JsonPrimitive(pkg))
+            put("title", JsonPrimitive(snapshot.title.orEmpty()))
+            put("text", JsonPrimitive(snapshot.artist.orEmpty()))
+            put("coverUrl", JsonPrimitive(snapshot.coverUrl.orEmpty()))
+            put("time", JsonPrimitive(now))
+            put("isPlaying", JsonPrimitive(snapshot.isPlaying))
+            if (position != null && position >= 0L && total != null && total > 0L) {
+                put("timerType", JsonPrimitive(if (snapshot.isPlaying) 1 else 2))
+                put("timerWhen", JsonPrimitive(now - position))
+                put("timerTotal", JsonPrimitive(total))
+                put("timerSystemCurrent", JsonPrimitive(now))
+            }
+        }.toString()
     }
 
     private fun SMTCLoaderAvailable(): Boolean = wtf.magma.audio.SMTCLoader.available

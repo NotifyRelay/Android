@@ -15,6 +15,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.list.FloatingRepli
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.pipeline.SuperIslandDisplayPipeline
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
+import github.xzynine.superislandui.model.components.MediaProgress
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -90,6 +91,7 @@ object FloatingReplicaWindowManager {
         appName: String? = null,
         isLocked: Boolean = false,
         isRestoring: Boolean = false,
+        mediaProgress: MediaProgress? = null,
     ) {
         runReplicaCatching(TAG, "显示浮窗") {
             if (!isFloatingWindowEnabled(context)) {
@@ -129,6 +131,7 @@ object FloatingReplicaWindowManager {
                                 paramV2Raw = paramV2Raw,
                                 picMap = picMap,
                                 appName = appName,
+                                mediaProgress = mediaProgress,
                                 channel = SuperIslandDisplayPipeline.Channel.FLOATING,
                                 tag = TAG,
                                 isRestoring = isRestoring,
@@ -156,6 +159,7 @@ object FloatingReplicaWindowManager {
                                         title = content.displayTitle,
                                         text = content.displayText,
                                         appName = appName,
+                                        mediaProgress = content.mediaProgress,
                                     )
 
                                     SuperIslandSourceStore.addSourceIdMapping(sourceId, sourceId)

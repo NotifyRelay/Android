@@ -57,7 +57,13 @@ internal object MediaSessionResender {
 
                     val sourceKey = sourceKeyPrefix + "_" + deviceUuid
                     val currentState = MediaStateApplier.buildMediaState(session.title, session.text, session.coverUrl)
-                    MediaStateApplier.applyMediaSessionState(sourceKey, currentState, session.appName, context)
+                    MediaStateApplier.applyMediaSessionState(
+                        sourceKey,
+                        currentState,
+                        session.appName,
+                        context,
+                        session.toMediaProgress(),
+                    )
 
                     setupResendTask(
                         handler,

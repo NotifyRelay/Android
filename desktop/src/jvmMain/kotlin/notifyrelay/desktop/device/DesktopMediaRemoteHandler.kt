@@ -5,8 +5,10 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import notifyrelay.base.log.Logger
 import notifyrelay.desktop.DataLayerDesktop
+import notifyrelay.desktop.platform.DesktopPcmPlayer
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.media.MediaControlAction
+import notifyrelay.domain.feature.media.MediaMessageReceiveMode
 import notifyrelay.domain.feature.media.MediaSessionSnapshot
 
 /**
@@ -38,6 +40,13 @@ internal object DesktopMediaRemoteHandler {
                 .getOrNull()
                 ?: return
 
+        // 接收模式在报文入口判定：不接受时不再保留会话，界面回落为无媒体。
+        val mediaControl = DataLayerDesktop.mediaControl
+        if (mediaControl != null && !shouldReceive(mediaControl.receiveMode())) {
+            mediaControl.updateRemoteSession(device, null)
+            return
+        }
+
         // 字段口径以 core 的 parse_media_inbound 为准：
         // 歌手在 text（无 artist 字段）；封面被重命名为 coverImage；isEnd 表示会话结束。
         val isEnd =
@@ -45,10 +54,17 @@ internal object DesktopMediaRemoteHandler {
                 ?.content
                 ?.toBooleanStrictOrNull() ?: false
         if (isEnd) {
-            DataLayerDesktop.mediaControl?.updateRemoteSession(device, null)
+            mediaControl?.updateRemoteSession(device, null)
             Logger.d(TAG, "远端媒体会话已结束: device=" + device.displayName)
             return
         }
+
+        // 进度由 core 归一为计时器口径：timerWhen 是位置归零时刻、timerSystemCurrent 是采样时刻。
+        // 这里换回「采样位置 + 采样时刻」，由显示侧按本地时钟推进。
+        val timerTotal = root.longField("timerTotal")
+        val timerWhen = root.longField("timerWhen")
+        val timerSystemCurrent = root.longField("timerSystemCurrent")
+        val hasProgress = timerTotal > 0L && timerWhen > 0L && timerSystemCurrent >= timerWhen
 
         val snapshot =
             MediaSessionSnapshot(
@@ -56,8 +72,12 @@ internal object DesktopMediaRemoteHandler {
                 title = root.stringField("title"),
                 artist = root.stringField("text"),
                 coverUrl = root.stringField("coverImage"),
+                positionMs = if (hasProgress) (timerSystemCurrent - timerWhen).coerceIn(0L, timerTotal) else null,
+                durationMs = if (hasProgress) timerTotal else null,
+                isPlaying = root.intField("timerType") == 1,
+                sampledAtMs = if (hasProgress) timerSystemCurrent else 0L,
             )
-        DataLayerDesktop.mediaControl?.updateRemoteSession(device, snapshot)
+        mediaControl?.updateRemoteSession(device, snapshot)
         Logger.d(TAG, "收到远端媒体状态: device=" + device.displayName)
     }
 
@@ -110,10 +130,38 @@ internal object DesktopMediaRemoteHandler {
         Logger.i(TAG, "已执行远端媒体指令: " + actionType)
     }
 
+    /**
+     * 接收模式判定，与 Android 侧同口径。
+     *
+     * - [MediaMessageReceiveMode.On]：全部接收；
+     * - [MediaMessageReceiveMode.Off]：不接收；
+     * - [MediaMessageReceiveMode.AudioOnly]：仅在本机正在接收音频时接收。
+     */
+    private fun shouldReceive(mode: MediaMessageReceiveMode): Boolean =
+        when (mode) {
+            MediaMessageReceiveMode.On -> true
+            MediaMessageReceiveMode.Off -> false
+            MediaMessageReceiveMode.AudioOnly -> DesktopPcmPlayer.isRunning
+        }
+
     /** 读取 JSON 对象的字符串字段。 */
     private fun JsonObject.stringField(field: String): String? =
         (this[field] as? kotlinx.serialization.json.JsonPrimitive)
             ?.jsonPrimitive
             ?.content
             ?.takeIf { it.isNotBlank() }
+
+    /** 读取 JSON 对象的整数字段；缺失或不可解析时为 0。 */
+    private fun JsonObject.longField(field: String): Long =
+        (this[field] as? kotlinx.serialization.json.JsonPrimitive)
+            ?.content
+            ?.toLongOrNull()
+            ?: 0L
+
+    /** 读取 JSON 对象的整数字段；缺失或不可解析时为 0。 */
+    private fun JsonObject.intField(field: String): Int =
+        (this[field] as? kotlinx.serialization.json.JsonPrimitive)
+            ?.content
+            ?.toIntOrNull()
+            ?: 0
 }

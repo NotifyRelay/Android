@@ -21,6 +21,7 @@ import github.xzynine.superislandui.floating.common.SuperIslandExpandableCard
 import github.xzynine.superislandui.floating.common.superIslandCardColor
 import github.xzynine.superislandui.floating.smallisland.compose.BigIslandCollapsedCompose
 import github.xzynine.superislandui.floating.smallisland.compose.collapsedCapsuleColor
+import github.xzynine.superislandui.model.components.MediaProgress
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
@@ -46,6 +47,8 @@ data class FloatingEntry(
     val title: String? = null,
     val text: String? = null,
     val appName: String? = null,
+    /** 媒体进度；仅媒体条目非空。 */
+    val mediaProgress: MediaProgress? = null,
     val isOverlapping: Boolean = false,
     val height: Int = 0, // 实际高度，由Compose组件测量后设置
 )
@@ -187,6 +190,7 @@ fun FloatingWindowContainer(
                                 fallbackTitle = entry.title,
                                 fallbackContent = entry.text,
                                 mediaAppName = entry.appName,
+                                mediaProgress = entry.mediaProgress,
                                 isOverlapping = entry.isOverlapping,
                                 onCopyVerificationCode = onCopyVerificationCode,
                                 onPlayPause = { mediaViewModel.playPauseLocal() },

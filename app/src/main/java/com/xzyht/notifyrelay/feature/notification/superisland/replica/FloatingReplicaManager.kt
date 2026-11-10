@@ -10,6 +10,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.list.FloatingRepli
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
+import github.xzynine.superislandui.model.components.MediaProgress
 import notifyrelay.base.log.Logger
 import notifyrelay.domain.feature.notification.superisland.list.SuperIslandListManager
 import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatching
@@ -30,6 +31,7 @@ object FloatingReplicaManager {
         appName: String? = null,
         isLocked: Boolean = false,
         cacheForChannelSwitch: Boolean = true,
+        mediaProgress: MediaProgress? = null,
     ) {
         appContext = context.applicationContext
         SuperIslandSourceStore.setAppContext(appContext)
@@ -50,7 +52,7 @@ object FloatingReplicaManager {
                 return
             }
             cacheDisplay()
-            FloatingReplicaWindowManager.showFloatingInternal(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked, false)
+            FloatingReplicaWindowManager.showFloatingInternal(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked, false, mediaProgress)
         } else if (isRecentlyClosed && SuperIslandListManager.containsSourceId(sourceId)) {
             Logger.i(TAG, "超级岛: sourceId=$sourceId 在30秒内被关闭过且条目仍在列表中，跳过展示")
             return

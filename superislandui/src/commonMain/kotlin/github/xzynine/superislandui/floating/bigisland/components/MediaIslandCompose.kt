@@ -15,6 +15,10 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,8 +30,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoFitText
 import github.xzynine.superislandui.common.AutoScrollText
+import github.xzynine.superislandui.currentTimeMillis
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.model.components.MediaSessionData
+import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
@@ -147,12 +153,13 @@ private fun ExpandedMediaIsland(
         }
 
         // 进度条与时间：仅有进度信息时显示，位于正文与操作按钮之间
-        val progressFraction = mediaSession.progressFraction
+        val progressNow = rememberMediaProgressClock(mediaSession)
+        val progressFraction = mediaSession.progressFractionAt(progressNow)
         if (progressFraction != null) {
             Spacer(modifier = Modifier.height(10.dp))
             MediaProgressRow(
                 fraction = progressFraction,
-                positionMs = mediaSession.positionMs ?: 0L,
+                positionMs = mediaSession.positionAt(progressNow) ?: 0L,
                 durationMs = mediaSession.durationMs ?: 0L,
             )
         }
@@ -209,9 +216,32 @@ private fun ExpandedMediaIsland(
 }
 
 /**
+ * 播放进度的时间基准。
+ *
+ * 只在播放中且带采样时刻时每秒前移一次；暂停、无进度或未标注采样时刻时停在原处。
+ * 口径与超级岛计时器组件一致：进度由本地时钟推算，对端无需按进度推送。
+ *
+ * @param mediaSession 媒体会话。
+ * @returns 用于推算进度的当前时刻（epoch 毫秒）。
+ */
+@Composable
+private fun rememberMediaProgressClock(mediaSession: MediaSessionData): Long {
+    val nowState = remember(mediaSession) { mutableLongStateOf(mediaSession.sampledAtMs.takeIf { it > 0L } ?: currentTimeMillis()) }
+    val advancing = mediaSession.isPlaying && mediaSession.sampledAtMs > 0L && mediaSession.durationMs != null
+    LaunchedEffect(mediaSession, advancing) {
+        if (!advancing) return@LaunchedEffect
+        while (true) {
+            nowState.longValue = currentTimeMillis()
+            delay(1_000L)
+        }
+    }
+    return nowState.longValue
+}
+
+/**
  * 播放进度：一条细进度条加两端时间。
  *
- * 进度比例由调用方按已播时长与总时长算出，本组件只负责绘制，
+ * 进度比例与位置由调用方按当前时刻推算后传入，本组件只负责绘制，
  * 因此暂停时进度停在原处、不自行推进。
  */
 @Composable

@@ -5,6 +5,7 @@ import android.content.Context
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
@@ -169,18 +170,22 @@ class MediaSessionMonitorService(
         lastMetadataHash = metadataHash
 
         // 歌词字段映射：歌词位于 title（多数应用）还是 artist（如 fnos 音乐）
-        val position = controller.playbackState?.position ?: -1L
+        val playbackState = controller.playbackState
+        val position = playbackState?.position ?: -1L
         val mediaId = metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_ID) ?: ""
         val (mappedTitle, mappedArtist) =
             lyricResolver.resolveLyricField(pkg, rawTitle ?: "", rawArtist ?: "", duration, mediaId, position)
 
-        // 通知 NotifyRelayNotificationListenerService 有新的媒体会话数据
+        // 通知 NotifyRelayNotificationListenerService 有新的媒体会话数据。
+        // 位置与播放态随元数据一并采样：接收端据此本地推进进度，发送端无需按进度高频推送。
         NotifyRelayNotificationListenerService.onMediaSessionUpdated(
             pkg,
             mappedTitle,
             mappedArtist,
             duration,
             artBitmap,
+            position,
+            playbackState?.state == PlaybackState.STATE_PLAYING,
         )
     }
 }

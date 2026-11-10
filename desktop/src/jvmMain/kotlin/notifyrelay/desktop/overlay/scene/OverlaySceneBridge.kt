@@ -242,6 +242,8 @@ internal class OverlaySceneBridge {
         heightPx: Int,
     ): @Composable () -> Unit =
         {
+            // 读版本号使这两个开关在改动后立即生效，无需重建叠加层
+            DesktopOverlaySettings.revision.value
             Box {
                 OverlayContent(
                     interactiveEnabled = DesktopOverlaySettings.interactiveEnabled,

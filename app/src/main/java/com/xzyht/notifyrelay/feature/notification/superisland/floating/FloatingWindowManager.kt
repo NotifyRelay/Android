@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
+import github.xzynine.superislandui.model.components.MediaProgress
 import github.xzynine.superislandui.model.core.ParamV2
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
@@ -71,6 +72,7 @@ class FloatingWindowManager {
         title: String? = null,
         text: String? = null,
         appName: String? = null,
+        mediaProgress: MediaProgress? = null,
     ) {
         // 保留原有条目的isExpanded、isOverlapping和height状态，其他属性使用新传入的值
         // 如果是摘要态，强制设为非展开状态
@@ -106,6 +108,7 @@ class FloatingWindowManager {
                 title = title,
                 text = text,
                 appName = appName,
+                mediaProgress = mediaProgress,
                 isOverlapping = finalIsOverlapping,
                 height = finalHeight,
             )

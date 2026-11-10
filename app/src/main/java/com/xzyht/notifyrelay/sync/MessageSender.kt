@@ -16,30 +16,6 @@ import notifyrelay.domain.feature.device.service.contract.DeviceMessagePort
  */
 object MessageSender {
     /**
-     * 组装「全量」媒体状态（与 Rust 合并引擎对齐，供主动推送与查询回调共用）。
-     */
-    fun buildMediaFullContent(
-        context: Context,
-        packageName: String,
-        appName: String?,
-        title: String?,
-        text: String?,
-        coverUrl: String?,
-        time: Long,
-        isPlaying: Boolean = true,
-    ): String =
-        MediaMessageBuilder.buildMediaFullContent(
-            context,
-            packageName,
-            appName,
-            title,
-            text,
-            coverUrl,
-            time,
-            isPlaying,
-        )
-
-    /**
      * 发送聊天测试消息
      * @param context 上下文
      * @param message 消息内容
@@ -50,31 +26,6 @@ object MessageSender {
         message: String,
         deviceManager: DeviceMessagePort,
     ) = ChatMessageBuilder.sendChatMessage(context, message, deviceManager)
-
-    /**
-     * 发送媒体播放通知
-     * 使用专门的协议前缀标记媒体通知，支持状态变化跟踪
-     * 差异计算（FULL/DELTA）、合并、ACK 与心跳均由 Rust 合并引擎负责。
-     */
-    fun sendMediaPlayNotification(
-        context: Context,
-        packageName: String,
-        appName: String?,
-        title: String?,
-        text: String?,
-        coverUrl: String?,
-        time: Long,
-        deviceManager: DeviceMessagePort,
-    ) = MediaMessageBuilder.sendMediaPlayNotification(
-        context,
-        packageName,
-        appName,
-        title,
-        text,
-        coverUrl,
-        time,
-        deviceManager,
-    )
 
     /**
      * 发送媒体播放结束通知

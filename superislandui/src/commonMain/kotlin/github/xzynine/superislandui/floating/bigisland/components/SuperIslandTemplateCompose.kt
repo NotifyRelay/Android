@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandComposeRoot
+import github.xzynine.superislandui.model.components.MediaProgress
 import github.xzynine.superislandui.model.components.MediaSessionData
 import github.xzynine.superislandui.model.core.ParamV2
 import top.yukonga.miuix.kmp.basic.Text
@@ -35,6 +36,7 @@ private const val COVER_PIC_KEY = "miui.focus.pic_cover"
  * @param fallbackTitle 无 paramV2 时的标题
  * @param fallbackContent 无 paramV2 时的正文
  * @param mediaAppName 媒体类型时的应用名（同时作为设备名）
+ * @param mediaProgress 媒体类型时的播放进度；为空时不显示进度条
  * @param mediaControlsVisible 媒体卡是否显示控制按钮
  * @param isOverlapping 卡片是否处于重叠提示态
  * @param onCopyVerificationCode 复制验证码回调；为空时不渲染复制按钮
@@ -51,6 +53,7 @@ fun SuperIslandTemplateCompose(
     fallbackTitle: String? = null,
     fallbackContent: String? = null,
     mediaAppName: String? = null,
+    mediaProgress: MediaProgress? = null,
     mediaControlsVisible: Boolean = true,
     isOverlapping: Boolean = false,
     onCopyVerificationCode: ((String) -> Unit)? = null,
@@ -81,6 +84,10 @@ fun SuperIslandTemplateCompose(
                                 text = fallbackContent.orEmpty(),
                                 coverUrl = picMap?.get(COVER_PIC_KEY) ?: picMap?.values?.firstOrNull(),
                                 deviceName = mediaAppName.orEmpty(),
+                                positionMs = mediaProgress?.positionMs,
+                                durationMs = mediaProgress?.durationMs?.takeIf { it > 0L },
+                                isPlaying = mediaProgress?.isPlaying ?: false,
+                                sampledAtMs = mediaProgress?.sampledAtMs ?: 0L,
                             ),
                         isExpanded = true,
                         showControls = mediaControlsVisible,

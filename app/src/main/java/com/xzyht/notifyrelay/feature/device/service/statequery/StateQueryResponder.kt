@@ -6,7 +6,7 @@ import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.device.service.callback.StateQueryPort
-import com.xzyht.notifyrelay.sync.MessageSender
+import com.xzyht.notifyrelay.sync.builder.MediaMessageBuilder
 import com.xzyht.notifyrelay.sync.builder.SuperIslandMessageBuilder
 import github.xzynine.superislandui.common.SuperIslandManager
 import kotlinx.coroutines.CoroutineScope
@@ -178,12 +178,14 @@ class StateQueryResponder(
                 }
                 cachedMediaCoverUrl
             }
-        // 轻量比较键：仅标题/艺术家/封面变化才重新构造 fullJson 并推送（isPlaying 由 Rust 媒体心跳处理）
-        val lightKey = "$pkg|${mediaData.title}|${mediaData.artist}|$coverUrl"
+        // 轻量比较键：标题/艺术家/封面变化与播放态翻转才重新构造 fullJson 并推送。
+        // 进度不进比较键：播放位置本就随查询增值，纳入会让每次查询都判为有变更并触发推送；
+        // 播放态必须纳入，否则暂停/恢复不会传播，接收端会继续按旧基准推进。
+        val lightKey = "$pkg|${mediaData.title}|${mediaData.artist}|${mediaData.isPlaying}|$coverUrl"
         val cacheKey = "$remoteUuid|$featureId"
         if (stateQueryKeys[cacheKey] == lightKey) return 1 // 存在无变更，保活等待下次查询
         val content =
-            MessageSender.buildMediaFullContent(
+            MediaMessageBuilder.buildMediaFullContent(
                 context,
                 pkg,
                 pkg,
@@ -191,6 +193,9 @@ class StateQueryResponder(
                 mediaData.artist,
                 coverUrl,
                 System.currentTimeMillis(),
+                isPlaying = mediaData.isPlaying,
+                positionMs = mediaData.position,
+                durationMs = mediaData.duration,
             )
         // 仅当原生入队成功才写入比较键并返回“有变更”，否则保留原键以便下次查询重试
         val dispatched =

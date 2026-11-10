@@ -261,6 +261,10 @@ fun MusicControlPage(
                 text = sessionSnapshot?.artist.orEmpty(),
                 coverUrl = sessionSnapshot?.coverUrl,
                 deviceName = deviceName,
+                positionMs = sessionSnapshot?.positionMs,
+                durationMs = sessionSnapshot?.durationMs,
+                isPlaying = sessionSnapshot?.isPlaying ?: false,
+                sampledAtMs = sessionSnapshot?.sampledAtMs ?: 0L,
             )
 
         // 用 Card 承载浮窗内容，给出明确边界（媒体卡片自身背景为深色，落在浅色页面时需要边框区分）

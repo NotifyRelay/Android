@@ -20,6 +20,13 @@ object MediaMessageBuilder {
 
     /**
      * 组装「全量」媒体状态（与 Rust 合并引擎对齐，供主动推送与查询回调共用）。
+     *
+     * 进度按超级岛计时器口径表达，与 `TimerInfo` 同构：`timerWhen` 为位置归零时刻、
+     * `timerTotal` 为总时长、`timerSystemCurrent` 为采样时刻、`timerType` 取 1 播放 / 2 暂停。
+     * 接收端据此在本地推进，发送端不按进度高频推送。
+     *
+     * @param positionMs 采样位置（毫秒）；负数表示未知，不写入进度字段
+     * @param durationMs 总时长（毫秒）；非正表示未知或直播，不写入进度字段
      */
     fun buildMediaFullContent(
         context: Context,
@@ -30,6 +37,8 @@ object MediaMessageBuilder {
         coverUrl: String?,
         time: Long,
         isPlaying: Boolean = true,
+        positionMs: Long = -1L,
+        durationMs: Long = 0L,
     ): String {
         val isLocked = PermissionHelper.isDeviceLocked(context)
         return JSONObject()
@@ -42,6 +51,13 @@ object MediaMessageBuilder {
                 put("time", time)
                 put("isLocked", isLocked)
                 put("isPlaying", isPlaying)
+                if (positionMs >= 0 && durationMs > 0) {
+                    val sampledAt = System.currentTimeMillis()
+                    put("timerType", if (isPlaying) 1 else 2)
+                    put("timerWhen", sampledAt - positionMs)
+                    put("timerTotal", durationMs)
+                    put("timerSystemCurrent", sampledAt)
+                }
             }.toString()
     }
 
@@ -59,6 +75,9 @@ object MediaMessageBuilder {
         coverUrl: String?,
         time: Long,
         deviceManager: DeviceAuthTablePort,
+        isPlaying: Boolean = true,
+        positionMs: Long = -1L,
+        durationMs: Long = 0L,
     ) {
         try {
             // 推送「全量」媒体状态：差异计算（FULL/DELTA）、合并与 ACK 均由 Rust 合并引擎负责。
@@ -74,7 +93,9 @@ object MediaMessageBuilder {
                     text,
                     coverUrl,
                     time,
-                    isPlaying = true,
+                    isPlaying = isPlaying,
+                    positionMs = positionMs,
+                    durationMs = durationMs,
                 )
 
             SendGateway.getAuthenticatedDevices(deviceManager).forEach { device ->

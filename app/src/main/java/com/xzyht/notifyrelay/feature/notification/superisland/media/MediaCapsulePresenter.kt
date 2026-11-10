@@ -4,6 +4,7 @@ import android.content.Context
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import github.xzynine.superislandui.builder.SuperIslandParamBuilder
 import github.xzynine.superislandui.json.toOrgJsonString
+import github.xzynine.superislandui.model.components.MediaProgress
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -16,6 +17,7 @@ object MediaCapsulePresenter {
         appName: String? = null,
         picMap: Map<String, String>? = null,
         coverUrl: String? = null,
+        mediaProgress: MediaProgress? = null,
     ) {
         // 处理歌词拆分（逻辑统一在 LyricsSplitter，P3-1/D2）
         val split = LyricsSplitter.split(context, title)
@@ -34,6 +36,7 @@ object MediaCapsulePresenter {
             appName = appName,
             // 远端媒体有独立开关，不参与超级岛通道切换的重建
             cacheForChannelSwitch = false,
+            mediaProgress = mediaProgress,
         )
     }
 

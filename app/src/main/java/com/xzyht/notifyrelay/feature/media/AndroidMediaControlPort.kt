@@ -17,14 +17,7 @@ class AndroidMediaControlPort(
     private val _sessionUpdates = MutableStateFlow<MediaSessionSnapshot?>(null)
     override val sessionUpdates: StateFlow<MediaSessionSnapshot?> = _sessionUpdates.asStateFlow()
 
-    override fun currentSession(): MediaSessionSnapshot? {
-        val session = RemoteMediaSessionManager.getCurrentSession() ?: return null
-        return MediaSessionSnapshot(
-            packageName = session.packageName,
-            title = session.title,
-            artist = null,
-        )
-    }
+    override fun currentSession(): MediaSessionSnapshot? = RemoteMediaSessionManager.getCurrentSession()?.toSnapshot()
 
     override fun currentDevice(): DeviceInfo? = RemoteMediaSessionManager.getCurrentDevice()
 
@@ -58,4 +51,12 @@ class AndroidMediaControlPort(
         }
         return true
     }
+
+    /**
+     * 分设备会话映射。
+     *
+     * 直接暴露 [RemoteMediaSessionManager.sessions]：会话状态由该管理器持有并发布，
+     * 端口不另造流，避免每次取用都产生新的订阅源。
+     */
+    override fun sessionsFlow(): StateFlow<Map<String, MediaSessionSnapshot>> = RemoteMediaSessionManager.sessions
 }

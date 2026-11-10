@@ -321,8 +321,10 @@ private fun OverlayMediaItem(
     // 展开是否由用户点开：换曲与首次出现均为自动展开，操作按钮只对用户点开的展开显示
     var userExpanded by remember { mutableStateOf(false) }
     var expandGeneration by remember { mutableLongStateOf(0L) }
-    val collapseMs = remember { DesktopOverlaySettings.mediaAutoCollapseMs }
-    val controlsEnabled = remember { DesktopOverlaySettings.mediaControlsEnabled }
+    // 设置项按版本号重取：否则改动后要等条目重建才生效
+    val settingsRevision = DesktopOverlaySettings.revision.value
+    val collapseMs = remember(settingsRevision) { DesktopOverlaySettings.mediaAutoCollapseMs }
+    val controlsEnabled = remember(settingsRevision) { DesktopOverlaySettings.mediaControlsEnabled }
     LaunchedEffect(trackKey) {
         userExpanded = false
     }
@@ -344,6 +346,7 @@ private fun OverlayMediaItem(
             positionMs = snapshot.positionMs,
             durationMs = snapshot.durationMs,
             isPlaying = snapshot.isPlaying,
+            sampledAtMs = snapshot.sampledAtMs,
         )
 
     val mediaControl = DataLayerDesktop.mediaControl
@@ -404,7 +407,8 @@ private fun OverlayMediaItem(
         modifier = Modifier.then(regionModifier),
         expandedCornerRadius = MEDIA_CARD_CORNER_RADIUS,
         // 收起态把白色描边换成绿色进度环；无进度信息时仍用白色描边
-        collapsedProgress = snapshot.progressFraction,
+        // 按帧时钟推算：进度环与展开态进度条同源，暂停时停住
+        collapsedProgress = snapshot.progressFractionAt(frameNow),
         expandedContent = {
             Box(Modifier.width(MEDIA_CARD_WIDTH)) {
                 MediaIslandCompose(

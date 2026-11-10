@@ -9,11 +9,15 @@ import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.device.ProtocolSender
 import github.xzynine.superislandui.model.components.MediaSessionData
 import io.github.miuzarte.scrcpyforandroid.services.AudioForwardingService
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import notifyrelay.base.log.Logger
 import notifyrelay.data.Storage
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.service.contract.DeviceAuthTablePort
 import notifyrelay.domain.feature.media.MediaMessageReceiveMode
+import notifyrelay.domain.feature.media.MediaSessionSnapshot
 import org.json.JSONObject
 import java.util.concurrent.ConcurrentHashMap
 
@@ -31,6 +35,11 @@ object RemoteMediaSessionManager {
 
     @Volatile
     private var currentDevice: DeviceInfo? = null
+
+    // 分设备会话映射流：唯一拥有者。UI 侧的 MediaControlPort 直接暴露本流，
+    // 不在端口内另造流，避免每次取用都产生新的订阅源。
+    private val _sessions = MutableStateFlow<Map<String, MediaSessionSnapshot>>(emptyMap())
+    val sessions: StateFlow<Map<String, MediaSessionSnapshot>> = _sessions.asStateFlow()
 
     private var isEnabled: Boolean = true
 
@@ -204,6 +213,16 @@ object RemoteMediaSessionManager {
             val coverUrl = parsed.optString("coverImage", "")
             val timeRaw = parsed.optLong("time", 0L)
             val timestamp = if (timeRaw == 0L) System.currentTimeMillis() else timeRaw
+            // 进度按超级岛计时器口径：总时长决定能否推进，timerWhen 为位置归零时刻。
+            // 接收端按本地时钟推算，发送端只在标题/专辑变更与固定周期推送。
+            val timerTotal = parsed.optLong("timerTotal", 0L)
+            val timerWhen = parsed.optLong("timerWhen", 0L)
+            val timerSystemCurrent = parsed.optLong("timerSystemCurrent", 0L)
+            val hasProgress = timerTotal > 0L && timerWhen > 0L && timerSystemCurrent >= timerWhen
+            val progressPositionMs = if (hasProgress) (timerSystemCurrent - timerWhen).coerceIn(0L, timerTotal) else null
+            val progressPlaying = parsed.optInt("timerType", 0) == 1
+            val progressSampledAt = if (hasProgress) timerSystemCurrent else 0L
+            val progressDurationMs = if (hasProgress) timerTotal else null
 
             if (title.isBlank() && text.isBlank()) {
                 Logger.w("RemoteMediaSessionManager", "收到空的媒体会话数据，继续处理以保持浮窗活跃")
@@ -223,6 +242,10 @@ object RemoteMediaSessionManager {
                     coverUrl = finalCoverUrl,
                     deviceName = device.displayName,
                     timestamp = timestamp,
+                    positionMs = progressPositionMs ?: oldSession?.positionMs,
+                    durationMs = progressDurationMs ?: oldSession?.durationMs,
+                    isPlaying = if (hasProgress) progressPlaying else oldSession?.isPlaying ?: false,
+                    sampledAtMs = if (hasProgress) progressSampledAt else oldSession?.sampledAtMs ?: 0L,
                 )
             currentDevice = device
 
@@ -252,8 +275,16 @@ object RemoteMediaSessionManager {
             // 有活跃会话，确保清理循环运行（已在 handler 线程，直接执行）
             MediaSessionTimeoutCleaner.ensureCleanupLoopOnHandler()
 
+            publishSessions()
+
             val currentState = MediaStateApplier.buildMediaState(finalTitle, finalText, finalCoverUrl)
-            MediaStateApplier.applyMediaSessionState(sourceKey, currentState, appName, context)
+            MediaStateApplier.applyMediaSessionState(
+                sourceKey,
+                currentState,
+                appName,
+                context,
+                currentSession?.toMediaProgress(),
+            )
 
             Logger.i("RemoteMediaSessionManager", "更新远端媒体会话: $title - $text (来自 ${device.displayName})")
         } catch (e: Exception) {
@@ -288,6 +319,7 @@ object RemoteMediaSessionManager {
         mediaSessionCache.clear()
         currentSession = null
         currentDevice = null
+        _sessions.value = emptyMap()
         MediaSessionTimeoutCleaner.stopCleanupLoop()
     }
 
@@ -327,6 +359,7 @@ object RemoteMediaSessionManager {
             if (currentDevice?.uuid == deviceUuid) {
                 currentSession = null
                 currentDevice = null
+                _sessions.value = emptyMap()
             }
         } catch (e: Exception) {
             Logger.e("RemoteMediaSessionManager", "关闭媒体超级岛浮窗失败: $sourceKey", e)
@@ -336,6 +369,13 @@ object RemoteMediaSessionManager {
     fun getCurrentSession(): MediaSessionData? = currentSession
 
     fun getCurrentDevice(): DeviceInfo? = currentDevice
+
+    /** 把当前会话发布到分设备映射流；由 handler 线程在会话写入后调用。 */
+    private fun publishSessions() {
+        val device = currentDevice ?: return
+        val session = currentSession ?: return
+        _sessions.value = mapOf(device.uuid to session.toSnapshot())
+    }
 
     fun sendMediaControl(
         context: Context,

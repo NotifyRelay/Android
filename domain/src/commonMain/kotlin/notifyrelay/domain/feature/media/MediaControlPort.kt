@@ -1,6 +1,7 @@
 package notifyrelay.domain.feature.media
 
 import kotlinx.coroutines.flow.StateFlow
+import notifyrelay.base.util.PlaybackProgress
 import notifyrelay.domain.feature.device.model.DeviceInfo
 
 /** 媒体会话信息（平台无关视图）。 */
@@ -16,14 +17,36 @@ data class MediaSessionSnapshot(
     val durationMs: Long? = null,
     /** 是否正在播放；用于进度推进与按钮文案。 */
     val isPlaying: Boolean = false,
+    /** [positionMs] 的采样时刻（epoch 毫秒）；0 表示未标注，进度不随时间推进。 */
+    val sampledAtMs: Long = 0L,
 ) {
-    /** 播放进度比例 0~1；无位置或时长未知时为 null。 */
+    /**
+     * 按计时器口径推算 [nowMs] 时刻的播放位置。
+     *
+     * 播放中自采样时刻起按经过时间推进，暂停则停在采样位置；两者都截到 [durationMs]。
+     *
+     * @param nowMs 当前时刻（epoch 毫秒）
+     * @returns 推算位置；无进度信息时为 null
+     */
+    fun positionAt(nowMs: Long): Long? {
+        val base = positionMs ?: return null
+        return PlaybackProgress.positionAt(base, durationMs, isPlaying, sampledAtMs, nowMs)
+    }
+
+    /** 采样时刻的播放进度比例 0~1；无位置或时长未知时为 null。 */
     val progressFraction: Float?
-        get() {
-            val total = durationMs?.takeIf { it > 0L } ?: return null
-            val current = positionMs ?: return null
-            return (current.toFloat() / total).coerceIn(0f, 1f)
-        }
+        get() = progressFractionAt(sampledAtMs)
+
+    /**
+     * 按计时器口径推算 [nowMs] 时刻的播放进度比例（0~1）。
+     *
+     * @param nowMs 当前时刻（epoch 毫秒）
+     * @returns 进度比例；无位置或时长未知时为 null
+     */
+    fun progressFractionAt(nowMs: Long): Float? {
+        val base = positionMs ?: return null
+        return PlaybackProgress.fractionAt(base, durationMs, isPlaying, sampledAtMs, nowMs)
+    }
 }
 
 /**

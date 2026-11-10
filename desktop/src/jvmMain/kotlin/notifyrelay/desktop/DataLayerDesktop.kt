@@ -160,10 +160,25 @@ object DataLayerDesktop {
             // 系统媒体中心由入口在 Swing 事件线程上接线（见 Main.kt）
             notifyrelay.desktop.platform.DesktopSystemMediaControl
                 .setSendControl(sendMediaControl)
+            // 媒体状态上报：走 Rust 合并引擎（与 Android 同一条 DATA_MEDIAPLAY 通道），
+            // 差异计算、合并与 ACK 由 core 负责，平台只交全量。
+            val sendMediaState = { device: notifyrelay.domain.feature.device.model.DeviceInfo, content: String, isEnd: Boolean ->
+                if (!com.xzyht.notifyrelay.nativecore.NativeCore
+                        .isReady()
+                ) {
+                    false
+                } else {
+                    runCatching {
+                        com.xzyht.notifyrelay.nativecore.NativeCore
+                            .pushMediaState(device.uuid, content, isEnd, false)
+                    }.getOrDefault(false)
+                }
+            }
             mediaControl =
                 notifyrelay.desktop.platform.DesktopMediaControlPort(
                     onlineDevices = { onlineDevices() },
                     sendControl = sendMediaControl,
+                    sendMediaState = sendMediaState,
                 )
             MediaControlPortRegistry.install(mediaControl!!)
             // 系统媒体中心按设备取当前会话：中继播放时优先展示对端曲目信息
