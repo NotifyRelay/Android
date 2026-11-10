@@ -45,7 +45,7 @@ class OverlayRecordingTest {
                 }
             }
 
-        val svg = recorder.record(System.nanoTime())
+        val svg = recorder.record(System.nanoTime()).document
         recorder.close()
 
         java.io.File("build/overlay-scene.svg").writeText(svg)

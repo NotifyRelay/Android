@@ -54,7 +54,7 @@ internal class OverlaySceneRecorder(
      * 先经 [ImageComposeScene.render] 驱动重组与布局，再向 SVG 画布绘制；
      * 顺序不可颠倒，否则录到的是上一帧的布局结果。
      */
-    fun record(nanoTime: Long): String {
+    fun record(nanoTime: Long): RecordedScene {
         // 触发重组与布局；返回的位图不使用，绘制改经 SVGCanvas 完成
         imageScene.render(nanoTime).close()
 
@@ -65,7 +65,31 @@ internal class OverlaySceneRecorder(
             composeScene.draw(skiaCanvas.asComposeCanvas())
             skiaCanvas.close()
         }
-        return out.toString(UTF_8)
+        return extractImages(out.toString(UTF_8))
+    }
+
+    /**
+     * 把内联的位图数据抽出来，文档里改写成对 imageId 的引用。
+     *
+     * SVGCanvas 会把图片写成 <image id="..." xlink:href="data:image/png;base64,...">，
+     * 内联数据通常占据场景体积的绝大部分。抽出后场景只剩引用，
+     * 图片本体经独立报文完整传输一次。
+     */
+    private fun extractImages(svg: String): RecordedScene {
+        val images = LinkedHashMap<String, ByteArray>()
+        val rewritten =
+            IMAGE_HREF.replace(svg) { match ->
+                val id = match.groupValues[1]
+                val base64 = match.groupValues[2]
+                runCatching {
+                    images[id] =
+                        java.util.Base64
+                            .getDecoder()
+                            .decode(base64)
+                }
+                " id=\"" + id + "\" xlink:href=\"" + id + "\""
+            }
+        return RecordedScene(document = rewritten, images = images)
     }
 
     /**
@@ -97,8 +121,19 @@ internal class OverlaySceneRecorder(
         imageScene.close()
     }
 
+    /** 一次录制的产物：文档与随附位图。 */
+    internal class RecordedScene(
+        val document: String,
+        /** imageId 到 PNG 字节；文档中以同名 id 引用。 */
+        val images: Map<String, ByteArray>,
+    )
+
     private companion object {
         private const val UTF_8 = "UTF-8"
+
+        /** 匹配 <image ... id="X" ... xlink:href="data:image/png;base64,YYY">。 */
+        private val IMAGE_HREF =
+            Regex("""\s+id="([^"]*)"(?:[^>]*?)xlink:href="data:image/[a-z]+;base64,([A-Za-z0-9+/=]+)""")
 
         private val SCENE_FIELD: Field =
             ImageComposeScene::class.java

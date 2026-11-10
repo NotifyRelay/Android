@@ -46,6 +46,9 @@ internal class NamedPipeSceneServer(
     /** 待推送的场景；由渲染侧写入，会话线程取走后清空。 */
     private val pending = AtomicReference<SceneSnapshot?>(null)
 
+    /** 待推送的位图；按顺序完整发送，发送后清空。 */
+    private val pendingImages = java.util.concurrent.ConcurrentLinkedQueue<Pair<String, ByteArray>>()
+
     /** 当前会话是否已有客户端订阅；无客户端时不录制场景。 */
     private val subscribed = AtomicBoolean(false)
 
@@ -76,6 +79,19 @@ internal class NamedPipeSceneServer(
     /** 提交一个待推送场景；后续场景覆盖前面的，只保证送达最新一帧。 */
     fun publish(snapshot: SceneSnapshot) {
         pending.set(snapshot)
+    }
+
+    /**
+     * 提交一张待推送位图。
+     *
+     * 每次都是完整数据，不依赖接收端缓存命中；队列在发送后立即清空，
+     * 因此不会随会话时长累积。
+     */
+    fun publishImage(
+        id: String,
+        png: ByteArray,
+    ) {
+        pendingImages.add(id to png)
     }
 
     /** 启动监听线程。 */
@@ -182,6 +198,21 @@ internal class NamedPipeSceneServer(
         // ---- 收发循环 ----
         var lastInboundAt = System.currentTimeMillis()
         while (running.get()) {
+            // 先把待发位图发完，再发场景：接收端解析场景时已有图可查
+            while (true) {
+                val image = pendingImages.poll() ?: break
+                val message =
+                    SceneMessage(
+                        type = SceneMessage.TYPE_IMAGE,
+                        imageId = image.first,
+                        imageData =
+                            java.util.Base64
+                                .getEncoder()
+                                .encodeToString(image.second),
+                    ).encodeLine()
+                if (!sendLine(handle, message)) return
+            }
+
             // 优先推送待发场景：场景与心跳共用一条管道，心跳的时效由下面的空轮询保证
             val snapshot = pending.getAndSet(null)
             if (snapshot != null) {
@@ -253,6 +284,8 @@ internal class NamedPipeSceneServer(
     private fun teardown(handle: WinNT.HANDLE) {
         subscribed.set(false)
         clientSize.set(null)
+        // 会话结束即丢弃未发位图，避免跨会话累积
+        pendingImages.clear()
         closePipe(handle)
         onClientGone()
     }
@@ -460,7 +493,6 @@ internal data class SceneSnapshot(
     val document: String,
     val regions: List<SceneRegion>,
 )
-/** advapi32 的 SDDL 转换入口；返回的安全描述符需用 LocalFree 释放。 */
 
 /** advapi32 的 SDDL 转换入口；返回的安全描述符需用 LocalFree 释放。 */
 internal interface SddlApi : StdCallLibrary {

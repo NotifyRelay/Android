@@ -156,7 +156,8 @@ internal class OverlaySceneBridge {
             lastFingerprint = null
         }
 
-        val document = recorder!!.record(System.nanoTime())
+        val recorded = recorder!!.record(System.nanoTime())
+        val document = recorded.document
 
         // 内容无变化时不推：静止场景只有内容变化才会重录
         val regionSnapshot = regions.toMap()
@@ -165,6 +166,12 @@ internal class OverlaySceneBridge {
         lastFingerprint = fingerprint
 
         revision += 1
+
+        // 先发图片再发场景：接收端解析场景时已有对应位图可查
+        recorded.images.forEach { (id, bytes) ->
+            server.publishImage(id, bytes)
+        }
+
         server.publish(
             SceneSnapshot(
                 revision = revision,
