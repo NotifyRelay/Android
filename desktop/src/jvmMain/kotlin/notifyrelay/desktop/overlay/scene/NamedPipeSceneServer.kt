@@ -195,6 +195,9 @@ internal class NamedPipeSceneServer(
         subscribed.set(true)
         Logger.i(TAG, "客户端已订阅 尺寸=" + width + "x" + height + " dpi=" + subscribe.dpi)
 
+        // 新会话需要重新收到全部位图
+        runCatching { onSessionEstablished?.invoke() }
+
         // ---- 收发循环 ----
         var lastInboundAt = System.currentTimeMillis()
         while (running.get()) {
@@ -279,6 +282,9 @@ internal class NamedPipeSceneServer(
     /** 点击回调：由渲染侧注入；参数为区域 key、阶段与场景坐标（dp）。 */
     var clickListener: ((String, String, Float?, Float?) -> Unit)? = null
 
+    /** 会话建立后的回调；渲染侧据此重置位图发送记录。 */
+    var onSessionEstablished: (() -> Unit)? = null
+
     private var lastRevision: Long = 0L
 
     private fun teardown(handle: WinNT.HANDLE) {
@@ -341,41 +347,30 @@ internal class NamedPipeSceneServer(
     }
 
     /**
-     * 写入一行；返回 false 表示管道已断或超时。
+     * 写入一行。
      *
-     * 写操作在独立线程上执行并限时等待：管道写满时 WriteFile 会一直阻塞到
-     * 对端读取为止，而会话线程同时负责心跳与超时判定，
-     * 一旦它卡在写上，僵尸会话就再也不会被判定出来。
+     * 直接把整行交给内核写端，失败才判定断开。
+     *
+     * 不再为每条报文新建线程、也不再逐条 FlushFileBuffers：
+     * 前者在每秒数十帧时会产生大量线程，后者会把每次写同步到对端读完为止，
+     * 两者叠加会让写入远慢于产出，管道最终被塞满。
+     * 管道本身有缓冲，FlushFileBuffers 对字节流没有额外语义。
      */
     private fun sendLine(
         handle: WinNT.HANDLE,
         line: String,
     ): Boolean {
         val bytes = line.toByteArray(Charsets.UTF_8)
-        val result =
-            java.util.concurrent.atomic
-                .AtomicBoolean(false)
-        val writer =
-            thread(isDaemon = true, name = "overlay-scene-write") {
-                val written = IntByReference()
-                val ok = kernel32.WriteFile(handle, bytes, bytes.size, written, null)
-                if (ok) {
-                    kernel32.FlushFileBuffers(handle)
-                    result.set(true)
-                } else {
-                    val error = kernel32.GetLastError()
-                    // ERROR_BROKEN_PIPE / ERROR_NO_DATA 表示客户端已走，属正常断开
-                    if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA) {
-                        Logger.w(TAG, "写入管道失败 错误码=" + error)
-                    }
-                }
+        val written = IntByReference()
+        if (!kernel32.WriteFile(handle, bytes, bytes.size, written, null)) {
+            val error = kernel32.GetLastError()
+            // ERROR_BROKEN_PIPE / ERROR_NO_DATA 表示客户端已走，属正常断开
+            if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA) {
+                Logger.w(TAG, "写入管道失败 错误码=" + error)
             }
-        writer.join(WRITE_TIMEOUT_MS)
-        if (writer.isAlive) {
-            Logger.w(TAG, "写入管道超时 " + WRITE_TIMEOUT_MS + "ms，判定对端不再读取")
             return false
         }
-        return result.get()
+        return true
     }
 
     /**

@@ -41,6 +41,14 @@ internal class OverlaySceneBridge {
     /** 已推送内容的指纹，用于跳过无变化的帧。 */
     private var lastFingerprint: String? = null
 
+    /**
+     * 已发送位图的内容摘要，键为 imageId。
+     *
+     * 同一张图只在内容变化时重发：每帧完整重传会把管道写满，
+     * 接收端来不及消费，服务端写超时后判定对端失效，两端表现为静止。
+     */
+    private val sentImages = HashMap<String, Int>()
+
     /** 最近一次录制尺寸；订阅尺寸变化时重建录制场景。 */
     private var recordedWidth = 0
     private var recordedHeight = 0
@@ -51,6 +59,8 @@ internal class OverlaySceneBridge {
     /** 启动服务端与录制循环。 */
     fun start() {
         server.clickListener = ::onClick
+        // 客户端重新订阅后需要重新收到全部位图
+        server.onSessionEstablished = { sentImages.clear() }
         server.start()
         scope.launch { publishLoop() }
         Logger.i(TAG, "矢量场景服务已启动 管道=" + SCENE_PIPE_NAME)
@@ -167,9 +177,19 @@ internal class OverlaySceneBridge {
 
         revision += 1
 
-        // 先发图片再发场景：接收端解析场景时已有对应位图可查
+        // 先发图片再发场景：接收端解析场景时已有对应位图可查。
+        // 仅发送内容有变化的位图，避免每帧重复传输把管道写满。
         recorded.images.forEach { (id, bytes) ->
-            server.publishImage(id, bytes)
+            val digest = bytes.contentHashCode()
+            if (sentImages[id] != digest) {
+                sentImages[id] = digest
+                server.publishImage(id, bytes)
+            }
+        }
+
+        // 丢弃已不再被该场景引用的图片记录，避免长期累积
+        if (sentImages.size > recorded.images.size) {
+            sentImages.keys.retainAll(recorded.images.keys)
         }
 
         server.publish(
