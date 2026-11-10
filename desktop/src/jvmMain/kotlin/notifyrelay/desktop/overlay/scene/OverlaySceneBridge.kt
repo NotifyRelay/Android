@@ -250,18 +250,24 @@ internal class OverlaySceneBridge {
         }
 
     /**
-     * 判断当前是否存在需要连续刷新的内容。
+     * 判断当前是否需要按动画周期录制。
      *
-     * 时钟按秒变化、滚动文本与频谱按帧推进、进度环随播放进度前进，
-     * 这些都只在叠加层有内容时出现。因此只要存在可见内容就按动画周期录制：
+     * 位图路径下所有动画都由本机渲染，接收端不会自行推进，
+     * 因此这里必须覆盖全部会随时间变化的内容：
+     * 超级岛的展开与自动收起、媒体卡的收起、滚动文本、频谱、时钟、播放进度。
+     *
+     * 只要叠加层上有可见内容就按动画周期录制：
      * 用「是否有内容」判定比逐项枚举可靠，新增动态元素也不会漏掉。
+     * 无内容时降到空闲周期，静止场景不持续占用 CPU。
      */
     private fun hasAnimatedContent(): Boolean =
-        // 时钟每秒才变一次文本，不需要逐帧重录；频谱与滚动文本的动画已写进文档，
-        // 由接收端自行推进，因此这里只剩「内容是否仍在变化」的判定。
-        DesktopOverlayStore.mediaSessions.isNotEmpty() ||
+        DesktopOverlayStore.clockText.value.isNotEmpty() ||
+            DesktopOverlayStore.mediaSessions.isNotEmpty() ||
             DesktopOverlayStore.superIslands.isNotEmpty() ||
-            DesktopOverlayStore.notifications.isNotEmpty()
+            DesktopOverlayStore.notifications.isNotEmpty() ||
+            DesktopOverlayStore.keyboardState.value.pressedKeys
+                .isNotEmpty() ||
+            DesktopOverlayStore.keyboardHint.value.isNotEmpty()
 
     private companion object {
         private const val TAG = "OverlaySceneBridge"
