@@ -68,6 +68,13 @@ internal object DesktopOverlayStore {
         expired.forEach { superIslands.remove(it) }
     }
 
+    /**
+     * 是否存在正在播放的媒体。
+     *
+     * 频谱与收起态进度环按时间连续推进，场景录制据此判断是否需要每帧刷新。
+     */
+    fun hasPlayingMedia(): Boolean = mediaSessions.values.any { it.isPlaying }
+
     /** 入队一条通知卡片。 */
     fun addNotification(entry: NotificationEntry) {
         notifications.add(entry)

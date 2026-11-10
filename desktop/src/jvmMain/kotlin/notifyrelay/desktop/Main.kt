@@ -217,13 +217,24 @@ fun main() {
             }
         }
 
-        // 叠加层：无边框透明置顶窗口，媒体卡/超级岛/弹幕与扩展点浮窗均由本机 Compose 绘制。
-        // 总开关关闭时不创建窗口，扩展点也一并不启动
+        // 叠加层：媒体卡/超级岛/弹幕与扩展点浮窗。
+        // 本机不再创建无边框置顶窗口，内容只经矢量场景服务推给 Gamebar 小组件。
+        // 总开关关闭时不启动任何相关服务
         val overlayEnabled = notifyrelay.desktop.platform.DesktopOverlaySettings.enabled
         if (overlayEnabled) {
-            notifyrelay.desktop.overlay.DesktopOverlayWindow()
+            // 矢量场景服务：把叠加层内容录成 SVG 推给 Gamebar 小组件。
+            // 无客户端订阅时不录制，因此开启本服务本身不产生额外开销
+            val sceneBridge =
+                remember {
+                    notifyrelay.desktop.overlay.scene
+                        .OverlaySceneBridge()
+                }
+            DisposableEffect(sceneBridge) {
+                sceneBridge.start()
+                onDispose { sceneBridge.close() }
+            }
 
-            // 扩展点数据源（余额 / 罗技电池 / 键盘 / 时间）：窗口就绪后按各自开关启动
+            // 扩展点数据源（余额 / 罗技电池 / 键盘 / 时间）：按各自开关启动
             val features =
                 remember {
                     notifyrelay.desktop.overlay.feature
@@ -235,7 +246,7 @@ fun main() {
             }
         } else {
             notifyrelay.base.log.Logger
-                .i("DesktopOverlay", "叠加层总开关关闭，不创建窗口与扩展点")
+                .i("DesktopOverlay", "叠加层总开关关闭，不启动场景服务与扩展点")
         }
 
         // 主题：索引经 ThemePort 持久化，跟随系统时读取系统深浅色

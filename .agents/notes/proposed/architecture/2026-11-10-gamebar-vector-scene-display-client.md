@@ -75,41 +75,55 @@ JVM 持有全部语义：通知与超级岛的报文模型、`paramV2` 模板解
 
 超出子集的元素由 JVM 侧拒绝生成并报 `ERROR`，不在 Gamebar 侧静默丢弃。
 
-### 动画
+### 动画与点击
 
-动画必须由 Gamebar 本地解释，不能逐帧推场景。实测的动画频率是决策依据：[OverlaySpectrum.kt](../../../../desktop/src/jvmMain/kotlin/notifyrelay/desktop/overlay/OverlaySpectrum.kt) 的相位由 `positionMs` 连续推进，属 60fps 级；[SuperIslandExpandableCard.kt](../../../../superislandui/src/commonMain/kotlin/github/xzynine/superislandui/floating/common/SuperIslandExpandableCard.kt) 的展开 460ms、收起 320ms，逐帧插值宽高、圆角、背景色与两态透明度；收起态进度环按进度裁切路径；文本超宽滚动由 `Animatable` 线性推进。若每帧推一次 `SCENE`，就退化成 60Hz 的跨进程帧流，正是要避免的形态。
+动画由接收端本地解释：`document` 内的 SMIL 声明由 `Svg.Skia` 的时间轴推进，JVM 只在目标态变化时推新场景。
 
-因此 `document` 内直接携带 SMIL 动画声明，Gamebar 的 SVG 渲染器按时间轴自行推进。JVM 只在**目标态变化**时推新场景（如展开切成收起），过渡由接收端补完。缓动只需 `fastOutSlowIn` 与 `linear` 两种，对应 `keySplines` 与 `linear`。
+点击不走「按 key 查表派发动作」那条路。区域 key 只用于命中判定，真正的动作由 Compose 自己的输入分发执行：
 
 ```mermaid
 sequenceDiagram
-    participant J as JVM 桌面端
     participant W as Gamebar 小组件
-    participant U as 用户
-    U->>W: 点击胶囊
+    participant J as JVM 桌面端
+    participant C as Compose 场景
+    U->>W: 按下
     W->>W: 本地按下态
-    W->>J: CLICK{up, key}
-    J->>J: 状态推进为目标态
-    J-->>W: SCENE{document 含 animate, 新 revision}
-    W->>W: SMIL 自行推进 460ms 形变
+    W->>J: CLICK{down, key, x, y}
+    J->>C: sendPointer(Press, x, y)
+    U->>W: 抬起
+    W->>J: CLICK{up, key, x, y}
+    J->>C: sendPointer(Release, x, y)
+    C->>C: 既有 clickable 执行动作
+    J-->>W: SCENE{新 revision}
 ```
 
-### 渲染器选型（待验证）
+这样新增任何控件都不需要在这条链路上登记动作：`OverlayContent` 里已有的 `clickable` 与手势处理原样生效。坐标以场景 dp 表达，接收端按与绘制相同的等比缩放换算，因此点在哪里就落在哪里。
 
-两条候选路径都能消费 SVG，取舍取决于矢量动画的解释能力：
+### 渲染器选型
 
-| 路径 | 动画 | 已验证事实 | 待验证 |
-|---|---|---|---|
-| SkiaSharp 直接画 SVG | 完整 SVG 语义，含 SMIL | Skiko 的 `SVGCanvas` 与 `SVGDOM` 在依赖中已存在，可作 JVM 侧导出端 | SkiaSharp 在 UWP AppContainer 内的可用性与原生库打包 |
-| Win2D `CanvasSvgDocument` | 需确认 SMIL 支持 | Gamebar 已引用 Win2D，摄像头小组件在用 | Direct2D 的 SVG 实现是否解释动画时间轴 |
+已定：Gamebar 侧用 **SkiaSharp + Svg.Skia**，承载控件为 `SKSwapChainPanel`。
 
-判定依据是上表最后两列：若 Win2D 不解释 SMIL，则必须在 Gamebar 侧另写动画推进，等于重新引入解释器，此时选 SkiaSharp。
+三条实测结论决定了这个组合：
+
+| 候选 | 结论 | 依据 |
+|---|---|---|
+| Win2D `CanvasSvgDocument` | 不采用 | Direct2D 的 SVG 接口没有动画成员：Windows SDK `d2d1svg.h` 全文 0 处 `animate`，Win2D 的 winmd 里也只有 `CanvasSvgDocument` 与 `DrawSvg` |
+| SkiaSharp + Svg.Skia | 采用 | `Svg.Skia` 的 `SKSvg` 提供 `AnimationController`、`SetAnimationTime`、`AdvanceAnimation`、`HasAnimations`，可在接收端本地推进时间轴 |
+| WebView2 | 不采用 | Game Bar 官方 known-issues 明确 WebView 不受支持 |
+
+版本组合受 UWP 目标框架约束：`SkiaSharp` 自 3.116.1 起移除 UAP 目标，`Svg.Skia` 自 4.9.1 起改用 SkiaSharp 3.x。可用组合是 `Svg.Skia 4.6.0` + `SkiaSharp.Views 2.88.9`（后者含 `lib/uap10.0/SkiaSharp.Views.UWP.dll`）。UWP 资产并非独立包：`SkiaSharp.Views.UWP` 在 NuGet 上不存在，它并入 `SkiaSharp.Views` 主包。
+
+原生库随 `SkiaSharp.NativeAssets.UWP` 打包，MSIX 内确认含 `libSkiaSharp.dll`、`libGLESv2.dll`、`libEGL.dll`、`zlib1.dll`。
 
 ### 位图资源
 
-只有应用图标与媒体封面是位图，来源本身就是位图，无法矢量化。它们经流管道单独传输，按内容哈希命名的 `imageId` 缓存，与场景解耦：同一图标在多次场景更新中只传一次。
+不需要独立的流管道。Skia 的 `SVGCanvas` 在录制时把图片内联成 `data:` URI：
 
-流管道的单帧为「4 字节小端长度 + 载荷」，载荷为 `id` 长度、`id`、PNG 字节。JVM 在发出引用新 `imageId` 的 `SCENE` 之前先发该图；Gamebar 收到不认识的 `imageId` 时用缓存的占位块并回 `IMAGE_MISSING`。缓存按最近使用保留，上限 64 项。
+```
+<image id="img_0" width="16" height="16" xlink:href="data:image/png;base64,..."/>
+```
+
+因此场景文档自包含，接收端不需要向 JVM 索取任何外部资源，也就不存在 `IMAGE_MISSING` 与缓存回收问题。代价是图标与封面会随场景重复传输；按当前卡片数量与场景体积（实测单帧约 1 KB，含图标时约为图标大小）可接受，若后续图标密集再引入缓存。
 
 ### 存活检测
 
