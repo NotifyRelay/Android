@@ -69,25 +69,40 @@ internal class OverlaySceneRecorder(
     }
 
     /**
-     * 把内联的位图数据抽出来，文档里改写成对 imageId 的引用。
+     * 抽出位图数据，并把渲染所需的引用改成可解析形式。
      *
-     * SVGCanvas 会把图片写成 <image id="..." xlink:href="data:image/png;base64,...">，
-     * 内联数据通常占据场景体积的绝大部分。抽出后场景只剩引用，
-     * 图片本体经独立报文完整传输一次。
+     * SVGCanvas 会把图片写成 <defs><image id="..." xlink:href="data:...">，
+     * 再以 <use> 引用。内联数据占据场景体积的绝大部分，故抽出后场景只留引用；
+     * 同时 Skia 不渲染 <use> 对 <image> 的间接引用（实测画不出内容），
+     * 因此这里把 <use> 就地替换成 <image>，几何属性沿用原定义。
      */
     private fun extractImages(svg: String): RecordedScene {
         val images = LinkedHashMap<String, ByteArray>()
-        val rewritten =
-            IMAGE_HREF.replace(svg) { match ->
+        val geom = HashMap<String, String>()
+
+        // 先摘掉 defs 内的位图定义（连同 base64），文档里只留引用
+        val withoutDefs =
+            DEF_IMAGE.replace(svg) { match ->
                 val id = match.groupValues[1]
-                val base64 = match.groupValues[2]
+                geom[id] = match.groupValues[2]
                 runCatching {
                     images[id] =
                         java.util.Base64
                             .getDecoder()
-                            .decode(base64)
+                            .decode(match.groupValues[3])
                 }
-                " id=\"" + id + "\" xlink:href=\"" + id + "\""
+                ""
+            }
+
+        val rewritten =
+            USE_IMAGE.replace(withoutDefs) { match ->
+                val id = match.groupValues[2]
+                val attrs = geom[id]
+                if (attrs == null) {
+                    match.value
+                } else {
+                    "<image " + match.groupValues[1] + attrs + " xlink:href=\"" + IMAGE_URI_PREFIX + id + "\"/>"
+                }
             }
         return RecordedScene(document = rewritten, images = images)
     }
@@ -132,13 +147,26 @@ internal class OverlaySceneRecorder(
         private const val UTF_8 = "UTF-8"
 
         /**
-         * 匹配 <image ... id="X" ... xlink:href="data:image/png;base64,YYY">。
+         * 位图引用的 URI 前缀。
          *
-         * 末尾的闭合引号必须一并吃掉：否则替换时补引号会与原有引号重复，
-         * 产出的 XML 属性边界错乱，解析时因引号非法而失败。
+         * 不能直接用 imageId 本身：元素 id 与 href 同值时形成自引用，
+         * 渲染器会把 <image> 当作引用自身，最终什么也画不出来。
          */
-        private val IMAGE_HREF =
-            Regex("""\s+id="([^"]*)"(?:[^>]*?)xlink:href="data:image/[a-z]+;base64,([A-Za-z0-9+/=]+)"""")
+        private const val IMAGE_URI_PREFIX = "nrimg:"
+
+        /**
+         * 匹配 <defs> 内的位图定义：捕获 id、base64 与其余几何属性。
+         *
+         * 末尾的闭合引号必须一并吃掉，否则替换后属性边界错乱。
+         */
+        private val DEF_IMAGE =
+            Regex(
+                """<image\s+id="([^"]*)"([^>]*?)xlink:href="data:image/[a-z]+;base64,([A-Za-z0-9+/=]+)"""",
+            )
+
+        /** 匹配 <use ... xlink:href="#img_N"/>，用于改写成直接绘制的 <image>。 */
+        private val USE_IMAGE =
+            Regex("""<use\s+([^>]*?)xlink:href="#([^"]*)"\s*/>""")
 
         private val SCENE_FIELD: Field =
             ImageComposeScene::class.java
