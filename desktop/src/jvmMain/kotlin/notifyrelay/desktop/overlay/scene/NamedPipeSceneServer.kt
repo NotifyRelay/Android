@@ -210,9 +210,6 @@ internal class NamedPipeSceneServer(
         subscribed.set(true)
         Logger.i(TAG, "客户端已订阅 尺寸=" + width + "x" + height + " dpi=" + subscribe.dpi)
 
-        // 新会话需要重新收到全部位图
-        runCatching { onSessionEstablished?.invoke() }
-
         // ---- 收发循环 ----
         // 发送独立成线程：管道写满时 WriteFile 会阻塞到对端读取为止，
         // 若与读取、心跳同线程，写阻塞会让心跳停摆，双方互相判定失效。
@@ -325,9 +322,6 @@ internal class NamedPipeSceneServer(
 
     /** 点击回调：由渲染侧注入；参数为区域 key、阶段与场景坐标（dp）。 */
     var clickListener: ((String, String, Float?, Float?) -> Unit)? = null
-
-    /** 会话建立后的回调；渲染侧据此重置位图发送记录。 */
-    var onSessionEstablished: (() -> Unit)? = null
 
     private var lastRevision: Long = 0L
 
