@@ -195,21 +195,28 @@ internal class OverlaySceneBridge {
         )
     }
 
-    /** 叠加层内容；与窗口共用同一份组合树。 */
+    /**
+     * 叠加层内容；与窗口共用同一份组合树。
+     *
+     * 外层提供导出标记：动态元素据此改用哨兵色绘制，
+     * 录制器识别后改写成接收端可自行推进的动画。
+     */
     private fun overlayContent(
         widthPx: Int,
         heightPx: Int,
     ): @Composable () -> Unit =
         {
-            Box {
-                OverlayContent(
-                    interactiveEnabled = DesktopOverlaySettings.interactiveEnabled,
-                    spectrumEnabled = DesktopOverlaySettings.spectrumEnabled,
-                    interactiveRegions = regions,
-                    contentSize = IntSize(widthPx, heightPx),
-                    onContentSizeChanged = {},
-                    modifier = Modifier,
-                )
+            ProvideSceneExport(SceneExport()) {
+                Box {
+                    OverlayContent(
+                        interactiveEnabled = DesktopOverlaySettings.interactiveEnabled,
+                        spectrumEnabled = DesktopOverlaySettings.spectrumEnabled,
+                        interactiveRegions = regions,
+                        contentSize = IntSize(widthPx, heightPx),
+                        onContentSizeChanged = {},
+                        modifier = Modifier,
+                    )
+                }
             }
         }
 
