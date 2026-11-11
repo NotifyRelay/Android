@@ -357,6 +357,16 @@ internal class NamedPipeSceneServer(
                     Logger.w(TAG, "心跳超时 " + silentMs + "ms，结束会话")
                     break
                 }
+
+                // 空闲会话与「对端已退出」在管道上表现相同，故在空闲时主动探查。
+                // 只在无报文的分支执行：有报文说明对端仍在。
+                if (message == null && reader.closed) {
+                    break
+                }
+                if (message == null && silentMs > PROBE_IDLE_MS && reader.probeDisconnected()) {
+                    Logger.i(TAG, "对端已断开，结束会话")
+                    break
+                }
             }
         } finally {
             sendRunning.set(false)
@@ -518,7 +528,14 @@ internal class NamedPipeSceneServer(
         private const val PIPE_TYPE_BYTE = 0x00000000
         private const val PIPE_READMODE_BYTE = 0x00000000
         private const val PIPE_WAIT = 0x00000000
-        private const val MAX_INSTANCES = 1
+
+        /**
+         * 管道实例上限。
+         *
+         * 取 2 而非 1：旧会话的句柄释放与内核回收之间有一段重叠，
+         * 单实例会让新客户端在这段窗口内只能拿到 ERROR_PIPE_BUSY。
+         */
+        private const val MAX_INSTANCES = 2
 
         /** 管道缓冲：按典型一帧场景的大小留出数帧余量，吸收突发推送。 */
         private const val BUFFER_SIZE = 4 * 1024 * 1024
@@ -552,6 +569,9 @@ internal class NamedPipeSceneServer(
 
         private const val HANDSHAKE_TIMEOUT_MS = 10_000L
         private const val POLL_INTERVAL_MS = 250L
+
+        /** 空闲超过该时长才探查对端连接，避免每个轮询都查询句柄状态。 */
+        private const val PROBE_IDLE_MS = 1_500L
         private const val RETRY_INTERVAL_MS = 500L
 
         /** 发送线程空闲时的轮询间隔。 */

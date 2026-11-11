@@ -41,6 +41,8 @@ internal class LineReader(
             val remaining = deadline - System.currentTimeMillis()
             if (remaining <= 0) return null
 
+            // 对端退出后 PeekNamedPipe 仍可能报成功且可用字节为 0，无法据此判定断开；
+            // 断开只由下面的 ReadFile 错误码与 [probeDisconnected] 识别。
             val available = IntByReference()
             if (!kernel32.PeekNamedPipe(handle, null, 0, null, available, null)) {
                 val error = kernel32.GetLastError()
@@ -58,12 +60,47 @@ internal class LineReader(
 
             val want = minOf(available.value, chunk.size)
             val read = IntByReference()
-            if (!kernel32.ReadFile(handle, chunk, want, read, null) || read.value <= 0) {
+            if (!kernel32.ReadFile(handle, chunk, want, read, null)) {
+                val error = kernel32.GetLastError()
+                if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA) {
+                    Logger.w(TAG, "读取命名管道失败 错误码=" + error)
+                }
+                closed = true
+                return null
+            }
+            if (read.value <= 0) {
+                // 成功但零字节说明连接已断，不能当空闲重试
                 closed = true
                 return null
             }
             buffer.write(chunk, 0, read.value)
         }
+    }
+
+    /**
+     * 探查对端是否已断开。
+     *
+     * 判据只在 PeekNamedPipe 的返回值：对端全部关闭后它直接失败并报
+     * ERROR_BROKEN_PIPE，而对端存活但空闲时它成功且可用字节为 0，两者可区分。
+     *
+     * 不用 GetNamedPipeHandleState：在字节模式管道上它对已连接的空闲实例
+     * 返回失败（ERROR_INVALID_PARAMETER），其 lpCurInstances 又表示实例总数
+     * 而非已连接客户端数，据此判定会把正常空闲会话误判成断开。
+     *
+     * @return 已断开时为 true
+     */
+    fun probeDisconnected(): Boolean {
+        if (closed) return true
+        val available = IntByReference()
+        if (kernel32.PeekNamedPipe(handle, null, 0, null, available, null)) {
+            return false
+        }
+        val error = kernel32.GetLastError()
+        if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA && error != ERROR_PIPE_NOT_CONNECTED) {
+            Logger.w(TAG, "探查命名管道失败 错误码=" + error)
+        }
+        closed = true
+        return true
     }
 
     /** 从缓冲区切出一整行（不含换行符）；没有完整行时返回 null。 */
@@ -96,6 +133,8 @@ internal class LineReader(
         private const val POLL_SLEEP_MS = 15L
         private const val ERROR_BROKEN_PIPE = 109
         private const val ERROR_NO_DATA = 232
+        private const val ERROR_PIPE_NOT_CONNECTED = 233
+        private const val ERROR_MORE_DATA = 234
 
         private val kernel32: Kernel32 = Kernel32.INSTANCE
     }
