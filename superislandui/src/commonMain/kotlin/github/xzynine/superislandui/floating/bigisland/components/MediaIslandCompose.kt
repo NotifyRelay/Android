@@ -49,9 +49,11 @@ fun MediaIslandCompose(
     onPrevious: () -> Unit = {},
     onNext: () -> Unit = {},
     onClose: () -> Unit = {},
+    progressNowMs: Long? = null,
 ) {
     ExpandedMediaIsland(
         mediaSession = mediaSession,
+        progressNowMs = progressNowMs,
         showControls = showControls,
         onPlayPause = onPlayPause,
         onPrevious = onPrevious,
@@ -63,6 +65,7 @@ fun MediaIslandCompose(
 @Composable
 private fun ExpandedMediaIsland(
     mediaSession: MediaSessionData,
+    progressNowMs: Long?,
     showControls: Boolean,
     onPlayPause: () -> Unit,
     onPrevious: () -> Unit,
@@ -153,7 +156,7 @@ private fun ExpandedMediaIsland(
         }
 
         // 进度条与时间：仅有进度信息时显示，位于正文与操作按钮之间
-        val progressNow = rememberMediaProgressClock(mediaSession)
+        val progressNow = rememberMediaProgressClock(mediaSession, progressNowMs)
         val progressFraction = mediaSession.progressFractionAt(progressNow)
         if (progressFraction != null) {
             Spacer(modifier = Modifier.height(10.dp))
@@ -218,17 +221,30 @@ private fun ExpandedMediaIsland(
 /**
  * 播放进度的时间基准。
  *
- * 只在播放中且带采样时刻时每秒前移一次；暂停、无进度或未标注采样时刻时停在原处。
+ * [progressNowMs] 非空时直接采用（供已有帧时钟的宿主复用，进度随帧平滑推进）；
+ * 为空时自建秒级时钟，只在播放中且带采样时刻时前移，暂停与未标注采样时刻停在原处。
  * 口径与超级岛计时器组件一致：进度由本地时钟推算，对端无需按进度推送。
  *
+ * 记忆键取采样相关的标量而非整个会话：会话对象常由宿主逐帧重建，
+ * 键在对象上会让状态与计时协程每帧重启，进度在采样值与当前时刻之间反复跳动。
+ *
  * @param mediaSession 媒体会话。
+ * @param progressNowMs 外部时钟；为空时自建。
  * @returns 用于推算进度的当前时刻（epoch 毫秒）。
  */
 @Composable
-private fun rememberMediaProgressClock(mediaSession: MediaSessionData): Long {
-    val nowState = remember(mediaSession) { mutableLongStateOf(mediaSession.sampledAtMs.takeIf { it > 0L } ?: currentTimeMillis()) }
+private fun rememberMediaProgressClock(
+    mediaSession: MediaSessionData,
+    progressNowMs: Long?,
+): Long {
+    // 外部已在逐帧推进：不再自建秒表，避免两套时钟各写一次状态
+    if (progressNowMs != null) return progressNowMs
     val advancing = mediaSession.isPlaying && mediaSession.sampledAtMs > 0L && mediaSession.durationMs != null
-    LaunchedEffect(mediaSession, advancing) {
+    val nowState =
+        remember(mediaSession.sampledAtMs, mediaSession.positionMs, mediaSession.isPlaying) {
+            mutableLongStateOf(mediaSession.sampledAtMs.takeIf { it > 0L } ?: currentTimeMillis())
+        }
+    LaunchedEffect(mediaSession.sampledAtMs, mediaSession.positionMs, mediaSession.isPlaying, advancing) {
         if (!advancing) return@LaunchedEffect
         while (true) {
             nowState.longValue = currentTimeMillis()

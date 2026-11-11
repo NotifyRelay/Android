@@ -253,19 +253,22 @@ fun MusicControlPage(
         val sessionSnapshot = allSessions[selectedDevice?.uuid ?: LOCAL_SESSION_KEY]
         val deviceName = selectedDevice?.displayName ?: "本机"
         // 无会话时仍保留媒体块，以「暂无正在播放」占位，避免区域塌陷
+        // 按快照与设备名记忆：重启会话对象会让媒体卡内的进度时钟反复重置
         val mediaSession =
-            MediaSessionData(
-                packageName = sessionSnapshot?.packageName.orEmpty(),
-                appName = sessionSnapshot?.packageName,
-                title = sessionSnapshot?.title.orEmpty().ifBlank { "暂无正在播放" },
-                text = sessionSnapshot?.artist.orEmpty(),
-                coverUrl = sessionSnapshot?.coverUrl,
-                deviceName = deviceName,
-                positionMs = sessionSnapshot?.positionMs,
-                durationMs = sessionSnapshot?.durationMs,
-                isPlaying = sessionSnapshot?.isPlaying ?: false,
-                sampledAtMs = sessionSnapshot?.sampledAtMs ?: 0L,
-            )
+            remember(sessionSnapshot, deviceName) {
+                MediaSessionData(
+                    packageName = sessionSnapshot?.packageName.orEmpty(),
+                    appName = sessionSnapshot?.packageName,
+                    title = sessionSnapshot?.title.orEmpty().ifBlank { "暂无正在播放" },
+                    text = sessionSnapshot?.artist.orEmpty(),
+                    coverUrl = sessionSnapshot?.coverUrl,
+                    deviceName = deviceName,
+                    positionMs = sessionSnapshot?.positionMs,
+                    durationMs = sessionSnapshot?.durationMs,
+                    isPlaying = sessionSnapshot?.isPlaying ?: false,
+                    sampledAtMs = sessionSnapshot?.sampledAtMs ?: 0L,
+                )
+            }
 
         // 用 Card 承载浮窗内容，给出明确边界（媒体卡片自身背景为深色，落在浅色页面时需要边框区分）
         Card(

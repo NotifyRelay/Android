@@ -335,19 +335,23 @@ private fun OverlayMediaItem(
         userExpanded = false
     }
 
+    // 按快照记忆：本组件随帧时钟重组，逐帧新建会带上新的默认时间戳，
+    // 使下游以会话对象为键的记忆状态每帧失效
     val mediaSession =
-        MediaSessionData(
-            packageName = snapshot.packageName.orEmpty(),
-            appName = deviceName,
-            title = snapshot.title.orEmpty(),
-            text = snapshot.artist.orEmpty(),
-            coverUrl = snapshot.coverUrl,
-            deviceName = deviceName,
-            positionMs = snapshot.positionMs,
-            durationMs = snapshot.durationMs,
-            isPlaying = snapshot.isPlaying,
-            sampledAtMs = snapshot.sampledAtMs,
-        )
+        remember(snapshot) {
+            MediaSessionData(
+                packageName = snapshot.packageName.orEmpty(),
+                appName = deviceName,
+                title = snapshot.title.orEmpty(),
+                text = snapshot.artist.orEmpty(),
+                coverUrl = snapshot.coverUrl,
+                deviceName = deviceName,
+                positionMs = snapshot.positionMs,
+                durationMs = snapshot.durationMs,
+                isPlaying = snapshot.isPlaying,
+                sampledAtMs = snapshot.sampledAtMs,
+            )
+        }
 
     val mediaControl = DataLayerDesktop.mediaControl
     val onPlayPause: () -> Unit = {
@@ -413,6 +417,8 @@ private fun OverlayMediaItem(
             Box(Modifier.width(MEDIA_CARD_WIDTH)) {
                 MediaIslandCompose(
                     mediaSession = mediaSession,
+                    // 展开态与收起态共用同一帧时钟，进度推进口径一致
+                    progressNowMs = frameNow,
                     showControls = interactiveEnabled && controlsEnabled && userExpanded,
                     onPlayPause = onPlayPause,
                     onPrevious = onPrevious,
