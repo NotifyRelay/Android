@@ -2,8 +2,11 @@ package com.xzyht.notifyrelay.feature.notification.service
 
 import android.app.Notification
 import android.graphics.Bitmap
+import android.media.session.PlaybackState
 import android.service.notification.StatusBarNotification
 import android.util.Base64
+import com.xzyht.notifyrelay.feature.media.PlaybackStatePosition
+import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.superisland.media.MediaCapsulePresenter
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
 import com.xzyht.notifyrelay.sync.builder.MediaMessageBuilder
@@ -176,6 +179,23 @@ object MediaNotificationHandler {
 
         try {
             val appName = service.getAppName(sbn.packageName)
+            // 进度与播放态在推送时刻现取：缓存里的位置停在元数据回调那一刻，
+            // 用它配推送时刻会让接收端每轮把进度重置回旧位置。
+            val controller = MediaSessionMonitorService.instance?.getPrimaryController()
+            val live = controller?.takeIf { it.packageName == sbn.packageName }
+            val livePlayback = live?.playbackState
+            val livePosition =
+                PlaybackStatePosition
+                    .estimate(livePlayback, System.currentTimeMillis())
+                    .takeIf { it >= 0L } ?: mediaSessionData.position
+            // 控制器取不到时退回缓存判断，避免把未知当成暂停
+            val livePlaying =
+                if (live != null) livePlayback?.state == PlaybackState.STATE_PLAYING else mediaSessionData.isPlaying
+            val liveDuration =
+                live
+                    ?.metadata
+                    ?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION)
+                    ?.takeIf { it > 0L } ?: mediaSessionData.duration
             MediaMessageBuilder.sendMediaPlayNotification(
                 service.applicationContext,
                 sbn.packageName,
@@ -185,9 +205,9 @@ object MediaNotificationHandler {
                 finalCoverUrl,
                 sbn.postTime,
                 service.deviceManager,
-                isPlaying = mediaSessionData.isPlaying,
-                positionMs = mediaSessionData.position,
-                durationMs = mediaSessionData.duration,
+                isPlaying = livePlaying,
+                positionMs = livePosition,
+                durationMs = liveDuration,
                 songKey = mediaSessionData.songKey,
             )
         } catch (e: Exception) {

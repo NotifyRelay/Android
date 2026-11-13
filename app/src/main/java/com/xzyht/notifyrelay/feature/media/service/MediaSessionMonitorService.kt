@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.service.notification.NotificationListenerService
+import com.xzyht.notifyrelay.feature.media.PlaybackStatePosition
 import com.xzyht.notifyrelay.feature.media.lyric.LyricResolver
 import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
 import notifyrelay.base.log.Logger
@@ -171,7 +172,10 @@ class MediaSessionMonitorService(
                 ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ART)
         val artHash = artBitmap?.hashCode() ?: 0
 
-        val metadataHash = Objects.hash(rawTitle, rawArtist, pkg, duration, artHash)
+        // 播放态参与去重：暂停/恢复不改变元数据，只改状态，
+        // 不纳入就会一直沿用上一次的「播放中」判断。
+        val playbackState = controller.playbackState
+        val metadataHash = Objects.hash(rawTitle, rawArtist, pkg, duration, artHash, playbackState?.state)
 
         if (metadataHash == lastMetadataHash) {
             return
@@ -179,8 +183,8 @@ class MediaSessionMonitorService(
         lastMetadataHash = metadataHash
 
         // 歌词字段映射：歌词位于 title（多数应用）还是 artist（如 fnos 音乐）
-        val playbackState = controller.playbackState
-        val position = playbackState?.position ?: -1L
+        // 播放中按速度推进到此刻；快照本身不会随播放前进
+        val position = PlaybackStatePosition.estimate(playbackState, System.currentTimeMillis())
         val mediaId = metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_ID) ?: ""
         val recognition =
             lyricResolver.resolve(pkg, rawTitle ?: "", rawArtist ?: "", duration, mediaId, position)

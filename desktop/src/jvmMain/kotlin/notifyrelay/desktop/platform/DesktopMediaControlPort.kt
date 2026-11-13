@@ -14,6 +14,7 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import notifyrelay.base.log.Logger
+import notifyrelay.base.util.PlaybackPositionTracker
 import notifyrelay.data.Storage
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.media.MediaControlAction
@@ -67,6 +68,9 @@ class DesktopMediaControlPort(
 
     /** 本机会话的单曲识别器：与接收侧同一套口径，歌词在标题时不会误判换歌。 */
     private val recognizer = SongRecognizer()
+
+    /** 本机播放位置推算：SMTC 只给快照，播放中需按经过时间推进（与安卓共用公共实现）。 */
+    private val playbackPosition = PlaybackPositionTracker()
 
     /**
      * 各设备各自的会话。
@@ -212,6 +216,16 @@ class DesktopMediaControlPort(
     /** 读取一次本机会话并更新状态。 */
     private fun refresh() {
         val snapshot = DesktopMediaSessionSource.read()
+        val readAt = System.currentTimeMillis()
+        // SMTC 的位置是快照：按经过时间推进到本次读数时刻，
+        // 否则每轮上报都会把接收端的基准重置回旧位置
+        val estimatedPosition =
+            playbackPosition.estimate(
+                reportedPositionMs = snapshot?.positionMs ?: -1L,
+                playing = snapshot?.playing == true,
+                nowMs = readAt,
+            )
+        if (snapshot == null) playbackPosition.reset()
         val mapped =
             snapshot?.let {
                 val sourceAppId = it.sourceAppId.orEmpty()
@@ -224,8 +238,8 @@ class DesktopMediaControlPort(
                                 artist = it.artist.orEmpty(),
                                 durationMs = it.durationMs,
                                 mediaId = "",
-                                positionMs = it.positionMs,
-                                nowMs = System.currentTimeMillis(),
+                                positionMs = estimatedPosition,
+                                nowMs = readAt,
                             ).songKey
                     }
                 MediaSessionSnapshot(
@@ -233,10 +247,10 @@ class DesktopMediaControlPort(
                     title = it.title,
                     artist = it.artist,
                     coverUrl = it.coverDataUrl,
-                    positionMs = it.positionMs,
+                    positionMs = estimatedPosition.takeIf { position -> position >= 0L },
                     durationMs = it.durationMs.takeIf { duration -> duration > 0L },
                     isPlaying = it.playing,
-                    sampledAtMs = if (it.durationMs > 0L) System.currentTimeMillis() else 0L,
+                    sampledAtMs = if (estimatedPosition >= 0L) readAt else 0L,
                     songKey = songKey,
                 )
             }
@@ -321,6 +335,9 @@ class DesktopMediaControlPort(
     private fun buildMediaFullContent(snapshot: MediaSessionSnapshot): String {
         val pkg = snapshot.packageName.orEmpty()
         val now = System.currentTimeMillis()
+        // 位置是在 [MediaSessionSnapshot.sampledAtMs] 采样并推算到那一刻的：
+        // 计时字段必须用同一个时刻，否则对端会把位置错配到更晚的基准上
+        val sampledAt = snapshot.sampledAtMs.takeIf { it > 0L } ?: now
         val position = snapshot.positionMs
         val total = snapshot.durationMs
         return buildJsonObject {
@@ -335,9 +352,9 @@ class DesktopMediaControlPort(
             put("isPlaying", JsonPrimitive(snapshot.isPlaying))
             if (position != null && position >= 0L && total != null && total > 0L) {
                 put("timerType", JsonPrimitive(if (snapshot.isPlaying) 1 else 2))
-                put("timerWhen", JsonPrimitive(now - position))
+                put("timerWhen", JsonPrimitive(sampledAt - position))
                 put("timerTotal", JsonPrimitive(total))
-                put("timerSystemCurrent", JsonPrimitive(now))
+                put("timerSystemCurrent", JsonPrimitive(sampledAt))
             }
         }.toString()
     }

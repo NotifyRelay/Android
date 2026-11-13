@@ -16,7 +16,9 @@ Status: implemented
 
 基准换算取自历史实现的 `ApplyTimerBase`，提取为 `:base` 的 `TimerClock.rebase`：对端的「归零时刻」与「采样时刻」都是对端时钟，只有两者的差值是与时钟原点无关的已计时长；接收端以本地采样时刻重算归零时刻。直接拿对端时间戳当基准会把两端时钟偏差算进进度，表现为播放中偏大、暂停时回落到真实值。超级岛的 `formatTimerInfo` 与安卓、桌面两个媒体接收端都调用这一个函数，不再各写一份换算。远端超级岛的换算统一用「内容在本地被接收的时刻」：安卓侧由 `SuperIslandSourceStore` 在内容入库时登记，浮窗经 `LocalSuperIslandReceivedAtMs` 下发，系统通知复刻的 chronometer 与胶囊文本也从同一登记值换算；桌面上报条目的 `updatedAt` 即接收时刻。本地内容的接收时刻与采样时刻同钟，换算退化为恒等。
 
-上报触发只有两类：换曲与固定周期。换曲的判定口径见[单曲识别下沉到公共端并随报文携带歌曲身份](2026-11-13-shared-song-recognition.md)，不用标题。固定周期沿用既有节奏——安卓走 Rust 媒体心跳（6 秒）与状态查询回调，桌面端由 `DesktopMediaControlPort` 每秒轮询 SMTC、每 6 秒或换曲时推送。播放态翻转另算一次变更：暂停与恢复必须传播，否则接收端会继续按旧基准推进。
+报文里的位置必须是「推送时刻的位置」。平台给的播放位置多是快照（安卓 `PlaybackState.position`、桌面 SMTC `TimelineProperties.Position`），只在状态变更时刷新；把它配推送时刻会让接收端每轮重算基准都退回旧位置，表现为进度涨到某处又回落。发送端因此在推送时刻把位置推进到此刻，实现在 `:base` 的 `PlaybackPosition`：能拿到快照时刻与速率的用 `predict`（安卓由 `PlaybackStatePosition` 把 `lastPositionUpdateTime` 换算到 epoch 后调用），只能轮询读数的用 `PlaybackPositionTracker`（读数变化处建基准，未变化时按经过时间推进，桌面 SMTC 即如此）。
+
+上报触发只有两类：换曲与固定周期。换曲的判定口径见[单曲识别下沉到公共端并随报文携带歌曲身份](2026-11-13-shared-song-recognition.md)，不用标题。固定周期沿用既有节奏——安卓走 Rust 媒体心跳（6 秒）与状态查询回调，桌面端由 `DesktopMediaControlPort` 每秒轮询 SMTC、每 6 秒或换曲时推送。播放态翻转另算一次变更：暂停与恢复必须传播，否则接收端会继续按旧基准推进；安卓的去重键因此把 `PlaybackState.state` 纳入，状态变化即触发一次上报，两条上报路径都在推送时现取位置、播放态与时长。
 
 桌面端补齐了此前缺失的上报链路：本机会话经 `DATA_MEDIAPLAY` 推给在线设备，与安卓同一条通道、同一个合并引擎。接收侧在报文入口按「接收媒体消息」三档判定，仅音频档要求正在接收音频；上报受「发送媒体通知到它端」开关控制。
 
