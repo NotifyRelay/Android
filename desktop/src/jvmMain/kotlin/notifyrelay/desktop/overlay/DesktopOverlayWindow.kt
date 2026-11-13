@@ -319,23 +319,20 @@ private fun OverlayMediaItem(
     // 换曲判定优先用歌曲身份：歌词在标题的应用其标题每句都变，
     // 按标题判定会把每句歌词当成换曲，重新展开并重置进度基准。
     val trackKey = snapshot.songKey ?: (snapshot.title.orEmpty() + "\u0001" + snapshot.artist.orEmpty())
-    var expanded by remember { mutableStateOf(true) }
+    val cardKey = deviceUuid
     // 展开是否由用户点开：换曲与首次出现均为自动展开，操作按钮只对用户点开的展开显示
     var userExpanded by remember { mutableStateOf(false) }
-    var expandGeneration by remember { mutableLongStateOf(0L) }
     // 设置项按版本号重取：否则改动后要等条目重建才生效
     val settingsRevision = DesktopOverlaySettings.revision.value
     val collapseMs = remember(settingsRevision) { DesktopOverlaySettings.mediaAutoCollapseMs }
     val controlsEnabled = remember(settingsRevision) { DesktopOverlaySettings.mediaControlsEnabled }
-    LaunchedEffect(trackKey) {
+    // 展开截止时刻存在组合之外：本组件随帧时钟重组，录制场景也可能重建，
+    // 用组合内的延时协程收起会在重建时被重新拉起，表现为永远展开
+    LaunchedEffect(cardKey, trackKey, settingsRevision) {
+        MediaCardExpansion.begin(cardKey, trackKey, System.currentTimeMillis(), collapseMs)
         userExpanded = false
     }
-    LaunchedEffect(trackKey, expandGeneration, collapseMs) {
-        expanded = true
-        delay(collapseMs)
-        expanded = false
-        userExpanded = false
-    }
+    val expanded = MediaCardExpansion.isExpanded(cardKey, trackKey, frameNow)
 
     // 按快照记忆：本组件随帧时钟重组，逐帧新建会带上新的默认时间戳，
     // 使下游以会话对象为键的记忆状态每帧失效
@@ -386,7 +383,10 @@ private fun OverlayMediaItem(
 
     val regionKey = "media-" + deviceUuid
     DisposableEffect(regionKey) {
-        onDispose { regions.remove(regionKey) }
+        onDispose {
+            regions.remove(regionKey)
+            MediaCardExpansion.forget(cardKey)
+        }
     }
     val regionModifier =
         if (interactiveEnabled) {
@@ -421,7 +421,7 @@ private fun OverlayMediaItem(
                     mediaSession = mediaSession,
                     // 展开态与收起态共用同一帧时钟，进度推进口径一致
                     progressNowMs = frameNow,
-                    showControls = interactiveEnabled && controlsEnabled && userExpanded,
+                    showControls = interactiveEnabled && controlsEnabled && userExpanded && expanded,
                     onPlayPause = onPlayPause,
                     onPrevious = onPrevious,
                     onNext = onNext,
@@ -433,9 +433,9 @@ private fun OverlayMediaItem(
                 Modifier.then(
                     if (interactiveEnabled) {
                         Modifier.clickable {
+                            // 用户点开：延长截止时刻并显示操作按钮
                             userExpanded = true
-                            expanded = true
-                            expandGeneration++
+                            MediaCardExpansion.extend(cardKey, trackKey, System.currentTimeMillis(), collapseMs)
                         }
                     } else {
                         Modifier
