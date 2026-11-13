@@ -10,6 +10,8 @@ import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.media.MediaControlAction
 import notifyrelay.domain.feature.media.MediaMessageReceiveMode
 import notifyrelay.domain.feature.media.MediaSessionSnapshot
+import notifyrelay.domain.feature.media.lyric.SongRecognizer
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 桌面端远端媒体报文处理。
@@ -23,6 +25,13 @@ internal object DesktopMediaRemoteHandler {
     private const val TAG = "DesktopMedia"
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    /**
+     * 各设备的单曲识别器：对端未带歌曲身份时用同一套公共识别兜底。
+     *
+     * 按设备分开，避免不同设备同名包互相污染字段学习状态。
+     */
+    private val recognizers = ConcurrentHashMap<String, SongRecognizer>()
 
     /** 处理远端播放状态回推。 */
     fun onMediaPlay(
@@ -61,17 +70,41 @@ internal object DesktopMediaRemoteHandler {
 
         // 进度由 core 归一为计时器口径：timerWhen 是位置归零时刻、timerSystemCurrent 是采样时刻。
         // 这里换回「采样位置 + 采样时刻」，由显示侧按本地时钟推进。
+        // 歌曲身份：对端直接给出时优先采用；缺失时由公共识别器按同一套口径兜底，
+        // 使歌词在标题的应用不会因每句歌词而被当成换歌。
+        val payloadSongKey = root.stringField("songKey")
         val timerTotal = root.longField("timerTotal")
         val timerWhen = root.longField("timerWhen")
         val timerSystemCurrent = root.longField("timerSystemCurrent")
         val hasProgress = timerTotal > 0L && timerWhen > 0L && timerSystemCurrent >= timerWhen
 
+        val title = root.stringField("title")
+        val artist = root.stringField("text")
+        val songKey =
+            payloadSongKey ?: run {
+                val recognizer = recognizers.computeIfAbsent(device.uuid) { SongRecognizer() }
+                val position = if (hasProgress) (timerSystemCurrent - timerWhen).coerceIn(0L, timerTotal) else -1L
+                synchronized(recognizer) {
+                    recognizer
+                        .observe(
+                            sourceKey = root.stringField("packageName").orEmpty(),
+                            title = title.orEmpty(),
+                            artist = artist.orEmpty(),
+                            durationMs = timerTotal,
+                            mediaId = "",
+                            positionMs = position,
+                            nowMs = System.currentTimeMillis(),
+                        ).songKey
+                }
+            }
+
         val snapshot =
             MediaSessionSnapshot(
                 packageName = root.stringField("packageName"),
-                title = root.stringField("title"),
-                artist = root.stringField("text"),
+                title = title,
+                artist = artist,
                 coverUrl = root.stringField("coverImage"),
+                songKey = songKey,
                 positionMs = if (hasProgress) (timerSystemCurrent - timerWhen).coerceIn(0L, timerTotal) else null,
                 durationMs = if (hasProgress) timerTotal else null,
                 isPlaying = root.intField("timerType") == 1,

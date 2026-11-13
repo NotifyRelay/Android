@@ -316,7 +316,9 @@ private fun OverlayMediaItem(
     frameNow: Long,
     regions: androidx.compose.runtime.snapshots.SnapshotStateMap<String, Rectangle>,
 ) {
-    val trackKey = snapshot.title.orEmpty() + "\u0001" + snapshot.artist.orEmpty()
+    // 换曲判定优先用歌曲身份：歌词在标题的应用其标题每句都变，
+    // 按标题判定会把每句歌词当成换曲，重新展开并重置进度基准。
+    val trackKey = snapshot.songKey ?: (snapshot.title.orEmpty() + "\u0001" + snapshot.artist.orEmpty())
     var expanded by remember { mutableStateOf(true) }
     // 展开是否由用户点开：换曲与首次出现均为自动展开，操作按钮只对用户点开的展开显示
     var userExpanded by remember { mutableStateOf(false) }

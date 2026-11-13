@@ -10,7 +10,7 @@ KMP 领域层，全部位于 `commonMain`，只依赖 `:base`。包根 `notifyre
 | `feature/device/service/callback` | `HandshakeRequestHandler` |
 | `feature/device/service/pairing` | `HandshakeWaiterRegistry` |
 | `feature/device/pairing` | `PairingCorePort` |
-| `feature/media` | `AudioRelayPort`（+ Registry）、`MediaControlPort`（+ Registry）、`MediaMessageReceiveMode` |
+| `feature/media` | `AudioRelayPort`（+ Registry）、`MediaControlPort`（+ Registry）、`MediaMessageReceiveMode`；`lyric/` 的 `SongRecognizer` 与歌词状态 |
 | `feature/notification/filter` | `FilterEntry`、`LocalFilterPort`（+ Registry）、`RemoteFilterPort`（+ Registry） |
 | `feature/notification/history` | `NotificationHistoryPort`、`SuperIslandHistoryPort`（+ 各自 Registry）、`NotificationHistoryModels`、`AppIconInfo` |
 | `feature/notification/superisland` | `SuperIslandConfigPort`（+ Registry）、`SpecInjectionMode` |

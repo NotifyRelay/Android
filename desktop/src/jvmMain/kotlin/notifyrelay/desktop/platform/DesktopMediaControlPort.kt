@@ -20,6 +20,7 @@ import notifyrelay.domain.feature.media.MediaControlAction
 import notifyrelay.domain.feature.media.MediaControlPort
 import notifyrelay.domain.feature.media.MediaMessageReceiveMode
 import notifyrelay.domain.feature.media.MediaSessionSnapshot
+import notifyrelay.domain.feature.media.lyric.SongRecognizer
 
 /**
  * 桌面端媒体控制端口。
@@ -63,6 +64,9 @@ class DesktopMediaControlPort(
     }
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** 本机会话的单曲识别器：与接收侧同一套口径，歌词在标题时不会误判换歌。 */
+    private val recognizer = SongRecognizer()
 
     /**
      * 各设备各自的会话。
@@ -210,6 +214,20 @@ class DesktopMediaControlPort(
         val snapshot = DesktopMediaSessionSource.read()
         val mapped =
             snapshot?.let {
+                val sourceAppId = it.sourceAppId.orEmpty()
+                val songKey =
+                    synchronized(recognizer) {
+                        recognizer
+                            .observe(
+                                sourceKey = sourceAppId,
+                                title = it.title.orEmpty(),
+                                artist = it.artist.orEmpty(),
+                                durationMs = it.durationMs,
+                                mediaId = "",
+                                positionMs = it.positionMs,
+                                nowMs = System.currentTimeMillis(),
+                            ).songKey
+                    }
                 MediaSessionSnapshot(
                     packageName = it.sourceAppId,
                     title = it.title,
@@ -219,6 +237,7 @@ class DesktopMediaControlPort(
                     durationMs = it.durationMs.takeIf { duration -> duration > 0L },
                     isPlaying = it.playing,
                     sampledAtMs = if (it.durationMs > 0L) System.currentTimeMillis() else 0L,
+                    songKey = songKey,
                 )
             }
         // 本机会话单独占一个键，不与远端设备的会话互相覆盖
@@ -252,12 +271,14 @@ class DesktopMediaControlPort(
             if (localStatePublished) publishEnd()
             return
         }
+        // 换曲判定用歌曲身份：歌词在标题的应用其标题每句都变，按标题会逐句上报
         val signature =
-            listOf(
-                mapped.title.orEmpty(),
-                mapped.artist.orEmpty(),
-                (mapped.durationMs ?: 0L).toString(),
-            ).joinToString("")
+            mapped.songKey
+                ?: listOf(
+                    mapped.title.orEmpty(),
+                    mapped.artist.orEmpty(),
+                    (mapped.durationMs ?: 0L).toString(),
+                ).joinToString("")
         val now = System.currentTimeMillis()
         val changed = signature != lastPushedTrack
         val due = now - lastPushedAt >= PUSH_INTERVAL_MS
@@ -308,6 +329,8 @@ class DesktopMediaControlPort(
             put("title", JsonPrimitive(snapshot.title.orEmpty()))
             put("text", JsonPrimitive(snapshot.artist.orEmpty()))
             put("coverUrl", JsonPrimitive(snapshot.coverUrl.orEmpty()))
+            // 歌曲身份随报文下发：对端据此判定换曲，不受歌词滚动影响
+            snapshot.songKey?.takeIf { it.isNotBlank() }?.let { put("songKey", JsonPrimitive(it)) }
             put("time", JsonPrimitive(now))
             put("isPlaying", JsonPrimitive(snapshot.isPlaying))
             if (position != null && position >= 0L && total != null && total > 0L) {

@@ -41,6 +41,7 @@ object MediaNotificationHandler {
         artBitmap: Any?,
         position: Long = -1L,
         isPlaying: Boolean = false,
+        songKey: String? = null,
     ) {
         Logger.i(TAG, "Received MediaSession update: $packageName - $title")
 
@@ -55,6 +56,7 @@ object MediaNotificationHandler {
                 timestamp = System.currentTimeMillis(),
                 position = position,
                 isPlaying = isPlaying,
+                songKey = songKey,
             )
         mediaSessionDataCache[packageName] = mediaSessionData
 
@@ -186,6 +188,7 @@ object MediaNotificationHandler {
                 isPlaying = mediaSessionData.isPlaying,
                 positionMs = mediaSessionData.position,
                 durationMs = mediaSessionData.duration,
+                songKey = mediaSessionData.songKey,
             )
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放消息失败", e)
@@ -220,5 +223,7 @@ object MediaNotificationHandler {
         val position: Long = -1L,
         /** 采样时的播放态。 */
         val isPlaying: Boolean = false,
+        /** 公共识别器给出的歌曲身份：歌词滚动期间保持不变，供对端判定换曲。 */
+        val songKey: String? = null,
     )
 }

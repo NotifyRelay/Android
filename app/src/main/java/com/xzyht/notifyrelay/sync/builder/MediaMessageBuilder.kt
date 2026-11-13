@@ -39,6 +39,7 @@ object MediaMessageBuilder {
         isPlaying: Boolean = true,
         positionMs: Long = -1L,
         durationMs: Long = 0L,
+        songKey: String? = null,
     ): String {
         val isLocked = PermissionHelper.isDeviceLocked(context)
         return JSONObject()
@@ -51,6 +52,8 @@ object MediaMessageBuilder {
                 put("time", time)
                 put("isLocked", isLocked)
                 put("isPlaying", isPlaying)
+                // 歌曲身份：歌词滚动只改展示文本，对端据此判定换曲与否
+                if (!songKey.isNullOrBlank()) put("songKey", songKey)
                 if (positionMs >= 0 && durationMs > 0) {
                     val sampledAt = System.currentTimeMillis()
                     put("timerType", if (isPlaying) 1 else 2)
@@ -78,6 +81,7 @@ object MediaMessageBuilder {
         isPlaying: Boolean = true,
         positionMs: Long = -1L,
         durationMs: Long = 0L,
+        songKey: String? = null,
     ) {
         try {
             // 推送「全量」媒体状态：差异计算（FULL/DELTA）、合并与 ACK 均由 Rust 合并引擎负责。
@@ -96,6 +100,7 @@ object MediaMessageBuilder {
                     isPlaying = isPlaying,
                     positionMs = positionMs,
                     durationMs = durationMs,
+                    songKey = songKey,
                 )
 
             SendGateway.getAuthenticatedDevices(deviceManager).forEach { device ->

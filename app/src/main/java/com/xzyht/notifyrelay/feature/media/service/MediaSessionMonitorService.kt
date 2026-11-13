@@ -52,8 +52,17 @@ class MediaSessionMonitorService(
     private val lyricResolver =
         LyricResolver(
             handler = handler,
-            onMediaSessionUpdated = { pkg, title, artist, duration, artBitmap ->
-                NotifyRelayNotificationListenerService.onMediaSessionUpdated(pkg, title, artist, duration, artBitmap)
+            onRecognized = { pkg, recognition, artBitmap, position, isPlaying ->
+                NotifyRelayNotificationListenerService.onMediaSessionUpdated(
+                    pkg,
+                    recognition.displayTitle,
+                    recognition.displayArtist,
+                    recognition.durationMs,
+                    artBitmap,
+                    position,
+                    isPlaying,
+                    recognition.songKey,
+                )
             },
             getPrimaryController = { getPrimaryController() },
         )
@@ -173,19 +182,20 @@ class MediaSessionMonitorService(
         val playbackState = controller.playbackState
         val position = playbackState?.position ?: -1L
         val mediaId = metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_ID) ?: ""
-        val (mappedTitle, mappedArtist) =
-            lyricResolver.resolveLyricField(pkg, rawTitle ?: "", rawArtist ?: "", duration, mediaId, position)
+        val recognition =
+            lyricResolver.resolve(pkg, rawTitle ?: "", rawArtist ?: "", duration, mediaId, position)
 
         // 通知 NotifyRelayNotificationListenerService 有新的媒体会话数据。
         // 位置与播放态随元数据一并采样：接收端据此本地推进进度，发送端无需按进度高频推送。
         NotifyRelayNotificationListenerService.onMediaSessionUpdated(
             pkg,
-            mappedTitle,
-            mappedArtist,
-            duration,
+            recognition.displayTitle,
+            recognition.displayArtist,
+            recognition.durationMs,
             artBitmap,
             position,
             playbackState?.state == PlaybackState.STATE_PLAYING,
+            recognition.songKey,
         )
     }
 }

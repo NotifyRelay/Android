@@ -19,6 +19,12 @@ data class MediaSessionSnapshot(
     val isPlaying: Boolean = false,
     /** [positionMs] 的采样时刻（epoch 毫秒）；0 表示未标注，进度不随时间推进。 */
     val sampledAtMs: Long = 0L,
+    /**
+     * 歌曲身份：同一首歌在歌词滚动期间保持不变。
+     *
+     * 为 null 时调用方需退回按标题/歌手判定换曲，歌词在标题的应用会因此误判。
+     */
+    val songKey: String? = null,
 ) {
     /**
      * 按计时器口径推算 [nowMs] 时刻的播放位置。

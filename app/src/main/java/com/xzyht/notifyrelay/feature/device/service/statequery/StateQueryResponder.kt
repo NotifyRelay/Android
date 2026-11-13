@@ -178,10 +178,10 @@ class StateQueryResponder(
                 }
                 cachedMediaCoverUrl
             }
-        // 轻量比较键：标题/艺术家/封面变化与播放态翻转才重新构造 fullJson 并推送。
-        // 进度不进比较键：播放位置本就随查询增值，纳入会让每次查询都判为有变更并触发推送；
-        // 播放态必须纳入，否则暂停/恢复不会传播，接收端会继续按旧基准推进。
-        val lightKey = "$pkg|${mediaData.title}|${mediaData.artist}|${mediaData.isPlaying}|$coverUrl"
+        // 轻量比较键：歌曲身份、封面或播放态变化才重新构造 fullJson 并推送。
+        // 标题不进比较键：歌词在标题的应用其标题每句都变，纳入会让查询每次都判为有变更；
+        // 进度也不进：播放位置本就随查询增值；播放态必须纳入，否则暂停/恢复不会传播。
+        val lightKey = "$pkg|${mediaData.songKey}|${mediaData.isPlaying}|$coverUrl"
         val cacheKey = "$remoteUuid|$featureId"
         if (stateQueryKeys[cacheKey] == lightKey) return 1 // 存在无变更，保活等待下次查询
         val content =
@@ -196,6 +196,7 @@ class StateQueryResponder(
                 isPlaying = mediaData.isPlaying,
                 positionMs = mediaData.position,
                 durationMs = mediaData.duration,
+                songKey = mediaData.songKey,
             )
         // 仅当原生入队成功才写入比较键并返回“有变更”，否则保留原键以便下次查询重试
         val dispatched =
