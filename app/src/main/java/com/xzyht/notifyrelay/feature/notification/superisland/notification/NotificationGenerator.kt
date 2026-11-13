@@ -52,6 +52,31 @@ object NotificationGenerator {
     }
 
     /**
+     * 组装一条复刻通知的展示内容。
+     *
+     * 接收时刻取来源存储的登记值：同一份内容无论走通用还是媒体分支、
+     * 是否因滚动而重建，计时器都用同一个本地基准。
+     */
+    private fun replicaContentFor(
+        sourceId: String,
+        title: String?,
+        text: String?,
+        appName: String?,
+        paramV2: ParamV2?,
+        paramV2Raw: String?,
+        picMap: Map<String, String>?,
+    ): ReplicaContent =
+        ReplicaContent(
+            title = title,
+            text = text,
+            appName = appName,
+            paramV2Raw = paramV2Raw,
+            picMap = picMap,
+            paramV2 = paramV2,
+            localSampleMs = SuperIslandSourceStore.receivedAtOf(sourceId) ?: System.currentTimeMillis(),
+        )
+
+    /**
      * 发送复刻通知，与原通知保持一致
      * @return 通知ID，如果发送失败则返回null
      */
@@ -157,12 +182,7 @@ object NotificationGenerator {
                     MediaReplicaNotifier.build(
                         context = context,
                         builder = builder,
-                        title = title,
-                        text = text,
-                        appName = appName,
-                        paramV2Raw = paramV2Raw,
-                        picMap = picMap,
-                        paramV2 = paramV2,
+                        content = replicaContentFor(sourceId, title, text, appName, paramV2, paramV2Raw, picMap),
                         key = key,
                         notificationId = notificationId,
                         notificationManager = notificationManager,
@@ -191,12 +211,7 @@ object NotificationGenerator {
                     GeneralReplicaNotifier.build(
                         context = context,
                         builder = builder,
-                        title = title,
-                        text = text,
-                        appName = appName,
-                        paramV2Raw = paramV2Raw,
-                        picMap = picMap,
-                        paramV2 = paramV2,
+                        content = replicaContentFor(sourceId, title, text, appName, paramV2, paramV2Raw, picMap),
                         key = key,
                     )
 

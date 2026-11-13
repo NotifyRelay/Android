@@ -11,6 +11,7 @@ import github.xzynine.superislandui.floating.smallisland.right.BSameWidthDigitIn
 import github.xzynine.superislandui.floating.smallisland.right.bPicKey
 import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.log.Logger
+import notifyrelay.base.util.TimerClock
 
 /**
  * 非媒体类型复刻通知构建。
@@ -42,14 +43,16 @@ internal object GeneralReplicaNotifier {
     suspend fun build(
         context: Context,
         builder: NotificationCompat.Builder,
-        title: String?,
-        text: String?,
-        appName: String?,
-        paramV2Raw: String?,
-        picMap: Map<String, String>?,
-        paramV2: ParamV2?,
+        content: ReplicaContent,
         key: String,
     ): Notification {
+        val title = content.title
+        val text = content.text
+        val appName = content.appName
+        val paramV2 = content.paramV2
+        val picMap = content.picMap
+        val paramV2Raw = content.paramV2Raw
+        val localSampleMs = content.localSampleMs
         // 使用已解析的 paramV2 中的组件数据，避免重复解析
         val bigIslandArea = paramV2?.paramIsland?.bigIslandArea
         val aComponent = bigIslandArea?.aComponent
@@ -126,27 +129,25 @@ internal object GeneralReplicaNotifier {
                     val isCountDown = timerType < 0
 
 // 使用NotificationCompat的计时器功能
+                    // 基准换算到本地时钟：两个时间戳都取发送端时钟，直接交给系统计时
+                    // 会把两端时钟偏差显示出来
+                    val base = TimerClock.rebase(timerType, timer.timerWhen, timer.timerSystemCurrent, localSampleMs)
+                    val localWhen = base?.whenMs ?: timer.timerWhen
                     if (isCountDown) {
-                        // 倒计时：计算剩余时间并设置chronometer自动倒计时
-                        val now = System.currentTimeMillis()
-                        val remaining = timer.timerWhen - now
-                        remaining.let {
-                            if (it > 0) {
-                                // 对于倒计时，设置chronometer自动倒计时
-                                builder.setUsesChronometer(true)
-                                builder.setChronometerCountDown(true)
-                                builder.setShowWhen(true) // 确保显示时间
-                                // 设置倒计时的终点时间
-                                timer.let { builder.setWhen(it.timerWhen) }
-                            }
+                        // 倒计时：chronometer 以终点时刻为 when 自动倒计时
+                        val remaining = localWhen - System.currentTimeMillis()
+                        if (remaining > 0) {
+                            builder.setUsesChronometer(true)
+                            builder.setChronometerCountDown(true)
+                            builder.setShowWhen(true) // 确保显示时间
+                            builder.setWhen(localWhen)
                         }
                     } else {
-                        // 正计时：使用timerWhen作为起点
+                        // 正计时：chronometer 以起点时刻为 when 自动累计
                         builder.setUsesChronometer(true)
                         builder.setChronometerCountDown(false)
                         builder.setShowWhen(true) // 确保显示时间
-                        // 设置正计时的起点时间
-                        timer.let { builder.setWhen(it.timerWhen) }
+                        builder.setWhen(localWhen)
                     }
                 }
             }
@@ -164,16 +165,12 @@ internal object GeneralReplicaNotifier {
                 // 非进度类型通知，或超级岛模式下（含进度类型）的通知：添加胶囊兼容字段并注入图标
                 val builtNotification =
                     ReplicaSmallIconInjector.buildCapsuleCompatibleNotificationWithIconInjection(
-                        context,
-                        builder,
-                        title,
-                        text,
-                        appName,
-                        picMap,
-                        paramV2Raw,
-                        aComponent,
-                        bComponent,
-                        isTimerType,
+                        context = context,
+                        builder = builder,
+                        content = content,
+                        aComponent = aComponent,
+                        bComponent = bComponent,
+                        isTimerType = isTimerType,
                     )
                 builtNotification
             } else {

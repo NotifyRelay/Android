@@ -13,6 +13,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import notifyrelay.base.log.Logger
+import notifyrelay.base.util.TimerClock
 import notifyrelay.data.Storage
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.device.service.contract.DeviceAuthTablePort
@@ -216,13 +217,25 @@ object RemoteMediaSessionManager {
             // 进度按超级岛计时器口径：总时长决定能否推进，timerWhen 为位置归零时刻。
             // 接收端按本地时钟推算，发送端只在标题/专辑变更与固定周期推送。
             val timerTotal = parsed.optLong("timerTotal", 0L)
-            val timerWhen = parsed.optLong("timerWhen", 0L)
-            val timerSystemCurrent = parsed.optLong("timerSystemCurrent", 0L)
-            val hasProgress = timerTotal > 0L && timerWhen > 0L && timerSystemCurrent >= timerWhen
-            val progressPositionMs = if (hasProgress) (timerSystemCurrent - timerWhen).coerceIn(0L, timerTotal) else null
-            val progressPlaying = parsed.optInt("timerType", 0) == 1
-            val progressSampledAt = if (hasProgress) timerSystemCurrent else 0L
-            val progressDurationMs = if (hasProgress) timerTotal else null
+            // 基准换算到本地时钟（与超级岛计时器同一实现）：对端两个时间戳之差是已计时长，
+            // 直接拿对端时间戳当基准会把两端时钟偏差算进进度，播放时偏大、暂停时回落到真实值。
+            val progressTimerType = parsed.optInt("timerType", 0)
+            val progressBase =
+                if (timerTotal > 0L) {
+                    TimerClock.rebase(
+                        progressTimerType,
+                        parsed.optLong("timerWhen", 0L),
+                        parsed.optLong("timerSystemCurrent", 0L),
+                        System.currentTimeMillis(),
+                    )
+                } else {
+                    null
+                }
+            val progressPositionMs = progressBase?.let { (it.currentMs - it.whenMs).coerceIn(0L, timerTotal) }
+            val progressPlaying = progressTimerType == 1
+            val progressSampledAt = progressBase?.currentMs ?: 0L
+            val progressDurationMs = if (progressPositionMs != null) timerTotal else null
+            val hasProgress = progressPositionMs != null
 
             if (title.isBlank() && text.isBlank()) {
                 Logger.w("RemoteMediaSessionManager", "收到空的媒体会话数据，继续处理以保持浮窗活跃")

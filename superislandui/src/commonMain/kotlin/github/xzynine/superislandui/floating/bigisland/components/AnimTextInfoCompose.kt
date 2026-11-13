@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import github.xzynine.superislandui.common.LocalSuperIslandReceivedAtMs
 import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.floating.common.resolveIconUrl
@@ -84,19 +85,22 @@ fun AnimTextInfoCompose(
             // secondary = content ?: (title!=null && formattedTimer!=null ? formattedTimer : null)
 
             val hasTimer = animTextInfo.timerInfo != null
+            // 基准按接收时刻换算到本地时钟，远端内容的时钟偏差不进入显示值
+            val receivedAtMs = LocalSuperIslandReceivedAtMs.current
+            val timerSampleMs = receivedAtMs ?: animTextInfo.timerInfo?.timerSystemCurrent
             val timerState =
-                remember(animTextInfo.timerInfo) {
+                remember(animTextInfo.timerInfo, timerSampleMs) {
                     mutableStateOf(
-                        animTextInfo.timerInfo?.let { formatTimerInfo(it) },
+                        animTextInfo.timerInfo?.let { formatTimerInfo(it, timerSampleMs ?: it.timerSystemCurrent) },
                     )
                 }
             if (hasTimer) {
                 // 仅计时进行中（正计时 timerType=1 / 倒计时 timerType=-1）才每秒刷新，暂停/无效类型静态显示
                 val isTimerRunning = animTextInfo.timerInfo.timerType == 1 || animTextInfo.timerInfo.timerType == -1
-                LaunchedEffect(animTextInfo.timerInfo) {
+                LaunchedEffect(animTextInfo.timerInfo, timerSampleMs) {
                     if (!isTimerRunning) return@LaunchedEffect
                     while (true) {
-                        timerState.value = formatTimerInfo(animTextInfo.timerInfo)
+                        timerState.value = formatTimerInfo(animTextInfo.timerInfo, timerSampleMs ?: animTextInfo.timerInfo.timerSystemCurrent)
                         delay(1000)
                     }
                 }

@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.key
 import androidx.compose.runtime.remember
@@ -15,6 +16,7 @@ import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalContext
 import com.xzyht.notifyrelay.feature.clipboard.ClipboardSyncManager
 import com.xzyht.notifyrelay.feature.device.service.DeviceConnectionManagerSingleton
+import github.xzynine.superislandui.common.LocalSuperIslandReceivedAtMs
 import github.xzynine.superislandui.floating.bigisland.components.SuperIslandTemplateCompose
 import github.xzynine.superislandui.floating.common.SUPER_ISLAND_CARD_CORNER_RADIUS
 import github.xzynine.superislandui.floating.common.SuperIslandExpandableCard
@@ -49,6 +51,8 @@ data class FloatingEntry(
     val appName: String? = null,
     /** 媒体进度；仅媒体条目非空。 */
     val mediaProgress: MediaProgress? = null,
+    /** 本条内容在本地被接收的时刻：计时器据此把基准换算到本地时钟。 */
+    val receivedAtMs: Long = 0L,
     val isOverlapping: Boolean = false,
     val height: Int = 0, // 实际高度，由Compose组件测量后设置
 )
@@ -177,42 +181,48 @@ fun FloatingWindowContainer(
                     val fallbackTitle = entry.title?.takeIf { it.isNotBlank() }
                     val fallbackContent = entry.appName?.takeIf { it.isNotBlank() }
 
-                    // 展开与收起共用折叠态底色：背景由容器单层绘制，组件自身不再画表面
-                    SuperIslandExpandableCard(
-                        expanded = entry.isExpanded,
-                        expandedBackgroundColor = superIslandCardColor(entry.isOverlapping),
-                        collapsedBackgroundColor = collapsedCapsuleColor(entry.isOverlapping),
-                        expandedCornerRadius = SUPER_ISLAND_CARD_CORNER_RADIUS,
-                        expandedContent = {
-                            SuperIslandTemplateCompose(
-                                paramV2 = entry.paramV2,
-                                picMap = entry.picMap,
-                                fallbackTitle = entry.title,
-                                fallbackContent = entry.text,
-                                mediaAppName = entry.appName,
-                                mediaProgress = entry.mediaProgress,
-                                isOverlapping = entry.isOverlapping,
-                                onCopyVerificationCode = onCopyVerificationCode,
-                                onPlayPause = { mediaViewModel.playPauseLocal() },
-                                onPrevious = { mediaViewModel.previousLocal() },
-                                onNext = { mediaViewModel.nextLocal() },
-                                onCollapseClick = { onEntryClick(entry.key) },
-                                drawSurface = false,
-                            )
-                        },
-                        collapsedContent = {
-                            BigIslandCollapsedCompose(
-                                bigIsland = bigIslandJson,
-                                picMap = entry.picMap,
-                                fallbackTitle = fallbackTitle,
-                                fallbackContent = fallbackContent,
-                                isOverlapping = entry.isOverlapping,
-                                picFunction = picFunction,
-                                aodPic = aodPic,
-                                drawSurface = false,
-                            )
-                        },
-                    )
+                    // 登记本条内容在本地被接收的时刻：计时器据此把基准换算到本地时钟，
+                    // 对端时钟偏差不进入显示值
+                    CompositionLocalProvider(
+                        LocalSuperIslandReceivedAtMs provides entry.receivedAtMs.takeIf { it > 0L },
+                    ) {
+                        // 展开与收起共用折叠态底色：背景由容器单层绘制，组件自身不再画表面
+                        SuperIslandExpandableCard(
+                            expanded = entry.isExpanded,
+                            expandedBackgroundColor = superIslandCardColor(entry.isOverlapping),
+                            collapsedBackgroundColor = collapsedCapsuleColor(entry.isOverlapping),
+                            expandedCornerRadius = SUPER_ISLAND_CARD_CORNER_RADIUS,
+                            expandedContent = {
+                                SuperIslandTemplateCompose(
+                                    paramV2 = entry.paramV2,
+                                    picMap = entry.picMap,
+                                    fallbackTitle = entry.title,
+                                    fallbackContent = entry.text,
+                                    mediaAppName = entry.appName,
+                                    mediaProgress = entry.mediaProgress,
+                                    isOverlapping = entry.isOverlapping,
+                                    onCopyVerificationCode = onCopyVerificationCode,
+                                    onPlayPause = { mediaViewModel.playPauseLocal() },
+                                    onPrevious = { mediaViewModel.previousLocal() },
+                                    onNext = { mediaViewModel.nextLocal() },
+                                    onCollapseClick = { onEntryClick(entry.key) },
+                                    drawSurface = false,
+                                )
+                            },
+                            collapsedContent = {
+                                BigIslandCollapsedCompose(
+                                    bigIsland = bigIslandJson,
+                                    picMap = entry.picMap,
+                                    fallbackTitle = fallbackTitle,
+                                    fallbackContent = fallbackContent,
+                                    isOverlapping = entry.isOverlapping,
+                                    picFunction = picFunction,
+                                    aodPic = aodPic,
+                                    drawSurface = false,
+                                )
+                            },
+                        )
+                    }
                 }
             }
         }

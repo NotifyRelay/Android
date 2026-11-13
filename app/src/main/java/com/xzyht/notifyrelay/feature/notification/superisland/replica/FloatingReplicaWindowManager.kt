@@ -160,6 +160,8 @@ object FloatingReplicaWindowManager {
                                         text = content.displayText,
                                         appName = appName,
                                         mediaProgress = content.mediaProgress,
+                                        // 与本条内容的来源记录同一接收时刻：计时器换算到本地时钟
+                                        receivedAtMs = SuperIslandSourceStore.receivedAtOf(sourceId) ?: System.currentTimeMillis(),
                                     )
 
                                     SuperIslandSourceStore.addSourceIdMapping(sourceId, sourceId)

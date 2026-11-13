@@ -206,31 +206,36 @@ val BComponent?.isTimerType: Boolean
 /**
  * B 区组件的标题展示文本。
  *
- * 计时组件（[BSameWidthDigitInfo.timer]）按 [formatTimerInfo] 生成当前剩余时间文本。
+ * 计时组件（[BSameWidthDigitInfo.timer]）按 [formatTimerInfo] 生成当前时间文本；
+ * [localSampleMs] 是这条内容在本地被接收的时刻，用于把对端时钟换算到本地。
+ *
+ * @param localSampleMs 本地接收时刻；默认沿用计时器自身的采样时刻（视作同一时钟）
  */
-val BComponent?.bTitle: String?
-    get() =
-        when (this) {
-            is BImageText2 -> title
-            is BImageText3 -> title
-            is BImageText6 -> title
-            is BTextInfo -> title
-            is BFixedWidthDigitInfo -> digit
-            is BSameWidthDigitInfo -> if (timer != null) formatTimerInfo(timer) else digit
-            is BProgressTextInfo -> title
-            else -> null
-        }
+fun BComponent?.bTitle(localSampleMs: Long? = null): String? =
+    when (this) {
+        is BImageText2 -> title
+        is BImageText3 -> title
+        is BImageText6 -> title
+        is BTextInfo -> title
+        is BFixedWidthDigitInfo -> digit
+        is BSameWidthDigitInfo ->
+            if (timer != null) formatTimerInfo(timer, localSampleMs ?: timer.timerSystemCurrent) else digit
+        is BProgressTextInfo -> title
+        else -> null
+    }
 
 /**
  * B 区组件的正文展示文本；计时组件按 [formatTimerInfo] 生成。
+ *
+ * @param localSampleMs 本地接收时刻；默认沿用计时器自身的采样时刻（视作同一时钟）
  */
-val BComponent?.bContent: String?
-    get() =
-        when (this) {
-            is BImageText2 -> content
-            is BTextInfo -> content
-            is BFixedWidthDigitInfo -> content
-            is BSameWidthDigitInfo -> if (timer != null) formatTimerInfo(timer) else content
-            is BProgressTextInfo -> content
-            else -> null
-        }
+fun BComponent?.bContent(localSampleMs: Long? = null): String? =
+    when (this) {
+        is BImageText2 -> content
+        is BTextInfo -> content
+        is BFixedWidthDigitInfo -> content
+        is BSameWidthDigitInfo ->
+            if (timer != null) formatTimerInfo(timer, localSampleMs ?: timer.timerSystemCurrent) else content
+        is BProgressTextInfo -> content
+        else -> null
+    }

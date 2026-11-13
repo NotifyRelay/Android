@@ -4,6 +4,7 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import notifyrelay.base.log.Logger
+import notifyrelay.base.util.TimerClock
 import notifyrelay.desktop.DataLayerDesktop
 import notifyrelay.desktop.platform.DesktopPcmPlayer
 import notifyrelay.domain.feature.device.model.DeviceInfo
@@ -76,14 +77,23 @@ internal object DesktopMediaRemoteHandler {
         val timerTotal = root.longField("timerTotal")
         val timerWhen = root.longField("timerWhen")
         val timerSystemCurrent = root.longField("timerSystemCurrent")
-        val hasProgress = timerTotal > 0L && timerWhen > 0L && timerSystemCurrent >= timerWhen
+        // 基准换算到本地时钟（与超级岛计时器同一实现）：对端两个时间戳之差是已计时长，
+        // 直接拿对端时间戳当基准会把两端时钟偏差算进进度，播放时偏大、暂停时回落到真实值。
+        val timerType = root.intField("timerType")
+        val base =
+            if (timerTotal > 0L) {
+                TimerClock.rebase(timerType, timerWhen, timerSystemCurrent, System.currentTimeMillis())
+            } else {
+                null
+            }
+        val position = base?.let { (it.currentMs - it.whenMs).coerceIn(0L, timerTotal) }
 
         val title = root.stringField("title")
         val artist = root.stringField("text")
         val songKey =
             payloadSongKey ?: run {
                 val recognizer = recognizers.computeIfAbsent(device.uuid) { SongRecognizer() }
-                val position = if (hasProgress) (timerSystemCurrent - timerWhen).coerceIn(0L, timerTotal) else -1L
+                val position = position ?: -1L
                 synchronized(recognizer) {
                     recognizer
                         .observe(
@@ -105,10 +115,10 @@ internal object DesktopMediaRemoteHandler {
                 artist = artist,
                 coverUrl = root.stringField("coverImage"),
                 songKey = songKey,
-                positionMs = if (hasProgress) (timerSystemCurrent - timerWhen).coerceIn(0L, timerTotal) else null,
-                durationMs = if (hasProgress) timerTotal else null,
-                isPlaying = root.intField("timerType") == 1,
-                sampledAtMs = if (hasProgress) timerSystemCurrent else 0L,
+                positionMs = position,
+                durationMs = if (position != null) timerTotal else null,
+                isPlaying = timerType == 1,
+                sampledAtMs = base?.currentMs ?: 0L,
             )
         mediaControl?.updateRemoteSession(device, snapshot)
         Logger.d(TAG, "收到远端媒体状态: device=" + device.displayName)

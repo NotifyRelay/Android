@@ -232,22 +232,24 @@ internal object ReplicaSmallIconInjector {
     private suspend fun buildCapsuleCompatibleNotification(
         context: Context,
         builder: NotificationCompat.Builder,
-        title: String?,
-        text: String?,
-        appName: String?,
-        picMap: Map<String, String>?,
-        paramV2Raw: String?,
+        content: ReplicaContent,
         aComponent: AComponent?,
         bComponent: BComponent?,
         isTimerType: Boolean,
     ): NotificationCompat.Builder {
+        val title = content.title
+        val text = content.text
+        val appName = content.appName
+        val picMap = content.picMap
+        val paramV2Raw = content.paramV2Raw
+        val localSampleMs = content.localSampleMs
         try {
             // 提取 A/B 区数据（使用已解析的组件）
             val aTitle = aComponent.aTitle
             val aContent = aComponent.aContent
             val aPicKey = aComponent.aPicKey
-            val bTitle = bComponent.bTitle
-            val bContent = bComponent.bContent
+            val bTitle = bComponent.bTitle(localSampleMs)
+            val bContent = bComponent.bContent(localSampleMs)
             val bPicKey = bComponent.bPicKey
             val bProgress = bComponent.bProgress
             val bProgressColorReach = bComponent.bProgressColorReach
@@ -354,29 +356,22 @@ internal object ReplicaSmallIconInjector {
     suspend fun buildCapsuleCompatibleNotificationWithIconInjection(
         context: Context,
         builder: NotificationCompat.Builder,
-        title: String?,
-        text: String?,
-        appName: String?,
-        picMap: Map<String, String>?,
-        paramV2Raw: String?,
+        content: ReplicaContent,
         aComponent: AComponent?,
         bComponent: BComponent?,
         isTimerType: Boolean,
     ): Notification {
+        val picMap = content.picMap
         try {
             // 先构建胶囊兼容的通知
             val capsuleBuilder =
                 buildCapsuleCompatibleNotification(
-                    context,
-                    builder,
-                    title,
-                    text,
-                    appName,
-                    picMap,
-                    paramV2Raw,
-                    aComponent,
-                    bComponent,
-                    isTimerType,
+                    context = context,
+                    builder = builder,
+                    content = content,
+                    aComponent = aComponent,
+                    bComponent = bComponent,
+                    isTimerType = isTimerType,
                 )
 
             // 构建通知并注入图标

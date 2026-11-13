@@ -181,6 +181,7 @@ internal object SuperIslandSourceStore {
     }
 
     fun removeSourceIdMappings(sourceId: String) {
+        receivedAt.remove(sourceId)
         sourceIdToNotificationIds.remove(sourceId)
         val entryKeys = sourceIdToEntryKeyMap.remove(sourceId)
         entryKeys?.forEach { entryKey ->
@@ -303,6 +304,9 @@ internal object SuperIslandSourceStore {
 
     private val store = ConcurrentHashMap<String, DiffSystem.State>()
 
+    /** 各来源内容在本地被接收的时刻；计时器据此把基准换算到本地时钟。 */
+    private val receivedAt = ConcurrentHashMap<String, Long>()
+
     /**
      * 清空远端载荷（可由后续入站包重建）。
      *
@@ -311,6 +315,7 @@ internal object SuperIslandSourceStore {
     @Synchronized
     fun clear() {
         store.clear()
+        receivedAt.clear()
     }
 
     @Synchronized
@@ -323,8 +328,12 @@ internal object SuperIslandSourceStore {
     ): DiffSystem.State? {
         val state = DiffSystem.State(title, text, paramV2Raw, pics.toMutableMap())
         store[sourceId] = state
+        receivedAt[sourceId] = System.currentTimeMillis()
         return state
     }
+
+    /** 指定来源内容的本地接收时刻；未登记时为 null。 */
+    fun receivedAtOf(sourceId: String): Long? = receivedAt[sourceId]
 
     /**
      * 根据 deviceUuid 和 mappedPkg 前缀寻找并移除匹配的 sourceId 条目，返回被移除的 sourceId 列表。
@@ -338,7 +347,10 @@ internal object SuperIslandSourceStore {
         try {
             val prefix = listOf(deviceUuid, mappedPkg).joinToString("|")
             val toRemove = store.keys.filter { it.startsWith("$prefix|") }
-            toRemove.forEach { store.remove(it) }
+            toRemove.forEach {
+                store.remove(it)
+                receivedAt.remove(it)
+            }
             toRemove
         } catch (_: Exception) {
             emptyList()
@@ -353,7 +365,10 @@ internal object SuperIslandSourceStore {
         try {
             val suffix = "|$featureKey"
             val toRemove = store.keys.filter { it.endsWith(suffix) || it == featureKey }
-            toRemove.forEach { store.remove(it) }
+            toRemove.forEach {
+                store.remove(it)
+                receivedAt.remove(it)
+            }
             toRemove
         } catch (_: Exception) {
             emptyList()
@@ -364,6 +379,7 @@ internal object SuperIslandSourceStore {
      */
     fun removeExact(sourceId: String): Boolean =
         try {
+            receivedAt.remove(sourceId)
             store.remove(sourceId) != null
         } catch (_: Exception) {
             false

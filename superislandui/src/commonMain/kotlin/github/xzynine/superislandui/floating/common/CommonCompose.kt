@@ -26,10 +26,12 @@ import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoScrollText
+import github.xzynine.superislandui.common.LocalSuperIslandReceivedAtMs
 import github.xzynine.superislandui.currentTimeMillis
 import github.xzynine.superislandui.model.components.TimerInfo
 import kotlinx.coroutines.delay
 import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.TimerClock
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -215,14 +217,25 @@ fun parseColorSafe(
 ): Int = ColorUtils.parseColorOr(s, default)
 
 /**
- * 格式化计时器信息
- * 修复了计时逻辑，确保暂停时显示正确进度，解决正计时快3s问题
+ * 格式化计时器信息。
+ *
+ * 基准经 [TimerClock.rebase] 换算到本地时钟：计时器来自其他设备时，两个时间戳取对端
+ * 时钟，直接与本地当前时刻相减会把两端时钟偏差算进显示值。
+ *
+ * @param timer 计时器信息
+ * @param localSampleMs 收到该计时器时的本地时刻；默认沿用 [TimerInfo.timerSystemCurrent]，
+ *   即视作与本地同一时钟。远端计时器应由调用方传入实际接收时刻。
  */
-fun formatTimerInfo(timer: TimerInfo): String {
+fun formatTimerInfo(
+    timer: TimerInfo,
+    localSampleMs: Long = timer.timerSystemCurrent,
+): String {
     val now = currentTimeMillis()
     val timerType = timer.timerType
-    val timerWhen = timer.timerWhen // 正计时：开始时间；倒计时：结束时间
-    val timerSystemCurrent = timer.timerSystemCurrent // 计时状态变更时的系统时间
+    val base = TimerClock.rebase(timerType, timer.timerWhen, timer.timerSystemCurrent, localSampleMs)
+    // 正计时：开始时刻；倒计时：结束时刻。两种口径的时间戳都在本地换算后使用
+    val timerWhen = base?.whenMs ?: timer.timerWhen
+    val timerSystemCurrent = base?.currentMs ?: timer.timerSystemCurrent
 
     val displayValue: Long =
         when (timerType) {
@@ -335,18 +348,23 @@ fun superIslandCardColor(isOverlapping: Boolean): Color =
  * 计时器文本随时间刷新。
  *
  * 仅计时进行中（正计时 `timerType=1` / 倒计时 `timerType=-1`）每秒重算，暂停与无效类型保持首次格式化的结果。
+ * 计时基准按 [LocalSuperIslandReceivedAtMs] 换算到本地时钟，远端内容的时钟偏差因此不进入显示值。
  *
  * @param timerInfo 计时器信息。
  * @returns 随时间更新的格式化文本。
  */
 @Composable
 fun rememberTimerText(timerInfo: TimerInfo): String {
-    val displayState = remember(timerInfo) { mutableStateOf(formatTimerInfo(timerInfo)) }
+    val receivedAtMs = LocalSuperIslandReceivedAtMs.current
+    val displayState =
+        remember(timerInfo, receivedAtMs) {
+            mutableStateOf(formatTimerInfo(timerInfo, receivedAtMs ?: timerInfo.timerSystemCurrent))
+        }
     val isTimerRunning = timerInfo.timerType == 1 || timerInfo.timerType == -1
-    LaunchedEffect(timerInfo) {
+    LaunchedEffect(timerInfo, receivedAtMs) {
         if (!isTimerRunning) return@LaunchedEffect
         while (true) {
-            displayState.value = formatTimerInfo(timerInfo)
+            displayState.value = formatTimerInfo(timerInfo, receivedAtMs ?: timerInfo.timerSystemCurrent)
             delay(1000)
         }
     }

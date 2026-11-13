@@ -15,6 +15,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
+import github.xzynine.superislandui.common.LocalSuperIslandReceivedAtMs
 import github.xzynine.superislandui.floating.common.CircularProgressCompose
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.CommonImagePlaceholder
@@ -167,16 +168,19 @@ fun BCompose(
                 // 标题文本：优先使用 digit，否则格式化 timer（暂停时也直接显示格式化后的值）
                 val titleText =
                     if (timer != null) {
+                        // 基准按接收时刻换算到本地时钟，远端内容的时钟偏差不进入显示值
+                        val receivedAtMs = LocalSuperIslandReceivedAtMs.current
+                        val sampleMs = receivedAtMs ?: timer.timerSystemCurrent
                         // 使用 remember + key 确保 timer 变化时重置状态
-                        var displayText by remember(timer) {
-                            mutableStateOf(formatTimerInfo(timer))
+                        var displayText by remember(timer, sampleMs) {
+                            mutableStateOf(formatTimerInfo(timer, sampleMs))
                         }
 
                         // 仅计时进行中才每秒刷新
                         if (isTimerRunning) {
-                            LaunchedEffect(timer) {
+                            LaunchedEffect(timer, sampleMs) {
                                 while (true) {
-                                    displayText = formatTimerInfo(timer)
+                                    displayText = formatTimerInfo(timer, sampleMs)
                                     kotlinx.coroutines.delay(1000L)
                                 }
                             }

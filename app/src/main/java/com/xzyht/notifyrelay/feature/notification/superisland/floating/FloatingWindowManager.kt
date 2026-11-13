@@ -73,6 +73,8 @@ class FloatingWindowManager {
         text: String? = null,
         appName: String? = null,
         mediaProgress: MediaProgress? = null,
+        /** 本条内容在本地被接收的时刻：计时器据此换算到本地时钟。 */
+        receivedAtMs: Long = 0L,
     ) {
         // 保留原有条目的isExpanded、isOverlapping和height状态，其他属性使用新传入的值
         // 如果是摘要态，强制设为非展开状态
@@ -109,6 +111,7 @@ class FloatingWindowManager {
                 text = text,
                 appName = appName,
                 mediaProgress = mediaProgress,
+                receivedAtMs = receivedAtMs.takeIf { it > 0L } ?: System.currentTimeMillis(),
                 isOverlapping = finalIsOverlapping,
                 height = finalHeight,
             )
