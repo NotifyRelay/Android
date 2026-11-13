@@ -2,6 +2,7 @@ package notifyrelay.desktop.overlay.scene
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.snapshots.SnapshotStateMap
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.IntSize
@@ -54,6 +55,18 @@ internal class OverlaySceneBridge {
 
     /** 叠加层当前的可交互区域，键与场景里的区域 key 一致。 */
     private val regions = SnapshotStateMap<String, Rectangle>()
+
+    /**
+     * 场景帧脉冲：每录制一帧递增一次。
+     *
+     * 组合树读它来推进时间，因此位图路径的动画不依赖 Compose 内部的帧时钟：
+     * 只要录制循环在跑，收起、滚动与进度就按墙钟逐帧重算。
+     */
+    private val frameTick = mutableLongStateOf(0L)
+
+    /** 上一统计窗口内的帧数与起始时刻，用于输出录制帧率。 */
+    private var statFrames = 0
+    private var statSince = System.currentTimeMillis()
 
     /** 启动服务端与录制循环。 */
     fun start() {
@@ -186,6 +199,10 @@ internal class OverlaySceneBridge {
                     )
                 }
 
+        // 递增帧脉冲：组合树据此按新时刻重组，时间推进不依赖 Compose 帧时钟
+        frameTick.longValue = frameTick.longValue + 1
+        statFrames += 1
+
         // 像素地址只在回调内有效，写出必须在回调里完成
         recorder!!.render(System.nanoTime()) { frame ->
             val byteCount = frame.byteCount
@@ -207,7 +224,24 @@ internal class OverlaySceneBridge {
             if (!server.sendFrame(revision, frame.width, frame.height, visibleHeight, payload, frame)) {
                 Logger.w(TAG, "推送帧失败 revision=" + revision)
             }
+            logFrameRate(visibleHeight)
         }
+    }
+
+    /**
+     * 每两秒输出一次录制帧率与内容高度。
+     *
+     * 位图路径按帧推进时间，帧率掉到个位数时收起与滚动会看着像静止，
+     * 该日志用于区分「组合没推进」与「帧没推出去」。
+     */
+    private fun logFrameRate(visibleHeight: Int) {
+        val now = System.currentTimeMillis()
+        val elapsed = now - statSince
+        if (elapsed < FRAME_STAT_INTERVAL_MS) return
+        val fps = statFrames * 1000f / elapsed
+        Logger.d(TAG, "录制帧率=" + String.format("%.1f", fps) + " fps 内容高度=" + visibleHeight)
+        statFrames = 0
+        statSince = now
     }
 
     /**
@@ -252,6 +286,7 @@ internal class OverlaySceneBridge {
                     contentSize = IntSize(widthPx, heightPx),
                     onContentSizeChanged = { size -> contentHeightDp = size.height },
                     modifier = Modifier,
+                    frameTick = frameTick.longValue,
                 )
             }
         }
@@ -294,5 +329,8 @@ internal class OverlaySceneBridge {
 
         /** 摘要的分块长度。 */
         private const val HASH_CHUNK = 64 * 1024
+
+        /** 帧率统计窗口。 */
+        private const val FRAME_STAT_INTERVAL_MS = 2_000L
     }
 }

@@ -17,11 +17,9 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -69,16 +67,17 @@ internal fun OverlayContent(
     contentSize: IntSize,
     onContentSizeChanged: (IntSize) -> Unit,
     modifier: Modifier = Modifier,
+    /**
+     * 录制端的帧脉冲：每录制一帧递增一次。
+     *
+     * 位图路径下帧时钟只由录制方推进，读它保证每帧按新时刻重组；
+     * 不用 withFrameMillis 自建时钟，避免帧时钟停摆时整列内容一起静止。
+     */
+    frameTick: Long = 0L,
 ) {
-    // 帧时钟：驱动频谱与映射提示淡出
-    var frameNow by remember { mutableLongStateOf(System.currentTimeMillis()) }
-    LaunchedEffect(Unit) {
-        while (true) {
-            withFrameMillis {
-                frameNow = System.currentTimeMillis()
-            }
-        }
-    }
+    // 读帧脉冲：本列的时间推进完全由录制方驱动
+    frameTick
+    val frameNow = System.currentTimeMillis()
 
     val regionDebug = DebugFlags.OVERLAY_REGION_DEBUG.value
     // 通知卡片的展开/收起状态：展开态卡片与状态行里的图标方块共用同一份
