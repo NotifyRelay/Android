@@ -26,11 +26,16 @@ object InboundNotificationProcessor {
     /** 每个包名在各设备下保留的通知条数上限。 */
     const val MAX_COUNT_PER_PACKAGE = 80
 
-    /** 相似度比对的历史窗口：窗口内按相似度判定，窗口外仅比对完全一致。 */
-    const val SIMILARITY_WINDOW_MS = 24 * 60 * 60 * 1000L
+    /** 单包跨设备比对时假定的设备数量上限。 */
+    private const val MAX_COMPARED_DEVICES = 4
 
-    /** 相似度比对的候选记录条数上限（按时间倒序取最近的）。 */
-    const val SIMILARITY_CANDIDATE_LIMIT = 200
+    /**
+     * 相似度比对的候选记录条数上限。
+     *
+     * 与留存上限同量级再留出跨设备余量：单包单设备最多保留 [MAX_COUNT_PER_PACKAGE] 条，
+     * 跨设备比对的候选量随设备数增长。
+     */
+    const val SIMILARITY_CANDIDATE_LIMIT = MAX_COUNT_PER_PACKAGE * MAX_COMPARED_DEVICES
 
     private const val LOCAL_DEVICE = "本机"
 
@@ -99,12 +104,17 @@ object InboundNotificationProcessor {
     )
 
     /**
-     * 已入库检定：判断一条通知是否与库中记录重复。
+     * 已入库检定：判断一条通知是否与库中已有记录重复。
      *
      * 判定顺序：
      * 1. core 的 10 秒内容窗口（键为「应用名 + 标题 + 正文」）；
-     * 2. [SIMILARITY_WINDOW_MS] 内的同包名候选记录，按「应用名指向同一应用 + 标题与正文相似度」判定；
-     * 3. 窗口之外的记录仅比对完全一致。
+     * 2. 该包名在 [scopeDeviceUuid] 维度下留存的全部记录，按「应用名指向同一应用 + 标题与正文相似度」判定。
+     *
+     * 第 2 步覆盖全部留存而非固定时间窗：留存本身受 [MAX_COUNT_PER_PACKAGE] 约束，
+     * 单包候选量有界，无需再用时间窗裁剪。完全相同的内容必然在第 2 步命中，
+     * 故不再单独做精确内容比对。
+     *
+     * 候选整体一次传入 core：逐条比较会把跨语言调用次数放大到候选数量级。
      *
      * 本方法只查询、不写窗口状态；确认展示后由调用方调 [markContentSeen]。
      *
@@ -122,7 +132,6 @@ object InboundNotificationProcessor {
         text: String,
         scopeDeviceUuid: String? = null,
         excludeKey: String? = null,
-        now: Long = System.currentTimeMillis(),
     ): Boolean {
         if (NativeCore.isReady() && NativeCore.contentDedup(CONTENT_DEDUP_QUERY, appName, title, text) == 1) {
             Logger.d(TAG, "10 秒内容窗口命中: app=" + appName)
@@ -137,7 +146,7 @@ object InboundNotificationProcessor {
             runCatching {
                 repository.getRecentNotificationsByPackage(
                     packageName = packageName,
-                    sinceTime = now - SIMILARITY_WINDOW_MS,
+                    sinceTime = 0L,
                     limit = SIMILARITY_CANDIDATE_LIMIT,
                     deviceUuid = scopeDeviceUuid,
                 )
@@ -146,32 +155,27 @@ object InboundNotificationProcessor {
                 return false
             }
 
-        val windowHit =
-            recent
-                .filter { record -> excludeKey == null || record.key != excludeKey }
-                .any { record ->
-                    NativeCore.shouldDeduplicate(
-                        appName,
-                        title,
-                        text,
-                        record.appName.orEmpty(),
-                        record.title.orEmpty(),
-                        record.text.orEmpty(),
-                    )
-                }
-        if (windowHit) {
-            Logger.d(TAG, "24 小时内相似记录命中: pkg=" + packageName + ", app=" + appName)
+        val candidates = recent.filter { record -> excludeKey == null || record.key != excludeKey }
+        if (candidates.isEmpty()) return false
+
+        val flattened = ArrayList<String>(candidates.size * 3)
+        candidates.forEach { record ->
+            flattened.add(record.appName.orEmpty())
+            flattened.add(record.title.orEmpty())
+            flattened.add(record.text.orEmpty())
+        }
+        val hit =
+            runCatching {
+                NativeCore.findSimilarCandidate(appName, title, text, flattened)
+            }.getOrElse {
+                Logger.w(TAG, "相似度比较失败: pkg=" + packageName, it)
+                return false
+            }
+        if (hit >= 0) {
+            Logger.d(TAG, "相似记录命中: pkg=" + packageName + ", app=" + appName + ", index=" + hit)
             return true
         }
-
-        val exactOld =
-            runCatching {
-                repository.hasNotificationWithExactContent(packageName, appName, title, text, scopeDeviceUuid)
-            }.getOrDefault(false)
-        if (exactOld) {
-            Logger.d(TAG, "24 小时外完全一致记录命中: pkg=" + packageName)
-        }
-        return exactOld
+        return false
     }
 
     /**

@@ -240,29 +240,6 @@ open class DatabaseRepository(
     suspend fun getNotificationCountByDevice(deviceUuid: String): Int = notificationRecordDao.countByDevice(deviceUuid)
 
     /**
-     * 判断是否已存在同内容通知记录（跨重启内容级判重）
-     */
-    suspend fun hasNotificationWithContent(
-        deviceUuid: String,
-        packageName: String,
-        title: String,
-        text: String,
-    ): Boolean = notificationRecordDao.countByContent(deviceUuid, packageName, title, text) > 0
-
-    /**
-     * 判断是否已存在「同包名 + 同应用名 + 同标题 + 同正文」记录。
-     *
-     * @param deviceUuid 为空时跨全部设备判定
-     */
-    suspend fun hasNotificationWithExactContent(
-        packageName: String,
-        appName: String,
-        title: String,
-        text: String,
-        deviceUuid: String? = null,
-    ): Boolean = notificationRecordDao.countByExactContent(packageName, appName, title, text, deviceUuid) > 0
-
-    /**
      * 取指定时刻之后、同一包名的记录，按时间倒序限制条数。
      *
      * @param deviceUuid 为空时跨全部设备取候选

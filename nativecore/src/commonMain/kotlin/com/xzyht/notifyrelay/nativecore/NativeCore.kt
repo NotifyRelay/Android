@@ -276,6 +276,21 @@ object NativeCore {
         com.xzyht.notifyrelay.core.ffi
             .shouldDeduplicate(newAppName, newTitle, newText, oldAppName, oldTitle, oldText)
 
+    /**
+     * 在一批候选中查找相似条目，返回首个命中的下标；全部不相似时返回 -1。
+     *
+     * 候选为扁平三元组序列：`[应用名, 标题, 正文, 应用名, 标题, 正文, ...]`。
+     * 相比逐条调用 [shouldDeduplicate]，跨语言调用次数与候选数量解耦。
+     */
+    fun findSimilarCandidate(
+        newAppName: String,
+        newTitle: String,
+        newText: String,
+        candidates: List<String>,
+    ): Int =
+        com.xzyht.notifyrelay.core.ffi
+            .findSimilarCandidate(newAppName, newTitle, newText, candidates)
+            .toInt()
     // ======== Filter ========
 
     fun setFilterConfig(configJson: String): Int = coreRef.value?.setFilterConfig(configJson) ?: -1

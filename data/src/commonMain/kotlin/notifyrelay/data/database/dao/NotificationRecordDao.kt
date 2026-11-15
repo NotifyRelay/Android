@@ -93,43 +93,10 @@ interface NotificationRecordDao {
     )
 
     /**
-     * 判断是否已存在同内容通知记录。
+     * 取同一包名的记录，按时间倒序限制条数。
      *
-     * 用于跨重启的内容级判重：本机通知每次采集的时间戳不同，
-     * 不能以「时间+包名+设备」作键，需按「设备 + 包名 + 标题 + 内容」比对
-     * （与 Windows `NotificationRepository` 的聚合键同思路）。
-     */
-    @Query("SELECT COUNT(*) FROM notification_records WHERE deviceUuid = :deviceUuid AND packageName = :packageName AND title = :title AND text = :text")
-    suspend fun countByContent(
-        deviceUuid: String,
-        packageName: String,
-        title: String,
-        text: String,
-    ): Int
-
-    /**
-     * 统计「同包名 + 同应用名 + 同标题 + 同正文」的记录数。
-     *
-     * 用于相似度窗口之外的旧记录判定：不限时间，仅比对完全一致。
-     * [deviceUuid] 为空时跨全部设备统计。
-     */
-    @Query(
-        "SELECT COUNT(*) FROM notification_records WHERE packageName = :packageName " +
-            "AND IFNULL(appName, '') = :appName AND IFNULL(title, '') = :title AND IFNULL(text, '') = :text " +
-            "AND (:deviceUuid IS NULL OR deviceUuid = :deviceUuid)",
-    )
-    suspend fun countByExactContent(
-        packageName: String,
-        appName: String,
-        title: String,
-        text: String,
-        deviceUuid: String?,
-    ): Int
-
-    /**
-     * 取指定时刻之后、同一包名的记录，按时间倒序限制条数。
-     *
-     * 作为相似度比对的候选集，避免全表扫描。
+     * 作为相似度比对的候选集，避免全表扫描。`sinceTime` 为下界时刻，传 0 表示不限时间；
+     * 候选量本身受每包留存上限约束。
      * [deviceUuid] 为空时跨全部设备取候选。
      */
     @Query(
