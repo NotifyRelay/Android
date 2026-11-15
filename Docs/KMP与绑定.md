@@ -71,3 +71,7 @@ KMP 库插件没有 `preBuild` 与 `jniLibs` DSL。前者挂到 `compileAndroidM
 日志复用既有桥：`log::set_logger` 只能成功一次且已被 `ffi::common::init_log_bridge` 占用，本层用 `set_log_callback_internal` 把既有桥的回调指针指向转发函数。
 
 生成代码的 2 条 `Expression is unused` 警告来自模板的 `IntegrityCheckingUniffiLib` 裸表达式，配置无法消除。
+
+## 电池库
+
+`desktop/device-battery-lib` 的绑定同样由 UniFFI 生成，接线见[叠加层](模块/desktop/叠加层.md)。

@@ -11,6 +11,10 @@ plugins {
 kotlin {
     jvm {
         // Compose Desktop 需要 JVM 11+
+        compilerOptions {
+            // UniFFI 生成物以 expect/actual class 承载原生对象类型（官方 Beta 特性）
+            freeCompilerArgs.add("-Xexpect-actual-classes")
+        }
     }
 
     sourceSets {
@@ -57,6 +61,10 @@ kotlin {
 
             // Win32 COM 封装：现代文件对话框（IFileOpenDialog）经 JNA 调用
             implementation(libs.jna.platform)
+
+            // UniFFI 生成的电池库绑定经 JNA 加载动态库，内部使用 atomicfu 原子计数器
+            implementation(libs.jna)
+            implementation(libs.atomicfu)
         }
 
         jvmTest.dependencies {
@@ -136,6 +144,63 @@ val deviceBatteryBuild =
 // 该库参与 :desktop 的编译与运行：先构建，再把产物目录并入库搜索路径。
 tasks.named("compileKotlinJvm") { dependsOn(deviceBatteryBuild) }
 val deviceBatteryLibDir = deviceBatteryDir.resolve("target/release")
+
+// UniFFI 绑定生成：以 kotlin_multiplatform = true 的配置产出 jvmMain 目录结构，
+// 生成物作为独立 Kotlin 源码目录参与 :desktop 编译，不进入版本库。
+// 工具为 gobley-uniffi-bindgen，需先执行:
+//   cargo install gobley-uniffi-bindgen --version 0.3.7 --locked
+val batteryUniffiConfig = deviceBatteryDir.resolve("uniffi.toml")
+val batteryUniffiOutDir =
+    layout.buildDirectory
+        .dir("generated/uniffi-battery")
+        .get()
+        .asFile
+
+val uniffiBatteryBindgen =
+    tasks.register<Exec>("uniffiBatteryBindgen") {
+        description = "由电池库生成 UniFFI Kotlin 绑定（需 gobley-uniffi-bindgen）"
+        group = "rust"
+        dependsOn(deviceBatteryBuild)
+        val hostLibFile = deviceBatteryLibDir.resolve("device_battery_lib.dll")
+        inputs.file(batteryUniffiConfig)
+        inputs.file(deviceBatteryDir.resolve("Cargo.lock"))
+        // 动态库是真正的输入：Rust 侧导出面变化时其内容随之改变，
+        // 未声明会导致本任务被判定 UP-TO-DATE 而沿用旧绑定。
+        inputs.file(hostLibFile)
+        outputs.dir(batteryUniffiOutDir)
+        doFirst {
+            require(hostLibFile.exists()) { "电池库产物缺失：$hostLibFile（请先执行 :desktop:deviceBatteryBuild）" }
+            batteryUniffiOutDir.deleteRecursively()
+            batteryUniffiOutDir.mkdirs()
+        }
+        commandLine(
+            "gobley-uniffi-bindgen",
+            "--library",
+            hostLibFile.absolutePath,
+            "--config",
+            batteryUniffiConfig.absolutePath,
+            "--out-dir",
+            batteryUniffiOutDir.absolutePath,
+        )
+    }
+
+tasks.named("compileKotlinJvm") { dependsOn(uniffiBatteryBindgen) }
+
+// 生成目录是 ktlint 的扫描输入但不属于本模块源文件：显式声明依赖，
+// 否则并行构建报 implicit dependency 校验失败。
+tasks.matching { it.name.startsWith("runKtlintCheckOver") }.configureEach {
+    dependsOn(uniffiBatteryBindgen)
+}
+
+// 生成物目录注册：commonMain 承载 expect 声明，jvmMain 承载 actual 实现
+kotlin.sourceSets
+    .getByName("commonMain")
+    .kotlin
+    .srcDir(batteryUniffiOutDir.resolve("commonMain/kotlin"))
+kotlin.sourceSets
+    .getByName("jvmMain")
+    .kotlin
+    .srcDir(batteryUniffiOutDir.resolve("jvmMain/kotlin"))
 
 // ===== 可分发包（createDistributable / runDistributable）的原生库 =====
 // 三个 Rust 动态库不随 jar 分发：复制进应用镜像的 app/resources，
