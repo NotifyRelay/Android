@@ -34,12 +34,8 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation(libs.compose.multiplatform.runtime)
-            implementation(libs.compose.multiplatform.foundation)
-            implementation(libs.compose.multiplatform.foundation.layout)
-            implementation(libs.compose.multiplatform.ui)
-            implementation(libs.compose.multiplatform.ui.text)
-            implementation(libs.compose.multiplatform.ui.tooling.preview)
+            // Compose 运行时、UI 与 @Preview 注解统一由 bundle 声明。
+            implementation(libs.bundles.compose.multiplatform.common)
             implementation(libs.compose.multiplatform.components.resources)
             // material3 与 material-icons-extended 使用 androidx 条目：其 Gradle 模块含 metadata 变体，
             // org.jetbrains.compose 侧对应版本线不覆盖 1.12.2。

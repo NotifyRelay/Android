@@ -2,11 +2,13 @@ package com.xzyht.notifyrelay.feature.device.service.statequery
 
 import android.content.Context
 import android.graphics.Bitmap
+import com.xzyht.notifyrelay.feature.media.PlaybackStatePosition
 import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
 import com.xzyht.notifyrelay.nativecore.NativeCore
 import com.xzyht.notifyrelay.nativecore.device.service.callback.StateQueryPort
-import com.xzyht.notifyrelay.sync.MessageSender
+import com.xzyht.notifyrelay.sync.builder.MediaMessageBuilder
+import com.xzyht.notifyrelay.sync.builder.SuperIslandMessageBuilder
 import github.xzynine.superislandui.common.SuperIslandManager
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
@@ -120,7 +122,7 @@ class StateQueryResponder(
             // 仅本地 file/content URI 时才会发生实际文件读取，故在此包装 runBlocking 是必要且可接受的。
             val content =
                 kotlinx.coroutines.runBlocking {
-                    MessageSender.buildSuperIslandFullContent(
+                    SuperIslandMessageBuilder.buildSuperIslandFullContent(
                         context,
                         superPkg,
                         superData.appName ?: "超级岛",
@@ -157,6 +159,23 @@ class StateQueryResponder(
         val mediaData =
             NotifyRelayNotificationListenerService.getMediaSessionData(pkg)
                 ?: return 1 // 有媒体会话但数据未就绪，保守保活等待下次查询
+        // 进度与播放态在推送时刻现取：缓存里的位置停在元数据回调那一刻，
+        // 用它配推送时刻会让接收端每轮把进度重置回旧位置。
+        val playbackState = primary.playbackState
+        val livePosition =
+            PlaybackStatePosition
+                .estimate(playbackState, System.currentTimeMillis())
+                .takeIf { it >= 0L } ?: mediaData.position
+        val livePlaying =
+            if (playbackState != null) {
+                playbackState.state == android.media.session.PlaybackState.STATE_PLAYING
+            } else {
+                mediaData.isPlaying
+            }
+        val liveDuration =
+            primary.metadata
+                ?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION)
+                ?.takeIf { it > 0L } ?: mediaData.duration
         val coverUrl =
             synchronized(mediaCoverCacheLock) {
                 val bmp = mediaData.artBitmap
@@ -177,12 +196,14 @@ class StateQueryResponder(
                 }
                 cachedMediaCoverUrl
             }
-        // 轻量比较键：仅标题/艺术家/封面变化才重新构造 fullJson 并推送（isPlaying 由 Rust 媒体心跳处理）
-        val lightKey = "$pkg|${mediaData.title}|${mediaData.artist}|$coverUrl"
+        // 轻量比较键：歌曲身份、封面或播放态变化才重新构造 fullJson 并推送。
+        // 标题不进比较键：歌词在标题的应用其标题每句都变，纳入会让查询每次都判为有变更；
+        // 进度也不进：播放位置本就随查询增值；播放态必须纳入，否则暂停/恢复不会传播。
+        val lightKey = "$pkg|${mediaData.songKey}|$livePlaying|$coverUrl"
         val cacheKey = "$remoteUuid|$featureId"
         if (stateQueryKeys[cacheKey] == lightKey) return 1 // 存在无变更，保活等待下次查询
         val content =
-            MessageSender.buildMediaFullContent(
+            MediaMessageBuilder.buildMediaFullContent(
                 context,
                 pkg,
                 pkg,
@@ -190,6 +211,10 @@ class StateQueryResponder(
                 mediaData.artist,
                 coverUrl,
                 System.currentTimeMillis(),
+                isPlaying = livePlaying,
+                positionMs = livePosition,
+                durationMs = liveDuration,
+                songKey = mediaData.songKey,
             )
         // 仅当原生入队成功才写入比较键并返回“有变更”，否则保留原键以便下次查询重试
         val dispatched =

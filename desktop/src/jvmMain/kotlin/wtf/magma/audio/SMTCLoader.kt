@@ -81,7 +81,8 @@ object SMTCLoader {
     /**
      * 当前播放状态。
      *
-     * @return Windows `MediaPlaybackStatus`：0 Closed / 1 Opened / 2 Changing / 3 Playing / 4 Paused / 5 Stopped
+     * @return Windows `GlobalSystemMediaTransportControlsSessionPlaybackStatus`：
+     * 0 Closed / 1 Opened / 2 Changing / 3 Stopped / 4 Playing / 5 Paused
      */
     @JvmStatic
     external fun getPlaybackStatus(): Int

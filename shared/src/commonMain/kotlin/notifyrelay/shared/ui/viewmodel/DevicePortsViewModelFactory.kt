@@ -2,8 +2,6 @@ package notifyrelay.shared.ui.viewmodel
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.lifecycle.ViewModel
-import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
 import notifyrelay.domain.feature.device.service.contract.DevicePortsProvider
 
@@ -14,14 +12,5 @@ val LocalDevicePortsProvider = staticCompositionLocalOf<DevicePortsProvider?> { 
 @Composable
 fun devicePortsViewModel(): DevicePortsViewModel {
     val provider = LocalDevicePortsProvider.current ?: error("LocalDevicePortsProvider 未提供")
-    return viewModel(
-        factory =
-            object : ViewModelProvider.Factory {
-                @Suppress("UNCHECKED_CAST")
-                override fun <T : ViewModel> create(
-                    modelClass: kotlin.reflect.KClass<T>,
-                    extras: androidx.lifecycle.viewmodel.CreationExtras,
-                ): T = DevicePortsViewModel(provider) as T
-            },
-    )
+    return viewModel(factory = factoryOf { DevicePortsViewModel(provider) })
 }

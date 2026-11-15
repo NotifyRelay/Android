@@ -2,11 +2,15 @@ package com.xzyht.notifyrelay.feature.notification.service
 
 import android.app.Notification
 import android.graphics.Bitmap
+import android.media.session.PlaybackState
 import android.service.notification.StatusBarNotification
 import android.util.Base64
+import com.xzyht.notifyrelay.feature.media.PlaybackStatePosition
+import com.xzyht.notifyrelay.feature.media.service.MediaSessionMonitorService
 import com.xzyht.notifyrelay.feature.notification.superisland.media.MediaCapsulePresenter
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
-import com.xzyht.notifyrelay.sync.MessageSender
+import com.xzyht.notifyrelay.sync.builder.MediaMessageBuilder
+import github.xzynine.superislandui.model.components.MediaProgress
 import notifyrelay.base.log.Logger
 import java.io.ByteArrayOutputStream
 import java.util.concurrent.ConcurrentHashMap
@@ -38,6 +42,9 @@ object MediaNotificationHandler {
         artist: String,
         duration: Long,
         artBitmap: Any?,
+        position: Long = -1L,
+        isPlaying: Boolean = false,
+        songKey: String? = null,
     ) {
         Logger.i(TAG, "Received MediaSession update: $packageName - $title")
 
@@ -50,6 +57,9 @@ object MediaNotificationHandler {
                 duration = duration,
                 artBitmap = artBitmap as? Bitmap,
                 timestamp = System.currentTimeMillis(),
+                position = position,
+                isPlaying = isPlaying,
+                songKey = songKey,
             )
         mediaSessionDataCache[packageName] = mediaSessionData
 
@@ -158,6 +168,7 @@ object MediaNotificationHandler {
                     text = finalText,
                     appName = appName,
                     picMap = picMap,
+                    mediaProgress = localMediaProgress(mediaSessionData),
                 )
             } catch (e: Exception) {
                 Logger.e(TAG, "在本机内生成浮窗和通知失败", e)
@@ -168,7 +179,24 @@ object MediaNotificationHandler {
 
         try {
             val appName = service.getAppName(sbn.packageName)
-            MessageSender.sendMediaPlayNotification(
+            // 进度与播放态在推送时刻现取：缓存里的位置停在元数据回调那一刻，
+            // 用它配推送时刻会让接收端每轮把进度重置回旧位置。
+            val controller = MediaSessionMonitorService.instance?.getPrimaryController()
+            val live = controller?.takeIf { it.packageName == sbn.packageName }
+            val livePlayback = live?.playbackState
+            val livePosition =
+                PlaybackStatePosition
+                    .estimate(livePlayback, System.currentTimeMillis())
+                    .takeIf { it >= 0L } ?: mediaSessionData.position
+            // 控制器取不到时退回缓存判断，避免把未知当成暂停
+            val livePlaying =
+                if (live != null) livePlayback?.state == PlaybackState.STATE_PLAYING else mediaSessionData.isPlaying
+            val liveDuration =
+                live
+                    ?.metadata
+                    ?.getLong(android.media.MediaMetadata.METADATA_KEY_DURATION)
+                    ?.takeIf { it > 0L } ?: mediaSessionData.duration
+            MediaMessageBuilder.sendMediaPlayNotification(
                 service.applicationContext,
                 sbn.packageName,
                 appName,
@@ -177,10 +205,30 @@ object MediaNotificationHandler {
                 finalCoverUrl,
                 sbn.postTime,
                 service.deviceManager,
+                isPlaying = livePlaying,
+                positionMs = livePosition,
+                durationMs = liveDuration,
+                songKey = mediaSessionData.songKey,
             )
         } catch (e: Exception) {
             Logger.e(TAG, "发送媒体播放消息失败", e)
         }
+    }
+
+    /**
+     * 本机会话的进度载荷；位置未知或无总时长时返回 null。
+     *
+     * 采样时刻取元数据采样时的系统时间：处理通知发生在采样之后，
+     * 若改用当前时刻会把这段延迟算进已播时长。
+     */
+    private fun localMediaProgress(mediaSessionData: MediaSessionData): MediaProgress? {
+        if (mediaSessionData.position < 0L || mediaSessionData.duration <= 0L) return null
+        return MediaProgress(
+            positionMs = mediaSessionData.position,
+            durationMs = mediaSessionData.duration,
+            isPlaying = mediaSessionData.isPlaying,
+            sampledAtMs = mediaSessionData.timestamp,
+        )
     }
 
     // 媒体会话数据类
@@ -191,5 +239,11 @@ object MediaNotificationHandler {
         val duration: Long,
         val artBitmap: Bitmap?,
         val timestamp: Long,
+        /** 采样时的播放位置（毫秒）；未知为 -1。 */
+        val position: Long = -1L,
+        /** 采样时的播放态。 */
+        val isPlaying: Boolean = false,
+        /** 公共识别器给出的歌曲身份：歌词滚动期间保持不变，供对端判定换曲。 */
+        val songKey: String? = null,
     )
 }

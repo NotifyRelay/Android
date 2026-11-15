@@ -10,8 +10,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import notifyrelay.base.log.Logger
 import notifyrelay.data.database.entity.NotificationRecordEntity
-import notifyrelay.desktop.overlay.DanmakuEntry
 import notifyrelay.desktop.overlay.DesktopOverlayStore
+import notifyrelay.desktop.overlay.NotificationEntry
 import notifyrelay.domain.feature.notification.chat.ChatMemory
 import notifyrelay.domain.feature.notification.history.NotificationHistoryPortRegistry
 
@@ -57,7 +57,7 @@ internal class DesktopInboundNotificationHandler(
                 // 登记应用（应用名 + 包名 + 图标）：清空历史后仍可用于列表与图标展示
                 registerRemoteApp(record, remoteUuid)
                 if (inbound.duplicate) {
-                    Logger.d(TAG, "远端通知已入库，跳过弹幕: pkg=" + record.packageName)
+                    Logger.d(TAG, "远端通知已入库，跳过上屏: pkg=" + record.packageName)
                 } else {
                     InboundNotificationProcessor.markContentSeen(
                         record.appName.orEmpty(),
@@ -67,7 +67,7 @@ internal class DesktopInboundNotificationHandler(
                     // 图标取本地缓存（入站时同链路的图标请求可能尚未回包，无图标时不占位）
                     val icon = runCatching { RemoteAppIconCache.cachedBytes(record.packageName) }.getOrNull()
                     withContext(Dispatchers.Main) {
-                        DesktopOverlayStore.addDanmaku(record.toDanmaku(remoteUuid, icon))
+                        DesktopOverlayStore.addNotification(record.toNotification(remoteUuid, icon))
                     }
                 }
                 // 图标缺失时向来源设备请求（与 Android 入站后 checkAndSyncIcon 同口径）
@@ -94,12 +94,12 @@ internal class DesktopInboundNotificationHandler(
         }.onFailure { Logger.w(TAG, "登记远端应用失败: " + record.packageName, it) }
     }
 
-    /** 远端通知转弹幕：应用名为记录中的应用名，缺省回落到包名。 */
-    private fun NotificationRecordEntity.toDanmaku(
+    /** 远端通知转卡片：应用名为记录中的应用名，缺省回落到包名。 */
+    private fun NotificationRecordEntity.toNotification(
         remoteUuid: String,
         icon: ByteArray?,
-    ): DanmakuEntry =
-        DanmakuEntry(
+    ): NotificationEntry =
+        NotificationEntry(
             id = key.hashCode().toLong(),
             appName = appName?.takeIf { it.isNotBlank() } ?: packageName,
             title = title.orEmpty(),

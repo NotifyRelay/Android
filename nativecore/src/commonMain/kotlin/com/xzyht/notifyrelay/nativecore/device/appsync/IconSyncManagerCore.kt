@@ -31,7 +31,7 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  */
 object IconSyncManagerCore {
     private const val TAG = "IconSyncManager"
-    private const val ICON_REQUEST_TIMEOUT_MS = 10000L
+    internal const val ICON_REQUEST_TIMEOUT_MS = 10000L
 
     private val json = Json { ignoreUnknownKeys = true }
     private val ioScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -258,7 +258,8 @@ object IconSyncManagerCore {
         ioScope.launch { handleIconResponse(payload) }
     }
 
-    private suspend fun requestIconsFromDevice(
+    /** 发送由 Rust 构造好的 ICON_REQUEST 报文；入队失败抛异常以触发调用方清理 pending。 */
+    internal suspend fun requestIconsFromDevice(
         requestJson: String,
         deviceManager: DeviceMessagePort,
         sourceDevice: DeviceInfo,
@@ -277,7 +278,8 @@ object IconSyncManagerCore {
         }
     }
 
-    private fun parseRequestedPackages(requestJson: String): List<String> =
+    /** 从请求报文中取出去重后的包名列表。 */
+    internal fun parseRequestedPackages(requestJson: String): List<String> =
         try {
             val root = json.parseToJsonElement(requestJson).jsonObject
             val single = root["packageName"]?.jsonPrimitive?.content

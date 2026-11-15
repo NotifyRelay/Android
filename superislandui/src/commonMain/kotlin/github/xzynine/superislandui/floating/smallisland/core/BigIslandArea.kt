@@ -2,11 +2,11 @@ package github.xzynine.superislandui.floating.smallisland.core
 
 import github.xzynine.superislandui.floating.smallisland.left.AComponent
 import github.xzynine.superislandui.floating.smallisland.right.BComponent
+import github.xzynine.superislandui.json.firstNonBlankString
 import github.xzynine.superislandui.json.optArrayOrNull
 import github.xzynine.superislandui.json.optBooleanOr
 import github.xzynine.superislandui.json.optObjectOrNull
 import github.xzynine.superislandui.json.optStringOr
-import github.xzynine.superislandui.json.optStringOrNull
 import github.xzynine.superislandui.parser.parseAComponent
 import github.xzynine.superislandui.parser.parseBComponent
 import kotlinx.serialization.json.JsonObject
@@ -68,8 +68,7 @@ fun parseBigIslandArea(
     }
 
     val primary =
-        firstString(
-            json,
+        json.firstNonBlankString(
             arrayOf(
                 "title",
                 "primaryText",
@@ -83,8 +82,7 @@ fun parseBigIslandArea(
         )
 
     val secondary =
-        firstString(
-            json,
+        json.firstNonBlankString(
             arrayOf(
                 "content",
                 "secondaryText",
@@ -120,24 +118,13 @@ fun parseBigIslandArea(
     )
 }
 
-private fun firstString(
-    obj: JsonObject,
-    keys: Array<String>,
-): String? {
-    for (key in keys) {
-        val value = obj.optStringOrNull(key)
-        if (!value.isNullOrBlank()) return value
-    }
-    return null
-}
-
 private fun nestedFirstString(
     obj: JsonObject,
     keys: Array<String>,
 ): String? {
     for (key in keys) {
         val nested = obj.optObjectOrNull(key) ?: continue
-        val direct = firstString(nested, arrayOf("title", "text", "content", "primaryText", "secondaryText"))
+        val direct = nested.firstNonBlankString(arrayOf("title", "text", "content", "primaryText", "secondaryText"))
         if (!direct.isNullOrBlank()) return direct
         // 支持数组中的第一项
         val arr = nested.optArrayOrNull("components") ?: nested.optArrayOrNull("items")

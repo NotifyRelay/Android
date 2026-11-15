@@ -47,6 +47,10 @@ kotlin {
             implementation(libs.compose.multiplatform.ui)
         }
 
+        commonTest.dependencies {
+            implementation(kotlin("test"))
+        }
+
         getByName("androidHostTest").dependencies {
             implementation(libs.junit)
         }

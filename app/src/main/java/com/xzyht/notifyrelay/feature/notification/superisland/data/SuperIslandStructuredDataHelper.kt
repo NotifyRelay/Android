@@ -108,11 +108,7 @@ object SuperIslandStructuredDataHelper {
                     extras.putBoolean("android.showChronometer", true)
                 }
 
-                extras.putBoolean(SuperIslandExtras.KEY_REDUCED_IMAGES, true)
-                extras.putString(SuperIslandExtras.KEY_SOURCE_PACKAGE, context.packageName)
-                extras.putString(SuperIslandExtras.KEY_APP_PACKAGE, context.packageName)
-                extras.putBoolean(SuperIslandExtras.KEY_IS_FOCUS_NOTIFICATION, true)
-                extras.putBoolean(SuperIslandExtras.KEY_SHOW_BADGE, false)
+                putFocusExtras(context, extras)
 
                 Logger.i(TAG, "添加超级岛结构化数据成功")
             }
@@ -254,11 +250,7 @@ object SuperIslandStructuredDataHelper {
             addActionBundlesToExtras(extras)
             addMediaPicMapToExtras(context, extras, picMap)
 
-            extras.putBoolean(SuperIslandExtras.KEY_REDUCED_IMAGES, true)
-            extras.putString(SuperIslandExtras.KEY_SOURCE_PACKAGE, context.packageName)
-            extras.putString(SuperIslandExtras.KEY_APP_PACKAGE, context.packageName)
-            extras.putBoolean(SuperIslandExtras.KEY_IS_FOCUS_NOTIFICATION, true)
-            extras.putBoolean(SuperIslandExtras.KEY_SHOW_BADGE, false)
+            putFocusExtras(context, extras)
 
             Logger.i(TAG, "添加媒体类型超级岛结构化数据成功")
         } catch (e: CancellationException) {
@@ -329,11 +321,7 @@ object SuperIslandStructuredDataHelper {
             addActionBundlesToExtras(extras)
 
             // 应用/源包信息等标准焦点标记
-            extras.putBoolean(SuperIslandExtras.KEY_REDUCED_IMAGES, true)
-            extras.putString(SuperIslandExtras.KEY_SOURCE_PACKAGE, context.packageName)
-            extras.putString(SuperIslandExtras.KEY_APP_PACKAGE, context.packageName)
-            extras.putBoolean(SuperIslandExtras.KEY_IS_FOCUS_NOTIFICATION, true)
-            extras.putBoolean(SuperIslandExtras.KEY_SHOW_BADGE, false)
+            putFocusExtras(context, extras)
 
             Logger.i(TAG, "添加非媒体类型超级岛结构化数据成功")
         } catch (e: Exception) {
@@ -399,11 +387,7 @@ object SuperIslandStructuredDataHelper {
                 MAX_MEDIA_PIC_TOTAL_BYTES,
             )
         if (result.icons.isEmpty()) return
-        val picsBundle = Bundle()
-        result.icons.forEach { (key, data) ->
-            picsBundle.putParcelable(key, Icon.createWithData(data, 0, data.size))
-        }
-        extras.putBundle(SuperIslandExtras.KEY_PICS, picsBundle)
+        putPicsBundle(extras, result.icons)
         Logger.i(TAG, "媒体图片资源注入成功，共 ${result.icons.size} 个图片（总计 ${result.totalBytes} bytes）")
     }
 
@@ -435,11 +419,7 @@ object SuperIslandStructuredDataHelper {
         if (result.icons.isEmpty()) return emptySet()
         // 依据《小米澎湃OS 岛通知开发指南》附录「图片数据参数：miui.focus.pics」：
         // 客户端实现把图片以 Icon 放进 miui.focus.pics Bundle，Json 里的 pic 只作为该 Bundle 的 key。
-        val picsBundle = Bundle()
-        result.icons.forEach { (key, data) ->
-            picsBundle.putParcelable(key, Icon.createWithData(data, 0, data.size))
-        }
-        extras.putBundle(SuperIslandExtras.KEY_PICS, picsBundle)
+        putPicsBundle(extras, result.icons)
         Logger.i(TAG, "超级岛图片资源注入成功（Icon，仅写 pics Bundle），共 ${result.icons.size} 个图片（总计 ${result.totalBytes} bytes）")
         return result.icons.keys
     }
@@ -703,4 +683,40 @@ object SuperIslandStructuredDataHelper {
             put("narrowFont", false)
             put("showHighlightColor", true)
         }
+}
+
+/**
+ * 写入焦点通知的标准 extras。
+ *
+ * @param context 提供源包名。
+ * @param extras 目标 extras。
+ */
+private fun putFocusExtras(
+    context: Context,
+    extras: Bundle,
+) {
+    extras.putBoolean(SuperIslandExtras.KEY_REDUCED_IMAGES, true)
+    extras.putString(SuperIslandExtras.KEY_SOURCE_PACKAGE, context.packageName)
+    extras.putString(SuperIslandExtras.KEY_APP_PACKAGE, context.packageName)
+    extras.putBoolean(SuperIslandExtras.KEY_IS_FOCUS_NOTIFICATION, true)
+    extras.putBoolean(SuperIslandExtras.KEY_SHOW_BADGE, false)
+}
+
+/**
+ * 把已编码的图标写入 `miui.focus.pics` Bundle。
+ *
+ * Json 里的 pic 只作为该 Bundle 的 key，系统按 key 取图。
+ *
+ * @param extras 目标 extras。
+ * @param icons 图片键到已编码图标数据的映射。
+ */
+private fun putPicsBundle(
+    extras: Bundle,
+    icons: Map<String, ByteArray>,
+) {
+    val picsBundle = Bundle()
+    icons.forEach { (key, data) ->
+        picsBundle.putParcelable(key, Icon.createWithData(data, 0, data.size))
+    }
+    extras.putBundle(SuperIslandExtras.KEY_PICS, picsBundle)
 }

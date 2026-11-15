@@ -56,8 +56,11 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
             artist: String,
             duration: Long,
             artBitmap: Any?,
+            position: Long = -1L,
+            isPlaying: Boolean = false,
+            songKey: String? = null,
         ) {
-            MediaNotificationHandler.onMediaSessionUpdated(packageName, title, artist, duration, artBitmap)
+            MediaNotificationHandler.onMediaSessionUpdated(packageName, title, artist, duration, artBitmap, position, isPlaying, songKey)
         }
 
         // 获取指定包名的媒体会话数据

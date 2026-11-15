@@ -1,58 +1,29 @@
 package com.xzyht.notifyrelay.ui.activity
 
-import android.content.Context
 import android.os.Bundle
 import androidx.activity.compose.setContent
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
-import com.xzyht.notifyrelay.ui.activity.GuideActivity
 import com.xzyht.notifyrelay.ui.common.SetupSystemBars
 import com.xzyht.notifyrelay.ui.devtools.NotificationFieldDumpPage
-import notifyrelay.base.log.Logger
 import notifyrelay.base.util.IntentUtils
-import notifyrelay.data.Storage
 import notifyrelay.shared.ui.common.NotifyRelayTheme
 import notifyrelay.shared.ui.common.ScrollableTopAppBarPage
-import top.yukonga.miuix.kmp.basic.DropdownEntry
-import top.yukonga.miuix.kmp.basic.DropdownItem
-import top.yukonga.miuix.kmp.preference.ArrowPreference
-import top.yukonga.miuix.kmp.preference.SwitchPreference
-import top.yukonga.miuix.kmp.preference.WindowDropdownPreference
+import notifyrelay.shared.ui.screen.DeveloperModeScreen
 
+/**
+ * 开发者选项页（Android 入口）。
+ *
+ * 页面主体复用公共端 [DeveloperModeScreen]；本类只提供页面容器与 Android 专属的
+ * 通知字段转储页切换、引导页分支调试入口。
+ *
+ * 日志级别与调试开关的持久化初值由 `NotifyRelayApplication` 装载，本类不再重复读取。
+ */
 class DeveloperModeActivity : AppCompatActivity() {
-    companion object {
-        private const val KEY_LOG_LEVEL = "log_level"
-        private const val KEY_DEBUG_UI_ENABLED = "debug_ui_enabled"
-        private const val KEY_FILTERED_NOTIFICATION_LOG_ENABLED = "filtered_notification_log_enabled"
-
-        val DEBUG_UI_ENABLED: MutableState<Boolean> = mutableStateOf(false)
-        val FILTERED_NOTIFICATION_LOG_ENABLED: MutableState<Boolean> = mutableStateOf(true)
-
-        fun initLogConfig(context: Context) {
-            val logLevelOrdinal = Storage.getInt(KEY_LOG_LEVEL, Logger.Level.INFO.ordinal)
-            Logger.currentLevel = Logger.Level.entries.getOrElse(logLevelOrdinal) { Logger.Level.INFO }
-        }
-
-        fun initDebugUiConfig(context: Context) {
-            DEBUG_UI_ENABLED.value = Storage.getBoolean(KEY_DEBUG_UI_ENABLED, false)
-            FILTERED_NOTIFICATION_LOG_ENABLED.value = Storage.getBoolean(KEY_FILTERED_NOTIFICATION_LOG_ENABLED, true)
-            Logger.enableFilteredNotificationLog = FILTERED_NOTIFICATION_LOG_ENABLED.value
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
@@ -87,132 +58,21 @@ class DeveloperModeActivity : AppCompatActivity() {
                     if (showNotificationDump) {
                         NotificationFieldDumpPage()
                     } else {
-                        DeveloperModeScreen(onOpenNotificationDump = { showNotificationDump = true })
+                        DeveloperModeScreen(
+                            onOpenGuideBranch = { branch -> openGuideBranch(branch) },
+                            onOpenDumpPage = { showNotificationDump = true },
+                        )
                     }
                 }
             }
         }
     }
 
-    @Composable
-    fun DeveloperModeScreen(onOpenNotificationDump: () -> Unit) {
-        val context = LocalContext.current
-
-        // 日志级别状态
-        val logLevel =
-            remember {
-                mutableStateOf(Logger.currentLevel)
-            }
-
-        // 日志级别选项，添加[e].[i]等蓝色文本
-        val logLevelOptions =
-            listOf(
-                "关闭" to Logger.Level.NONE,
-                "[E] 错误" to Logger.Level.ERROR,
-                "[W] 警告" to Logger.Level.WARN,
-                "[I] 信息" to Logger.Level.INFO,
-                "[D] 调试" to Logger.Level.DEBUG,
-                "[V] 详细" to Logger.Level.VERBOSE,
-            )
-
-        // 当前选中的日志级别索引
-        val selectedLevelIndex =
-            remember {
-                mutableIntStateOf(logLevelOptions.indexOfFirst { it.second == logLevel.value })
-            }
-
-        Column(
-            modifier =
-                Modifier
-                    .fillMaxSize()
-                    .padding(start = 16.dp, end = 16.dp),
-        ) {
-            Column(
-                modifier =
-                    Modifier
-                        .fillMaxSize(),
-            ) {
-                var debugUiEnabled by DEBUG_UI_ENABLED
-                var filteredNotificationLogEnabled by FILTERED_NOTIFICATION_LOG_ENABLED
-
-                SwitchPreference(
-                    title = "浮窗/去重调试",
-                    summary = "超级岛浮窗说明显示调试信息、智能去重输出调试日志",
-                    checked = debugUiEnabled,
-                    onCheckedChange = {
-                        debugUiEnabled = it
-                        Storage.putBoolean(KEY_DEBUG_UI_ENABLED, it)
-                    },
-                )
-
-                WindowDropdownPreference(
-                    title = "调试引导页",
-                    summary = "选择分支进入引导页调试多分支显示",
-                    entry =
-                        DropdownEntry(
-                            items =
-                                listOf(
-                                    DropdownItem(
-                                        text = "完整流程",
-                                        onClick = {
-                                            val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
-                                            intent.putExtra("fromInternal", true)
-                                            intent.putExtra("forceBranch", "full")
-                                            IntentUtils.startActivity(context, intent, true)
-                                        },
-                                    ),
-                                    DropdownItem(
-                                        text = "重授权",
-                                        onClick = {
-                                            val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
-                                            intent.putExtra("fromInternal", true)
-                                            intent.putExtra("forceBranch", "reauth")
-                                            IntentUtils.startActivity(context, intent, true)
-                                        },
-                                    ),
-                                    DropdownItem(
-                                        text = "需重新同意",
-                                        onClick = {
-                                            val intent = IntentUtils.createIntent(context, GuideActivity::class.java)
-                                            intent.putExtra("fromInternal", true)
-                                            intent.putExtra("forceBranch", "consent")
-                                            IntentUtils.startActivity(context, intent, true)
-                                        },
-                                    ),
-                                ),
-                        ),
-                )
-
-                SwitchPreference(
-                    title = "过滤通知日志",
-                    summary = "显示被过滤通知的详细日志",
-                    checked = filteredNotificationLogEnabled,
-                    onCheckedChange = {
-                        filteredNotificationLogEnabled = it
-                        Logger.enableFilteredNotificationLog = it
-                        Storage.putBoolean(KEY_FILTERED_NOTIFICATION_LOG_ENABLED, it)
-                    },
-                )
-
-                WindowDropdownPreference(
-                    title = "日志级别",
-                    summary = "当前级别: ${logLevelOptions[selectedLevelIndex.intValue].first}",
-                    items = logLevelOptions.map { it.first },
-                    selectedIndex = selectedLevelIndex.intValue,
-                    onSelectedIndexChange = {
-                        selectedLevelIndex.intValue = it
-                        logLevel.value = logLevelOptions[it].second
-                        Logger.currentLevel = logLevel.value
-                        Storage.putInt(KEY_LOG_LEVEL, logLevel.value.ordinal)
-                    },
-                )
-
-                ArrowPreference(
-                    title = "通知字段转储",
-                    summary = "抓取当前通知栏活跃通知的全部字段（仅内存留存），长按单项复制",
-                    onClick = onOpenNotificationDump,
-                )
-            }
-        }
+    /** 以强制分支进入引导页，供开发者选项的多分支调试入口使用。 */
+    private fun openGuideBranch(branch: String) {
+        val intent = IntentUtils.createIntent(this, GuideActivity::class.java)
+        intent.putExtra("fromInternal", true)
+        intent.putExtra("forceBranch", branch)
+        IntentUtils.startActivity(this, intent, true)
     }
 }

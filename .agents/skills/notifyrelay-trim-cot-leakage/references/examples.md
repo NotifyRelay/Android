@@ -232,15 +232,15 @@ alternatives-considered 体裁是获准的归属地；评审者与轮次不属�
 
 工作语言片段与会话分隔线是转录残留。Figma 画板名保留：那是按设计在仓库外解析的外部来源。
 
-<a id="authoring-language-slip-inside-a-paired-fence"></a>
+<a id="authoring-language-slip-inside-a-verbatim-fence"></a>
 
-### 双语围栏内的编写语言残留
+### 逐字围栏内的编写语言残留
 
-**两侧文件中的泄漏：** 逐字代码块内的 `// 更新这里 before returning`。
+**泄漏：** 逐字代码块内的 `// 更新这里 before returning`。
 
-**两侧文件中的修复：** `// Update this before returning.`
+**修复：** `// Update this before returning.`
 
-修正代码块一次，并把该逐字节精确的围栏复制进两个语言文件。即使两条注释各自都通顺，用中文对侧以不同方式翻译该代码注释也会破坏配对契约。
+逐字围栏只有一份可编辑的源：修正代码块本身，生成物随之更新。
 
 <a id="behavior-visible-candidates"></a>
 

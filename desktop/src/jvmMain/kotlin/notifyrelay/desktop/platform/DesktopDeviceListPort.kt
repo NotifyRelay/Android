@@ -1,10 +1,6 @@
 package notifyrelay.desktop.platform
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.font.FontFamily
-import notifyrelay.base.util.BatteryIconConverter
-import notifyrelay.shared.ui.common.deviceIconFontFamily
 import notifyrelay.shared.ui.screen.devicelist.DeviceListPort
 
 /**
@@ -18,16 +14,6 @@ class DesktopDeviceListPort : DeviceListPort {
 
     override fun localChargingState(): Char = if (PowerStatusMonitor.snapshot.value.charging) '1' else '0'
 
-    override fun localBatteryGlyph(
-        level: Int,
-        chargingState: Char,
-    ): String = BatteryIconConverter.getBatteryIcon(level, chargingState)
-
-    override fun localBatteryColor(level: Int): Color = BatteryIconConverter.getBatteryColor(level)
-
     @Composable
     override fun isLandscape(): Boolean = isWindowLandscape()
-
-    @Composable
-    override fun iconFontFamily(): FontFamily = deviceIconFontFamily()
 }

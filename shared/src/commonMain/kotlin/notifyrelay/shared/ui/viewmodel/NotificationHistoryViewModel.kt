@@ -1,6 +1,5 @@
 package notifyrelay.shared.ui.viewmodel
 
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import androidx.paging.Pager
@@ -16,7 +15,6 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import notifyrelay.domain.feature.notification.history.AppIconInfo
 import notifyrelay.domain.feature.notification.history.GroupedNotifications
 import notifyrelay.domain.feature.notification.history.NotificationHistoryPort
 import notifyrelay.domain.feature.notification.history.NotificationHistoryUiState
@@ -30,15 +28,15 @@ class NotificationHistoryViewModel(
     private val _uiState = MutableStateFlow(NotificationHistoryUiState())
     val uiState: StateFlow<NotificationHistoryUiState> = _uiState.asStateFlow()
 
-    private val _appIconCache = MutableStateFlow<Map<String, Pair<String, ImageBitmap?>>>(emptyMap())
-    val appIconCache: StateFlow<Map<String, Pair<String, ImageBitmap?>>> = _appIconCache.asStateFlow()
+    /** 图标缓存与预加载逻辑两个历史页共用，见 [HistoryIconCache]。 */
+    private val iconCache = HistoryIconCache(viewModelScope) { packageNames -> port.appIcons(packageNames) }
+    val appIconCache = iconCache.icons
 
     private val installedPackagesFlow = MutableStateFlow<Set<String>>(emptySet())
     val installedPackagesState: StateFlow<Set<String>> = installedPackagesFlow.asStateFlow()
 
     private val deviceFlow = MutableStateFlow("本机")
     private val refreshSignal = MutableStateFlow(0L)
-    private val iconLoading = mutableSetOf<String>()
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val groupedPagingFlow: Flow<PagingData<GroupedNotifications>> =
@@ -54,19 +52,13 @@ class NotificationHistoryViewModel(
             _uiState.update { it.copy(deviceList = port.deviceList()) }
             installedPackagesFlow.value = port.installedPackages()
         }
-        viewModelScope.launch {
-            port.iconUpdates.collect { update ->
-                update?.let { (packageName, _) ->
-                    _appIconCache.update { it - packageName }
-                    preloadAppIcons(listOf(packageName))
-                }
-            }
-        }
+        observeIconUpdates(port.iconUpdates, iconCache)
         viewModelScope.launch {
             port.historyChanged.collect { refreshSignal.value = it }
         }
     }
 
+    /** 切换历史设备；同一设备重复调用不重查。 */
     fun loadNotifications(device: String) {
         if (deviceFlow.value == device) return
         deviceFlow.value = device
@@ -107,20 +99,8 @@ class NotificationHistoryViewModel(
         }
     }
 
-    fun preloadAppIcons(packageNames: List<String>) {
-        val missing = packageNames.filter { it.isNotBlank() && !_appIconCache.value.containsKey(it) && iconLoading.add(it) }
-        if (missing.isEmpty()) return
-        viewModelScope.launch {
-            try {
-                val icons: Map<String, AppIconInfo> = port.appIcons(missing)
-                _appIconCache.update { cache ->
-                    cache + icons.mapValues { (_, info) -> info.appName to info.icon }
-                }
-            } finally {
-                iconLoading.removeAll(missing.toSet())
-            }
-        }
-    }
+    /** 批量补图标；参数与缓存去重由 [HistoryIconCache.preload] 负责。 */
+    fun preloadAppIcons(packageNames: List<String>) = iconCache.preload(packageNames)
 
     private fun refreshPaging() {
         refreshSignal.value = refreshSignal.value + 1

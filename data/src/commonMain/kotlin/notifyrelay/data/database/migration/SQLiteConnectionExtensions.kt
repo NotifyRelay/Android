@@ -49,6 +49,27 @@ fun SQLiteConnection.querySingleLong(
         statement.getLong(0)
     }
 
+/**
+ * 逐行遍历查询结果。
+ *
+ * 迁移里需要「读完一行再写一行」的场景（如把 JSON 列拆成关联表）无法用单标量查询表达；
+ * 回调内不要在同一连接上重入 prepare 同一个语句。
+ *
+ * @param sql 查询语句。
+ * @param args 位置参数。
+ * @param action 每行的处理逻辑，入参是已定位到当前行的语句。
+ */
+fun SQLiteConnection.forEachRow(
+    sql: String,
+    args: List<Any?> = emptyList(),
+    action: (SQLiteStatement) -> Unit,
+) {
+    prepare(sql).use { statement ->
+        statement.bindAll(args)
+        while (statement.step()) action(statement)
+    }
+}
+
 /** 按 1-based 顺序绑定参数；支持的运行时类型与迁移脚本实际用到的类型一致。 */
 private fun SQLiteStatement.bindAll(args: List<Any?>) {
     args.forEachIndexed { index, value ->

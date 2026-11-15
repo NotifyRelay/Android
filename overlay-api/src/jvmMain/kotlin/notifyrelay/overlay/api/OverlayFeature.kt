@@ -3,18 +3,14 @@ package notifyrelay.overlay.api
 import java.util.concurrent.ConcurrentHashMap
 
 /**
- * 叠加层元素的锚点与外观配置。
+ * 叠加层状态元素的外观配置。
  *
- * 坐标按屏幕宽高的百分比（0~100）表达，与 Windows 叠加层同口径；
- * JVM 叠加层为覆盖主屏的单一窗口，故无目标屏字段。
+ * 状态元素（时间 / 键盘 / 余额）由叠加层按固定列布局排布，位置不在此表达；
+ * 本类型只承载开关与文本外观。
  */
-data class OverlayAnchor(
+data class OverlayStyle(
     /** 是否显示该元素。 */
     val enabled: Boolean = true,
-    /** 水平位置，占屏宽百分比（0~100）。 */
-    val xPercent: Float = 50f,
-    /** 垂直位置，占屏高百分比（0~100）。 */
-    val yPercent: Float = 10f,
     /** 缩放倍数。 */
     val scale: Float = 1f,
     /** 文本颜色，`#RRGGBB`。 */

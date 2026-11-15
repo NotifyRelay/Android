@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -15,8 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.dp
+import github.xzynine.superislandui.common.LocalSuperIslandReceivedAtMs
 import github.xzynine.superislandui.floating.bigisland.components.SuperIslandTemplateCompose
+import github.xzynine.superislandui.floating.common.SuperIslandExpandableCard
+import github.xzynine.superislandui.floating.common.superIslandCardColor
 import github.xzynine.superislandui.floating.smallisland.compose.BigIslandCollapsedCompose
+import github.xzynine.superislandui.floating.smallisland.compose.collapsedCapsuleColor
 import github.xzynine.superislandui.model.core.ParamV2
 import github.xzynine.superislandui.model.core.parseParamV2
 import kotlinx.coroutines.delay
@@ -75,6 +81,9 @@ internal fun SuperIslandCard(
     }
 
     val regionKey = "super-" + entry.sourceKey
+    DisposableEffect(regionKey) {
+        onDispose { regions?.remove(regionKey) }
+    }
     val regionModifier =
         if (interactiveEnabled && regions != null) {
             Modifier.onGloballyPositioned { coords ->
@@ -92,32 +101,44 @@ internal fun SuperIslandCard(
             Modifier
         }
 
-    if (expanded) {
-        Box(Modifier.then(regionModifier)) {
-            ExpandedSuperIslandCard(entry, paramV2)
-        }
-    } else {
-        Box(
-            Modifier.then(regionModifier).then(
-                if (interactiveEnabled) {
-                    Modifier.clickable {
-                        expanded = true
-                        expandGeneration++
-                    }
-                } else {
-                    Modifier
-                },
-            ),
-        ) {
-            BigIslandCollapsedCompose(
-                bigIsland = extractBigIsland(entry.paramV2Raw),
-                picMap = entry.pics,
-                fallbackTitle = entry.title,
-                fallbackContent = entry.text,
-                picFunction = paramV2?.picFunction,
-                aodPic = paramV2?.aodPic,
-            )
-        }
+    // 摘要胶囊的入参解析只随内容变化重算：形变期间两态内容同时组合
+    val bigIsland = remember(entry.paramV2Raw) { extractBigIsland(entry.paramV2Raw) }
+
+    // 登记本条内容在本地被接收的时刻：计时器据此把基准换算到本地时钟，
+    // 对端时钟偏差不进入显示值
+    CompositionLocalProvider(LocalSuperIslandReceivedAtMs provides entry.updatedAt) {
+        // 展开与收起共用折叠态底色：背景由容器单层绘制，组件自身不再画表面
+        SuperIslandExpandableCard(
+            expanded = expanded,
+            expandedBackgroundColor = superIslandCardColor(isOverlapping = false),
+            collapsedBackgroundColor = collapsedCapsuleColor(isOverlapping = false),
+            modifier = Modifier.then(regionModifier),
+            expandedContent = { ExpandedSuperIslandCard(entry, paramV2) },
+            collapsedContent = {
+                Box(
+                    Modifier.then(
+                        if (interactiveEnabled) {
+                            Modifier.clickable {
+                                expanded = true
+                                expandGeneration++
+                            }
+                        } else {
+                            Modifier
+                        },
+                    ),
+                ) {
+                    BigIslandCollapsedCompose(
+                        bigIsland = bigIsland,
+                        picMap = entry.pics,
+                        fallbackTitle = entry.title,
+                        fallbackContent = entry.text,
+                        picFunction = paramV2?.picFunction,
+                        aodPic = paramV2?.aodPic,
+                        drawSurface = false,
+                    )
+                }
+            },
+        )
     }
 }
 
@@ -136,6 +157,7 @@ private fun ExpandedSuperIslandCard(
             fallbackContent = entry.text,
             mediaAppName = entry.deviceName,
             mediaControlsVisible = false,
+            drawSurface = false,
         )
     }
 }

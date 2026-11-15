@@ -201,12 +201,7 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 
     // Compose 运行时与 UI 采用 Compose Multiplatform 坐标（版本由 CMP 统一决定）
-    implementation(libs.compose.multiplatform.runtime)
-    implementation(libs.compose.multiplatform.foundation)
-    implementation(libs.compose.multiplatform.foundation.layout)
-    implementation(libs.compose.multiplatform.ui)
-    implementation(libs.compose.multiplatform.ui.text)
-    implementation(libs.compose.multiplatform.ui.tooling.preview)
+    implementation(libs.bundles.compose.multiplatform.common)
     debugImplementation(libs.compose.multiplatform.ui.tooling)
 
     // material3 保留 androidx 坐标（提供 KMP 元数据变体）

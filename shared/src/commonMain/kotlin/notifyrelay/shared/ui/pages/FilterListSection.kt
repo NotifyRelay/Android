@@ -177,29 +177,12 @@ fun FilterListSection(
         ) {
             defaultEntries.forEach { entry ->
                 key(entry) {
-                    var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-                    LaunchedEffect(entry) {
-                        if (entry.packageName.isNotBlank() && iconBitmap == null) {
-                            viewModel.loadIcon(entry.packageName) { icon ->
-                                iconBitmap = icon ?: defaultAppIconBitmap
-                            }
-                        }
-                    }
-                    SwitchPreference(
-                        title = entryLabel(entry),
-                        startAction = {
-                            if (entry.packageName.isNotBlank()) {
-                                iconBitmap?.let {
-                                    Image(
-                                        bitmap = it,
-                                        contentDescription = null,
-                                        modifier = Modifier.size(24.dp),
-                                    )
-                                }
-                            }
-                        },
+                    EntrySwitch(
+                        entry = entry,
+                        viewModel = viewModel,
+                        defaultIcon = defaultAppIconBitmap,
                         checked = entryEnabled(entry),
-                        onCheckedChange = { enabled -> onEntryEnabledChange?.invoke(entry, enabled) },
+                        onCheckedChange = onEntryEnabledChange,
                     )
                 }
             }
@@ -220,33 +203,16 @@ fun FilterListSection(
         ) {
             manualEntries.forEach { entry ->
                 key(entry) {
-                    var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
-                    LaunchedEffect(entry) {
-                        if (entry.packageName.isNotBlank() && iconBitmap == null) {
-                            viewModel.loadIcon(entry.packageName) { icon ->
-                                iconBitmap = icon ?: defaultAppIconBitmap
-                            }
-                        }
-                    }
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        SwitchPreference(
-                            title = entryLabel(entry),
-                            startAction = {
-                                if (entry.packageName.isNotBlank()) {
-                                    iconBitmap?.let {
-                                        Image(
-                                            bitmap = it,
-                                            contentDescription = null,
-                                            modifier = Modifier.size(24.dp),
-                                        )
-                                    }
-                                }
-                            },
+                        EntrySwitch(
+                            entry = entry,
+                            viewModel = viewModel,
+                            defaultIcon = defaultAppIconBitmap,
                             checked = entryEnabled(entry),
-                            onCheckedChange = { enabled -> onEntryEnabledChange?.invoke(entry, enabled) },
+                            onCheckedChange = onEntryEnabledChange,
                             modifier = Modifier.weight(1f),
                         )
                         IconButton(
@@ -259,6 +225,52 @@ fun FilterListSection(
             }
         }
     }
+}
+
+/**
+ * 条目开关行：图标按包名异步加载，缺失时回落到 [defaultIcon]。
+ *
+ * @param entry 条目。
+ * @param viewModel 图标来源。
+ * @param defaultIcon 图标缺失时的回落位图。
+ * @param checked 开关状态。
+ * @param onCheckedChange 开关回调，null 时开关不可切换。
+ * @param modifier 应用到偏好项的修饰符。
+ */
+@Composable
+private fun EntrySwitch(
+    entry: FilterEntryItem,
+    viewModel: AppIconViewModel,
+    defaultIcon: ImageBitmap?,
+    checked: Boolean,
+    onCheckedChange: ((FilterEntryItem, Boolean) -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+    LaunchedEffect(entry) {
+        if (entry.packageName.isNotBlank() && iconBitmap == null) {
+            viewModel.loadIcon(entry.packageName) { icon ->
+                iconBitmap = icon ?: defaultIcon
+            }
+        }
+    }
+    SwitchPreference(
+        title = entryLabel(entry),
+        startAction = {
+            if (entry.packageName.isNotBlank()) {
+                iconBitmap?.let {
+                    Image(
+                        bitmap = it,
+                        contentDescription = null,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        },
+        checked = checked,
+        onCheckedChange = { enabled -> onCheckedChange?.invoke(entry, enabled) },
+        modifier = modifier,
+    )
 }
 
 private fun entryLabel(item: FilterEntryItem): String =

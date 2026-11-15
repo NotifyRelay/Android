@@ -10,6 +10,7 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.runBlocking
 import notifyrelay.base.log.Logger
 import notifyrelay.base.util.TextUtils
+import notifyrelay.data.filter.RemoteFilterRepository
 import notifyrelay.domain.feature.notification.filter.RemoteFilterPlaceholderQueue
 import notifyrelay.shared.ui.common.DebugFlags
 import org.json.JSONObject
@@ -120,7 +121,7 @@ object BackendRemoteFilter {
                     filterPort.isLoaded = true
                     if (NativeCore.isReady()) {
                         val installedPkgs = InstalledAppsRepository.getInstalledPackageNamesSync(context)
-                        filterPort.let { (it as? AndroidRemoteFilterPort)?.syncToRust(installedPkgs) }
+                        filterPort.let { (it as? RemoteFilterRepository)?.syncToRust(installedPkgs) }
                     }
                 } catch (e: Exception) {
                     Logger.e("NotifyRelay(狂鼠)", "远程过滤配置加载失败", e)

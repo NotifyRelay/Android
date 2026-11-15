@@ -8,25 +8,19 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
-import github.xzynine.superislandui.floating.common.formatTimerInfo
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
+import github.xzynine.superislandui.floating.common.rememberTimerText
 import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.model.templates.HighlightInfo
-import kotlinx.coroutines.delay
 import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.SuperIslandImageUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -67,7 +61,7 @@ fun HighlightInfoCompose(
         } else {
             primaryText?.let {
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                     color = Color(primaryColor),
                     fontSize = 20.sp,
                     modifier = Modifier.padding(end = 4.dp),
@@ -80,7 +74,7 @@ fun HighlightInfoCompose(
             ?.takeIf { it.isNotBlank() && it != renderedPrimaryText }
             ?.let {
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                     color = Color(ColorUtils.parseColor(highlightInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(start = 8.dp),
@@ -104,7 +98,7 @@ fun HighlightInfoCompose(
             ?.takeIf { it.isNotBlank() && it != renderedPrimaryText }
             ?.let {
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                     color = Color(ColorUtils.parseColor(highlightInfo.colorSubContent) ?: 0xFF9EA3FF.toInt()),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(start = 8.dp),
@@ -148,18 +142,8 @@ private fun TimerText(
     timerInfo: TimerInfo,
     colorInt: Int,
 ) {
-    val displayState = remember(timerInfo) { mutableStateOf(formatTimerInfo(timerInfo)) }
-    // 仅计时进行中（正计时 timerType=1 / 倒计时 timerType=-1）才每秒刷新，暂停/无效类型静态显示
-    val isTimerRunning = timerInfo.timerType == 1 || timerInfo.timerType == -1
-    LaunchedEffect(timerInfo) {
-        if (!isTimerRunning) return@LaunchedEffect
-        while (true) {
-            displayState.value = formatTimerInfo(timerInfo)
-            delay(1000)
-        }
-    }
     Text(
-        text = displayState.value,
+        text = rememberTimerText(timerInfo),
         fontSize = 20.sp,
         color = Color(colorInt),
         modifier = Modifier.padding(end = 4.dp),
@@ -174,22 +158,4 @@ private fun selectIconKey(highlightInfo: HighlightInfo): String? {
     candidates.add(highlightInfo.picFunction ?: "")
     candidates.add(highlightInfo.picFunctionDark ?: "")
     return candidates.firstOrNull { it.isNotBlank() }
-}
-
-@Preview(name = "强调图文", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun HighlightInfoComposePreview() {
-    HighlightInfoCompose(
-        highlightInfo = PreviewData.sampleHighlightInfo,
-        picMap = PreviewData.samplePicMap,
-    )
-}
-
-@Preview(name = "强调图文带计时器", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun HighlightInfoComposeWithTimerPreview() {
-    HighlightInfoCompose(
-        highlightInfo = PreviewData.sampleHighlightInfoWithTimer,
-        picMap = PreviewData.samplePicMap,
-    )
 }

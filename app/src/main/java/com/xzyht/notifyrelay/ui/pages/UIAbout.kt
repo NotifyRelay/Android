@@ -1,20 +1,15 @@
 package com.xzyht.notifyrelay.ui.pages
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -22,7 +17,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -46,14 +40,15 @@ import notifyrelay.base.util.ToastUtils
 import notifyrelay.base.util.image.toBitmapOrDefault
 import notifyrelay.data.Storage
 import notifyrelay.shared.ui.dialog.UpdateDialog
+import notifyrelay.shared.ui.screen.AboutHeader
 import notifyrelay.shared.ui.screen.LogStorageSection
+import notifyrelay.shared.ui.screen.rememberDeveloperModeActivation
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.preference.ArrowPreference
 import top.yukonga.miuix.kmp.preference.SwitchPreference
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import java.util.Date
 import kotlin.time.Duration.Companion.milliseconds
 
 private const val DEFAULT_PROXY_URL = "https://gh.llkk.cc/"
@@ -67,9 +62,6 @@ fun UIAbout() {
     val context = LocalContext.current
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
-
-    var clickCount by remember { mutableIntStateOf(0) }
-    var lastClickTime by remember { mutableLongStateOf(0L) }
 
     var isCheckingUpdate by remember { mutableStateOf(false) }
     val showUpdateDialog = remember { mutableStateOf(false) }
@@ -112,49 +104,12 @@ fun UIAbout() {
                 .fillMaxWidth()
                 .verticalScroll(scrollState),
     ) {
-        appIcon?.let {
-            Image(
-                bitmap = it,
-                contentDescription = "应用图标",
-                modifier =
-                    Modifier
-                        .padding(top = 24.dp)
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .align(Alignment.CenterHorizontally),
-            )
-        }
-
-        Text(
-            text = "Notify Relay",
-            style = textStyles.title1,
-            color = colorScheme.primary,
-            modifier =
-                Modifier
-                    .padding(top = if (appIcon != null) 16.dp else 24.dp, bottom = 16.dp)
-                    .align(Alignment.CenterHorizontally),
-        )
+        AboutHeader(appIcon)
 
         ArrowPreference(
             title = "版本信息",
             summary = "主版本: ${BuildConfig.VERSION_NAME}\n内部版本: ${BuildConfig.VERSION_CODE}",
-            onClick = {
-                val currentTime = Date().time
-                if (currentTime - lastClickTime < 3000) {
-                    clickCount++
-                } else {
-                    clickCount = 1
-                }
-                lastClickTime = currentTime
-
-                if (clickCount in 3..<5) {
-                    ToastUtils.showShortToast(context, "再点击 ${5 - clickCount} 次进入开发者模式")
-                } else if (clickCount >= 5) {
-                    ToastUtils.showShortToast(context, "开发者模式已激活")
-                    Storage.putBoolean("developer_mode_enabled", true)
-                    clickCount = 0
-                }
-            },
+            onClick = rememberDeveloperModeActivation(),
             modifier = Modifier.padding(horizontal = 16.dp),
         )
 

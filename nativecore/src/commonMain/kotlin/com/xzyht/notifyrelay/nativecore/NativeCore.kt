@@ -38,7 +38,7 @@ object NativeCore {
 
     /** 发送队列是否已就绪（由 [startCore] 建立）。 */
     val senderQueueReady: Boolean
-        get() = coreRef.value?.isSenderQueueReady() ?: false
+        get() = CoreWatchdog.track { coreRef.value?.isSenderQueueReady() ?: false }
 
     /** 创建核心实例；重复调用返回既有实例。返回是否已就绪。 */
     fun createContext(): Boolean {
@@ -46,6 +46,7 @@ object NativeCore {
             synchronized(coreLock) {
                 if (coreRef.value == null) {
                     coreRef.value = Core()
+                    CoreWatchdog.reset()
                 }
             }
         }
@@ -54,6 +55,16 @@ object NativeCore {
 
     /** 绑定是否已初始化。 */
     fun isReady(): Boolean = coreRef.value != null
+
+    /**
+     * 请求关停核心实例。
+     *
+     * 直接调用绑定层：该接口只置位 Rust 侧原子信号，不参与核心锁，
+     * 因此在核心调用卡死时依然可返回。恢复需重建实例，见 [createContext]。
+     */
+    fun requestShutdown() {
+        coreRef.value?.requestShutdown()
+    }
 
     /** UniFFI ABI 版本（绑定链路自检用）。 */
     fun getAbiProbe(): String = abiProbe()
@@ -119,7 +130,7 @@ object NativeCore {
 
     // ======== Persistence（Rust 私有库：uuid/密钥由 Rust 持有）=======
 
-    fun getLocalUuid(): String? = coreRef.value?.getLocalUuid()
+    fun getLocalUuid(): String? = CoreWatchdog.track { coreRef.value?.getLocalUuid() }
 
     fun renameDevice(
         deviceUuid: String,
@@ -302,7 +313,7 @@ object NativeCore {
         name: String,
         battery: Int,
         deviceType: String,
-    ) {
+    ) = CoreWatchdog.trackUnit {
         coreRef.value?.updateHeartbeatSchedulerParams(name, battery, deviceType)
     }
 
@@ -311,7 +322,7 @@ object NativeCore {
     fun getDeviceList(
         authedTimeoutMs: Long,
         unauthedTimeoutMs: Long,
-    ): String? = coreRef.value?.getDeviceList(authedTimeoutMs, unauthedTimeoutMs)
+    ): String? = CoreWatchdog.track { coreRef.value?.getDeviceList(authedTimeoutMs, unauthedTimeoutMs) }
 
     // ======== Sender queue ========
 
@@ -320,11 +331,12 @@ object NativeCore {
         deviceUuid: String,
         header: String,
         plaintext: String,
-    ): Int {
-        val c = coreRef.value ?: return -1
-        if (!c.isSenderQueueReady()) return -1
-        return if (c.enqueueMessage(deviceUuid, header, plaintext)) 1 else 0
-    }
+    ): Int =
+        CoreWatchdog.track {
+            val c = coreRef.value ?: return@track -1
+            if (!c.isSenderQueueReady()) return@track -1
+            if (c.enqueueMessage(deviceUuid, header, plaintext)) 1 else 0
+        }
 
     // ======== Clipboard ========
 
@@ -481,9 +493,10 @@ object NativeCore {
         coreRef.value?.reconnectAddTarget(uuid, ip)
     }
 
-    fun reconnectRemoveTarget(uuid: String) {
-        coreRef.value?.reconnectRemoveTarget(uuid)
-    }
+    fun reconnectRemoveTarget(uuid: String) =
+        CoreWatchdog.trackUnit {
+            coreRef.value?.reconnectRemoveTarget(uuid)
+        }
 
     // ======== Audio stream ========
 

@@ -17,7 +17,6 @@ import github.xzynine.superislandui.floating.smallisland.right.bProgressColorRea
 import github.xzynine.superislandui.floating.smallisland.right.bProgressColorUnReach
 import github.xzynine.superislandui.floating.smallisland.right.bProgressIsCCW
 import github.xzynine.superislandui.floating.smallisland.right.textToRender
-import github.xzynine.superislandui.model.core.ParamV2
 import notifyrelay.base.log.Logger
 
 /**
@@ -33,16 +32,17 @@ internal object MediaReplicaNotifier {
     suspend fun build(
         context: Context,
         builder: NotificationCompat.Builder,
-        title: String?,
-        text: String?,
-        appName: String?,
-        paramV2Raw: String?,
-        picMap: Map<String, String>?,
-        paramV2: ParamV2?,
+        content: ReplicaContent,
         key: String,
         notificationId: Int,
         notificationManager: NotificationManager,
     ): Notification {
+        val title = content.title
+        val text = content.text
+        val appName = content.appName
+        val paramV2Raw = content.paramV2Raw
+        val picMap = content.picMap
+        val paramV2 = content.paramV2
         // 检查规范信息注入模式
         val isSuperIslandEnabled = SuperIslandConfigUtils.isSuperIslandSpecInjectionEnabled(context)
         val isLiveUpdatesEnabled = SuperIslandConfigUtils.isLiveUpdatesSpecInjectionEnabled(context)

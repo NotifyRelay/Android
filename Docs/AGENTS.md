@@ -30,7 +30,7 @@
 | 测试策略页 | 测试层级、证据选择、执行拓扑与资源归属 | 会与脚本漂移的逐项检查清单；设计理由（→ Agent Notes） |
 | 技能（`.agents/skills/`） | 可复用工作流与专门判断标准 | 产品与运行时契约（→ docs 或源码） |
 
-本仓库当前带根指令、Agent Notes 规则、技能与这份文档标准；上表中缺陷类别规则、事故复盘与测试策略三层的具体页面按本仓库自己的制品建立，各页仍各归其位。
+上表中缺陷类别规则、事故复盘与测试策略三层各有其页：[缺陷类别规则](缺陷类别规则.md)按制品收拢评审强制项，[测试策略](测试策略.md)记录层级与证据选择，[事故复盘](事故复盘.md)承载亲历叙事。新增常驻文档时在同一次改动里补上预算上限。
 
 放置：bug → 事故复盘；理由 → Agent Notes；流程 → 技能或教程；类型定义 → 参考页；契约 → README；常驻指令 → 根 `AGENTS.md` 并附理由链接；评审强制规则 → 缺陷类别规则页。
 
@@ -48,7 +48,7 @@
 
 ## 词数预算
 
-[doc-budgets.manifest.json](../scripts/doc-budgets.manifest.json) 设定常驻文档上限；`pnpm run verify-doc-budgets` 拒绝超限或缺失文件。计数把每个 CJK 字符算一个词，因为只按空白切分会把中文页读成几十个词。
+[doc-budgets.manifest.json](../scripts/doc-budgets.manifest.json) 设定常驻文档上限；`pnpm run verify-doc-budgets` 拒绝超限或缺失文件。`doc-system.config.ts` 的 `budgetCoveragePatterns` 声明哪些文档必须逐篇有上限，漏配同样失败，因此新增常驻文档时在同一次改动里补上条目。计数把每个 CJK 字符算一个词，因为只按空白切分会把中文页读成几十个词。
 
 门禁变红时：
 

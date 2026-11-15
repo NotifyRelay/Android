@@ -2,8 +2,8 @@ package github.xzynine.superislandui.model.templates
 
 import github.xzynine.superislandui.json.optBooleanOr
 import github.xzynine.superislandui.json.optIntOr
+import github.xzynine.superislandui.json.optNonEmptyString
 import github.xzynine.superislandui.json.optObjectOrNull
-import github.xzynine.superislandui.json.optStringOr
 import github.xzynine.superislandui.model.components.TimerInfo
 import github.xzynine.superislandui.model.components.parseTimerInfo
 import kotlinx.serialization.json.JsonObject
@@ -31,20 +31,20 @@ data class HighlightInfo(
 // 解析高亮信息组件（强调图文组件）
 fun parseHighlightInfo(json: JsonObject): HighlightInfo =
     HighlightInfo(
-        title = json.optStringOr("title", "").takeIf { it.isNotEmpty() },
+        title = json.optNonEmptyString("title"),
         timerInfo = json.optObjectOrNull("timerInfo")?.let { parseTimerInfo(it) },
-        content = json.optStringOr("content", "").takeIf { it.isNotEmpty() },
-        picFunction = json.optStringOr("picFunction", "").takeIf { it.isNotEmpty() },
-        picFunctionDark = json.optStringOr("picFunctionDark", "").takeIf { it.isNotEmpty() },
-        subContent = json.optStringOr("subContent", "").takeIf { it.isNotEmpty() },
+        content = json.optNonEmptyString("content"),
+        picFunction = json.optNonEmptyString("picFunction"),
+        picFunctionDark = json.optNonEmptyString("picFunctionDark"),
+        subContent = json.optNonEmptyString("subContent"),
         type = json.optIntOr("type", -1).takeIf { it != -1 },
-        colorTitle = json.optStringOr("colorTitle", "").takeIf { it.isNotEmpty() },
-        colorTitleDark = json.optStringOr("colorTitleDark", "").takeIf { it.isNotEmpty() },
-        colorContent = json.optStringOr("colorContent", "").takeIf { it.isNotEmpty() },
-        colorContentDark = json.optStringOr("colorContentDark", "").takeIf { it.isNotEmpty() },
-        colorSubContent = json.optStringOr("colorSubContent", "").takeIf { it.isNotEmpty() },
-        colorSubContentDark = json.optStringOr("colorSubContentDark", "").takeIf { it.isNotEmpty() },
-        bigImageLeft = json.optStringOr("bigImageLeft", "").takeIf { it.isNotEmpty() },
-        bigImageRight = json.optStringOr("bigImageRight", "").takeIf { it.isNotEmpty() },
+        colorTitle = json.optNonEmptyString("colorTitle"),
+        colorTitleDark = json.optNonEmptyString("colorTitleDark"),
+        colorContent = json.optNonEmptyString("colorContent"),
+        colorContentDark = json.optNonEmptyString("colorContentDark"),
+        colorSubContent = json.optNonEmptyString("colorSubContent"),
+        colorSubContentDark = json.optNonEmptyString("colorSubContentDark"),
+        bigImageLeft = json.optNonEmptyString("bigImageLeft"),
+        bigImageRight = json.optNonEmptyString("bigImageRight"),
         iconOnly = json.optBooleanOr("iconOnly", false),
     )

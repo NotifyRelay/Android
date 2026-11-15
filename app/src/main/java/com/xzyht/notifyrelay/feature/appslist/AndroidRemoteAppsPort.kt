@@ -4,11 +4,11 @@ import android.content.Context
 import com.xzyht.notifyrelay.nativecore.device.appsync.AppListSyncManagerCore
 import com.xzyht.notifyrelay.nativecore.device.appsync.RemoteAppsCacheCore
 import kotlinx.coroutines.flow.StateFlow
-import notifyrelay.data.repository.applist.PinnedAppsRepository
 import notifyrelay.domain.feature.appslist.RemoteAppsPort
 import notifyrelay.domain.feature.appslist.model.RemoteAppInfo
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.shared.feature.appslist.PinnedAppsPortRegistry
+import notifyrelay.shared.feature.appslist.RepositoryPinnedAppsPort
 
 /** 以公共缓存与同步管理器实现 [RemoteAppsPort]。 */
 class AndroidRemoteAppsPort(
@@ -17,27 +17,21 @@ class AndroidRemoteAppsPort(
     override val iconUpdates: StateFlow<Pair<String, Long>?> get() = AppIconRepository.iconUpdates
 
     override val pinnedApps: StateFlow<Map<String, Set<String>>>
-        get() = PinnedAppsPortRegistry.current?.pinnedApps ?: PinnedAppsRepository.pinnedApps
+        get() = PinnedAppsPortRegistry.current?.pinnedApps ?: RepositoryPinnedAppsPort.pinnedApps
 
     override suspend fun remoteApps(deviceUuid: String): List<RemoteAppInfo> = RemoteAppsCacheCore.list(deviceUuid)
 
-    override fun loadPinned(deviceUuid: String) {
-        PinnedAppsRepository.loadPinnedApps(deviceUuid)
-    }
+    override fun loadPinned(deviceUuid: String) = RepositoryPinnedAppsPort.load(deviceUuid)
 
     override fun pin(
         deviceUuid: String,
         packageName: String,
-    ) {
-        PinnedAppsRepository.pinApp(deviceUuid, packageName)
-    }
+    ) = RepositoryPinnedAppsPort.pin(deviceUuid, packageName)
 
     override fun unpin(
         deviceUuid: String,
         packageName: String,
-    ) {
-        PinnedAppsRepository.unpinApp(deviceUuid, packageName)
-    }
+    ) = RepositoryPinnedAppsPort.unpin(deviceUuid, packageName)
 
     override suspend fun requestAppList(deviceUuid: String): Boolean {
         val deviceManager =

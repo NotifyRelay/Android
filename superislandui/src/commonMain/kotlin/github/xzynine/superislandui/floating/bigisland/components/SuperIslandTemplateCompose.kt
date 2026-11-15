@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -18,6 +19,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.floating.common.CommonImageCompose
 import github.xzynine.superislandui.floating.common.SuperIslandComposeRoot
+import github.xzynine.superislandui.model.components.MediaProgress
 import github.xzynine.superislandui.model.components.MediaSessionData
 import github.xzynine.superislandui.model.core.ParamV2
 import top.yukonga.miuix.kmp.basic.Text
@@ -35,6 +37,7 @@ private const val COVER_PIC_KEY = "miui.focus.pic_cover"
  * @param fallbackTitle 无 paramV2 时的标题
  * @param fallbackContent 无 paramV2 时的正文
  * @param mediaAppName 媒体类型时的应用名（同时作为设备名）
+ * @param mediaProgress 媒体类型时的播放进度；为空时不显示进度条
  * @param mediaControlsVisible 媒体卡是否显示控制按钮
  * @param isOverlapping 卡片是否处于重叠提示态
  * @param onCopyVerificationCode 复制验证码回调；为空时不渲染复制按钮
@@ -42,6 +45,7 @@ private const val COVER_PIC_KEY = "miui.focus.pic_cover"
  * @param onPrevious 上一首回调
  * @param onNext 下一首回调
  * @param onCollapseClick 收起回调
+ * @param drawSurface 是否自行绘制卡片背景与圆角；由外部形态变换容器统一绘制表面时传 false
  */
 @Composable
 fun SuperIslandTemplateCompose(
@@ -50,6 +54,7 @@ fun SuperIslandTemplateCompose(
     fallbackTitle: String? = null,
     fallbackContent: String? = null,
     mediaAppName: String? = null,
+    mediaProgress: MediaProgress? = null,
     mediaControlsVisible: Boolean = true,
     isOverlapping: Boolean = false,
     onCopyVerificationCode: ((String) -> Unit)? = null,
@@ -57,6 +62,7 @@ fun SuperIslandTemplateCompose(
     onPrevious: () -> Unit = {},
     onNext: () -> Unit = {},
     onCollapseClick: () -> Unit = {},
+    drawSurface: Boolean = true,
 ) {
     SuperIslandComposeRoot(
         content = {
@@ -70,8 +76,10 @@ fun SuperIslandTemplateCompose(
                 }
 
                 paramV2.business == "media" -> {
-                    MediaIslandCompose(
-                        mediaSession =
+                    // 按展示内容记忆：本组件会随宿主重组重建会话对象，
+                    // 逐次新建会让下游以对象为键的进度时钟反复重启
+                    val mediaSession =
+                        remember(mediaAppName, fallbackTitle, fallbackContent, picMap, mediaProgress) {
                             MediaSessionData(
                                 packageName = mediaAppName.orEmpty(),
                                 appName = mediaAppName,
@@ -79,7 +87,14 @@ fun SuperIslandTemplateCompose(
                                 text = fallbackContent.orEmpty(),
                                 coverUrl = picMap?.get(COVER_PIC_KEY) ?: picMap?.values?.firstOrNull(),
                                 deviceName = mediaAppName.orEmpty(),
-                            ),
+                                positionMs = mediaProgress?.positionMs,
+                                durationMs = mediaProgress?.durationMs?.takeIf { it > 0L },
+                                isPlaying = mediaProgress?.isPlaying ?: false,
+                                sampledAtMs = mediaProgress?.sampledAtMs ?: 0L,
+                            )
+                        }
+                    MediaIslandCompose(
+                        mediaSession = mediaSession,
                         isExpanded = true,
                         showControls = mediaControlsVisible,
                         onCollapse = onCollapseClick,
@@ -116,6 +131,7 @@ fun SuperIslandTemplateCompose(
             }
         },
         isOverlapping = isOverlapping,
+        drawSurface = drawSurface,
     )
 }
 

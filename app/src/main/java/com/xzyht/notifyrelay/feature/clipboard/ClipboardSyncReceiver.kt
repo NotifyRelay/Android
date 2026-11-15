@@ -55,8 +55,9 @@ class ClipboardSyncReceiver : BroadcastReceiver() {
             syncIntent.flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_NO_ANIMATION
             context.startActivity(syncIntent)
 
-            ToastUtils.showShortToast(context, "剪贴板同步成功")
-            Logger.d(TAG, "手动同步成功")
+            // 读取与发送在透明 Activity 里完成，此处不宣称结果
+            ToastUtils.showShortToast(context, "正在同步剪贴板")
+            Logger.d(TAG, "已启动透明 Activity 读取剪贴板")
         } catch (e: Exception) {
             Logger.e(TAG, "手动同步失败", e)
             ToastUtils.showShortToast(context, "同步失败：${e.message}")

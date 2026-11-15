@@ -5,8 +5,9 @@ import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
+import androidx.room.RoomWarnings
 import notifyrelay.data.database.entity.SuperIslandHistoryEntity
-import notifyrelay.data.database.entity.SuperIslandHistorySummary
+import notifyrelay.data.database.entity.SuperIslandHistoryImageEntity
 
 data class SuperIslandPackageCount(
     val packageName: String,
@@ -27,10 +28,13 @@ interface SuperIslandHistoryDao {
     suspend fun getAllHistory(): List<SuperIslandHistoryEntity>
 
     /**
-     * 获取所有超级岛历史记录的摘要（不包含 rawPayload），用于列表/摘要态展示，避免一次性载入大字段
+     * 读取列表用的历史条目（不含 rawPayload 大字段）。
+     *
+     * 返回完整实体而不是单独的投影类型：`picMap` 是 `@Ignore` 的装配字段，查不到也不会报缺失。
      */
-    @Query("SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, picMap, featureId FROM super_island_history ORDER BY id DESC")
-    suspend fun getAllHistorySummary(): List<SuperIslandHistorySummary>
+    @Query("SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, featureId FROM super_island_history ORDER BY id DESC")
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    suspend fun getAllHistorySummary(): List<SuperIslandHistoryEntity>
 
     /**
      * 根据特征ID获取最新的历史记录
@@ -148,7 +152,7 @@ interface SuperIslandHistoryDao {
      */
     @Query(
         """
-        SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, picMap, featureId
+        SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, featureId
         FROM super_island_history
         WHERE 
             CASE 
@@ -159,18 +163,19 @@ interface SuperIslandHistoryDao {
         LIMIT :limit OFFSET :offset
     """,
     )
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
     suspend fun getByPackage(
         packageName: String?,
         limit: Int,
         offset: Int,
-    ): List<SuperIslandHistorySummary>
+    ): List<SuperIslandHistoryEntity>
 
     /**
      * 按包名获取所有历史记录摘要（不分页，用于分组内展示）
      */
     @Query(
         """
-        SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, picMap, featureId
+        SELECT id, sourceDeviceUuid, originalPackage, mappedPackage, appName, title, text, paramV2Raw, featureId
         FROM super_island_history
         WHERE 
             CASE 
@@ -180,7 +185,8 @@ interface SuperIslandHistoryDao {
         ORDER BY id DESC
     """,
     )
-    suspend fun getAllByPackage(packageName: String?): List<SuperIslandHistorySummary>
+    @SuppressWarnings(RoomWarnings.QUERY_MISMATCH)
+    suspend fun getAllByPackage(packageName: String?): List<SuperIslandHistoryEntity>
 
     /**
      * 按包名删除历史记录
@@ -208,4 +214,20 @@ interface SuperIslandHistoryDao {
      */
     @Query("SELECT COUNT(*) FROM super_island_history")
     suspend fun getCount(): Int
+
+    /** 取单条历史的图片引用。 */
+    @Query("SELECT * FROM super_island_history_images WHERE historyId = :historyId")
+    suspend fun imagesOf(historyId: Long): List<SuperIslandHistoryImageEntity>
+
+    /** 批量取一组历史的图片引用。 */
+    @Query("SELECT * FROM super_island_history_images WHERE historyId IN (:historyIds)")
+    suspend fun imagesOf(historyIds: List<Long>): List<SuperIslandHistoryImageEntity>
+
+    /** 写入图片引用（同键覆盖）。 */
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun upsertImages(images: List<SuperIslandHistoryImageEntity>)
+
+    /** 删除某条历史的全部图片引用。 */
+    @Query("DELETE FROM super_island_history_images WHERE historyId = :historyId")
+    suspend fun deleteImagesOf(historyId: Long)
 }

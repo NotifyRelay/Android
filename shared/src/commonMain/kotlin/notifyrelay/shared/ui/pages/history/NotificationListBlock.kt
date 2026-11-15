@@ -8,6 +8,7 @@ import androidx.compose.foundation.gestures.Orientation
 import androidx.compose.foundation.gestures.anchoredDraggable
 import androidx.compose.foundation.gestures.snapTo
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -94,35 +95,9 @@ fun NotificationListBlock(
                         }
                     }
 
-                // 确保锚点始终有效，在状态创建或锚点变化时立即更新
-                LaunchedEffect(anchoredDraggableState, anchors) {
-                    // 直接更新锚点，不需要额外的contains检查
-                    anchoredDraggableState.updateAnchors(anchors)
-                }
-
-                // 安全地计算偏移量，避免无效状态
-                val offset =
-                    remember(
-                        anchoredDraggableState.currentValue,
-                        anchoredDraggableState.offset,
-                    ) {
-                        when {
-                            anchoredDraggableState.currentValue == DragValue.End -> -deleteWidthPx
-                            anchoredDraggableState.offset.isNaN() -> 0f
-                            else -> anchoredDraggableState.offset
-                        }
-                    }
+                val offset = rememberSwipeOffset(anchoredDraggableState, anchors, deleteWidthPx)
                 Box(modifier = Modifier.fillMaxWidth()) {
-                    // 卡片
-                    Box(
-                        modifier =
-                            Modifier
-                                .fillMaxWidth()
-                                .anchoredDraggable(
-                                    state = anchoredDraggableState,
-                                    orientation = Orientation.Horizontal,
-                                ).offset { IntOffset(offset.roundToInt(), 0) },
-                    ) {
+                    SwipeableContent(anchoredDraggableState, offset) {
                         if (sortedList.size == 1) {
                             val record = sortedList[0]
                             val (_, appIcon) = getCachedAppInfo(record.packageName)
@@ -262,36 +237,9 @@ fun NotificationListBlock(
                                                     }
                                                 }
 
-                                            LaunchedEffect(anchoredDraggableState, anchors) {
-                                                anchoredDraggableState.updateAnchors(anchors)
-                                            }
-
-                                            val offset =
-                                                remember(
-                                                    anchoredDraggableState.currentValue,
-                                                    anchoredDraggableState.offset,
-                                                ) {
-                                                    when {
-                                                        anchoredDraggableState.currentValue == DragValue.End -> -deleteWidthPx
-                                                        anchoredDraggableState.offset.isNaN() -> 0f
-                                                        else -> anchoredDraggableState.offset
-                                                    }
-                                                }
+                                            val offset = rememberSwipeOffset(anchoredDraggableState, anchors, deleteWidthPx)
                                             Box(modifier = Modifier.fillMaxWidth()) {
-                                                Box(
-                                                    modifier =
-                                                        Modifier
-                                                            .fillMaxWidth()
-                                                            .anchoredDraggable(
-                                                                state = anchoredDraggableState,
-                                                                orientation = Orientation.Horizontal,
-                                                            ).offset {
-                                                                IntOffset(
-                                                                    offset.roundToInt(),
-                                                                    0,
-                                                                )
-                                                            },
-                                                ) {
+                                                SwipeableContent(anchoredDraggableState, offset) {
                                                     val (_, appIcon1) = getCachedAppInfo(record.packageName)
                                                     NotificationCard(
                                                         record = record,
@@ -355,5 +303,55 @@ fun NotificationListBlock(
                 }
             }
         }
+    }
+}
+
+/**
+ * 同步拖动锚点并计算内容偏移量。
+ *
+ * @param state 拖动状态。
+ * @param anchors 锚点。
+ * @param deleteWidthPx 删除区的像素宽度。
+ * @returns 内容的水平偏移量。
+ */
+@Composable
+private fun rememberSwipeOffset(
+    state: AnchoredDraggableState<DragValue>,
+    anchors: DraggableAnchors<DragValue>,
+    deleteWidthPx: Float,
+): Float {
+    LaunchedEffect(state, anchors) {
+        state.updateAnchors(anchors)
+    }
+    return remember(state.currentValue, state.offset) {
+        when {
+            state.currentValue == DragValue.End -> -deleteWidthPx
+            state.offset.isNaN() -> 0f
+            else -> state.offset
+        }
+    }
+}
+
+/**
+ * 随偏移量水平平移的内容容器。
+ *
+ * @param state 拖动状态。
+ * @param offset 内容偏移量。
+ * @param content 内容。
+ */
+@Composable
+private fun SwipeableContent(
+    state: AnchoredDraggableState<DragValue>,
+    offset: Float,
+    content: @Composable BoxScope.() -> Unit,
+) {
+    Box(
+        modifier =
+            Modifier
+                .fillMaxWidth()
+                .anchoredDraggable(state = state, orientation = Orientation.Horizontal)
+                .offset { IntOffset(offset.roundToInt(), 0) },
+    ) {
+        content()
     }
 }

@@ -78,6 +78,8 @@ internal class MediaControllerRegistry(
                                         val meta = primary.metadata
                                         if (meta != null) {
                                             val artHash = (meta.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART) ?: meta.getBitmap(MediaMetadata.METADATA_KEY_ART))?.hashCode() ?: 0
+                                            // 与宿主同一口径：播放态参与去重，
+                                            // 暂停/恢复不改变元数据，只改状态
                                             val currentHash =
                                                 Objects.hash(
                                                     meta.getString(MediaMetadata.METADATA_KEY_TITLE),
@@ -85,6 +87,7 @@ internal class MediaControllerRegistry(
                                                     primary.packageName,
                                                     meta.getLong(MediaMetadata.METADATA_KEY_DURATION),
                                                     artHash,
+                                                    state?.state,
                                                 )
                                             if (currentHash != getLastMetadataHash()) {
                                                 onMetadataUpdate(primary)

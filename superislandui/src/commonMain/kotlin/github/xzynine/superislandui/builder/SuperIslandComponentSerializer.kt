@@ -17,6 +17,7 @@ import github.xzynine.superislandui.model.templates.IconTextInfo
 import github.xzynine.superislandui.model.templates.PicInfo
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
@@ -116,13 +117,15 @@ fun ChatInfo.toJson(): JsonObject =
         putOpt("picProfile", picProfile)
         putOpt("picProfileDark", picProfileDark)
         putOpt("appIconPkg", appIconPkg)
-        putOpt("title", title)
-        putOpt("content", content)
-        putOpt("timerInfo", timerInfo?.toJson())
-        putOpt("colorTitle", colorTitle)
-        putOpt("colorTitleDark", colorTitleDark)
-        putOpt("colorContent", colorContent)
-        putOpt("colorContentDark", colorContentDark)
+        putTextAndColors(
+            title = title,
+            content = content,
+            timerInfo = timerInfo,
+            colorTitle = colorTitle,
+            colorTitleDark = colorTitleDark,
+            colorContent = colorContent,
+            colorContentDark = colorContentDark,
+        )
     }
 
 fun HighlightInfo.toJson(): JsonObject =
@@ -185,13 +188,15 @@ fun AnimTextInfo.toJson(): JsonObject =
                 putOpt("srcDark", icon.srcDark)
             },
         )
-        putOpt("title", title)
-        putOpt("content", content)
-        putOpt("timerInfo", timerInfo?.toJson())
-        putOpt("colorTitle", colorTitle)
-        putOpt("colorTitleDark", colorTitleDark)
-        putOpt("colorContent", colorContent)
-        putOpt("colorContentDark", colorContentDark)
+        putTextAndColors(
+            title = title,
+            content = content,
+            timerInfo = timerInfo,
+            colorTitle = colorTitle,
+            colorTitleDark = colorTitleDark,
+            colorContent = colorContent,
+            colorContentDark = colorContentDark,
+        )
     }
 
 fun TextButton.toJson(): JsonObject =
@@ -250,3 +255,32 @@ fun HighlightInfoV3.toJson(): JsonObject =
         putOpt("highLightbgColorDark", highLightbgColorDark)
         putOpt("actionInfo", actionInfo?.toJson())
     }
+
+/**
+ * 写入标题、正文、计时器与四个颜色字段，键序与各序列化器的既有输出一致。
+ *
+ * @param title 标题。
+ * @param content 正文。
+ * @param timerInfo 计时器信息。
+ * @param colorTitle 标题颜色。
+ * @param colorTitleDark 标题深色颜色。
+ * @param colorContent 正文颜色。
+ * @param colorContentDark 正文深色颜色。
+ */
+private fun JsonObjectBuilder.putTextAndColors(
+    title: String?,
+    content: String?,
+    timerInfo: TimerInfo?,
+    colorTitle: String?,
+    colorTitleDark: String?,
+    colorContent: String?,
+    colorContentDark: String?,
+) {
+    putOpt("title", title)
+    putOpt("content", content)
+    putOpt("timerInfo", timerInfo?.toJson())
+    putOpt("colorTitle", colorTitle)
+    putOpt("colorTitleDark", colorTitleDark)
+    putOpt("colorContent", colorContent)
+    putOpt("colorContentDark", colorContentDark)
+}

@@ -38,13 +38,15 @@ private val LOG_LEVEL_OPTIONS =
 /**
  * 开发者选项页。
  *
- * 平台专属入口（引导页分支、通知字段转储）经槽位注入：
- * [onOpenGuideBranch] 为 null 时不显示「调试引导页」，[dumpPageContent] 为 null 时不显示转储入口。
+ * 平台专属入口（引导页分支、通知字段转储、桌面叠加层调试）经槽位注入：
+ * [onOpenGuideBranch] 为 null 时不显示「调试引导页」，[onOpenDumpPage] 为 null 时不显示转储入口，
+ * [desktopExtraContent] 为 null 时不显示桌面专有项。
  */
 @Composable
 fun DeveloperModeScreen(
     onOpenGuideBranch: ((String) -> Unit)? = null,
     onOpenDumpPage: (() -> Unit)? = null,
+    desktopExtraContent: (@Composable () -> Unit)? = null,
 ) {
     val preferencePort = LocalPreferencePort.current
 
@@ -118,6 +120,8 @@ fun DeveloperModeScreen(
                 onClick = onOpenDumpPage,
             )
         }
+
+        if (desktopExtraContent != null) desktopExtraContent()
     }
 }
 

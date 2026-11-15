@@ -2,12 +2,13 @@
  * 拒绝跨多个物理行的 Markdown 散文段落。GFM AST 能把段落——包括列表与
  * 引用块内的段落——与多行结构节点区分开。检查器从不改写；符号链接形式的
  * 指令文件会被去重。VitePress frontmatter 与自定义容器定界符在解析前被
- * 掩码。约定归属见 `Docs/AGENTS.md`。
+ * 掩码。约定归属见 `docs/AGENTS.md`。
  */
 
 import { readFileSync } from 'node:fs'
 import { relative } from 'node:path'
 import type { Nodes } from 'mdast'
+import { gateHint } from './gate-hint.ts'
 import { parseMarkdown, visitMarkdown } from './markdown.ts'
 import { isArchivedAgentNotePath, splitLines, uniqueRepoFiles } from './repo-files.ts'
 import { docSystem, repoRoot } from './doc-system.config.ts'
@@ -68,4 +69,5 @@ console.error('verify-md-wrap: hard-wrapped prose paragraphs found (write one ph
 for (const v of all) {
   console.error(`  ${v.file}:${v.line}  ${v.text.slice(0, 80)}${v.text.length > 80 ? '…' : ''}`)
 }
+console.error(gateHint('verify-md-wrap'))
 process.exit(1)

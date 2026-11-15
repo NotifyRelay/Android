@@ -95,7 +95,7 @@ fun SettingsScreen(showOverlayEntry: Boolean = false) {
         if (showOverlayEntry) {
             ArrowPreference(
                 title = "叠加层",
-                summary = "媒体卡、超级岛与弹幕的显示设置",
+                summary = "媒体卡、超级岛与通知卡片的显示设置",
                 onClick = { navigator.push(Route.SettingsOverlay) },
                 modifier = Modifier.padding(horizontal = 16.dp),
             )
@@ -163,9 +163,9 @@ fun SettingsAppearanceScreen() = SettingsSubPage("外观") { UIAppearance() }
 @Composable
 fun SettingsOverlayScreen(content: @Composable () -> Unit) = SettingsSubPage("叠加层") { content() }
 
-/** 叠加层-弹幕与媒体卡子页（仅桌面端注册内容）。 */
+/** 叠加层-通知与媒体卡子页（仅桌面端注册内容）。 */
 @Composable
-fun SettingsOverlayDanmakuScreen(content: @Composable () -> Unit) = SettingsSubPage("弹幕与媒体卡") { content() }
+fun SettingsOverlayNotificationsScreen(content: @Composable () -> Unit) = SettingsSubPage("通知与媒体卡") { content() }
 
 /** 叠加层-余额子页（仅桌面端注册内容）。 */
 @Composable
@@ -181,4 +181,4 @@ fun SettingsOverlayKeyboardScreen(content: @Composable () -> Unit) = SettingsSub
 
 /** 叠加层-时间子页（仅桌面端注册内容）。 */
 @Composable
-fun SettingsOverlayClockScreen(content: @Composable () -> Unit) = SettingsSubPage("时间浮窗") { content() }
+fun SettingsOverlayClockScreen(content: @Composable () -> Unit) = SettingsSubPage("时间元素") { content() }

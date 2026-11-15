@@ -237,22 +237,16 @@ class RemoteFilterRepository(
         val groupEnabled = mutableMapOf<String, Boolean>()
         var groupIndex = 0
 
-        for ((index, group) in defaultPackageGroups.withIndex()) {
-            val enabled = defaultGroupEnabled.getOrNull(index) ?: true
-            if (enabled) {
-                packageGroupsArray.add(
-                    buildJsonObject {
-                        put("groupName", "group_" + groupIndex)
-                        put("packages", JsonArray(group.map { JsonPrimitive(it) }))
-                    },
-                )
-                groupEnabled["group_" + groupIndex] = true
-                groupIndex++
-            }
-        }
-        for ((index, group) in customPackageGroups.withIndex()) {
-            val enabled = customGroupEnabled.getOrNull(index) ?: true
-            if (enabled) {
+        // 默认组与自定义组按同一规则编号，顺序即分组下标
+        val groupSources =
+            listOf(
+                defaultPackageGroups to defaultGroupEnabled,
+                customPackageGroups to customGroupEnabled,
+            )
+        for ((groups, enabledFlags) in groupSources) {
+            for ((index, group) in groups.withIndex()) {
+                val enabled = enabledFlags.getOrNull(index) ?: true
+                if (!enabled) continue
                 packageGroupsArray.add(
                     buildJsonObject {
                         put("groupName", "group_" + groupIndex)

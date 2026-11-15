@@ -1,87 +1,62 @@
 package com.xzyht.notifyrelay.feature.notification.history
 
-import androidx.paging.PagingSource
-import androidx.paging.PagingState
 import notifyrelay.data.database.dao.PackageCount
 import notifyrelay.data.database.entity.NotificationRecordEntity
+import notifyrelay.data.database.paging.GroupedPagingSource
 import notifyrelay.data.database.repository.DatabaseRepository
 import notifyrelay.domain.feature.notification.filter.RemoteFilterPortRegistry
 import notifyrelay.domain.feature.notification.history.GroupedNotifications
 import notifyrelay.domain.feature.notification.history.NotificationHistoryEntry
-import kotlin.math.max
 
+/**
+ * 通知历史分页源：按（映射后的）包名分组，每组内按时间倒序。
+ *
+ * 分页骨架与超级岛历史共用 [GroupedPagingSource]；本类只负责把远端包名映射成本机等价包名后分组。
+ */
 class NotificationHistoryPagingSource(
     private val repository: DatabaseRepository,
     private val deviceUuid: String,
     private val installedPackages: Set<String>,
-) : PagingSource<Int, GroupedNotifications>() {
+) : GroupedPagingSource<GroupedNotifications>() {
     private var cachedGroups: List<GroupedPackage>? = null
 
-    override suspend fun load(params: LoadParams<Int>): LoadResult<Int, GroupedNotifications> {
-        return try {
-            val offset = params.key ?: 0
-            val groups =
-                cachedGroups ?: run {
-                    val packageCounts = repository.getPackageCountByDevice(deviceUuid)
-                    val groupedPackages = buildGroupedPackages(packageCounts)
-                    cachedGroups = groupedPackages
-                    groupedPackages
-                }
+    override suspend fun loadGroupCount(): Int {
+        val packageCounts = repository.getPackageCountByDevice(deviceUuid)
+        cachedGroups = buildGroupedPackages(packageCounts)
+        return cachedGroups?.size ?: 0
+    }
 
-            if (groups.isEmpty()) {
-                return LoadResult.Page(emptyList(), prevKey = null, nextKey = null)
-            }
-
-            val pageGroups = groups.drop(offset).take(params.loadSize)
-            val data =
-                pageGroups.map { group ->
-                    val records =
-                        group.packageNames
-                            .flatMap { packageName ->
-                                repository.getNotificationsByPackageAndDevice(packageName, deviceUuid)
-                            }.sortedByDescending { it.time }
-
-                    val notifications = records.map { it.toNotificationEntry() }
-                    val appName = notifications.firstOrNull()?.appName?.takeIf { it.isNotBlank() } ?: group.groupKey
-
-                    GroupedNotifications(
-                        packageName = group.groupKey,
-                        appName = appName,
-                        latestTime = group.latestTime,
-                        notifications = notifications,
-                    )
-                }
-
-            val nextKey = if (offset + pageGroups.size >= groups.size) null else offset + pageGroups.size
-            val prevKey = if (offset == 0) null else max(offset - params.loadSize, 0)
-
-            LoadResult.Page(
-                data = data,
-                prevKey = prevKey,
-                nextKey = nextKey,
+    override suspend fun loadPage(
+        offset: Int,
+        limit: Int,
+    ): List<GroupedNotifications> {
+        val groups = cachedGroups ?: emptyList()
+        return groups.drop(offset).take(limit).map { group ->
+            val records =
+                group.packageNames
+                    .flatMap { packageName -> repository.getNotificationsByPackageAndDevice(packageName, deviceUuid) }
+                    .sortedByDescending { it.time }
+            val notifications = records.map { it.toNotificationEntry() }
+            val appName = notifications.firstOrNull()?.appName?.takeIf { it.isNotBlank() } ?: group.groupKey
+            GroupedNotifications(
+                packageName = group.groupKey,
+                appName = appName,
+                latestTime = group.latestTime,
+                notifications = notifications,
             )
-        } catch (e: Exception) {
-            LoadResult.Error(e)
         }
     }
 
-    override fun getRefreshKey(state: PagingState<Int, GroupedNotifications>): Int? {
-        val anchorPosition = state.anchorPosition ?: return null
-        val page = state.closestPageToPosition(anchorPosition) ?: return null
-        return page.prevKey?.let { it + state.config.pageSize } ?: page.nextKey?.let { it - state.config.pageSize }
-    }
+    override fun onLoadError(cause: Exception): LoadResult.Error<Int, GroupedNotifications> = LoadResult.Error(cause)
 
     private fun buildGroupedPackages(packageCounts: List<PackageCount>): List<GroupedPackage> {
         val grouped = linkedMapOf<String, GroupAccumulator>()
 
         for (count in packageCounts) {
             val mappedPackage = RemoteFilterPortRegistry.current?.mapToLocalPackage(count.packageName, installedPackages) ?: count.packageName
-            val group =
-                grouped.getOrPut(mappedPackage) {
-                    GroupAccumulator(mappedPackage)
-                }
+            val group = grouped.getOrPut(mappedPackage) { GroupAccumulator(mappedPackage) }
             group.packageNames.add(count.packageName)
-            group.latestTime = max(group.latestTime, count.latestTime)
+            group.latestTime = maxOf(group.latestTime, count.latestTime)
         }
 
         return grouped.values

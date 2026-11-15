@@ -9,7 +9,6 @@
 import { createHash } from 'node:crypto'
 import { basename } from 'node:path'
 import { AGENT_NOTE_CLASSES } from './agent-note-tree.ts'
-import { docSystem } from './doc-system.config.ts'
 import { splitLines } from './repo-files.ts'
 
 /** 冻结内容清单中的版本化字段。 */
@@ -21,14 +20,6 @@ export interface ArchiveManifest {
 /** 以与仓库 Git 对象格式无关的方式哈希一个归档产物。 */
 function archiveContentHash(content: Buffer): string {
   return `sha256:${createHash('sha256').update(content).digest('hex')}`
-}
-
-/** 计算中英一致性 sidecar 使用的 SHA-1 Git blob id。 */
-export function gitBlobHash(content: Buffer): string {
-  const hash = createHash('sha1')
-  hash.update(`blob ${content.byteLength}\0`)
-  hash.update(content)
-  return hash.digest('hex')
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -90,23 +81,6 @@ function validDate(value: string): boolean {
   return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
 }
 
-interface Triplet {
-  source?: Buffer
-  zh?: Buffer
-  meta?: Buffer
-}
-
-function pairMeta(content: string): Map<string, string> | undefined {
-  const entries = new Map<string, string>()
-  for (const line of splitLines(content)) {
-    if (line === '' || line.startsWith('#')) continue
-    const match = /^([^:#]+\.md): ([0-9a-f]{40})$/.exec(line)
-    if (match?.[1] === undefined || match[2] === undefined) return undefined
-    entries.set(match[1], match[2])
-  }
-  return entries
-}
-
 function validateMetadata(path: string, content: Buffer, sourceBase: string): { errors: string[]; date: string | undefined } {
   const errors: string[] = []
   const lines = splitLines(content.toString('utf8'))
@@ -122,68 +96,28 @@ function validateMetadata(path: string, content: Buffer, sourceBase: string): { 
 }
 
 /**
- * 校验封闭 kind 树与归档笔记元数据。单语仓库为每条笔记封印一个 `.md`；
- * 双语仓库封印完整的 `.md` / `.zh.md` / `.i18n.yaml` 三元组。
+ * 校验封闭 kind 树与归档笔记元数据。每条笔记封印一个 `.md`。
  * @param artifacts - 以相对归档根的路径为键的归档文件。
- * @returns 每条结构、元数据或配对违规对应一条诊断。
+ * @returns 每条结构或元数据违规对应一条诊断。
  */
 export function validateArchiveArtifacts(artifacts: ReadonlyMap<string, Buffer>): string[] {
   const errors: string[] = []
-  const triplets = new Map<string, Triplet>()
-  const suffixPattern = docSystem.bilingual ? /(\.zh\.md|\.i18n\.yaml|\.md)$/ : /(\.md)$/
+  const notes = new Map<string, Buffer>()
   for (const [path, content] of artifacts) {
-    const match = /^([^/]+)\/(\d{4}-\d{2}-\d{2}-.+?)(\.zh\.md|\.i18n\.yaml|\.md)$/.exec(path)
-    const suffix = suffixPattern.exec(path)
-    if (match?.[1] === undefined || match[2] === undefined || suffix === null) {
-      errors.push(`${path}: expected {kind}/yyyy-mm-dd-topic.${docSystem.bilingual ? '{md,zh.md,i18n.yaml}' : 'md'}`)
+    const match = /^([^/]+)\/(\d{4}-\d{2}-\d{2}-.+?)\.md$/.exec(path)
+    if (match?.[1] === undefined || match[2] === undefined) {
+      errors.push(`${path}: expected {kind}/yyyy-mm-dd-topic.md`)
       continue
     }
     if (!(AGENT_NOTE_CLASSES as readonly string[]).includes(match[1])) {
       errors.push(`${path}: unknown Agent Note kind ${JSON.stringify(match[1])}`)
       continue
     }
-    const key = `${match[1]}/${match[2]}`
-    const triplet = triplets.get(key) ?? {}
-    if (suffix[1] === '.md') triplet.source = content
-    else if (suffix[1] === '.zh.md') triplet.zh = content
-    else triplet.meta = content
-    triplets.set(key, triplet)
+    notes.set(`${match[1]}/${match[2]}`, content)
   }
 
-  for (const [key, triplet] of [...triplets].sort(([left], [right]) => left.localeCompare(right))) {
-    const sourcePath = `${key}.md`
-    const { source, zh, meta } = triplet
-    if (source === undefined) {
-      errors.push(`${key}: incomplete archived note; missing ${sourcePath}`)
-      continue
-    }
-    if (docSystem.bilingual) {
-      const zhPath = `${key}.zh.md`
-      const metaPath = `${key}.i18n.yaml`
-      const missing = [
-        zh === undefined ? zhPath : undefined,
-        meta === undefined ? metaPath : undefined,
-      ].filter((path): path is string => path !== undefined)
-      if (zh === undefined || meta === undefined) {
-        errors.push(`${key}: incomplete archived triplet; missing ${missing.join(', ')}`)
-        continue
-      }
-      const sourceBase = basename(key)
-      const { errors: sourceErrors, date: sourceDate } = validateMetadata(sourcePath, source, sourceBase)
-      const { errors: zhErrors, date: zhDate } = validateMetadata(zhPath, zh, sourceBase)
-      errors.push(...sourceErrors, ...zhErrors)
-      if (sourceDate !== undefined && zhDate !== undefined && sourceDate !== zhDate) {
-        errors.push(`${key}: English and Chinese archive dates differ (${sourceDate} vs ${zhDate})`)
-      }
-      const pair = pairMeta(meta.toString('utf8'))
-      if (pair === undefined || pair.size !== 2
-        || pair.get(`${sourceBase}.md`) !== gitBlobHash(source)
-        || pair.get(`${sourceBase}.zh.md`) !== gitBlobHash(zh)) {
-        errors.push(`${metaPath}: consistency record must contain the current Git blob hashes of both archived sides`)
-      }
-      continue
-    }
-    errors.push(...validateMetadata(sourcePath, source, basename(key)).errors)
+  for (const [key, content] of [...notes].sort(([left], [right]) => left.localeCompare(right))) {
+    errors.push(...validateMetadata(`${key}.md`, content, basename(key)).errors)
   }
   return errors
 }

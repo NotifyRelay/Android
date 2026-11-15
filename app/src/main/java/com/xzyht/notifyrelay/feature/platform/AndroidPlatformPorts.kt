@@ -7,7 +7,6 @@ import notifyrelay.base.util.DeviceUtils
 import notifyrelay.base.util.PermissionHelper
 import notifyrelay.domain.feature.appslist.AppLabelPort
 import notifyrelay.domain.feature.appslist.InstalledPackagesPort
-import notifyrelay.domain.feature.notification.filter.NativeFilterPort
 import notifyrelay.domain.platform.FormFactorPort
 
 /** 设备形态端口：平板判定与系统版本均取 Android 系统能力。 */
@@ -33,28 +32,4 @@ class AndroidAppLabelPort(
     private val context: Context,
 ) : AppLabelPort {
     override fun labelOf(packageName: String): String = runCatching { AppListHelper.getApplicationLabel(context, packageName) }.getOrDefault(packageName)
-}
-
-/** Rust 过滤能力端口：以 NativeCore 的过滤三方法为唯一来源。 */
-object AndroidNativeFilterPort : NativeFilterPort {
-    override fun isReady(): Boolean =
-        com.xzyht.notifyrelay.nativecore.NativeCore
-            .isReady()
-
-    override fun setFilterConfig(json: String): Boolean =
-        com.xzyht.notifyrelay.nativecore.NativeCore
-            .setFilterConfig(json) == 0
-
-    override fun mapLocalPackage(packageName: String): String? =
-        com.xzyht.notifyrelay.nativecore.NativeCore
-            .mapLocalPackage(packageName)
-
-    override fun checkFilterMode(
-        packageName: String,
-        notificationPackageName: String,
-        title: String,
-        text: String,
-    ): Boolean =
-        com.xzyht.notifyrelay.nativecore.NativeCore
-            .checkFilterMode(packageName, notificationPackageName, title, text)
 }

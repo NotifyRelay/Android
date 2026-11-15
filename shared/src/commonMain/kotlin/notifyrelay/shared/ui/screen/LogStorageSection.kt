@@ -1,13 +1,10 @@
 package notifyrelay.shared.ui.screen
 
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -16,7 +13,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.unit.dp
 import notifyrelay.base.log.LogFileStore
@@ -110,33 +106,14 @@ fun DesktopAboutContent(
     val textStyles = MiuixTheme.textStyles
 
     Column(modifier = Modifier.fillMaxWidth()) {
-        appIcon?.let {
-            Image(
-                bitmap = it,
-                contentDescription = "应用图标",
-                modifier =
-                    Modifier
-                        .padding(top = 24.dp)
-                        .size(72.dp)
-                        .clip(RoundedCornerShape(16.dp))
-                        .align(Alignment.CenterHorizontally),
-            )
-        }
+        AboutHeader(appIcon)
         Spacer(modifier = Modifier.height(8.dp))
-        Text(
-            text = "Notify Relay",
-            style = textStyles.title1,
-            color = colorScheme.primary,
+        // 版本信息同时是开发者模式的激活入口：连续点击 5 次激活
+        ArrowPreference(
+            title = "版本信息",
+            summary = "版本 " + versionName,
+            onClick = rememberDeveloperModeActivation(),
             modifier = Modifier.padding(horizontal = 16.dp),
-        )
-        Text(
-            text = "版本 " + versionName,
-            style = textStyles.body2,
-            color = colorScheme.onSurfaceSecondary,
-            modifier =
-                Modifier
-                    .padding(horizontal = 16.dp)
-                    .padding(top = 4.dp),
         )
 
         onCheckUpdate?.let {

@@ -4,10 +4,15 @@ import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import notifyrelay.base.log.Logger
+import notifyrelay.base.util.TimerClock
 import notifyrelay.desktop.DataLayerDesktop
+import notifyrelay.desktop.platform.DesktopPcmPlayer
 import notifyrelay.domain.feature.device.model.DeviceInfo
 import notifyrelay.domain.feature.media.MediaControlAction
+import notifyrelay.domain.feature.media.MediaMessageReceiveMode
 import notifyrelay.domain.feature.media.MediaSessionSnapshot
+import notifyrelay.domain.feature.media.lyric.SongRecognizer
+import java.util.concurrent.ConcurrentHashMap
 
 /**
  * 桌面端远端媒体报文处理。
@@ -21,6 +26,13 @@ internal object DesktopMediaRemoteHandler {
     private const val TAG = "DesktopMedia"
 
     private val json = Json { ignoreUnknownKeys = true }
+
+    /**
+     * 各设备的单曲识别器：对端未带歌曲身份时用同一套公共识别兜底。
+     *
+     * 按设备分开，避免不同设备同名包互相污染字段学习状态。
+     */
+    private val recognizers = ConcurrentHashMap<String, SongRecognizer>()
 
     /** 处理远端播放状态回推。 */
     fun onMediaPlay(
@@ -38,6 +50,13 @@ internal object DesktopMediaRemoteHandler {
                 .getOrNull()
                 ?: return
 
+        // 接收模式在报文入口判定：不接受时不再保留会话，界面回落为无媒体。
+        val mediaControl = DataLayerDesktop.mediaControl
+        if (mediaControl != null && !shouldReceive(mediaControl.receiveMode())) {
+            mediaControl.updateRemoteSession(device, null)
+            return
+        }
+
         // 字段口径以 core 的 parse_media_inbound 为准：
         // 歌手在 text（无 artist 字段）；封面被重命名为 coverImage；isEnd 表示会话结束。
         val isEnd =
@@ -45,19 +64,63 @@ internal object DesktopMediaRemoteHandler {
                 ?.content
                 ?.toBooleanStrictOrNull() ?: false
         if (isEnd) {
-            DataLayerDesktop.mediaControl?.updateRemoteSession(device, null)
+            mediaControl?.updateRemoteSession(device, null)
             Logger.d(TAG, "远端媒体会话已结束: device=" + device.displayName)
             return
         }
 
+        // 进度由 core 归一为计时器口径：timerWhen 是位置归零时刻、timerSystemCurrent 是采样时刻。
+        // 这里换回「采样位置 + 采样时刻」，由显示侧按本地时钟推进。
+        // 歌曲身份：对端直接给出时优先采用；缺失时由公共识别器按同一套口径兜底，
+        // 使歌词在标题的应用不会因每句歌词而被当成换歌。
+        val payloadSongKey = root.stringField("songKey")
+        val timerTotal = root.longField("timerTotal")
+        val timerWhen = root.longField("timerWhen")
+        val timerSystemCurrent = root.longField("timerSystemCurrent")
+        // 基准换算到本地时钟（与超级岛计时器同一实现）：对端两个时间戳之差是已计时长，
+        // 直接拿对端时间戳当基准会把两端时钟偏差算进进度，播放时偏大、暂停时回落到真实值。
+        val timerType = root.intField("timerType")
+        val base =
+            if (timerTotal > 0L) {
+                TimerClock.rebase(timerType, timerWhen, timerSystemCurrent, System.currentTimeMillis())
+            } else {
+                null
+            }
+        val position = base?.let { (it.currentMs - it.whenMs).coerceIn(0L, timerTotal) }
+
+        val title = root.stringField("title")
+        val artist = root.stringField("text")
+        val songKey =
+            payloadSongKey ?: run {
+                val recognizer = recognizers.computeIfAbsent(device.uuid) { SongRecognizer() }
+                val position = position ?: -1L
+                synchronized(recognizer) {
+                    recognizer
+                        .observe(
+                            sourceKey = root.stringField("packageName").orEmpty(),
+                            title = title.orEmpty(),
+                            artist = artist.orEmpty(),
+                            durationMs = timerTotal,
+                            mediaId = "",
+                            positionMs = position,
+                            nowMs = System.currentTimeMillis(),
+                        ).songKey
+                }
+            }
+
         val snapshot =
             MediaSessionSnapshot(
                 packageName = root.stringField("packageName"),
-                title = root.stringField("title"),
-                artist = root.stringField("text"),
+                title = title,
+                artist = artist,
                 coverUrl = root.stringField("coverImage"),
+                songKey = songKey,
+                positionMs = position,
+                durationMs = if (position != null) timerTotal else null,
+                isPlaying = timerType == 1,
+                sampledAtMs = base?.currentMs ?: 0L,
             )
-        DataLayerDesktop.mediaControl?.updateRemoteSession(device, snapshot)
+        mediaControl?.updateRemoteSession(device, snapshot)
         Logger.d(TAG, "收到远端媒体状态: device=" + device.displayName)
     }
 
@@ -110,10 +173,38 @@ internal object DesktopMediaRemoteHandler {
         Logger.i(TAG, "已执行远端媒体指令: " + actionType)
     }
 
+    /**
+     * 接收模式判定，与 Android 侧同口径。
+     *
+     * - [MediaMessageReceiveMode.On]：全部接收；
+     * - [MediaMessageReceiveMode.Off]：不接收；
+     * - [MediaMessageReceiveMode.AudioOnly]：仅在本机正在接收音频时接收。
+     */
+    private fun shouldReceive(mode: MediaMessageReceiveMode): Boolean =
+        when (mode) {
+            MediaMessageReceiveMode.On -> true
+            MediaMessageReceiveMode.Off -> false
+            MediaMessageReceiveMode.AudioOnly -> DesktopPcmPlayer.isRunning
+        }
+
     /** 读取 JSON 对象的字符串字段。 */
     private fun JsonObject.stringField(field: String): String? =
         (this[field] as? kotlinx.serialization.json.JsonPrimitive)
             ?.jsonPrimitive
             ?.content
             ?.takeIf { it.isNotBlank() }
+
+    /** 读取 JSON 对象的整数字段；缺失或不可解析时为 0。 */
+    private fun JsonObject.longField(field: String): Long =
+        (this[field] as? kotlinx.serialization.json.JsonPrimitive)
+            ?.content
+            ?.toLongOrNull()
+            ?: 0L
+
+    /** 读取 JSON 对象的整数字段；缺失或不可解析时为 0。 */
+    private fun JsonObject.intField(field: String): Int =
+        (this[field] as? kotlinx.serialization.json.JsonPrimitive)
+            ?.content
+            ?.toIntOrNull()
+            ?: 0
 }

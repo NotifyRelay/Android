@@ -84,64 +84,12 @@ fun GuideAgreementPage(
                     .verticalScroll(rememberScrollState())
                     .padding(horizontal = 20.dp),
         ) {
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    notices.forEachIndexed { index, notice ->
-                        Row(modifier = Modifier.padding(vertical = 6.dp)) {
-                            Text(
-                                text = "${index + 1}.",
-                                style = MiuixTheme.textStyles.body1,
-                                color = colorScheme.primary,
-                                modifier = Modifier.width(24.dp),
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = notice.first,
-                                    style = MiuixTheme.textStyles.body1,
-                                    color = colorScheme.onSurface,
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = notice.second,
-                                    style = MiuixTheme.textStyles.body2,
-                                    color = colorScheme.onSurfaceVariantSummary,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            GuideNumberedCard(notices)
 
             // 已注册权限清单：逐项列出本应用申请的权限及其用途，供用户阅读确认。
             GuideSectionLabel(title = "已申请的权限及用途", description = "")
             Spacer(modifier = Modifier.height(8.dp))
-            Card(modifier = Modifier.fillMaxWidth()) {
-                Column(modifier = Modifier.padding(16.dp)) {
-                    registeredPermissions.forEachIndexed { index, perm ->
-                        Row(modifier = Modifier.padding(vertical = 6.dp)) {
-                            Text(
-                                text = "${index + 1}.",
-                                style = MiuixTheme.textStyles.body1,
-                                color = colorScheme.primary,
-                                modifier = Modifier.width(24.dp),
-                            )
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    text = perm.first,
-                                    style = MiuixTheme.textStyles.body1,
-                                    color = colorScheme.onSurface,
-                                )
-                                Spacer(modifier = Modifier.height(4.dp))
-                                Text(
-                                    text = perm.second,
-                                    style = MiuixTheme.textStyles.body2,
-                                    color = colorScheme.onSurfaceVariantSummary,
-                                )
-                            }
-                        }
-                    }
-                }
-            }
+            GuideNumberedCard(registeredPermissions)
 
             if (!reauth) {
                 Row(
@@ -186,5 +134,42 @@ fun GuideAgreementPage(
             onBack = onBack,
             onNext = onNext,
         )
+    }
+}
+
+/**
+ * 编号条目卡片：每条显示序号、标题与说明。
+ *
+ * @param items 条目的标题与说明。
+ */
+@Composable
+private fun GuideNumberedCard(items: List<Pair<String, String>>) {
+    val colorScheme = MiuixTheme.colorScheme
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            items.forEachIndexed { index, entry ->
+                Row(modifier = Modifier.padding(vertical = 6.dp)) {
+                    Text(
+                        text = "${index + 1}.",
+                        style = MiuixTheme.textStyles.body1,
+                        color = colorScheme.primary,
+                        modifier = Modifier.width(24.dp),
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = entry.first,
+                            style = MiuixTheme.textStyles.body1,
+                            color = colorScheme.onSurface,
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = entry.second,
+                            style = MiuixTheme.textStyles.body2,
+                            color = colorScheme.onSurfaceVariantSummary,
+                        )
+                    }
+                }
+            }
+        }
     }
 }

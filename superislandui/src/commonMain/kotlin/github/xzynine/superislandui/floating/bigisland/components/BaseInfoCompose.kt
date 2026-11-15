@@ -17,14 +17,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.model.templates.BaseInfo
 import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.SuperIslandImageUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -81,7 +79,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
     ) {
         baseInfo.title?.let {
             Text(
-                text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                 color = Color(ColorUtils.parseColor(baseInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Normal,
@@ -104,7 +102,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
 
         baseInfo.subTitle?.let {
             Text(
-                text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                 color = Color(ColorUtils.parseColor(baseInfo.colorSubTitle) ?: 0xFFFFFFFF.toInt()),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Normal,
@@ -119,7 +117,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
                 Spacer(modifier = Modifier.width(8.dp))
             }
             Text(
-                text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                 color = Color(ColorUtils.parseColor(baseInfo.colorExtraTitle) ?: 0xFFFFFFFF.toInt()),
                 fontSize = 14.sp,
                 fontWeight = FontWeight.Normal,
@@ -134,7 +132,7 @@ private fun MainTextRow(baseInfo: BaseInfo) {
                 Spacer(modifier = Modifier.width(8.dp))
             }
             Text(
-                text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                 color = Color(ColorUtils.parseColor(baseInfo.colorSpecialTitle) ?: 0xFFFFFFFF.toInt()),
                 fontSize = 12.sp,
                 fontWeight = FontWeight.Normal,
@@ -166,7 +164,7 @@ private fun SecondaryTextRow(
     ) {
         baseInfo.content?.let {
             Text(
-                text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                 color = Color(ColorUtils.parseColor(baseInfo.colorContent) ?: 0xFFDDDDDD.toInt()),
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -180,7 +178,7 @@ private fun SecondaryTextRow(
                 Spacer(modifier = Modifier.width(8.dp))
             }
             Text(
-                text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                 color = Color(ColorUtils.parseColor(baseInfo.colorSubContent) ?: 0xFFDDDDDD.toInt()),
                 fontSize = 12.sp,
                 maxLines = 1,
@@ -219,22 +217,4 @@ private fun ContentDivider(baseInfo: BaseInfo) {
     } else {
         Spacer(modifier = Modifier.height(8.dp))
     }
-}
-
-@Preview(name = "文本组件1", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun BaseInfoComposeType1Preview() {
-    BaseInfoCompose(
-        baseInfo = PreviewData.sampleBaseInfo,
-        picMap = PreviewData.samplePicMap,
-    )
-}
-
-@Preview(name = "文本组件2", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun BaseInfoComposeType2Preview() {
-    BaseInfoCompose(
-        baseInfo = PreviewData.sampleBaseInfoType2,
-        picMap = PreviewData.samplePicMap,
-    )
 }

@@ -9,24 +9,29 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.wrapContentWidth
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.TextUnit
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import github.xzynine.superislandui.common.AutoScrollText
+import github.xzynine.superislandui.common.LocalSuperIslandReceivedAtMs
 import github.xzynine.superislandui.currentTimeMillis
 import github.xzynine.superislandui.model.components.TimerInfo
+import kotlinx.coroutines.delay
 import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.TimerClock
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.CardDefaults
 import top.yukonga.miuix.kmp.basic.CircularProgressIndicator
@@ -113,7 +118,7 @@ fun CommonTextBlockCompose(
     titleFontSize: TextUnit = 14.sp,
     contentColor: Color = Color(0xCCFFFFFF),
     contentFontSize: TextUnit = 12.sp,
-    maxWidth: Dp = 160.dp, // 适当增加最大宽度，确保内容完整显示
+    maxWidth: Dp = 160.dp, // 文本块宽度上限：短文本按内容宽，超宽进入滚动
 ) {
     // 确定字体家族
     val fontFamily =
@@ -126,7 +131,8 @@ fun CommonTextBlockCompose(
     Column(
         modifier =
             Modifier
-                .wrapContentWidth()
+                // 上限内自适应：短文本按内容宽，超宽文本进入 AutoScrollText 滚动
+                .widthIn(max = maxWidth)
                 .padding(start = horizontalPadding),
     ) {
         // 前置标题
@@ -211,14 +217,25 @@ fun parseColorSafe(
 ): Int = ColorUtils.parseColorOr(s, default)
 
 /**
- * 格式化计时器信息
- * 修复了计时逻辑，确保暂停时显示正确进度，解决正计时快3s问题
+ * 格式化计时器信息。
+ *
+ * 基准经 [TimerClock.rebase] 换算到本地时钟：计时器来自其他设备时，两个时间戳取对端
+ * 时钟，直接与本地当前时刻相减会把两端时钟偏差算进显示值。
+ *
+ * @param timer 计时器信息
+ * @param localSampleMs 收到该计时器时的本地时刻；默认沿用 [TimerInfo.timerSystemCurrent]，
+ *   即视作与本地同一时钟。远端计时器应由调用方传入实际接收时刻。
  */
-fun formatTimerInfo(timer: TimerInfo): String {
+fun formatTimerInfo(
+    timer: TimerInfo,
+    localSampleMs: Long = timer.timerSystemCurrent,
+): String {
     val now = currentTimeMillis()
     val timerType = timer.timerType
-    val timerWhen = timer.timerWhen // 正计时：开始时间；倒计时：结束时间
-    val timerSystemCurrent = timer.timerSystemCurrent // 计时状态变更时的系统时间
+    val base = TimerClock.rebase(timerType, timer.timerWhen, timer.timerSystemCurrent, localSampleMs)
+    // 正计时：开始时刻；倒计时：结束时刻。两种口径的时间戳都在本地换算后使用
+    val timerWhen = base?.whenMs ?: timer.timerWhen
+    val timerSystemCurrent = base?.currentMs ?: timer.timerSystemCurrent
 
     val displayValue: Long =
         when (timerType) {
@@ -275,11 +292,14 @@ fun formatDuration(ms: Long): String {
 /**
  * 超级岛根布局组件
  * 提供统一的卡片样式和布局结构
+ *
+ * @param drawSurface 是否自行绘制卡片背景与圆角；由外部形态变换容器统一绘制表面时传 false
  */
 @Composable
 fun SuperIslandComposeRoot(
     content: @Composable () -> Unit,
     isOverlapping: Boolean = false,
+    drawSurface: Boolean = true,
 ) {
     Box(
         modifier =
@@ -287,21 +307,19 @@ fun SuperIslandComposeRoot(
                 .fillMaxWidth()
                 .padding(8.dp),
     ) {
-        Card(
-            cornerRadius = 16.dp,
-            colors =
-                CardDefaults.defaultColors(
-                    color =
-                        if (isOverlapping) {
-                            // 重叠时显示红色背景
-                            Color.Red.copy(alpha = 0.92f)
-                        } else {
-                            // 正常时显示黑色背景
-                            Color.Black.copy(alpha = 0.92f)
-                        },
-                ),
-            modifier = Modifier.fillMaxWidth(),
-        ) {
+        if (drawSurface) {
+            Card(
+                cornerRadius = SUPER_ISLAND_CARD_CORNER_RADIUS,
+                colors = CardDefaults.defaultColors(color = superIslandCardColor(isOverlapping)),
+                modifier = Modifier.fillMaxWidth(),
+            ) {
+                Column(
+                    modifier = Modifier.padding(8.dp),
+                ) {
+                    content()
+                }
+            }
+        } else {
             Column(
                 modifier = Modifier.padding(8.dp),
             ) {
@@ -311,45 +329,44 @@ fun SuperIslandComposeRoot(
     }
 }
 
-@Preview(name = "通用文本块", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun CommonTextBlockComposePreview() {
-    CommonTextBlockCompose(
-        frontTitle = "前置标题",
-        title = "主标题",
-        content = "内容描述",
-        narrow = false,
-        highlight = true,
-        monospace = false,
-    )
-}
+/** 展开态卡片圆角。 */
+val SUPER_ISLAND_CARD_CORNER_RADIUS = 16.dp
 
-@Preview(name = "圆形进度环", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun CircularProgressComposePreview() {
-    CircularProgressCompose(
-        progress = 60,
-        colorReach = Color(0xFF3482FF),
-        colorUnReach = Color(0x33333333),
-        strokeWidth = 3.dp,
-        isClockwise = true,
-        size = 48.dp,
-    )
-}
+/**
+ * 超级岛卡片的表面色：重叠提示态为红色，常态为黑色。
+ *
+ * 形态变换容器以本函数返回值作唯一背景色，保证展开与收起共用同一底色。
+ */
+fun superIslandCardColor(isOverlapping: Boolean): Color =
+    if (isOverlapping) {
+        Color.Red.copy(alpha = 0.92f)
+    } else {
+        Color.Black.copy(alpha = 0.92f)
+    }
 
-@Preview(name = "超级岛根布局", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
+/**
+ * 计时器文本随时间刷新。
+ *
+ * 仅计时进行中（正计时 `timerType=1` / 倒计时 `timerType=-1`）每秒重算，暂停与无效类型保持首次格式化的结果。
+ * 计时基准按 [LocalSuperIslandReceivedAtMs] 换算到本地时钟，远端内容的时钟偏差因此不进入显示值。
+ *
+ * @param timerInfo 计时器信息。
+ * @returns 随时间更新的格式化文本。
+ */
 @Composable
-fun SuperIslandComposeRootPreview() {
-    SuperIslandComposeRoot(
-        content = {
-            CommonTextBlockCompose(
-                frontTitle = null,
-                title = "超级岛标题",
-                content = "超级岛内容",
-                narrow = false,
-                highlight = false,
-                monospace = false,
-            )
-        },
-    )
+fun rememberTimerText(timerInfo: TimerInfo): String {
+    val receivedAtMs = LocalSuperIslandReceivedAtMs.current
+    val displayState =
+        remember(timerInfo, receivedAtMs) {
+            mutableStateOf(formatTimerInfo(timerInfo, receivedAtMs ?: timerInfo.timerSystemCurrent))
+        }
+    val isTimerRunning = timerInfo.timerType == 1 || timerInfo.timerType == -1
+    LaunchedEffect(timerInfo, receivedAtMs) {
+        if (!isTimerRunning) return@LaunchedEffect
+        while (true) {
+            displayState.value = formatTimerInfo(timerInfo, receivedAtMs ?: timerInfo.timerSystemCurrent)
+            delay(1000)
+        }
+    }
+    return displayState.value
 }

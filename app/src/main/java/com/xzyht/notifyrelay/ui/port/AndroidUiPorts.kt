@@ -1,6 +1,7 @@
 package com.xzyht.notifyrelay.ui.port
 
 import android.content.Context
+import androidx.activity.compose.LocalActivity
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.platform.LocalContext
@@ -137,7 +138,7 @@ fun ProvideAndroidUiPorts(content: @Composable () -> Unit) {
         LocalDeviceListPort provides AndroidDeviceListPort(context),
         LocalDevicePortsProvider provides AndroidDevicePortsProvider(context),
         LocalSettingsPort provides AndroidSettingsPort(context),
-        LocalMainScreenPort provides AndroidMainScreenPort(context, LocalContext.current as? MainActivity),
+        LocalMainScreenPort provides AndroidMainScreenPort(context, LocalActivity.current as? MainActivity),
         LocalPreferencePort provides AndroidPreferencePort,
         LocalNotificationActionPort provides AndroidNotificationActionPort(context),
         LocalImageDecodePort provides AndroidImageDecodePort(context),

@@ -13,15 +13,13 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.common.PreviewData
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.floating.common.rememberSuperIslandImagePainter
 import github.xzynine.superislandui.floating.common.resolveIconUrl
 import github.xzynine.superislandui.model.templates.CoverInfo
 import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.SuperIslandImageUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -44,7 +42,7 @@ fun CoverInfoCompose(
         val coverKey = coverInfo.picCover
         var finalCoverUrl: String? = resolveIconUrl(picMap, coverKey)
         if (finalCoverUrl.isNullOrEmpty() && picMap != null) {
-            finalCoverUrl = SuperIslandImageUtil.resolveFallbackIconUrl(picMap)
+            finalCoverUrl = SuperIslandImageUtils.resolveFallbackIconUrl(picMap)
         }
 
         if (!finalCoverUrl.isNullOrEmpty()) {
@@ -65,7 +63,7 @@ fun CoverInfoCompose(
         Column(modifier = Modifier.weight(1f)) {
             coverInfo.title?.let { text ->
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                     fontSize = 16.sp,
                     fontWeight = FontWeight.SemiBold,
                     color =
@@ -78,7 +76,7 @@ fun CoverInfoCompose(
             }
             coverInfo.content?.let { text ->
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                     fontSize = 12.sp,
                     color =
                         Color(
@@ -91,7 +89,7 @@ fun CoverInfoCompose(
             }
             coverInfo.subContent?.let { text ->
                 Text(
-                    text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(text),
+                    text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(text),
                     fontSize = 12.sp,
                     color =
                         Color(
@@ -104,13 +102,4 @@ fun CoverInfoCompose(
             }
         }
     }
-}
-
-@Preview(name = "封面组件", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun CoverInfoComposePreview() {
-    CoverInfoCompose(
-        coverInfo = PreviewData.sampleCoverInfo,
-        picMap = PreviewData.samplePicMap,
-    )
 }

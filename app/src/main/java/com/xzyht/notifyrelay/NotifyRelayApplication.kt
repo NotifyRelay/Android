@@ -8,19 +8,18 @@ import com.xzyht.notifyrelay.feature.appslist.AndroidPinnedAppsPort
 import com.xzyht.notifyrelay.feature.appslist.AndroidRemoteAppsPort
 import com.xzyht.notifyrelay.feature.media.AndroidAudioRelayPort
 import com.xzyht.notifyrelay.feature.media.AndroidMediaControlPort
-import com.xzyht.notifyrelay.feature.notification.filter.AndroidLocalFilterPort
-import com.xzyht.notifyrelay.feature.notification.filter.AndroidRemoteFilterPort
 import com.xzyht.notifyrelay.feature.notification.history.AndroidNotificationHistoryPort
 import com.xzyht.notifyrelay.feature.notification.history.AndroidSuperIslandHistoryPort
 import com.xzyht.notifyrelay.feature.notification.superisland.config.AndroidSuperIslandConfigPort
 import com.xzyht.notifyrelay.feature.platform.AndroidAppLabelPort
 import com.xzyht.notifyrelay.feature.platform.AndroidFormFactorPort
 import com.xzyht.notifyrelay.feature.platform.AndroidInstalledPackagesPort
-import com.xzyht.notifyrelay.feature.platform.AndroidNativeFilterPort
 import com.xzyht.notifyrelay.nativecore.device.appsync.IconCodecPortRegistry
+import com.xzyht.notifyrelay.nativecore.device.filter.NativeFilterBridge
 import notifyrelay.base.log.installLoggerFileSink
 import notifyrelay.data.DataLayerAndroid
 import notifyrelay.data.Storage
+import notifyrelay.data.filter.LocalFilterRepository
 import notifyrelay.data.filter.RemoteFilterRepository
 import notifyrelay.domain.feature.appslist.AppLabelPortRegistry
 import notifyrelay.domain.feature.appslist.InstalledPackagesPortRegistry
@@ -57,15 +56,15 @@ class NotifyRelayApplication : Application() {
         FormFactorPortRegistry.install(AndroidFormFactorPort(this))
         InstalledPackagesPortRegistry.install(AndroidInstalledPackagesPort(this))
         AppLabelPortRegistry.install(AndroidAppLabelPort(this))
-        NativeFilterPortRegistry.install(AndroidNativeFilterPort)
+        NativeFilterPortRegistry.install(NativeFilterBridge)
         IconCodecPortRegistry.install(AndroidAppIconCodecPort(this))
 
         AppIconPortRegistry.install(AndroidAppIconPort(this))
         LocalAppsPortRegistry.install(AndroidLocalAppsPort(this))
-        PinnedAppsPortRegistry.install(AndroidPinnedAppsPort())
+        PinnedAppsPortRegistry.install(AndroidPinnedAppsPort)
         RemoteAppsPortRegistry.install(AndroidRemoteAppsPort(this))
-        LocalFilterPortRegistry.install(AndroidLocalFilterPort())
-        RemoteFilterPortRegistry.install(AndroidRemoteFilterPort(RemoteFilterRepository()))
+        LocalFilterPortRegistry.install(LocalFilterRepository)
+        RemoteFilterPortRegistry.install(RemoteFilterRepository())
         MediaControlPortRegistry.install(AndroidMediaControlPort(this))
         AudioRelayPortRegistry.install(AndroidAudioRelayPort(this))
         SuperIslandConfigPortRegistry.install(AndroidSuperIslandConfigPort(this))

@@ -9,14 +9,12 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import github.xzynine.superislandui.common.PreviewData
 import github.xzynine.superislandui.floating.common.CommonImageCompose
-import github.xzynine.superislandui.floating.common.SuperIslandImageUtil
 import github.xzynine.superislandui.model.templates.PicInfo
 import notifyrelay.base.util.ColorUtils
+import notifyrelay.base.util.SuperIslandImageUtils
 import top.yukonga.miuix.kmp.basic.Text
 
 /**
@@ -48,28 +46,10 @@ fun PicInfoCompose(
         picInfo.title?.let {
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = SuperIslandImageUtil.parseSimpleHtmlToAnnotatedString(it),
+                text = SuperIslandImageUtils.parseSimpleHtmlToAnnotatedString(it),
                 color = Color(ColorUtils.parseColor(picInfo.colorTitle) ?: 0xFFFFFFFF.toInt()),
                 fontSize = 14.sp,
             )
         }
     }
-}
-
-@Preview(name = "图片信息类型1", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun PicInfoComposeType1Preview() {
-    PicInfoCompose(
-        picInfo = PreviewData.samplePicInfo,
-        picMap = PreviewData.samplePicMap,
-    )
-}
-
-@Preview(name = "图片信息类型2", showBackground = true, backgroundColor = 0xFF000000, widthDp = 360)
-@Composable
-fun PicInfoComposeType2Preview() {
-    PicInfoCompose(
-        picInfo = PreviewData.samplePicInfoType2,
-        picMap = PreviewData.samplePicMap,
-    )
 }

@@ -5,10 +5,12 @@ import android.content.Context
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSessionManager
+import android.media.session.PlaybackState
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.service.notification.NotificationListenerService
+import com.xzyht.notifyrelay.feature.media.PlaybackStatePosition
 import com.xzyht.notifyrelay.feature.media.lyric.LyricResolver
 import com.xzyht.notifyrelay.feature.notification.service.NotifyRelayNotificationListenerService
 import notifyrelay.base.log.Logger
@@ -51,8 +53,17 @@ class MediaSessionMonitorService(
     private val lyricResolver =
         LyricResolver(
             handler = handler,
-            onMediaSessionUpdated = { pkg, title, artist, duration, artBitmap ->
-                NotifyRelayNotificationListenerService.onMediaSessionUpdated(pkg, title, artist, duration, artBitmap)
+            onRecognized = { pkg, recognition, artBitmap, position, isPlaying ->
+                NotifyRelayNotificationListenerService.onMediaSessionUpdated(
+                    pkg,
+                    recognition.displayTitle,
+                    recognition.displayArtist,
+                    recognition.durationMs,
+                    artBitmap,
+                    position,
+                    isPlaying,
+                    recognition.songKey,
+                )
             },
             getPrimaryController = { getPrimaryController() },
         )
@@ -161,7 +172,10 @@ class MediaSessionMonitorService(
                 ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ART)
         val artHash = artBitmap?.hashCode() ?: 0
 
-        val metadataHash = Objects.hash(rawTitle, rawArtist, pkg, duration, artHash)
+        // 播放态参与去重：暂停/恢复不改变元数据，只改状态，
+        // 不纳入就会一直沿用上一次的「播放中」判断。
+        val playbackState = controller.playbackState
+        val metadataHash = Objects.hash(rawTitle, rawArtist, pkg, duration, artHash, playbackState?.state)
 
         if (metadataHash == lastMetadataHash) {
             return
@@ -169,18 +183,23 @@ class MediaSessionMonitorService(
         lastMetadataHash = metadataHash
 
         // 歌词字段映射：歌词位于 title（多数应用）还是 artist（如 fnos 音乐）
-        val position = controller.playbackState?.position ?: -1L
+        // 播放中按速度推进到此刻；快照本身不会随播放前进
+        val position = PlaybackStatePosition.estimate(playbackState, System.currentTimeMillis())
         val mediaId = metadata.getString(MediaMetadata.METADATA_KEY_MEDIA_ID) ?: ""
-        val (mappedTitle, mappedArtist) =
-            lyricResolver.resolveLyricField(pkg, rawTitle ?: "", rawArtist ?: "", duration, mediaId, position)
+        val recognition =
+            lyricResolver.resolve(pkg, rawTitle ?: "", rawArtist ?: "", duration, mediaId, position)
 
-        // 通知 NotifyRelayNotificationListenerService 有新的媒体会话数据
+        // 通知 NotifyRelayNotificationListenerService 有新的媒体会话数据。
+        // 位置与播放态随元数据一并采样：接收端据此本地推进进度，发送端无需按进度高频推送。
         NotifyRelayNotificationListenerService.onMediaSessionUpdated(
             pkg,
-            mappedTitle,
-            mappedArtist,
-            duration,
+            recognition.displayTitle,
+            recognition.displayArtist,
+            recognition.durationMs,
             artBitmap,
+            position,
+            playbackState?.state == PlaybackState.STATE_PLAYING,
+            recognition.songKey,
         )
     }
 }

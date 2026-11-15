@@ -5,6 +5,7 @@ import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -201,36 +202,16 @@ fun UISuperIslandSettings(
             val installedPackages = remember { viewModel.installedPackages() }
 
             DEFAULT_MIRROR_PACKAGES.forEach { packageName ->
-                val isInstalled = installedPackages.contains(packageName)
-                var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
                 val isEnabled = customPackages.find { it.packageName == packageName }?.enabled ?: true
-
-                LaunchedEffect(packageName) {
-                    if (iconBitmap == null) {
-                        viewModel.loadIcon(packageName) { iconBitmap = it }
-                    }
-                }
-
-                SwitchPreference(
-                    title = packageName,
-                    titleColor =
-                        BasicComponentDefaults.titleColor(
-                            color = if (isInstalled) colorScheme.primary else colorScheme.onSurface,
-                        ),
+                MirrorPackageSwitch(
+                    packageName = packageName,
+                    viewModel = viewModel,
+                    isInstalled = installedPackages.contains(packageName),
                     checked = isEnabled,
                     onCheckedChange = { value ->
                         viewModel.viewModelScope.launch {
                             MirrorFilterRepository.upsert(packageName, value)
                             loadCustomPackages()
-                        }
-                    },
-                    startAction = {
-                        iconBitmap?.let {
-                            Image(
-                                bitmap = it,
-                                contentDescription = null,
-                                modifier = Modifier.size(24.dp).padding(end = 8.dp),
-                            )
                         }
                     },
                 )
@@ -239,36 +220,17 @@ fun UISuperIslandSettings(
             customPackages.filter { it.packageName !in DEFAULT_MIRROR_PACKAGES }.forEach { entity ->
                 key(entity.packageName) {
                     val packageName = entity.packageName
-                    val isInstalled = installedPackages.contains(packageName)
-                    var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
                     var packageEnabled by remember(entity.packageName, entity.enabled) { mutableStateOf(entity.enabled) }
 
-                    LaunchedEffect(packageName) {
-                        if (iconBitmap == null) {
-                            viewModel.loadIcon(packageName) { iconBitmap = it }
-                        }
-                    }
-
-                    SwitchPreference(
-                        title = packageName,
-                        titleColor =
-                            BasicComponentDefaults.titleColor(
-                                color = if (isInstalled) colorScheme.primary else colorScheme.onSurface,
-                            ),
+                    MirrorPackageSwitch(
+                        packageName = packageName,
+                        viewModel = viewModel,
+                        isInstalled = installedPackages.contains(packageName),
                         checked = packageEnabled,
                         onCheckedChange = { value ->
                             packageEnabled = value
                             viewModel.viewModelScope.launch {
                                 MirrorFilterRepository.setEnabled(packageName, value)
-                            }
-                        },
-                        startAction = {
-                            iconBitmap?.let {
-                                Image(
-                                    bitmap = it,
-                                    contentDescription = null,
-                                    modifier = Modifier.size(24.dp).padding(end = 8.dp),
-                                )
                             }
                         },
                         endActions = {
@@ -314,4 +276,53 @@ fun UISuperIslandSettings(
             title = "选择镜像过滤应用",
         )
     }
+}
+
+/**
+ * 镜像过滤包名开关：图标按包名异步加载，标题色按是否已安装区分。
+ *
+ * @param packageName 包名。
+ * @param viewModel 图标来源。
+ * @param isInstalled 包是否已安装。
+ * @param checked 开关状态。
+ * @param onCheckedChange 开关回调。
+ * @param endActions 行尾操作区，未提供时不渲染。
+ */
+@Composable
+private fun MirrorPackageSwitch(
+    packageName: String,
+    viewModel: SuperIslandSettingsViewModel,
+    isInstalled: Boolean,
+    checked: Boolean,
+    onCheckedChange: (Boolean) -> Unit,
+    endActions: (@Composable RowScope.() -> Unit)? = null,
+) {
+    val colorScheme = MiuixTheme.colorScheme
+    var iconBitmap by remember { mutableStateOf<ImageBitmap?>(null) }
+
+    LaunchedEffect(packageName) {
+        if (iconBitmap == null) {
+            viewModel.loadIcon(packageName) { iconBitmap = it }
+        }
+    }
+
+    SwitchPreference(
+        title = packageName,
+        titleColor =
+            BasicComponentDefaults.titleColor(
+                color = if (isInstalled) colorScheme.primary else colorScheme.onSurface,
+            ),
+        checked = checked,
+        onCheckedChange = onCheckedChange,
+        startAction = {
+            iconBitmap?.let {
+                Image(
+                    bitmap = it,
+                    contentDescription = null,
+                    modifier = Modifier.size(24.dp).padding(end = 8.dp),
+                )
+            }
+        },
+        endActions = endActions ?: {},
+    )
 }

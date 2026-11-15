@@ -64,9 +64,6 @@ class MainActivity : FragmentActivity() {
             }
         }
 
-        DeveloperModeActivity.initLogConfig(this)
-        DeveloperModeActivity.initDebugUiConfig(this)
-
         // 调试入口：通过 intent 直接触发超级岛测试样本（仅 debug 构建生效，见 SuperIslandTestLauncher）
         SuperIslandTestLauncher.tryLaunchFromIntent(this)
 

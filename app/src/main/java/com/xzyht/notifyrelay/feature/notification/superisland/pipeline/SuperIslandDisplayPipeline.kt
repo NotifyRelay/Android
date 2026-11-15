@@ -11,6 +11,7 @@ import com.xzyht.notifyrelay.feature.notification.superisland.notification.Notif
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaWindowManager
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaNotificationCloser
 import com.xzyht.notifyrelay.feature.notification.superisland.store.SuperIslandSourceStore
+import github.xzynine.superislandui.model.components.MediaProgress
 import github.xzynine.superislandui.model.core.ParamV2
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -63,6 +64,7 @@ internal object SuperIslandDisplayPipeline {
         val displayTitle: String?,
         val displayText: String?,
         val summaryOnly: Boolean,
+        val mediaProgress: MediaProgress?,
     )
 
     /**
@@ -96,6 +98,8 @@ internal object SuperIslandDisplayPipeline {
         val paramV2Raw: String?,
         val picMap: Map<String, String>?,
         val appName: String?,
+        /** 媒体进度；仅媒体通道非空，供渲染侧显示进度条。 */
+        val mediaProgress: MediaProgress? = null,
         val channel: Channel,
         val tag: String,
         val forceRefresh: Boolean = false,
@@ -193,6 +197,7 @@ internal object SuperIslandDisplayPipeline {
                 displayTitle = displayTitle,
                 displayText = displayText,
                 summaryOnly = summaryOnly,
+                mediaProgress = request.mediaProgress,
             )
 
         // ③ 钩子：浮窗通道在此登记条目（含 overlay 创建）并登记映射，返回 entryExistedBefore

@@ -58,6 +58,10 @@ kotlin {
             // Win32 COM 封装：现代文件对话框（IFileOpenDialog）经 JNA 调用
             implementation(libs.jna.platform)
         }
+
+        jvmTest.dependencies {
+            implementation(kotlin("test"))
+        }
     }
 }
 
