@@ -2,9 +2,9 @@ package notifyrelay.desktop.overlay.feature
 
 import notifyrelay.base.log.Logger
 import notifyrelay.overlay.api.BalanceSnapshot
+import notifyrelay.overlay.api.BatteryDevice
 import notifyrelay.overlay.api.KeyMapping
 import notifyrelay.overlay.api.KeyboardStateSnapshot
-import notifyrelay.overlay.api.LogiBatteryDevice
 import notifyrelay.overlay.api.OverlayFeature
 import java.io.Closeable
 
@@ -17,16 +17,16 @@ import java.io.Closeable
  *
  * 装配口径（用户裁定）：
  * - 余额默认关闭，用户填入凭据并开启后启动轮询；
- * - 罗技电池、键盘、时间默认开启；罗技仅在枚举到设备时显示；
+ * - 设备电池、键盘、时间默认开启；设备仅在枚举到设备时显示；
  * - 键盘项开关与叠加层总开关同时满足才安装全局键盘钩子。
  */
 class DesktopOverlayFeatures : Closeable {
     private val balance = DesktopBalanceFeature()
-    private val logi = DesktopLogiBatteryFeature()
+    private val battery = DesktopBatteryFeature()
     private val keyboard = DesktopKeyboardFeature()
     private val clock = DesktopClockFeature()
 
-    private val features: List<OverlayFeature> = listOf(balance, logi, keyboard, clock)
+    private val features: List<OverlayFeature> = listOf(balance, battery, keyboard, clock)
 
     @Volatile
     private var started = false
@@ -63,7 +63,7 @@ class DesktopOverlayFeatures : Closeable {
     fun syncSwitches() {
         if (!started) return
         balance.syncSwitch(notifyrelay.desktop.platform.DesktopOverlaySettings.balanceEnabled)
-        logi.syncSwitch(notifyrelay.desktop.platform.DesktopOverlaySettings.logiEnabled)
+        battery.syncSwitch(notifyrelay.desktop.platform.DesktopOverlaySettings.batteryEnabled)
         keyboard.syncSwitch(notifyrelay.desktop.platform.DesktopOverlaySettings.keyboardEnabled)
         clock.syncSwitch(notifyrelay.desktop.platform.DesktopOverlaySettings.clockEnabled)
     }
@@ -85,8 +85,8 @@ class DesktopOverlayFeatures : Closeable {
     /** 当前余额快照（供设置页展示）。 */
     fun balanceSnapshot(): BalanceSnapshot = balance.source.snapshot
 
-    /** 当前罗技设备快照（供设置页展示）。 */
-    fun logiDevices(): List<LogiBatteryDevice> = logi.source.devices()
+    /** 当前电池设备快照（供设置页展示）。 */
+    fun batteryDevices(): List<BatteryDevice> = battery.source.devices()
 
     /** 当前按键状态（供设置页展示）。 */
     fun keyboardState(): KeyboardStateSnapshot = keyboard.source.state()
@@ -112,20 +112,20 @@ class DesktopOverlayFeatures : Closeable {
     /** 是否已配置余额凭据。 */
     fun isBalanceConfigured(): Boolean = balance.source.isConfigured
 
-    /** 罗技原生库是否可用。 */
-    fun isLogiAvailable(): Boolean = logi.source.available
+    /** 电池原生库是否可用。 */
+    fun isBatteryAvailable(): Boolean = battery.source.available
 
-    /** 立即枚举一次罗技设备，不改变轮询状态。 */
-    fun refreshLogiNow() = logi.source.refreshNow()
+    /** 立即枚举一次电池设备，不改变轮询状态。 */
+    fun refreshBatteryNow() = battery.source.refreshNow()
 
-    /** 设置或清除罗技设备自定义名；空名表示回退原生名。 */
-    fun setLogiDeviceName(
+    /** 设置或清除电池设备自定义名；空名表示回退原生名。 */
+    fun setBatteryDeviceName(
         deviceId: String,
         name: String?,
-    ) = logi.source.setDeviceNameOverride(deviceId, name)
+    ) = battery.source.setDeviceNameOverride(deviceId, name)
 
-    /** 订阅罗技设备快照；供设置页展示设备列表。 */
-    fun observeLogiDevices(listener: (List<LogiBatteryDevice>) -> Unit): AutoCloseable = logi.source.observe(listener)
+    /** 订阅电池设备快照；供设置页展示设备列表。 */
+    fun observeBatteryDevices(listener: (List<BatteryDevice>) -> Unit): AutoCloseable = battery.source.observe(listener)
 
     /** 键盘监控是否可用。 */
     fun isKeyboardAvailable(): Boolean = keyboard.source.available

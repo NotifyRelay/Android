@@ -1,11 +1,11 @@
 package notifyrelay.overlay.api
 
 /**
- * 罗技电池设备快照。
+ * 电池设备快照。
  *
- * 字段与 `logi-battery` crate 的 `LbDeviceInfo` 一一对应。
+ * 字段与 `device-battery-lib` crate 的 `LbDeviceInfo` 一一对应。
  */
-data class LogiBatteryDevice(
+data class BatteryDevice(
     /** USB Vendor ID（0x046D = Logitech）。 */
     val vendorId: Int,
     /** USB Product ID。 */
@@ -30,16 +30,16 @@ data class LogiBatteryDevice(
 }
 
 /**
- * 罗技电池数据源。
+ * 设备电池数据源。
  *
- * 实现侧经 `logi_battery.dll` 的 C FFI 枚举设备；枚举是阻塞 IO，由实现自行调度。
+ * 实现侧经 `device_battery_lib.dll` 的 C FFI 枚举设备；枚举是阻塞 IO，由实现自行调度。
  */
-interface LogiBatterySource {
+interface BatterySource {
     /** 是否可枚举（原生库可用）。 */
     val available: Boolean
 
     /** 当前设备快照；空集合表示无设备。 */
-    fun devices(): List<LogiBatteryDevice>
+    fun devices(): List<BatteryDevice>
 
     /** 启动后台轮询；已启动时幂等。 */
     fun start()
@@ -53,7 +53,7 @@ interface LogiBatterySource {
     /**
      * 设置或清除设备自定义名。
      *
-     * [name] 为空表示回退到 FFI 原始名；覆盖按 [LogiBatteryDevice.deviceId] 持久化，重启后保留。
+     * [name] 为空表示回退到 FFI 原始名；覆盖按 [BatteryDevice.deviceId] 持久化，重启后保留。
      */
     fun setDeviceNameOverride(
         deviceId: String,
@@ -61,5 +61,5 @@ interface LogiBatterySource {
     )
 
     /** 设备集合变化订阅；返回取消订阅函数。 */
-    fun observe(listener: (List<LogiBatteryDevice>) -> Unit): AutoCloseable
+    fun observe(listener: (List<BatteryDevice>) -> Unit): AutoCloseable
 }

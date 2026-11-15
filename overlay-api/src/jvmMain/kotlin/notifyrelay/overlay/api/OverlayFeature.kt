@@ -22,7 +22,7 @@ data class OverlayStyle(
 /**
  * 叠加层扩展点的统一生命周期契约。
  *
- * 各浮窗能力（余额 / 罗技电池 / 键盘 / 时间 / …）实现本接口并经
+ * 各浮窗能力（余额 / 设备电池 / 键盘 / 时间 / …）实现本接口并经
  * [OverlayFeatureRegistry] 注册；编排方（`DesktopOverlayFeatures`）只遍历注册表
  * 统一启停，新增能力无需修改编排方与本模块的核心结构。
  *

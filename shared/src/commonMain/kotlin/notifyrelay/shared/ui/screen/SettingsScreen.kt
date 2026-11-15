@@ -171,9 +171,9 @@ fun SettingsOverlayNotificationsScreen(content: @Composable () -> Unit) = Settin
 @Composable
 fun SettingsOverlayBalanceScreen(content: @Composable () -> Unit) = SettingsSubPage("DeepSeek 余额") { content() }
 
-/** 叠加层-罗技电池子页（仅桌面端注册内容）。 */
+/** 叠加层-设备电池子页（仅桌面端注册内容）。 */
 @Composable
-fun SettingsOverlayLogiScreen(content: @Composable () -> Unit) = SettingsSubPage("罗技电池") { content() }
+fun SettingsOverlayBatteryScreen(content: @Composable () -> Unit) = SettingsSubPage("设备电池") { content() }
 
 /** 叠加层-键盘子页（仅桌面端注册内容）。 */
 @Composable

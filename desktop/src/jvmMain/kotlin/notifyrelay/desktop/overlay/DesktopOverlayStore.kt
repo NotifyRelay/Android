@@ -5,8 +5,8 @@ import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import notifyrelay.domain.feature.media.MediaSessionSnapshot
 import notifyrelay.overlay.api.BalanceSnapshot
+import notifyrelay.overlay.api.BatteryDevice
 import notifyrelay.overlay.api.KeyboardStateSnapshot
-import notifyrelay.overlay.api.LogiBatteryDevice
 
 /** 媒体业务标识。 */
 internal const val BUSINESS_MEDIA = "media"
@@ -90,13 +90,13 @@ internal object DesktopOverlayStore {
         notifications.clear()
     }
 
-    // ======== 扩展点数据（余额 / 罗技电池 / 键盘 / 时间）========
+    // ======== 扩展点数据（余额 / 设备电池 / 键盘 / 时间）========
 
     /** 当前余额快照；未启动或未配置时为 [BalanceSnapshot] 的默认值。 */
     val balance = mutableStateOf(BalanceSnapshot())
 
-    /** 罗技电池设备快照；空集合表示无设备。 */
-    val logiDevices = mutableStateOf<List<LogiBatteryDevice>>(emptyList())
+    /** 电池设备快照；空集合表示无设备。 */
+    val batteryDevices = mutableStateOf<List<BatteryDevice>>(emptyList())
 
     /** 当前按键状态。 */
     val keyboardState = mutableStateOf(KeyboardStateSnapshot.EMPTY)
@@ -115,9 +115,9 @@ internal object DesktopOverlayStore {
         balance.value = snapshot
     }
 
-    /** 写入罗技设备快照。 */
-    fun putLogiDevices(devices: List<LogiBatteryDevice>) {
-        logiDevices.value = devices
+    /** 写入电池设备快照。 */
+    fun putBatteryDevices(devices: List<BatteryDevice>) {
+        batteryDevices.value = devices
     }
 
     /** 写入按键状态。 */
@@ -144,7 +144,7 @@ internal object DesktopOverlayStore {
     /** 清空全部扩展点数据（停止时调用）。 */
     fun clearFeatures() {
         balance.value = BalanceSnapshot()
-        logiDevices.value = emptyList()
+        batteryDevices.value = emptyList()
         keyboardState.value = KeyboardStateSnapshot.EMPTY
         keyboardHint.value = ""
         clockText.value = ""
@@ -159,7 +159,7 @@ internal data class SuperIslandEntry(
     val text: String?,
     val paramV2Raw: String?,
     val pics: Map<String, String>?,
-    /** 业务标识（如 media / miui_flashlight / logi_battery）。 */
+    /** 业务标识（如 media / miui_flashlight / battery）。 */
     val business: String? = null,
     /** 最近更新时间（毫秒），用于超时回收。 */
     val updatedAt: Long = System.currentTimeMillis(),

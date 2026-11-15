@@ -7,13 +7,13 @@ import kotlinx.serialization.json.buildJsonObject
 import notifyrelay.base.log.Logger
 
 /**
- * 罗技设备自定义名的持久化编解码。
+ * 电池设备自定义名的持久化编解码。
  *
  * 以 JSON 对象（`设备标识 → 名称`）存入 [notifyrelay.data.Storage]；
  * 解码失败时返回空表并记录告警，不抛异常。
  */
-internal object LogiDeviceNameStore {
-    private const val TAG = "LogiDeviceName"
+internal object BatteryDeviceNameStore {
+    private const val TAG = "BatteryDeviceName"
 
     private val json = Json { ignoreUnknownKeys = true }
 

@@ -76,9 +76,9 @@ fun DesktopOverlaySettingsContent() {
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
         ArrowPreference(
-            title = "罗技电池",
+            title = "设备电池",
             summary = "设备电量显示与离线处理",
-            onClick = { navigator.push(Route.SettingsOverlayLogi) },
+            onClick = { navigator.push(Route.SettingsOverlayBattery) },
         )
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
         ArrowPreference(

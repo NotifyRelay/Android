@@ -38,9 +38,9 @@ import notifyrelay.desktop.platform.DesktopDeveloperContent
 import notifyrelay.desktop.platform.DesktopDeviceListPort
 import notifyrelay.desktop.platform.DesktopNotificationActionPort
 import notifyrelay.desktop.platform.DesktopOverlayBalanceContent
+import notifyrelay.desktop.platform.DesktopOverlayBatteryContent
 import notifyrelay.desktop.platform.DesktopOverlayClockContent
 import notifyrelay.desktop.platform.DesktopOverlayKeyboardContent
-import notifyrelay.desktop.platform.DesktopOverlayLogiContent
 import notifyrelay.desktop.platform.DesktopOverlayNotificationContent
 import notifyrelay.desktop.platform.DesktopOverlaySettingsContent
 import notifyrelay.desktop.platform.DesktopThemePort
@@ -73,9 +73,9 @@ import notifyrelay.shared.ui.screen.SettingsAppearanceScreen
 import notifyrelay.shared.ui.screen.SettingsDeveloperModeScreen
 import notifyrelay.shared.ui.screen.SettingsLocalFilterScreen
 import notifyrelay.shared.ui.screen.SettingsOverlayBalanceScreen
+import notifyrelay.shared.ui.screen.SettingsOverlayBatteryScreen
 import notifyrelay.shared.ui.screen.SettingsOverlayClockScreen
 import notifyrelay.shared.ui.screen.SettingsOverlayKeyboardScreen
-import notifyrelay.shared.ui.screen.SettingsOverlayLogiScreen
 import notifyrelay.shared.ui.screen.SettingsOverlayNotificationsScreen
 import notifyrelay.shared.ui.screen.SettingsOverlayScreen
 import notifyrelay.shared.ui.screen.SettingsRemoteFilterScreen
@@ -234,7 +234,7 @@ fun main() {
                 onDispose { sceneBridge.close() }
             }
 
-            // 扩展点数据源（余额 / 罗技电池 / 键盘 / 时间）：按各自开关启动
+            // 扩展点数据源（余额 / 设备电池 / 键盘 / 时间）：按各自开关启动
             val features =
                 remember {
                     notifyrelay.desktop.overlay.feature
@@ -579,8 +579,8 @@ private fun DesktopRoot(
                     entry<Route.SettingsOverlayBalance> {
                         SettingsOverlayBalanceScreen { DesktopOverlayBalanceContent() }
                     }
-                    entry<Route.SettingsOverlayLogi> {
-                        SettingsOverlayLogiScreen { DesktopOverlayLogiContent() }
+                    entry<Route.SettingsOverlayBattery> {
+                        SettingsOverlayBatteryScreen { DesktopOverlayBatteryContent() }
                     }
                     entry<Route.SettingsOverlayKeyboard> {
                         SettingsOverlayKeyboardScreen { DesktopOverlayKeyboardContent() }

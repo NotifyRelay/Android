@@ -54,7 +54,7 @@ import kotlin.math.roundToInt
 internal val OVERLAY_COLUMN_WIDTH = 420.dp
 
 /**
- * 叠加层内容：媒体卡 → 超级岛（含罗技汇总）→ 通知卡 → 状态元素。
+ * 叠加层内容：媒体卡 → 超级岛（含电池汇总）→ 通知卡 → 状态元素。
  *
  * 该列是叠加层唯一的内容容器，宽度固定为 [OVERLAY_COLUMN_WIDTH]，
  * 高度随各行内容变化，上层内容把下层内容整体下压。
@@ -84,7 +84,7 @@ internal fun OverlayContent(
     val cardsState = rememberNotificationCardsState()
 
     Box(modifier.then(Modifier.wrapContentSize())) {
-        // 独立行（卡片与罗技胶囊）居中，状态条目与通知图标填进它们左右剩下的空档
+        // 独立行（卡片与电池胶囊）居中，状态条目与通知图标填进它们左右剩下的空档
         OverlayColumn(
             modifier = Modifier.width(OVERLAY_COLUMN_WIDTH).onSizeChanged(onContentSizeChanged),
             anchors = overlayAnchors(interactiveEnabled, spectrumEnabled, frameNow, cardsState, interactiveRegions),
@@ -112,9 +112,9 @@ internal fun OverlayContent(
 }
 
 /**
- * 独立行内容：媒体卡、超级岛卡片、通知卡片、罗技汇总岛。
+ * 独立行内容：媒体卡、超级岛卡片、通知卡片、电池汇总岛。
  *
- * 每个条目独占一行并水平居中；罗技汇总岛排在最后，作为状态条目的主要落点。
+ * 每个条目独占一行并水平居中；电池汇总岛排在最后，作为状态条目的主要落点。
  */
 @Composable
 private fun overlayAnchors(
@@ -159,12 +159,12 @@ private fun overlayAnchors(
     }
 
     val revision = DesktopOverlaySettings.revision.value
-    val logiEnabled = remember(revision) { DesktopOverlaySettings.logiEnabled }
-    val logiHideDisconnected = remember(revision) { DesktopOverlaySettings.logiHideWhenDisconnected }
-    if (logiEnabled && visibleLogiDevices(logiHideDisconnected).isNotEmpty()) {
+    val batteryEnabled = remember(revision) { DesktopOverlaySettings.batteryEnabled }
+    val batteryHideDisconnected = remember(revision) { DesktopOverlaySettings.batteryHideWhenDisconnected }
+    if (batteryEnabled && visibleBatteryDevices(batteryHideDisconnected).isNotEmpty()) {
         anchors.add(
-            OverlayColumnItem(key = "logi") {
-                LogiIslandCard(
+            OverlayColumnItem(key = "battery") {
+                BatteryIslandCard(
                     interactiveEnabled = interactiveEnabled,
                     interactiveRegions = interactiveRegions,
                 )

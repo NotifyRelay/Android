@@ -5,18 +5,18 @@ import com.sun.jna.Native
 import com.sun.jna.Pointer
 import com.sun.jna.Structure
 import notifyrelay.base.log.Logger
-import notifyrelay.overlay.api.LogiBatteryDevice
+import notifyrelay.overlay.api.BatteryDevice
 
 /**
- * `logi_battery.dll` 的 JNA 声明。
+ * `device_battery_lib.dll` 的 JNA 声明。
  *
  * 结构体字段与 Rust 侧 `LbDeviceInfo` / `LbDeviceList` 逐字段对应，
  * 字段顺序不可改动：JNA 按 [Structure.FieldOrder] 计算偏移与结构体大小。
  *
- * 库由 `:desktop:logiBatteryBuild` 构建，产物目录已加入 `jna.library.path`。
+ * 库由 `:desktop:deviceBatteryBuild` 构建，产物目录已加入 `jna.library.path`。
  */
-internal interface LogiBatteryLibrary : Library {
-    /** 枚举全部罗技 HID++ 设备及其电量；成功返回 0，负数表示错误。 */
+internal interface BatteryLibrary : Library {
+    /** 枚举全部 HID++ 设备及其电量；成功返回 0，负数表示错误。 */
     fun lb_enumerate_devices(out: LbDeviceList): Int
 
     /** 重新读取指定下标设备的电量；成功返回 0。 */
@@ -76,7 +76,7 @@ internal class LbDeviceInfo : Structure(ALIGN_NONE) {
     }
 
     /**
-     * 设备稳定标识：`VID:PID:槽位`，与 Windows 侧 `LogiBatteryDeviceInfo.DeviceId` 同口径。
+     * 设备稳定标识：`VID:PID:槽位`，与 Windows 侧 `DeviceBatteryDeviceInfo.DeviceId` 同口径。
      *
      * 十六进制小写、无前导零填充差异，供刷新前后比对同一台设备。
      */
@@ -118,19 +118,19 @@ internal class LbBatteryInfo : Structure(ALIGN_NONE) {
 }
 
 /**
- * 罗技设备枚举门面。
+ * 电池设备枚举门面。
  *
  * 枚举本身是阻塞的 HID IO（每次可能耗时数百毫秒），调用方须在后台线程使用；
  * 原生库不可用时 [available] 为 false，各方法返回空结果，不抛异常。
  */
-internal object LogiBatteryNative {
-    private const val TAG = "LogiBattery"
+internal object BatteryNative {
+    private const val TAG = "BatteryNative"
 
-    /** 库名（`cargo build --release` 产出 `logi_battery.dll`）。 */
-    private const val LIBRARY_NAME = "logi_battery"
+    /** 库名（`cargo build --release` 产出 `device_battery_lib.dll`）。 */
+    private const val LIBRARY_NAME = "device_battery_lib"
 
-    private val library: LogiBatteryLibrary? by lazy {
-        runCatching { Native.load(LIBRARY_NAME, LogiBatteryLibrary::class.java) }
+    private val library: BatteryLibrary? by lazy {
+        runCatching { Native.load(LIBRARY_NAME, BatteryLibrary::class.java) }
             .onFailure { Logger.w(TAG, "原生库加载失败: " + it.message) }
             .getOrNull()
     }
@@ -139,13 +139,13 @@ internal object LogiBatteryNative {
     val available: Boolean get() = library != null
 
     /**
-     * 枚举全部罗技设备。
+     * 枚举全部电池设备。
      *
      * 内部完成「分配 → 逐个读取 → 释放」全过程，不把裸指针交给调用方。
      *
      * @return 设备列表；库不可用或枚举失败时返回空列表
      */
-    fun enumerate(): List<LogiBatteryDevice> {
+    fun enumerate(): List<BatteryDevice> {
         val lib = library ?: return emptyList()
         val list = LbDeviceList()
         val result =
@@ -168,9 +168,9 @@ internal object LogiBatteryNative {
 
     /** 按结构体大小逐元素读取数组。 */
     private fun readDevices(
-        lib: LogiBatteryLibrary,
+        lib: BatteryLibrary,
         list: LbDeviceList,
-    ): List<LogiBatteryDevice> {
+    ): List<BatteryDevice> {
         val base = list.devices ?: return emptyList()
         if (list.count <= 0) return emptyList()
 
@@ -189,7 +189,7 @@ internal object LogiBatteryNative {
     }
 
     /** 读取最近一次错误信息；无错误记录或空指针时返回空串。 */
-    private fun lastError(lib: LogiBatteryLibrary): String =
+    private fun lastError(lib: BatteryLibrary): String =
         runCatching {
             val pointer = lib.lb_last_error()
             // JNA 把返回的指针映射为非空类型，但原生侧可能返回空指针，需按地址判定
@@ -198,12 +198,12 @@ internal object LogiBatteryNative {
         }.getOrDefault("")
 
     /** Rust 结构体到契约模型的转换：无电量或离线时电量记 -1。 */
-    private fun LbDeviceInfo.toDomain(): LogiBatteryDevice {
+    private fun LbDeviceInfo.toDomain(): BatteryDevice {
         val onlineFlag = online.toInt() and 0xFF == 1
         val hasBatteryFlag = hasBattery.toInt() and 0xFF == 1
         val percent = if (hasBatteryFlag && onlineFlag) percentage.toInt() and 0xFF else -1
         val name = deviceName()
-        return LogiBatteryDevice(
+        return BatteryDevice(
             vendorId = vendorId.toInt() and 0xFFFF,
             productId = productId.toInt() and 0xFFFF,
             deviceId = deviceId(),

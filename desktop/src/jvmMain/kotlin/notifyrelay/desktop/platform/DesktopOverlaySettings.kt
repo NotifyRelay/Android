@@ -32,9 +32,9 @@ object DesktopOverlaySettings {
     private const val KEY_BALANCE_TOKEN = "desktop_overlay_balance_token"
     private const val KEY_BALANCE_INTERVAL_MS = "desktop_overlay_balance_interval_ms"
 
-    private const val KEY_LOGI_ENABLED = "desktop_overlay_logi_enabled"
-    private const val KEY_LOGI_HIDE_DISCONNECTED = "desktop_overlay_logi_hide_disconnected"
-    private const val KEY_LOGI_DEVICE_NAMES = "desktop_overlay_logi_device_names"
+    private const val KEY_BATTERY_ENABLED = "desktop_overlay_battery_enabled"
+    private const val KEY_BATTERY_HIDE_DISCONNECTED = "desktop_overlay_battery_hide_disconnected"
+    private const val KEY_BATTERY_DEVICE_NAMES = "desktop_overlay_battery_device_names"
 
     private const val KEY_KEYBOARD_ENABLED = "desktop_overlay_keyboard_enabled"
     private const val KEY_KEYBOARD_MAPPINGS = "desktop_overlay_keyboard_mappings"
@@ -98,22 +98,22 @@ object DesktopOverlaySettings {
         get() = Storage.getInt(KEY_BALANCE_INTERVAL_MS, DEFAULT_BALANCE_INTERVAL_MS.toInt()).toLong()
         set(value) = Storage.putInt(KEY_BALANCE_INTERVAL_MS, value.toInt())
 
-    // ======== 罗技电池 ========
+    // ======== 设备电池 ========
 
-    /** 罗技电池岛条目是否显示。 */
-    var logiEnabled: Boolean
-        get() = Storage.getBoolean(KEY_LOGI_ENABLED, DEFAULT_LOGI_ENABLED)
-        set(value) = Storage.putBoolean(KEY_LOGI_ENABLED, value)
+    /** 设备电池岛条目是否显示。 */
+    var batteryEnabled: Boolean
+        get() = Storage.getBoolean(KEY_BATTERY_ENABLED, DEFAULT_BATTERY_ENABLED)
+        set(value) = Storage.putBoolean(KEY_BATTERY_ENABLED, value)
 
     /** 离线设备是否隐藏。 */
-    var logiHideWhenDisconnected: Boolean
-        get() = Storage.getBoolean(KEY_LOGI_HIDE_DISCONNECTED, true)
-        set(value) = Storage.putBoolean(KEY_LOGI_HIDE_DISCONNECTED, value)
+    var batteryHideWhenDisconnected: Boolean
+        get() = Storage.getBoolean(KEY_BATTERY_HIDE_DISCONNECTED, true)
+        set(value) = Storage.putBoolean(KEY_BATTERY_HIDE_DISCONNECTED, value)
 
-    /** 罗技设备自定义名：键为 `VID:PID:槽位`，值为用户改名；重启后保留。 */
-    var logiDeviceNameOverrides: Map<String, String>
-        get() = LogiDeviceNameStore.decode(Storage.getString(KEY_LOGI_DEVICE_NAMES, ""))
-        set(value) = Storage.putString(KEY_LOGI_DEVICE_NAMES, LogiDeviceNameStore.encode(value))
+    /** 电池设备自定义名：键为 `VID:PID:槽位`，值为用户改名；重启后保留。 */
+    var batteryDeviceNameOverrides: Map<String, String>
+        get() = BatteryDeviceNameStore.decode(Storage.getString(KEY_BATTERY_DEVICE_NAMES, ""))
+        set(value) = Storage.putString(KEY_BATTERY_DEVICE_NAMES, BatteryDeviceNameStore.encode(value))
 
     // ======== 键盘监控 ========
 
@@ -214,7 +214,7 @@ object DesktopOverlaySettings {
     private const val DEFAULT_BALANCE_ENABLED = false
     private const val DEFAULT_BALANCE_INTERVAL_MS = 300_000L
 
-    private const val DEFAULT_LOGI_ENABLED = true
+    private const val DEFAULT_BATTERY_ENABLED = true
     private const val DEFAULT_KEYBOARD_ENABLED = true
     private const val DEFAULT_CLOCK_ENABLED = true
 

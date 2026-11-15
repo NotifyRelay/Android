@@ -104,22 +104,22 @@ val smtcRustBuild =
 tasks.named("compileKotlinJvm") { dependsOn(smtcRustBuild) }
 val smtcLibDir = smtcRustDir.resolve("target/release")
 
-// 罗技电池 Rust 库（子模块 desktop/logi-battery）：C ABI 动态库，供桌面端枚举罗技设备电量。
+// 设备电池 Rust 库（子模块 desktop/device-battery-lib）：C ABI 动态库，供桌面端枚举电池设备电量。
 // 与 smtc-rust 同方式，只构建 host 目标（HID++ 实现仅 Windows 有实际后端）。
-val logiBatteryDir = project.projectDir.resolve("logi-battery")
-val logiBatteryBuild =
-    tasks.register<Exec>("logiBatteryBuild") {
-        description = "构建罗技电池 Rust 库（本机 host 目标，供桌面端枚举设备电量）"
+val deviceBatteryDir = project.projectDir.resolve("device-battery-lib")
+val deviceBatteryBuild =
+    tasks.register<Exec>("deviceBatteryBuild") {
+        description = "构建设备电池 Rust 库（本机 host 目标，供桌面端枚举设备电量）"
         group = "rust"
         doFirst {
-            require(logiBatteryDir.exists()) { "罗技电池 Rust 子模块未同步，请执行 git submodule update --init" }
+            require(deviceBatteryDir.exists()) { "设备电池 Rust 子模块未同步，请执行 git submodule update --init" }
         }
-        inputs.dir(logiBatteryDir.resolve("src"))
-        inputs.dir(logiBatteryDir.resolve("crates"))
-        inputs.file(logiBatteryDir.resolve("Cargo.toml"))
-        inputs.file(logiBatteryDir.resolve("Cargo.lock"))
-        outputs.file(logiBatteryDir.resolve("target/release/logi_battery.dll")).withPropertyName("logiLib")
-        workingDir = logiBatteryDir
+        inputs.dir(deviceBatteryDir.resolve("src"))
+        inputs.dir(deviceBatteryDir.resolve("crates"))
+        inputs.file(deviceBatteryDir.resolve("Cargo.toml"))
+        inputs.file(deviceBatteryDir.resolve("Cargo.lock"))
+        outputs.file(deviceBatteryDir.resolve("target/release/device_battery_lib.dll")).withPropertyName("batteryLib")
+        workingDir = deviceBatteryDir
         // crates.io 直连不可达，走 rsproxy 镜像（与本项目其他 Rust 构建一致）。
         environment("CARGO_NET_OFFLINE", "false")
         environment("CARGO_REGISTRIES_CRATES_IO_PROTOCOL", "sparse")
@@ -134,8 +134,8 @@ val logiBatteryBuild =
     }
 
 // 该库参与 :desktop 的编译与运行：先构建，再把产物目录并入库搜索路径。
-tasks.named("compileKotlinJvm") { dependsOn(logiBatteryBuild) }
-val logiBatteryLibDir = logiBatteryDir.resolve("target/release")
+tasks.named("compileKotlinJvm") { dependsOn(deviceBatteryBuild) }
+val deviceBatteryLibDir = deviceBatteryDir.resolve("target/release")
 
 // ===== 可分发包（createDistributable / runDistributable）的原生库 =====
 // 三个 Rust 动态库不随 jar 分发：复制进应用镜像的 app/resources，
@@ -149,10 +149,10 @@ val prepareDistributableNatives =
         into(distributableAppResources.map { it.dir("common") })
         dependsOn(":core:hostRustBuild")
         dependsOn(smtcRustBuild)
-        dependsOn(logiBatteryBuild)
+        dependsOn(deviceBatteryBuild)
         from(rustHostLibDir) { include("*.dll") }
         from(smtcLibDir) { include("*.dll") }
-        from(logiBatteryLibDir) { include("*.dll") }
+        from(deviceBatteryLibDir) { include("*.dll") }
     }
 
 tasks
@@ -178,7 +178,7 @@ tasks
             .files(
                 fileTree(rustHostLibDir) { include("*.dll", "*.so", "*.dylib") },
                 fileTree(smtcLibDir) { include("*.dll", "*.so", "*.dylib") },
-                fileTree(logiBatteryLibDir) { include("*.dll", "*.so", "*.dylib") },
+                fileTree(deviceBatteryLibDir) { include("*.dll", "*.so", "*.dylib") },
             ).withPropertyName("nativeLibraries")
             .withPathSensitivity(PathSensitivity.NAME_ONLY)
     }
@@ -215,7 +215,7 @@ val nativeAccessArgs = listOf("--enable-native-access=ALL-UNNAMED")
 
 // 全部原生库产物目录：JNA 与 System.loadLibrary 各自按名字查找，故都要在搜索路径上。
 val nativeLibPath =
-    listOf(rustHostLibDir, smtcLibDir, logiBatteryLibDir)
+    listOf(rustHostLibDir, smtcLibDir, deviceBatteryLibDir)
         .joinToString(File.pathSeparator) { it.absolutePath }
 
 tasks.withType<JavaExec>().configureEach {

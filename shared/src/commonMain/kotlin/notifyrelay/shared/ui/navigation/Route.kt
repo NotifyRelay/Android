@@ -113,10 +113,10 @@ sealed interface Route : NavKey {
     data object SettingsOverlayBalance : Route
 
     /**
-     * 设置-叠加层-罗技电池子页面（仅桌面端显示）
+     * 设置-叠加层-设备电池子页面（仅桌面端显示）
      */
     @Serializable
-    data object SettingsOverlayLogi : Route
+    data object SettingsOverlayBattery : Route
 
     /**
      * 设置-叠加层-键盘子页面（仅桌面端显示）

@@ -16,12 +16,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import notifyrelay.desktop.overlay.batterySummaryColor
+import notifyrelay.desktop.overlay.batterySummaryGlyph
 import notifyrelay.desktop.overlay.feature.DesktopOverlayFeatures
-import notifyrelay.desktop.overlay.logiSummaryColor
-import notifyrelay.desktop.overlay.logiSummaryGlyph
+import notifyrelay.overlay.api.BatteryDevice
 import notifyrelay.overlay.api.KeyMapping
 import notifyrelay.overlay.api.KeyboardSource
-import notifyrelay.overlay.api.LogiBatteryDevice
 import notifyrelay.shared.ui.common.deviceIconFontFamily
 import top.yukonga.miuix.kmp.basic.HorizontalDivider
 import top.yukonga.miuix.kmp.basic.Text
@@ -33,7 +33,7 @@ import top.yukonga.miuix.kmp.preference.SwitchPreference
 import kotlin.math.roundToInt
 
 /**
- * 叠加层扩展点子页内容：余额、罗技电池、键盘、时间。
+ * 叠加层扩展点子页内容：余额、设备电池、键盘、时间。
  *
  * 位置由叠加层固定列决定，本页只暴露开关、格式与外观（缩放、描边）。
  * 开关变化后经 [DesktopOverlayFeatures.current] 即时同步各数据源的启停。
@@ -116,14 +116,14 @@ fun DesktopOverlayBalanceContent() {
     }
 }
 
-/** 罗技电池子页。 */
+/** 设备电池子页。 */
 @Composable
-fun DesktopOverlayLogiContent() {
+fun DesktopOverlayBatteryContent() {
     val revision = DesktopOverlaySettings.revision.value
     val features = DesktopOverlayFeatures.current
 
-    var enabled by remember(revision) { mutableStateOf(DesktopOverlaySettings.logiEnabled) }
-    var hideDisconnected by remember(revision) { mutableStateOf(DesktopOverlaySettings.logiHideWhenDisconnected) }
+    var enabled by remember(revision) { mutableStateOf(DesktopOverlaySettings.batteryEnabled) }
+    var hideDisconnected by remember(revision) { mutableStateOf(DesktopOverlaySettings.batteryHideWhenDisconnected) }
 
     Column(
         modifier =
@@ -133,9 +133,9 @@ fun DesktopOverlayLogiContent() {
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         SwitchPreference(
-            title = "显示罗技电池",
+            title = "显示设备电池",
             summary =
-                if (features?.isLogiAvailable() != true) {
+                if (features?.isBatteryAvailable() != true) {
                     "原生库不可用；枚举到设备后才会显示"
                 } else {
                     "所有设备合并为一条超级岛卡片，电量变动时展开，无设备时不显示"
@@ -143,7 +143,7 @@ fun DesktopOverlayLogiContent() {
             checked = enabled,
             onCheckedChange = {
                 enabled = it
-                DesktopOverlaySettings.logiEnabled = it
+                DesktopOverlaySettings.batteryEnabled = it
                 DesktopOverlaySettings.notifyChanged()
                 features?.syncSwitches()
             },
@@ -154,49 +154,49 @@ fun DesktopOverlayLogiContent() {
             checked = hideDisconnected,
             onCheckedChange = {
                 hideDisconnected = it
-                DesktopOverlaySettings.logiHideWhenDisconnected = it
+                DesktopOverlaySettings.batteryHideWhenDisconnected = it
                 DesktopOverlaySettings.notifyChanged()
             },
         )
 
         HorizontalDivider(modifier = Modifier.padding(horizontal = 8.dp))
 
-        LogiDeviceListSection(features = features)
+        BatteryDeviceListSection(features = features)
     }
 }
 
 /**
- * 罗技设备列表与设备名修改。
+ * 电池设备列表与设备名修改。
  *
  * 列表项复用汇总卡片同一套电量图标与分段着色；点击设备名可改写显示名，
  * 空名提交时回退到原生名。设备名覆盖按设备标识持久化。
  */
 @Composable
-private fun LogiDeviceListSection(features: DesktopOverlayFeatures?) {
-    var devices by remember { mutableStateOf(features?.logiDevices().orEmpty()) }
-    var editing by remember { mutableStateOf<LogiBatteryDevice?>(null) }
+private fun BatteryDeviceListSection(features: DesktopOverlayFeatures?) {
+    var devices by remember { mutableStateOf(features?.batteryDevices().orEmpty()) }
+    var editing by remember { mutableStateOf<BatteryDevice?>(null) }
     var editText by remember { mutableStateOf("") }
 
     DisposableEffect(features) {
-        val subscription = features?.observeLogiDevices { devices = it }
+        val subscription = features?.observeBatteryDevices { devices = it }
         onDispose { subscription?.close() }
     }
 
     val statusHint =
         when {
             features == null -> "叠加层未启用，设备列表不可用"
-            !features.isLogiAvailable() -> "原生库未就绪，无法枚举设备"
-            devices.isEmpty() -> "未检测到罗技设备（未配对、HID 未授权 或 设备离线）"
+            !features.isBatteryAvailable() -> "原生库未就绪，无法枚举设备"
+            devices.isEmpty() -> "未检测到电池设备（未配对、HID 未授权 或 设备离线）"
             else -> null
         }
 
     ArrowPreference(
-        title = "罗技设备列表",
+        title = "电池设备列表",
         summary = statusHint ?: "共 " + devices.size + " 台；点击设备名可修改显示名",
         endActions = {
             TextButton(
                 text = "立即刷新",
-                onClick = { features?.refreshLogiNow() },
+                onClick = { features?.refreshBatteryNow() },
             )
         },
     )
@@ -206,15 +206,15 @@ private fun LogiDeviceListSection(features: DesktopOverlayFeatures?) {
         devices.forEach { device ->
             ArrowPreference(
                 title = device.deviceName,
-                summary = logiDeviceSummary(device),
+                summary = batteryDeviceSummary(device),
                 onClick = {
                     editing = device
                     editText = device.deviceName
                 },
                 endActions = {
                     Text(
-                        text = logiSummaryGlyph(device),
-                        color = logiSummaryColor(device),
+                        text = batterySummaryGlyph(device),
+                        color = batterySummaryColor(device),
                         fontSize = 20.sp,
                         fontFamily = iconFontFamily,
                     )
@@ -241,7 +241,7 @@ private fun LogiDeviceListSection(features: DesktopOverlayFeatures?) {
                 TextButton(
                     text = "保存",
                     onClick = {
-                        features?.setLogiDeviceName(target.deviceId, editText)
+                        features?.setBatteryDeviceName(target.deviceId, editText)
                         editing = null
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -257,7 +257,7 @@ private fun LogiDeviceListSection(features: DesktopOverlayFeatures?) {
 }
 
 /** 设备行摘要：电量、充电状态与在线状态。 */
-private fun logiDeviceSummary(device: LogiBatteryDevice): String {
+private fun batteryDeviceSummary(device: BatteryDevice): String {
     val battery =
         when {
             !device.hasBattery || device.batteryPercent < 0 -> "无电量数据"
