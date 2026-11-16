@@ -78,6 +78,8 @@ internal object SuperIslandDisplayPipeline {
      * @param textFallback 正文三级回退的兜底值：同上。
      * @param preGuard 图片入库**前后**各调一次的前置守卫，返回 false 则中止
      *   （列表模式的「active 条目仍是本条目」判定，等价于原实现的两次 active 检查）。
+     * @param contentKey 本条展示内容的标识（由调用方经 `ReplicaTtlRegistry.contentKeyOf` 计算）；
+     *   越过全部守卫后登记为「正在展示」，关闭时据此识别同一份内容的重复驱动。
      * @param extraGuard 竞态复检守卫，返回 true 则中止。
      *   浮窗/普通通知通道为 `ReplicaTtlRegistry.isSourceRecentlyClosed`（修复 nextVersion 被
      *   `computeIfAbsent` 重建导致的版本误判）；列表通道无此守卫（传 null，与原实现一致）。
@@ -108,6 +110,8 @@ internal object SuperIslandDisplayPipeline {
         val titleFallback: String? = "未知",
         val textFallback: String? = "未知",
         val preGuard: (() -> Boolean)? = null,
+        /** 本条展示内容的标识；由 `ReplicaTtlRegistry.contentKeyOf` 计算。 */
+        val contentKey: String? = null,
         val extraGuard: (suspend () -> Boolean)? = null,
         val onContentReady: (suspend (DisplayContent) -> Boolean)? = null,
         val registerMappingBeforeSend: Boolean = true,
@@ -202,6 +206,10 @@ internal object SuperIslandDisplayPipeline {
 
         // ③ 钩子：浮窗通道在此登记条目（含 overlay 创建）并登记映射，返回 entryExistedBefore
         val entryExistedBefore = request.onContentReady?.invoke(content) ?: false
+
+        // 内容已越过全部守卫：登记为「正在展示」，关闭时据此识别同一份内容的重复驱动。
+        // 标识由调用方按入参算好并传下，保证与关闭时读取的口径一致
+        request.contentKey?.let { SuperIslandSourceStore.setLastShownContentKey(sourceId, it) }
 
         if (request.registerMappingBeforeSend) {
             SuperIslandSourceStore.addSourceIdMapping(sourceId, sourceId)

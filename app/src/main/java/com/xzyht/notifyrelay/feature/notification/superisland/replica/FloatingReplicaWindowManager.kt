@@ -92,6 +92,7 @@ object FloatingReplicaWindowManager {
         isLocked: Boolean = false,
         isRestoring: Boolean = false,
         mediaProgress: MediaProgress? = null,
+        contentKey: String? = null,
     ) {
         runReplicaCatching(TAG, "显示浮窗") {
             if (!isFloatingWindowEnabled(context)) {
@@ -135,13 +136,15 @@ object FloatingReplicaWindowManager {
                                 channel = SuperIslandDisplayPipeline.Channel.FLOATING,
                                 tag = TAG,
                                 isRestoring = isRestoring,
+                                contentKey = contentKey,
                                 requireEntryExistedBefore = true,
                                 titleFallback = null,
                                 textFallback = null,
                                 // 竞态守卫：协程 nextVersion 可能在 dismissBySource 的 removeSourceIdMappings 之后执行，
                                 // 导致版本被 computeIfAbsent 重建、isLatestVersion 误判通过。
-                                // 此处复检 isSourceRecentlyClosed（dismissBySource 已 markSourceClosed），命中即中止。
-                                extraGuard = { ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId) },
+                                // 此处复检关闭窗口（dismissBySource 已登记关闭），命中即中止；
+                                // 浮窗通道与展示入口同口径，认全部关闭原因
+                                extraGuard = { ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId, contentKey) },
                                 abortMessage = "在异步发送期间被关闭，中止显示",
                                 skipRefreshMessage = "内容无变更，跳过系统通知刷新，仅重置内部撤回计时器",
                                 onContentReady = { content ->
@@ -183,13 +186,14 @@ object FloatingReplicaWindowManager {
 
     fun toggleFloating(
         context: Context,
-        sourceId: String,
-        title: String?,
-        text: String?,
-        paramV2Raw: String? = null,
-        picMap: Map<String, String>? = null,
-        appName: String? = null,
+        subscription: ReplicaSubscription,
     ) {
+        val sourceId = subscription.sourceId
+        val title = subscription.title
+        val text = subscription.text
+        val paramV2Raw = subscription.paramV2Raw
+        val picMap = subscription.picMap
+        val appName = subscription.appName
         if (!isFloatingWindowEnabled(context)) {
             if (SuperIslandConfigUtils.isNotificationListMode(context)) {
                 FloatingReplicaListModeManager.switchNotificationInList(context.applicationContext)

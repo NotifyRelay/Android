@@ -5,6 +5,7 @@ import android.content.Context
 import android.content.Intent
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.replica.FloatingReplicaManager
+import com.xzyht.notifyrelay.feature.notification.superisland.replica.ReplicaSubscription
 import notifyrelay.base.log.Logger
 import notifyrelay.domain.feature.notification.superisland.contract.SuperIslandActions
 
@@ -70,12 +71,14 @@ class NotificationBroadcastReceiver : BroadcastReceiver() {
                 Logger.i("超级岛", "接收到切换广播，浮窗=$floatingWindowEnabled, 列表=${SuperIslandConfigUtils.isNotificationListMode(context)}, sourceId=$sourceId")
                 FloatingReplicaManager.toggleFloating(
                     context,
-                    sourceId,
-                    title,
-                    text,
-                    paramV2Raw,
-                    if (picMap.isEmpty()) null else picMap,
-                    appName,
+                    ReplicaSubscription(
+                        sourceId = sourceId,
+                        title = title,
+                        text = text,
+                        paramV2Raw = paramV2Raw,
+                        picMap = if (picMap.isEmpty()) null else picMap,
+                        appName = appName,
+                    ),
                 )
             }
             else -> {

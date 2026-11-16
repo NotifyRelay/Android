@@ -113,7 +113,7 @@ class NotifyRelayNotificationListenerService : NotificationListenerService() {
                 if (latestMediaSbn?.key == sbn.key) {
                     latestMediaSbn = null
                 }
-                // 关闭对应的浮窗条目，像远程通知一样立即结束
+                // 关闭对应的胶囊展示：这一份投递结束了，来源随后重新投递的新内容仍应正常展示
                 val sbnKey = getNotificationKey(sbn)
                 FloatingReplicaManager.dismissBySource(sbnKey)
                 Logger.i(TAG, "媒体通知被移除，关闭对应的浮窗条目: sbnKey=$sbnKey")

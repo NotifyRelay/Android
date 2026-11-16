@@ -6,6 +6,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateListOf
 import github.xzynine.superislandui.model.components.MediaProgress
 import github.xzynine.superislandui.model.core.ParamV2
+import notifyrelay.domain.feature.notification.superisland.replica.ReplicaTiming
 import java.util.concurrent.ConcurrentHashMap
 import kotlin.math.abs
 
@@ -16,8 +17,11 @@ import kotlin.math.abs
 class FloatingWindowManager {
     // 常量定义
     private val expandedDurationMs = 3000L // 展开态持续时间
-    private val autoDismissDurationMs = 12000L // 自动移除时间（非媒体类型）
-    private val autoDismissDurationMsMedia = 45_000L // 媒体类型自动移除时间，需长于 30s 轮询刷新周期
+
+    // 非媒体条目的自动移除时限：一次性展示，无需与刷新周期对齐；
+    // 媒体条目用 ReplicaTiming.MEDIA_VIEW_TTL_MS，必须长于来源刷新周期
+    private val nonMediaViewTtlMs = 12_000L
+
     private val heightUpdateThresholdPx = 4 // 高度变化去抖阈值，抑制形变动画期间的逐帧写入
 
     // 用于处理延迟任务的Handler
@@ -169,7 +173,7 @@ class FloatingWindowManager {
     ) {
         scheduleRemoval(
             key,
-            if (business == "media") autoDismissDurationMsMedia else autoDismissDurationMs,
+            if (business == "media") ReplicaTiming.MEDIA_VIEW_TTL_MS else nonMediaViewTtlMs,
         )
     }
 

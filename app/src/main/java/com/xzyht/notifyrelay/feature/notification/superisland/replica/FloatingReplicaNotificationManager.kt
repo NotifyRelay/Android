@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Build
 import com.xzyht.notifyrelay.feature.notification.superisland.config.SuperIslandConfigUtils
 import com.xzyht.notifyrelay.feature.notification.superisland.floating.FloatingWindowManager
+import com.xzyht.notifyrelay.feature.notification.superisland.formatter.SuperIslandDataFormatter
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.LiveUpdatesNotificationManager
 import com.xzyht.notifyrelay.feature.notification.superisland.notification.NotificationGenerator
 import com.xzyht.notifyrelay.feature.notification.superisland.pipeline.SuperIslandDisplayPipeline
@@ -15,11 +16,15 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import notifyrelay.base.log.Logger
 import notifyrelay.domain.feature.notification.superisland.notification.SuperIslandNotificationIds
+import notifyrelay.domain.feature.notification.superisland.replica.ReplicaTiming
 import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatching
 import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCatchingSuspend
 
 object FloatingReplicaNotificationManager {
     private const val TAG = "超级岛通知管理"
+
+    /** 非媒体条目的兜底撤回时限：一次性展示，无需与刷新周期对齐。 */
+    private const val NON_MEDIA_VIEW_TTL_MS = 12_000L
 
     fun sendNotification(
         context: Context,
@@ -29,6 +34,7 @@ object FloatingReplicaNotificationManager {
         paramV2Raw: String?,
         picMap: Map<String, String>?,
         appName: String?,
+        contentKey: String? = null,
     ) {
         CoroutineScope(Dispatchers.Main).launch {
             runReplicaCatchingSuspend(TAG, "发送通知") {
@@ -46,10 +52,12 @@ object FloatingReplicaNotificationManager {
                                 appName = appName,
                                 channel = SuperIslandDisplayPipeline.Channel.NOTIFICATION,
                                 tag = TAG,
+                                contentKey = contentKey,
                                 // 竞态守卫：协程 nextVersion 可能在 dismissBySource 的 removeSourceIdMappings 之后执行，
                                 // 导致版本被 computeIfAbsent 重建、isLatestVersion 误判通过。
-                                // 此处复检 isSourceRecentlyClosed（dismissBySource 已 markSourceClosed），命中即中止。
-                                extraGuard = { ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId) },
+                                // 此处复检关闭窗口（dismissBySource 已登记关闭），命中即中止；
+                                // 与展示入口同口径，只拦来源驱动的关闭
+                                extraGuard = { ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId, contentKey) },
                                 abortMessage = "在异步发送期间被关闭，中止发送",
                                 skipRefreshMessage = "内容无变更，跳过系统通知刷新",
                                 registerMappingBeforeSend = true,
@@ -63,7 +71,9 @@ object FloatingReplicaNotificationManager {
                 SuperIslandSourceStore.cancelTimeoutJob(sourceId)
                 val timeoutJob =
                     CoroutineScope(Dispatchers.Main).launch {
-                        delay(30_000L)
+                        // 媒体撤回时限长于来源刷新周期：相等时每轮刷新前都先撤回一次，
+                        // 表现为胶囊周期性消失后再被刷新拉回来。非媒体条目沿用原有较短的时限
+                        delay(if (SuperIslandDataFormatter.isMediaType(null, paramV2Raw)) ReplicaTiming.MEDIA_VIEW_TTL_MS else NON_MEDIA_VIEW_TTL_MS)
                         runReplicaCatching(TAG, "超时自动移除通知") {
                             FloatingReplicaManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
                         }

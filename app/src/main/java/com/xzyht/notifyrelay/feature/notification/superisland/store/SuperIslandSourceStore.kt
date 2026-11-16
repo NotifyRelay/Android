@@ -45,6 +45,11 @@ internal object SuperIslandSourceStore {
 
     private val sourceVersions = ConcurrentHashMap<String, AtomicLong>()
 
+    // 最近一次被接受的展示内容标识（sourceId → 标识）。
+    // 关闭时据此区分「同一份内容被刷新周期重复驱动」与「来源真正换了内容」：
+    // 前者必须继续被关闭窗口挡住，后者应允许重新展示。
+    private val lastShownContentKeys = ConcurrentHashMap<String, String>()
+
     // 上次成功发出的系统通知内容指纹（sourceId → 指纹）。
     // 保活包内容无变更时跳过 notify()，仅重置内部撤回计时器；通知撤回时同步清理，保证撤回后会重新发出
     private val lastNotificationFingerprints = ConcurrentHashMap<String, String>()
@@ -148,6 +153,7 @@ internal object SuperIslandSourceStore {
         entryKeyToNotificationId.clear()
         sourceIdToNotificationIds.clear()
         sourceVersions.clear()
+        lastShownContentKeys.clear()
         lastNotificationFingerprints.clear()
         sourceIdToInjectionMode.clear()
         hiddenEntries.clear()
@@ -188,6 +194,7 @@ internal object SuperIslandSourceStore {
             entryKeyToNotificationId.remove(entryKey)
         }
         sourceVersions.remove(sourceId)
+        lastShownContentKeys.remove(sourceId)
         lastNotificationFingerprints.remove(sourceId)
         sourceIdToInjectionMode.remove(sourceId)
     }
@@ -234,6 +241,17 @@ internal object SuperIslandSourceStore {
     fun removeNotificationFingerprint(sourceId: String) {
         lastNotificationFingerprints.remove(sourceId)
     }
+
+    /** 登记最近一次被接受的展示内容标识。 */
+    fun setLastShownContentKey(
+        sourceId: String,
+        contentKey: String,
+    ) {
+        lastShownContentKeys[sourceId] = contentKey
+    }
+
+    /** 最近一次被接受的展示内容标识；没有展示记录时为 null。 */
+    fun lastShownContentKey(sourceId: String): String? = lastShownContentKeys[sourceId]
 
     /** 记录本次发送所用的注入模式（发送成功后调用） */
     fun setInjectionMode(

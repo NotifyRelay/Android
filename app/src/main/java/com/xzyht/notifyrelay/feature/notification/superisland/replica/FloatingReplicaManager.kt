@@ -44,39 +44,48 @@ object FloatingReplicaManager {
             }
         }
 
-        val isRecentlyClosed = ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId)
+        // 关闭标记对三个通道都生效：展示前清除标记会让「媒体通知被移除」之后的同名重发
+        // 绕过关闭意图，胶囊被重新拉起。屏蔽按内容身份判定，来源换了内容即解除。
+        val contentKey = ReplicaTtlRegistry.contentKeyOf(title, text, paramV2Raw)
 
-        if (SuperIslandConfigUtils.isFloatingWindowEnabled(context)) {
-            if (isRecentlyClosed) {
-                Logger.i(TAG, "超级岛: sourceId=$sourceId 在30秒内被关闭过，跳过浮窗展示")
-                return
-            }
-            cacheDisplay()
-            FloatingReplicaWindowManager.showFloatingInternal(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked, false, mediaProgress)
-        } else if (isRecentlyClosed && SuperIslandListManager.containsSourceId(sourceId)) {
-            Logger.i(TAG, "超级岛: sourceId=$sourceId 在30秒内被关闭过且条目仍在列表中，跳过展示")
+        if (ReplicaTtlRegistry.isSourceRecentlyClosed(sourceId, contentKey)) {
+            Logger.i(TAG, "超级岛: sourceId=$sourceId 的这一份内容已关闭，跳过展示")
             return
-        } else if (SuperIslandConfigUtils.isNotificationListMode(context)) {
-            cacheDisplay()
-            ReplicaTtlRegistry.removeClosedSource(sourceId)
-            FloatingReplicaListModeManager.showFloatingListMode(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked)
-        } else {
-            cacheDisplay()
-            ReplicaTtlRegistry.removeClosedSource(sourceId)
-            FloatingReplicaNotificationManager.sendNotification(context, sourceId, title, text, paramV2Raw, picMap, appName)
+        }
+
+        when {
+            SuperIslandConfigUtils.isFloatingWindowEnabled(context) -> {
+                cacheDisplay()
+                FloatingReplicaWindowManager.showFloatingInternal(
+                    context = context,
+                    sourceId = sourceId,
+                    title = title,
+                    text = text,
+                    paramV2Raw = paramV2Raw,
+                    picMap = picMap,
+                    appName = appName,
+                    isLocked = isLocked,
+                    isRestoring = false,
+                    mediaProgress = mediaProgress,
+                    contentKey = contentKey,
+                )
+            }
+            SuperIslandConfigUtils.isNotificationListMode(context) -> {
+                cacheDisplay()
+                FloatingReplicaListModeManager.showFloatingListMode(context, sourceId, title, text, paramV2Raw, picMap, appName, isLocked)
+            }
+            else -> {
+                cacheDisplay()
+                FloatingReplicaNotificationManager.sendNotification(context, sourceId, title, text, paramV2Raw, picMap, appName, contentKey)
+            }
         }
     }
 
     fun toggleFloating(
         context: Context,
-        sourceId: String,
-        title: String?,
-        text: String?,
-        paramV2Raw: String? = null,
-        picMap: Map<String, String>? = null,
-        appName: String? = null,
+        subscription: ReplicaSubscription,
     ) {
-        FloatingReplicaWindowManager.toggleFloating(context, sourceId, title, text, paramV2Raw, picMap, appName)
+        FloatingReplicaWindowManager.toggleFloating(context, subscription)
     }
 
     fun closeByNotificationId(notificationId: Int) {
@@ -111,14 +120,21 @@ object FloatingReplicaManager {
         reason: FloatingWindowManager.RemovalReason = FloatingWindowManager.RemovalReason.REMOTE,
     ) {
         runReplicaCatching(TAG, "按来源关闭浮窗") {
-            if (ReplicaTtlRegistry.isSourceRecentlyClosedWithinMinute(sourceId)) {
-                return@runReplicaCatching
-            }
-
             if (reason != FloatingWindowManager.RemovalReason.HIDDEN) {
-                ReplicaTtlRegistry.markSourceClosed(sourceId)
                 // HIDDEN 保留缓存：隐藏是可恢复的临时状态，内容仍然活跃、切换通道时仍应展示
                 ReplicaDisplayCache.remove(sourceId)
+            }
+
+            // 关闭意图登记：只有「这份内容到此为止」的关闭才登记。
+            // TIMEOUT 是展示侧的兜底撤回，来源若仍在刷新就必须能重新展示，
+            // 登记下来会让活跃来源被误判为已结束；HIDDEN 是用户临时隐藏，不应解除内容活跃。
+            if (reason != FloatingWindowManager.RemovalReason.HIDDEN && reason != FloatingWindowManager.RemovalReason.TIMEOUT) {
+                // 记下关闭时正在展示的内容：来源随后重发同一份内容时继续挡住，
+                // 换过内容说明来源重新开始
+                ReplicaTtlRegistry.markSourceClosed(
+                    sourceId = sourceId,
+                    contentKey = SuperIslandSourceStore.lastShownContentKey(sourceId),
+                )
             }
 
             SuperIslandSourceStore.cancelTimeoutJob(sourceId)
@@ -224,6 +240,8 @@ object FloatingReplicaManager {
 
         snapshot.forEach { entry ->
             try {
+                // 重建表达「现在就按新通道展示」，与关闭意图同源，不受关闭窗口拦截
+                ReplicaTtlRegistry.removeClosedSource(entry.sourceId)
                 showFloating(
                     context = context,
                     sourceId = entry.sourceId,
