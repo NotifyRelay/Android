@@ -76,12 +76,28 @@ internal class OverlaySceneBridge {
         Logger.i(TAG, "矢量场景服务已启动 管道=" + SCENE_PIPE_NAME)
     }
 
-    /** 停止服务端并释放录制场景。 */
+    /**
+     * 停止服务端并释放录制场景。
+     *
+     * 本方法在组合树的释放回调里执行，即界面线程上：
+     * 录制场景的关闭涉及原生资源，不能在此直接同步等待，
+     * 否则一旦底层 I/O 未收敛就会拖住整帧重组。
+     */
     fun close() {
         scope.cancel()
         server.close()
-        recorder?.close()
+        val stale = recorder
         recorder = null
+        Thread(
+            {
+                runCatching { stale?.close() }
+                    .onFailure { Logger.w(TAG, "释放录制场景失败", it) }
+            },
+            "overlay-scene-release",
+        ).apply {
+            isDaemon = true
+            start()
+        }
         Logger.i(TAG, "矢量场景服务已停止")
     }
 

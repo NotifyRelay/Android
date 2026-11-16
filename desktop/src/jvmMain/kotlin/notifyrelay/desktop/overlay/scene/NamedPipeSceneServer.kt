@@ -67,6 +67,15 @@ internal class NamedPipeSceneServer(
     private var worker: Thread? = null
     private var pipe: WinNT.HANDLE? = null
 
+    /**
+     * 监听线程当前持有的实例句柄。
+     *
+     * 与 [pipe] 的区别：构造阶段 [pipe] 尚未发布，
+     * 而关闭要在任意时刻都能打断阻塞中的 CreateNamedPipe/ConnectNamedPipe。
+     */
+    @Volatile
+    private var workerHandle: WinNT.HANDLE? = null
+
     // 安全描述符与属主结构必须与管道同生命周期，否则指向已释放内存
     private var securityDescriptor: Pointer? = null
     private var securityAttributes: WinBase.SECURITY_ATTRIBUTES? = null
@@ -138,21 +147,35 @@ internal class NamedPipeSceneServer(
         handle: WinNT.HANDLE,
         header: ByteArray,
     ): Boolean {
-        val written = IntByReference()
-        if (!kernel32.WriteFile(handle, header, header.size, written, null)) {
-            val error = kernel32.GetLastError()
-            if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA) {
-                Logger.w(TAG, "写入报文头失败 错误码=" + error)
+        val io = OverlappedIo()
+        try {
+            val written = IntByReference()
+            // 头体积远小于管道缓冲，用 JNA 的数组重载即可，无需原生地址
+            val started = kernel32.WriteFile(handle, header, header.size, written, io.overlapped)
+            if (!started) {
+                val error = kernel32.GetLastError()
+                if (error == ERROR_BROKEN_PIPE || error == ERROR_NO_DATA) return false
+                if (error != ERROR_IO_PENDING) {
+                    Logger.w(TAG, "写入报文头失败 错误码=" + error)
+                    return false
+                }
+                // 排队成功但未完成：等内核写完或超时
+                if (!awaitOverlapped(handle, io, written)) {
+                    cancelPendingWrite(handle, io.overlapped)
+                    return false
+                }
             }
-            return false
+            return written.value == header.size
+        } finally {
+            io.close()
         }
-        return written.value == header.size
     }
 
     /**
      * 从原生地址写满 [count] 字节。
      *
      * 大块写在字节模式管道的缓冲写满后会只写入一部分，必须循环推进偏移。
+     * 每次写都有超时：对端停止读取时管道会写满，同步写会永久阻塞。
      */
     private fun writeAll(
         handle: WinNT.HANDLE,
@@ -161,20 +184,70 @@ internal class NamedPipeSceneServer(
     ): Boolean {
         var offset = 0
         while (offset < count) {
-            val written = IntByReference()
-            if (!pipeWrite.WriteFile(handle, data.share(offset.toLong()), count - offset, written, null)) {
-                val error = kernel32.GetLastError()
-                if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA) {
-                    Logger.w(TAG, "写入管道失败 错误码=" + error)
+            val io = OverlappedIo()
+            try {
+                val written = IntByReference()
+                val started = pipeWrite.WriteFile(handle, data.share(offset.toLong()), count - offset, written, io.overlapped)
+                if (!started) {
+                    val error = kernel32.GetLastError()
+                    if (error == ERROR_BROKEN_PIPE || error == ERROR_NO_DATA) return false
+                    if (error != ERROR_IO_PENDING) {
+                        Logger.w(TAG, "写入管道失败 错误码=" + error)
+                        return false
+                    }
+                    if (!awaitOverlapped(handle, io, written)) {
+                        cancelPendingWrite(handle, io.overlapped)
+                        Logger.w(TAG, "写入管道超时 " + WRITE_TIMEOUT_MS + "ms，对端停止读取")
+                        return false
+                    }
                 }
-                return false
+                if (written.value <= 0) {
+                    return false
+                }
+                offset += written.value
+            } finally {
+                io.close()
             }
-            if (written.value <= 0) {
-                return false
-            }
-            offset += written.value
         }
         return true
+    }
+
+    /**
+     * 等待重叠写完成。
+     *
+     * 用完成事件而非直接调用 GetOverlappedResult：后者在 WAIT_TIMEOUT 时
+     * 仍需由调用方决定放弃，事件模型能把超时与完成统一到一次等待里。
+     */
+    private fun awaitOverlapped(
+        handle: WinNT.HANDLE,
+        io: OverlappedIo,
+        written: IntByReference,
+    ): Boolean {
+        if (!io.hasEvent) return false
+        val wait = kernel32.WaitForSingleObject(io.overlapped.hEvent, WRITE_TIMEOUT_MS.toInt())
+        if (wait != WAIT_OBJECT_0) {
+            if (wait != WAIT_TIMEOUT) {
+                Logger.w(TAG, "等待写入完成失败 结果=" + wait)
+            }
+            return false
+        }
+        return overlappedApi.GetOverlappedResult(handle, io.overlapped, written, false)
+    }
+
+    /**
+     * 取消尚未完成的重叠写再放行后续关闭。
+     *
+     * 未完成的 I/O 会让 CloseHandle 停在内核里等它结束，
+     * 而写本身正等对端读取，两者互锁会永久卡住调用线程。
+     */
+    private fun cancelPendingWrite(
+        handle: WinNT.HANDLE,
+        overlapped: WinBase.OVERLAPPED,
+    ) {
+        overlappedApi.CancelIoEx(handle, overlapped)
+        val written = IntByReference()
+        // 取消后由内核收尾，等它把请求置为完成才能安全复用该结构
+        overlappedApi.GetOverlappedResult(handle, overlapped, written, true)
     }
 
     /** 启动监听线程。 */
@@ -186,6 +259,12 @@ internal class NamedPipeSceneServer(
             }
     }
 
+    /**
+     * 停止服务端。
+     *
+     * 不阻塞调用线程：关闭会打断在途 I/O，而被打断的 I/O 未必能立刻从内核返回，
+     * 若在界面线程上等待就会拖住整帧的重组。等待监听线程退出转由独立线程承担。
+     */
     override fun close() {
         running.set(false)
 
@@ -193,17 +272,39 @@ internal class NamedPipeSceneServer(
         pendingControl.set(null)
         activePipe = null
 
-        // 先关句柄：无客户端时线程阻塞在 ConnectNamedPipe 上，
-        // 仅置标志位无法让它返回，必须由关闭句柄打断。
-        closePipe()
+        // 先取消在途 I/O：未完成的写会让随后的 CloseHandle 停在内核里等它结束
+        cancelInflight()
 
-        // 必须等监听线程真正退出：它退出时还会走一次会话收尾，
-        // 若此时调用方已开始下一轮（测试里同名管道重建），两个会话会互相干扰。
-        worker?.join(CLOSE_JOIN_TIMEOUT_MS)
-        if (worker?.isAlive == true) {
-            Logger.w(TAG, "监听线程未在 " + CLOSE_JOIN_TIMEOUT_MS + "ms 内退出")
+        // 再关句柄：无客户端时线程阻塞在 ConnectNamedPipe 上，
+        // 仅置标志位无法让它返回，必须由关闭句柄打断。
+        val current = pipe ?: workerHandle
+        closePipe(current)
+
+        // 只发出等待请求，不在此处 join
+        Thread(
+            {
+                worker?.join(CLOSE_JOIN_TIMEOUT_MS)
+                if (worker?.isAlive == true) {
+                    Logger.w(TAG, "监听线程未在 " + CLOSE_JOIN_TIMEOUT_MS + "ms 内退出")
+                }
+            },
+            "overlay-scene-close",
+        ).apply {
+            isDaemon = true
+            start()
         }
-        worker = null
+    }
+
+    /**
+     * 取消会话中未完成的管道 I/O。
+     *
+     * 只对当前活动句柄生效；无会话时无操作。
+     */
+    private fun cancelInflight() {
+        val handle = activePipe ?: workerHandle
+        if (handle == null) return
+        runCatching { overlappedApi.CancelIoEx(handle, null) }
+            .onFailure { Logger.w(TAG, "取消管道 I/O 失败", it) }
     }
 
     // ======== 会话主循环 ========
@@ -216,6 +317,7 @@ internal class NamedPipeSceneServer(
                 continue
             }
             pipe = handle
+            workerHandle = handle
             try {
                 serveSession(handle)
             } catch (t: Throwable) {
@@ -232,13 +334,31 @@ internal class NamedPipeSceneServer(
      * 握手与订阅都设超时，避免连上却不说话的客户端长期占住唯一实例。
      */
     private fun serveSession(handle: WinNT.HANDLE) {
-        if (!kernel32.ConnectNamedPipe(handle, null)) {
-            val error = kernel32.GetLastError()
-            // ERROR_PIPE_CONNECTED 表示客户端在 ConnectNamedPipe 之前就已连上，属正常
-            if (error != ERROR_PIPE_CONNECTED) {
-                Logger.w(TAG, "等待客户端连接失败 错误码=" + error)
-                return
+        // 重叠句柄上 ConnectNamedPipe 必须带 OVERLAPPED：
+        // 传 null 会让内核按同步语义处理，句柄被关闭时该调用无法返回。
+        val connectIo = OverlappedIo()
+        try {
+            if (!kernel32.ConnectNamedPipe(handle, connectIo.overlapped)) {
+                val error = kernel32.GetLastError()
+                when (error) {
+                    // 客户端在 ConnectNamedPipe 之前就已连上，属正常
+                    ERROR_PIPE_CONNECTED -> Unit
+                    ERROR_IO_PENDING -> {
+                        // 等待连接；关闭句柄会让等待立刻返回
+                        val wait = kernel32.WaitForSingleObject(connectIo.overlapped.hEvent, CONNECT_WAIT_MS.toInt())
+                        if (wait != WAIT_OBJECT_0) {
+                            Logger.i(TAG, "等待客户端连接结束 结果=" + wait)
+                            return
+                        }
+                    }
+                    else -> {
+                        Logger.w(TAG, "等待客户端连接失败 错误码=" + error)
+                        return
+                    }
+                }
             }
+        } finally {
+            connectIo.close()
         }
 
         val reader = LineReader(handle)
@@ -382,6 +502,7 @@ internal class NamedPipeSceneServer(
     private fun teardown(handle: WinNT.HANDLE) {
         subscribed.set(false)
         clientSize.set(null)
+        if (workerHandle === handle) workerHandle = null
 
         // 会话结束即清掉待发内容，避免旧报文串入新会话
         pendingControl.set(null)
@@ -401,7 +522,7 @@ internal class NamedPipeSceneServer(
         val handle =
             kernel32.CreateNamedPipe(
                 fullName,
-                PIPE_ACCESS_DUPLEX,
+                PIPE_ACCESS_DUPLEX or FILE_FLAG_OVERLAPPED,
                 PIPE_TYPE_BYTE or PIPE_READMODE_BYTE or PIPE_WAIT,
                 MAX_INSTANCES,
                 BUFFER_SIZE,
@@ -567,8 +688,15 @@ internal class NamedPipeSceneServer(
         /** 单次写入的等待上限；超时即认为对端停止读取。 */
         private const val WRITE_TIMEOUT_MS = 3_000L
 
+        /** WaitForSingleObject 的返回结果。 */
+        private const val WAIT_OBJECT_0 = 0
+        private const val WAIT_TIMEOUT = 258
+
         private const val HANDSHAKE_TIMEOUT_MS = 10_000L
         private const val POLL_INTERVAL_MS = 250L
+
+        /** 等待客户端连接的上限；超时即重建实例，避免空实例长期占用。 */
+        private const val CONNECT_WAIT_MS = 60_000L
 
         /** 空闲超过该时长才探查对端连接，避免每个轮询都查询句柄状态。 */
         private const val PROBE_IDLE_MS = 1_500L
@@ -613,7 +741,7 @@ internal interface PipeWriteApi : StdCallLibrary {
         buffer: Pointer,
         bytesToWrite: Int,
         bytesWritten: IntByReference,
-        overlapped: Pointer?,
+        overlapped: WinBase.OVERLAPPED?,
     ): Boolean
 }
 

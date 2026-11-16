@@ -60,13 +60,31 @@ internal class LineReader(
 
             val want = minOf(available.value, chunk.size)
             val read = IntByReference()
-            if (!kernel32.ReadFile(handle, chunk, want, read, null)) {
-                val error = kernel32.GetLastError()
-                if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA) {
-                    Logger.w(TAG, "读取命名管道失败 错误码=" + error)
+            // 句柄以重叠方式打开，ReadFile 必须带 OVERLAPPED：
+            // 传 null 会被内核按同步语义处理，关闭句柄时该调用无法返回。
+            val io = OverlappedIo()
+            try {
+                if (!kernel32.ReadFile(handle, chunk, want, read, io.overlapped)) {
+                    val error = kernel32.GetLastError()
+                    if (error == ERROR_IO_PENDING) {
+                        // 已确认有数据，排队后通常立刻完成；仍按事件等待一次
+                        val wait = kernel32.WaitForSingleObject(io.overlapped.hEvent, READ_WAIT_MS.toInt())
+                        if (wait != WAIT_OBJECT_0 ||
+                            !overlappedApi.GetOverlappedResult(handle, io.overlapped, read, false)
+                        ) {
+                            closed = true
+                            return null
+                        }
+                    } else {
+                        if (error != ERROR_BROKEN_PIPE && error != ERROR_NO_DATA) {
+                            Logger.w(TAG, "读取命名管道失败 错误码=" + error)
+                        }
+                        closed = true
+                        return null
+                    }
                 }
-                closed = true
-                return null
+            } finally {
+                io.close()
             }
             if (read.value <= 0) {
                 // 成功但零字节说明连接已断，不能当空闲重试
@@ -135,6 +153,11 @@ internal class LineReader(
         private const val ERROR_NO_DATA = 232
         private const val ERROR_PIPE_NOT_CONNECTED = 233
         private const val ERROR_MORE_DATA = 234
+        private const val ERROR_IO_PENDING = 997
+
+        /** 单次读取的等待上限；超时即认为对端停止发送。 */
+        private const val READ_WAIT_MS = 1_000L
+        private const val WAIT_OBJECT_0 = 0
 
         private val kernel32: Kernel32 = Kernel32.INSTANCE
     }
