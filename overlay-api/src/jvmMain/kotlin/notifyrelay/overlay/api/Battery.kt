@@ -3,10 +3,10 @@ package notifyrelay.overlay.api
 /**
  * 电池设备快照。
  *
- * 字段与 `device-battery-lib` crate 的 `LbDeviceInfo` 一一对应。
+ * 字段与 `device-battery-lib` crate 的 `BatteryDeviceInfo` 一一对应。
  */
 data class BatteryDevice(
-    /** USB Vendor ID（0x046D = Logitech）。 */
+    /** USB Vendor ID（0x046D = Logitech，0x37D7 = Flydigi）。 */
     val vendorId: Int,
     /** USB Product ID。 */
     val productId: Int,
@@ -14,7 +14,7 @@ data class BatteryDevice(
     val deviceId: String,
     /** 人类可读设备名；可由用户在设置页覆盖。 */
     val deviceName: String,
-    /** 接收器配对槽位：0 = 直连，1..6 = 接收器。 */
+    /** 接收器配对槽位：0 = 直连，1..6 = 接收器；飞智恒为 0。 */
     val slot: Int,
     /** 是否在线。 */
     val online: Boolean,
@@ -59,6 +59,16 @@ interface BatterySource {
         deviceId: String,
         name: String?,
     )
+
+    /**
+     * 从列表中移除一台设备，并清除它的自定义名覆盖。
+     *
+     * 用于清理长期离线、重新枚举也不会再出现的残留条目；对在线设备同样可用。
+     */
+    fun removeDevice(deviceId: String)
+
+    /** 清除全部设备名覆盖，回退到原始名。 */
+    fun clearDeviceNameOverrides()
 
     /** 设备集合变化订阅；返回取消订阅函数。 */
     fun observe(listener: (List<BatteryDevice>) -> Unit): AutoCloseable

@@ -108,6 +108,29 @@ class DesktopBatterySource(
         }
     }
 
+    override fun removeDevice(deviceId: String) {
+        val hadOverride = nameOverrides.remove(deviceId) != null
+        if (hadOverride) {
+            DesktopOverlaySettings.batteryDeviceNameOverrides = nameOverrides.toMap()
+        }
+        val updated = current.filterNot { it.deviceId == deviceId }
+        if (updated.size != current.size) {
+            current = updated
+            notifyListeners()
+        }
+    }
+
+    override fun clearDeviceNameOverrides() {
+        if (nameOverrides.isEmpty()) return
+        nameOverrides.clear()
+        DesktopOverlaySettings.batteryDeviceNameOverrides = emptyMap()
+        val restored = applyOverrides(current)
+        if (restored != current) {
+            current = restored
+            notifyListeners()
+        }
+    }
+
     override fun observe(listener: (List<BatteryDevice>) -> Unit): AutoCloseable {
         listeners.add(listener)
         listener(current)

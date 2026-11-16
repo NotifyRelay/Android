@@ -31,7 +31,7 @@ internal object BatteryNative {
      *
      * @return 设备列表；库不可用或枚举失败时返回空列表
      */
-    fun enumerate(): List<BatteryDevice> {
+    suspend fun enumerate(): List<BatteryDevice> {
         val lib = library ?: return emptyList()
         val snapshot =
             runCatching { lib.enumerateDevices() }.getOrElse {
@@ -48,13 +48,12 @@ internal object BatteryNative {
 
 /** 绑定记录到契约模型的转换：无电量或离线时电量记 -1。 */
 private fun BatteryDeviceInfo.toDomain(): BatteryDevice {
-    val id = deviceId()
     val percent = if (hasBattery && online) percentage.toInt() and 0xFF else -1
     return BatteryDevice(
         vendorId = vendorId.toInt() and 0xFFFF,
         productId = productId.toInt() and 0xFFFF,
-        deviceId = id,
-        deviceName = name.ifBlank { id },
+        deviceId = deviceId,
+        deviceName = name.ifBlank { deviceId },
         slot = slot.toInt() and 0xFF,
         online = online,
         hasBattery = hasBattery,
@@ -62,18 +61,6 @@ private fun BatteryDeviceInfo.toDomain(): BatteryDevice {
         statusRaw = status.rawValue(),
     )
 }
-
-/**
- * 设备稳定标识：`VID:PID:槽位`，与 Windows 侧 `DeviceBatteryDeviceInfo.DeviceId` 同口径。
- *
- * 十六进制小写、无前导零填充差异，供刷新前后比对同一台设备。
- */
-private fun BatteryDeviceInfo.deviceId(): String =
-    (vendorId.toInt() and 0xFFFF).toString(16) +
-        ":" +
-        (productId.toInt() and 0xFFFF).toString(16) +
-        ":" +
-        (slot.toInt() and 0xFF)
 
 /** 充电状态的线协议取值，与 `BatteryDevice.statusRaw` 的约定一致。 */
 internal fun ChargeStatus.rawValue(): Int =
