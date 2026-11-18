@@ -31,12 +31,13 @@ import github.xzynine.superislandui.floating.smallisland.compose.collapsedCapsul
 import kotlinx.coroutines.delay
 import notifyrelay.base.util.BatteryIconConverter
 import notifyrelay.desktop.platform.DesktopOverlaySettings
+import notifyrelay.domain.feature.notification.superisland.replica.ReplicaTiming
 import notifyrelay.overlay.api.BatteryDevice
 import notifyrelay.shared.ui.common.deviceIconFontFamily
 import top.yukonga.miuix.kmp.basic.Text
 
 /** 电池汇总岛展开后的自动收起时长。 */
-private const val BATTERY_EXPAND_MS = 3_000L
+private val BATTERY_EXPAND_MS = ReplicaTiming.EXPANDED_DURATION_MS
 
 /** 展开态的卡片最大宽度：等于状态行去掉左右内边距后的可用宽度。 */
 private val BATTERY_CARD_MAX_WIDTH = 404.dp

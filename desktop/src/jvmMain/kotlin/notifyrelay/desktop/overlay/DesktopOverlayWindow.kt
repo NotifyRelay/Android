@@ -45,6 +45,7 @@ import notifyrelay.desktop.DataLayerDesktop
 import notifyrelay.desktop.platform.DesktopOverlaySettings
 import notifyrelay.domain.feature.media.MediaControlAction
 import notifyrelay.domain.feature.media.MediaSessionSnapshot
+import notifyrelay.domain.feature.notification.superisland.replica.ReplicaTiming
 import notifyrelay.shared.ui.common.DebugFlags
 import top.yukonga.miuix.kmp.basic.Text
 import java.awt.Rectangle
@@ -52,6 +53,9 @@ import kotlin.math.roundToInt
 
 /** 叠加层内容宽度：媒体卡、超级岛卡与通知卡共用同一列宽。 */
 internal val OVERLAY_COLUMN_WIDTH = 420.dp
+
+/** 回收循环的单次休眠下限；避免剩余存活极短时忙等。 */
+private const val SUPER_ISLAND_MIN_WAIT_MS = 50L
 
 /**
  * 叠加层内容：媒体卡 → 超级岛（含电池汇总）→ 通知卡 → 状态元素。
@@ -98,14 +102,16 @@ internal fun OverlayContent(
             )
         }
 
-        // 超级岛超时回收：超过存活时长没有更新的条目自动移除
+        // 超级岛超时回收：每次先清理，再按「最近一条的剩余存活」精确休眠。
+        // 不用固定周期 sleep：条目到达时刻与轮询相位无关，固定周期会让实际存活最长翻倍。
+        // 休眠上限取非媒体时限，保证新条目在空转期间也会被及时判定；下限避免忙等。
         LaunchedEffect(Unit) {
             while (true) {
-                delay(SUPER_ISLAND_TIMEOUT_MS)
-                DesktopOverlayStore.pruneSuperIslands(
-                    nonMediaTimeoutMs = SUPER_ISLAND_TIMEOUT_MS,
-                    mediaTimeoutMs = SUPER_ISLAND_MEDIA_TIMEOUT_MS,
-                )
+                DesktopOverlayStore.pruneSuperIslands()
+                val wait =
+                    DesktopOverlayStore.nextSuperIslandExpiryInMs()
+                        ?: ReplicaTiming.NON_MEDIA_VIEW_TTL_MS
+                delay(wait.coerceIn(SUPER_ISLAND_MIN_WAIT_MS, ReplicaTiming.NON_MEDIA_VIEW_TTL_MS))
             }
         }
     }

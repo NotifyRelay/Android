@@ -4,6 +4,7 @@ import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import notifyrelay.domain.feature.media.MediaSessionSnapshot
+import notifyrelay.domain.feature.notification.superisland.replica.ReplicaExpiry
 import notifyrelay.overlay.api.BalanceSnapshot
 import notifyrelay.overlay.api.BatteryDevice
 import notifyrelay.overlay.api.KeyboardStateSnapshot
@@ -42,9 +43,21 @@ internal object DesktopOverlayStore {
         mediaSessions.remove(deviceUuid)
     }
 
-    /** 超级岛更新。 */
+    /**
+     * 超级岛更新。
+     *
+     * 内容未变时保留原有的 [SuperIslandEntry.updatedAt]：对端会周期性重发同一份
+     * 报文，若每次都当作新内容就会不断推迟超时回收，条目永远不会被清理。
+     * 只有标题、正文、paramV2 或图片真正变化才算一次更新。
+     */
     fun putSuperIsland(entry: SuperIslandEntry) {
-        superIslands[entry.sourceKey] = entry
+        val previous = superIslands[entry.sourceKey]
+        superIslands[entry.sourceKey] =
+            if (previous != null && previous.hasSameContent(entry)) {
+                entry.copy(updatedAt = previous.updatedAt)
+            } else {
+                entry
+            }
     }
 
     /** 超级岛移除。 */
@@ -52,21 +65,43 @@ internal object DesktopOverlayStore {
         superIslands.remove(sourceKey)
     }
 
-    /** 清理超过存活时长没有更新的超级岛；媒体类存活更长（与 Android 轮询周期一致）。 */
-    fun pruneSuperIslands(
-        nonMediaTimeoutMs: Long,
-        mediaTimeoutMs: Long,
-        now: Long = System.currentTimeMillis(),
-    ) {
+    /**
+     * 清理超过展示时限的超级岛。
+     *
+     * 过期判据与时限都取自公共层 [ReplicaExpiry] / [ReplicaTiming]，
+     * 与 Android 端同一口径。
+     *
+     * @return 被移除的条数
+     */
+    fun pruneSuperIslands(now: Long = System.currentTimeMillis()): Int {
         val expired =
             superIslands
                 .filterValues { entry ->
-                    val timeout = if (entry.business == BUSINESS_MEDIA) mediaTimeoutMs else nonMediaTimeoutMs
-                    now - entry.updatedAt > timeout
+                    ReplicaExpiry.isExpired(
+                        updatedAtMs = entry.updatedAt,
+                        isMedia = entry.business == BUSINESS_MEDIA,
+                        nowMs = now,
+                    )
                 }.keys
                 .toList()
         expired.forEach { superIslands.remove(it) }
+        return expired.size
     }
+
+    /**
+     * 距最近一次条目过期还有多少毫秒；无条目时为 null。
+     *
+     * 供回收循环按时唤醒：固定周期轮询会让实际存活最长翻倍，
+     * 因为条目到达时刻与轮询相位无关。
+     */
+    fun nextSuperIslandExpiryInMs(now: Long = System.currentTimeMillis()): Long? =
+        superIslands.values.minOfOrNull { entry ->
+            ReplicaExpiry.remainingMs(
+                updatedAtMs = entry.updatedAt,
+                isMedia = entry.business == BUSINESS_MEDIA,
+                nowMs = now,
+            )
+        }
 
     /**
      * 是否存在正在播放的媒体。
@@ -75,9 +110,19 @@ internal object DesktopOverlayStore {
      */
     fun hasPlayingMedia(): Boolean = mediaSessions.values.any { it.isPlaying }
 
-    /** 入队一条通知卡片。 */
+    /**
+     * 入队一条通知卡片。
+     *
+     * 同一 id 已在队列里时替换而非追加：对端可能重发同一条通知，
+     * 追加会让同一通知占据多个卡片位并各自计时，收起的表现随之错乱。
+     */
     fun addNotification(entry: NotificationEntry) {
-        notifications.add(entry)
+        val index = notifications.indexOfFirst { it.id == entry.id }
+        if (index >= 0) {
+            notifications[index] = entry
+        } else {
+            notifications.add(entry)
+        }
     }
 
     /** 移除一条通知卡片。 */
@@ -161,9 +206,21 @@ internal data class SuperIslandEntry(
     val pics: Map<String, String>?,
     /** 业务标识（如 media / miui_flashlight / battery）。 */
     val business: String? = null,
-    /** 最近更新时间（毫秒），用于超时回收。 */
+    /** 最近一次内容变化时刻（毫秒），用于超时回收。 */
     val updatedAt: Long = System.currentTimeMillis(),
-)
+) {
+    /**
+     * 判断两份条目是否为同一份内容。
+     *
+     * [updatedAt] 不参与比较：它表达的是「内容何时变化」，不是内容本身。
+     */
+    fun hasSameContent(other: SuperIslandEntry): Boolean =
+        title == other.title &&
+            text == other.text &&
+            paramV2Raw == other.paramV2Raw &&
+            business == other.business &&
+            pics == other.pics
+}
 
 /** 一条通知卡片数据。 */
 internal data class NotificationEntry(

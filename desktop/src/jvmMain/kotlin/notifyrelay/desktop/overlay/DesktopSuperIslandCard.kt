@@ -29,19 +29,13 @@ import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
+import notifyrelay.domain.feature.notification.superisland.replica.ReplicaTiming
 import kotlin.math.roundToInt
-
-/** 超级岛展开后的自动收起时长。 */
-private const val SUPER_ISLAND_AUTO_COLLAPSE_MS = 3_000L
 
 /** 展开态卡片宽度（与媒体卡同宽）。 */
 private val SUPER_ISLAND_CARD_WIDTH = 420.dp
 
-/** 超级岛无更新时的存活时长（非媒体类型）。 */
-internal const val SUPER_ISLAND_TIMEOUT_MS = 12_000L
-
-/** 媒体类型超级岛的存活时长（长于轮询刷新周期）。 */
-internal const val SUPER_ISLAND_MEDIA_TIMEOUT_MS = 45_000L
+// 时长不在此定义：见 ReplicaTiming，两端共用同一份时限契约。
 
 /** 仅摘要显示的业务标识（手电筒）：不展开为大岛。 */
 private const val BUSINESS_SUMMARY_ONLY = "miui_flashlight"
@@ -76,7 +70,7 @@ internal fun SuperIslandCard(
             return@LaunchedEffect
         }
         expanded = true
-        delay(SUPER_ISLAND_AUTO_COLLAPSE_MS)
+        delay(ReplicaTiming.EXPANDED_DURATION_MS)
         expanded = false
     }
 

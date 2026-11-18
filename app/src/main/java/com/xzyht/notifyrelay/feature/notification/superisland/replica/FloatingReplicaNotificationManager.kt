@@ -23,9 +23,6 @@ import notifyrelay.domain.feature.notification.superisland.replica.runReplicaCat
 object FloatingReplicaNotificationManager {
     private const val TAG = "超级岛通知管理"
 
-    /** 非媒体条目的兜底撤回时限：一次性展示，无需与刷新周期对齐。 */
-    private const val NON_MEDIA_VIEW_TTL_MS = 12_000L
-
     fun sendNotification(
         context: Context,
         sourceId: String,
@@ -73,7 +70,7 @@ object FloatingReplicaNotificationManager {
                     CoroutineScope(Dispatchers.Main).launch {
                         // 媒体撤回时限长于来源刷新周期：相等时每轮刷新前都先撤回一次，
                         // 表现为胶囊周期性消失后再被刷新拉回来。非媒体条目沿用原有较短的时限
-                        delay(if (SuperIslandDataFormatter.isMediaType(null, paramV2Raw)) ReplicaTiming.MEDIA_VIEW_TTL_MS else NON_MEDIA_VIEW_TTL_MS)
+                        delay(ReplicaTiming.viewTtlMs(SuperIslandDataFormatter.isMediaType(null, paramV2Raw)))
                         runReplicaCatching(TAG, "超时自动移除通知") {
                             FloatingReplicaManager.dismissBySourceInternal(sourceId, FloatingWindowManager.RemovalReason.TIMEOUT)
                         }

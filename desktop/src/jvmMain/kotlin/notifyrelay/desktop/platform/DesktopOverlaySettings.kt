@@ -3,6 +3,7 @@ package notifyrelay.desktop.platform
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import notifyrelay.data.Storage
+import notifyrelay.domain.feature.notification.superisland.replica.ReplicaTiming
 import notifyrelay.overlay.api.KeyMapping
 import notifyrelay.overlay.api.OverlayStyle
 
@@ -208,7 +209,7 @@ object DesktopOverlaySettings {
             )
     }
 
-    private const val DEFAULT_MEDIA_AUTO_COLLAPSE_MS = 3_000L
+    private val DEFAULT_MEDIA_AUTO_COLLAPSE_MS = ReplicaTiming.EXPANDED_DURATION_MS
 
     /** 余额默认关闭：需用户填入凭据后手动开启。 */
     private const val DEFAULT_BALANCE_ENABLED = false

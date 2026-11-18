@@ -15,12 +15,8 @@ import kotlin.math.abs
  */
 @Stable
 class FloatingWindowManager {
-    // 常量定义
-    private val expandedDurationMs = 3000L // 展开态持续时间
-
-    // 非媒体条目的自动移除时限：一次性展示，无需与刷新周期对齐；
-    // 媒体条目用 ReplicaTiming.MEDIA_VIEW_TTL_MS，必须长于来源刷新周期
-    private val nonMediaViewTtlMs = 12_000L
+    // 时限全部取自 ReplicaTiming：两端共用同一份契约，不在此另立数值
+    private val expandedDurationMs = ReplicaTiming.EXPANDED_DURATION_MS
 
     private val heightUpdateThresholdPx = 4 // 高度变化去抖阈值，抑制形变动画期间的逐帧写入
 
@@ -173,7 +169,7 @@ class FloatingWindowManager {
     ) {
         scheduleRemoval(
             key,
-            if (business == "media") ReplicaTiming.MEDIA_VIEW_TTL_MS else nonMediaViewTtlMs,
+            ReplicaTiming.viewTtlMs(business == "media"),
         )
     }
 
