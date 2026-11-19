@@ -6,10 +6,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshots.SnapshotStateMap
@@ -25,11 +22,9 @@ import github.xzynine.superislandui.floating.smallisland.compose.BigIslandCollap
 import github.xzynine.superislandui.floating.smallisland.compose.collapsedCapsuleColor
 import github.xzynine.superislandui.model.core.ParamV2
 import github.xzynine.superislandui.model.core.parseParamV2
-import kotlinx.coroutines.delay
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.jsonObject
-import notifyrelay.domain.feature.notification.superisland.replica.ReplicaTiming
 import kotlin.math.roundToInt
 
 /** 展开态卡片宽度（与媒体卡同宽）。 */
@@ -62,17 +57,12 @@ internal fun SuperIslandCard(
     val summaryOnly =
         paramV2?.business == BUSINESS_SUMMARY_ONLY ||
             entry.paramV2Raw?.contains(BUSINESS_SUMMARY_ONLY) == true
-    var expanded by remember { mutableStateOf(!summaryOnly) }
-    var expandGeneration by remember { mutableLongStateOf(0L) }
-    LaunchedEffect(contentKey, expandGeneration, summaryOnly) {
-        if (summaryOnly) {
-            expanded = false
-            return@LaunchedEffect
-        }
-        expanded = true
-        delay(ReplicaTiming.EXPANDED_DURATION_MS)
-        expanded = false
-    }
+    // 展开态由 SuperIslandExpansionState 统一持有：计时与通知卡片走同一条 OverlayClock，
+    // 不在此用 remember + delay——那会在录制器重建时被清空且协程被取消。
+    val expansion = SuperIslandExpansionHolder.stateFor(entry.sourceKey)
+    // 不在 onDispose 里释放：录制器重建也会触发释放，计时随之归零。
+    // 状态跟随条目本身，由 Store 在条目被移除时清理。
+    val expanded = expansion.isExpanded(summaryOnly, contentKey)
 
     val regionKey = "super-" + entry.sourceKey
     DisposableEffect(regionKey) {
@@ -112,10 +102,7 @@ internal fun SuperIslandCard(
                 Box(
                     Modifier.then(
                         if (interactiveEnabled) {
-                            Modifier.clickable {
-                                expanded = true
-                                expandGeneration++
-                            }
+                            Modifier.clickable { expansion.expand() }
                         } else {
                             Modifier
                         },

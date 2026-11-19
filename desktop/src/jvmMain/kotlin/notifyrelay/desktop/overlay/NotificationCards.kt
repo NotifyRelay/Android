@@ -13,7 +13,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -26,7 +25,6 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.delay
 import notifyrelay.desktop.platform.DesktopIconCodecPort
 import top.yukonga.miuix.kmp.basic.Text
 
@@ -41,9 +39,6 @@ internal const val NOTIFICATION_MAX_EXPANDED = 2
 
 /** 通知卡片宽度，与媒体卡同宽。 */
 internal val NOTIFICATION_CARD_WIDTH = 420.dp
-
-/** 状态巡检间隔：驱动收起与图标到期。 */
-private const val NOTIFICATION_TICK_MS = 200L
 
 /** 卡片圆角。 */
 private val CARD_CORNER = 16.dp
@@ -100,6 +95,13 @@ internal class NotificationCardsState {
         expandedAt[id] = now
     }
 
+    /** 登记某条目开始展开；已登记则保持原起点。 */
+    internal fun markExpanded(id: Long) {
+        if (expandedAt[id] == null && collapsedAt[id] == null) {
+            expandedAt[id] = System.currentTimeMillis()
+        }
+    }
+
     /** 巡检一轮：登记新展开项、推进收起、移除到期图标。 */
     internal fun tick(now: Long) {
         val alive = DesktopOverlayStore.notifications.toList()
@@ -130,22 +132,39 @@ internal class NotificationCardsState {
 }
 
 /**
- * 建立并驱动通知卡片状态。
+ * 通知卡片状态的进程级持有者。
  *
- * 巡检循环只在叠加层内容里启动一次；展开与收起由同一处推进，
- * 因此独占一行的卡片与状态行里的图标始终看到同一份状态。
+ * 状态不能挂在组合树的 remember 上：录制尺寸变化时 OverlaySceneRecorder 会被整体重建，
+ * 组合状态随之归零，展开起始时刻反复被刷新，卡片就永远攒不满收起阈值、
+ * 图标也永远到不了存活上限。计时与渲染因此分家：本对象长期存活，组合树只读它。
  */
-@Composable
-internal fun rememberNotificationCardsState(): NotificationCardsState {
-    val state = remember { NotificationCardsState() }
-    LaunchedEffect(state) {
-        while (true) {
-            delay(NOTIFICATION_TICK_MS)
-            state.tick(System.currentTimeMillis())
-        }
+internal object NotificationCardsHolder {
+    /** 唯一的状态实例。 */
+    val state: NotificationCardsState by lazy { NotificationCardsState() }
+
+    init {
+        // 计时统一由 OverlayClock 推进，本对象不再自建循环
+        OverlayClock.register { now -> state.tick(now) }
     }
-    return state
+
+    /**
+     * 登记新到达的条目。
+     *
+     * 展开起点在此写入而非等下一次 tick：巡检有粒度，等到下一轮才登记
+     * 会让起点晚于真实到达时刻，收起随之整体推迟。
+     */
+    fun onArrived(id: Long) {
+        state.markExpanded(id)
+    }
 }
+
+/**
+ * 取得通知卡片状态。
+ *
+ * 状态与计时都进程级持有（见 NotificationCardsHolder 与 OverlayClock），
+ * 因此录制器重建不会重置收起与移除的进度。
+ */
+@Composable internal fun rememberNotificationCardsState(): NotificationCardsState = NotificationCardsHolder.state
 
 /**
  * 展开态通知卡片列：每条独占一行并居中。

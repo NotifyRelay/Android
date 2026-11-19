@@ -60,9 +60,10 @@ internal object DesktopOverlayStore {
             }
     }
 
-    /** 超级岛移除。 */
+    /** 超级岛移除；同时释放它的展开状态，避免按来源累积。 */
     fun removeSuperIsland(sourceKey: String) {
         superIslands.remove(sourceKey)
+        SuperIslandExpansionHolder.release(sourceKey)
     }
 
     /**
@@ -84,7 +85,7 @@ internal object DesktopOverlayStore {
                     )
                 }.keys
                 .toList()
-        expired.forEach { superIslands.remove(it) }
+        expired.forEach { removeSuperIsland(it) }
         return expired.size
     }
 
@@ -113,8 +114,7 @@ internal object DesktopOverlayStore {
     /**
      * 入队一条通知卡片。
      *
-     * 同一 id 已在队列里时替换而非追加：对端可能重发同一条通知，
-     * 追加会让同一通知占据多个卡片位并各自计时，收起的表现随之错乱。
+     * 同一 id 已在队列里时替换而非追加：对端可能重发同一条通知。
      */
     fun addNotification(entry: NotificationEntry) {
         val index = notifications.indexOfFirst { it.id == entry.id }
@@ -123,6 +123,8 @@ internal object DesktopOverlayStore {
         } else {
             notifications.add(entry)
         }
+        // 展开起点在到达时登记：巡检有粒度，等下一轮会整体推迟收起
+        NotificationCardsHolder.onArrived(entry.id)
     }
 
     /** 移除一条通知卡片。 */
